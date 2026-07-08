@@ -9,6 +9,7 @@ from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
 )
+from dstack._internal.cli.services.endpoint_logs import EndpointLogPoller
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import (
     NO_OFFERS_WARNING,
@@ -178,9 +179,11 @@ class EndpointConfigurator(
         self.apply_env_vars(conf.env, args)
 
     def _follow_endpoint_apply(self, endpoint: Endpoint):
+        log_poller = EndpointLogPoller(api=self.api, endpoint=endpoint)
         try:
             with MultiItemStatus(_get_apply_status(endpoint), console=console) as live:
                 while not _is_endpoint_apply_finished(endpoint):
+                    _print_endpoint_log_batch(log_poller.poll())
                     live.update(
                         get_endpoints_table([endpoint], format_date=local_time),
                         status=_get_apply_status(endpoint),
@@ -190,6 +193,7 @@ class EndpointConfigurator(
                         project_name=self.api.project,
                         name=endpoint.name,
                     )
+                _print_endpoint_log_batch(log_poller.poll())
         except KeyboardInterrupt:
             console.print("\nDetached")
             return
@@ -209,6 +213,11 @@ class EndpointConfigurator(
         _print_finished_endpoint_message(endpoint)
         if endpoint.status == EndpointStatus.FAILED:
             exit(1)
+
+
+def _print_endpoint_log_batch(logs: list[bytes]) -> None:
+    for log in logs:
+        console.out(log.decode(errors="replace"), end="")
 
 
 def _apply_profile(conf: EndpointConfiguration, profile: Profile):
@@ -258,12 +267,8 @@ def _print_endpoint_plan(plan: EndpointPlan, no_fleets: bool = False):
     props.add_row(th("Max price"), _format_max_price(plan))
     props.add_row(th("Preset policy"), plan.preset_policy.value)
     if isinstance(plan.provisioning_plan, EndpointProvisioningPlanPreset):
-        props.add_row(th("Preset"), plan.provisioning_plan.preset_name)
-    elif (
-        isinstance(plan.provisioning_plan, EndpointProvisioningPlanAgent)
-        and plan.provisioning_plan.max_budget is not None
-    ):
-        props.add_row(th("Agent budget"), _format_price_limit(plan.provisioning_plan.max_budget))
+        props.add_row(th("Preset"), plan.provisioning_plan.preset_model)
+        props.add_row(th("Recipe"), plan.provisioning_plan.recipe_id)
     console.print(props)
     console.print()
 

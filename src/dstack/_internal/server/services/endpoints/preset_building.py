@@ -10,12 +10,16 @@ from dstack._internal.server.services import jobs as jobs_services
 from dstack._internal.server.services import runs as runs_services
 from dstack._internal.server.services.endpoints.presets import (
     EndpointPreset,
-    EndpointPresetReplicaSpecGroup,
+    EndpointPresetRecipe,
+    EndpointPresetValidation,
+    EndpointPresetValidationReplica,
+    make_endpoint_preset_recipe_id,
+    set_service_gpu_vendors_from_validations,
 )
 from dstack._internal.utils.common import format_mib_as_gb
 
 
-def build_endpoint_preset_from_run(name: str, run_model: RunModel) -> EndpointPreset:
+def build_endpoint_preset_from_run(run_model: RunModel) -> EndpointPreset:
     run_spec = runs_services.get_run_spec(run_model)
     configuration = run_spec.configuration
     if not isinstance(configuration, ServiceConfiguration):
@@ -24,30 +28,39 @@ def build_endpoint_preset_from_run(name: str, run_model: RunModel) -> EndpointPr
         raise ValueError("endpoint preset service must specify model")
 
     jobs_by_group = _get_current_registered_replica_jobs_by_group(run_model)
-    replica_spec_groups = []
+    validation_replicas = []
     for replica_group in configuration.replica_groups:
         group_name = replica_group.name
         if group_name is None:
-            raise ValueError("endpoint preset cannot be built from unnamed replica groups")
+            raise ValueError("endpoint preset cannot be built from unnamed service replicas")
         group_jobs = jobs_by_group.get(group_name, [])
         if not group_jobs:
             raise ValueError(
                 f"endpoint preset cannot be built: replica group {group_name!r} "
                 "has no registered running replicas"
             )
-        replica_spec_groups.append(
-            EndpointPresetReplicaSpecGroup(
-                name=group_name,
-                resources=replica_group.resources,
-                tested_resources=[_get_job_resources_spec(job) for job in group_jobs],
+        validation_replicas.append(
+            EndpointPresetValidationReplica(
+                resources=[_get_job_resources_spec(job) for job in group_jobs],
             )
         )
 
+    service = configuration.copy(deep=True)
+    service.name = None
+    validation = EndpointPresetValidation(replicas=validation_replicas)
+    set_service_gpu_vendors_from_validations(
+        service=service,
+        validations=[validation],
+    )
     return EndpointPreset(
-        name=name,
         model=configuration.model.name,
-        replica_spec_groups=replica_spec_groups,
-        configuration=configuration.copy(deep=True),
+        recipes=[
+            EndpointPresetRecipe(
+                id=make_endpoint_preset_recipe_id(service),
+                service=service,
+                validations=[validation],
+            )
+        ],
     )
 
 

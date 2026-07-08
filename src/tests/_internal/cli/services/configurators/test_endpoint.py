@@ -20,7 +20,6 @@ from dstack._internal.core.models.endpoints import (
     EndpointConfiguration,
     EndpointPlan,
     EndpointPlanJobOffers,
-    EndpointPlanReplicaSpecGroup,
     EndpointPresetPolicy,
     EndpointProvisioningPlanAgent,
     EndpointProvisioningPlanNone,
@@ -119,15 +118,9 @@ class TestPrintEndpointPlan:
         resources = ResourcesSpec.parse_obj({"gpu": "16GB", "disk": "60GB"})
         plan = _get_endpoint_plan(
             EndpointProvisioningPlanPreset(
-                preset_name="qwen-vllm",
+                preset_model="Qwen/Qwen3-0.6B",
+                recipe_id="vllm-a40",
                 service_name="qwen-endpoint-serving",
-                replica_spec_groups=[
-                    EndpointPlanReplicaSpecGroup(
-                        name="0",
-                        resources=resources,
-                        tested_resources=[resources],
-                    )
-                ],
                 job_offers=[
                     EndpointPlanJobOffers(
                         replica_group="0",
@@ -146,7 +139,8 @@ class TestPrintEndpointPlan:
 
         output = console.export_text()
         assert "Resources" not in output
-        assert "Preset         qwen-vllm" in output
+        assert "Preset         Qwen/Qwen3-0.6B" in output
+        assert "Recipe         vllm-a40" in output
 
     def test_prints_agent_reason_when_preset_has_no_offers(self, monkeypatch: pytest.MonkeyPatch):
         console = _patch_console(monkeypatch)
@@ -163,19 +157,6 @@ class TestPrintEndpointPlan:
         assert "Preset policy  reuse-or-create" in output
         assert "Endpoint preset qwen matched but has no available offers." in output
         assert "Agent" not in output
-
-    def test_prints_agent_budget_when_set(self, monkeypatch: pytest.MonkeyPatch):
-        console = _patch_console(monkeypatch)
-        plan = _get_endpoint_plan(
-            EndpointProvisioningPlanAgent(agent_model="test-agent", max_budget=2.0)
-        )
-
-        _print_endpoint_plan(plan)
-
-        output = console.export_text()
-        assert "Agent budget" in output
-        assert "$2" in output
-        assert "test-agent" not in output
 
 
 class TestPrintSubmittedEndpointMessage:

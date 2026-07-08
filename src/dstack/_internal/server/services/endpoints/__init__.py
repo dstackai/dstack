@@ -2,24 +2,24 @@ import uuid
 from datetime import datetime
 from typing import Any, List, Optional
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.endpoints import (
     Endpoint,
     EndpointConfiguration,
     EndpointPlan,
     EndpointPlanJobOffers,
-    EndpointPlanReplicaSpecGroup,
     EndpointPresetPolicy,
     EndpointProvisioningPlanAgent,
     EndpointProvisioningPlanNone,
     EndpointProvisioningPlanPreset,
     EndpointStatus,
 )
+from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.runs import ServiceSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -27,6 +27,9 @@ from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     EndpointModel,
     EndpointRunSubmissionModel,
+    ExportedFleetModel,
+    FleetModel,
+    ImportModel,
     ProjectModel,
     UserModel,
 )
@@ -35,7 +38,6 @@ from dstack._internal.server.services.endpoints.agent import (
     AgentPlan,
     get_agent_service,
     get_agent_unavailable_reason,
-    get_effective_max_agent_budget,
 )
 from dstack._internal.server.services.endpoints.planning import (
     EndpointPresetPlan,
@@ -54,6 +56,13 @@ logger = get_logger(__name__)
 
 _ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE = (
     "Creating endpoint presets with the server agent requires project admin permissions."
+)
+_ENDPOINT_NO_FLEETS_MESSAGE = (
+    "The project has no fleets. Create one before submitting an endpoint."
+)
+_ENDPOINT_NO_MATCHING_FLEETS_MESSAGE = (
+    "No fleets match the endpoint configuration. Create a fleet or update `fleets` before "
+    "submitting an endpoint."
 )
 
 
@@ -273,6 +282,24 @@ async def get_endpoint_plan(
         )
         if current_resource is not None and current_resource.status.is_finished():
             current_resource = None
+    has_usable_fleets = await has_endpoint_existing_usable_fleets(
+        session=session,
+        project=project,
+        configuration=configuration,
+    )
+    if not has_usable_fleets:
+        return EndpointPlan(
+            project_name=project.name,
+            user=user.name,
+            configuration=configuration,
+            configuration_path=configuration_path,
+            current_resource=current_resource,
+            action=ApplyAction.CREATE if current_resource is None else ApplyAction.UPDATE,
+            preset_policy=configuration.preset_policy,
+            provisioning_plan=EndpointProvisioningPlanNone(
+                reason=get_endpoint_no_fleets_message(configuration)
+            ),
+        )
     preset_plan = None
     unprovisionable_preset_plan = None
     if configuration.preset_policy != EndpointPresetPolicy.CREATE:
@@ -300,7 +327,6 @@ async def get_endpoint_plan(
         if can_use_endpoint_agent(user=user, project=project):
             provisioning_plan = _agent_plan_to_provisioning_plan(
                 get_agent_service().get_plan(),
-                max_budget=get_effective_max_agent_budget(configuration),
                 reason=_get_unprovisionable_preset_reason(unprovisionable_preset_plan),
             )
         else:
@@ -330,14 +356,71 @@ def get_endpoint_agent_admin_required_message() -> str:
     return _ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE
 
 
+def get_endpoint_no_fleets_message(configuration: EndpointConfiguration) -> str:
+    if configuration.fleets:
+        return _ENDPOINT_NO_MATCHING_FLEETS_MESSAGE
+    return _ENDPOINT_NO_FLEETS_MESSAGE
+
+
+async def has_endpoint_existing_usable_fleets(
+    *,
+    session: AsyncSession,
+    project: ProjectModel,
+    configuration: EndpointConfiguration,
+) -> bool:
+    filters = [
+        FleetModel.deleted == False,
+        FleetModel.status == FleetStatus.ACTIVE,
+        _get_endpoint_usable_fleet_ownership_filter(project),
+    ]
+    if configuration.fleets is not None:
+        fleet_filter = _get_endpoint_configured_fleets_filter(configuration.fleets, project)
+        if fleet_filter is None:
+            return False
+        filters.append(fleet_filter)
+    res = await session.execute(
+        select(FleetModel.id).join(FleetModel.project).where(*filters).limit(1)
+    )
+    return res.scalar_one_or_none() is not None
+
+
+def _get_endpoint_usable_fleet_ownership_filter(project: ProjectModel):
+    is_fleet_imported_subquery = exists().where(
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == FleetModel.id,
+    )
+    return or_(FleetModel.project_id == project.id, is_fleet_imported_subquery)
+
+
+def _get_endpoint_configured_fleets_filter(fleets, project: ProjectModel):
+    conditions = []
+    for ref in map(EntityReference.parse, fleets):
+        if ref.project is None:
+            conditions.append(
+                and_(
+                    FleetModel.name == ref.name,
+                    FleetModel.project_id == project.id,
+                )
+            )
+        else:
+            conditions.append(
+                and_(
+                    FleetModel.name == ref.name,
+                    ProjectModel.name == ref.project,
+                )
+            )
+    if not conditions:
+        return None
+    return or_(*conditions)
+
+
 def _agent_plan_to_provisioning_plan(
     agent_plan: AgentPlan,
-    max_budget: Optional[float],
     reason: Optional[str] = None,
 ) -> EndpointProvisioningPlanAgent:
     return EndpointProvisioningPlanAgent(
         agent_model=agent_plan.model,
-        max_budget=max_budget,
         reason=reason,
     )
 
@@ -395,7 +478,10 @@ def _get_unprovisionable_preset_reason(
 ) -> Optional[str]:
     if preset_plan is None:
         return None
-    return f"Endpoint preset {preset_plan.preset.name} matched but has no available offers."
+    return (
+        f"Endpoint preset for model {preset_plan.preset.model} "
+        f"recipe {preset_plan.recipe.id} matched but has no available offers."
+    )
 
 
 def _endpoint_preset_plan_to_provisioning_plan(
@@ -404,16 +490,9 @@ def _endpoint_preset_plan_to_provisioning_plan(
     run_spec = preset_plan.run_plan.get_effective_run_spec()
     service_name = run_spec.run_name or run_spec.configuration.name or "(generated)"
     return EndpointProvisioningPlanPreset(
-        preset_name=preset_plan.preset.name,
+        preset_model=preset_plan.preset.model,
+        recipe_id=preset_plan.recipe.id,
         service_name=service_name,
-        replica_spec_groups=[
-            EndpointPlanReplicaSpecGroup(
-                name=group.name,
-                resources=group.resources,
-                tested_resources=group.tested_resources,
-            )
-            for group in preset_plan.preset.replica_spec_groups
-        ],
         job_offers=[
             EndpointPlanJobOffers(
                 replica_group=job_plan.job_spec.replica_group,
@@ -437,12 +516,6 @@ async def create_endpoint(
     pipeline_hinter: PipelineHinterProtocol,
 ) -> Endpoint:
     _validate_endpoint_configuration(configuration)
-    await _check_can_submit_endpoint_configuration(
-        session=session,
-        project=project,
-        user=user,
-        configuration=configuration,
-    )
 
     lock_namespace = f"endpoint_names_{project.name}"
     if is_db_sqlite():
@@ -463,6 +536,12 @@ async def create_endpoint(
             if endpoint_model is not None:
                 if not endpoint_model.status.is_finished():
                     raise ResourceExistsError()
+                await _check_can_submit_endpoint_configuration(
+                    session=session,
+                    project=project,
+                    user=user,
+                    configuration=configuration,
+                )
                 endpoint_model.user = user
                 endpoint_model.service_run_id = None
                 endpoint_model.service_run = None
@@ -486,6 +565,13 @@ async def create_endpoint(
                 return endpoint_model_to_endpoint(endpoint_model)
         else:
             configuration.name = await generate_endpoint_name(session=session, project=project)
+
+        await _check_can_submit_endpoint_configuration(
+            session=session,
+            project=project,
+            user=user,
+            configuration=configuration,
+        )
 
         endpoint_model = EndpointModel(
             id=uuid.uuid4(),
@@ -515,10 +601,15 @@ async def _check_can_submit_endpoint_configuration(
     user: UserModel,
     configuration: EndpointConfiguration,
 ) -> None:
+    if not await has_endpoint_existing_usable_fleets(
+        session=session,
+        project=project,
+        configuration=configuration,
+    ):
+        raise ServerClientError(get_endpoint_no_fleets_message(configuration))
     if configuration.preset_policy == EndpointPresetPolicy.REUSE:
         return
-    if can_use_endpoint_agent(user=user, project=project):
-        return
+    preset_planning_result = None
     if configuration.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
         preset_planning_result = await find_preset_planning_result(
             session=session,
@@ -529,6 +620,8 @@ async def _check_can_submit_endpoint_configuration(
         )
         if preset_planning_result.provisionable is not None:
             return
+    if can_use_endpoint_agent(user=user, project=project):
+        return
     raise ForbiddenError(_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE)
 
 

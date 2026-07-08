@@ -10,14 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoints import EndpointConfiguration, EndpointStatus
+from dstack._internal.core.models.endpoints import (
+    EndpointConfiguration,
+    EndpointStatus,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import RunSpec, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server import settings
 from dstack._internal.server.models import EndpointModel
 from dstack._internal.server.services.endpoints.agent import AgentPlan
 from dstack._internal.server.services.endpoints.planning import (
@@ -26,10 +28,13 @@ from dstack._internal.server.services.endpoints.planning import (
 )
 from dstack._internal.server.services.endpoints.presets import (
     EndpointPreset,
-    EndpointPresetReplicaSpecGroup,
+    EndpointPresetRecipe,
+    EndpointPresetValidation,
+    EndpointPresetValidationReplica,
 )
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_fleet,
     create_project,
     create_repo,
     create_run,
@@ -55,6 +60,7 @@ class TestEndpointPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        await create_fleet(session=session, project=project)
 
         with patch(
             "dstack._internal.server.services.endpoints.find_preset_planning_result",
@@ -133,9 +139,55 @@ class TestEndpointPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_agent_provisioning_plan(
-        self, test_db, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_MAX_BUDGET", 4.0)
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_fleet(session=session, project=project)
+        agent_service = Mock()
+        agent_service.is_enabled.return_value = True
+        agent_service.get_plan.return_value = AgentPlan(model="test-agent")
+
+        with (
+            patch(
+                "dstack._internal.server.services.endpoints.find_preset_planning_result",
+                new=AsyncMock(return_value=EndpointPresetPlanningResult()),
+            ),
+            patch(
+                "dstack._internal.server.services.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/get_plan",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                    },
+                    "configuration_path": "endpoint.dstack.yml",
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        body = response.json()
+        assert body["preset_policy"] == "reuse-or-create"
+        assert body["provisioning_plan"] == {
+            "type": "agent",
+            "agent_model": "test-agent",
+            "reason": None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_agent_plan_without_existing_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -163,20 +215,94 @@ class TestEndpointPlan:
                         "type": "endpoint",
                         "name": "qwen-endpoint",
                         "model": "Qwen/Qwen3-0.6B",
-                        "max_agent_budget": 2.0,
                     },
                     "configuration_path": "endpoint.dstack.yml",
                 },
             )
 
         assert response.status_code == 200, response.json()
-        body = response.json()
-        assert body["preset_policy"] == "reuse-or-create"
-        assert body["provisioning_plan"] == {
-            "type": "agent",
-            "agent_model": "test-agent",
-            "max_budget": 2.0,
-            "reason": None,
+        assert response.json()["provisioning_plan"] == {
+            "type": "none",
+            "reason": "The project has no fleets. Create one before submitting an endpoint.",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_fleets_plan_for_reuse_without_existing_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/get_plan",
+            headers=get_auth_headers(user.token),
+            json={
+                "configuration": {
+                    "type": "endpoint",
+                    "name": "qwen-endpoint",
+                    "model": "Qwen/Qwen3-0.6B",
+                    "preset_policy": "reuse",
+                },
+                "configuration_path": "endpoint.dstack.yml",
+            },
+        )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["provisioning_plan"] == {
+            "type": "none",
+            "reason": "The project has no fleets. Create one before submitting an endpoint.",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_agent_plan_when_configured_fleet_does_not_match(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_fleet(session=session, project=project, name="existing-fleet")
+        agent_service = Mock()
+        agent_service.is_enabled.return_value = True
+        agent_service.get_plan.return_value = AgentPlan(model="test-agent")
+
+        with (
+            patch(
+                "dstack._internal.server.services.endpoints.find_preset_planning_result",
+                new=AsyncMock(return_value=EndpointPresetPlanningResult()),
+            ),
+            patch(
+                "dstack._internal.server.services.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/get_plan",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                        "fleets": ["missing-fleet"],
+                    },
+                    "configuration_path": "endpoint.dstack.yml",
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["provisioning_plan"] == {
+            "type": "none",
+            "reason": (
+                "No fleets match the endpoint configuration. Create a fleet or update `fleets` "
+                "before submitting an endpoint."
+            ),
         }
 
     @pytest.mark.asyncio
@@ -189,6 +315,7 @@ class TestEndpointPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        await create_fleet(session=session, project=project)
         agent_service = Mock()
         agent_service.is_enabled.return_value = True
 
@@ -234,6 +361,7 @@ class TestEndpointPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        await create_fleet(session=session, project=project)
 
         with patch(
             "dstack._internal.server.services.endpoints.find_preset_planning_result",
@@ -257,9 +385,9 @@ class TestEndpointPlan:
         body = response.json()
         assert body["provisioning_plan"]["type"] == "preset"
         assert body["preset_policy"] == "reuse-or-create"
-        assert body["provisioning_plan"]["preset_name"] == "qwen"
+        assert body["provisioning_plan"]["preset_model"] == "Qwen/Qwen3-0.6B"
+        assert body["provisioning_plan"]["recipe_id"] == "vllm-t4"
         assert body["provisioning_plan"]["service_name"] == "qwen-endpoint-serving"
-        assert body["provisioning_plan"]["replica_spec_groups"][0]["name"] == "0"
         assert body["provisioning_plan"]["job_offers"][0]["replica_group"] == "0"
         assert body["provisioning_plan"]["job_offers"][0]["resources"]["gpu"] is not None
         assert body["provisioning_plan"]["job_offers"][0]["spot"] is None
@@ -283,6 +411,7 @@ class TestCreateEndpoint:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
+        await create_fleet(session=session, project=project)
 
         response = await client.post(
             f"/api/project/{project.name}/endpoints/create",
@@ -321,6 +450,67 @@ class TestCreateEndpoint:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_rejects_create_without_existing_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        with patch(
+            "dstack._internal.server.services.endpoints.find_preset_planning_result",
+            new=AsyncMock(return_value=EndpointPresetPlanningResult()),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/create",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                    }
+                },
+            )
+
+        assert response.status_code == 400
+        assert response.json()["detail"][0]["msg"] == (
+            "The project has no fleets. Create one before submitting an endpoint."
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_rejects_reuse_without_existing_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/create",
+            headers=get_auth_headers(user.token),
+            json={
+                "configuration": {
+                    "type": "endpoint",
+                    "name": "qwen-endpoint",
+                    "model": "Qwen/Qwen3-0.6B",
+                    "preset_policy": "reuse",
+                }
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"][0]["msg"] == (
+            "The project has no fleets. Create one before submitting an endpoint."
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_resubmits_terminal_endpoint(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -329,6 +519,7 @@ class TestCreateEndpoint:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
+        await create_fleet(session=session, project=project)
         previous_endpoint = await _create_endpoint_model(
             session=session,
             project=project,
@@ -363,6 +554,45 @@ class TestCreateEndpoint:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_rejects_resubmit_terminal_endpoint_without_existing_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        previous_endpoint = await _create_endpoint_model(
+            session=session,
+            project=project,
+            user=user,
+            status=EndpointStatus.FAILED,
+        )
+        previous_endpoint.status_message = "old failure"
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/create",
+            headers=get_auth_headers(user.token),
+            json={
+                "configuration": {
+                    "type": "endpoint",
+                    "name": "qwen-endpoint",
+                    "model": "Qwen/Qwen3-0.6B",
+                }
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"][0]["msg"] == (
+            "The project has no fleets. Create one before submitting an endpoint."
+        )
+        await session.refresh(previous_endpoint)
+        assert previous_endpoint.status == EndpointStatus.FAILED
+        assert previous_endpoint.status_message == "old failure"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_rejects_project_user_when_create_requires_agent(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -371,6 +601,7 @@ class TestCreateEndpoint:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        await create_fleet(session=session, project=project)
 
         with patch(
             "dstack._internal.server.services.endpoints.find_preset_planning_result",
@@ -403,6 +634,7 @@ class TestCreateEndpoint:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        await create_fleet(session=session, project=project)
 
         with patch(
             "dstack._internal.server.services.endpoints.find_preset_planning_result",
@@ -643,11 +875,10 @@ class TestEndpointPresets:
         assert response.status_code == 200, response.json()
         body = response.json()
         assert len(body) == 1
-        assert body[0]["name"] == "qwen"
         assert body[0]["model"] == "Qwen/Qwen3-0.6B"
-        assert body[0]["replica_spec_groups"][0]["name"] == "0"
-        assert body[0]["replica_spec_groups"][0]["resources"]["gpu"] is not None
-        assert body[0]["replica_spec_groups"][0]["tested_resources"][0]["gpu"] is not None
+        assert body[0]["recipes"][0]["id"] == "vllm-t4"
+        assert body[0]["recipes"][0]["service"]["resources"]["gpu"] is not None
+        assert body[0]["recipes"][0]["validations"][0]["replicas"][0]["resources"][0]["gpu"]
         assert preset_service.list_project_names == [project.name]
 
     @pytest.mark.asyncio
@@ -673,11 +904,11 @@ class TestEndpointPresets:
         response = await client.post(
             f"/api/project/{project.name}/endpoints/presets/delete",
             headers=get_auth_headers(user.token),
-            json={"names": ["qwen"]},
+            json={"models": ["Qwen/Qwen3-0.6B"]},
         )
 
         assert response.status_code == 200, response.json()
-        assert preset_service.deleted_names == ["qwen"]
+        assert preset_service.deleted_models == ["Qwen/Qwen3-0.6B"]
         assert preset_service.delete_project_names == [project.name]
 
     @pytest.mark.asyncio
@@ -703,15 +934,14 @@ class TestEndpointPresets:
         response = await client.post(
             f"/api/project/{project.name}/endpoints/presets/get",
             headers=get_auth_headers(user.token),
-            json={"name": "qwen"},
+            json={"model": "Qwen/Qwen3-0.6B"},
         )
 
         assert response.status_code == 200, response.json()
         body = response.json()
-        assert body["name"] == "qwen"
         assert body["model"] == "Qwen/Qwen3-0.6B"
-        assert body["service"]["type"] == "service"
-        assert body["service"]["name"] == "qwen-endpoint-serving"
+        assert body["recipes"][0]["service"]["type"] == "service"
+        assert body["recipes"][0]["service"]["resources"]["gpu"] is not None
         assert preset_service.get_project_names == [project.name]
 
 
@@ -721,24 +951,24 @@ class _FakeEndpointPresetService:
         self.list_project_names = []
         self.get_project_names = []
         self.delete_project_names = []
-        self.deleted_names = []
+        self.deleted_models = []
 
     async def list_presets(self, project_name):
         self.list_project_names.append(project_name)
         return self._presets
 
-    async def get_preset(self, project_name, name):
+    async def get_preset(self, project_name, model):
         self.get_project_names.append(project_name)
         for preset in self._presets:
-            if preset.name == name:
+            if preset.model == model:
                 return preset
         return None
 
-    async def delete_preset(self, project_name, name):
-        if name not in {preset.name for preset in self._presets}:
-            raise FileNotFoundError(name)
+    async def delete_preset(self, project_name, model):
+        if model not in {preset.model for preset in self._presets}:
+            raise FileNotFoundError(model)
         self.delete_project_names.append(project_name)
-        self.deleted_names.append(name)
+        self.deleted_models.append(model)
 
 
 async def _create_endpoint_model(
@@ -776,27 +1006,29 @@ def _endpoint_preset_plan() -> EndpointPresetPlan:
             "resources": {"gpu": "16GB"},
         }
     )
-    preset = EndpointPreset(
-        name="qwen",
-        model="Qwen/Qwen3-0.6B",
-        replica_spec_groups=[
-            EndpointPresetReplicaSpecGroup.parse_obj(
-                {
-                    "name": "0",
-                    "resources": {"gpu": "16GB"},
-                    "tested_resources": [
+    recipe = EndpointPresetRecipe(
+        id="vllm-t4",
+        service=service_configuration,
+        validations=[
+            EndpointPresetValidation(
+                replicas=[
+                    EndpointPresetValidationReplica.parse_obj(
                         {
-                            "cpu": 4,
-                            "memory": "16GB",
-                            "disk": "100GB",
-                            "gpu": {"name": "T4", "memory": "16GB", "count": 1},
+                            "resources": [
+                                {
+                                    "cpu": 4,
+                                    "memory": "16GB",
+                                    "disk": "100GB",
+                                    "gpu": {"name": "T4", "memory": "16GB", "count": 1},
+                                }
+                            ]
                         }
-                    ],
-                }
+                    )
+                ]
             )
         ],
-        configuration=service_configuration,
     )
+    preset = EndpointPreset(model="Qwen/Qwen3-0.6B", recipes=[recipe])
     run_plan = Mock()
     run_plan.get_effective_run_spec.return_value = RunSpec(
         run_name="qwen-endpoint-serving",
@@ -811,7 +1043,7 @@ def _endpoint_preset_plan() -> EndpointPresetPlan:
     job_plan.total_offers = 2
     job_plan.max_price = 1.25
     run_plan.job_plans = [job_plan]
-    return EndpointPresetPlan(preset=preset, run_plan=run_plan)
+    return EndpointPresetPlan(preset=preset, recipe=recipe, run_plan=run_plan)
 
 
 def _instance_offer() -> InstanceOfferWithAvailability:

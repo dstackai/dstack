@@ -40,10 +40,18 @@ class TestGetEndpointsTable:
 
         assert "ERROR" not in [column.header for column in table.columns]
 
+    def test_default_table_shows_preset_policy_not_service_run(self):
+        table = get_endpoints_table([_get_endpoint()])
+
+        headers = [column.header for column in table.columns]
+        assert "POLICY" in headers
+        assert "SERVICE RUN" not in headers
+
     def test_verbose_table_shows_status_message(self):
         table = get_endpoints_table([_get_endpoint()], verbose=True)
 
         assert "ERROR" in [column.header for column in table.columns]
+        assert "SERVICE RUN" in [column.header for column in table.columns]
 
     def test_failed_status_without_reason_is_colored(self):
         table = get_endpoints_table([_get_endpoint(status_message=None)])
@@ -89,11 +97,7 @@ class TestGetEndpointsTable:
 
     def test_agent_failed_status_is_colored(self):
         table = get_endpoints_table(
-            [
-                _get_endpoint(
-                    status_message="Server agent process exited without a verification report"
-                )
-            ]
+            [_get_endpoint(status_message="Server agent process exited without a final report")]
         )
 
         status_column = next(column for column in table.columns if column.header == "STATUS")
@@ -105,11 +109,11 @@ class TestGetEndpointsTable:
         status_column = next(column for column in table.columns if column.header == "STATUS")
         assert status_column._cells == ["[bold sea_green3]running[/]"]
 
-    def test_clauding_status_is_colored(self):
-        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.CLAUDING)])
+    def test_prototyping_status_is_colored(self):
+        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.PROTOTYPING)])
 
         status_column = next(column for column in table.columns if column.header == "STATUS")
-        assert status_column._cells == ["[bold medium_purple1]clauding[/]"]
+        assert status_column._cells == ["[bold medium_purple1]prototyping[/]"]
 
     def test_stopping_status_is_colored(self):
         table = get_endpoints_table([_get_endpoint(status=EndpointStatus.STOPPING)])
@@ -138,7 +142,8 @@ class TestGetEndpointTable:
             "[bold]Endpoint[/bold]",
             "[bold]Model[/bold]",
             "[bold]Status[/bold]",
-            "[bold]Run[/bold]",
+            "[bold]Preset policy[/bold]",
+            "[bold]Service run[/bold]",
             "[bold]URL[/bold]",
             "[bold]Created[/bold]",
             "[bold]Error[/bold]",
@@ -149,6 +154,7 @@ class TestGetEndpointTable:
             "qwen-endpoint",
             "Qwen/Qwen3-0.6B",
             "[indian_red1]no preset[/]",
+            "reuse-or-create",
             "-",
             "-",
             "now",
@@ -157,7 +163,7 @@ class TestGetEndpointTable:
 
 
 class TestFilterEndpointsForListing:
-    def test_default_shows_unfinished_and_latest_finished(self):
+    def test_default_shows_unfinished_only_when_present(self):
         endpoints = [
             _get_endpoint(
                 name="failed-old",
@@ -175,8 +181,8 @@ class TestFilterEndpointsForListing:
                 created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
             ),
             _get_endpoint(
-                name="clauding",
-                status=EndpointStatus.CLAUDING,
+                name="prototyping",
+                status=EndpointStatus.PROTOTYPING,
                 created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
             ),
         ]
@@ -184,8 +190,7 @@ class TestFilterEndpointsForListing:
         filtered = filter_endpoints_for_listing(endpoints)
 
         assert [endpoint.name for endpoint in filtered] == [
-            "clauding",
-            "failed-new",
+            "prototyping",
             "running",
         ]
 
@@ -207,7 +212,7 @@ class TestFilterEndpointsForListing:
 
         assert [endpoint.name for endpoint in filtered] == ["failed-new"]
 
-    def test_default_shows_latest_finished_and_unfinished_in_watch(self):
+    def test_default_hides_latest_finished_when_unfinished_exist(self):
         endpoints = [
             _get_endpoint(
                 name="failed-new",
@@ -215,15 +220,15 @@ class TestFilterEndpointsForListing:
                 created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
             ),
             _get_endpoint(
-                name="clauding",
-                status=EndpointStatus.CLAUDING,
+                name="prototyping",
+                status=EndpointStatus.PROTOTYPING,
                 created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
             ),
         ]
 
         filtered = filter_endpoints_for_listing(endpoints)
 
-        assert [endpoint.name for endpoint in filtered] == ["clauding", "failed-new"]
+        assert [endpoint.name for endpoint in filtered] == ["prototyping"]
 
     def test_all_shows_all_sorted_newest_first(self):
         endpoints = [

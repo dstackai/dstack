@@ -14,8 +14,8 @@ If a test does not answer that question, it is not a useful harness test.
 
 ### Agent runtime facts to rely on
 
-- Claude Code print/headless mode supports `--output-format stream-json`, `--json-schema`, `--max-turns`, and `--max-budget-usd`. These are useful for subprocess integration, structured final reports, and API-spend caps.
-- `--max-budget-usd` caps Claude API spend only. It does not cap GPU spend from dstack runs. The harness must separately track candidate run lifetimes and stop/abort GPU candidates.
+- Claude Code print/headless mode supports `--output-format stream-json`, `--json-schema`, `--max-turns`, and `--max-budget-usd`. These are useful facts for later runtime governance, but v1 does not expose an endpoint agent-budget field.
+- `--max-budget-usd` caps Claude API spend only. It does not cap GPU spend from dstack runs. Budget/cost governance must be designed later with durable per-session accounting before it becomes user-facing.
 - Claude Code plugins/skills are useful for packaging context, but they are not the harness. A plugin can expose skills; it does not give us state, candidate accounting, cleanup, resume, spend tracking, or verification gates.
 - Public harness engineering writeups emphasize the same lesson: harness design changes outcomes materially, and useful harnesses rely on traces, self-verification/evaluator separation, context handoff artifacts, and controlled execution loops.
 
@@ -157,6 +157,58 @@ Required checks:
 - final verification request is recorded
 - endpoint constraints were not violated in previews/submissions
 - final preset, if saved, includes final service YAML and replica resource evidence
+- task/dev probes used for promotion exercised the intended serving stack, not only host/GPU
+  visibility
+
+### Placement/Experiment Observer
+
+For create-recipe e2e runs, the observer must also check that the agent did not
+blindly choose the first cheap placement:
+
+- allowed fleets were used for offer inspection; global offers alone are not enough;
+- if a broad fleet exposes multiple backends, the agent compared backend/runtime
+  characteristics, not just fleet names;
+- viable reusable or inspectable placements were identified when present: VM-based,
+  SSH, Kubernetes, or any backend/runtime path where tasks/dev environments can reuse
+  image/package/model cache or support interactive diagnosis;
+- if such a placement was viable under the endpoint constraints, the first paid
+  experiment was normally a task or dev-environment style probe, not the final service;
+- if the agent chose container-style placement or service-first, `progress.jsonl` contains
+  a concrete reason, such as no viable reusable offer,
+  constraint violation, insufficient GPU/disk, much higher price, no useful cache
+  persistence, or final URL/probe behavior being the only remaining unknown;
+- the agent treated hourly price as a constraint, not the objective. A cheaper
+  container offer is not automatically better than a slightly more expensive reusable
+  placement if the reusable placement can reduce total iteration time, repeated model
+  downloads, image churn, or debugging risk;
+- the final service was submitted only after the probe removed the main uncertainty, or
+  after the agent recorded why a probe would not help.
+- task-first is not the same as interactive SSH/dev-environment proof. Record whether the
+  agent had attach/SSH/dev-environment available, whether it used it, and why not if it
+  skipped it.
+- if attach/SSH is available, a probe task should normally stay alive while the agent runs
+  inspection commands through attach/SSH. A task that packs all checks into one shell
+  command chain is only acceptable for a genuinely one-shot question or unavailable
+  attach/SSH.
+- a probe is useful only if it reaches the intended recipe evidence: selected image or
+  install path, Python/framework runtime, model/auth/cache path when feasible, serving
+  command/port, and ideally a local health or model API request. `nvidia-smi` alone is
+  host evidence, not service recipe proof.
+- for Hugging Face-style model serving, check whether probe and final service YAMLs use
+  useful optional instance cache mounts, such as Hugging Face and package caches. If not,
+  the agent must explain why repeated downloads/setup are acceptable for that backend and
+  model size.
+- final service verification remains the success gate. If the final service fails a real
+  model request, the correct result is another experiment or terminal failure, not a
+  successful final report based on task/dev evidence.
+
+This is not a product rule that forbids container backends. It is a harness test:
+when reusable/inspectable placement would make the loop faster or more reliable, the
+agent should notice and use it.
+
+Run this as a ladder. First use a cheaper scenario where reusable placement exists
+inside a modest budget. Then repeat later with broader/more expensive approved hardware
+so the harness is not accidentally tuned only for low-cost small-model cases.
 
 ## Required Workspace Artifacts
 
@@ -173,7 +225,6 @@ Required fields:
   "endpoint_name": "qwen-endpoint-agent-smoke",
   "model": "Qwen/Qwen3-0.6B",
   "phase": "research|capacity|experiment|verify|success|failure",
-  "max_agent_budget": 2.0,
   "max_hourly_price": 0.3,
   "started_at": "ISO-8601",
   "updated_at": "ISO-8601"
@@ -196,11 +247,13 @@ One JSON object per source:
 }
 ```
 
-### `hardware_reasoning.md`
+### Decision Trail
 
-Purpose: make the hardware decision reviewable.
+Purpose: make deployment decisions reviewable without forcing the agent to write
+separate markdown notes.
 
-Must include:
+Must be visible through `progress.jsonl`, `submissions.jsonl`, `sources.jsonl`,
+`verification.json`, and `final_report.json`:
 
 - model size and serving mode
 - expected framework
@@ -358,7 +411,6 @@ type: endpoint
 name: qwen-endpoint-contract
 model: Qwen/Qwen3-0.6B
 preset_policy: create
-max_agent_budget: 0.25
 spot_policy: on-demand
 max_price: 0.3
 ```
@@ -393,7 +445,6 @@ type: endpoint
 name: qwen-endpoint-no-offers
 model: Qwen/Qwen3-0.6B
 preset_policy: create
-max_agent_budget: 0.25
 spot_policy: on-demand
 max_price: 0.001
 ```
@@ -401,7 +452,7 @@ max_price: 0.001
 Pass:
 
 - No paid run submitted.
-- `sources.jsonl` and `hardware_reasoning.md` explain that model is deployable but constraints block capacity.
+- `sources.jsonl`, `progress.jsonl`, and the failure report explain that the model is deployable but constraints block capacity.
 - Failure summary is concise.
 
 Fail:
@@ -430,7 +481,6 @@ type: endpoint
 name: qwen-endpoint-agent-smoke
 model: Qwen/Qwen3-0.6B
 preset_policy: create
-max_agent_budget: 2.0
 spot_policy: on-demand
 max_price: 0.3
 ```
@@ -636,6 +686,11 @@ Development live-test order:
 5. If the issue is dstack/backend, reproduce it outside endpoints and report it in
    `endpoint-agent-backend-troubleshooting.md`.
 
+For the next probe-path e2e, success is not just "the endpoint eventually runs." The agent must
+show the intended loop: submit a long-lived task/dev probe, attach/SSH into it, run real recipe
+checks inside the live environment, then promote a clean service and verify that service through
+the model API. A batch task that embeds the whole investigation in `commands` is a harness failure.
+
 ## Server Integration Gates
 
 Only harden endpoint worker behavior after the real server path or unit tests show it is
@@ -644,7 +699,7 @@ needed. Avoid speculative scaffolding.
 ### Gate A: Runtime
 
 - Claude Code subprocess can run non-interactively from server env.
-- `--max-budget-usd` is honored for API spend.
+- Budget/cost governance is deferred until it can be enforced durably per endpoint agent session.
 - Stream JSON parsing does not block.
 - Large tool outputs are kept out of endpoint status.
 - Debug trace captures enough detail.
@@ -706,7 +761,7 @@ Prompt wording, skills, plugins, or runtime flags are implementation details. Th
 
 - Keep the "one endpoint config to verified service" UX.
 - Make the generated service YAML inspectable and save it as preset provenance.
-- Record the engine/framework choice and important serving flags in `sources.jsonl` / `hardware_reasoning.md`.
+- Record the engine/framework choice and important serving flags in `sources.jsonl`, `verification.json`, and the final report.
 - Record enough final-run metadata to reproduce: model, framework, image/install path, command, resources, observed replica resources, and verification request.
 - Treat "no hidden black box" as a v1 principle: if the agent made a deployment decision, the workspace artifacts should show why.
 - Keep first verification functional: a real model request proves the endpoint works.

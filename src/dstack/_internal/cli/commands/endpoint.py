@@ -1,5 +1,4 @@
 import argparse
-import base64
 import sys
 import time
 from typing import Iterable
@@ -11,6 +10,7 @@ from dstack._internal.cli.services.completion import (
     EndpointNameCompleter,
     EndpointPresetNameCompleter,
 )
+from dstack._internal.cli.services.endpoint_logs import EndpointLogPoller
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -27,7 +27,6 @@ from dstack._internal.cli.utils.endpoint import (
 from dstack._internal.cli.utils.preset import print_endpoint_presets_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.endpoints import Endpoint
-from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
@@ -50,8 +49,8 @@ class EndpointCommand(APIBaseCommand):
                 "-a",
                 "--all",
                 help=(
-                    "Show all endpoints. By default, it only shows unfinished endpoints "
-                    "and the last finished endpoint."
+                    "Show all endpoints. By default, it shows unfinished endpoints, "
+                    "or the last finished endpoint if there are no unfinished endpoints."
                 ),
                 action="store_true",
             )
@@ -81,6 +80,12 @@ class EndpointCommand(APIBaseCommand):
             "name",
             help="The name of the endpoint",
         ).completer = EndpointNameCompleter()  # type: ignore[attr-defined]
+        logs_parser.add_argument(
+            "-w",
+            "--watch",
+            help="Watch endpoint logs in realtime",
+            action="store_true",
+        )
         logs_parser.add_argument(
             "--since",
             help=(
@@ -125,6 +130,9 @@ class EndpointCommand(APIBaseCommand):
             help="Manage endpoint presets",
             formatter_class=self._parser.formatter_class,
         )
+        preset_parser.add_argument(
+            "-v", "--verbose", action="store_true", help="Show more information"
+        )
         preset_parser.set_defaults(subfunc=self._preset_list)
         preset_subparsers = preset_parser.add_subparsers(dest="preset_action")
 
@@ -132,6 +140,13 @@ class EndpointCommand(APIBaseCommand):
             "list",
             help="List endpoint presets",
             formatter_class=self._parser.formatter_class,
+        )
+        preset_list_parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="Show more information",
         )
         preset_list_parser.set_defaults(subfunc=self._preset_list)
 
@@ -141,8 +156,9 @@ class EndpointCommand(APIBaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         preset_get_parser.add_argument(
-            "name",
-            help="The name of the endpoint preset",
+            "model",
+            metavar="MODEL",
+            help="The model of the endpoint preset",
         ).completer = EndpointPresetNameCompleter()  # type: ignore[attr-defined]
         preset_get_parser.add_argument(
             "--json",
@@ -157,8 +173,9 @@ class EndpointCommand(APIBaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         preset_delete_parser.add_argument(
-            "name",
-            help="The name of the endpoint preset",
+            "model",
+            metavar="MODEL",
+            help="The model of the endpoint preset",
         ).completer = EndpointPresetNameCompleter()  # type: ignore[attr-defined]
         preset_delete_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -204,33 +221,23 @@ class EndpointCommand(APIBaseCommand):
 
         start_time = get_start_time(args.since)
         try:
-            for log in self._get_endpoint_logs(endpoint=endpoint, start_time=start_time):
+            for log in self._get_endpoint_logs(
+                endpoint=endpoint, start_time=start_time, watch=args.watch
+            ):
                 sys.stdout.buffer.write(log)
                 sys.stdout.buffer.flush()
         except KeyboardInterrupt:
             pass
 
-    def _get_endpoint_logs(self, endpoint: Endpoint, start_time) -> Iterable[bytes]:
-        next_token = None
+    def _get_endpoint_logs(
+        self, endpoint: Endpoint, start_time, watch: bool = False
+    ) -> Iterable[bytes]:
+        poller = EndpointLogPoller(api=self.api, endpoint=endpoint, start_time=start_time)
         while True:
-            resp = self.api.client.logs.poll(
-                project_name=self.api.project,
-                body=PollLogsRequest(
-                    run_name=endpoint.name,
-                    job_submission_id=endpoint.id,
-                    start_time=start_time,
-                    end_time=None,
-                    descending=False,
-                    limit=1000,
-                    diagnose=False,
-                    next_token=next_token,
-                ),
-            )
-            for log in resp.logs:
-                yield base64.b64decode(log.message)
-            next_token = resp.next_token
-            if next_token is None:
+            yield from poller.poll()
+            if not watch:
                 break
+            time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
 
     def _stop(self, args: argparse.Namespace):
         try:
@@ -269,7 +276,7 @@ class EndpointCommand(APIBaseCommand):
 
     def _preset_list(self, args: argparse.Namespace):
         presets = self.api.client.endpoint_presets.list(self.api.project)
-        print_endpoint_presets_table(presets)
+        print_endpoint_presets_table(presets, verbose=args.verbose)
 
     def _preset_get(self, args: argparse.Namespace):
         if not args.json:
@@ -278,20 +285,22 @@ class EndpointCommand(APIBaseCommand):
         try:
             preset = self.api.client.endpoint_presets.get(
                 project_name=self.api.project,
-                name=args.name,
+                model=args.model,
             )
         except ResourceNotExistsError:
-            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+            console.print(f"Endpoint preset for model [code]{args.model}[/] does not exist")
             exit(1)
         print(pydantic_orjson_dumps_with_indent(preset.dict(), default=None))
 
     def _preset_delete(self, args: argparse.Namespace):
         presets = self.api.client.endpoint_presets.list(self.api.project)
-        if args.name not in {preset.name for preset in presets}:
-            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+        if args.model not in {preset.model for preset in presets}:
+            console.print(f"Endpoint preset for model [code]{args.model}[/] does not exist")
             exit(1)
 
-        if not args.yes and not confirm_ask(f"Delete the endpoint preset [code]{args.name}[/]?"):
+        if not args.yes and not confirm_ask(
+            f"Delete the endpoint preset for model [code]{args.model}[/]?"
+        ):
             console.print("\nExiting...")
             return
 
@@ -299,10 +308,10 @@ class EndpointCommand(APIBaseCommand):
             with console.status("Deleting endpoint preset..."):
                 self.api.client.endpoint_presets.delete(
                     project_name=self.api.project,
-                    names=[args.name],
+                    models=[args.model],
                 )
         except ResourceNotExistsError:
-            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+            console.print(f"Endpoint preset for model [code]{args.model}[/] does not exist")
             exit(1)
 
-        console.print(f"Endpoint preset [code]{args.name}[/] deleted")
+        console.print(f"Endpoint preset for model [code]{args.model}[/] deleted")

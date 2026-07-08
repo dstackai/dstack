@@ -43,11 +43,14 @@ class _FakeEndpoints:
 
 
 class _FakeLogs:
-    def __init__(self):
+    def __init__(self, responses=None):
+        self._responses = responses
         self.requests = []
 
     def poll(self, project_name, body):
         self.requests.append(body)
+        if self._responses is not None:
+            return self._responses.pop(0)
         return JobSubmissionLogs(
             logs=[
                 LogEvent(
@@ -59,29 +62,77 @@ class _FakeLogs:
         )
 
 
-def _get_command(endpoint: Endpoint) -> EndpointCommand:
+def _get_command(endpoint: Endpoint, logs=None) -> EndpointCommand:
     command = EndpointCommand.__new__(EndpointCommand)
     command.api = SimpleNamespace(
         project="main",
         client=SimpleNamespace(
             endpoints=_FakeEndpoints(endpoint),
-            logs=_FakeLogs(),
+            logs=logs or _FakeLogs(),
         ),
     )
     return command
 
 
 class TestEndpointCommand:
+    def test_preset_list_verbose_can_be_before_or_after_list_action(self):
+        parser = argparse.ArgumentParser()
+        EndpointCommand(parser)._register()
+
+        assert parser.parse_args(["preset", "-v", "list"]).verbose is True
+        assert parser.parse_args(["preset", "list", "-v"]).verbose is True
+        assert parser.parse_args(["preset", "list"]).verbose is False
+
     def test_reads_endpoint_logs(self):
         endpoint = _get_endpoint()
         command = _get_command(endpoint)
 
         logs = list(command._get_endpoint_logs(endpoint=endpoint, start_time=None))
 
-        assert logs == [b"agent log\n"]
+        assert len(logs) == 1
+        assert logs[0].startswith(b"[")
+        assert logs[0].endswith(b"] agent log\n")
         request = command.api.client.logs.requests[0]
         assert request.run_name == endpoint.name
         assert request.job_submission_id == endpoint.id
+
+    def test_watch_endpoint_logs_does_not_swallow_same_timestamp_logs(self, monkeypatch):
+        endpoint = _get_endpoint()
+        timestamp = datetime.now(timezone.utc)
+        logs_api = _FakeLogs(
+            responses=[
+                JobSubmissionLogs(
+                    logs=[
+                        LogEvent(
+                            timestamp=timestamp,
+                            log_source=LogEventSource.STDOUT,
+                            message=base64.b64encode(b"first\n").decode(),
+                        ),
+                    ],
+                ),
+                JobSubmissionLogs(
+                    logs=[
+                        LogEvent(
+                            timestamp=timestamp,
+                            log_source=LogEventSource.STDOUT,
+                            message=base64.b64encode(b"first\n").decode(),
+                        ),
+                        LogEvent(
+                            timestamp=timestamp,
+                            log_source=LogEventSource.STDOUT,
+                            message=base64.b64encode(b"second\n").decode(),
+                        ),
+                    ],
+                ),
+            ],
+        )
+        command = _get_command(endpoint, logs=logs_api)
+        monkeypatch.setattr("dstack._internal.cli.commands.endpoint.time.sleep", lambda _: None)
+
+        logs = command._get_endpoint_logs(endpoint=endpoint, start_time=None, watch=True)
+
+        assert next(logs).endswith(b"] first\n")
+        assert next(logs).endswith(b"] second\n")
 
     def test_stop_endpoint(self):
         endpoint = _get_endpoint()

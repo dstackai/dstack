@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from pydantic import Field, root_validator
+from pydantic import root_validator
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -12,8 +12,6 @@ AGENT_FINAL_REPORT_JSON_SCHEMA = {
         "run_id": {"type": "string"},
         "run_name": {"type": "string"},
         "service_yaml": {"type": "string"},
-        "recipe_sources": {"type": "array", "items": {"type": "string"}},
-        "verification_summary": {"type": "string"},
         "failure_summary": {"type": "string"},
     },
     "required": ["success"],
@@ -28,8 +26,6 @@ class AgentFinalReport(CoreModel):
     run_id: Optional[uuid.UUID] = None
     run_name: Optional[str] = None
     service_yaml: Optional[str] = None
-    recipe_sources: list[str] = Field(default_factory=list)
-    verification_summary: Optional[str] = None
     failure_summary: Optional[str] = None
 
     @root_validator
@@ -40,8 +36,6 @@ class AgentFinalReport(CoreModel):
                 raise ValueError("successful agent report must include run_id")
             if not values.get("service_yaml"):
                 raise ValueError("successful agent report must include service_yaml")
-            if not values.get("verification_summary"):
-                raise ValueError("successful agent report must include verification_summary")
         else:
             if not values.get("failure_summary"):
                 raise ValueError("failed agent report must include failure_summary")

@@ -11,7 +11,6 @@ def filter_endpoints_for_listing(
     endpoints: List[Endpoint],
     show_all: bool = False,
     limit: int | None = None,
-    include_latest_finished: bool = True,
 ) -> List[Endpoint]:
     endpoints = sorted(
         endpoints,
@@ -23,18 +22,10 @@ def filter_endpoints_for_listing(
     if show_all:
         return endpoints
 
-    latest_finished = None
-    filtered = []
-    for endpoint in endpoints:
-        if _is_endpoint_finished(endpoint):
-            if not include_latest_finished:
-                continue
-            if latest_finished is None:
-                latest_finished = endpoint
-                filtered.append(endpoint)
-            continue
-        filtered.append(endpoint)
-    return filtered
+    unfinished = [endpoint for endpoint in endpoints if not _is_endpoint_finished(endpoint)]
+    if unfinished:
+        return unfinished
+    return endpoints[:1]
 
 
 def print_endpoints_table(endpoints: List[Endpoint], verbose: bool = False):
@@ -70,7 +61,8 @@ def get_endpoint_table(
             endpoint.status_message,
         ),
     )
-    table.add_row(th("Run"), endpoint.run_name or "-")
+    table.add_row(th("Preset policy"), endpoint.configuration.preset_policy.value)
+    table.add_row(th("Service run"), endpoint.run_name or "-")
     table.add_row(th("URL"), endpoint.url or "-")
     table.add_row(th("Created"), format_date(endpoint.created_at))
     if endpoint.status_message:
@@ -87,8 +79,9 @@ def get_endpoints_table(
     table.add_column("NAME", no_wrap=True)
     table.add_column("MODEL")
     table.add_column("STATUS", no_wrap=True)
-    table.add_column("RUN")
+    table.add_column("POLICY", no_wrap=True)
     if verbose:
+        table.add_column("SERVICE RUN")
         table.add_column("URL")
     table.add_column("CREATED")
     if verbose:
@@ -102,7 +95,8 @@ def get_endpoints_table(
                 endpoint.status,
                 endpoint.status_message,
             ),
-            "RUN": endpoint.run_name or "-",
+            "POLICY": endpoint.configuration.preset_policy.value,
+            "SERVICE RUN": endpoint.run_name or "-",
             "URL": endpoint.url or "-",
             "CREATED": format_date(endpoint.created_at),
             "ERROR": endpoint.status_message,
@@ -119,7 +113,7 @@ def _format_endpoint_status(
     color_map = {
         EndpointStatus.SUBMITTED: "grey",
         EndpointStatus.PROVISIONING: "deep_sky_blue1",
-        EndpointStatus.CLAUDING: "medium_purple1",
+        EndpointStatus.PROTOTYPING: "medium_purple1",
         EndpointStatus.RUNNING: "sea_green3",
         EndpointStatus.STOPPING: "deep_sky_blue1",
         EndpointStatus.STOPPED: "grey62",

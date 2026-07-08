@@ -13,13 +13,6 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def _parse_positive_float(value: str) -> float:
-    parsed = float(value)
-    if parsed <= 0:
-        raise ValueError("value must be greater than 0")
-    return parsed
-
-
 def _getenv_non_empty(name: str) -> str | None:
     value = os.getenv(name)
     if value is None or value == "":
@@ -41,9 +34,6 @@ SERVER_PROJECTS_DIR_PATH = SERVER_DIR_PATH / "projects"
 AGENT_ANTHROPIC_API_KEY = _getenv_non_empty("DSTACK_AGENT_ANTHROPIC_API_KEY")
 AGENT_CLAUDE_PATH = _getenv_non_empty("DSTACK_AGENT_CLAUDE_PATH")
 AGENT_ANTHROPIC_MODEL = os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-opus-4-8")
-AGENT_ANTHROPIC_MAX_BUDGET = environ.get_callback(
-    "DSTACK_AGENT_ANTHROPIC_MAX_BUDGET_USD", _parse_positive_float
-)
 
 DATABASE_URL = os.getenv(
     "DSTACK_DATABASE_URL", f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"

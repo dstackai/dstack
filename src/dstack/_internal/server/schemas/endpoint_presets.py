@@ -4,8 +4,8 @@ from dstack._internal.core.models.common import CoreModel
 
 
 class GetEndpointPresetRequest(CoreModel):
-    name: str
+    model: str
 
 
 class DeleteEndpointPresetsRequest(CoreModel):
-    names: List[str]
+    models: List[str]

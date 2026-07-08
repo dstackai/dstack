@@ -3,45 +3,78 @@ from typing import List
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
-from dstack._internal.core.models.endpoint_presets import EndpointPreset
+from dstack._internal.core.models.endpoint_presets import EndpointPreset, EndpointPresetRecipe
+from dstack._internal.utils.common import pretty_resources
 
 
-def print_endpoint_presets_table(presets: List[EndpointPreset]):
-    table = get_endpoint_presets_table(presets)
+def print_endpoint_presets_table(presets: List[EndpointPreset], verbose: bool = False):
+    table = get_endpoint_presets_table(presets, verbose=verbose)
     console.print(table)
     console.print()
 
 
-def get_endpoint_presets_table(presets: List[EndpointPreset]) -> Table:
+def get_endpoint_presets_table(presets: List[EndpointPreset], verbose: bool = False) -> Table:
     table = Table(box=None)
-    table.add_column("NAME", style="bold", no_wrap=True)
-    table.add_column("MODEL")
-    table.add_column("RESOURCES")
+    table.add_column("MODEL", no_wrap=True)
+    if verbose:
+        table.add_column("RESOURCES")
+    else:
+        table.add_column("GPU")
 
     for preset in presets:
-        if len(preset.replica_spec_groups) == 1:
-            add_row_from_dict(
+        if len(preset.recipes) == 1:
+            _add_recipe_rows(
                 table,
-                {
-                    "NAME": preset.name,
-                    "MODEL": preset.model,
-                    "RESOURCES": _format_resources(preset.replica_spec_groups[0].resources),
-                },
+                label=f"[bold]{preset.model}[/]",
+                recipe=preset.recipes[0],
+                verbose=verbose,
             )
             continue
-        add_row_from_dict(table, {"NAME": preset.name, "MODEL": preset.model})
-        for group in preset.replica_spec_groups:
-            add_row_from_dict(
+        add_row_from_dict(table, {"MODEL": f"[bold]{preset.model}[/]"})
+        for recipe_num, recipe in enumerate(preset.recipes):
+            _add_recipe_rows(
                 table,
-                {
-                    "NAME": f"   group={group.name}",
-                    "RESOURCES": _format_resources(group.resources),
-                },
+                label=f"[secondary]   recipe={recipe_num}[/]",
+                recipe=recipe,
+                verbose=verbose,
             )
     return table
 
 
-def _format_resources(resources) -> str:
+def _add_recipe_rows(
+    table: Table,
+    label: str,
+    recipe: EndpointPresetRecipe,
+    verbose: bool,
+) -> None:
+    groups = recipe.service.replica_groups
+    column = "RESOURCES" if verbose else "GPU"
+    if len(groups) == 1:
+        add_row_from_dict(
+            table,
+            {
+                "MODEL": label,
+                column: _format_resources(groups[0].resources, verbose=verbose),
+            },
+        )
+        return
+
+    add_row_from_dict(table, {"MODEL": label})
+    for group in groups:
+        add_row_from_dict(
+            table,
+            {
+                "MODEL": f"[secondary]   group={group.name}[/]",
+                column: _format_resources(group.resources, verbose=verbose),
+            },
+        )
+
+
+def _format_resources(resources, verbose: bool) -> str:
+    if not verbose:
+        if resources.gpu is None:
+            return "-"
+        return _format_gpu(resources)
     formatted = resources.pretty_format()
     if resources.gpu is not None and resources.gpu.count.min == 0:
         if resources.gpu.count.max in (None, 0):
@@ -52,3 +85,19 @@ def _format_resources(resources) -> str:
                 .replace("gpu=0", "-")
             )
     return formatted
+
+
+def _format_gpu(resources) -> str:
+    gpu = resources.gpu
+    assert gpu is not None
+    if gpu.count.min == 0 and gpu.count.max in (None, 0):
+        return "-"
+    formatted = pretty_resources(
+        gpu_vendor=gpu.vendor,
+        gpu_name=",".join(gpu.name) if gpu.name else None,
+        gpu_count=gpu.count,
+        gpu_memory=gpu.memory,
+        total_gpu_memory=gpu.total_memory,
+        compute_capability=gpu.compute_capability,
+    )
+    return formatted.removeprefix("gpu=") or "-"

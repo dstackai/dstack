@@ -14,25 +14,13 @@ class TestAgentFinalReport:
             {
                 "success": True,
                 "run_id": str(run_id),
+                "run_name": "qwen-serving",
                 "service_yaml": "type: service\nname: qwen-serving\n",
-                "recipe_sources": ["https://example.com/recipe"],
-                "verification_summary": "Chat completion request returned 200.",
             }
         )
 
         assert report.run_id == run_id
-        assert report.recipe_sources == ["https://example.com/recipe"]
-
-    def test_rejects_success_without_verification_summary(self):
-        with pytest.raises(ValidationError, match="verification_summary"):
-            AgentFinalReport.parse_obj(
-                {
-                    "success": True,
-                    "run_id": str(uuid.uuid4()),
-                    "run_name": "qwen-serving",
-                    "service_yaml": "type: service\nname: qwen-serving\n",
-                }
-            )
+        assert report.run_name == "qwen-serving"
 
     def test_rejects_success_without_run_id(self):
         with pytest.raises(ValidationError, match="run_id"):
@@ -41,7 +29,6 @@ class TestAgentFinalReport:
                     "success": True,
                     "run_name": "qwen-serving",
                     "service_yaml": "type: service\nname: qwen-serving\n",
-                    "verification_summary": "Chat completion request returned 200.",
                 }
             )
 

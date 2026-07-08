@@ -19,7 +19,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 class EndpointStatus(str, Enum):
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
-    CLAUDING = "clauding"
+    PROTOTYPING = "prototyping"
     RUNNING = "running"
     STOPPING = "stopping"
     STOPPED = "stopped"
@@ -62,6 +62,9 @@ class EndpointConfiguration(
         Env,
         Field(description="The mapping or the list of environment variables"),
     ] = Env()
+    # TODO: Add endpoint-level resources only with hard scheduling semantics for both
+    # single-service and replica-group presets. V1 intentionally relies on preset/service
+    # resources plus ProfileParams constraints.
     preset_policy: Annotated[
         EndpointPresetPolicy,
         Field(
@@ -72,16 +75,6 @@ class EndpointConfiguration(
             )
         ),
     ] = EndpointPresetPolicy.REUSE_OR_CREATE
-    max_agent_budget: Annotated[
-        Optional[float],
-        Field(
-            description=(
-                "The maximum agent spend for provisioning this endpoint, in dollars. "
-                "If not specified, the server default is used."
-            ),
-            gt=0.0,
-        ),
-    ] = None
 
 
 class Endpoint(CoreModel):
@@ -104,16 +97,6 @@ class EndpointProvisioningPlanNone(CoreModel):
     reason: str
 
 
-class EndpointPlanReplicaSpecGroup(CoreModel):
-    """Ordered to match service replica groups; "0" is the implicit group."""
-
-    name: str
-    resources: ResourcesSpec
-    """Per-replica scheduling requirements used for offer matching."""
-    tested_resources: list[ResourcesSpec]
-    """Exact resources of the replicas that were running when the preset was verified."""
-
-
 class EndpointPlanJobOffers(CoreModel):
     replica_group: str
     resources: ResourcesSpec
@@ -126,16 +109,15 @@ class EndpointPlanJobOffers(CoreModel):
 
 class EndpointProvisioningPlanPreset(CoreModel):
     type: Literal["preset"] = "preset"
-    preset_name: str
+    preset_model: str
+    recipe_id: str
     service_name: str
-    replica_spec_groups: list[EndpointPlanReplicaSpecGroup]
     job_offers: list[EndpointPlanJobOffers]
 
 
 class EndpointProvisioningPlanAgent(CoreModel):
     type: Literal["agent"] = "agent"
     agent_model: str
-    max_budget: Optional[float] = None
     reason: Optional[str] = None
 
 

@@ -3,21 +3,22 @@ from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.resources import ResourcesSpec
 
 
-class EndpointPresetReplicaSpecGroup(CoreModel):
-    """Ordered to match service replica groups; "0" is the implicit group."""
+class EndpointPresetValidationReplica(CoreModel):
+    resources: list[ResourcesSpec]
+    """Exact resources for each running replica in this service replica group."""
 
-    name: str
-    resources: ResourcesSpec
-    """Per-replica scheduling requirements used when applying the preset."""
-    tested_resources: list[ResourcesSpec]
-    """Exact resources of the replicas that were running when the preset was verified."""
+
+class EndpointPresetValidation(CoreModel):
+    replicas: list[EndpointPresetValidationReplica]
+    """Ordered to match `ServiceConfiguration.replica_groups`."""
+
+
+class EndpointPresetRecipe(CoreModel):
+    id: str
+    service: ServiceConfiguration
+    validations: list[EndpointPresetValidation]
 
 
 class EndpointPreset(CoreModel):
-    name: str
     model: str
-    replica_spec_groups: list[EndpointPresetReplicaSpecGroup]
-
-
-class EndpointPresetDetails(EndpointPreset):
-    service: ServiceConfiguration
+    recipes: list[EndpointPresetRecipe]

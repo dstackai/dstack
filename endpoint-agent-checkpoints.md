@@ -227,9 +227,9 @@ Observed result:
 
 ### Endpoint Preset CLI
 
-`dstack preset` now lists endpoint presets saved on the server. `dstack preset list`
-is equivalent, and `dstack preset delete NAME` removes a saved endpoint preset after
-confirmation.
+`dstack endpoint preset` lists endpoint presets saved on the server.
+`dstack endpoint preset get MODEL --json` returns the model-level preset, and
+`dstack endpoint preset delete MODEL` removes it after confirmation.
 
 This is intentionally limited to list/delete. Creating or updating presets remains part
 of the endpoint agent flow, where the agent saves a preset only after verifying the final
@@ -240,9 +240,9 @@ Verification on 2026-07-04:
 ```bash
 uv run pytest src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/routers/test_endpoints.py
 uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
-uv run ruff check src/dstack/_internal/core/models/endpoint_presets.py src/dstack/_internal/server/services/endpoints/presets.py src/dstack/_internal/server/schemas/endpoint_presets.py src/dstack/api/server/_endpoint_presets.py src/dstack/api/server/__init__.py src/dstack/_internal/server/routers/endpoints.py src/dstack/_internal/cli/utils/preset.py src/dstack/_internal/cli/commands/preset.py src/dstack/_internal/cli/services/completion.py src/dstack/_internal/cli/main.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/routers/test_endpoints.py
-uv run dstack preset --help
-uv run dstack preset
+uv run ruff check src/dstack/_internal/core/models/endpoint_presets.py src/dstack/_internal/server/services/endpoints/presets.py src/dstack/_internal/server/schemas/endpoint_presets.py src/dstack/api/server/_endpoint_presets.py src/dstack/api/server/__init__.py src/dstack/_internal/server/routers/endpoints.py src/dstack/_internal/cli/utils/preset.py src/dstack/_internal/cli/commands/endpoint.py src/dstack/_internal/cli/services/completion.py src/dstack/_internal/cli/main.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/routers/test_endpoints.py
+uv run dstack endpoint preset --help
+uv run dstack endpoint preset
 uv run dstack --help
 ```
 
@@ -251,17 +251,17 @@ Observed result:
 - focused preset/router pytest: `38 passed, 11 skipped`
 - broader endpoint/preset pytest: `125 passed, 46 skipped`
 - ruff: `All checks passed!`
-- `dstack preset` lists the saved Qwen endpoint presets
-- top-level help now includes `preset            Manage endpoint presets`
+- `dstack endpoint preset` lists the saved Qwen endpoint presets
+- endpoint help includes `preset            Manage endpoint presets`
 
 ### Endpoint Preset Resource Contract
 
 Endpoint presets now separate scheduling requirements from verified runtime evidence:
-`replica_spec_groups[*].resources` is used for service planning and offer matching,
-while `replica_spec_groups[*].tested_resources` stores exact resources captured from
-actual registered service replicas.
+recipe `service.resources` is used for service planning and offer matching, while
+`validations[*].replicas[*].resources` stores exact resources captured from actual
+registered service replicas.
 
-`dstack preset` now displays every actual replica when a preset has multiple replicas, using child rows such as `replica=0` or `group=worker replica=1`, matching the hierarchy used by `dstack ps`. It does not summarize replicas as counts.
+`dstack endpoint preset` now displays one row per recipe, and expands service replica groups with child rows when a recipe has multiple groups. Exact validation resources stay in `get --json`.
 
 Invalid local preset files are skipped for user-facing preset listing and logged server-side with
 the preset path and parse/validation error.
@@ -272,7 +272,7 @@ Verification on 2026-07-04:
 uv run pytest src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/cli/utils/test_preset.py
 uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
 uv run ruff check src/dstack/_internal/server/services/endpoints/presets.py src/dstack/_internal/server/services/endpoints/preset_building.py src/dstack/_internal/cli/utils/preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/cli/utils/test_preset.py
-uv run dstack preset
+uv run dstack endpoint preset
 ```
 
 Observed result:
@@ -280,7 +280,7 @@ Observed result:
 - focused preset/endpoint-worker pytest: `69 passed, 35 skipped`
 - broader endpoint pytest: `138 passed, 46 skipped`
 - ruff: `All checks passed!`
-- `dstack preset` skips the old loose smoke preset and lists the valid learned preset; the server logs the skipped preset path and validation error
+- `dstack endpoint preset` skips the old loose smoke preset and lists the valid learned preset; the server logs the skipped preset path and validation error
 
 ### Endpoint Agent Retest After Deleting Preset
 
@@ -310,7 +310,7 @@ Important harness findings:
   requirements (`gpu.name: [L4, A40, RTX3090]`) instead of preserving the broadest
   correct model-derived requirement.
 - Bad: the agent's verification/final report said L4, but the actual provisioned
-  hardware and saved `tested_resources` were A40. The server-side preset builder used
+  hardware and saved validation resources were A40. The server-side preset builder used
   actual run state correctly; the agent report was stale/inferred.
 
 Patch made after this run:
@@ -363,7 +363,7 @@ Default CLI project preserved: `main -> http://127.0.0.1:3002`
 ```bash
 uv run dstack endpoint --project endpoint-dev get qwen-endpoint-smoke --json
 uv run dstack run --project endpoint-dev get qwen-smoke --json
-uv run dstack preset --project endpoint-dev
+uv run dstack endpoint --project endpoint-dev preset
 uv run dstack logs --project endpoint-dev qwen-smoke --since 3m
 ```
 
@@ -371,7 +371,7 @@ Observed result on 2026-07-04:
 
 - endpoint status: `running`
 - backing service status: `running`
-- preset listed by `dstack preset --project endpoint-dev`
+- preset listed by `dstack endpoint --project endpoint-dev preset`
 - `verification.json` recorded HTTP 200 for `/v1/models` and
   `/v1/chat/completions`
 - `final_report.json` recorded actual provisioned hardware from run JSON
@@ -389,7 +389,7 @@ These are outside the repo and are not part of the checkpoint commit:
 
 ### Known Issues / Next Hardening
 
-- After agent verification, the endpoint briefly transitions from `agenting` to
+- After agent verification, the endpoint briefly transitions from `prototyping` to
   `provisioning` before `running`. This is confusing; the next patch should avoid
   exposing that intermediate status for agent-verified endpoints.
 - The agent still sometimes uses invalid CLI forms first, such as `dstack run list`
@@ -418,9 +418,9 @@ Status behavior:
 - Agent-created endpoints no longer expose an intermediate `provisioning` state after
   the agent returns a verified service run.
 - If the reported service is not yet fully visible as a ready dstack service, the
-  endpoint stays `agenting` with `service_run_id` linked.
+  endpoint stays `prototyping` with `service_run_id` linked.
 - Once the linked service is ready, the worker saves the learned preset and moves the
-  endpoint directly from `agenting` to `running`.
+  endpoint directly from `prototyping` to `running`.
 - Preset-based endpoint creation still uses `provisioning`.
 
 Endpoint log behavior:
@@ -450,3 +450,303 @@ Observed result:
 - broader endpoint/log pytest: `104 passed, 11 skipped`
 - ruff: `All checks passed!`
 - format check: `4 files already formatted`
+
+## Checkpoint: qwen2-runpod-restart-resource-envelope
+
+Status: known-good same-host restart plus learned-preset resource-envelope validation.
+
+Suggested local tag after the next checkpoint commit:
+
+```bash
+endpoint-agent/qwen2-runpod-restart-resource-envelope
+```
+
+Date: 2026-07-07
+Project: `endpoint-e2e`
+Server: current checkout on `127.0.0.1:3000`
+Test directory: `/Users/dstack/dstack-endpoints-demo/endpoint-agent-restart`
+
+### What Worked
+
+- Endpoint `qwen2-05b-restart-1110` reached `running`.
+- Model: `Qwen/Qwen2-0.5B-Instruct`.
+- Server restart during `prototyping` reused the same agent session/workspace and did not start a
+  duplicate Claude process.
+- Claude submitted and verified service run `qwen2-05b-restart-1110-1`.
+- Final run ID: `c1be5e1a-6c49-4ef5-926e-4d2171a03d98`.
+- Backend/hardware: RunPod `EU-CZ-1`, NVIDIA RTX 3090 24GB.
+- Hourly price: `$0.46/hr`; final run cost after cleanup: `$0.0484`.
+- Claude reported agent cost: `$1.1923`.
+- Agent verified `/v1/chat/completions` through the dstack proxy with HTTP 200 and response model
+  `Qwen/Qwen2-0.5B-Instruct`.
+- Endpoint preset was saved as `qwen-qwen2-0-5b-instruct-c1be5e1a`.
+- Final service YAML used scheduling resources `gpu: 16GB..24GB:1`, not bare `gpu: 1` and not exact
+  RTX 3090 resources.
+- Saved preset kept reusable scheduling resources separate from exact tested hardware:
+  - scheduling: `cpu=2.. mem=8GB.. disk=30GB.. gpu=16GB..24GB:1`
+  - tested: `cpu=32 mem=125GB disk=100GB gpu=RTX3090:24GB:1`
+- `dstack endpoint stop qwen2-05b-restart-1110 -y` stopped the endpoint and terminated the backing
+  service run.
+- A no-cost reuse preview for the same model found offers without Claude, but selected the older
+  duplicate preset `qwen-qwen2-0-5b-instruct-532ddf05`, not this checkpoint's new
+  `qwen-qwen2-0-5b-instruct-c1be5e1a` preset.
+
+### Useful Runtime Artifacts
+
+- Workspace:
+  `/Users/dstack/.dstack/server/data/endpoint_agent_runs/6a9ce2c9-2310-4210-9533-0acf47e49d27/1/workspace`
+- Final report:
+  `/Users/dstack/.dstack/server/data/endpoint_agent_runs/6a9ce2c9-2310-4210-9533-0acf47e49d27/1/workspace/final_report.json`
+- Verification:
+  `/Users/dstack/.dstack/server/data/endpoint_agent_runs/6a9ce2c9-2310-4210-9533-0acf47e49d27/1/workspace/verification.json`
+
+### Known Issues / Next Hardening
+
+- Claude first wrote `backend` instead of `backends` and omitted `fleets`; the workspace CLI guard
+  caught both before paid submission, but the prompt/skill should reduce this wasted turn.
+- Endpoint logs showed Claude assistant stdout even though `progress.jsonl` was clean. Fixed after
+  this run: assistant stream text is now trace-only; endpoint logs use `progress.jsonl` and explicit
+  server lifecycle messages.
+- The run recorded successful CUDA/vLLM/FlashAttention behavior but did not capture direct
+  `nvidia-smi` host driver output.
+- Duplicate presets for the same model now exist from repeated tests. Keep that inspectable in v1;
+  automatic update/repair policy is later, but selection/ranking needs a v1 decision if duplicates
+  can change which preset is reused.
+
+### Verification Commands
+
+```bash
+uv run pytest src/tests/_internal/server/services/endpoints/test_claude_agent.py
+uv run pytest src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py
+uv run ruff check .
+uv run pyright -p .
+```
+
+Observed result after the endpoint-log fix:
+
+- focused agent pytest: `30 passed`
+- broader endpoint pytest slice: `124 passed, 72 skipped`
+- ruff: `All checks passed!`
+- pyright: `0 errors, 0 warnings, 0 informations`
+
+## Checkpoint: qwen25-7b-backend-placement-task-first
+
+Status: known-good backend-placement/task-first validation, with a probe-quality fix applied after
+review.
+
+Suggested local tag after the next checkpoint commit:
+
+```bash
+endpoint-agent/qwen25-7b-backend-placement-task-first
+```
+
+Date: 2026-07-07
+Project: `endpoint-agent-reasoning`
+Endpoint: `qwen25-7b-placement-choice`
+Model: `Qwen/Qwen2.5-7B-Instruct`
+Fleet: `reusable-vs-container`
+
+### What Worked
+
+- The allowed fleet exposed cheaper RunPod container offers and a JarvisLabs L4 reusable/inspectable
+  offer.
+- Claude chose JarvisLabs L4 at `$0.44/hr` over cheaper RunPod offers because it could reuse/inspect
+  the instance and keep a warm path for the final service.
+- Claude submitted a task first: `qwen25-7b-placement-choice-1`.
+- Claude then submitted the final service: `qwen25-7b-placement-choice-2`.
+- The service reused the warm JarvisLabs instance and verified:
+  - `/v1/models=200`
+  - `/v1/chat/completions=200`
+  - response model matched `Qwen/Qwen2.5-7B-Instruct`
+- Endpoint reached `running`, saved a preset, then was stopped cleanly.
+- Temporary fleet was deleted afterward; `dstack fleet --project endpoint-agent-reasoning` showed no
+  fleets.
+
+### What Was Not Proven
+
+- The agent did not SSH into the task and did not use a dev environment.
+- This proves task-first on reusable backend capacity, not an interactive SSH/dev loop.
+- The task probe was too shallow: it observed `nvidia-smi` and driver evidence, but failed on
+  `python` missing before proving framework import/runtime/server behavior.
+
+### Fix Applied After Review
+
+- Endpoint system prompt and `skills/dstack-prototyping/SKILL.md` now say that `nvidia-smi` is host
+  evidence only.
+- A task/dev probe must exercise the intended serving image/runtime/command before it can justify
+  promotion.
+- Final service verification remains the success gate; if final service verification fails, the
+  agent must return to the evidence loop instead of writing success.
+
+### Verification Commands
+
+```bash
+uv run pytest src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+uv run pytest src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+```
+
+Observed result:
+
+- focused agent pytest: `31 passed`
+- broader endpoint/preset/pipeline pytest: `117 passed, 50 skipped`
+
+## Checkpoint: endpoint-probe-task-shape-guard
+
+Status: structural harness fix after the batch-task failure.
+
+Date: 2026-07-07
+
+### Why
+
+The previous prompt/skill change was not enough by itself. In the next live run, Claude added an
+optional Hugging Face cache mount, but still encoded the whole probe as a batch task and chose a
+RunPod service-like path. That means the agent understood part of the instruction while still
+missing the core shape: a probe task should usually be a live environment the agent can attach/SSH
+into, not a one-shot shell script.
+
+### Fix
+
+- The endpoint agent's local `dstack` wrapper now rejects batch-style endpoint probe tasks.
+- Allowed task probe shape: a single long-lived idle command such as `sleep infinity`, with checks
+  run later through attach/SSH.
+- Rejected task probe shape: commands that pack `nvidia-smi`, Python/framework imports, `vllm` /
+  `sglang`, server startup, or `curl` probes into the task YAML.
+- Services are unaffected; the final endpoint proof is still a verified dstack service.
+
+### Verification Commands
+
+```bash
+uv run pytest src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+uv run pytest src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+uv run ruff check src/dstack/_internal/server/services/endpoints/agent/claude.py src/tests/_internal/server/services/endpoints/test_claude_agent.py
+```
+
+Observed result:
+
+- focused agent pytest: `33 passed`
+- broader endpoint/preset/pipeline pytest: `119 passed, 50 skipped`
+- ruff: `All checks passed`
+
+## Checkpoint: qwen25-probe-quality-cached-batch-abort
+
+Status: aborted validation run; confirms cache-mount prompt worked but interactive-probe prompt did
+not.
+
+Date: 2026-07-07
+Project: `endpoint-agent-reasoning`
+Endpoint: `qwen25-probe-quality-2202`
+Fleet: `probe-quality-mixed`
+
+### What Improved
+
+- Generated task YAML included an optional Hugging Face instance cache mount:
+  `/dstack-cache/huggingface` → `/root/.cache/huggingface`, `optional: true`.
+- Planned checks still covered vLLM import, local server start, health, and chat completion.
+
+### What Was Still Wrong
+
+- The probe remained a batch `commands` chain instead of a long-lived task plus attach/SSH
+  inspection.
+- Claude again wrote `jarvislabs+runpod (container-style)` without stronger backend evidence.
+- The actual submitted run landed on RunPod L4, so the placement preference regressed.
+
+### Cleanup
+
+- Endpoint `qwen25-probe-quality-2202`: `stopped`
+- Task `qwen25-probe-quality-2202-1`: `terminated`, `termination_reason=terminated_by_user`
+- Temporary fleet `probe-quality-mixed`: deleted
+
+### Lesson
+
+Prompt-only enforcement is not enough here. The next useful change should give the agent explicit
+server-generated backend/fleet capability context and should consider a pre-submit guard or required
+artifact for interactive probes, instead of adding more generic prose.
+
+## Checkpoint: qwen25-probe-quality-service-first-abort
+
+Status: aborted validation run; useful harness failure, not a passing endpoint e2e.
+
+Date: 2026-07-07
+Project: `endpoint-agent-reasoning`
+Endpoint: `qwen25-probe-quality-2136`
+Fleet: `probe-quality-mixed`
+
+### What Happened
+
+- Temporary fleet exposed RunPod A5000/L4/RTX3090 offers and JarvisLabs L4.
+- Claude wrote that both RunPod and JarvisLabs were "container-only (no reusable VM/SSH state)".
+- Claude skipped the task/dev probe and submitted direct service `qwen25-probe-quality-2136-1`.
+- The service landed on RunPod CA-MTL-1 A5000 at `$0.27/hr`.
+- We stopped the endpoint because the run no longer tested the probe-quality fix.
+
+### Cleanup
+
+- Endpoint `qwen25-probe-quality-2136`: `stopped`
+- Service `qwen25-probe-quality-2136-1`: `terminated`, `termination_reason=terminated_by_user`
+- Temporary fleet `probe-quality-mixed`: deleted
+
+### Lesson
+
+The failure happened before probe quality. The agent inferred backend capability from the offer
+table, turned uncertainty into "no reusable state", and then optimized back to the cheaper RunPod
+service-first path.
+
+Prompt/skill correction after this run:
+
+- Do not infer "container-only" or "no reusable state" from offers alone.
+- Fleet state (`nodes: 0..N`, `idle_duration`, idle/running instances) matters.
+- If backend reuse/SSH/cache behavior is uncertain, resolve that uncertainty; do not use it as a
+  reason to skip a task/dev probe.
+- Tiny/well-known model is not enough by itself to skip a probe for a create-recipe endpoint on an
+  unverified fleet/backend/runtime path.
+
+## Checkpoint: qwen25-probe-quality-batch-task-abort
+
+Status: aborted validation run; useful harness failure after backend-choice improvement.
+
+Date: 2026-07-07
+Project: `endpoint-agent-reasoning`
+Endpoint: `qwen25-probe-quality-2152`
+Fleet: `probe-quality-mixed`
+
+### What Improved
+
+- Claude chose a task probe instead of service-first.
+- The task landed on JarvisLabs `L4-1x` at `$0.44/hr`, despite cheaper RunPod offers.
+- The planned checks went beyond host visibility: vLLM/Torch/CUDA import, local server start,
+  `/health`, `/v1/models`, and a local chat completion request.
+
+### What Was Still Wrong
+
+- The probe was encoded as one batch `commands` chain instead of a long-lived task plus attach/SSH.
+- No instance volumes were configured. Run JSON showed `configuration.volumes=[]`,
+  `job_spec.volumes=[]`, and `runtime.volume_names=[]`.
+- Claude still used imprecise backend wording: `jarvislabs+runpod (container-style)`.
+
+### Cleanup
+
+- Endpoint `qwen25-probe-quality-2152`: `stopped`
+- Task `qwen25-probe-quality-2152-1`: `terminated`, `termination_reason=terminated_by_user`
+- Temporary fleet `probe-quality-mixed`: deleted
+
+### Fix Applied After Review
+
+- Endpoint prompt and `skills/dstack-prototyping/SKILL.md` now require long-lived interactive probes
+  when attach/SSH is available: keep the probe alive with `sleep infinity` or equivalent, attach/SSH
+  into it, and run bounded checks inside the live environment.
+- Batch task commands are now explicitly reserved for unavailable attach/SSH or truly one-shot
+  checks.
+- Prompt/skill now require optional instance cache mounts for Hugging Face-style model caches when
+  useful, and require the agent to record why cache mounts were omitted.
+
+### Verification Commands
+
+```bash
+uv run pytest src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+uv run pytest src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py -q
+```
+
+Observed result:
+
+- focused agent pytest: `31 passed`
+- broader endpoint/preset/pipeline pytest: `117 passed, 50 skipped`

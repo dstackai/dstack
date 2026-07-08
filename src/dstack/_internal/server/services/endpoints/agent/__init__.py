@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.server import settings
 from dstack._internal.server.models import EndpointModel
 from dstack._internal.server.services.endpoints.agent.report import AgentFinalReport
@@ -19,7 +18,8 @@ class AgentPlan:
 class AgentProvisioningResult:
     run_id: Optional[uuid.UUID] = None
     run_name: Optional[str] = None
-    candidate_run_ids: tuple[uuid.UUID, ...] = ()
+    submitted_run_ids: tuple[uuid.UUID, ...] = ()
+    submitted_run_names: tuple[str, ...] = ()
     error: Optional[str] = None
     final_report: Optional[AgentFinalReport] = None
     in_progress: bool = False
@@ -42,6 +42,9 @@ class AgentService(ABC):
     ) -> AgentProvisioningResult:
         pass
 
+    async def abort_endpoint(self, endpoint_model: EndpointModel) -> bool:
+        return True
+
 
 class DisabledAgentService(AgentService):
     def __init__(self, reason: Optional[str] = None) -> None:
@@ -59,6 +62,14 @@ class DisabledAgentService(AgentService):
         pipeline_hinter: PipelineHinterProtocol,
     ) -> AgentProvisioningResult:
         return AgentProvisioningResult(error=self._reason or get_agent_unavailable_reason())
+
+
+async def abort_agent_endpoint(endpoint_model: EndpointModel) -> bool:
+    # Cancellation must work even if a new agent session cannot be started because
+    # the API key or Claude executable is no longer configured.
+    from dstack._internal.server.services.endpoints.agent.claude import ClaudeAgentService
+
+    return await ClaudeAgentService().abort_endpoint(endpoint_model)
 
 
 def get_agent_service() -> AgentService:
@@ -83,11 +94,3 @@ def get_agent_unavailable_reason() -> Optional[str]:
     )
 
     return get_claude_agent_unavailable_reason()
-
-
-def get_effective_max_agent_budget(
-    configuration: EndpointConfiguration,
-) -> Optional[float]:
-    if configuration.max_agent_budget is not None:
-        return configuration.max_agent_budget
-    return settings.AGENT_ANTHROPIC_MAX_BUDGET

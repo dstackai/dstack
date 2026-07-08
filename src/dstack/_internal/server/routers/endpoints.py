@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.endpoints as endpoints_services
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.endpoint_presets import EndpointPreset, EndpointPresetDetails
+from dstack._internal.core.models.endpoint_presets import EndpointPreset
 from dstack._internal.core.models.endpoints import Endpoint, EndpointPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -156,15 +156,13 @@ async def list_endpoint_presets(
     return CustomORJSONResponse([endpoint_preset_to_api_model(preset) for preset in presets])
 
 
-@project_router.post(
-    "/presets/get", summary="Get endpoint preset", response_model=EndpointPresetDetails
-)
+@project_router.post("/presets/get", summary="Get endpoint preset", response_model=EndpointPreset)
 async def get_endpoint_preset(
     body: GetEndpointPresetRequest,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     _, project = user_project
-    preset = await get_endpoint_preset_service().get_preset(project.name, body.name)
+    preset = await get_endpoint_preset_service().get_preset(project.name, body.model)
     if preset is None:
         raise ResourceNotExistsError()
     return CustomORJSONResponse(endpoint_preset_to_api_details(preset))
@@ -178,7 +176,7 @@ async def delete_endpoint_presets(
     _, project = user_project
     preset_service = get_endpoint_preset_service()
     try:
-        for name in body.names:
-            await preset_service.delete_preset(project.name, name)
+        for model in body.models:
+            await preset_service.delete_preset(project.name, model)
     except FileNotFoundError:
         raise ResourceNotExistsError()

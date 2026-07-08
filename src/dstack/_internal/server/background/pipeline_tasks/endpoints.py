@@ -45,9 +45,12 @@ from dstack._internal.server.services.endpoints import (
     emit_endpoint_status_change_event,
     get_endpoint_agent_admin_required_message,
     get_endpoint_configuration,
+    get_endpoint_no_fleets_message,
+    has_endpoint_existing_usable_fleets,
     record_endpoint_run_submission,
 )
 from dstack._internal.server.services.endpoints.agent import (
+    abort_agent_endpoint,
     get_agent_service,
     get_agent_unavailable_reason,
 )
@@ -166,7 +169,7 @@ class EndpointFetcher(Fetcher[EndpointPipelineItem]):
                             [
                                 EndpointStatus.SUBMITTED,
                                 EndpointStatus.PROVISIONING,
-                                EndpointStatus.CLAUDING,
+                                EndpointStatus.PROTOTYPING,
                                 EndpointStatus.RUNNING,
                                 EndpointStatus.STOPPING,
                             ]
@@ -249,8 +252,8 @@ class EndpointWorker(Worker[EndpointPipelineItem]):
                 endpoint_model=endpoint_model,
                 pipeline_hinter=self._pipeline_hinter,
             )
-        elif endpoint_model.status == EndpointStatus.CLAUDING:
-            result = await _process_clauding_endpoint(
+        elif endpoint_model.status == EndpointStatus.PROTOTYPING:
+            result = await _process_prototyping_endpoint(
                 endpoint_model=endpoint_model,
                 pipeline_hinter=self._pipeline_hinter,
             )
@@ -394,13 +397,14 @@ class _ProcessResult:
 @dataclass(frozen=True)
 class _PresetSubmission:
     run_id: uuid.UUID
-    preset_name: str
+    preset_model: str
+    recipe_id: str
 
 
 @dataclass(frozen=True)
 class _PresetSubmissionResult:
     submission: Optional[_PresetSubmission] = None
-    unprovisionable_preset_name: Optional[str] = None
+    unprovisionable_preset: Optional[str] = None
 
 
 async def _get_endpoint_runs_to_stop_after_failure(
@@ -442,6 +446,20 @@ async def _process_submitted_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
+    endpoint_configuration = get_endpoint_configuration(endpoint_model)
+    async with get_session_ctx() as session:
+        has_usable_fleets = await has_endpoint_existing_usable_fleets(
+            session=session,
+            project=endpoint_model.project,
+            configuration=endpoint_configuration,
+        )
+    if not has_usable_fleets:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": get_endpoint_no_fleets_message(endpoint_configuration),
+            }
+        )
     try:
         submission_result = await _submit_endpoint_from_preset(
             endpoint_id=endpoint_model.id,
@@ -456,22 +474,26 @@ async def _process_submitted_endpoint(
         )
     if submission_result.submission is not None:
         logger.info(
-            "Provisioning endpoint %s from preset %s",
+            "Provisioning endpoint %s from preset %s recipe %s",
             endpoint_model.name,
-            submission_result.submission.preset_name,
+            submission_result.submission.preset_model,
+            submission_result.submission.recipe_id,
         )
         update_map = _EndpointUpdateMap(
             status=EndpointStatus.PROVISIONING,
             status_message=None,
             service_run_id=submission_result.submission.run_id,
-            provisioning_method=f"preset:{submission_result.submission.preset_name}",
+            provisioning_method=(
+                f"preset:{submission_result.submission.preset_model}"
+                f"#{submission_result.submission.recipe_id}"
+            ),
         )
         return _ProcessResult(update_map=update_map)
 
-    if _should_provision_with_agent(endpoint_model):
+    if await _should_provision_with_agent(endpoint_model):
         logger.info("Provisioning endpoint %s with server agent", endpoint_model.name)
         update_map = _EndpointUpdateMap(
-            status=EndpointStatus.CLAUDING,
+            status=EndpointStatus.PROTOTYPING,
             status_message=None,
             provisioning_method="agent",
         )
@@ -483,19 +505,26 @@ async def _process_submitted_endpoint(
             "status": EndpointStatus.FAILED,
             "status_message": _get_no_provisioning_path_message(
                 endpoint_model,
-                unprovisionable_preset_name=submission_result.unprovisionable_preset_name,
+                unprovisionable_preset=submission_result.unprovisionable_preset,
             ),
         }
     )
 
 
-def _should_provision_with_agent(endpoint_model: EndpointModel) -> bool:
+async def _should_provision_with_agent(endpoint_model: EndpointModel) -> bool:
     endpoint_configuration = get_endpoint_configuration(endpoint_model)
-    return (
-        endpoint_configuration.preset_policy != EndpointPresetPolicy.REUSE
-        and get_agent_service().is_enabled()
-        and can_use_endpoint_agent(user=endpoint_model.user, project=endpoint_model.project)
-    )
+    if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE:
+        return False
+    if not get_agent_service().is_enabled():
+        return False
+    if not can_use_endpoint_agent(user=endpoint_model.user, project=endpoint_model.project):
+        return False
+    async with get_session_ctx() as session:
+        return await has_endpoint_existing_usable_fleets(
+            session=session,
+            project=endpoint_model.project,
+            configuration=endpoint_configuration,
+        )
 
 
 async def _get_active_serving_run_name_conflict(
@@ -529,7 +558,7 @@ async def _process_provisioning_endpoint(
 ) -> _ProcessResult:
     if endpoint_model.service_run is None:
         if endpoint_model.provisioning_method == "agent":
-            return await _process_clauding_endpoint(
+            return await _process_prototyping_endpoint(
                 endpoint_model=endpoint_model,
                 pipeline_hinter=pipeline_hinter,
             )
@@ -548,12 +577,17 @@ async def _process_provisioning_endpoint(
     if readiness.model_base_url is None or readiness.model_name is None:
         return _ProcessResult()
     if endpoint_model.provisioning_method == "agent":
-        # The agent's verification report is the functional signal. This server-side gate only
+        # The agent's final report is the functional signal. This server-side gate only
         # confirms that the verified run still looks like a normal ready dstack service.
         await _try_save_agent_endpoint_preset(
             endpoint_model=endpoint_model,
-            model_name=readiness.model_name,
         )
+        if endpoint_model.service_run_id is not None:
+            await _stop_non_final_submitted_runs(
+                endpoint_model=endpoint_model,
+                final_run_id=endpoint_model.service_run_id,
+                pipeline_hinter=pipeline_hinter,
+            )
     return _ProcessResult(
         update_map={
             "status": EndpointStatus.RUNNING,
@@ -562,19 +596,25 @@ async def _process_provisioning_endpoint(
     )
 
 
-async def _process_clauding_endpoint(
+async def _process_prototyping_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
     if endpoint_model.service_run is not None:
-        return await _process_agent_verified_endpoint(endpoint_model)
+        return await _process_agent_verified_endpoint(
+            endpoint_model=endpoint_model,
+            pipeline_hinter=pipeline_hinter,
+        )
     return await _provision_endpoint_with_agent(
         endpoint_model=endpoint_model,
         pipeline_hinter=pipeline_hinter,
     )
 
 
-async def _process_agent_verified_endpoint(endpoint_model: EndpointModel) -> _ProcessResult:
+async def _process_agent_verified_endpoint(
+    endpoint_model: EndpointModel,
+    pipeline_hinter: PipelineHinterProtocol,
+) -> _ProcessResult:
     run_model = endpoint_model.service_run
     if run_model is None:
         return _ProcessResult()
@@ -587,11 +627,15 @@ async def _process_agent_verified_endpoint(endpoint_model: EndpointModel) -> _Pr
             }
         )
     if readiness.model_base_url is None or readiness.model_name is None:
-        return _ProcessResult(update_map={"status": EndpointStatus.CLAUDING})
+        return _ProcessResult(update_map={"status": EndpointStatus.PROTOTYPING})
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
-        model_name=readiness.model_name,
+    )
+    await _stop_non_final_submitted_runs(
+        endpoint_model=endpoint_model,
+        final_run_id=run_model.id,
+        pipeline_hinter=pipeline_hinter,
     )
     return _ProcessResult(
         update_map={
@@ -618,14 +662,15 @@ async def _provision_endpoint_with_agent(
         endpoint_model=endpoint_model,
         pipeline_hinter=pipeline_hinter,
     )
-    await _record_agent_candidate_run_submissions(
+    await _record_agent_submitted_runs(
         endpoint_model=endpoint_model,
-        candidate_run_ids=result.candidate_run_ids,
+        submitted_run_ids=result.submitted_run_ids,
+        submitted_run_names=result.submitted_run_names,
     )
     if result.in_progress:
         return _ProcessResult(
             update_map={
-                "status": EndpointStatus.CLAUDING,
+                "status": EndpointStatus.PROTOTYPING,
                 "status_message": None,
             }
         )
@@ -641,7 +686,7 @@ async def _provision_endpoint_with_agent(
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": "Server agent did not return a verification report",
+                "status_message": "Server agent did not return a final report",
             }
         )
     if not report.success:
@@ -659,7 +704,7 @@ async def _provision_endpoint_with_agent(
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": "Server agent returned inconsistent run id in verification report",
+                "status_message": "Server agent returned inconsistent run id in final report",
             }
         )
     if (
@@ -670,16 +715,14 @@ async def _provision_endpoint_with_agent(
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": (
-                    "Server agent returned inconsistent run name in verification report"
-                ),
+                "status_message": ("Server agent returned inconsistent run name in final report"),
             }
         )
     if run_id is None:
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": "Server agent verification report did not identify a run id",
+                "status_message": "Server agent final report did not identify a run id",
             }
         )
 
@@ -700,6 +743,23 @@ async def _provision_endpoint_with_agent(
             update_map={
                 "status": EndpointStatus.FAILED,
                 "status_message": (f"Server agent reported run '{run_id}' but it was not found"),
+            }
+        )
+    if report.run_name is not None and report.run_name != run_model.run_name:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": ("Server agent returned inconsistent run name in final report"),
+            }
+        )
+    if not _is_valid_agent_submission_run_name(endpoint_model.name, run_model.run_name):
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": (
+                    "Server agent final service run name must be "
+                    f"'{endpoint_model.name}-<submission-number>'"
+                ),
             }
         )
     if run_model.user_id != endpoint_model.user_id:
@@ -748,7 +808,7 @@ async def _provision_endpoint_with_agent(
     if readiness.model_base_url is None or readiness.model_name is None:
         return _ProcessResult(
             update_map={
-                "status": EndpointStatus.CLAUDING,
+                "status": EndpointStatus.PROTOTYPING,
                 "status_message": None,
                 "service_run_id": run_model.id,
             }
@@ -756,7 +816,11 @@ async def _provision_endpoint_with_agent(
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
-        model_name=readiness.model_name,
+    )
+    await _stop_non_final_submitted_runs(
+        endpoint_model=endpoint_model,
+        final_run_id=run_model.id,
+        pipeline_hinter=pipeline_hinter,
     )
     return _ProcessResult(
         update_map={
@@ -789,27 +853,37 @@ async def _record_endpoint_run_submission(endpoint_id: uuid.UUID, run_id: uuid.U
         await session.commit()
 
 
-async def _record_agent_candidate_run_submissions(
+async def _record_agent_submitted_runs(
     *,
     endpoint_model: EndpointModel,
-    candidate_run_ids: Sequence[uuid.UUID],
+    submitted_run_ids: Sequence[uuid.UUID],
+    submitted_run_names: Sequence[str],
 ) -> None:
-    if len(candidate_run_ids) == 0:
+    valid_submitted_run_names = [
+        run_name
+        for run_name in submitted_run_names
+        if _is_valid_agent_submission_run_name(endpoint_model.name, run_name)
+    ]
+    if len(submitted_run_ids) == 0 and len(valid_submitted_run_names) == 0:
         return
     async with get_session_ctx() as session:
         res = await session.execute(
             select(RunModel).where(
-                RunModel.id.in_(candidate_run_ids),
+                or_(
+                    RunModel.id.in_(submitted_run_ids),
+                    RunModel.run_name.in_(valid_submitted_run_names),
+                ),
                 RunModel.project_id == endpoint_model.project_id,
                 RunModel.user_id == endpoint_model.user_id,
                 RunModel.deleted == False,
             )
         )
         runs_by_id = {run.id: run for run in res.scalars().all()}
-        for run_id in candidate_run_ids:
+        runs_by_name = {run.run_name: run for run in runs_by_id.values()}
+        for run_id in submitted_run_ids:
             if run_id not in runs_by_id:
                 logger.info(
-                    "Ignoring endpoint %s candidate run %s because it is not a live run "
+                    "Ignoring endpoint %s submitted run %s because it is not a live run "
                     "owned by the endpoint user/project",
                     endpoint_model.name,
                     run_id,
@@ -823,12 +897,62 @@ async def _record_agent_candidate_run_submissions(
                 )
             except ServerClientError as e:
                 logger.info(
-                    "Ignoring endpoint %s candidate run %s: %s",
+                    "Ignoring endpoint %s submitted run %s: %s",
                     endpoint_model.name,
                     run_id,
                     e.msg,
                 )
+        for run_name in valid_submitted_run_names:
+            run = runs_by_name.get(run_name)
+            if run is None:
+                continue
+            try:
+                await record_endpoint_run_submission(
+                    session=session,
+                    endpoint_id=endpoint_model.id,
+                    run_id=run.id,
+                )
+            except ServerClientError as e:
+                logger.info(
+                    "Ignoring endpoint %s submitted run %s: %s",
+                    endpoint_model.name,
+                    run_name,
+                    e.msg,
+                )
         await session.commit()
+
+
+async def _stop_non_final_submitted_runs(
+    *,
+    endpoint_model: EndpointModel,
+    final_run_id: uuid.UUID,
+    pipeline_hinter: PipelineHinterProtocol,
+) -> None:
+    for run_model in await _get_endpoint_unfinished_runs(endpoint_model):
+        if run_model.id == final_run_id or run_model.status == RunStatus.TERMINATING:
+            continue
+        logger.info(
+            "Stopping non-final endpoint run %s after endpoint %s verified run %s",
+            run_model.run_name,
+            endpoint_model.name,
+            final_run_id,
+        )
+        await _stop_backing_run(
+            endpoint_model=endpoint_model,
+            run_name=run_model.run_name,
+            pipeline_hinter=pipeline_hinter,
+        )
+
+
+def _is_valid_agent_submission_run_name(endpoint_name: str, run_name: str) -> bool:
+    prefix = f"{endpoint_name}-"
+    if not run_name.startswith(prefix):
+        return False
+    suffix = run_name[len(prefix) :]
+    if not suffix.isdecimal():
+        return False
+    submission_num = int(suffix)
+    return submission_num > 0 and str(submission_num) == suffix
 
 
 async def _process_running_endpoint(endpoint_model: EndpointModel) -> _ProcessResult:
@@ -849,10 +973,13 @@ async def _process_stopping_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
-    # TODO: When the Claude agent service exposes cancellation, interrupt a live
-    # agent process here instead of waiting for it to notice/finish.
+    agent_aborted = True
+    if endpoint_model.provisioning_method == "agent":
+        agent_aborted = await abort_agent_endpoint(endpoint_model)
     run_models = await _get_endpoint_unfinished_runs(endpoint_model)
     if not run_models:
+        if not agent_aborted:
+            return _ProcessResult()
         return _get_stopped_result()
     for run_model in run_models:
         if run_model.status == RunStatus.TERMINATING:
@@ -872,7 +999,6 @@ async def _process_stopping_endpoint(
 
 async def _try_save_agent_endpoint_preset(
     endpoint_model: EndpointModel,
-    model_name: str,
 ) -> None:
     run_model = endpoint_model.service_run
     if run_model is None:
@@ -880,18 +1006,15 @@ async def _try_save_agent_endpoint_preset(
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
-        model_name=model_name,
     )
 
 
 async def _save_agent_endpoint_preset(
     endpoint_model: EndpointModel,
     run_model: RunModel,
-    model_name: str,
 ) -> None:
-    preset_name = f"{model_name}-{str(run_model.id)[:8]}"
     try:
-        preset = build_endpoint_preset_from_run(name=preset_name, run_model=run_model)
+        preset = build_endpoint_preset_from_run(run_model)
         saved_preset = await get_endpoint_preset_service().save_preset(
             endpoint_model.project.name,
             preset,
@@ -910,7 +1033,13 @@ async def _save_agent_endpoint_preset(
             exc_info=True,
         )
         return
-    logger.info("Saved endpoint preset %s for endpoint %s", saved_preset.name, endpoint_model.name)
+    recipe_ids = ", ".join(recipe.id for recipe in saved_preset.recipes)
+    logger.info(
+        "Saved endpoint preset for model %s recipes %s for endpoint %s",
+        saved_preset.model,
+        recipe_ids,
+        endpoint_model.name,
+    )
 
 
 @dataclass(frozen=True)
@@ -990,10 +1119,12 @@ async def _submit_endpoint_from_preset(
         )
         preset_plan = preset_planning_result.provisionable
         if preset_plan is None:
-            unprovisionable_preset_name = None
+            unprovisionable_preset = None
             if preset_planning_result.unprovisionable is not None:
-                unprovisionable_preset_name = preset_planning_result.unprovisionable.preset.name
-            return _PresetSubmissionResult(unprovisionable_preset_name=unprovisionable_preset_name)
+                unprovisionable_preset = _format_preset_plan_label(
+                    preset_planning_result.unprovisionable
+                )
+            return _PresetSubmissionResult(unprovisionable_preset=unprovisionable_preset)
         conflict_message = await _get_active_run_name_conflict_message(
             session=session,
             project=endpoint_model.project,
@@ -1020,7 +1151,11 @@ async def _submit_endpoint_from_preset(
         )
         await session.commit()
         return _PresetSubmissionResult(
-            submission=_PresetSubmission(run_id=run.id, preset_name=preset_plan.preset.name)
+            submission=_PresetSubmission(
+                run_id=run.id,
+                preset_model=preset_plan.preset.model,
+                recipe_id=preset_plan.recipe.id,
+            )
         )
 
 
@@ -1049,13 +1184,11 @@ async def _get_active_run_name_conflict_message(
 
 def _get_no_provisioning_path_message(
     endpoint_model: EndpointModel,
-    unprovisionable_preset_name: Optional[str] = None,
+    unprovisionable_preset: Optional[str] = None,
 ) -> str:
     endpoint_configuration = get_endpoint_configuration(endpoint_model)
-    if unprovisionable_preset_name is not None:
-        reason = (
-            f"Endpoint preset {unprovisionable_preset_name} matched but has no available offers."
-        )
+    if unprovisionable_preset is not None:
+        reason = f"Endpoint preset {unprovisionable_preset} matched but has no available offers."
         if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE:
             return reason
         if get_agent_service().is_enabled() and not can_use_endpoint_agent(
@@ -1088,6 +1221,10 @@ def _get_no_provisioning_path_message(
             f"Creating a preset requires the server agent, but {agent_unavailable_reason}"
         )
     return f"Preset policy create requires the server agent, but {agent_unavailable_reason}"
+
+
+def _format_preset_plan_label(preset_plan) -> str:
+    return f"for model {preset_plan.preset.model} recipe {preset_plan.recipe.id}"
 
 
 async def _stop_backing_run(

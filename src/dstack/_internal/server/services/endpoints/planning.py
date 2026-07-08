@@ -15,6 +15,7 @@ from dstack._internal.server.services import users as users_services
 from dstack._internal.server.services.endpoints.names import get_endpoint_serving_run_name
 from dstack._internal.server.services.endpoints.presets import (
     EndpointPreset,
+    EndpointPresetRecipe,
     EndpointPresetService,
     get_endpoint_preset_service,
 )
@@ -28,6 +29,7 @@ class EndpointPresetPlan:
     """A preset selected by endpoint planning and the run plan computed from it."""
 
     preset: EndpointPreset
+    recipe: EndpointPresetRecipe
     run_plan: RunPlan
 
 
@@ -84,40 +86,46 @@ async def find_preset_planning_result(
     user = await _ensure_user_has_ssh_key(session=session, user=user)
     first_unprovisionable_preset: Optional[EndpointPresetPlan] = None
     for preset in presets:
-        try:
-            run_spec = build_preset_run_spec(
-                endpoint_name=endpoint_name,
-                endpoint_configuration=endpoint_configuration,
-                preset=preset,
-            )
-            _validate_run_spec_env_resolved(run_spec)
-            run_plan = await runs_services.get_plan(
-                session=session,
-                project=project,
-                user=user,
-                run_spec=run_spec,
-                max_offers=max_offers,
-            )
-        except (ServerClientError, ValueError) as e:
-            logger.warning("Skipping endpoint preset %s: %s", preset.name, e)
-            continue
-        preset_plan = EndpointPresetPlan(preset=preset, run_plan=run_plan)
-        if _run_plan_has_available_offers(run_plan.job_plans):
-            return EndpointPresetPlanningResult(
-                provisionable=preset_plan,
-                unprovisionable=first_unprovisionable_preset,
-            )
-        if first_unprovisionable_preset is None:
-            first_unprovisionable_preset = preset_plan
+        for recipe in preset.recipes:
+            try:
+                run_spec = build_preset_run_spec(
+                    endpoint_name=endpoint_name,
+                    endpoint_configuration=endpoint_configuration,
+                    recipe=recipe,
+                )
+                _validate_run_spec_env_resolved(run_spec)
+                run_plan = await runs_services.get_plan(
+                    session=session,
+                    project=project,
+                    user=user,
+                    run_spec=run_spec,
+                    max_offers=max_offers,
+                )
+            except (ServerClientError, ValueError) as e:
+                logger.warning(
+                    "Skipping endpoint preset %s recipe %s: %s",
+                    preset.model,
+                    recipe.id,
+                    e,
+                )
+                continue
+            preset_plan = EndpointPresetPlan(preset=preset, recipe=recipe, run_plan=run_plan)
+            if _run_plan_has_available_offers(run_plan.job_plans):
+                return EndpointPresetPlanningResult(
+                    provisionable=preset_plan,
+                    unprovisionable=first_unprovisionable_preset,
+                )
+            if first_unprovisionable_preset is None:
+                first_unprovisionable_preset = preset_plan
     return EndpointPresetPlanningResult(unprovisionable=first_unprovisionable_preset)
 
 
 def build_preset_service_configuration(
     endpoint_name: Optional[str],
     endpoint_configuration: EndpointConfiguration,
-    preset: EndpointPreset,
+    recipe: EndpointPresetRecipe,
 ) -> ServiceConfiguration:
-    service_configuration = preset.configuration.copy(deep=True)
+    service_configuration = recipe.service.copy(deep=True)
     service_configuration.name = get_endpoint_serving_run_name(endpoint_name)
     service_configuration.env.update(endpoint_configuration.env)
     for field in ProfileParams.__fields__:
@@ -130,12 +138,12 @@ def build_preset_service_configuration(
 def build_preset_run_spec(
     endpoint_name: Optional[str],
     endpoint_configuration: EndpointConfiguration,
-    preset: EndpointPreset,
+    recipe: EndpointPresetRecipe,
 ) -> RunSpec:
     service_configuration = build_preset_service_configuration(
         endpoint_name=endpoint_name,
         endpoint_configuration=endpoint_configuration,
-        preset=preset,
+        recipe=recipe,
     )
     return RunSpec(
         run_name=service_configuration.name,

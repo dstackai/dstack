@@ -17,7 +17,6 @@ class TestEndpointConfiguration:
                 "fleets": ["gpu-fleet"],
                 "creation_policy": "reuse",
                 "preset_policy": "reuse",
-                "max_agent_budget": 2.0,
             }
         )
 
@@ -31,24 +30,11 @@ class TestEndpointConfiguration:
         assert fleet.name == "gpu-fleet"
         assert conf.creation_policy == CreationPolicy.REUSE
         assert conf.preset_policy == EndpointPresetPolicy.REUSE
-        assert conf.max_agent_budget == 2.0
 
     def test_defaults_to_reuse_or_create_preset_policy(self):
         conf = EndpointConfiguration(name="qwen-endpoint", model="Qwen/Qwen3-0.6B")
 
         assert conf.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE
-        assert conf.max_agent_budget is None
-
-    def test_rejects_non_positive_agent_budget(self):
-        with pytest.raises(ConfigurationError):
-            parse_apply_configuration(
-                {
-                    "type": "endpoint",
-                    "name": "qwen-endpoint",
-                    "model": "Qwen/Qwen3-0.6B",
-                    "max_agent_budget": 0,
-                }
-            )
 
     def test_rejects_unknown_fields(self):
         with pytest.raises(ConfigurationError):

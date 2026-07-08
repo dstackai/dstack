@@ -1,7 +1,11 @@
 import json
+import signal
+import stat
+import subprocess
 import uuid
 from asyncio import StreamReader
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 import yaml
@@ -15,8 +19,8 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
-    EndpointAgentAttemptModel,
-    EndpointAgentAttemptStatus,
+    EndpointAgentSessionModel,
+    EndpointAgentSessionStatus,
     EndpointModel,
 )
 from dstack._internal.server.services.endpoints.agent.claude import (
@@ -24,30 +28,36 @@ from dstack._internal.server.services.endpoints.agent.claude import (
     _AgentRunnerResult,
     _AgentWorkspace,
     _build_claude_command,
+    _load_submissions,
     _read_agent_stdout,
     _run_agent_in_subprocess,
     _write_trace_record,
     get_claude_agent_unavailable_reason,
 )
 from dstack._internal.server.services.endpoints.agent.report import AgentFinalReport
-from dstack._internal.server.testing.common import create_project, create_user
+from dstack._internal.server.testing.common import (
+    create_fleet,
+    create_project,
+    create_user,
+)
 
 
 async def _create_endpoint_model(
     session: AsyncSession,
-    max_agent_budget: float | None = None,
     max_price: float | None = None,
     spot_policy: SpotPolicy | None = None,
     backends: list[BackendType] | None = None,
     fleets: list[str] | None = None,
+    create_default_fleet: bool = True,
 ) -> EndpointModel:
     user = await create_user(session=session, name="admin", token="user-token")
     project = await create_project(session=session, owner=user, name="main")
+    if create_default_fleet:
+        await create_fleet(session=session, project=project)
     configuration = EndpointConfiguration(
         name="qwen-endpoint",
         model="Qwen/Qwen3-0.6B",
         env=Env.parse_obj({"HF_TOKEN": "hf-secret"}),
-        max_agent_budget=max_agent_budget,
         max_price=max_price,
         spot_policy=spot_policy,
         backends=backends,
@@ -89,34 +99,348 @@ class TestClaudeAgentService:
         _configure_fake_claude(tmp_path, monkeypatch)
         monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
         started = {}
+        written_logs = []
+
+        def write_logs(**kwargs):
+            written_logs.extend(log.message.decode().rstrip("\n") for log in kwargs["job_logs"])
 
         def start_agent(workspace, request):
             started["workspace"] = workspace
             started["request"] = request
             return 12345
 
+        monkeypatch.setattr(claude_module.logs_services, "write_logs", write_logs)
         monkeypatch.setattr(claude_module, "_start_agent_subprocess_detached", start_agent)
-        endpoint_model = await _create_endpoint_model(session, max_agent_budget=1.5)
+        endpoint_model = await _create_endpoint_model(session)
         service = ClaudeAgentService(workspace_base_dir=tmp_path)
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
         assert result.in_progress is True
         assert result.error is None
-        attempt_root = tmp_path / str(endpoint_model.id) / "1"
-        assert started["workspace"].root_dir == attempt_root
-        assert started["request"]["cwd"] == str(attempt_root / "workspace")
-        assert started["request"]["options"]["max_budget"] == 1.5
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        assert started["workspace"].root_dir == session_root
+        assert started["request"]["cwd"] == str(session_root / "workspace")
+        assert "max_budget" not in started["request"]["options"]
         res = await session.execute(
-            select(EndpointAgentAttemptModel).where(
-                EndpointAgentAttemptModel.endpoint_id == endpoint_model.id
+            select(EndpointAgentSessionModel).where(
+                EndpointAgentSessionModel.endpoint_id == endpoint_model.id
             )
         )
-        attempt = res.scalar_one()
-        assert attempt.attempt_num == 1
-        assert attempt.status == EndpointAgentAttemptStatus.RUNNING
-        assert attempt.pid == 12345
-        assert attempt.workspace_path == str(attempt_root)
+        agent_session = res.scalar_one()
+        assert agent_session.session_num == 1
+        assert agent_session.status == EndpointAgentSessionStatus.RUNNING
+        assert agent_session.pid == 12345
+        assert agent_session.workspace_path == str(session_root)
+        progress_path = session_root / "workspace" / "progress.jsonl"
+        progress_text = progress_path.read_text()
+        assert "Starting endpoint prototyping agent for Qwen/Qwen3-0.6B" in progress_text
+        assert agent_session.progress_log_offset == progress_path.stat().st_size
+        assert written_logs == [
+            "Starting endpoint prototyping agent for Qwen/Qwen3-0.6B. "
+            "Allowed fleets: test-fleet. The agent will inspect offers, choose a service "
+            "recipe, deploy it, and verify the model API before the endpoint becomes active."
+        ]
+
+    @pytest.mark.asyncio
+    async def test_restart_resumes_same_session_when_previous_process_exited(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
+        endpoint_model = await _create_endpoint_model(session)
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        work_dir = session_root / "workspace"
+        work_dir.mkdir(parents=True)
+        (work_dir / "submissions.jsonl").write_text(
+            json.dumps(
+                {
+                    "name": "qwen-endpoint-1",
+                    "type": "service",
+                    "status": "submitted",
+                    "run_id": str(uuid.uuid4()),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        agent_session = EndpointAgentSessionModel(
+            endpoint_id=endpoint_model.id,
+            session_num=1,
+            status=EndpointAgentSessionStatus.RUNNING,
+            workspace_path=str(session_root),
+            pid=12345,
+            process_host=claude_module._get_process_host(),
+            progress_log_offset=0,
+            stdout_log_offset=0,
+            stderr_log_offset=0,
+            created_at=endpoint_model.created_at,
+            updated_at=endpoint_model.created_at,
+        )
+        session.add(agent_session)
+        await session.commit()
+        monkeypatch.setattr(claude_module, "_is_process_group_running", lambda pgid: False)
+        started = {}
+
+        def start_agent(workspace, request):
+            started["workspace"] = workspace
+            started["request"] = request
+            return 23456
+
+        monkeypatch.setattr(claude_module, "_start_agent_subprocess_detached", start_agent)
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.in_progress is True
+        assert result.error is None
+        assert started["workspace"].root_dir == session_root
+        assert "On startup or resume" in started["request"]["prompt"]
+        assert "previous_sessions.md" not in started["request"]["prompt"]
+        await session.refresh(agent_session)
+        assert agent_session.session_num == 1
+        assert agent_session.status == EndpointAgentSessionStatus.RUNNING
+        assert agent_session.pid == 23456
+        assert agent_session.workspace_path == str(session_root)
+
+    @pytest.mark.asyncio
+    async def test_new_endpoint_lifecycle_starts_new_session_without_previous_context(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        endpoint_model = await _create_endpoint_model(session)
+        previous_root = tmp_path / str(endpoint_model.id) / "1"
+        previous_work_dir = previous_root / "workspace"
+        previous_work_dir.mkdir(parents=True)
+        previous_run_id = uuid.uuid4()
+        (previous_work_dir / "final_report.json").write_text(
+            json.dumps(
+                {
+                    "success": False,
+                    "run_id": str(previous_run_id),
+                    "run_name": "qwen-endpoint-1",
+                    "service_yaml": "type: service\nname: qwen-endpoint-1\n",
+                    "failure_summary": "Previous image required a newer driver.",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (previous_work_dir / "submissions.jsonl").write_text(
+            json.dumps(
+                {
+                    "name": "qwen-endpoint-1",
+                    "status": "failed",
+                    "run_id": str(previous_run_id),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        previous_session = EndpointAgentSessionModel(
+            endpoint_id=endpoint_model.id,
+            session_num=1,
+            status=EndpointAgentSessionStatus.FAILED,
+            workspace_path=str(previous_root),
+            progress_log_offset=0,
+            stdout_log_offset=0,
+            stderr_log_offset=0,
+            status_message="Previous image required a newer driver.",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            updated_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            finished_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+        )
+        session.add(previous_session)
+        endpoint_model.created_at = datetime(2023, 1, 3, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+        captured = {}
+
+        async def runner(workspace, request):
+            captured["workspace"] = workspace
+            captured["request"] = request
+            return _AgentRunnerResult(
+                report=AgentFinalReport(
+                    success=True,
+                    run_id=uuid.uuid4(),
+                    run_name="qwen-endpoint-1",
+                    service_yaml="type: service\nname: qwen-endpoint-1\n",
+                )
+            )
+
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.error is None
+        assert captured["workspace"].root_dir == tmp_path / str(endpoint_model.id) / "2"
+        prompt = captured["request"]["prompt"]
+        assert "previous_sessions.md" not in prompt
+        assert "Previous image required a newer driver." not in prompt
+        assert not (
+            tmp_path / str(endpoint_model.id) / "2" / "workspace" / "previous_sessions.md"
+        ).exists()
+        res = await session.execute(
+            select(EndpointAgentSessionModel)
+            .where(EndpointAgentSessionModel.endpoint_id == endpoint_model.id)
+            .order_by(EndpointAgentSessionModel.session_num)
+        )
+        sessions = list(res.scalars().all())
+        assert [agent_session.session_num for agent_session in sessions] == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_abort_endpoint_stops_agent_process_group(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
+        endpoint_model = await _create_endpoint_model(session)
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        work_dir = session_root / "workspace"
+        work_dir.mkdir(parents=True)
+        process_state_path = work_dir / "agent_process.json"
+        process_state_path.write_text(
+            json.dumps(
+                {
+                    "pid": 12345,
+                    "pgid": 12345,
+                    "host": claude_module._get_process_host(),
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        agent_session = EndpointAgentSessionModel(
+            endpoint_id=endpoint_model.id,
+            session_num=1,
+            status=EndpointAgentSessionStatus.RUNNING,
+            workspace_path=str(session_root),
+            pid=12345,
+            process_host=claude_module._get_process_host(),
+            progress_log_offset=0,
+            stdout_log_offset=0,
+            stderr_log_offset=0,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            updated_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        session.add(agent_session)
+        await session.commit()
+
+        group_running = iter([True, False])
+        signals = []
+
+        monkeypatch.setattr(
+            claude_module,
+            "_is_process_group_running",
+            lambda pgid: next(group_running),
+        )
+        monkeypatch.setattr(claude_module, "_AGENT_PROCESS_ABORT_GRACE_SECONDS", 0)
+        monkeypatch.setattr(
+            claude_module.os,
+            "killpg",
+            lambda pgid, sig: signals.append((pgid, sig)),
+        )
+
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        aborted = await service.abort_endpoint(endpoint_model)
+
+        assert aborted is True
+        assert signals == [(12345, signal.SIGTERM)]
+        assert not process_state_path.exists()
+        await session.refresh(agent_session)
+        assert agent_session.status == EndpointAgentSessionStatus.FAILED
+        assert agent_session.status_message == "Endpoint stop requested"
+
+    @pytest.mark.asyncio
+    async def test_abort_endpoint_waits_for_agent_process_on_another_host(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
+        endpoint_model = await _create_endpoint_model(session)
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        work_dir = session_root / "workspace"
+        work_dir.mkdir(parents=True)
+        process_state_path = work_dir / "agent_process.json"
+        process_state_path.write_text(
+            json.dumps({"pid": 12345, "pgid": 12345, "host": "other-host"}) + "\n",
+            encoding="utf-8",
+        )
+        agent_session = EndpointAgentSessionModel(
+            endpoint_id=endpoint_model.id,
+            session_num=1,
+            status=EndpointAgentSessionStatus.RUNNING,
+            workspace_path=str(session_root),
+            pid=12345,
+            process_host="other-host",
+            progress_log_offset=0,
+            stdout_log_offset=0,
+            stderr_log_offset=0,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            updated_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        session.add(agent_session)
+        await session.commit()
+        monkeypatch.setattr(
+            claude_module.os,
+            "killpg",
+            lambda pgid, sig: pytest.fail("remote process group must not be signaled locally"),
+        )
+
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        aborted = await service.abort_endpoint(endpoint_model)
+
+        assert aborted is False
+        assert process_state_path.exists()
+        await session.refresh(agent_session)
+        assert agent_session.status == EndpointAgentSessionStatus.RUNNING
+
+    def test_process_group_liveness_ignores_zombie_only_group(self, monkeypatch):
+        class _PsResult:
+            returncode = 0
+            stdout = "64979 Z\n64979 Z+\n"
+
+        def killpg(pgid, sig):
+            raise PermissionError
+
+        monkeypatch.setattr(claude_module.os, "killpg", killpg)
+        monkeypatch.setattr(
+            claude_module.subprocess,
+            "run",
+            lambda *args, **kwargs: _PsResult(),
+        )
+
+        assert claude_module._is_process_group_running(64979) is False
+
+    def test_process_group_liveness_detects_non_zombie_member(self, monkeypatch):
+        class _PsResult:
+            returncode = 0
+            stdout = "64979 Z\n64979 S+\n"
+
+        def killpg(pgid, sig):
+            raise PermissionError
+
+        monkeypatch.setattr(claude_module.os, "killpg", killpg)
+        monkeypatch.setattr(
+            claude_module.subprocess,
+            "run",
+            lambda *args, **kwargs: _PsResult(),
+        )
+
+        assert claude_module._is_process_group_running(64979) is True
 
     @pytest.mark.asyncio
     async def test_invokes_agent_with_isolated_dstack_cli_context(
@@ -128,7 +452,6 @@ class TestClaudeAgentService:
         monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
         claude_path = _configure_fake_claude(tmp_path, monkeypatch)
         monkeypatch.setattr(settings, "AGENT_ANTHROPIC_MODEL", "test-claude-model")
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_MAX_BUDGET", 3.0)
         monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
         monkeypatch.setenv("DATABASE_URL", "must-not-leak")
         captured = {}
@@ -141,36 +464,42 @@ class TestClaudeAgentService:
                 report=AgentFinalReport(
                     success=True,
                     run_id=run_id,
-                    run_name="qwen-agent-candidate",
-                    service_yaml="type: service\nname: qwen-agent-candidate\n",
-                    verification_summary="Agent verified chat completions.",
+                    run_name="qwen-endpoint-1",
+                    service_yaml="type: service\nname: qwen-endpoint-1\n",
                 )
             )
 
-        endpoint_model = await _create_endpoint_model(session, max_agent_budget=1.5)
+        endpoint_model = await _create_endpoint_model(session)
         service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
         assert result.error is None
         assert result.run_id == run_id
-        assert result.run_name == "qwen-agent-candidate"
+        assert result.run_name == "qwen-endpoint-1"
         assert result.final_report is not None
-        assert result.final_report.verification_summary == "Agent verified chat completions."
+        assert result.final_report.success is True
         assert (
-            "successful final report must include the verified service run `run_id`"
+            "`final_report.json` must contain only the schema fields"
             in captured["request"]["prompt"]
         )
-        attempt_root = tmp_path / str(endpoint_model.id) / "1"
-        assert captured["request"]["cwd"] == str(attempt_root / "workspace")
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        assert captured["request"]["cwd"] == str(session_root / "workspace")
         env = captured["request"]["env"]
         assert env["ANTHROPIC_API_KEY"] == "agent-secret"
-        assert env["HOME"] == str(attempt_root / "home")
+        agent_home = Path(env["HOME"])
+        assert agent_home != session_root / "home"
+        assert agent_home.resolve() == session_root / "home"
+        control_sock_path = agent_home / ".dstack" / "ssh" / f"{'x' * 60}.control.sock"
+        assert len(str(control_sock_path)) < 104
+        assert stat.S_IMODE((session_root / "home" / ".ssh").stat().st_mode) == 0o700
         assert env["DSTACK_PROJECT"] == "main"
+        assert env["DSTACK_ENDPOINT_SERVER_URL"] == "http://127.0.0.1:8000"
+        assert env["DSTACK_ENDPOINT_BEARER_TOKEN"] == "user-token"
         assert env["HF_TOKEN"] == "hf-secret"
         assert "DATABASE_URL" not in env
         assert captured["request"]["options"]["model"] == "test-claude-model"
-        assert captured["request"]["options"]["max_budget"] == 1.5
+        assert "max_budget" not in captured["request"]["options"]
         assert "StructuredOutput" in captured["request"]["options"]["tools"]
         assert "Edit" in captured["request"]["options"]["allowed_tools"]
         assert "StructuredOutput" in captured["request"]["options"]["allowed_tools"]
@@ -182,9 +511,8 @@ class TestClaudeAgentService:
         assert command[command.index("--tools") + 1] == captured["request"]["options"]["tools"]
         assert "--permission-mode" in command
         assert command[command.index("--permission-mode") + 1] == "bypassPermissions"
-        assert "--max-budget-usd" in command
-        assert command[command.index("--max-budget-usd") + 1] == "1.5"
-        config = yaml.safe_load((attempt_root / "home" / ".dstack" / "config.yml").read_text())
+        assert "--max-budget-usd" not in command
+        config = yaml.safe_load((session_root / "home" / ".dstack" / "config.yml").read_text())
         assert config == {
             "projects": [
                 {
@@ -195,22 +523,37 @@ class TestClaudeAgentService:
                 }
             ],
         }
-        work_dir = attempt_root / "workspace"
+        work_dir = session_root / "workspace"
         state = json.loads((work_dir / "agent_state.json").read_text())
         assert state["endpoint_name"] == "qwen-endpoint"
         assert state["model"] == "Qwen/Qwen3-0.6B"
         assert state["phase"] == "success"
-        assert state["max_agent_budget"] == 1.5
-        assert (work_dir / "sources.jsonl").exists()
-        assert (work_dir / "candidates.jsonl").exists()
+        assert "max_agent_budget" not in state
+        assert not (work_dir / "sources.jsonl").exists()
+        assert (work_dir / "submissions.jsonl").exists()
         assert (work_dir / "commands.jsonl").exists()
         assert (work_dir / "progress.jsonl").exists()
-        assert (work_dir / "hardware_reasoning.md").exists()
+        progress_helper = session_root / "bin" / "progress"
+        assert progress_helper.exists()
+        assert not (session_root / "bin" / "dstack").exists()
+        progress_result = subprocess.run(
+            [str(progress_helper), "Checked model config."],
+            cwd=work_dir,
+            env=captured["request"]["env"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert progress_result.returncode == 0
+        assert json.loads((work_dir / "progress.jsonl").read_text().splitlines()[-1]) == {
+            "message": "Checked model config."
+        }
+        assert not (work_dir / "hardware_reasoning.md").exists()
         assert (work_dir / ".claude" / "skills" / "dstack" / "SKILL.md").exists()
         assert (work_dir / ".claude" / "skills" / "dstack-prototyping" / "SKILL.md").exists()
         final_report = json.loads((work_dir / "final_report.json").read_text())
         assert final_report["success"] is True
-        assert final_report["run_name"] == "qwen-agent-candidate"
+        assert final_report["run_name"] == "qwen-endpoint-1"
 
     @pytest.mark.asyncio
     async def test_includes_endpoint_profile_constraints_in_prompt(
@@ -229,9 +572,8 @@ class TestClaudeAgentService:
                 report=AgentFinalReport(
                     success=True,
                     run_id=uuid.uuid4(),
-                    run_name="qwen-agent-candidate",
-                    service_yaml="type: service\nname: qwen-agent-candidate\n",
-                    verification_summary="Agent verified chat completions.",
+                    run_name="qwen-endpoint-1",
+                    service_yaml="type: service\nname: qwen-endpoint-1\n",
                 )
             )
 
@@ -248,129 +590,10 @@ class TestClaudeAgentService:
         prompt = captured["request"]["prompt"]
         assert "- max_price: 0.3" in prompt
         assert "- spot_policy: on-demand" in prompt
-        assert "--max-price 0.3 --on-demand" in prompt
+        assert "Reuse these CLI flags" not in prompt
+        assert "--max-price 0.3 --on-demand" not in prompt
         assert "--availability-zone" not in prompt
         assert "--instance " not in prompt
-
-    @pytest.mark.asyncio
-    async def test_prompt_points_to_bundled_skills_and_endpoint_contract(
-        self,
-        session: AsyncSession,
-        tmp_path,
-        monkeypatch,
-    ):
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
-        _configure_fake_claude(tmp_path, monkeypatch)
-        captured = {}
-
-        async def runner(workspace, request):
-            captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=uuid.uuid4(),
-                    run_name="qwen-agent-candidate",
-                    service_yaml="type: service\nname: qwen-agent-candidate\n",
-                    verification_summary="Agent verified chat completions.",
-                )
-            )
-
-        endpoint_model = await _create_endpoint_model(
-            session,
-            max_price=0.5,
-            spot_policy=SpotPolicy.ONDEMAND,
-            backends=[BackendType.RUNPOD],
-            fleets=["endpoint-e2e-runpod"],
-        )
-        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
-
-        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
-
-        assert result.error is None
-        prompt = captured["request"]["prompt"]
-        assert "Load and follow `/dstack`" in prompt
-        assert "Load and follow `/dstack-prototyping`" in prompt
-        assert "Bundled Claude Code skills are installed in `.claude/skills`" in prompt
-        assert "Do not call hidden server APIs" in prompt
-        assert "real model API request" in prompt
-        assert "dstack-development" not in prompt
-        assert "progress.jsonl" in prompt
-        assert (
-            "Do not write YAML, command output, long tables, raw traces, or secrets to "
-            "`progress.jsonl`" in prompt
-        )
-        assert (
-            "Record each dev environment, task, or service candidate in `candidates.jsonl`"
-            in prompt
-        )
-        assert "verification.json" in prompt
-        assert "service run name must not equal the endpoint name `qwen-endpoint`" in prompt
-        assert "prefer `qwen-endpoint-1`, `qwen-endpoint-2`, etc." in prompt
-        assert "Make each service YAML self-contained" in prompt
-        assert "Do not wait only for log text" in prompt
-        assert "Use normal service logs first" in prompt
-        assert "- backends: runpod" in prompt
-        assert (
-            "- Reuse these CLI flags where applicable: --max-price 0.5 --on-demand --backend runpod --fleet endpoint-e2e-runpod"
-            in prompt
-        )
-        assert "RUNPOD" not in prompt
-        work_dir = tmp_path / str(endpoint_model.id) / "1" / "workspace"
-        prototyping_skill = (
-            work_dir / ".claude" / "skills" / "dstack-prototyping" / "SKILL.md"
-        ).read_text()
-        assert "Load `/dstack` first" in prototyping_skill
-        assert "Do not repeat or override `/dstack` command syntax here" in prototyping_skill
-        assert "Start with vLLM and SGLang" in prototyping_skill
-        assert "Use a dev environment when an interactive shell can answer" in prototyping_skill
-        assert "Never collapse tested hardware back into minimum requirements" in prototyping_skill
-        assert "Do not treat `running`, a passed service probe, or clean logs" in prototyping_skill
-        assert (
-            "Retrying the same YAML after the same error is not prototyping" in prototyping_skill
-        )
-        assert "do not name a candidate service exactly like the endpoint" in prototyping_skill
-        assert "Do not use `:latest` for a final serving image" in prototyping_skill
-        assert "poll run JSON and stop waiting on terminal states" in prototyping_skill
-        assert "Use normal logs before diagnostic logs" in prototyping_skill
-        assert "include applicable backend, fleet, price, spot" in prototyping_skill
-        assert "https://recipes.vllm.ai/models.json" in prototyping_skill
-        assert (
-            "https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development"
-            in prototyping_skill
-        )
-        assert "dstack-development" not in prototyping_skill
-
-    @pytest.mark.asyncio
-    async def test_uses_server_default_agent_budget_when_endpoint_does_not_set_one(
-        self,
-        session: AsyncSession,
-        tmp_path,
-        monkeypatch,
-    ):
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
-        _configure_fake_claude(tmp_path, monkeypatch)
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_MAX_BUDGET", 4.0)
-        captured = {}
-
-        async def runner(workspace, request):
-            captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=uuid.uuid4(),
-                    run_name="qwen-agent-candidate",
-                    service_yaml="type: service\nname: qwen-agent-candidate\n",
-                    verification_summary="Agent verified chat completions.",
-                )
-            )
-
-        endpoint_model = await _create_endpoint_model(session)
-        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
-
-        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
-
-        assert result.error is None
-        assert captured["request"]["options"]["max_budget"] == 4.0
 
     @pytest.mark.asyncio
     async def test_reuses_existing_final_report_without_invoking_runner(
@@ -390,9 +613,8 @@ class TestClaudeAgentService:
                 {
                     "success": True,
                     "run_id": str(run_id),
-                    "run_name": "qwen-agent-candidate",
-                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
-                    "verification_summary": "Verified before restart.",
+                    "run_name": "qwen-endpoint-1",
+                    "service_yaml": "type: service\nname: qwen-endpoint-1\n",
                 }
             ),
             encoding="utf-8",
@@ -408,9 +630,9 @@ class TestClaudeAgentService:
 
         assert result.error is None
         assert result.run_id == run_id
-        assert result.run_name == "qwen-agent-candidate"
+        assert result.run_name == "qwen-endpoint-1"
         assert result.final_report is not None
-        assert result.final_report.verification_summary == "Verified before restart."
+        assert result.final_report.success is True
 
     @pytest.mark.asyncio
     async def test_waits_for_claude_result_after_final_report_while_process_runs(
@@ -424,7 +646,7 @@ class TestClaudeAgentService:
         monkeypatch.setattr(
             claude_module,
             "_get_running_agent_process_pid",
-            lambda workspace, attempt=None: 123,
+            lambda workspace, agent_session=None: 123,
         )
         endpoint_model = await _create_endpoint_model(session)
         work_dir = tmp_path / str(endpoint_model.id) / "workspace"
@@ -434,9 +656,8 @@ class TestClaudeAgentService:
                 {
                     "success": True,
                     "run_id": str(uuid.uuid4()),
-                    "run_name": "qwen-agent-candidate",
-                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
-                    "verification_summary": "Verified before Claude exited.",
+                    "run_name": "qwen-endpoint-1",
+                    "service_yaml": "type: service\nname: qwen-endpoint-1\n",
                 }
             ),
             encoding="utf-8",
@@ -450,57 +671,6 @@ class TestClaudeAgentService:
         assert result.final_report is None
 
     @pytest.mark.asyncio
-    async def test_reconciles_claude_cost_from_result_stream(
-        self,
-        session: AsyncSession,
-        tmp_path,
-        monkeypatch,
-    ):
-        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
-        _configure_fake_claude(tmp_path, monkeypatch)
-        endpoint_model = await _create_endpoint_model(session)
-        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
-        work_dir.mkdir(parents=True)
-        run_id = uuid.uuid4()
-        (work_dir / "final_report.json").write_text(
-            json.dumps(
-                {
-                    "success": True,
-                    "run_id": str(run_id),
-                    "run_name": "qwen-agent-candidate",
-                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
-                    "verification_summary": "Verified before restart.",
-                }
-            ),
-            encoding="utf-8",
-        )
-        (work_dir / "agent_stdout.jsonl").write_text(
-            json.dumps(
-                {
-                    "type": "result",
-                    "is_error": False,
-                    "total_cost_usd": 0.42,
-                }
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        service = ClaudeAgentService(workspace_base_dir=tmp_path)
-
-        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
-
-        assert result.error is None
-        assert result.run_id == run_id
-        res = await session.execute(
-            select(EndpointAgentAttemptModel).where(
-                EndpointAgentAttemptModel.endpoint_id == endpoint_model.id
-            )
-        )
-        attempt = res.scalar_one()
-        assert attempt.status == EndpointAgentAttemptStatus.SUCCEEDED
-        assert attempt.spent_agent_budget == 0.42
-
-    @pytest.mark.asyncio
     async def test_returns_in_progress_when_agent_process_is_still_running(
         self,
         session: AsyncSession,
@@ -512,7 +682,7 @@ class TestClaudeAgentService:
         monkeypatch.setattr(
             claude_module,
             "_get_running_agent_process_pid",
-            lambda workspace, attempt=None: 123,
+            lambda workspace, agent_session=None: 123,
         )
         endpoint_model = await _create_endpoint_model(session)
 
@@ -549,9 +719,8 @@ class TestClaudeAgentService:
                 report=AgentFinalReport(
                     success=True,
                     run_id=run_id,
-                    run_name="qwen-agent-candidate",
+                    run_name="qwen-endpoint-1",
                     service_yaml="token: hf-secret\n",
-                    verification_summary="Agent verified with agent-secret.",
                 )
             )
 
@@ -581,7 +750,7 @@ class TestClaudeAgentService:
 
         async def runner(workspace, request):
             return _AgentRunnerResult(
-                error="Server agent failed before returning a verification report: bad key"
+                error="Server agent failed before returning a final report: bad key"
             )
 
         endpoint_model = await _create_endpoint_model(session)
@@ -589,9 +758,7 @@ class TestClaudeAgentService:
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
-        assert (
-            result.error == "Server agent failed before returning a verification report: bad key"
-        )
+        assert result.error == "Server agent failed before returning a final report: bad key"
         assert result.final_report is None
         work_dir = tmp_path / str(endpoint_model.id) / "1" / "workspace"
         state = json.loads((work_dir / "agent_state.json").read_text())
@@ -599,7 +766,7 @@ class TestClaudeAgentService:
         agent_error = json.loads((work_dir / "agent_error.json").read_text())
         assert agent_error["success"] is False
         assert agent_error["failure_summary"] == (
-            "Server agent failed before returning a verification report: bad key"
+            "Server agent failed before returning a final report: bad key"
         )
 
     def test_returns_error_when_configured_claude_path_is_not_executable(
@@ -639,7 +806,6 @@ class TestClaudeAgentService:
                     "disallowed_tools": "",
                     "model": "test-model",
                     "max_turns": 1,
-                    "max_budget": None,
                     "json_schema": {},
                 },
             }
@@ -660,14 +826,12 @@ class TestClaudeAgentService:
             redacted_values=["secret"],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
         )
         report = {
             "success": True,
             "run_id": str(uuid.uuid4()),
-            "run_name": "qwen-agent-candidate",
+            "run_name": "qwen-endpoint-1",
             "service_yaml": "env: secret\n",
-            "verification_summary": "verified secret",
         }
         reader.feed_data(
             json.dumps({"type": "assistant", "message": {"content": "working"}}).encode() + b"\n"
@@ -684,8 +848,41 @@ class TestClaudeAgentService:
         assert "secret" not in trace
         assert "[redacted]" in trace
 
+    def test_loads_submitted_run_names_without_run_ids(self, tmp_path):
+        workspace = _AgentWorkspace(
+            root_dir=tmp_path,
+            home_dir=tmp_path / "home",
+            work_dir=tmp_path / "work",
+            trace_path=tmp_path / "trace.jsonl",
+            env={},
+            redacted_values=[],
+            endpoint_name="qwen-endpoint",
+            model="Qwen/Qwen3-0.6B",
+        )
+        workspace.work_dir.mkdir(parents=True)
+        run_id = uuid.uuid4()
+        (workspace.work_dir / "submissions.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps({"name": "qwen-endpoint-1", "run_id": None}),
+                    json.dumps({"name": "qwen-endpoint-1", "run_id": str(run_id)}),
+                    json.dumps({"name": "qwen-endpoint-2"}),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        submissions = _load_submissions(workspace)
+
+        assert submissions.run_ids == (run_id,)
+        assert submissions.run_names == ("qwen-endpoint-1", "qwen-endpoint-2")
+
     @pytest.mark.asyncio
-    async def test_records_commands_without_copying_claude_stream_to_endpoint_logs(self, tmp_path):
+    async def test_stores_assistant_text_without_copying_stream_to_endpoint_logs(
+        self,
+        tmp_path,
+    ):
         class FakeLogWriter:
             def __init__(self):
                 self.messages = []
@@ -707,7 +904,6 @@ class TestClaudeAgentService:
             redacted_values=["secret"],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
             log_writer=log_writer,
         )
         reader.feed_data(
@@ -717,6 +913,10 @@ class TestClaudeAgentService:
                     "message": {
                         "content": [
                             {
+                                "type": "text",
+                                "text": "Checking offers without exposing secret.",
+                            },
+                            {
                                 "type": "tool_use",
                                 "id": "tool-1",
                                 "name": "Bash",
@@ -724,7 +924,7 @@ class TestClaudeAgentService:
                                     "description": "List offers",
                                     "command": "dstack offer --gpu 1 --max-price 0.3",
                                 },
-                            }
+                            },
                         ]
                     },
                 }
@@ -788,7 +988,6 @@ class TestClaudeAgentService:
             redacted_values=[],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
             log_writer=log_writer,
         )
         long_output = "\n".join(f"offer {i:04d} gpu=A5000 price=0.27" for i in range(200))
@@ -841,15 +1040,14 @@ class TestClaudeAgentService:
         claude_path = tmp_path / "claude"
         claude_path.write_text(
             """#!/bin/sh
-printf '%s\\n' '{"phase":"research","message":"Checking recipes with secret"}' >> progress.jsonl
-printf '%s\\n' '{"phase":"submit","message":"Submitted service candidate"}' >> progress.jsonl
+printf '%s\\n' 'Checking recipes with secret' >> progress.jsonl
+printf '%s\\n' '{"phase":"submit","message":"Submitted service run"}' >> progress.jsonl
 cat > final_report.json <<'JSON'
 {
   "success": true,
   "run_id": "6e578748-d597-4fde-a3a4-203587cad5a2",
-  "run_name": "qwen-agent-candidate",
-  "service_yaml": "type: service\\nname: qwen-agent-candidate\\n",
-  "verification_summary": "Verified chat completions."
+  "run_name": "qwen-endpoint-1",
+  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n"
 }
 JSON
 printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
@@ -870,7 +1068,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
             redacted_values=["secret"],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
             log_writer=log_writer,
         )
         request = {
@@ -882,7 +1079,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
                 "disallowed_tools": "",
                 "model": "test-model",
                 "max_turns": 1,
-                "max_budget": None,
                 "json_schema": {},
             },
         }
@@ -895,8 +1091,8 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
 
         assert result.error is None
         assert log_writer.messages == [
-            "research: Checking recipes with [redacted]",
-            "submit: Submitted service candidate",
+            "Checking recipes with [redacted]",
+            "Submitted service run",
         ]
 
     @pytest.mark.asyncio
@@ -912,9 +1108,8 @@ cat > final_report.json <<'JSON'
 {
   "success": true,
   "run_id": "6e578748-d597-4fde-a3a4-203587cad5a2",
-  "run_name": "qwen-agent-candidate",
-  "service_yaml": "type: service\\nname: qwen-agent-candidate\\n",
-  "verification_summary": "Verified chat completions over SSH."
+  "run_name": "qwen-endpoint-1",
+  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n"
 }
 JSON
 printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
@@ -933,7 +1128,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
             redacted_values=[],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
         )
         request = {
             "prompt": "prompt",
@@ -944,7 +1138,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
                 "disallowed_tools": "",
                 "model": "test-model",
                 "max_turns": 1,
-                "max_budget": None,
                 "json_schema": {},
             },
         }
@@ -954,8 +1147,7 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
         assert result.error is None
         assert result.report is not None
         assert result.report.success is True
-        assert result.report.run_name == "qwen-agent-candidate"
-        assert result.report.verification_summary == "Verified chat completions over SSH."
+        assert result.report.run_name == "qwen-endpoint-1"
 
     @pytest.mark.asyncio
     async def test_subprocess_no_report_error_does_not_include_stream_output(
@@ -982,7 +1174,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
             redacted_values=[],
             endpoint_name="qwen-endpoint",
             model="Qwen/Qwen3-0.6B",
-            max_agent_budget=None,
         )
         request = {
             "prompt": "prompt",
@@ -992,7 +1183,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
                 "disallowed_tools": "",
                 "model": "test-model",
                 "max_turns": 1,
-                "max_budget": None,
                 "json_schema": {},
             },
         }
@@ -1000,6 +1190,6 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
         result = await _run_agent_in_subprocess(workspace, request)
 
         assert result.error == (
-            "Server agent process exited without a verification report (return code 143)"
+            "Server agent process exited without a final report (return code 143)"
         )
         assert "huge offer table" not in result.error

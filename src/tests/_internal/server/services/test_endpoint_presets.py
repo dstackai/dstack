@@ -31,8 +31,11 @@ from dstack._internal.server.services.endpoints.preset_building import (
 )
 from dstack._internal.server.services.endpoints.presets import (
     EndpointPreset,
-    EndpointPresetReplicaSpecGroup,
+    EndpointPresetRecipe,
+    EndpointPresetValidation,
+    EndpointPresetValidationReplica,
     LocalDirEndpointPresetService,
+    make_endpoint_preset_recipe_id,
 )
 from dstack._internal.server.testing.common import (
     create_job,
@@ -52,6 +55,109 @@ class TestLocalDirEndpointPresetService:
         presets_dir = _project_presets_dir(tmp_path)
         presets_dir.mkdir(parents=True)
         (presets_dir / "qwen.dstack.yml").write_text(
+            """\
+model: Qwen/Qwen3-4B
+type: endpoint-preset
+recipes:
+  - id: vllm-t4
+    service:
+      image: vllm/vllm-openai:latest
+      commands:
+        - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+      port: 8000
+      resources:
+        gpu: 16GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
+"""
+        )
+
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
+
+        assert len(presets) == 1
+        assert presets[0].model == "Qwen/Qwen3-4B"
+        assert [recipe.id for recipe in presets[0].recipes] == ["vllm-t4"]
+        recipe = presets[0].recipes[0]
+        assert recipe.service.resources.gpu is not None
+        assert recipe.service.resources.gpu.vendor is None
+        assert recipe.validations[0].replicas[0].resources[0].gpu is not None
+
+    @pytest.mark.asyncio
+    async def test_lists_replica_group_presets_in_group_order(self, tmp_path):
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "qwen.yml").write_text(
+            """\
+type: endpoint-preset
+model: Qwen/Qwen3-4B
+recipes:
+  - id: grouped
+    service:
+      port: 8000
+      model: Qwen/Qwen3-4B
+      replicas:
+        - name: router
+          count: 1
+          image: ghcr.io/example/router:latest
+          commands:
+            - python router.py
+          resources:
+            cpu: 4
+        - name: worker
+          count: 2
+          image: vllm/vllm-openai:latest
+          commands:
+            - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+          resources:
+            gpu: 24GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 8
+                memory: 16GB
+                disk: 100GB
+                gpu: 0
+          - resources:
+              - cpu: 14
+                memory: 64GB
+                disk: 200GB
+                gpu:
+                  name: L4
+                  memory: 24GB
+                  count: 1
+              - cpu: 14
+                memory: 64GB
+                disk: 200GB
+                gpu:
+                  name: L4
+                  memory: 24GB
+                  count: 1
+"""
+        )
+
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
+
+        assert len(presets) == 1
+        replica_groups = presets[0].recipes[0].service.replica_groups
+        assert [group.name for group in replica_groups] == ["router", "worker"]
+        assert replica_groups[0].resources.gpu is not None
+        assert replica_groups[0].resources.gpu.count.min == 0
+        assert replica_groups[0].resources.cpu.count.min == 4
+        assert replica_groups[1].resources.gpu is not None
+
+    @pytest.mark.asyncio
+    async def test_loads_legacy_replica_spec_groups_as_recipe_validation(self, tmp_path):
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "qwen-legacy.yml").write_text(
             """\
 model: Qwen/Qwen3-4B
 type: endpoint-preset
@@ -77,80 +183,49 @@ replica_spec_groups:
         presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert len(presets) == 1
-        assert presets[0].name == "qwen"
-        assert presets[0].model == "Qwen/Qwen3-4B"
-        assert len(presets[0].replica_spec_groups) == 1
-        assert presets[0].replica_spec_groups[0].name == "0"
-        assert presets[0].replica_spec_groups[0].resources.gpu is not None
-        assert presets[0].replica_spec_groups[0].tested_resources[0].gpu is not None
-        assert presets[0].configuration.resources.gpu is not None
+        recipe = presets[0].recipes[0]
+        assert recipe.service.resources.gpu is not None
+        assert recipe.service.resources.gpu.vendor is None
+        assert recipe.validations[0].replicas[0].resources[0].gpu is not None
 
     @pytest.mark.asyncio
-    async def test_lists_replica_group_presets_in_group_order(self, tmp_path):
+    async def test_rejects_service_gpu_vendor_mismatch(self, tmp_path, caplog):
         presets_dir = _project_presets_dir(tmp_path)
         presets_dir.mkdir(parents=True)
         (presets_dir / "qwen.yml").write_text(
             """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  model: Qwen/Qwen3-4B
-  replicas:
-    - name: router
-      count: 1
-      image: ghcr.io/example/router:latest
-      commands:
-        - python router.py
-    - name: worker
-      count: 2
-      image: vllm/vllm-openai:latest
+recipes:
+  - id: vllm-amd
+    service:
       commands:
         - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
-replica_spec_groups:
-  - name: router
-    resources:
-      cpu: 4
-    tested_resources:
-      - cpu: 8
-        memory: 16GB
-        disk: 100GB
-        gpu: 0
-  - name: worker
-    resources:
-      gpu: 24GB
-    tested_resources:
-      - cpu: 14
-        memory: 64GB
-        disk: 200GB
-        gpu:
-          name: L4
-          memory: 24GB
-          count: 1
-      - cpu: 14
-        memory: 64GB
-        disk: 200GB
-        gpu:
-          name: L4
-          memory: 24GB
-          count: 1
+      port: 8000
+      resources:
+        gpu: amd:16GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """
         )
 
         presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
-        assert len(presets) == 1
-        assert [group.name for group in presets[0].replica_spec_groups] == ["router", "worker"]
-        replica_groups = presets[0].configuration.replica_groups
-        assert [group.name for group in replica_groups] == ["router", "worker"]
-        assert replica_groups[0].resources.gpu is not None
-        assert replica_groups[0].resources.gpu.count.min == 0
-        assert replica_groups[0].resources.cpu.count.min == 4
-        assert replica_groups[1].resources.gpu is not None
+        assert presets == []
+        assert "preset service GPU vendor does not match validation" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_saves_preset_without_overwriting(self, tmp_path):
-        preset = _qwen_preset(name="qwen")
+    async def test_saves_preset_with_comments_and_merges_same_model(self, tmp_path):
+        preset = _qwen_preset(recipe_id="vllm-t4")
+        extra_preset = _qwen_preset(recipe_id="vllm-l4", resources={"gpu": "24GB"})
         service = LocalDirEndpointPresetService(tmp_path)
 
         saved = await service.save_preset(
@@ -161,52 +236,82 @@ replica_spec_groups:
                 "run: 00000000-0000-0000-0000-000000000001",
             ],
         )
-        saved_again = await service.save_preset(PROJECT_NAME, preset)
-
-        assert saved.name == "qwen"
-        assert saved_again.name == "qwen-2"
+        assert saved.model == "Qwen/Qwen3-4B"
         presets_dir = _project_presets_dir(tmp_path)
-        assert (presets_dir / "qwen.dstack.yml").exists()
-        assert (presets_dir / "qwen-2.dstack.yml").exists()
-        text = (presets_dir / "qwen.dstack.yml").read_text()
+        preset_files = list(presets_dir.glob("*.dstack.yml"))
+        assert len(preset_files) == 1
+        text = preset_files[0].read_text()
         assert text.startswith(
             "# endpoint: qwen-endpoint\n# run: 00000000-0000-0000-0000-000000000001\n"
         )
         assert "SECRET_VALUE" not in text
         assert "preset-service-name" not in text
         assert "creation_policy" not in text
-        assert "tested_resources:" in text
+        assert "validations:" in text
         assert "HF_HOME=/root/.cache/huggingface" in text
         assert "HF_TOKEN" in text
+        saved_again = await service.save_preset(PROJECT_NAME, extra_preset)
+
+        assert [recipe.id for recipe in saved_again.recipes] == ["vllm-l4", "vllm-t4"]
+        assert len(list(presets_dir.glob("*.dstack.yml"))) == 1
+
+    @pytest.mark.asyncio
+    async def test_merges_duplicate_model_files_for_list_get_save_and_delete(self, tmp_path):
+        service = LocalDirEndpointPresetService(tmp_path)
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        _write_qwen_preset_file(presets_dir / "qwen-a.yml", recipe_id="vllm-t4", gpu="16GB")
+        _write_qwen_preset_file(presets_dir / "qwen-b.yml", recipe_id="vllm-l4", gpu="24GB")
+
+        presets = await service.list_presets(PROJECT_NAME)
+        preset = await service.get_preset(PROJECT_NAME, "Qwen/Qwen3-4B")
+
+        assert len(presets) == 1
+        assert preset is not None
+        assert [recipe.id for recipe in presets[0].recipes] == ["vllm-t4", "vllm-l4"]
+        assert [recipe.id for recipe in preset.recipes] == ["vllm-t4", "vllm-l4"]
+
+        saved = await service.save_preset(
+            PROJECT_NAME,
+            _qwen_preset(recipe_id="vllm-a100", resources={"gpu": "80GB"}),
+        )
+
+        assert [recipe.id for recipe in saved.recipes] == ["vllm-a100", "vllm-t4", "vllm-l4"]
+        assert len(list(presets_dir.glob("*.yml"))) == 1
+
+        await service.delete_preset(PROJECT_NAME, "Qwen/Qwen3-4B")
+
+        assert await service.list_presets(PROJECT_NAME) == []
+        assert list(presets_dir.glob("*.yml")) == []
 
     @pytest.mark.asyncio
     async def test_saved_preset_round_trips(self, tmp_path):
         saved = await LocalDirEndpointPresetService(tmp_path).save_preset(
             PROJECT_NAME,
-            _qwen_preset(name="Qwen/Qwen3-4B vLLM"),
+            _qwen_preset(recipe_id="vllm-t4"),
         )
 
         presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
-        assert saved.name == "qwen-qwen3-4b-vllm"
+        assert saved.model == "Qwen/Qwen3-4B"
         assert len(presets) == 1
-        assert presets[0].name == saved.name
         assert presets[0].model == "Qwen/Qwen3-4B"
-        assert presets[0].configuration.model is not None
-        assert presets[0].configuration.model.name == "Qwen/Qwen3-4B"
-        assert set(presets[0].configuration.env.keys()) == {"HF_HOME", "HF_TOKEN"}
-        assert presets[0].configuration.env["HF_HOME"] == "/root/.cache/huggingface"
-        assert presets[0].configuration.resources.gpu is not None
+        recipe = presets[0].recipes[0]
+        assert recipe.service.model is not None
+        assert recipe.service.model.name == "Qwen/Qwen3-4B"
+        assert set(recipe.service.env.keys()) == {"HF_HOME", "HF_TOKEN"}
+        assert recipe.service.env["HF_HOME"] == "/root/.cache/huggingface"
+        assert recipe.service.resources.gpu is not None
 
     @pytest.mark.asyncio
-    async def test_deletes_preset_by_name(self, tmp_path):
+    async def test_deletes_preset_by_model(self, tmp_path):
         service = LocalDirEndpointPresetService(tmp_path)
-        saved = await service.save_preset(PROJECT_NAME, _qwen_preset(name="qwen"))
+        saved = await service.save_preset(PROJECT_NAME, _qwen_preset())
 
-        await service.delete_preset(PROJECT_NAME, saved.name)
+        await service.delete_preset(PROJECT_NAME, saved.model)
 
         assert await service.list_presets(PROJECT_NAME) == []
-        assert not (_project_presets_dir(tmp_path) / "qwen.dstack.yml").exists()
+        assert list(_project_presets_dir(tmp_path).glob("*.dstack.yml")) == []
 
     @pytest.mark.asyncio
     async def test_delete_missing_preset_raises(self, tmp_path):
@@ -238,186 +343,197 @@ replica_spec_groups:
                 "missing-model.yml",
                 """\
 type: endpoint-preset
-service:
-  commands:
-    - python -m http.server 8000
-  port: 8000
-replica_spec_groups:
-  - resources:
-      gpu: 16GB
-    tested_resources:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu: 0
+recipes:
+  - id: vllm
+    service:
+      commands:
+        - python -m http.server 8000
+      port: 8000
+      resources:
+        gpu: 16GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu: 0
 """,
                 "preset must specify a model",
             ),
             (
-                "mixed-resources.yml",
+                "missing-recipes.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  commands:
-    - python -m http.server 8000
-  port: 8000
-  resources:
-    gpu: 24GB
-replica_spec_groups:
-  - resources:
-      gpu: 16GB
-    tested_resources:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
 """,
-                "preset service object must not specify resources",
+                "preset recipe must specify a service object",
+            ),
+            (
+                "missing-service.yml",
+                """\
+type: endpoint-preset
+model: Qwen/Qwen3-4B
+recipes:
+  - id: vllm
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu: 0
+""",
+                "preset recipe must specify a service object",
             ),
             (
                 "service-profile.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  commands:
-    - python -m http.server 8000
-  port: 8000
-  creation_policy: reuse
-replica_spec_groups:
-  - resources:
-      gpu: 16GB
-    tested_resources:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
+recipes:
+  - id: vllm
+    service:
+      commands:
+        - python -m http.server 8000
+      port: 8000
+      resources:
+        gpu: 16GB
+      creation_policy: reuse
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """,
                 "preset service object must not specify profile fields",
             ),
             (
-                "group-resources.yml",
+                "missing-service-resources.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  replicas:
-    - name: worker
-      count: 1
-      image: vllm/vllm-openai:latest
-      resources:
-        gpu: 24GB
-replica_spec_groups:
-  - name: worker
-    replica_specs:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
+recipes:
+  - id: vllm
+    service:
+      commands:
+        - python -m http.server 8000
+      port: 8000
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """,
-                "preset service replica groups must not specify resources",
+                "preset service object must specify resources",
             ),
             (
-                "missing-replica-spec-groups.yml",
+                "group-missing-resources.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  replicas:
-    - name: worker
-      count: 1
-      image: vllm/vllm-openai:latest
+recipes:
+  - id: vllm
+    service:
+      port: 8000
+      replicas:
+        - name: worker
+          count: 1
+          image: vllm/vllm-openai:latest
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """,
-                "preset must specify non-empty replica_spec_groups",
+                "preset service replica groups must specify resources",
             ),
             (
                 "loose-resources.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  commands:
-    - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
-  port: 8000
-replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
+recipes:
+  - id: vllm
+    service:
+      commands:
+        - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+      port: 8000
+      resources:
+        gpu: 16GB
+    validations:
+      - replicas:
+          - resources:
+              - gpu: 16GB
 """,
-                "preset tested_resources must use exact replica resources",
+                "preset validations must use exact replica resources",
             ),
             (
-                "mismatched-replica-spec-groups.yml",
+                "mismatched-validation-replicas.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  replicas:
-    - name: worker
-      count: 1
-      image: vllm/vllm-openai:latest
-replica_spec_groups:
-  - name: other
-    replica_specs:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
+recipes:
+  - id: grouped
+    service:
+      port: 8000
+      replicas:
+        - name: router
           count: 1
+          image: ghcr.io/example/router:latest
+          resources:
+            cpu: 4
+        - name: worker
+          count: 1
+          image: vllm/vllm-openai:latest
+          resources:
+            gpu: 16GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu: 0
 """,
-                "preset replica_spec_groups must match replica group order",
-            ),
-            (
-                "missing-tested-resources.yml",
-                """\
-type: endpoint-preset
-model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  replicas:
-    - name: worker
-      count: 1
-      image: vllm/vllm-openai:latest
-replica_spec_groups:
-  - name: worker
-    resources:
-      gpu: 16GB
-""",
-                "preset replica_spec_groups must specify resources and tested_resources",
+                "preset validation replicas must match service replica group order",
             ),
             (
                 "bad-replica-group-shape.yml",
                 """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  port: 8000
-  replicas:
-    - worker
-replica_spec_groups:
-  - name: worker
-    replica_specs:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
+recipes:
+  - id: grouped
+    service:
+      port: 8000
+      replicas:
+        - worker
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """,
                 "preset service replica groups must be objects",
             ),
@@ -480,16 +596,19 @@ class TestBuildEndpointPresetFromRun:
         )
         await session.refresh(run, attribute_names=["jobs"])
 
-        preset = build_endpoint_preset_from_run("qwen-learned", run)
+        preset = build_endpoint_preset_from_run(run)
         saved = await LocalDirEndpointPresetService(tmp_path).save_preset(PROJECT_NAME, preset)
 
-        assert saved.name == "qwen-learned"
         assert saved.model == "Qwen/Qwen3-4B"
-        assert [group.name for group in saved.replica_spec_groups] == ["0"]
-        assert "gpu=16GB" in saved.replica_spec_groups[0].resources.pretty_format()
-        tested_resources = saved.replica_spec_groups[0].tested_resources[0].pretty_format()
-        assert "cpu=14" in tested_resources
-        assert "gpu=L4:24GB:1" in tested_resources
+        recipe = saved.recipes[0]
+        assert recipe.id == make_endpoint_preset_recipe_id(recipe.service)
+        assert recipe.service.resources.gpu is not None
+        assert recipe.service.resources.gpu.vendor is not None
+        assert recipe.service.resources.gpu.vendor.value == "nvidia"
+        assert "gpu=nvidia:16GB" in recipe.service.resources.pretty_format()
+        resources = recipe.validations[0].replicas[0].resources[0].pretty_format()
+        assert "cpu=14" in resources
+        assert "gpu=L4:24GB:1" in resources
 
     @pytest.mark.asyncio
     async def test_requires_actual_instance_resources(self, session: AsyncSession):
@@ -528,7 +647,7 @@ class TestBuildEndpointPresetFromRun:
         await session.refresh(run, attribute_names=["jobs"])
 
         with pytest.raises(ValueError, match="actual instance resources"):
-            build_endpoint_preset_from_run("qwen-learned", run)
+            build_endpoint_preset_from_run(run)
 
     @pytest.mark.asyncio
     async def test_builds_replica_groups_in_service_order(self, session: AsyncSession, tmp_path):
@@ -603,18 +722,22 @@ class TestBuildEndpointPresetFromRun:
         )
         await session.refresh(run, attribute_names=["jobs"])
 
-        preset = build_endpoint_preset_from_run("qwen-grouped", run)
+        preset = build_endpoint_preset_from_run(run)
         saved = await LocalDirEndpointPresetService(tmp_path).save_preset(PROJECT_NAME, preset)
 
-        assert [group.name for group in saved.replica_spec_groups] == ["router", "worker"]
-        assert "cpu=4" in saved.replica_spec_groups[0].resources.pretty_format()
-        assert "gpu=24GB" in saved.replica_spec_groups[1].resources.pretty_format()
-        assert len(saved.replica_spec_groups[0].tested_resources) == 1
-        assert len(saved.replica_spec_groups[1].tested_resources) == 2
-        assert [group.name for group in saved.configuration.replica_groups] == [
+        recipe = saved.recipes[0]
+        assert [group.name for group in recipe.service.replica_groups] == [
             "router",
             "worker",
         ]
+        assert "cpu=4" in recipe.service.replica_groups[0].resources.pretty_format()
+        worker_resources = recipe.service.replica_groups[1].resources
+        assert worker_resources.gpu is not None
+        assert worker_resources.gpu.vendor is not None
+        assert worker_resources.gpu.vendor.value == "nvidia"
+        assert "gpu=nvidia:24GB" in worker_resources.pretty_format()
+        assert len(recipe.validations[0].replicas[0].resources) == 1
+        assert len(recipe.validations[0].replicas[1].resources) == 2
 
 
 class TestBuildPresetServiceConfiguration:
@@ -627,26 +750,8 @@ class TestBuildPresetServiceConfiguration:
         assert get_endpoint_serving_run_name(endpoint_name) == endpoint_name
 
     def test_endpoint_name_env_and_profile_are_applied(self):
-        preset = EndpointPreset(
-            name="qwen",
-            model="Qwen/Qwen3-4B",
-            replica_spec_groups=[
-                EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())
-            ],
-            configuration=ServiceConfiguration.parse_obj(
-                {
-                    "type": "service",
-                    "name": "preset-name",
-                    "commands": [
-                        "vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000",
-                    ],
-                    "port": 8000,
-                    "model": "Qwen/Qwen3-4B",
-                    "env": {"HF_HOME": "/root/.cache/huggingface", "HF_TOKEN": "preset"},
-                    "resources": {"gpu": "16GB"},
-                }
-            ),
-        )
+        preset = _qwen_preset()
+        recipe = preset.recipes[0]
         endpoint_configuration = EndpointConfiguration(
             name="endpoint-name",
             model="Qwen/Qwen3-4B",
@@ -658,7 +763,7 @@ class TestBuildPresetServiceConfiguration:
         service_configuration = build_preset_service_configuration(
             endpoint_name="endpoint-name",
             endpoint_configuration=endpoint_configuration,
-            preset=preset,
+            recipe=recipe,
         )
 
         assert service_configuration.name == "endpoint-name-serving"
@@ -671,23 +776,8 @@ class TestBuildPresetServiceConfiguration:
         assert service_configuration.resources.gpu is not None
 
     def test_builds_repo_less_run_spec(self):
-        preset = EndpointPreset(
-            name="qwen",
-            model="Qwen/Qwen3-4B",
-            replica_spec_groups=[
-                EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())
-            ],
-            configuration=ServiceConfiguration.parse_obj(
-                {
-                    "type": "service",
-                    "commands": [
-                        "vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000",
-                    ],
-                    "port": 8000,
-                    "model": "Qwen/Qwen3-4B",
-                }
-            ),
-        )
+        preset = _qwen_preset()
+        recipe = preset.recipes[0]
         endpoint_configuration = EndpointConfiguration(
             name="endpoint-name",
             model="Qwen/Qwen3-4B",
@@ -696,7 +786,7 @@ class TestBuildPresetServiceConfiguration:
         run_spec = build_preset_run_spec(
             endpoint_name="endpoint-name",
             endpoint_configuration=endpoint_configuration,
-            preset=preset,
+            recipe=recipe,
         )
 
         assert run_spec.run_name == "endpoint-name-serving"
@@ -745,7 +835,8 @@ class TestFindMatchingPreset:
             )
 
         assert match is not None
-        assert match.preset.name == "qwen"
+        assert match.preset.model == "Qwen/Qwen3-4B"
+        assert match.recipe.id == "vllm-t4"
         get_plan_mock.assert_awaited_once()
         assert get_plan_mock.await_args is not None
         assert get_plan_mock.await_args.kwargs["run_spec"].run_name == "qwen-endpoint-serving"
@@ -780,7 +871,85 @@ class TestFindMatchingPreset:
 
         assert result.provisionable is None
         assert result.unprovisionable is not None
-        assert result.unprovisionable.preset.name == "qwen"
+        assert result.unprovisionable.preset.model == "Qwen/Qwen3-4B"
+        assert result.unprovisionable.recipe.id == "vllm-t4"
+
+    @pytest.mark.asyncio
+    async def test_uses_first_later_recipe_with_available_offers(
+        self, session: AsyncSession, tmp_path
+    ):
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        _write_qwen_preset_file(presets_dir / "qwen-a.yml", recipe_id="vllm-t4", gpu="16GB")
+        _write_qwen_preset_file(presets_dir / "qwen-b.yml", recipe_id="vllm-l4", gpu="24GB")
+        user = await create_user(
+            session=session,
+            global_role=GlobalRole.USER,
+            ssh_public_key="ssh-rsa test",
+        )
+        project = await create_project(session=session, owner=user)
+
+        with patch(
+            "dstack._internal.server.services.endpoints.planning.runs_services.get_plan",
+            new=AsyncMock(
+                side_effect=[
+                    _run_plan_with_offer(available=False),
+                    _run_plan_with_offer(available=True),
+                ]
+            ),
+        ) as get_plan_mock:
+            result = await find_preset_planning_result(
+                session=session,
+                project=project,
+                user=user,
+                endpoint_name="qwen-endpoint",
+                endpoint_configuration=EndpointConfiguration(
+                    name="qwen-endpoint",
+                    model="Qwen/Qwen3-4B",
+                ),
+                preset_service=LocalDirEndpointPresetService(tmp_path),
+            )
+
+        assert result.provisionable is not None
+        assert result.provisionable.recipe.id == "vllm-l4"
+        assert result.unprovisionable is not None
+        assert result.unprovisionable.recipe.id == "vllm-t4"
+        assert get_plan_mock.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_stops_at_first_recipe_with_available_offers(
+        self, session: AsyncSession, tmp_path
+    ):
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        _write_qwen_preset_file(presets_dir / "qwen-a.yml", recipe_id="vllm-t4", gpu="16GB")
+        _write_qwen_preset_file(presets_dir / "qwen-b.yml", recipe_id="vllm-l4", gpu="24GB")
+        user = await create_user(
+            session=session,
+            global_role=GlobalRole.USER,
+            ssh_public_key="ssh-rsa test",
+        )
+        project = await create_project(session=session, owner=user)
+
+        with patch(
+            "dstack._internal.server.services.endpoints.planning.runs_services.get_plan",
+            new=AsyncMock(return_value=_run_plan_with_offer(available=True)),
+        ) as get_plan_mock:
+            match = await find_matching_preset_plan(
+                session=session,
+                project=project,
+                user=user,
+                endpoint_name="qwen-endpoint",
+                endpoint_configuration=EndpointConfiguration(
+                    name="qwen-endpoint",
+                    model="Qwen/Qwen3-4B",
+                ),
+                preset_service=LocalDirEndpointPresetService(tmp_path),
+            )
+
+        assert match is not None
+        assert match.recipe.id == "vllm-t4"
+        get_plan_mock.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_matching_plan_requires_available_offers(self, session: AsyncSession, tmp_path):
@@ -820,23 +989,26 @@ class TestFindMatchingPreset:
             """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  env:
-    - HF_TOKEN
-  commands:
-    - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
-  port: 8000
-replica_spec_groups:
-  - resources:
-      gpu: 16GB
-    tested_resources:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
+recipes:
+  - id: vllm-t4
+    service:
+      env:
+        - HF_TOKEN
+      commands:
+        - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+      port: 8000
+      resources:
+        gpu: 16GB
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
 """
         )
         user = await create_user(
@@ -903,26 +1075,37 @@ replica_spec_groups:
 def _write_qwen_preset(tmp_path):
     presets_dir = _project_presets_dir(tmp_path)
     presets_dir.mkdir(parents=True)
-    (presets_dir / "qwen.yml").write_text(
+    _write_qwen_preset_file(presets_dir / "qwen.yml")
+
+
+def _write_qwen_preset_file(
+    path,
+    recipe_id: str = "vllm-t4",
+    gpu: str = "16GB",
+):
+    path.write_text(
         """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
-service:
-  commands:
-    - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
-  port: 8000
-replica_spec_groups:
-  - resources:
-      gpu: 16GB
-    tested_resources:
-      - cpu: 4
-        memory: 16GB
-        disk: 100GB
-        gpu:
-          name: T4
-          memory: 16GB
-          count: 1
-"""
+recipes:
+  - id: {recipe_id}
+    service:
+      commands:
+        - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+      port: 8000
+      resources:
+        gpu: {gpu}
+    validations:
+      - replicas:
+          - resources:
+              - cpu: 4
+                memory: 16GB
+                disk: 100GB
+                gpu:
+                  name: T4
+                  memory: 16GB
+                  count: 1
+""".format(recipe_id=recipe_id, gpu=gpu)
     )
 
 
@@ -963,36 +1146,48 @@ def _instance_offer(
     )
 
 
-def _qwen_preset(name: str) -> EndpointPreset:
+def _qwen_preset(
+    recipe_id: str = "vllm-t4",
+    resources: dict | None = None,
+) -> EndpointPreset:
+    service = ServiceConfiguration.parse_obj(
+        {
+            "type": "service",
+            "name": "preset-service-name",
+            "commands": [
+                "vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000",
+            ],
+            "port": 8000,
+            "model": "Qwen/Qwen3-4B",
+            "env": {
+                "HF_HOME": "/root/.cache/huggingface",
+                "HF_TOKEN": "SECRET_VALUE",
+            },
+            "resources": resources or {"gpu": "16GB"},
+            "creation_policy": "reuse",
+        }
+    )
     return EndpointPreset(
-        name=name,
         model="Qwen/Qwen3-4B",
-        replica_spec_groups=[EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())],
-        configuration=ServiceConfiguration.parse_obj(
-            {
-                "type": "service",
-                "name": "preset-service-name",
-                "commands": [
-                    "vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000",
+        recipes=[
+            EndpointPresetRecipe(
+                id=recipe_id,
+                service=service,
+                validations=[
+                    EndpointPresetValidation(
+                        replicas=[
+                            EndpointPresetValidationReplica.parse_obj(_t4_validation_replica())
+                        ]
+                    )
                 ],
-                "port": 8000,
-                "model": "Qwen/Qwen3-4B",
-                "env": {
-                    "HF_HOME": "/root/.cache/huggingface",
-                    "HF_TOKEN": "SECRET_VALUE",
-                },
-                "resources": {"gpu": "16GB"},
-                "creation_policy": "reuse",
-            }
-        ),
+            )
+        ],
     )
 
 
-def _t4_replica_spec_group() -> dict:
+def _t4_validation_replica() -> dict:
     return {
-        "name": "0",
-        "resources": {"gpu": "16GB"},
-        "tested_resources": [
+        "resources": [
             {
                 "cpu": 4,
                 "memory": "16GB",

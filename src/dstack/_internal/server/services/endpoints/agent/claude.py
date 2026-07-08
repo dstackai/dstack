@@ -1,10 +1,13 @@
 import asyncio
 import enum
+import hashlib
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
+import sys
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,16 +17,20 @@ from uuid import UUID
 
 import yaml
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select
 
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig
 from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
-    EndpointAgentAttemptModel,
-    EndpointAgentAttemptStatus,
+    EndpointAgentSessionModel,
+    EndpointAgentSessionStatus,
     EndpointModel,
+    ExportedFleetModel,
+    FleetModel,
+    ImportModel,
     ProjectModel,
 )
 from dstack._internal.server.schemas.runner import LogEvent
@@ -32,7 +39,6 @@ from dstack._internal.server.services.endpoints.agent import (
     AgentPlan,
     AgentProvisioningResult,
     AgentService,
-    get_effective_max_agent_budget,
 )
 from dstack._internal.server.services.endpoints.agent.report import (
     AGENT_FINAL_REPORT_JSON_SCHEMA,
@@ -67,11 +73,28 @@ _MAX_CAPTURED_OUTPUT_CHARS = 20_000
 _MAX_AGENT_LOG_MESSAGE_CHARS = 4_000
 _AGENT_LOG_BATCH_SIZE = 1
 _AGENT_PROGRESS_LOG_NAME = "progress.jsonl"
+_AGENT_SUBMISSIONS_LOG_NAME = "submissions.jsonl"
 _AGENT_PROCESS_STATE_NAME = "agent_process.json"
 _AGENT_STDOUT_LOG_NAME = "agent_stdout.jsonl"
 _AGENT_STDERR_LOG_NAME = "agent_stderr.jsonl"
 _AGENT_PROGRESS_POLL_SECONDS = 1.0
+_AGENT_PROCESS_ABORT_GRACE_SECONDS = 1.0
 _CLAUDE_AGENT_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
+_AGENT_ABORT_MESSAGE = "Endpoint stop requested"
+_AGENT_BIN_DIR_NAME = "bin"
+_AGENT_PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
+_ENDPOINT_NO_FLEETS_MESSAGE = (
+    "The project has no fleets. Create one before submitting an endpoint."
+)
+_ENDPOINT_NO_MATCHING_FLEETS_MESSAGE = (
+    "No fleets match the endpoint configuration. Create a fleet or update `fleets` before "
+    "submitting an endpoint."
+)
+_AGENT_START_PROGRESS_TEMPLATE = (
+    "Starting endpoint prototyping agent for {model}. Allowed fleets: {fleets}. "
+    "The agent will inspect offers, choose a service recipe, deploy it, and verify "
+    "the model API before the endpoint becomes active."
+)
 
 
 @dataclass(frozen=True)
@@ -84,8 +107,20 @@ class _AgentRunnerResult:
 class _AgentProcessOutput:
     report_data: Optional[dict[str, Any]] = None
     result_error: Optional[str] = None
-    spent_budget: Optional[float] = None
     stdout_tail: str = ""
+
+
+@dataclass(frozen=True)
+class _AgentProcessState:
+    pid: int
+    pgid: int
+    host: Optional[str]
+
+
+@dataclass(frozen=True)
+class _EndpointAgentConstraints:
+    prompt_text: str
+    allowed_fleets: tuple[str, ...]
 
 
 class ClaudeAgentService(AgentService):
@@ -115,17 +150,25 @@ class ClaudeAgentService(AgentService):
             return AgentProvisioningResult(error=unavailable_reason)
 
         try:
-            max_agent_budget = get_effective_max_agent_budget(
-                EndpointConfiguration.__response__.parse_raw(endpoint_model.configuration)
+            configuration = EndpointConfiguration.__response__.parse_raw(
+                endpoint_model.configuration
             )
-            attempt = await _get_or_create_agent_attempt(
+            agent_constraints = await _get_endpoint_agent_constraints(
+                endpoint_model=endpoint_model,
+                configuration=configuration,
+            )
+            if not agent_constraints.allowed_fleets:
+                return AgentProvisioningResult(
+                    error=_get_endpoint_no_fleets_message(configuration)
+                )
+            agent_session = await _get_or_create_agent_session(
                 endpoint_model=endpoint_model,
                 workspace_base_dir=self._workspace_base_dir,
-                max_agent_budget=max_agent_budget,
             )
             workspace = _prepare_workspace(
                 endpoint_model=endpoint_model,
-                workspace_root_dir=Path(attempt.workspace_path),
+                workspace_root_dir=Path(agent_session.workspace_path),
+                agent_constraints=agent_constraints,
             )
         except Exception as e:
             logger.warning("Failed to prepare endpoint agent workspace: %s", e, exc_info=True)
@@ -135,43 +178,80 @@ class ClaudeAgentService(AgentService):
 
         if self._runner is not None:
             return await _run_injected_agent_runner(
-                attempt=attempt,
+                agent_session=agent_session,
                 workspace=workspace,
                 runner=self._runner,
             )
-        return await _reconcile_detached_agent_attempt(
-            attempt=attempt,
+        return await _reconcile_detached_agent_session(
+            agent_session=agent_session,
             workspace=workspace,
         )
+
+    async def abort_endpoint(self, endpoint_model: EndpointModel) -> bool:
+        agent_session = await _get_latest_agent_session(endpoint_model)
+        if agent_session is None or agent_session.status != EndpointAgentSessionStatus.RUNNING:
+            return True
+        try:
+            workspace = _prepare_workspace(
+                endpoint_model=endpoint_model,
+                workspace_root_dir=Path(agent_session.workspace_path),
+                install_skills=False,
+            )
+        except Exception:
+            logger.warning(
+                "Failed to prepare endpoint agent workspace for abort: endpoint=%s",
+                endpoint_model.name,
+                exc_info=True,
+            )
+            return False
+
+        aborted = await _abort_agent_session_process(
+            agent_session=agent_session,
+            workspace=workspace,
+        )
+        if not aborted:
+            return False
+        workspace.artifacts.record_error(_AGENT_ABORT_MESSAGE)
+        await _mark_agent_session_failed(agent_session, _AGENT_ABORT_MESSAGE)
+        await _flush_agent_logs(workspace)
+        return True
 
 
 async def _run_injected_agent_runner(
     *,
-    attempt: EndpointAgentAttemptModel,
+    agent_session: EndpointAgentSessionModel,
     workspace: "_AgentWorkspace",
     runner: Callable[["_AgentWorkspace", dict[str, Any]], Awaitable[_AgentRunnerResult]],
 ) -> AgentProvisioningResult:
-    reconcile_result = await _reconcile_agent_artifacts(attempt=attempt, workspace=workspace)
+    reconcile_result = await _reconcile_agent_artifacts(
+        agent_session=agent_session,
+        workspace=workspace,
+    )
     if reconcile_result is not None:
         return reconcile_result
 
     runner_result = await runner(workspace, _build_agent_request(workspace))
-    candidate_run_ids = _load_candidate_run_ids(workspace)
+    submissions = _load_submissions(workspace)
     if runner_result.error is not None:
         workspace.artifacts.record_error(runner_result.error)
-        await _mark_agent_attempt_failed(attempt, runner_result.error)
+        await _mark_agent_session_failed(agent_session, runner_result.error)
         return AgentProvisioningResult(
             error=runner_result.error,
-            candidate_run_ids=candidate_run_ids,
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
         )
     report = runner_result.report
     if report is None:
-        error = "Server agent did not return a verification report"
+        error = "Server agent did not return a final report"
         workspace.artifacts.record_error(error)
-        await _mark_agent_attempt_failed(attempt, error)
-        return AgentProvisioningResult(error=error, candidate_run_ids=candidate_run_ids)
+        await _mark_agent_session_failed(agent_session, error)
+        return AgentProvisioningResult(
+            error=error,
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
+        )
     workspace.artifacts.record_report(report)
-    await _mark_agent_attempt_from_report(attempt, report, spent_budget=None)
+    await _mark_agent_session_from_report(agent_session, report)
 
     logger.info(
         "Endpoint agent finished for endpoint %s: success=%s run_id=%s run_name=%s",
@@ -183,158 +263,197 @@ async def _run_injected_agent_runner(
     return AgentProvisioningResult(
         run_id=report.run_id,
         run_name=report.run_name,
-        candidate_run_ids=candidate_run_ids,
+        submitted_run_ids=submissions.run_ids,
+        submitted_run_names=submissions.run_names,
         final_report=report,
     )
 
 
-async def _reconcile_detached_agent_attempt(
+async def _reconcile_detached_agent_session(
     *,
-    attempt: EndpointAgentAttemptModel,
+    agent_session: EndpointAgentSessionModel,
     workspace: "_AgentWorkspace",
 ) -> AgentProvisioningResult:
-    reconcile_result = await _reconcile_agent_artifacts(attempt=attempt, workspace=workspace)
+    reconcile_result = await _reconcile_agent_artifacts(
+        agent_session=agent_session,
+        workspace=workspace,
+    )
     if reconcile_result is not None:
         return reconcile_result
 
-    running_pid = _get_running_agent_process_pid(workspace, attempt=attempt)
+    running_pid = _get_running_agent_process_pid(workspace, agent_session=agent_session)
     if running_pid is not None:
         logger.info(
             "Endpoint agent process %s is already running for endpoint %s",
             running_pid,
             workspace.endpoint_name,
         )
+        submissions = _load_submissions(workspace)
         return AgentProvisioningResult(
             in_progress=True,
-            candidate_run_ids=_load_candidate_run_ids(workspace),
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
         )
 
-    if attempt.pid is not None:
-        error = "Server agent process exited without a verification report"
-        workspace.artifacts.record_error(error)
-        await _mark_agent_attempt_failed(attempt, error)
-        return AgentProvisioningResult(
-            error=error,
-            candidate_run_ids=_load_candidate_run_ids(workspace),
+    if agent_session.pid is not None:
+        logger.info(
+            "Endpoint agent process %s is no longer running for endpoint %s; "
+            "resuming session %s from workspace",
+            agent_session.pid,
+            workspace.endpoint_name,
+            agent_session.session_num,
         )
+        _write_trace_record(
+            workspace,
+            {
+                "type": "agent-process-resume",
+                "pid": agent_session.pid,
+                "process_host": agent_session.process_host,
+                "session_num": agent_session.session_num,
+            },
+        )
+        await _write_agent_session_progress(
+            agent_session,
+            workspace,
+            "Resuming endpoint prototyping agent from the existing workspace.",
+        )
+        await _clear_agent_session_process(agent_session)
 
     try:
+        await _write_agent_session_progress(
+            agent_session,
+            workspace,
+            _get_agent_start_progress_message(workspace),
+        )
         pid = _start_agent_subprocess_detached(workspace, _build_agent_request(workspace))
     except Exception as e:
         logger.warning("Failed to start endpoint agent process: %s", e, exc_info=True)
         error = f"Failed to start endpoint agent process: {e}"
         workspace.artifacts.record_error(error)
-        await _mark_agent_attempt_failed(attempt, error)
+        await _mark_agent_session_failed(agent_session, error)
         return AgentProvisioningResult(error=error)
 
-    await _mark_agent_attempt_running(attempt, pid=pid, process_host=_get_process_host())
+    await _mark_agent_session_running(agent_session, pid=pid, process_host=_get_process_host())
     return AgentProvisioningResult(in_progress=True)
 
 
 async def _reconcile_agent_artifacts(
     *,
-    attempt: EndpointAgentAttemptModel,
+    agent_session: EndpointAgentSessionModel,
     workspace: "_AgentWorkspace",
 ) -> Optional[AgentProvisioningResult]:
-    process_output = await _reconcile_agent_stream_files(attempt=attempt, workspace=workspace)
-    await _reconcile_agent_progress(attempt=attempt, workspace=workspace)
-    candidate_run_ids = _load_candidate_run_ids(workspace)
+    process_output = await _reconcile_agent_stream_files(
+        agent_session=agent_session,
+        workspace=workspace,
+    )
+    await _reconcile_agent_progress(agent_session=agent_session, workspace=workspace)
+    submissions = _load_submissions(workspace)
 
     report = _load_final_report(workspace)
     if report is None and process_output.report_data is not None:
         try:
             report = AgentFinalReport.parse_obj(process_output.report_data)
         except ValidationError as e:
-            error = f"Server agent returned an invalid verification report: {e}"
+            error = f"Server agent returned an invalid final report: {e}"
             workspace.artifacts.record_error(error)
-            await _mark_agent_attempt_failed(attempt, error)
-            return AgentProvisioningResult(error=error, candidate_run_ids=candidate_run_ids)
+            await _mark_agent_session_failed(agent_session, error)
+            return AgentProvisioningResult(
+                error=error,
+                submitted_run_ids=submissions.run_ids,
+                submitted_run_names=submissions.run_names,
+            )
     if report is not None:
-        if (
-            process_output.spent_budget is None
-            and _get_running_agent_process_pid(workspace, attempt=attempt) is not None
-        ):
+        if _get_running_agent_process_pid(workspace, agent_session=agent_session) is not None:
             return AgentProvisioningResult(
                 in_progress=True,
-                candidate_run_ids=candidate_run_ids,
+                submitted_run_ids=submissions.run_ids,
+                submitted_run_names=submissions.run_names,
             )
         workspace.artifacts.record_report(report)
-        await _mark_agent_attempt_from_report(
-            attempt,
-            report,
-            spent_budget=process_output.spent_budget,
-        )
+        await _mark_agent_session_from_report(agent_session, report)
         return AgentProvisioningResult(
             run_id=report.run_id,
             run_name=report.run_name,
-            candidate_run_ids=candidate_run_ids,
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
             final_report=report,
         )
 
     error = _load_agent_error(workspace)
     if error is not None:
-        await _mark_agent_attempt_failed(
-            attempt,
-            error,
-            spent_budget=process_output.spent_budget,
+        await _mark_agent_session_failed(agent_session, error)
+        return AgentProvisioningResult(
+            error=error,
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
         )
-        return AgentProvisioningResult(error=error, candidate_run_ids=candidate_run_ids)
     if process_output.result_error is not None:
-        error = "Server agent failed before returning a verification report"
+        error = "Server agent failed before returning a final report"
         workspace.artifacts.record_error(error)
-        await _mark_agent_attempt_failed(
-            attempt,
-            error,
-            spent_budget=process_output.spent_budget,
+        await _mark_agent_session_failed(agent_session, error)
+        return AgentProvisioningResult(
+            error=error,
+            submitted_run_ids=submissions.run_ids,
+            submitted_run_names=submissions.run_names,
         )
-        return AgentProvisioningResult(error=error, candidate_run_ids=candidate_run_ids)
     return None
 
 
-async def _get_or_create_agent_attempt(
+async def _get_or_create_agent_session(
     *,
     endpoint_model: EndpointModel,
     workspace_base_dir: Path,
-    max_agent_budget: Optional[float],
-) -> EndpointAgentAttemptModel:
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(EndpointAgentAttemptModel)
-            .where(EndpointAgentAttemptModel.endpoint_id == endpoint_model.id)
-            .order_by(EndpointAgentAttemptModel.attempt_num.desc())
+) -> EndpointAgentSessionModel:
+    async with get_session_ctx() as db_session:
+        res = await db_session.execute(
+            select(EndpointAgentSessionModel)
+            .where(EndpointAgentSessionModel.endpoint_id == endpoint_model.id)
+            .order_by(EndpointAgentSessionModel.session_num.desc())
             .limit(1)
         )
-        attempt = res.scalar_one_or_none()
-        if attempt is not None and attempt.created_at >= endpoint_model.created_at:
-            return attempt
+        agent_session = res.scalar_one_or_none()
+        if agent_session is not None and agent_session.created_at >= endpoint_model.created_at:
+            return agent_session
 
-        max_attempt_num_res = await session.execute(
-            select(func.max(EndpointAgentAttemptModel.attempt_num)).where(
-                EndpointAgentAttemptModel.endpoint_id == endpoint_model.id
+        max_session_num_res = await db_session.execute(
+            select(func.max(EndpointAgentSessionModel.session_num)).where(
+                EndpointAgentSessionModel.endpoint_id == endpoint_model.id
             )
         )
-        attempt_num = (max_attempt_num_res.scalar_one_or_none() or 0) + 1
+        session_num = (max_session_num_res.scalar_one_or_none() or 0) + 1
         now = get_current_datetime()
         legacy_workspace_path = workspace_base_dir / str(endpoint_model.id)
-        if attempt_num == 1 and _has_agent_workspace_artifacts(legacy_workspace_path):
+        if session_num == 1 and _has_agent_workspace_artifacts(legacy_workspace_path):
             workspace_path = legacy_workspace_path
         else:
-            workspace_path = workspace_base_dir / str(endpoint_model.id) / str(attempt_num)
-        attempt = EndpointAgentAttemptModel(
+            workspace_path = workspace_base_dir / str(endpoint_model.id) / str(session_num)
+        agent_session = EndpointAgentSessionModel(
             endpoint_id=endpoint_model.id,
-            attempt_num=attempt_num,
-            status=EndpointAgentAttemptStatus.RUNNING,
+            session_num=session_num,
+            status=EndpointAgentSessionStatus.RUNNING,
             workspace_path=str(workspace_path),
             progress_log_offset=0,
             stdout_log_offset=0,
             stderr_log_offset=0,
-            max_agent_budget=max_agent_budget,
             created_at=now,
             updated_at=now,
         )
-        session.add(attempt)
-        await session.commit()
-        return attempt
+        db_session.add(agent_session)
+        await db_session.commit()
+        return agent_session
+
+
+async def _get_latest_agent_session(
+    endpoint_model: EndpointModel,
+) -> Optional[EndpointAgentSessionModel]:
+    async with get_session_ctx() as db_session:
+        res = await db_session.execute(
+            select(EndpointAgentSessionModel)
+            .where(EndpointAgentSessionModel.endpoint_id == endpoint_model.id)
+            .order_by(EndpointAgentSessionModel.session_num.desc())
+            .limit(1)
+        )
+        return res.scalar_one_or_none()
 
 
 def _has_agent_workspace_artifacts(root_dir: Path) -> bool:
@@ -350,178 +469,203 @@ def _has_agent_workspace_artifacts(root_dir: Path) -> bool:
     )
 
 
-async def _get_agent_attempt(session, attempt: EndpointAgentAttemptModel):
-    return await session.get(
-        EndpointAgentAttemptModel,
+async def _get_agent_session(db_session, agent_session: EndpointAgentSessionModel):
+    return await db_session.get(
+        EndpointAgentSessionModel,
         {
-            "endpoint_id": attempt.endpoint_id,
-            "attempt_num": attempt.attempt_num,
+            "endpoint_id": agent_session.endpoint_id,
+            "session_num": agent_session.session_num,
         },
     )
 
 
-async def _mark_agent_attempt_running(
-    attempt: EndpointAgentAttemptModel,
+async def _mark_agent_session_running(
+    agent_session: EndpointAgentSessionModel,
     *,
     pid: int,
     process_host: str,
 ) -> None:
-    async with get_session_ctx() as session:
-        stored_attempt = await _get_agent_attempt(session, attempt)
-        if stored_attempt is None:
+    async with get_session_ctx() as db_session:
+        stored_session = await _get_agent_session(db_session, agent_session)
+        if stored_session is None:
             return
-        stored_attempt.status = EndpointAgentAttemptStatus.RUNNING
-        stored_attempt.pid = pid
-        stored_attempt.process_host = process_host
-        stored_attempt.updated_at = get_current_datetime()
-        await session.commit()
-        attempt.pid = pid
-        attempt.process_host = process_host
+        stored_session.status = EndpointAgentSessionStatus.RUNNING
+        stored_session.pid = pid
+        stored_session.process_host = process_host
+        stored_session.updated_at = get_current_datetime()
+        await db_session.commit()
+        agent_session.pid = pid
+        agent_session.process_host = process_host
 
 
-async def _mark_agent_attempt_from_report(
-    attempt: EndpointAgentAttemptModel,
+async def _clear_agent_session_process(agent_session: EndpointAgentSessionModel) -> None:
+    async with get_session_ctx() as db_session:
+        stored_session = await _get_agent_session(db_session, agent_session)
+        if stored_session is None:
+            return
+        stored_session.pid = None
+        stored_session.process_host = None
+        stored_session.updated_at = get_current_datetime()
+        await db_session.commit()
+        agent_session.pid = None
+        agent_session.process_host = None
+
+
+async def _mark_agent_session_from_report(
+    agent_session: EndpointAgentSessionModel,
     report: AgentFinalReport,
-    *,
-    spent_budget: Optional[float],
 ) -> None:
     if report.success:
-        await _mark_agent_attempt_succeeded(attempt, spent_budget=spent_budget)
+        await _mark_agent_session_succeeded(agent_session)
     else:
-        await _mark_agent_attempt_failed(
-            attempt,
+        await _mark_agent_session_failed(
+            agent_session,
             report.failure_summary or "Server agent did not verify the endpoint",
-            spent_budget=spent_budget,
         )
 
 
-async def _mark_agent_attempt_succeeded(
-    attempt: EndpointAgentAttemptModel,
-    *,
-    spent_budget: Optional[float],
+async def _mark_agent_session_succeeded(
+    agent_session: EndpointAgentSessionModel,
 ) -> None:
     now = get_current_datetime()
-    async with get_session_ctx() as session:
-        stored_attempt = await _get_agent_attempt(session, attempt)
-        if stored_attempt is None:
+    async with get_session_ctx() as db_session:
+        stored_session = await _get_agent_session(db_session, agent_session)
+        if stored_session is None:
             return
-        stored_attempt.status = EndpointAgentAttemptStatus.SUCCEEDED
-        stored_attempt.status_message = None
-        if spent_budget is not None:
-            stored_attempt.spent_agent_budget = spent_budget
-        stored_attempt.finished_at = stored_attempt.finished_at or now
-        stored_attempt.updated_at = now
-        await session.commit()
-        attempt.status = EndpointAgentAttemptStatus.SUCCEEDED
-        attempt.status_message = None
-        attempt.spent_agent_budget = stored_attempt.spent_agent_budget
-        attempt.finished_at = stored_attempt.finished_at
+        stored_session.status = EndpointAgentSessionStatus.SUCCEEDED
+        stored_session.status_message = None
+        stored_session.finished_at = stored_session.finished_at or now
+        stored_session.updated_at = now
+        await db_session.commit()
+        agent_session.status = EndpointAgentSessionStatus.SUCCEEDED
+        agent_session.status_message = None
+        agent_session.finished_at = stored_session.finished_at
 
 
-async def _mark_agent_attempt_failed(
-    attempt: EndpointAgentAttemptModel,
+async def _mark_agent_session_failed(
+    agent_session: EndpointAgentSessionModel,
     error: str,
-    *,
-    spent_budget: Optional[float] = None,
 ) -> None:
     now = get_current_datetime()
-    async with get_session_ctx() as session:
-        stored_attempt = await _get_agent_attempt(session, attempt)
-        if stored_attempt is None:
+    async with get_session_ctx() as db_session:
+        stored_session = await _get_agent_session(db_session, agent_session)
+        if stored_session is None:
             return
-        stored_attempt.status = EndpointAgentAttemptStatus.FAILED
-        stored_attempt.status_message = error
-        if spent_budget is not None:
-            stored_attempt.spent_agent_budget = spent_budget
-        stored_attempt.finished_at = stored_attempt.finished_at or now
-        stored_attempt.updated_at = now
-        await session.commit()
-        attempt.status = EndpointAgentAttemptStatus.FAILED
-        attempt.status_message = error
-        attempt.spent_agent_budget = stored_attempt.spent_agent_budget
-        attempt.finished_at = stored_attempt.finished_at
+        stored_session.status = EndpointAgentSessionStatus.FAILED
+        stored_session.status_message = error
+        stored_session.finished_at = stored_session.finished_at or now
+        stored_session.updated_at = now
+        await db_session.commit()
+        agent_session.status = EndpointAgentSessionStatus.FAILED
+        agent_session.status_message = error
+        agent_session.finished_at = stored_session.finished_at
 
 
-async def _update_agent_attempt_offsets(
-    attempt: EndpointAgentAttemptModel,
+async def _update_agent_session_offsets(
+    agent_session: EndpointAgentSessionModel,
     *,
     progress_log_offset: Optional[int] = None,
     stdout_log_offset: Optional[int] = None,
     stderr_log_offset: Optional[int] = None,
-    spent_budget: Optional[float] = None,
 ) -> None:
-    async with get_session_ctx() as session:
-        stored_attempt = await _get_agent_attempt(session, attempt)
-        if stored_attempt is None:
+    async with get_session_ctx() as db_session:
+        stored_session = await _get_agent_session(db_session, agent_session)
+        if stored_session is None:
             return
         if progress_log_offset is not None:
-            stored_attempt.progress_log_offset = progress_log_offset
-            attempt.progress_log_offset = progress_log_offset
+            stored_session.progress_log_offset = progress_log_offset
+            agent_session.progress_log_offset = progress_log_offset
         if stdout_log_offset is not None:
-            stored_attempt.stdout_log_offset = stdout_log_offset
-            attempt.stdout_log_offset = stdout_log_offset
+            stored_session.stdout_log_offset = stdout_log_offset
+            agent_session.stdout_log_offset = stdout_log_offset
         if stderr_log_offset is not None:
-            stored_attempt.stderr_log_offset = stderr_log_offset
-            attempt.stderr_log_offset = stderr_log_offset
-        if spent_budget is not None:
-            stored_attempt.spent_agent_budget = spent_budget
-            attempt.spent_agent_budget = spent_budget
-        stored_attempt.updated_at = get_current_datetime()
-        await session.commit()
+            stored_session.stderr_log_offset = stderr_log_offset
+            agent_session.stderr_log_offset = stderr_log_offset
+        stored_session.updated_at = get_current_datetime()
+        await db_session.commit()
 
 
 async def _reconcile_agent_progress(
     *,
-    attempt: EndpointAgentAttemptModel,
+    agent_session: EndpointAgentSessionModel,
     workspace: "_AgentWorkspace",
 ) -> None:
     offset = await _flush_agent_progress_logs(
         workspace,
-        offset=attempt.progress_log_offset,
+        offset=agent_session.progress_log_offset,
         include_partial=False,
     )
-    if offset != attempt.progress_log_offset:
-        await _update_agent_attempt_offsets(attempt, progress_log_offset=offset)
+    if offset != agent_session.progress_log_offset:
+        await _update_agent_session_offsets(agent_session, progress_log_offset=offset)
+
+
+async def _write_agent_session_progress(
+    agent_session: EndpointAgentSessionModel,
+    workspace: "_AgentWorkspace",
+    message: str,
+) -> None:
+    _append_agent_progress_record(workspace, message)
+    offset = workspace.progress_path.stat().st_size
+    await _write_agent_log(workspace, message)
+    await _flush_agent_logs(workspace)
+    await _update_agent_session_offsets(agent_session, progress_log_offset=offset)
+
+
+def _append_agent_progress_record(workspace: "_AgentWorkspace", message: str) -> None:
+    workspace.progress_path.parent.mkdir(parents=True, exist_ok=True)
+    with workspace.progress_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"message": message}, ensure_ascii=True) + "\n")
+
+
+def _get_agent_start_progress_message(workspace: "_AgentWorkspace") -> str:
+    fleets = ", ".join(workspace.allowed_fleets) if workspace.allowed_fleets else "none"
+    return _AGENT_START_PROGRESS_TEMPLATE.format(model=workspace.model, fleets=fleets)
 
 
 async def _reconcile_agent_stream_files(
     *,
-    attempt: EndpointAgentAttemptModel,
+    agent_session: EndpointAgentSessionModel,
     workspace: "_AgentWorkspace",
 ) -> _AgentProcessOutput:
     stdout_output, stdout_offset = await _read_agent_stream_file(
         workspace=workspace,
         path=workspace.work_dir / _AGENT_STDOUT_LOG_NAME,
-        offset=attempt.stdout_log_offset,
+        offset=agent_session.stdout_log_offset,
         stream_name="stdout",
     )
     stderr_output, stderr_offset = await _read_agent_stream_file(
         workspace=workspace,
         path=workspace.work_dir / _AGENT_STDERR_LOG_NAME,
-        offset=attempt.stderr_log_offset,
+        offset=agent_session.stderr_log_offset,
         stream_name="stderr",
     )
     output = _merge_process_outputs(stdout_output, stderr_output)
     if (
-        stdout_offset != attempt.stdout_log_offset
-        or stderr_offset != attempt.stderr_log_offset
-        or output.spent_budget is not None
+        stdout_offset != agent_session.stdout_log_offset
+        or stderr_offset != agent_session.stderr_log_offset
     ):
-        await _update_agent_attempt_offsets(
-            attempt,
+        await _update_agent_session_offsets(
+            agent_session,
             stdout_log_offset=stdout_offset,
             stderr_log_offset=stderr_offset,
-            spent_budget=output.spent_budget,
         )
     return output
 
 
-def _load_candidate_run_ids(workspace: "_AgentWorkspace") -> tuple[UUID, ...]:
-    path = workspace.work_dir / "candidates.jsonl"
+@dataclass(frozen=True)
+class _AgentSubmissions:
+    run_ids: tuple[UUID, ...] = ()
+    run_names: tuple[str, ...] = ()
+
+
+def _load_submissions(workspace: "_AgentWorkspace") -> _AgentSubmissions:
+    path = workspace.work_dir / _AGENT_SUBMISSIONS_LOG_NAME
     if not path.exists():
-        return ()
+        return _AgentSubmissions()
     run_ids: list[UUID] = []
-    seen: set[UUID] = set()
+    run_names: list[str] = []
+    seen_run_ids: set[UUID] = set()
+    seen_run_names: set[str] = set()
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
             continue
@@ -530,11 +674,17 @@ def _load_candidate_run_ids(workspace: "_AgentWorkspace") -> tuple[UUID, ...]:
         except json.JSONDecodeError:
             _write_trace_record(
                 workspace,
-                {"type": "agent-candidate-invalid", "line": line},
+                {"type": "agent-submission-invalid", "path": str(path), "line": line},
             )
             continue
         if not isinstance(parsed, dict):
             continue
+        raw_name = parsed.get("name")
+        if isinstance(raw_name, str):
+            run_name = raw_name.strip()
+            if run_name and run_name not in seen_run_names:
+                seen_run_names.add(run_name)
+                run_names.append(run_name)
         raw_run_id = parsed.get("run_id")
         if not isinstance(raw_run_id, str) or not raw_run_id.strip():
             continue
@@ -543,13 +693,17 @@ def _load_candidate_run_ids(workspace: "_AgentWorkspace") -> tuple[UUID, ...]:
         except ValueError:
             _write_trace_record(
                 workspace,
-                {"type": "agent-candidate-invalid-run-id", "run_id": raw_run_id},
+                {
+                    "type": "agent-submission-invalid-run-id",
+                    "path": str(path),
+                    "run_id": raw_run_id,
+                },
             )
             continue
-        if run_id not in seen:
-            seen.add(run_id)
+        if run_id not in seen_run_ids:
+            seen_run_ids.add(run_id)
             run_ids.append(run_id)
-    return tuple(run_ids)
+    return _AgentSubmissions(run_ids=tuple(run_ids), run_names=tuple(run_names))
 
 
 def _load_agent_error(workspace: "_AgentWorkspace") -> Optional[str]:
@@ -596,10 +750,10 @@ class _AgentWorkspace:
         redacted_values: Sequence[str],
         endpoint_name: str,
         model: str,
-        max_agent_budget: Optional[float],
         endpoint_constraints: str = "",
         max_price: Optional[float] = None,
         spot_policy: Optional[str] = None,
+        allowed_fleets: Sequence[str] = (),
         log_writer: Optional["_AgentLogWriter"] = None,
     ) -> None:
         self.root_dir = root_dir
@@ -610,10 +764,10 @@ class _AgentWorkspace:
         self.redacted_values = tuple(redacted_values)
         self.endpoint_name = endpoint_name
         self.model = model
-        self.max_agent_budget = max_agent_budget
         self.endpoint_constraints = endpoint_constraints
         self.max_price = max_price
         self.spot_policy = spot_policy
+        self.allowed_fleets = tuple(allowed_fleets)
         self.log_writer = log_writer
         self.artifacts = _AgentArtifactRecorder(self)
 
@@ -674,16 +828,24 @@ def _prepare_workspace(
     *,
     endpoint_model: EndpointModel,
     workspace_root_dir: Path,
+    install_skills: bool = True,
+    agent_constraints: Optional[_EndpointAgentConstraints] = None,
 ) -> _AgentWorkspace:
     configuration = EndpointConfiguration.__response__.parse_raw(endpoint_model.configuration)
+    endpoint_env = configuration.env.as_dict()
+    if agent_constraints is None:
+        agent_constraints = _get_static_endpoint_agent_constraints(configuration, endpoint_env)
 
     root_dir = workspace_root_dir
     home_dir = root_dir / "home"
+    agent_home_dir = _prepare_agent_home_dir(root_dir=root_dir, home_dir=home_dir)
     work_dir = root_dir / "workspace"
     dstack_dir = home_dir / ".dstack"
     work_dir.mkdir(parents=True, exist_ok=True)
     dstack_dir.mkdir(parents=True, exist_ok=True)
     token = endpoint_model.user.token.get_plaintext_or_error()
+    allowed_fleets = agent_constraints.allowed_fleets
+    bin_dir = root_dir / _AGENT_BIN_DIR_NAME
     _write_cli_config(
         dstack_dir=dstack_dir,
         project_name=endpoint_model.project.name,
@@ -691,11 +853,13 @@ def _prepare_workspace(
         token=token,
     )
 
-    endpoint_env = configuration.env.as_dict()
     env = _build_agent_env(
-        home_dir=home_dir,
+        home_dir=agent_home_dir,
         project_name=endpoint_model.project.name,
+        server_url=settings.SERVER_URL,
+        token=token,
         endpoint_env=endpoint_env,
+        bin_dir=bin_dir,
     )
     redacted_values = _get_redacted_values(
         [
@@ -715,19 +879,45 @@ def _prepare_workspace(
         redacted_values=redacted_values,
         endpoint_name=endpoint_model.name,
         model=configuration.model,
-        max_agent_budget=get_effective_max_agent_budget(configuration),
-        endpoint_constraints=_format_endpoint_constraints(configuration, endpoint_env),
+        endpoint_constraints=agent_constraints.prompt_text,
         max_price=configuration.max_price,
         spot_policy=configuration.spot_policy.value if configuration.spot_policy else None,
+        allowed_fleets=allowed_fleets,
         log_writer=_AgentLogWriter(
             project=endpoint_model.project,
             endpoint_id=endpoint_model.id,
             endpoint_name=endpoint_model.name,
         ),
     )
-    _install_agent_skills(workspace)
+    workspace.env[_AGENT_PROGRESS_ENV] = str(workspace.progress_path)
+    _install_agent_helper_scripts(workspace)
+    if install_skills:
+        _install_agent_skills(workspace)
     workspace.artifacts.initialize()
     return workspace
+
+
+def _prepare_agent_home_dir(*, root_dir: Path, home_dir: Path) -> Path:
+    home_dir.mkdir(parents=True, exist_ok=True)
+    ssh_dir = home_dir / ".ssh"
+    ssh_dir.mkdir(parents=True, exist_ok=True)
+    ssh_dir.chmod(0o700)
+    short_home_dir = _get_short_agent_home_dir(root_dir)
+    short_home_dir.parent.mkdir(parents=True, exist_ok=True)
+    if short_home_dir.is_symlink() and short_home_dir.resolve() == home_dir.resolve():
+        return short_home_dir
+    if short_home_dir.exists() or short_home_dir.is_symlink():
+        if short_home_dir.is_dir() and not short_home_dir.is_symlink():
+            shutil.rmtree(short_home_dir)
+        else:
+            short_home_dir.unlink()
+    short_home_dir.symlink_to(home_dir, target_is_directory=True)
+    return short_home_dir
+
+
+def _get_short_agent_home_dir(root_dir: Path) -> Path:
+    root_hash = hashlib.sha1(str(root_dir).encode()).hexdigest()[:8]
+    return Path("/tmp") / f"dah-{root_hash}"
 
 
 class _AgentArtifactRecorder:
@@ -740,23 +930,11 @@ class _AgentArtifactRecorder:
         self._command_counter = self._get_last_command_output_num()
         self._update_agent_state(phase="starting")
         for filename in [
-            "sources.jsonl",
-            "candidates.jsonl",
+            _AGENT_SUBMISSIONS_LOG_NAME,
             "commands.jsonl",
             _AGENT_PROGRESS_LOG_NAME,
         ]:
             (self._workspace.work_dir / filename).touch(exist_ok=True)
-        hardware_reasoning_path = self._workspace.work_dir / "hardware_reasoning.md"
-        if not hardware_reasoning_path.exists():
-            hardware_reasoning_path.write_text(
-                (
-                    "# Hardware Reasoning\n\n"
-                    "The endpoint agent should update this file with the model size,\n"
-                    "serving framework, resource estimate, offer/fleet choice, and\n"
-                    "why the selected hardware is credible.\n"
-                ),
-                encoding="utf-8",
-            )
 
     def mark_running(self) -> None:
         self._update_agent_state(phase="running")
@@ -805,7 +983,6 @@ class _AgentArtifactRecorder:
                 "endpoint_name": self._workspace.endpoint_name,
                 "model": self._workspace.model,
                 "phase": phase,
-                "max_agent_budget": self._workspace.max_agent_budget,
                 "max_hourly_price": self._workspace.max_price,
                 "spot_policy": self._workspace.spot_policy,
                 "updated_at": now,
@@ -925,18 +1102,151 @@ def _build_agent_env(
     *,
     home_dir: Path,
     project_name: str,
+    server_url: str,
+    token: str,
     endpoint_env: dict[str, str],
+    bin_dir: Path,
 ) -> dict[str, str]:
     env = {name: value for name in _INHERITED_ENV_NAMES if (value := os.environ.get(name))}
+    path = env.get("PATH", "")
+    env["PATH"] = str(bin_dir) if not path else os.pathsep.join([str(bin_dir), path])
     env.update(
         {
             "ANTHROPIC_API_KEY": settings.AGENT_ANTHROPIC_API_KEY or "",
             "HOME": str(home_dir),
             "DSTACK_PROJECT": project_name,
+            "DSTACK_ENDPOINT_SERVER_URL": server_url,
+            "DSTACK_ENDPOINT_BEARER_TOKEN": token,
         }
     )
     env.update(endpoint_env)
     return env
+
+
+async def _get_endpoint_agent_constraints(
+    *,
+    endpoint_model: EndpointModel,
+    configuration: EndpointConfiguration,
+) -> _EndpointAgentConstraints:
+    endpoint_env = configuration.env.as_dict()
+    allowed_fleets = await _get_endpoint_allowed_fleets(
+        endpoint_model=endpoint_model,
+        configuration=configuration,
+    )
+    return _EndpointAgentConstraints(
+        prompt_text=_format_endpoint_constraints(
+            configuration,
+            endpoint_env,
+            allowed_fleets=allowed_fleets,
+        ),
+        allowed_fleets=allowed_fleets,
+    )
+
+
+def _get_static_endpoint_agent_constraints(
+    configuration: EndpointConfiguration,
+    endpoint_env: dict[str, str],
+) -> _EndpointAgentConstraints:
+    allowed_fleets = _get_configured_endpoint_fleet_refs(configuration)
+    return _EndpointAgentConstraints(
+        prompt_text=_format_endpoint_constraints(
+            configuration,
+            endpoint_env,
+            allowed_fleets=allowed_fleets,
+        ),
+        allowed_fleets=allowed_fleets,
+    )
+
+
+async def _get_endpoint_allowed_fleets(
+    *,
+    endpoint_model: EndpointModel,
+    configuration: EndpointConfiguration,
+) -> tuple[str, ...]:
+    if configuration.fleets is not None and len(configuration.fleets) == 0:
+        return ()
+    configured_fleets = _get_configured_endpoint_fleet_refs(configuration)
+    if configured_fleets:
+        return configured_fleets
+
+    async with get_session_ctx() as db_session:
+        is_fleet_imported_subquery = exists().where(
+            ImportModel.project_id == endpoint_model.project_id,
+            ImportModel.export_id == ExportedFleetModel.export_id,
+            ExportedFleetModel.fleet_id == FleetModel.id,
+        )
+        res = await db_session.execute(
+            select(FleetModel.name, FleetModel.project_id, ProjectModel.name)
+            .join(FleetModel.project)
+            .where(
+                FleetModel.deleted == False,
+                FleetModel.status == FleetStatus.ACTIVE,
+                or_(
+                    FleetModel.project_id == endpoint_model.project_id,
+                    is_fleet_imported_subquery,
+                ),
+            )
+            .order_by(ProjectModel.name, FleetModel.name)
+        )
+        return tuple(
+            name if project_id == endpoint_model.project_id else f"{project_name}/{name}"
+            for name, project_id, project_name in res.all()
+        )
+
+
+def _get_configured_endpoint_fleet_refs(
+    configuration: EndpointConfiguration,
+) -> tuple[str, ...]:
+    if not configuration.fleets:
+        return ()
+    return tuple(_format_constraint_value(fleet) for fleet in configuration.fleets)
+
+
+def _get_endpoint_no_fleets_message(configuration: EndpointConfiguration) -> str:
+    if configuration.fleets:
+        return _ENDPOINT_NO_MATCHING_FLEETS_MESSAGE
+    return _ENDPOINT_NO_FLEETS_MESSAGE
+
+
+def _install_agent_helper_scripts(workspace: _AgentWorkspace) -> None:
+    bin_dir = workspace.root_dir / _AGENT_BIN_DIR_NAME
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    scripts = {
+        "progress": _get_agent_progress_script(),
+    }
+    for name, script in scripts.items():
+        script_path = bin_dir / name
+        script_path.write_text(script, encoding="utf-8")
+        script_path.chmod(0o755)
+
+
+def _get_agent_progress_script() -> str:
+    return f"""#!{sys.executable}
+import json
+import os
+from pathlib import Path
+import sys
+
+PROGRESS_ENV = "{_AGENT_PROGRESS_ENV}"
+
+
+def main():
+    message = " ".join(sys.argv[1:]).strip()
+    if not message and not sys.stdin.isatty():
+        message = sys.stdin.read().strip()
+    if not message:
+        print("Usage: progress <message>", file=sys.stderr)
+        return 2
+    path = Path(os.environ.get(PROGRESS_ENV, "progress.jsonl"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps({{"message": message}}, ensure_ascii=False) + "\\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+"""
 
 
 def _build_agent_request(workspace: _AgentWorkspace) -> dict[str, Any]:
@@ -952,7 +1262,6 @@ def _build_agent_request(workspace: _AgentWorkspace) -> dict[str, Any]:
             "disallowed_tools": "Task,NotebookEdit",
             "model": settings.AGENT_ANTHROPIC_MODEL,
             "max_turns": None,
-            "max_budget": workspace.max_agent_budget,
             "json_schema": AGENT_FINAL_REPORT_JSON_SCHEMA,
         },
     }
@@ -961,25 +1270,11 @@ def _build_agent_request(workspace: _AgentWorkspace) -> dict[str, Any]:
 def _build_prompt(workspace: _AgentWorkspace) -> str:
     return f"""{_load_endpoint_prompt()}
 
-Deploy endpoint {workspace.endpoint_name!r} for model {workspace.model!r}.
+Endpoint request:
+- name: {workspace.endpoint_name}
+- model: {workspace.model}
 
 {workspace.endpoint_constraints}
-
-Bundled Claude Code skills are installed in `.claude/skills`. Load and follow:
-- `/dstack`
-- `/dstack-prototyping`
-
-Required final service:
-- service YAML type: service
-- service YAML must set `model: {workspace.model}`
-- service run name must not equal the endpoint name `{workspace.endpoint_name}`
-- for sequential service attempts, prefer `{workspace.endpoint_name}-1`, `{workspace.endpoint_name}-2`, etc.
-- submit runs detached with `dstack apply -f <file> -y -d`
-- use concise, unique run names that are useful for debugging
-- the successful final report must include the verified service run `run_id`
-
-When you have a terminal result, write `final_report.json` in the workspace with the
-same fields requested by the JSON schema, then return only the structured final report.
 """
 
 
@@ -1002,59 +1297,36 @@ def _install_agent_skills(workspace: _AgentWorkspace) -> None:
 
 def _get_packaged_skills_dir() -> Path:
     for parent in Path(__file__).resolve().parents:
-        candidate = parent / "skills"
-        if (candidate / "dstack" / "SKILL.md").is_file():
-            return candidate
+        skills_dir = parent / "skills"
+        if (skills_dir / "dstack" / "SKILL.md").is_file():
+            return skills_dir
     raise FileNotFoundError("Could not find packaged dstack skills")
 
 
 def _format_endpoint_constraints(
     configuration: EndpointConfiguration,
     endpoint_env: dict[str, str],
+    *,
+    allowed_fleets: Sequence[str],
 ) -> str:
     lines = [
-        "Binding endpoint constraints:",
-        "- Every `dstack offer`, `dstack apply` preview, and submitted service must honor these constraints.",
-        "- Do not submit a service if the plan violates these constraints.",
+        "Fixed endpoint constraints:",
+        "- Do not submit any task or service that conflicts with these values.",
+        "- Put applicable fixed constraints into the final service YAML.",
     ]
-    cli_flags = []
     if configuration.max_price is not None:
         lines.append(f"- max_price: {configuration.max_price}")
-        cli_flags.extend(["--max-price", str(configuration.max_price)])
     if configuration.spot_policy is not None:
         lines.append(f"- spot_policy: {configuration.spot_policy.value}")
-        if configuration.spot_policy.value == "spot":
-            cli_flags.append("--spot")
-        elif configuration.spot_policy.value == "on-demand":
-            cli_flags.append("--on-demand")
-        else:
-            cli_flags.append("--spot-auto")
-    for field, flag in [
-        ("backends", "--backend"),
-        ("regions", "--region"),
-        ("instance_types", "--instance-type"),
-        ("fleets", "--fleet"),
-    ]:
+    for field in ["backends", "regions", "availability_zones", "instance_types"]:
         values = getattr(configuration, field)
         if not values:
             continue
         formatted_values = [_format_constraint_value(value) for value in values]
         lines.append(f"- {field}: {', '.join(formatted_values)}")
-        for value in formatted_values:
-            cli_flags.extend([flag, value])
-    for field in ["availability_zones", "instances"]:
-        values = getattr(configuration, field)
-        if not values:
-            continue
-        formatted_values = [_format_constraint_value(value) for value in values]
-        lines.append(f"- {field}: {', '.join(formatted_values)}")
-    if configuration.creation_policy is not None:
-        lines.append(f"- creation_policy: {configuration.creation_policy.value}")
-        if configuration.creation_policy.value == "reuse":
-            cli_flags.append("--reuse")
-    if cli_flags:
-        lines.append(f"- Reuse these CLI flags where applicable: {' '.join(cli_flags)}")
-    else:
+    if allowed_fleets:
+        lines.append(f"- fleets: {', '.join(allowed_fleets)}")
+    if len(lines) == 3:
         lines.append("- No explicit profile constraints were set.")
     if endpoint_env:
         lines.append(
@@ -1158,25 +1430,19 @@ async def _run_agent_in_subprocess(
         process_output.report_data = _load_final_report_artifact(workspace)
     if process_output.report_data is None:
         if process_output.result_error is not None:
-            return _AgentRunnerResult(
-                error="Server agent failed before returning a verification report"
-            )
+            return _AgentRunnerResult(error="Server agent failed before returning a final report")
         if returncode not in (0, None):
             return _AgentRunnerResult(
                 error=(
-                    "Server agent process exited without a verification report "
+                    "Server agent process exited without a final report "
                     f"(return code {returncode})"
                 )
             )
-        return _AgentRunnerResult(
-            error="Server agent process exited without a verification report"
-        )
+        return _AgentRunnerResult(error="Server agent process exited without a final report")
     try:
         return _AgentRunnerResult(report=AgentFinalReport.parse_obj(process_output.report_data))
     except ValidationError as e:
-        return _AgentRunnerResult(
-            error=f"Server agent returned an invalid verification report: {e}"
-        )
+        return _AgentRunnerResult(error=f"Server agent returned an invalid final report: {e}")
 
 
 def _build_claude_command(request: dict[str, Any]) -> list[str]:
@@ -1204,8 +1470,6 @@ def _build_claude_command(request: dict[str, Any]) -> list[str]:
     ]
     if options["max_turns"] is not None:
         cmd[2:2] = ["--max-turns", str(options["max_turns"])]
-    if options["max_budget"] is not None:
-        cmd[2:2] = ["--max-budget-usd", str(options["max_budget"])]
     return cmd
 
 
@@ -1240,7 +1504,7 @@ async def _read_agent_stream(
         if not line_bytes:
             return output
         line = line_bytes.decode(errors="replace")
-        _process_agent_stream_line(
+        await _process_agent_stream_line(
             line=line,
             workspace=workspace,
             stream_name=stream_name,
@@ -1258,7 +1522,7 @@ async def _read_agent_stream_file(
     output = _AgentProcessOutput()
     lines, new_offset = _read_complete_file_lines(path=path, offset=offset)
     for line in lines:
-        _process_agent_stream_line(
+        await _process_agent_stream_line(
             line=line,
             workspace=workspace,
             stream_name=stream_name,
@@ -1267,7 +1531,7 @@ async def _read_agent_stream_file(
     return output, new_offset
 
 
-def _process_agent_stream_line(
+async def _process_agent_stream_line(
     *,
     line: str,
     workspace: _AgentWorkspace,
@@ -1348,19 +1612,11 @@ class _AgentProgressLogTailer:
     async def _write_progress_line(self, line: str) -> None:
         if not line.strip():
             return
-        try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError:
-            _write_trace_record(
-                self._workspace,
-                {"type": "agent-progress-invalid", "line": line},
-            )
-            return
-        message = _format_agent_progress_log_message(parsed)
+        message = _parse_agent_progress_log_message(line)
         if message is None:
             _write_trace_record(
                 self._workspace,
-                {"type": "agent-progress-ignored", "record": parsed},
+                {"type": "agent-progress-ignored", "line": line},
             )
             return
         await _write_agent_log(self._workspace, message)
@@ -1392,33 +1648,34 @@ async def _flush_agent_progress_logs(
 async def _write_agent_progress_line(workspace: _AgentWorkspace, line: str) -> None:
     if not line.strip():
         return
-    try:
-        parsed = json.loads(line)
-    except json.JSONDecodeError:
-        _write_trace_record(
-            workspace,
-            {"type": "agent-progress-invalid", "line": line},
-        )
-        return
-    message = _format_agent_progress_log_message(parsed)
+    message = _parse_agent_progress_log_message(line)
     if message is None:
         _write_trace_record(
             workspace,
-            {"type": "agent-progress-ignored", "record": parsed},
+            {"type": "agent-progress-ignored", "line": line},
         )
         return
     await _write_agent_log(workspace, message)
 
 
+def _parse_agent_progress_log_message(line: str) -> Optional[str]:
+    try:
+        parsed = json.loads(line)
+    except json.JSONDecodeError:
+        message = line.strip()
+        return message or None
+    return _format_agent_progress_log_message(parsed)
+
+
 def _format_agent_progress_log_message(record: Any) -> Optional[str]:
+    if isinstance(record, str):
+        message = record.strip()
+        return message or None
     if not isinstance(record, dict):
         return None
     message = record.get("message")
     if not isinstance(message, str) or not message.strip():
         return None
-    phase = record.get("phase")
-    if isinstance(phase, str) and phase.strip():
-        return f"{phase.strip()}: {message.strip()}"
     return message.strip()
 
 
@@ -1428,9 +1685,6 @@ def _update_agent_process_output(
 ) -> None:
     if message.get("type") != "result":
         return
-    total_cost = message.get("total_cost_usd")
-    if isinstance(total_cost, (int, float)):
-        output.spent_budget = float(total_cost)
     if message.get("is_error"):
         output.result_error = message.get("result") or "Claude agent failed"
     structured_output = message.get("structured_output")
@@ -1456,8 +1710,6 @@ def _merge_process_outputs(*outputs: _AgentProcessOutput) -> _AgentProcessOutput
             merged.report_data = output.report_data
         if output.result_error is not None:
             merged.result_error = output.result_error
-        if output.spent_budget is not None:
-            merged.spent_budget = output.spent_budget
         merged.stdout_tail = _append_bounded_output(merged.stdout_tail, output.stdout_tail)
     return merged
 
@@ -1527,6 +1779,7 @@ def _write_agent_process_state(workspace: _AgentWorkspace, pid: int) -> None:
     path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
     data = {
         "pid": pid,
+        "pgid": pid,
         "host": _get_process_host(),
         "started_at": _utcnow_iso(),
     }
@@ -1548,34 +1801,119 @@ def _clear_agent_process_state(workspace: _AgentWorkspace, pid: int) -> None:
 
 def _get_running_agent_process_pid(
     workspace: _AgentWorkspace,
-    attempt: Optional[EndpointAgentAttemptModel] = None,
+    agent_session: Optional[EndpointAgentSessionModel] = None,
 ) -> Optional[int]:
-    if attempt is not None and attempt.process_host not in (None, _get_process_host()):
-        return attempt.pid
-    path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
-    if not path.exists():
-        if attempt is None or attempt.pid is None:
-            return None
-        if attempt.process_host not in (None, _get_process_host()):
-            return attempt.pid
-        return attempt.pid if _is_process_running(attempt.pid) else None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        path.unlink(missing_ok=True)
+    state = _load_agent_process_state(workspace, agent_session=agent_session)
+    if state is None:
         return None
-    host = data.get("host")
-    if isinstance(host, str) and host and host != _get_process_host():
-        pid = data.get("pid")
-        return pid if isinstance(pid, int) else None
+    if state.host not in (None, _get_process_host()):
+        return state.pid
+    if _is_process_group_running(state.pgid):
+        return state.pid
+    _clear_agent_process_state(workspace, state.pid)
+    return None
+
+
+async def _abort_agent_session_process(
+    *,
+    agent_session: EndpointAgentSessionModel,
+    workspace: _AgentWorkspace,
+) -> bool:
+    state = _load_agent_process_state(workspace, agent_session=agent_session)
+    if state is None:
+        return True
+    if state.host not in (None, _get_process_host()):
+        logger.info(
+            "Endpoint agent process %s for endpoint %s is running on host %s; "
+            "waiting for that host to abort it",
+            state.pid,
+            workspace.endpoint_name,
+            state.host,
+        )
+        return False
+    if not _is_process_group_running(state.pgid):
+        _clear_agent_process_state(workspace, state.pid)
+        return True
+
+    logger.info(
+        "Stopping endpoint agent process group %s for endpoint %s",
+        state.pgid,
+        workspace.endpoint_name,
+    )
+    _write_trace_record(
+        workspace,
+        {
+            "type": "agent-process-abort-requested",
+            "pid": state.pid,
+            "pgid": state.pgid,
+            "host": state.host,
+        },
+    )
+    if not await _terminate_process_group(state.pgid):
+        return False
+    _clear_agent_process_state(workspace, state.pid)
+    return True
+
+
+async def _terminate_process_group(pgid: int) -> bool:
+    if not _send_process_group_signal(pgid, signal.SIGTERM):
+        return True
+    await asyncio.sleep(_AGENT_PROCESS_ABORT_GRACE_SECONDS)
+    if not _is_process_group_running(pgid):
+        return True
+    _send_process_group_signal(pgid, signal.SIGKILL)
+    await asyncio.sleep(0)
+    return not _is_process_group_running(pgid)
+
+
+def _send_process_group_signal(pgid: int, sig: signal.Signals) -> bool:
+    try:
+        os.killpg(pgid, sig)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        logger.warning("Permission denied while signaling process group %s", pgid)
+        return True
+    return True
+
+
+def _load_agent_process_state(
+    workspace: _AgentWorkspace,
+    agent_session: Optional[EndpointAgentSessionModel] = None,
+) -> Optional[_AgentProcessState]:
+    path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            path.unlink(missing_ok=True)
+            return None
+        state = _parse_agent_process_state(data)
+        if state is not None:
+            return state
+        path.unlink(missing_ok=True)
+    if agent_session is None or agent_session.pid is None:
+        return None
+    return _AgentProcessState(
+        pid=agent_session.pid,
+        pgid=agent_session.pid,
+        host=agent_session.process_host,
+    )
+
+
+def _parse_agent_process_state(data: Any) -> Optional[_AgentProcessState]:
+    if not isinstance(data, dict):
+        return None
     pid = data.get("pid")
     if not isinstance(pid, int):
-        path.unlink(missing_ok=True)
         return None
-    if _is_process_running(pid):
-        return pid
-    path.unlink(missing_ok=True)
-    return None
+    pgid = data.get("pgid", pid)
+    if not isinstance(pgid, int):
+        pgid = pid
+    host = data.get("host")
+    if not isinstance(host, str):
+        host = None
+    return _AgentProcessState(pid=pid, pgid=pgid, host=host)
 
 
 def _get_process_host() -> str:
@@ -1590,6 +1928,48 @@ def _is_process_running(pid: int) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def _is_process_group_running(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        live_process_found = _has_non_zombie_process_in_group(pgid)
+        return True if live_process_found is None else live_process_found
+    return True
+
+
+def _has_non_zombie_process_in_group(pgid: int) -> Optional[bool]:
+    try:
+        result = subprocess.run(
+            ["ps", "-axo", "pgid=,stat="],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    found_group = False
+    for line in result.stdout.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        try:
+            line_pgid = int(parts[0])
+        except ValueError:
+            continue
+        if line_pgid != pgid:
+            continue
+        found_group = True
+        stat = parts[1].strip()
+        if stat and not stat.startswith("Z"):
+            return True
+    return False if found_group else False
 
 
 def _write_trace_record(workspace: _AgentWorkspace, data: dict[str, Any]) -> None:
