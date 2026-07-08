@@ -98,6 +98,7 @@ class TestListBackendTypes:
             "nebius",
             "oci",
             "runpod",
+            "slurm",
             "vastai",
             "verda",
             "vultr",

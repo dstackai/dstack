@@ -1,8 +1,11 @@
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict
-from typing import Callable, List, Optional, TypeVar
+from typing import Callable, Generic, List, Literal, Optional, TypeVar
+from uuid import UUID
 
 import gpuhunt
+from cachetools import TTLCache
 from pydantic import parse_obj_as
 
 from dstack._internal.core.models.backends.base import BackendType
@@ -14,8 +17,8 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, Memory, Range
-from dstack._internal.core.models.runs import Requirements
+from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, GPUSpec, Memory, Range
+from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.common import get_or_error
 
 # Offers not supported by all dstack versions are hidden behind one or more flags.
@@ -29,6 +32,14 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "runpod-cpu",
     "runpod-cluster",
 ]
+
+
+# NvidiaGPUInfo.name in KNOWN_NVIDIA_GPUS is not unique -- there are multiple variants
+# with the same name but different amount of memory, but Compute Capability of the variants
+# is always the same, so it's safe to use 1:1 mapping
+NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP = {
+    gpu_info.name: gpu_info.compute_capability for gpu_info in gpuhunt.KNOWN_NVIDIA_GPUS
+}
 
 
 def get_catalog_offers(
@@ -241,3 +252,68 @@ def get_offers_disk_modifier(
         return offer_copy
 
     return modifier
+
+
+def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:
+    if gpu_spec.vendor is not None and gpu.vendor != gpu_spec.vendor:
+        return False
+    if gpu_spec.name is not None and gpu.name.lower() not in map(str.lower, gpu_spec.name):
+        return False
+    if gpu_spec.memory is not None:
+        min_memory_gib = gpu_spec.memory.min
+        if min_memory_gib is not None and gpu.memory_mib < min_memory_gib * 1024:
+            return False
+        max_memory_gib = gpu_spec.memory.max
+        if max_memory_gib is not None and gpu.memory_mib > max_memory_gib * 1024:
+            return False
+    if gpu_spec.compute_capability is not None:
+        if gpu.vendor != gpuhunt.AcceleratorVendor.NVIDIA:
+            return False
+        compute_capability = NVIDIA_GPU_NAME_TO_COMPUTE_CAPABILITY_MAP.get(gpu.name)
+        if compute_capability is None:
+            return False
+        if compute_capability < gpu_spec.compute_capability:
+            return False
+    return True
+
+
+OfferKeyT = TypeVar("OfferKeyT")
+
+
+class BaseSkipOfferCache(Generic[OfferKeyT], ABC):
+    """
+    A base class for a cache to track (run/job, offer) pairs that failed to provision.
+
+    Implementations can be used to skip offers based on, e.g., a region, an instance type,
+    a region/type pair, etc.
+
+    Subclasses must implement `_build_key()`.
+    """
+
+    def __init__(self, *, ttl: int, maxsize: int = 1000) -> None:
+        self._cache = TTLCache[OfferKeyT, Literal[True]](maxsize=maxsize, ttl=ttl)
+
+    def add(self, run: Run, job: Job, offer: InstanceOffer) -> None:
+        self._cache[self._build_key(run, job, offer)] = True
+
+    def check(self, run: Run, job: Job, offer: InstanceOffer) -> bool:
+        return self._build_key(run, job, offer) in self._cache
+
+    @abstractmethod
+    def _build_key(self, run: Run, job: Job, offer: InstanceOffer) -> OfferKeyT:
+        pass
+
+
+class RegionalSkipOfferCache(BaseSkipOfferCache[tuple[UUID, str]]):
+    """
+    `RegionalSkipOfferRegionCache` tracks failed provisioning attempts based on the offer's region.
+
+    The current implementation tracks _any_ job of the specific run (identified by `Run.id`)
+    in the specific region (identified by `InstanceOffer.region`).
+    """
+
+    def _build_key(self, run: Run, job: Job, offer: InstanceOffer) -> tuple[UUID, str]:
+        # The current implementation uses only Run.id ignoring the job/job spec.
+        # A more sophisticated implementation could use some parts of the job spec
+        # (e.g., requirements, volumes) instead.
+        return (run.id, offer.region)

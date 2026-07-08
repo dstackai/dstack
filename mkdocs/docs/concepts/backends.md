@@ -1281,6 +1281,109 @@ projects:
 
 > To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
 
+### Slurm
+
+`dstack` can orchestrate container-based runs across your [Slurm](https://slurm.schedmd.com/) clusters. A single `slurm` backend can manage one or many clusters — `dstack` connects to each cluster's login node over SSH and submits runs as Slurm jobs. Each cluster becomes its own `dstack` region, named after the cluster.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: slurm
+
+    clusters:
+    - name: gpu-cluster-a
+      hostname: login.example.com
+      user: admin
+      private_key:
+        path: ~/.ssh/id_rsa
+
+      gpu_partitions:
+      - gpu: H100
+        partitions: [gpu]
+```
+
+</div>
+
+`dstack` logs in to `hostname` as `user` using `private_key`, and uses this login node both to submit jobs and as an SSH jump host to reach the containers — no additional setup is required.
+
+!!! info "Prerequisites"
+    `dstack` runs each job as a Slurm batch job that launches the run's container via the [Pyxis](https://github.com/NVIDIA/pyxis) SPANK plugin and the [enroot](https://github.com/NVIDIA/enroot) container runtime. Both must be installed and configured on the cluster's compute nodes.
+
+!!! info "Partitions"
+    `dstack` selects which Slurm partitions to submit to based on whether a run requests GPUs:
+
+    - `gpu_partitions` maps a GPU model, in the `[vendor:]name[:memory]` format (e.g. `H100`, `A100:40GB`, `MI300X`), to the partitions that provide it. Only partitions listed here are used for GPU runs. If `gpu_partitions` is not set, GPU runs are not allowed.
+    - `cpu_partitions` lists the partitions used for CPU-only runs. If not set, it defaults to all cluster partitions except those listed in `gpu_partitions`.
+
+    ```yaml
+    clusters:
+    - name: gpu-cluster-a
+      hostname: login.example.com
+      user: admin
+      private_key:
+        path: ~/.ssh/id_rsa
+      gpu_partitions:
+      - gpu: H100
+        partitions: [gpu-h100]
+      - gpu: A100:40GB
+        partitions: [gpu-a100]
+      cpu_partitions: [cpu]
+    ```
+
+    Partitions are exposed as availability zones, so a run can target specific partitions via the `availability_zones` property in its configuration:
+
+    ```yaml
+    type: task
+    availability_zones: [gpu-h100]
+    ```
+
+    The partitions selected by default (the `gpu_partitions` for a GPU run, or the `cpu_partitions` for a CPU-only run) act as a bounding set: `availability_zones` can only narrow this set, not extend it — a partition outside it is never used. When `availability_zones` is not set, all default-selected partitions are eligible.
+
+!!! info "GPU model syntax"
+    The `gpu` field accepts the `[vendor:]name[:memory]` format. In most cases the name alone is enough: `dstack` matches it against its list of known GPU models, inferring the vendor and memory size and normalizing the name so it stays consistent with other backends (e.g. `RTX 4090` becomes `RTX4090`).
+
+    Specify the memory size only when a model comes in several memory variants — for example `A100:40GB` versus `A100:80GB` — otherwise the name is ambiguous and configuration fails.
+
+    The full `vendor:name:memory` form (e.g. `nvidia:A100:80GB`) bypasses this matching and normalization, so it can describe models `dstack` doesn't know about. It's used verbatim and requires all three fields. Prefer the short form where possible — it's easier and keeps GPU names consistent across backends.
+
+!!! info "Region"
+    Each enabled cluster becomes its own `dstack` region, named after the cluster's `name`. Use the `region` field in fleet or run configurations to target a specific cluster.
+
+??? info "User interface"
+    If you are configuring the `slurm` backend on the [project settings page](projects.md#backends), specify the contents of the private key in `content` instead of referencing a `path`:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: slurm
+
+    clusters:
+    - name: gpu-cluster-a
+      hostname: login.example.com
+      user: admin
+      private_key:
+        content: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          ...
+          -----END OPENSSH PRIVATE KEY-----
+      gpu_partitions:
+      - gpu: H100
+        partitions: [gpu]
+    ```
+
+    </div>
+
+??? info "Resources and offers"
+    Like the `kubernetes` backend, if you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, the `slurm` backend only requests the lower limit of each range — the upper limit is ignored. The requested CPU, memory, and GPU counts are passed to Slurm as `--cpus-per-task`, `--mem`, and `--gres=gpu:<count>` respectively.
+
+!!! warning "Known limitations"
+    - **One `dstack` job per node.** A `dstack` job can share a node with non-`dstack` Slurm jobs, but two `dstack` jobs cannot run on the same node — the second one fails to start and its run eventually fails by provisioning timeout. `dstack` does not control node placement, so this can happen whenever the Slurm scheduler places a second `dstack` job on a node that already runs one. This limitation is expected to be lifted in a future release.
+    - **Runs always execute as `root`.** `enroot` is a single-user container runtime: it can only map the invoking host user inside the container to either the same UID/GID or to `root` (`0:0`). `dstack` uses the latter, so runs always execute as `root`, and both the image's default user and the run configuration's `user` property are ignored. The single-user model is a fundamental `enroot` limitation, not specific to the `dstack` integration.
+    - **Private registries via `registry_auth` are not supported.** The `registry_auth` run configuration property is rejected. You can still pull images from a private registry by preconfiguring `enroot` credentials on the cluster's compute nodes — see the [enroot import documentation](https://github.com/NVIDIA/enroot/blob/main/doc/cmd/import.md#description).
+
 ### Runpod
 
 Log into your [Runpod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click

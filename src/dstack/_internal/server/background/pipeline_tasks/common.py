@@ -14,6 +14,8 @@ def get_provisioning_timeout(backend_type: BackendType, instance_type_name: str)
         return timedelta(minutes=20)
     if backend_type == BackendType.KUBERNETES:
         return timedelta(minutes=20)
+    if backend_type == BackendType.SLURM:
+        return timedelta(minutes=20)
     if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(minutes=20)
     if backend_type == BackendType.VULTR and instance_type_name.startswith("vbm"):

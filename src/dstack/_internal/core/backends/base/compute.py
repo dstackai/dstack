@@ -982,6 +982,7 @@ def get_gateway_user_data(
 def get_docker_commands(
     authorized_keys: list[str],
     bin_path: Optional[PathLike] = None,
+    pre_runner_commands: Optional[Iterable[str]] = None,
 ) -> list[str]:
     dstack_runner_binary_path = get_dstack_runner_binary_path(bin_path)
     commands = [
@@ -1001,6 +1002,9 @@ def get_docker_commands(
         "if ! exists curl; then install_pkg curl; fi",
         ": )",
     ]
+
+    if pre_runner_commands is not None:
+        commands.extend(pre_runner_commands)
 
     runner_command = [
         dstack_runner_binary_path,

@@ -66,6 +66,11 @@ from dstack._internal.core.backends.runpod.models import (
     RunpodBackendConfig,
     RunpodBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.slurm.models import (
+    SlurmBackendConfig,
+    SlurmBackendConfigWithCreds,
+    SlurmBackendFileConfigWithCreds,
+)
 from dstack._internal.core.backends.tensordock.models import (
     TensorDockBackendConfig,
     TensorDockBackendConfigWithCreds,
@@ -104,6 +109,7 @@ AnyBackendConfigWithoutCreds = Union[
     VastAIBackendConfig,
     VerdaBackendConfig,
     VultrBackendConfig,
+    SlurmBackendConfig,
     DstackBackendConfig,
     DstackBaseBackendConfig,
 ]
@@ -130,6 +136,7 @@ AnyBackendConfigWithCreds = Union[
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
     VultrBackendConfigWithCreds,
+    SlurmBackendConfigWithCreds,
     DstackBackendConfig,
 ]
 
@@ -155,6 +162,7 @@ AnyBackendFileConfigWithCreds = Union[
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
     VultrBackendConfigWithCreds,
+    SlurmBackendFileConfigWithCreds,
 ]
 
 
