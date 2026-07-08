@@ -70,6 +70,12 @@ the requested model. For a chat or reasoning model, check the response behavior
 the endpoint is expected to support, such as reasoning output when that model is
 supposed to expose it.
 
+If you stop a run to submit another one, whether it is a task or a service,
+ensure the previous run has fully stopped, for example by reaching `stopped`,
+`terminated`, or another terminal status. This can prevent provisioning extra
+instances by reusing idle instances when possible, and can also preserve
+instance volumes.
+
 ## Verify As A Service
 
 Submit the service after the task has verified the recipe: image, command, port,
