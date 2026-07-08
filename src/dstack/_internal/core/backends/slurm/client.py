@@ -304,7 +304,7 @@ def _build_node_from_dict(node_dict: dict[str, str]) -> Node:
     if not cpus_raw:
         cpus_raw = node_dict.get("cputot")
         if not cpus_raw:
-            raise SlurmClientError("Failed to detect CPU count")
+            raise ValueError("Failed to detect CPU count")
     try:
         cpus = int(cpus_raw)
     except ValueError as e:
