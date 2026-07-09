@@ -130,6 +130,7 @@ class RunpodCompute(
         project_ssh_private_key: str,
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         assert run.run_spec.ssh_key_pub is not None
         instance_config = InstanceConfiguration(
@@ -245,6 +246,7 @@ class RunpodCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> ComputeGroupProvisioningData:
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job

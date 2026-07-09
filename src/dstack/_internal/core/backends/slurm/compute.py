@@ -127,12 +127,14 @@ class SlurmCompute(
         project_ssh_private_key: str,
         volumes: list[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         compute_provisioning_data = self._run_slurm_job(
             run=run,
             job=job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
+            requirements=requirements,
         )
         return compute_provisioning_data.job_provisioning_datas[0]
 
@@ -144,6 +146,7 @@ class SlurmCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> ComputeGroupProvisioningData:
         master_job = job_configurations[0].job
         return self._run_slurm_job(
@@ -151,6 +154,7 @@ class SlurmCompute(
             job=master_job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
+            requirements=requirements,
         )
 
     def terminate_instance(
@@ -172,6 +176,7 @@ class SlurmCompute(
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        requirements: Requirements,
     ) -> ComputeGroupProvisioningData:
         if job.job_spec.registry_auth is not None:
             self._skip_offer_cache.add(run, job, instance_offer)
@@ -196,7 +201,7 @@ class SlurmCompute(
             authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
 
             node_count = job.job_spec.jobs_per_replica
-            resources_spec = job.job_spec.requirements.resources
+            resources_spec = requirements.resources
             requested_resources = get_requested_resources_from_resources_spec(resources_spec)
 
             partitions = _get_cluster_partitions(cluster, requested_resources)

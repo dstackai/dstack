@@ -173,6 +173,7 @@ class KubernetesCompute(
         project_ssh_private_key: str,
         volumes: list[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         cluster = self.region_cluster_map.get(instance_offer.region)
         if cluster is None:
@@ -247,6 +248,7 @@ class KubernetesCompute(
                 run_spec=run.run_spec,
                 job_spec=job.job_spec,
                 volumes=volumes,
+                requirements=requirements,
                 authorized_keys=authorized_keys,
             )
             exit_stack.callback(
@@ -1098,6 +1100,7 @@ def _create_job_pod(
     run_spec: RunSpec,
     job_spec: JobSpec,
     volumes: list[Volume],
+    requirements: Requirements,
     authorized_keys: list[str],
 ) -> None:
     resources_requests: dict[str, str] = {}
@@ -1108,7 +1111,7 @@ def _create_job_pod(
     volume_mounts: list[client.V1VolumeMount] = []
     env_vars: list[client.V1EnvVar] = []
 
-    resources_spec = job_spec.requirements.resources
+    resources_spec = requirements.resources
     assert isinstance(resources_spec.cpu, CPUSpec)
     if (cpu_min := resources_spec.cpu.count.min) is not None:
         resources_requests["cpu"] = str(cpu_min)
