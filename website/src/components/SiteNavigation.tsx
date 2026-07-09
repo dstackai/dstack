@@ -68,8 +68,8 @@ type ProductLink = {
 // section.
 const products: ProductLink[] = [
   { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: DOCS_URL, icon: <GithubGlyph /> },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudUploadGlyph /> },
   { id: 'enterprise', text: 'Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <FingerprintGlyph /> },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudUploadGlyph /> },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
