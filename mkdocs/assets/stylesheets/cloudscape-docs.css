@@ -208,6 +208,14 @@
    pill (700), mirroring the landing where the primary and normal button variants differ in weight. */
 [data-md-color-primary=white] .md-header__buttons .md-button--primary.cs-gs-menu__trigger {
     font-weight: 500 !important;
+    /* Inverts with the theme (like the landing's primary button): dark fill + white text in light
+       mode, light fill + dark text in dark mode. The global rgba(0,0,0,.87) stayed dark in both. */
+    background: var(--cs-text) !important;
+    color: var(--cs-bg) !important;
+}
+[data-md-color-primary=white] .md-header__buttons .md-button--primary.cs-gs-menu__trigger:hover {
+    background: color-mix(in srgb, var(--cs-text) 88%, var(--cs-bg)) !important;
+    color: var(--cs-bg) !important;
 }
 
 /* GitHub → outlined (normal) "GitHub" with a trailing external-link glyph, mirroring the landing's
