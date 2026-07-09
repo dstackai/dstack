@@ -105,7 +105,7 @@ def get_repo_creds_and_default_branch(
     # token from gh config
     if os.path.exists(gh_config_path):
         with open(gh_config_path, "r") as f:
-            gh_hosts = yaml.load(f, Loader=yaml.FullLoader)
+            gh_hosts = yaml.safe_load(f)
         _oauth_token = gh_hosts.get(url.host, {}).get("oauth_token")
         if _oauth_token is not None:
             with suppress(RepoInvalidCredentialsError):

@@ -185,7 +185,7 @@ class Kubeconfig(CoreModel):
 
 
 def kubeconfig_data_to_kubeconfig_dict(kubeconfig_data: str) -> dict:
-    kubeconfig_dict = yaml.load(kubeconfig_data, yaml.FullLoader)
+    kubeconfig_dict = yaml.safe_load(kubeconfig_data)
     if not isinstance(kubeconfig_dict, dict):
         raise TypeError(f"Unexpected kubeconfig_data type: {kubeconfig_dict.__class__.__name__}")
     return kubeconfig_dict

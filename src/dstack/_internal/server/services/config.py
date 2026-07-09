@@ -220,7 +220,7 @@ class ServerConfigManager:
                 content = f.read()
         except OSError:
             return
-        config_dict = yaml.load(content, yaml.FullLoader)
+        config_dict = yaml.safe_load(content)
         return ServerConfig.parse_obj(config_dict)
 
     def _save_config(self, config: ServerConfig):
@@ -271,7 +271,7 @@ class _BackendConfigWithCreds(CoreModel):
 
 def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds:
     try:
-        config_dict = yaml.load(config_yaml, yaml.FullLoader)
+        config_dict = yaml.safe_load(config_yaml)
     except yaml.YAMLError:
         raise ServerClientError("Error parsing YAML")
     try:
