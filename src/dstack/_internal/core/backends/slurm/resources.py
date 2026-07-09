@@ -128,6 +128,8 @@ def get_requested_resources_from_resources_spec(spec: ResourcesSpec) -> Requeste
     # The easiest/safest option is to use some sane default
     memory = spec.memory.min or DEFAULT_MEMORY_SIZE.min
     assert memory
+    if spec.memory.max:
+        memory = min(memory, spec.memory.max)
     memory_mib = round(memory * 1024)
 
     gpu_count: int = 0
