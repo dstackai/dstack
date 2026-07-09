@@ -87,7 +87,6 @@ class TestListBackendTypes:
             "azure",
             "cloudrift",
             "crusoe",
-            "cudo",
             "datacrunch",
             "digitalocean",
             "gcp",

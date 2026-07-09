@@ -45,15 +45,6 @@ except ImportError:
     pass
 
 try:
-    from dstack._internal.core.backends.cudo.configurator import (
-        CudoConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(CudoConfigurator)
-except ImportError:
-    pass
-
-try:
     from dstack._internal.core.backends.datacrunch.configurator import (
         DataCrunchConfigurator,
     )
