@@ -5,8 +5,9 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Literal, Optional, Union, cast
+from typing import Callable, Literal, Optional, Union, cast, get_args
 
+import gpuhunt
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
 
 # XXX: kubernetes.utils is missing in the stubs package
@@ -15,7 +16,6 @@ from kubernetes.client import CoreV1Api, V1Node, V1Taint
 from typing_extensions import Self
 
 from dstack._internal.core.backends.base.compute import normalize_arch
-from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -26,8 +26,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
-from dstack._internal.core.models.runs import Requirements
+from dstack._internal.core.models.resources import CPUSpec, Memory, ResourcesSpec
 from dstack._internal.utils import docker as docker_utils
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
@@ -96,6 +95,19 @@ class KubernetesResource(str, Enum):
     NVIDIA_GPU = NVIDIA_GPU_RESOURCE
     AMD_GPU = AMD_GPU_RESOURCE
 
+    @classmethod
+    def from_gpu_vendor(cls, vendor: gpuhunt.AcceleratorVendor) -> "AnyKubernetesGPUResource":
+        match vendor:
+            case gpuhunt.AcceleratorVendor.NVIDIA:
+                return KubernetesResource.NVIDIA_GPU
+            case gpuhunt.AcceleratorVendor.AMD:
+                return KubernetesResource.AMD_GPU
+        raise ValueError(f"Unsupported accelerator vendor: {vendor}")
+
+
+AnyKubernetesGPUResource = Literal[KubernetesResource.NVIDIA_GPU, KubernetesResource.AMD_GPU]
+GPU_RESOURCES: tuple[AnyKubernetesGPUResource, ...] = get_args(AnyKubernetesGPUResource)
+
 
 @dataclasses.dataclass
 class KubernetesResources:
@@ -133,6 +145,125 @@ class KubernetesResources:
         for field, qty in dataclasses.asdict(other).items():
             dct[field] -= qty
         return type(self)(**dct)
+
+
+@dataclasses.dataclass(frozen=True)
+class ResourceRequestsLimits:
+    cpu: Optional[int]
+    memory_mib: Optional[int]
+    disk_mib: Optional[int]
+    gpu: int
+
+    def to_kubernetes_map(
+        self, gpu_resource: Optional[AnyKubernetesGPUResource] = None
+    ) -> dict[str, str]:
+        dct: dict[str, str] = {}
+        if self.cpu is not None:
+            dct[KubernetesResource.CPU.value] = str(self.cpu)
+        if self.memory_mib is not None:
+            dct[KubernetesResource.MEMORY.value] = f"{self.memory_mib}Mi"
+        if self.disk_mib is not None:
+            dct[KubernetesResource.EPHEMERAL_STORAGE.value] = f"{self.disk_mib}Mi"
+        if self.gpu > 0:
+            if gpu_resource is None:
+                raise ValueError("gpu_resource is not specified")
+            dct[gpu_resource.value] = str(self.gpu)
+        return dct
+
+
+@dataclasses.dataclass(frozen=True)
+class ResourceRequests(ResourceRequestsLimits):
+    cpu: int
+    memory_mib: int
+    disk_mib: int
+
+    @classmethod
+    def from_resources_spec(cls, spec: ResourcesSpec) -> Self:
+        assert isinstance(spec.cpu, CPUSpec)
+        cpu = spec.cpu.count.min or 0
+        memory_mib: int = 0
+        if spec.memory.min is not None:
+            memory_mib = round(spec.memory.min * 1024)
+        disk_mib: int = 0
+        if spec.disk is not None and spec.disk.size.min is not None:
+            disk_mib = round(spec.disk.size.min * 1024)
+        gpu: int = 0
+        if spec.gpu is not None:
+            gpu = spec.gpu.count.min or 0
+        return cls(
+            cpu=cpu,
+            memory_mib=memory_mib,
+            disk_mib=disk_mib,
+            gpu=gpu,
+        )
+
+    @classmethod
+    def from_kubernetes_map(cls, map_: Mapping[str, str]) -> Self:
+        cpu_qty = map_.get(KubernetesResource.CPU.value, "0")
+        cpu = round(parse_quantity(cpu_qty))
+        memory_qty = map_.get(KubernetesResource.MEMORY.value, "0")
+        memory_mib = round(parse_quantity(memory_qty) / 2**20)
+        disk_qty = map_.get(KubernetesResource.EPHEMERAL_STORAGE.value, "0")
+        disk_mib = round(parse_quantity(disk_qty) / 2**20)
+        gpu: int = 0
+        for gpu_resource in GPU_RESOURCES:
+            gpu_qty = map_.get(gpu_resource)
+            if gpu_qty is not None:
+                gpu = round(parse_quantity(gpu_qty))
+                break
+        return cls(
+            cpu=cpu,
+            memory_mib=memory_mib,
+            disk_mib=disk_mib,
+            gpu=gpu,
+        )
+
+
+@dataclasses.dataclass(frozen=True)
+class ResourceLimits(ResourceRequestsLimits):
+    @classmethod
+    def from_resources_spec(cls, spec: ResourcesSpec) -> Self:
+        assert isinstance(spec.cpu, CPUSpec)
+        cpu = spec.cpu.count.max
+        memory_mib: Optional[int] = None
+        if spec.memory.max is not None:
+            memory_mib = round(spec.memory.max * 1024)
+        disk_mib: Optional[int] = None
+        if spec.disk is not None:
+            if spec.disk.size.max is not None:
+                disk_mib = round(spec.disk.size.max * 1024)
+        gpu: int = 0
+        if spec.gpu is not None:
+            # GPU resources cannot be overcommitted, limit must be equal to request
+            gpu = spec.gpu.count.min or 0
+        assert isinstance(spec.cpu, CPUSpec)
+        return cls(
+            cpu=cpu,
+            memory_mib=memory_mib,
+            disk_mib=disk_mib,
+            gpu=gpu,
+        )
+
+
+def adjust_resources_by_resource_requests(
+    resources: Resources,
+    resource_requests: ResourceRequests,
+    *,
+    force: bool = False,
+) -> None:
+    cpu = resource_requests.cpu
+    if not force:
+        cpu = min(resources.cpus, cpu)
+    resources.cpus = cpu
+    memory_mib = resource_requests.memory_mib
+    if not force:
+        memory_mib = min(resources.memory_mib, memory_mib)
+    resources.memory_mib = memory_mib
+    resources.gpus = resources.gpus[: resource_requests.gpu]
+    disk_mib = resource_requests.disk_mib
+    if not force:
+        disk_mib = min(resources.disk.size_mib, disk_mib)
+    resources.disk = Disk(size_mib=disk_mib)
 
 
 def build_base_labels(
@@ -225,10 +356,6 @@ def format_memory(memory: Memory) -> str:
     return f"{float(memory)}Gi"
 
 
-def get_gpu_request_from_gpu_spec(gpu_spec: GPUSpec) -> int:
-    return gpu_spec.count.min or 0
-
-
 def get_node_name(node: V1Node) -> Optional[str]:
     if (metadata := node.metadata) is None:
         return None
@@ -258,20 +385,7 @@ def is_taint_tolerated(taint: V1Taint) -> bool:
     return taint.key in (NVIDIA_GPU_NODE_TAINT, AMD_GPU_NODE_TAINT)
 
 
-def get_instance_offers(
-    api: CoreV1Api, region: str, requirements: Requirements
-) -> list[InstanceOfferWithAvailability]:
-    resources_spec = requirements.resources
-    assert isinstance(resources_spec.cpu, CPUSpec)
-    cpu_request = resources_spec.cpu.count.min or 0
-    memory_mib_request = round((resources_spec.memory.min or 0) * 1024)
-    gpu_request = 0
-    if (gpu_spec := resources_spec.gpu) is not None:
-        gpu_request = get_gpu_request_from_gpu_spec(gpu_spec)
-    disk_mib_request = 0
-    if (disk_spec := resources_spec.disk) is not None:
-        disk_mib_request = round((disk_spec.size.min or 0) * 1024)
-
+def get_instance_offers(api: CoreV1Api, region: str) -> list[InstanceOfferWithAvailability]:
     nodes_allocated_resources = _get_nodes_allocated_resources(api)
     offers: list[InstanceOfferWithAvailability] = []
     for node in api.list_node().items:
@@ -282,24 +396,14 @@ def get_instance_offers(
             node_name=node_name,
             node_allocated_resources=nodes_allocated_resources.get(node_name),
             region=region,
-            cpu_request=cpu_request,
-            memory_mib_request=memory_mib_request,
-            gpu_request=gpu_request,
-            disk_mib_request=disk_mib_request,
         )
         if offer is not None:
-            offers.extend(filter_offers_by_requirements([offer], requirements))
+            offers.append(offer)
     return offers
 
 
 def get_instance_offer_from_node(
-    node: V1Node,
-    *,
-    region: str,
-    cpu_request: int,
-    memory_mib_request: int,
-    gpu_request: int,
-    disk_mib_request: int,
+    node: V1Node, region: str
 ) -> Optional[InstanceOfferWithAvailability]:
     node_name = get_node_name(node)
     if node_name is None:
@@ -309,10 +413,6 @@ def get_instance_offer_from_node(
         node_name=node_name,
         node_allocated_resources=None,
         region=region,
-        cpu_request=cpu_request,
-        memory_mib_request=memory_mib_request,
-        gpu_request=gpu_request,
-        disk_mib_request=disk_mib_request,
     )
 
 
@@ -365,10 +465,6 @@ def _get_instance_offer_from_node(
     node_name: str,
     node_allocated_resources: Optional[KubernetesResources],
     region: str,
-    cpu_request: int,
-    memory_mib_request: int,
-    gpu_request: int,
-    disk_mib_request: int,
 ) -> Optional[InstanceOfferWithAvailability]:
     try:
         node_spec = get_or_error(node.spec)
@@ -398,11 +494,11 @@ def _get_instance_offer_from_node(
         instance=InstanceType(
             name=node_name,
             resources=Resources(
-                cpus=min(cpu_request, cpu),
+                cpus=cpu,
                 cpu_arch=cpu_arch,
-                memory_mib=min(memory_mib_request, memory_mib),
-                gpus=gpus[:gpu_request],
-                disk=Disk(size_mib=min(disk_mib_request, disk_mib)),
+                memory_mib=memory_mib,
+                gpus=gpus,
+                disk=Disk(size_mib=disk_mib),
                 spot=False,
             ),
         ),

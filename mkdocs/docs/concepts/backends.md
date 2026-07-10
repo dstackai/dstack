@@ -1247,9 +1247,9 @@ projects:
     If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.
 
     The `kubernetes` backend handles it differently.
-    
+
     * For `gpu`, if you specify a range (e.g. `gpu: 4..8`), the `kubernetes` backend only provisions pods with the GPU count equal to the lower limit (`4`). The upper limit of the GPU range is always ignored.
-    * For other resources such as `cpu`, `memory`, and `disk`, the `kubernetes` backend passes the lower and upper limits of the range as Kubernetes [requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) respectively. If the upper limit is not set, the Kubernetes limit is also not set.
+    * For other resources such as `cpu`, `memory`, and `disk`, the `kubernetes` backend passes the lower and upper limits of the range as Kubernetes [requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) respectively. If the lower limit is not set, the Kubernetes request is set to `0`, unlike Kubernetes, where the request defaults to the limit if not set. If the upper limit is not set, the Kubernetes limit is also not set.
 
     Example:
 
@@ -1260,7 +1260,7 @@ projects:
     ide: vscode
 
     resources:
-      cpu: 32..64
+      cpu: ..64
       memory: 1024GB
       disk: 100GB..
       gpu: nvidia:4..8
@@ -1272,7 +1272,7 @@ projects:
 
     | Resource            | Request  | Limit     |
     |---------------------|----------|-----------|
-    | `cpu`               | `32`     | `64`      |
+    | `cpu`               | `0`      | `64`      |
     | `memory`            | `1024Gi` | `1024Gi`  |
     | `ephemeral-storage` | `100Gi`  | _not set_ |
     | `nvidia.com/gpu`    | `4`      | `4`       |
