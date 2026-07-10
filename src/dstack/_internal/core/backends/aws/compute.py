@@ -188,12 +188,13 @@ class AWSCompute(
         # Requirements is not hashable, so we use a hack to get arguments hash
         return hash(requirements.json())
 
+    # For `pyright: ignore` directive, see: https://github.com/tkem/cachetools/issues/394
     @cachedmethod(
         cache=lambda self: self._offers_post_filter_cache.cache,
         key=_get_offers_cached_key,
         lock=lambda self: self._offers_post_filter_cache.lock,
     )
-    def get_offers_post_filter(
+    def get_offers_post_filter(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, requirements: Requirements
     ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
         if requirements.reservation:
