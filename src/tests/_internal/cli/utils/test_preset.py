@@ -39,6 +39,25 @@ class TestGetEndpointPresetsTable:
             "cpu=2.. mem=8GB.. disk=100GB.. gpu=nvidia:16GB:1..",
         ]
 
+    def test_shows_recipe_model_when_it_differs_from_preset_base(self):
+        preset = _endpoint_preset(
+            model="Qwen/Qwen3-0.6B",
+            recipe_id="vllm-a40",
+            recipe_model="groxaxo/Qwen3-0.6B-GPTQ-4Bit",
+            service={"resources": {"gpu": "nvidia:16GB"}},
+        )
+
+        table = get_endpoint_presets_table([preset])
+
+        assert table.columns[0]._cells == [
+            "[bold]Qwen/Qwen3-0.6B[/]",
+            "   repo=groxaxo/Qwen3-0.6B-GPTQ-4Bit",
+        ]
+        assert table.columns[1]._cells == [
+            "nvidia:16GB:1..",
+            "",
+        ]
+
     def test_shows_single_implicit_group_once_even_with_multiple_tested_replicas(self):
         preset = _endpoint_preset(
             model="Qwen/Qwen3-0.6B",
@@ -98,7 +117,7 @@ class TestGetEndpointPresetsTable:
 
     def test_groups_multiple_recipes_by_model(self):
         preset = EndpointPreset(
-            model="Qwen/Qwen3-0.6B",
+            base="Qwen/Qwen3-0.6B",
             recipes=[
                 _endpoint_preset(
                     model="Qwen/Qwen3-0.6B",
@@ -133,6 +152,7 @@ def _endpoint_preset(
     recipe_id: str,
     service: dict,
     validation_replicas: list[dict] | None = None,
+    recipe_model: str | None = None,
 ) -> EndpointPreset:
     service_data = {
         "type": "service",
@@ -143,10 +163,11 @@ def _endpoint_preset(
     if "replicas" not in service_data:
         service_data["commands"] = [f"vllm serve {model}"]
     return EndpointPreset(
-        model=model,
+        base=model,
         recipes=[
             EndpointPresetRecipe(
                 id=recipe_id,
+                model=recipe_model or model,
                 service=ServiceConfiguration.parse_obj(service_data),
                 validations=[
                     EndpointPresetValidation(

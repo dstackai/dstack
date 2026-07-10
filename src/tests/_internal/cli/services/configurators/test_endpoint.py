@@ -118,7 +118,7 @@ class TestPrintEndpointPlan:
         resources = ResourcesSpec.parse_obj({"gpu": "16GB", "disk": "60GB"})
         plan = _get_endpoint_plan(
             EndpointProvisioningPlanPreset(
-                preset_model="Qwen/Qwen3-0.6B",
+                preset_base="Qwen/Qwen3-0.6B",
                 recipe_id="vllm-a40",
                 service_name="qwen-endpoint-serving",
                 job_offers=[

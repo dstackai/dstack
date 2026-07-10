@@ -12,6 +12,8 @@ AGENT_FINAL_REPORT_JSON_SCHEMA = {
         "run_id": {"type": "string"},
         "run_name": {"type": "string"},
         "service_yaml": {"type": "string"},
+        "base": {"type": "string"},
+        "model": {"type": "string"},
         "failure_summary": {"type": "string"},
     },
     "required": ["success"],
@@ -26,6 +28,8 @@ class AgentFinalReport(CoreModel):
     run_id: Optional[uuid.UUID] = None
     run_name: Optional[str] = None
     service_yaml: Optional[str] = None
+    base: Optional[str] = None
+    model: Optional[str] = None
     failure_summary: Optional[str] = None
 
     @root_validator
@@ -36,6 +40,10 @@ class AgentFinalReport(CoreModel):
                 raise ValueError("successful agent report must include run_id")
             if not values.get("service_yaml"):
                 raise ValueError("successful agent report must include service_yaml")
+            if not values.get("base") or not values["base"].strip():
+                raise ValueError("successful agent report must include base")
+            if not values.get("model") or not values["model"].strip():
+                raise ValueError("successful agent report must include model")
         else:
             if not values.get("failure_summary"):
                 raise ValueError("failed agent report must include failure_summary")

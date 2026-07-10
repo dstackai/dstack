@@ -39,11 +39,11 @@ class EndpointPresetService(ABC):
         pass
 
     @abstractmethod
-    async def get_preset(self, project_name: str, model: str) -> Optional[EndpointPreset]:
+    async def get_preset(self, project_name: str, base: str) -> Optional[EndpointPreset]:
         pass
 
     @abstractmethod
-    async def delete_preset(self, project_name: str, model: str) -> None:
+    async def delete_preset(self, project_name: str, base: str) -> None:
         pass
 
     @abstractmethod
@@ -64,11 +64,11 @@ class LocalDirEndpointPresetService(EndpointPresetService):
     async def list_presets(self, project_name: str) -> list[EndpointPreset]:
         return await run_async(self._list_presets, project_name)
 
-    async def get_preset(self, project_name: str, model: str) -> Optional[EndpointPreset]:
-        return await run_async(self._get_preset, project_name, model)
+    async def get_preset(self, project_name: str, base: str) -> Optional[EndpointPreset]:
+        return await run_async(self._get_preset, project_name, base)
 
-    async def delete_preset(self, project_name: str, model: str) -> None:
-        return await run_async(self._delete_preset, project_name, model)
+    async def delete_preset(self, project_name: str, base: str) -> None:
+        return await run_async(self._delete_preset, project_name, base)
 
     async def save_preset(
         self,
@@ -81,14 +81,14 @@ class LocalDirEndpointPresetService(EndpointPresetService):
     def _list_presets(self, project_name: str) -> list[EndpointPreset]:
         return [preset for preset, _ in self._list_merged_presets(project_name)]
 
-    def _get_preset(self, project_name: str, model: str) -> Optional[EndpointPreset]:
-        preset, _ = self._find_preset_by_model(project_name, model)
+    def _get_preset(self, project_name: str, base: str) -> Optional[EndpointPreset]:
+        preset, _ = self._find_preset_by_base(project_name, base)
         return preset
 
-    def _delete_preset(self, project_name: str, model: str) -> None:
-        _, paths = self._find_preset_by_model(project_name, model)
+    def _delete_preset(self, project_name: str, base: str) -> None:
+        _, paths = self._find_preset_by_base(project_name, base)
         if not paths:
-            raise FileNotFoundError(model)
+            raise FileNotFoundError(base)
         for path in paths:
             path.unlink()
 
@@ -102,13 +102,13 @@ class LocalDirEndpointPresetService(EndpointPresetService):
         presets_dir = self._get_project_presets_dir(project_name)
         presets_dir.mkdir(parents=True, exist_ok=True)
 
-        existing_preset, existing_paths = self._find_preset_by_model(project_name, preset.model)
+        existing_preset, existing_paths = self._find_preset_by_base(project_name, preset.base)
         if existing_preset is not None:
             saved_preset = _merge_presets(existing_preset, preset, prefer_incoming=True)
             path = existing_paths[0]
         else:
             saved_preset = preset
-            path = self._get_available_preset_path(presets_dir, preset.model)
+            path = self._get_available_preset_path(presets_dir, preset.base)
 
         data = _preset_to_data(saved_preset)
         content = _format_preset_comments(comments) + yaml.safe_dump(data, sort_keys=False)
@@ -120,14 +120,14 @@ class LocalDirEndpointPresetService(EndpointPresetService):
             raise ValueError(f"saved endpoint preset {path} could not be loaded")
         return loaded_preset
 
-    def _find_preset_by_model(
+    def _find_preset_by_base(
         self,
         project_name: str,
-        model: str,
+        base: str,
     ) -> tuple[Optional[EndpointPreset], list[Path]]:
-        model_key = model.lower()
+        base_key = base.lower()
         for preset, paths in self._list_merged_presets(project_name):
-            if preset.model.lower() == model_key:
+            if preset.base.lower() == base_key:
                 return preset, paths
         return None, []
 
@@ -136,27 +136,27 @@ class LocalDirEndpointPresetService(EndpointPresetService):
         if not presets_dir.exists():
             return []
 
-        presets_by_model: dict[str, EndpointPreset] = {}
-        paths_by_model: dict[str, list[Path]] = {}
-        model_order: list[str] = []
+        presets_by_base: dict[str, EndpointPreset] = {}
+        paths_by_base: dict[str, list[Path]] = {}
+        base_order: list[str] = []
         for path in self._iter_preset_paths(presets_dir):
             preset = self._load_preset(path)
             if preset is None:
                 continue
-            model_key = preset.model.lower()
-            existing = presets_by_model.get(model_key)
+            base_key = preset.base.lower()
+            existing = presets_by_base.get(base_key)
             if existing is None:
-                presets_by_model[model_key] = preset
-                paths_by_model[model_key] = [path]
-                model_order.append(model_key)
+                presets_by_base[base_key] = preset
+                paths_by_base[base_key] = [path]
+                base_order.append(base_key)
                 continue
             try:
-                presets_by_model[model_key] = _merge_presets(existing, preset)
+                presets_by_base[base_key] = _merge_presets(existing, preset)
             except ValueError as e:
                 logger.warning("Skipping endpoint preset %s: %s", path, e)
                 continue
-            paths_by_model[model_key].append(path)
-        return [(presets_by_model[model], paths_by_model[model]) for model in model_order]
+            paths_by_base[base_key].append(path)
+        return [(presets_by_base[base], paths_by_base[base]) for base in base_order]
 
     def _iter_preset_paths(self, presets_dir: Path) -> list[Path]:
         return [path for path in sorted(presets_dir.iterdir()) if path.suffix in [".yml", ".yaml"]]
@@ -220,45 +220,56 @@ def _preset_from_data(data: Any) -> EndpointPreset:
         raise ValueError("preset must be a YAML object")
     if data.get("type") != "endpoint-preset":
         raise ValueError("preset must be an endpoint preset")
-    model = data.get("model")
-    if not isinstance(model, str) or model == "":
-        raise ValueError("preset must specify a model")
+    base = data.get("base", data.get("model"))
+    if not isinstance(base, str) or base == "":
+        raise ValueError("preset must specify a base")
+    legacy_model = data.get("model")
+    if isinstance(legacy_model, str) and "base" in data and legacy_model != base:
+        raise ValueError("preset base must match legacy model")
     if "recipes" in data:
         return EndpointPreset(
-            model=model,
-            recipes=_get_preset_recipes(data=data, model=model),
+            base=base,
+            recipes=_get_preset_recipes(data=data, base=base),
         )
     return EndpointPreset(
-        model=model,
-        recipes=[_get_legacy_preset_recipe(data=data, model=model)],
+        base=base,
+        recipes=[_get_legacy_preset_recipe(data=data, base=base)],
     )
 
 
-def _get_preset_recipes(data: dict[str, Any], model: str) -> list[EndpointPresetRecipe]:
+def _get_preset_recipes(data: dict[str, Any], base: str) -> list[EndpointPresetRecipe]:
     raw_recipes = data.get("recipes")
     if not isinstance(raw_recipes, list) or not raw_recipes:
         raise ValueError("preset must specify non-empty recipes")
-    recipes = [_get_preset_recipe(raw_recipe, model=model) for raw_recipe in raw_recipes]
+    recipes = [_get_preset_recipe(raw_recipe, base=base) for raw_recipe in raw_recipes]
     recipe_ids = [recipe.id for recipe in recipes]
     if len(recipe_ids) != len(set(recipe_ids)):
         raise ValueError("preset recipes must have unique ids")
     return recipes
 
 
-def _get_preset_recipe(raw_recipe: Any, model: str) -> EndpointPresetRecipe:
+def _get_preset_recipe(raw_recipe: Any, base: str) -> EndpointPresetRecipe:
     if not isinstance(raw_recipe, dict):
         raise ValueError("preset recipes must be objects")
     recipe_id = raw_recipe.get("id")
     if not isinstance(recipe_id, str) or recipe_id == "":
         raise ValueError("preset recipe must specify id")
-    service_data = _get_service_data(raw_recipe, model=model)
+    recipe_model = raw_recipe.get("model", base)
+    if not isinstance(recipe_model, str) or not recipe_model.strip():
+        raise ValueError("preset recipe must specify model")
+    service_data = _get_service_data(raw_recipe, base=base)
     service = ServiceConfiguration.parse_obj(service_data)
     validations = _get_validations(raw_recipe, service=service)
-    return EndpointPresetRecipe(id=recipe_id, service=service, validations=validations)
+    return EndpointPresetRecipe(
+        id=recipe_id,
+        model=recipe_model,
+        service=service,
+        validations=validations,
+    )
 
 
-def _get_legacy_preset_recipe(data: dict[str, Any], model: str) -> EndpointPresetRecipe:
-    service_data = _get_service_data(data, model=model, allow_missing_resources=True)
+def _get_legacy_preset_recipe(data: dict[str, Any], base: str) -> EndpointPresetRecipe:
+    service_data = _get_service_data(data, base=base, allow_missing_resources=True)
     raw_groups = _get_legacy_replica_spec_groups(data=data, service_data=service_data)
     _apply_legacy_replica_group_resources(service_data=service_data, groups=raw_groups)
     service = ServiceConfiguration.parse_obj(service_data)
@@ -275,6 +286,7 @@ def _get_legacy_preset_recipe(data: dict[str, Any], model: str) -> EndpointPrese
     )
     return EndpointPresetRecipe(
         id=make_endpoint_preset_recipe_id(service),
+        model=base,
         service=service,
         validations=[validation],
     )
@@ -282,7 +294,7 @@ def _get_legacy_preset_recipe(data: dict[str, Any], model: str) -> EndpointPrese
 
 def _get_service_data(
     data: dict[str, Any],
-    model: str,
+    base: str,
     allow_missing_resources: bool = False,
 ) -> dict[str, Any]:
     service_data = data.get("service")
@@ -300,13 +312,13 @@ def _get_service_data(
         )
     if not allow_missing_resources:
         _validate_service_has_resources(service_data)
-    service_data.setdefault("model", model)
+    service_data.setdefault("model", base)
     service_data["type"] = "service"
     configuration = ServiceConfiguration.parse_obj(service_data)
     if configuration.model is None:
         raise ValueError("preset service configuration must specify model")
-    if configuration.model.name.lower() != model.lower():
-        raise ValueError("preset model must match the service model")
+    if configuration.model.name.lower() != base.lower():
+        raise ValueError("preset base must match the service model")
     return service_data
 
 
@@ -344,10 +356,12 @@ def _validate_preset(preset: EndpointPreset) -> None:
     if len(recipe_ids) != len(set(recipe_ids)):
         raise ValueError("preset recipes must have unique ids")
     for recipe in preset.recipes:
+        if not recipe.model.strip():
+            raise ValueError("preset recipe must specify model")
         if recipe.service.model is None:
             raise ValueError("preset recipe service must specify model")
-        if recipe.service.model.name.lower() != preset.model.lower():
-            raise ValueError("preset model must match the recipe service model")
+        if recipe.service.model.name.lower() != preset.base.lower():
+            raise ValueError("preset base must match the recipe service model")
         _validate_validations(validations=recipe.validations, service=recipe.service)
         _validate_service_gpu_vendor_matches_validations(
             service=recipe.service,
@@ -489,8 +503,8 @@ def _merge_presets(
     incoming: EndpointPreset,
     prefer_incoming: bool = False,
 ) -> EndpointPreset:
-    if existing.model.lower() != incoming.model.lower():
-        raise ValueError("cannot merge endpoint presets for different models")
+    if existing.base.lower() != incoming.base.lower():
+        raise ValueError("cannot merge endpoint presets for different bases")
     recipes = [EndpointPresetRecipe.parse_obj(recipe.dict()) for recipe in existing.recipes]
     recipes_by_id = {recipe.id: recipe for recipe in recipes}
     incoming_recipe_ids = []
@@ -502,8 +516,10 @@ def _merge_presets(
             recipes_by_id[recipe.id] = recipe
             incoming_recipe_ids.append(recipe.id)
             continue
-        if _service_configuration_to_preset_data(existing_recipe.service) != (
-            _service_configuration_to_preset_data(incoming_recipe.service)
+        if (
+            _service_configuration_to_preset_data(existing_recipe.service)
+            != (_service_configuration_to_preset_data(incoming_recipe.service))
+            or existing_recipe.model != incoming_recipe.model
         ):
             raise ValueError(f"endpoint preset recipe id conflict: {incoming_recipe.id}")
         _merge_recipe_validations(existing_recipe, incoming_recipe.validations)
@@ -513,7 +529,7 @@ def _merge_presets(
         recipes = [recipes_by_id[recipe_id] for recipe_id in incoming_recipe_ids] + [
             recipe for recipe in recipes if recipe.id not in preferred_ids
         ]
-    return EndpointPreset(model=existing.model, recipes=recipes)
+    return EndpointPreset(base=existing.base, recipes=recipes)
 
 
 def _merge_recipe_validations(
@@ -537,7 +553,7 @@ def _validation_key(validation: EndpointPresetValidation) -> str:
 def _preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
     return {
         "type": "endpoint-preset",
-        "model": preset.model,
+        "base": preset.base,
         "recipes": [_recipe_to_data(recipe) for recipe in preset.recipes],
     }
 
@@ -545,6 +561,7 @@ def _preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
 def _recipe_to_data(recipe: EndpointPresetRecipe) -> dict[str, Any]:
     return {
         "id": recipe.id,
+        "model": recipe.model,
         "service": _service_configuration_to_preset_data(recipe.service),
         "validations": [
             json.loads(validation.json(exclude_none=True)) for validation in recipe.validations

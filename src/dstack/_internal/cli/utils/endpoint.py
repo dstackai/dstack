@@ -53,7 +53,10 @@ def get_endpoint_table(
     table.add_row(th("Project"), endpoint.project_name)
     table.add_row(th("User"), endpoint.user)
     table.add_row(th("Endpoint"), endpoint.name)
-    table.add_row(th("Model"), endpoint.configuration.model)
+    model = endpoint.configuration.model.api_model_name
+    table.add_row(th("Model"), model)
+    if endpoint.model_repo is not None and endpoint.model_repo != model:
+        table.add_row(th("Repo"), endpoint.model_repo)
     table.add_row(
         th("Status"),
         _format_endpoint_status(
@@ -88,9 +91,10 @@ def get_endpoints_table(
         table.add_column("ERROR")
 
     for endpoint in endpoints:
+        model = endpoint.configuration.model.api_model_name
         row = {
             "NAME": endpoint.name,
-            "MODEL": endpoint.configuration.model,
+            "MODEL": model,
             "STATUS": _format_endpoint_status(
                 endpoint.status,
                 endpoint.status_message,
@@ -102,6 +106,12 @@ def get_endpoints_table(
             "ERROR": endpoint.status_message,
         }
         add_row_from_dict(table, row)
+        if endpoint.model_repo is not None and endpoint.model_repo != model:
+            add_row_from_dict(
+                table,
+                {"MODEL": f"   repo={endpoint.model_repo}"},
+                style="secondary",
+            )
     return table
 
 

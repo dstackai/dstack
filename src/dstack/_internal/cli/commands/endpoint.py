@@ -296,7 +296,7 @@ class EndpointCommand(APIBaseCommand):
 
     def _preset_delete(self, args: argparse.Namespace):
         presets = self.api.client.endpoint_presets.list(self.api.project)
-        if args.model not in {preset.model for preset in presets}:
+        if args.model not in {preset.base for preset in presets}:
             console.print(f"Endpoint preset for model [code]{args.model}[/] does not exist")
             exit(1)
 

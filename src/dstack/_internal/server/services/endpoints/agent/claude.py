@@ -767,6 +767,7 @@ class _AgentWorkspace:
         redacted_values: Sequence[str],
         endpoint_name: str,
         model: str,
+        endpoint_context: Optional[str] = None,
         dstack_home_dir: Optional[Path] = None,
         endpoint_constraints: str = "",
         max_price: Optional[float] = None,
@@ -783,6 +784,9 @@ class _AgentWorkspace:
         self.redacted_values = tuple(redacted_values)
         self.endpoint_name = endpoint_name
         self.model = model
+        self.endpoint_context = endpoint_context or (
+            f"- service_model_name: {model}\n- model_repo: {model}"
+        )
         self.endpoint_constraints = endpoint_constraints
         self.max_price = max_price
         self.spot_policy = spot_policy
@@ -890,6 +894,16 @@ def _prepare_workspace(
         ]
     )
     trace_path = root_dir / "trace.jsonl" if _is_debug_trace_enabled() else None
+    if configuration.model.allows_variant_selection:
+        endpoint_context = (
+            f"- service_model_name: {configuration.model.api_model_name}\n"
+            f"- base_model: {configuration.model.api_model_name}"
+        )
+    else:
+        endpoint_context = (
+            f"- service_model_name: {configuration.model.api_model_name}\n"
+            f"- model_repo: {configuration.model.exact_repo}"
+        )
     workspace = _AgentWorkspace(
         root_dir=root_dir,
         home_dir=home_dir,
@@ -899,7 +913,8 @@ def _prepare_workspace(
         env=env,
         redacted_values=redacted_values,
         endpoint_name=endpoint_model.name,
-        model=configuration.model,
+        model=configuration.model.api_model_name,
+        endpoint_context=endpoint_context,
         endpoint_constraints=agent_constraints.prompt_text,
         max_price=configuration.max_price,
         spot_policy=configuration.spot_policy.value if configuration.spot_policy else None,
@@ -1321,9 +1336,9 @@ def _build_agent_request(workspace: _AgentWorkspace) -> dict[str, Any]:
 def _build_prompt(workspace: _AgentWorkspace) -> str:
     return f"""{_load_endpoint_prompt()}
 
-Endpoint request:
-- name: {workspace.endpoint_name}
-- model: {workspace.model}
+Endpoint context:
+- endpoint_name: {workspace.endpoint_name}
+{workspace.endpoint_context}
 
 {workspace.endpoint_constraints}
 """

@@ -84,7 +84,10 @@ class TestEndpointPlan:
         body = response.json()
         assert body["project_name"] == project.name
         assert body["user"] == user.name
-        assert body["configuration"]["model"] == "Qwen/Qwen3-0.6B"
+        assert body["configuration"]["model"] == {
+            "repo": "Qwen/Qwen3-0.6B",
+            "name": None,
+        }
         assert body["configuration_path"] == "endpoint.dstack.yml"
         assert body["current_resource"] is None
         assert body["action"] == "create"
@@ -385,7 +388,7 @@ class TestEndpointPlan:
         body = response.json()
         assert body["provisioning_plan"]["type"] == "preset"
         assert body["preset_policy"] == "reuse-or-create"
-        assert body["provisioning_plan"]["preset_model"] == "Qwen/Qwen3-0.6B"
+        assert body["provisioning_plan"]["preset_base"] == "Qwen/Qwen3-0.6B"
         assert body["provisioning_plan"]["recipe_id"] == "vllm-t4"
         assert body["provisioning_plan"]["service_name"] == "qwen-endpoint-serving"
         assert body["provisioning_plan"]["job_offers"][0]["replica_group"] == "0"
@@ -432,7 +435,10 @@ class TestCreateEndpoint:
         assert body["name"] == "qwen-endpoint"
         assert body["project_name"] == project.name
         assert body["user"] == user.name
-        assert body["configuration"]["model"] == "Qwen/Qwen3-0.6B"
+        assert body["configuration"]["model"] == {
+            "repo": "Qwen/Qwen3-0.6B",
+            "name": None,
+        }
         assert body["configuration"]["env"] == {"HF_TOKEN": "secret"}
         assert body["created_at"] == "2023-01-02T03:04:00+00:00"
         assert body["last_processed_at"] == "2023-01-02T03:04:00+00:00"
@@ -875,7 +881,7 @@ class TestEndpointPresets:
         assert response.status_code == 200, response.json()
         body = response.json()
         assert len(body) == 1
-        assert body[0]["model"] == "Qwen/Qwen3-0.6B"
+        assert body[0]["base"] == "Qwen/Qwen3-0.6B"
         assert body[0]["recipes"][0]["id"] == "vllm-t4"
         assert body[0]["recipes"][0]["service"]["resources"]["gpu"] is not None
         assert body[0]["recipes"][0]["validations"][0]["replicas"][0]["resources"][0]["gpu"]
@@ -939,7 +945,7 @@ class TestEndpointPresets:
 
         assert response.status_code == 200, response.json()
         body = response.json()
-        assert body["model"] == "Qwen/Qwen3-0.6B"
+        assert body["base"] == "Qwen/Qwen3-0.6B"
         assert body["recipes"][0]["service"]["type"] == "service"
         assert body["recipes"][0]["service"]["resources"]["gpu"] is not None
         assert preset_service.get_project_names == [project.name]
@@ -960,12 +966,12 @@ class _FakeEndpointPresetService:
     async def get_preset(self, project_name, model):
         self.get_project_names.append(project_name)
         for preset in self._presets:
-            if preset.model == model:
+            if preset.base == model:
                 return preset
         return None
 
     async def delete_preset(self, project_name, model):
-        if model not in {preset.model for preset in self._presets}:
+        if model not in {preset.base for preset in self._presets}:
             raise FileNotFoundError(model)
         self.delete_project_names.append(project_name)
         self.deleted_models.append(model)
@@ -1008,6 +1014,7 @@ def _endpoint_preset_plan() -> EndpointPresetPlan:
     )
     recipe = EndpointPresetRecipe(
         id="vllm-t4",
+        model="Qwen/Qwen3-0.6B",
         service=service_configuration,
         validations=[
             EndpointPresetValidation(
@@ -1028,7 +1035,7 @@ def _endpoint_preset_plan() -> EndpointPresetPlan:
             )
         ],
     )
-    preset = EndpointPreset(model="Qwen/Qwen3-0.6B", recipes=[recipe])
+    preset = EndpointPreset(base="Qwen/Qwen3-0.6B", recipes=[recipe])
     run_plan = Mock()
     run_plan.get_effective_run_spec.return_value = RunSpec(
         run_name="qwen-endpoint-serving",

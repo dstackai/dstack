@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, Resources
@@ -19,13 +19,25 @@ from dstack._internal.server.services.endpoints.presets import (
 from dstack._internal.utils.common import format_mib_as_gb
 
 
-def build_endpoint_preset_from_run(run_model: RunModel) -> EndpointPreset:
+def build_endpoint_preset_from_run(
+    run_model: RunModel,
+    base_model: Optional[str] = None,
+    recipe_model: Optional[str] = None,
+) -> EndpointPreset:
     run_spec = runs_services.get_run_spec(run_model)
     configuration = run_spec.configuration
     if not isinstance(configuration, ServiceConfiguration):
         raise ValueError("endpoint preset can only be built from a service run")
     if configuration.model is None:
         raise ValueError("endpoint preset service must specify model")
+    if base_model is None:
+        base_model = configuration.model.name
+    if not base_model.strip():
+        raise ValueError("endpoint preset base must be non-empty")
+    if recipe_model is None:
+        recipe_model = configuration.model.name
+    if not recipe_model.strip():
+        raise ValueError("endpoint preset recipe must specify model")
 
     jobs_by_group = _get_current_registered_replica_jobs_by_group(run_model)
     validation_replicas = []
@@ -53,10 +65,11 @@ def build_endpoint_preset_from_run(run_model: RunModel) -> EndpointPreset:
         validations=[validation],
     )
     return EndpointPreset(
-        model=configuration.model.name,
+        base=base_model,
         recipes=[
             EndpointPresetRecipe(
                 id=make_endpoint_preset_recipe_id(service),
+                model=recipe_model,
                 service=service,
                 validations=[validation],
             )

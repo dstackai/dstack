@@ -25,15 +25,17 @@ def get_endpoint_presets_table(presets: List[EndpointPreset], verbose: bool = Fa
         if len(preset.recipes) == 1:
             _add_recipe_rows(
                 table,
-                label=f"[bold]{preset.model}[/]",
+                preset_base=preset.base,
+                label=f"[bold]{preset.base}[/]",
                 recipe=preset.recipes[0],
                 verbose=verbose,
             )
             continue
-        add_row_from_dict(table, {"MODEL": f"[bold]{preset.model}[/]"})
+        add_row_from_dict(table, {"MODEL": f"[bold]{preset.base}[/]"})
         for recipe_num, recipe in enumerate(preset.recipes):
             _add_recipe_rows(
                 table,
+                preset_base=preset.base,
                 label=f"[secondary]   recipe={recipe_num}[/]",
                 recipe=recipe,
                 verbose=verbose,
@@ -43,6 +45,7 @@ def get_endpoint_presets_table(presets: List[EndpointPreset], verbose: bool = Fa
 
 def _add_recipe_rows(
     table: Table,
+    preset_base: str,
     label: str,
     recipe: EndpointPresetRecipe,
     verbose: bool,
@@ -57,9 +60,19 @@ def _add_recipe_rows(
                 column: _format_resources(groups[0].resources, verbose=verbose),
             },
         )
+        _add_recipe_model_row(
+            table,
+            preset_base=preset_base,
+            recipe_model=recipe.model,
+        )
         return
 
     add_row_from_dict(table, {"MODEL": label})
+    _add_recipe_model_row(
+        table,
+        preset_base=preset_base,
+        recipe_model=recipe.model,
+    )
     for group in groups:
         add_row_from_dict(
             table,
@@ -68,6 +81,16 @@ def _add_recipe_rows(
                 column: _format_resources(group.resources, verbose=verbose),
             },
         )
+
+
+def _add_recipe_model_row(
+    table: Table,
+    preset_base: str,
+    recipe_model: str,
+) -> None:
+    if recipe_model == preset_base:
+        return
+    add_row_from_dict(table, {"MODEL": f"   repo={recipe_model}"}, style="secondary")
 
 
 def _format_resources(resources, verbose: bool) -> str:

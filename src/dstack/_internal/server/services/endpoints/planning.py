@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.models.endpoints import (
+    EndpointConfiguration,
+)
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.runs import JobPlan, RunPlan, RunSpec
@@ -74,19 +76,22 @@ async def find_preset_planning_result(
     if preset_service is None:
         preset_service = get_endpoint_preset_service()
 
-    endpoint_model = endpoint_configuration.model.lower()
+    endpoint_model = endpoint_configuration.model.api_model_name.lower()
     presets = [
         preset
         for preset in await preset_service.list_presets(project.name)
-        if preset.model.lower() == endpoint_model
+        if preset.base.lower() == endpoint_model
     ]
     if not presets:
         return EndpointPresetPlanningResult()
 
+    exact_model_repo = endpoint_configuration.model.exact_repo
     user = await _ensure_user_has_ssh_key(session=session, user=user)
     first_unprovisionable_preset: Optional[EndpointPresetPlan] = None
     for preset in presets:
         for recipe in preset.recipes:
+            if exact_model_repo is not None and recipe.model != exact_model_repo:
+                continue
             try:
                 run_spec = build_preset_run_spec(
                     endpoint_name=endpoint_name,
@@ -104,7 +109,7 @@ async def find_preset_planning_result(
             except (ServerClientError, ValueError) as e:
                 logger.warning(
                     "Skipping endpoint preset %s recipe %s: %s",
-                    preset.model,
+                    preset.base,
                     recipe.id,
                     e,
                 )

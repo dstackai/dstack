@@ -1031,6 +1031,8 @@ class EndpointModel(PipelineModelMixin, BaseModel):
     status: Mapped[EndpointStatus] = mapped_column(EnumAsString(EndpointStatus, 100), index=True)
     """`status` must be changed only via `switch_endpoint_status()`."""
     status_message: Mapped[Optional[str]] = mapped_column(Text)
+    model_base: Mapped[Optional[str]] = mapped_column(Text)
+    model_repo: Mapped[Optional[str]] = mapped_column(Text)
     provisioning_method: Mapped[Optional[str]] = mapped_column(String(100))
 
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)

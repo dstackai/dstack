@@ -12,6 +12,9 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.endpoints import (
     EndpointConfiguration,
+    EndpointModelBase,
+    EndpointModelRepo,
+    EndpointModelSpec,
     EndpointPresetPolicy,
     EndpointStatus,
 )
@@ -93,6 +96,7 @@ async def _lock_endpoint_model(session: AsyncSession, endpoint_model: EndpointMo
 async def _create_endpoint_model(
     session: AsyncSession,
     status: EndpointStatus = EndpointStatus.SUBMITTED,
+    model: str | EndpointModelSpec = "Qwen/Qwen3-0.6B",
     user_ssh_public_key: str | None = None,
     user_global_role: GlobalRole = GlobalRole.ADMIN,
     project_role: ProjectRole | None = None,
@@ -112,7 +116,7 @@ async def _create_endpoint_model(
         )
     configuration = EndpointConfiguration(
         name="qwen-endpoint",
-        model="Qwen/Qwen3-0.6B",
+        model=EndpointModelRepo(repo=model) if isinstance(model, str) else model,
         env=Env.parse_obj({"HF_TOKEN": "secret"}),
     )
     endpoint_model = EndpointModel(
@@ -244,6 +248,8 @@ def _get_verified_agent_result(
     *,
     run_id: uuid.UUID | None = None,
     run_name: str | None = None,
+    base: str = "Qwen/Qwen3-0.6B",
+    model: str = "Qwen/Qwen3-0.6B",
 ) -> AgentProvisioningResult:
     return AgentProvisioningResult(
         run_id=run_id if run_id is not None else run.id,
@@ -253,6 +259,8 @@ def _get_verified_agent_result(
             run_id=run.id,
             run_name=run.run_name,
             service_yaml=f"type: service\nname: {run.run_name}\n",
+            base=base,
+            model=model,
         ),
     )
 
@@ -263,8 +271,9 @@ def _get_agent_run_name(suffix: str = "1") -> str:
 
 def _make_preset_plan(run_name: str = "qwen-endpoint-serving") -> Mock:
     preset_plan = Mock()
-    preset_plan.preset.model = "Qwen/Qwen3-0.6B"
+    preset_plan.preset.base = "Qwen/Qwen3-0.6B"
     preset_plan.recipe.id = "vllm-t4"
+    preset_plan.recipe.model = "Qwen/Qwen3-0.6B"
     preset_plan.run_plan.run_spec = RunSpec(
         run_name=run_name,
         configuration=ServiceConfiguration.parse_obj(
@@ -356,7 +365,7 @@ class TestRecordEndpointRunSubmission:
         endpoint_model = await _create_endpoint_model(session=session)
         other_configuration = EndpointConfiguration(
             name="other-qwen-endpoint",
-            model="Qwen/Qwen3-0.6B",
+            model=EndpointModelRepo(repo="Qwen/Qwen3-0.6B"),
             env=Env.parse_obj({"HF_TOKEN": "secret"}),
         )
         other_endpoint_model = EndpointModel(
@@ -1120,6 +1129,8 @@ class TestEndpointWorkerProvisioning:
                         run_id=run.id,
                         run_name=run.run_name,
                         service_yaml=f"type: service\nname: {run.run_name}\n",
+                        base="Qwen/Qwen3-0.6B",
+                        model="Qwen/Qwen3-0.6B",
                     ),
                 )
 
@@ -1153,6 +1164,125 @@ class TestEndpointWorkerProvisioning:
         assert submissions[0].run_id == endpoint_model.service_run_id
         preset_service.save_preset.assert_awaited_once()
 
+    async def test_agent_base_model_report_sets_endpoint_model_repo_and_preset_recipe_model(
+        self, test_db, session: AsyncSession, worker: EndpointWorker
+    ):
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            status=EndpointStatus.PROTOTYPING,
+            model=EndpointModelBase(base="Qwen/Qwen3-0.6B"),
+        )
+        endpoint_model.provisioning_method = "agent"
+        await session.commit()
+        selected_model = "groxaxo/Qwen3-0.6B-GPTQ-4Bit"
+
+        async def provision_endpoint(endpoint_model, pipeline_hinter):
+            async with get_session_ctx() as provisioning_session:
+                res = await provisioning_session.execute(
+                    select(EndpointModel)
+                    .where(EndpointModel.id == endpoint_model.id)
+                    .options(joinedload(EndpointModel.project))
+                    .options(joinedload(EndpointModel.user))
+                )
+                provisioning_endpoint = res.unique().scalar_one()
+                run = await _create_backing_service_run(
+                    session=provisioning_session,
+                    endpoint_model=provisioning_endpoint,
+                    link_endpoint=False,
+                    run_name=_get_agent_run_name(),
+                )
+                return AgentProvisioningResult(
+                    run_id=run.id,
+                    final_report=AgentFinalReport(
+                        success=True,
+                        run_id=run.id,
+                        run_name=run.run_name,
+                        service_yaml=f"type: service\nname: {run.run_name}\n",
+                        base="Qwen/Qwen3-0.6B",
+                        model=selected_model,
+                    ),
+                )
+
+        agent_service = _FakeAgentService(side_effect=provision_endpoint)
+        preset_service = Mock()
+        preset_service.save_preset = AsyncMock(
+            side_effect=lambda project_name, preset, comments: preset
+        )
+
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints."
+                "get_endpoint_preset_service",
+                return_value=preset_service,
+            ),
+        ):
+            await worker.process(_endpoint_to_pipeline_item(endpoint_model))
+
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.RUNNING
+        assert endpoint_model.model_base == "Qwen/Qwen3-0.6B"
+        assert endpoint_model.model_repo == selected_model
+        saved_preset = preset_service.save_preset.await_args.args[1]
+        assert saved_preset.base == "Qwen/Qwen3-0.6B"
+        assert saved_preset.recipes[0].model == selected_model
+
+    async def test_agent_exact_model_report_mismatch_fails_endpoint(
+        self, test_db, session: AsyncSession, worker: EndpointWorker
+    ):
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            status=EndpointStatus.PROTOTYPING,
+        )
+        endpoint_model.provisioning_method = "agent"
+        await session.commit()
+
+        async def provision_endpoint(endpoint_model, pipeline_hinter):
+            async with get_session_ctx() as provisioning_session:
+                res = await provisioning_session.execute(
+                    select(EndpointModel)
+                    .where(EndpointModel.id == endpoint_model.id)
+                    .options(joinedload(EndpointModel.project))
+                    .options(joinedload(EndpointModel.user))
+                )
+                provisioning_endpoint = res.unique().scalar_one()
+                run = await _create_backing_service_run(
+                    session=provisioning_session,
+                    endpoint_model=provisioning_endpoint,
+                    link_endpoint=False,
+                    run_name=_get_agent_run_name(),
+                )
+                return AgentProvisioningResult(
+                    run_id=run.id,
+                    final_report=AgentFinalReport(
+                        success=True,
+                        run_id=run.id,
+                        run_name=run.run_name,
+                        service_yaml=f"type: service\nname: {run.run_name}\n",
+                        base="Qwen/Qwen3-0.6B",
+                        model="groxaxo/Qwen3-0.6B-GPTQ-4Bit",
+                    ),
+                )
+
+        agent_service = _FakeAgentService(side_effect=provision_endpoint)
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+            return_value=agent_service,
+        ):
+            await worker.process(_endpoint_to_pipeline_item(endpoint_model))
+
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.FAILED
+        assert endpoint_model.service_run_id is None
+        assert endpoint_model.model_repo is None
+        assert endpoint_model.status_message == (
+            "Server agent final report model does not match the requested model repo"
+        )
+
     async def test_agent_success_stops_non_final_submitted_runs(
         self, test_db, session: AsyncSession, worker: EndpointWorker
     ):
@@ -1185,6 +1315,8 @@ class TestEndpointWorkerProvisioning:
                     run_id=final_run.id,
                     run_name=final_run.run_name,
                     service_yaml=f"type: service\nname: {final_run.run_name}\n",
+                    base="Qwen/Qwen3-0.6B",
+                    model="Qwen/Qwen3-0.6B",
                 ),
             )
         )
@@ -1659,7 +1791,7 @@ class TestEndpointWorkerProvisioning:
         preset_service.save_preset.assert_awaited_once()
         assert preset_service.save_preset.await_args.args[0] == "test_project"
         saved_preset = preset_service.save_preset.await_args.args[1]
-        assert saved_preset.model == "Qwen/Qwen3-0.6B"
+        assert saved_preset.base == "Qwen/Qwen3-0.6B"
         assert len(saved_preset.recipes) == 1
         assert saved_preset.recipes[0].service.resources.gpu is not None
         assert saved_preset.recipes[0].validations[0].replicas[0].resources[0].gpu is not None

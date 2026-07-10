@@ -44,6 +44,7 @@ from dstack._internal.server.testing.common import (
 
 async def _create_endpoint_model(
     session: AsyncSession,
+    model="Qwen/Qwen3-0.6B",
     max_price: float | None = None,
     spot_policy: SpotPolicy | None = None,
     backends: list[BackendType] | None = None,
@@ -56,7 +57,7 @@ async def _create_endpoint_model(
         await create_fleet(session=session, project=project)
     configuration = EndpointConfiguration(
         name="qwen-endpoint",
-        model="Qwen/Qwen3-0.6B",
+        model=model,
         env=Env.parse_obj({"HF_TOKEN": "hf-secret"}),
         max_price=max_price,
         spot_policy=spot_policy,
@@ -77,6 +78,28 @@ async def _create_endpoint_model(
     session.add(endpoint_model)
     await session.commit()
     return endpoint_model
+
+
+def _successful_agent_report(
+    *,
+    run_id: uuid.UUID | None = None,
+    run_name: str = "qwen-endpoint-1",
+    base: str = "Qwen/Qwen3-0.6B",
+    model: str = "Qwen/Qwen3-0.6B",
+    service_yaml: str | None = None,
+) -> AgentFinalReport:
+    if run_id is None:
+        run_id = uuid.uuid4()
+    if service_yaml is None:
+        service_yaml = f"type: service\nname: {run_name}\n"
+    return AgentFinalReport(
+        success=True,
+        run_id=run_id,
+        run_name=run_name,
+        service_yaml=service_yaml,
+        base=base,
+        model=model,
+    )
 
 
 def _configure_fake_claude(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
@@ -271,14 +294,7 @@ class TestClaudeAgentService:
         async def runner(workspace, request):
             captured["workspace"] = workspace
             captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=uuid.uuid4(),
-                    run_name="qwen-endpoint-1",
-                    service_yaml="type: service\nname: qwen-endpoint-1\n",
-                )
-            )
+            return _AgentRunnerResult(report=_successful_agent_report())
 
         service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
 
@@ -465,14 +481,7 @@ class TestClaudeAgentService:
         async def runner(workspace, request):
             captured["workspace"] = workspace
             captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=run_id,
-                    run_name="qwen-endpoint-1",
-                    service_yaml="type: service\nname: qwen-endpoint-1\n",
-                )
-            )
+            return _AgentRunnerResult(report=_successful_agent_report(run_id=run_id))
 
         endpoint_model = await _create_endpoint_model(session)
         service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
@@ -568,6 +577,83 @@ class TestClaudeAgentService:
         assert final_report["run_name"] == "qwen-endpoint-1"
 
     @pytest.mark.asyncio
+    async def test_prompt_includes_base_model_endpoint_context(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        captured = {}
+
+        async def runner(workspace, request):
+            captured["request"] = request
+            return _AgentRunnerResult(
+                report=AgentFinalReport(
+                    success=False,
+                    failure_summary="not needed",
+                )
+            )
+
+        endpoint_model = await _create_endpoint_model(
+            session,
+            model={"base": "Qwen/Qwen3.6-27B"},
+        )
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.final_report is not None
+        prompt = captured["request"]["prompt"]
+        assert "Endpoint context:" in prompt
+        assert "- endpoint_name: qwen-endpoint" in prompt
+        assert "- service_model_name: Qwen/Qwen3.6-27B" in prompt
+        assert "- base_model: Qwen/Qwen3.6-27B" in prompt
+        assert "- model_repo:" not in prompt
+        assert "- final_report.json.model:" not in prompt
+
+    @pytest.mark.asyncio
+    async def test_prompt_includes_exact_model_endpoint_context(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        captured = {}
+
+        async def runner(workspace, request):
+            captured["request"] = request
+            return _AgentRunnerResult(
+                report=AgentFinalReport(
+                    success=False,
+                    failure_summary="not needed",
+                )
+            )
+
+        endpoint_model = await _create_endpoint_model(
+            session,
+            model={
+                "repo": "groxaxo/Qwen3.6-27B-GPTQ-Pro-4Bit",
+                "name": "Qwen/Qwen3.6-27B",
+            },
+        )
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.final_report is not None
+        prompt = captured["request"]["prompt"]
+        assert "Endpoint context:" in prompt
+        assert "- endpoint_name: qwen-endpoint" in prompt
+        assert "- service_model_name: Qwen/Qwen3.6-27B" in prompt
+        assert "- model_repo: groxaxo/Qwen3.6-27B-GPTQ-Pro-4Bit" in prompt
+        assert "- base_model:" not in prompt
+        assert "- final_report.json.model:" not in prompt
+
+    @pytest.mark.asyncio
     async def test_existing_claude_auth_uses_real_home_for_claude_and_short_home_for_dstack(
         self,
         session: AsyncSession,
@@ -585,14 +671,7 @@ class TestClaudeAgentService:
         async def runner(workspace, request):
             captured["workspace"] = workspace
             captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=run_id,
-                    run_name="qwen-endpoint-1",
-                    service_yaml="type: service\nname: qwen-endpoint-1\n",
-                )
-            )
+            return _AgentRunnerResult(report=_successful_agent_report(run_id=run_id))
 
         endpoint_model = await _create_endpoint_model(session)
         service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
@@ -636,14 +715,7 @@ class TestClaudeAgentService:
 
         async def runner(workspace, request):
             captured["request"] = request
-            return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=uuid.uuid4(),
-                    run_name="qwen-endpoint-1",
-                    service_yaml="type: service\nname: qwen-endpoint-1\n",
-                )
-            )
+            return _AgentRunnerResult(report=_successful_agent_report())
 
         endpoint_model = await _create_endpoint_model(
             session,
@@ -683,6 +755,8 @@ class TestClaudeAgentService:
                     "run_id": str(run_id),
                     "run_name": "qwen-endpoint-1",
                     "service_yaml": "type: service\nname: qwen-endpoint-1\n",
+                    "base": "Qwen/Qwen3-0.6B",
+                    "model": "Qwen/Qwen3-0.6B",
                 }
             ),
             encoding="utf-8",
@@ -726,6 +800,8 @@ class TestClaudeAgentService:
                     "run_id": str(uuid.uuid4()),
                     "run_name": "qwen-endpoint-1",
                     "service_yaml": "type: service\nname: qwen-endpoint-1\n",
+                    "base": "Qwen/Qwen3-0.6B",
+                    "model": "Qwen/Qwen3-0.6B",
                 }
             ),
             encoding="utf-8",
@@ -784,12 +860,7 @@ class TestClaudeAgentService:
                 {"type": "FakeMessage", "text": "hf-secret agent-secret"},
             )
             return _AgentRunnerResult(
-                report=AgentFinalReport(
-                    success=True,
-                    run_id=run_id,
-                    run_name="qwen-endpoint-1",
-                    service_yaml="token: hf-secret\n",
-                )
+                report=_successful_agent_report(run_id=run_id, service_yaml="token: hf-secret\n")
             )
 
         endpoint_model = await _create_endpoint_model(session)
@@ -1035,6 +1106,8 @@ class TestClaudeAgentService:
             "run_id": str(uuid.uuid4()),
             "run_name": "qwen-endpoint-1",
             "service_yaml": "env: secret\n",
+            "base": "Qwen/Qwen3-0.6B",
+            "model": "Qwen/Qwen3-0.6B",
         }
         reader.feed_data(
             json.dumps({"type": "assistant", "message": {"content": "working"}}).encode() + b"\n"
@@ -1250,7 +1323,9 @@ cat > final_report.json <<'JSON'
   "success": true,
   "run_id": "6e578748-d597-4fde-a3a4-203587cad5a2",
   "run_name": "qwen-endpoint-1",
-  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n"
+  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n",
+  "base": "Qwen/Qwen3-0.6B",
+  "model": "Qwen/Qwen3-0.6B"
 }
 JSON
 printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
@@ -1312,7 +1387,9 @@ cat > final_report.json <<'JSON'
   "success": true,
   "run_id": "6e578748-d597-4fde-a3a4-203587cad5a2",
   "run_name": "qwen-endpoint-1",
-  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n"
+  "service_yaml": "type: service\\nname: qwen-endpoint-1\\n",
+  "base": "Qwen/Qwen3-0.6B",
+  "model": "Qwen/Qwen3-0.6B"
 }
 JSON
 printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'

@@ -271,7 +271,7 @@ def _print_endpoint_plan(plan: EndpointPlan, no_fleets: bool = False):
     props.add_row(th("Max price"), _format_max_price(plan))
     props.add_row(th("Preset policy"), plan.preset_policy.value)
     if isinstance(plan.provisioning_plan, EndpointProvisioningPlanPreset):
-        props.add_row(th("Preset"), plan.provisioning_plan.preset_model)
+        props.add_row(th("Preset"), plan.provisioning_plan.preset_base)
         props.add_row(th("Recipe"), plan.provisioning_plan.recipe_id)
     console.print(props)
     console.print()

@@ -16,11 +16,15 @@ class TestAgentFinalReport:
                 "run_id": str(run_id),
                 "run_name": "qwen-serving",
                 "service_yaml": "type: service\nname: qwen-serving\n",
+                "base": "Qwen/Qwen3-0.6B",
+                "model": "Qwen/Qwen3-0.6B",
             }
         )
 
         assert report.run_id == run_id
         assert report.run_name == "qwen-serving"
+        assert report.base == "Qwen/Qwen3-0.6B"
+        assert report.model == "Qwen/Qwen3-0.6B"
 
     def test_rejects_success_without_run_id(self):
         with pytest.raises(ValidationError, match="run_id"):
@@ -29,6 +33,34 @@ class TestAgentFinalReport:
                     "success": True,
                     "run_name": "qwen-serving",
                     "service_yaml": "type: service\nname: qwen-serving\n",
+                    "base": "Qwen/Qwen3-0.6B",
+                    "model": "Qwen/Qwen3-0.6B",
+                }
+            )
+
+    def test_rejects_success_with_empty_base(self):
+        with pytest.raises(ValidationError, match="base"):
+            AgentFinalReport.parse_obj(
+                {
+                    "success": True,
+                    "run_id": str(uuid.uuid4()),
+                    "run_name": "qwen-serving",
+                    "service_yaml": "type: service\nname: qwen-serving\n",
+                    "base": "",
+                    "model": "Qwen/Qwen3-0.6B",
+                }
+            )
+
+    def test_rejects_success_with_empty_model(self):
+        with pytest.raises(ValidationError, match="model"):
+            AgentFinalReport.parse_obj(
+                {
+                    "success": True,
+                    "run_id": str(uuid.uuid4()),
+                    "run_name": "qwen-serving",
+                    "service_yaml": "type: service\nname: qwen-serving\n",
+                    "base": "Qwen/Qwen3-0.6B",
+                    "model": "",
                 }
             )
 

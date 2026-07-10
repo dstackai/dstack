@@ -15,10 +15,13 @@ class EndpointPresetValidation(CoreModel):
 
 class EndpointPresetRecipe(CoreModel):
     id: str
+    model: str
+    """Exact repo/path loaded by this recipe's service command."""
     service: ServiceConfiguration
     validations: list[EndpointPresetValidation]
 
 
 class EndpointPreset(CoreModel):
-    model: str
+    base: str
+    """Base/requested/API model name used for preset lookup and client requests."""
     recipes: list[EndpointPresetRecipe]

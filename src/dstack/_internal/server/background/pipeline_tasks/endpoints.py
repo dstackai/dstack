@@ -10,7 +10,11 @@ from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoints import EndpointPresetPolicy, EndpointStatus
+from dstack._internal.core.models.endpoints import (
+    EndpointConfiguration,
+    EndpointPresetPolicy,
+    EndpointStatus,
+)
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     JobStatus,
@@ -355,6 +359,12 @@ async def _link_reported_service_run_to_stopping_endpoint(
         return False
 
     update_map = _EndpointUpdateMap(service_run_id=service_run_id)
+    model_repo = result.update_map.get("model_repo")
+    if model_repo is not None:
+        update_map["model_repo"] = model_repo
+    model_base = result.update_map.get("model_base")
+    if model_base is not None:
+        update_map["model_base"] = model_base
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
 
@@ -386,6 +396,8 @@ class _EndpointUpdateMap(ItemUpdateMap, total=False):
     status: EndpointStatus
     status_message: Optional[str]
     service_run_id: uuid.UUID
+    model_base: Optional[str]
+    model_repo: Optional[str]
     provisioning_method: Optional[str]
 
 
@@ -397,8 +409,9 @@ class _ProcessResult:
 @dataclass(frozen=True)
 class _PresetSubmission:
     run_id: uuid.UUID
-    preset_model: str
+    preset_base: str
     recipe_id: str
+    model_repo: str
 
 
 @dataclass(frozen=True)
@@ -476,15 +489,17 @@ async def _process_submitted_endpoint(
         logger.info(
             "Provisioning endpoint %s from preset %s recipe %s",
             endpoint_model.name,
-            submission_result.submission.preset_model,
+            submission_result.submission.preset_base,
             submission_result.submission.recipe_id,
         )
         update_map = _EndpointUpdateMap(
             status=EndpointStatus.PROVISIONING,
             status_message=None,
             service_run_id=submission_result.submission.run_id,
+            model_base=submission_result.submission.preset_base,
+            model_repo=submission_result.submission.model_repo,
             provisioning_method=(
-                f"preset:{submission_result.submission.preset_model}"
+                f"preset:{submission_result.submission.preset_base}"
                 f"#{submission_result.submission.recipe_id}"
             ),
         )
@@ -631,6 +646,8 @@ async def _process_agent_verified_endpoint(
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
+        base_model=endpoint_model.model_base,
+        recipe_model=endpoint_model.model_repo,
     )
     await _stop_non_final_submitted_runs(
         endpoint_model=endpoint_model,
@@ -725,6 +742,17 @@ async def _provision_endpoint_with_agent(
                 "status_message": "Server agent final report did not identify a run id",
             }
         )
+    model_base, model_repo, model_error = _get_agent_report_models(
+        endpoint_configuration=get_endpoint_configuration(endpoint_model),
+        report=report,
+    )
+    if model_error is not None:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": model_error,
+            }
+        )
 
     async with get_session_ctx() as session:
         res = await session.execute(
@@ -785,6 +813,18 @@ async def _provision_endpoint_with_agent(
                 "status_message": f"Run '{run_model.run_name}' is not a service",
             }
         )
+    endpoint_configuration = get_endpoint_configuration(endpoint_model)
+    requested_model_name = endpoint_configuration.model.api_model_name
+    if (
+        run_spec.configuration.model is None
+        or run_spec.configuration.model.name != requested_model_name
+    ):
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": "Server agent final service model does not match the endpoint model",
+            }
+        )
     try:
         await _record_endpoint_run_submission(
             endpoint_id=endpoint_model.id,
@@ -811,11 +851,15 @@ async def _provision_endpoint_with_agent(
                 "status": EndpointStatus.PROTOTYPING,
                 "status_message": None,
                 "service_run_id": run_model.id,
+                "model_base": model_base,
+                "model_repo": model_repo,
             }
         )
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
+        base_model=model_base,
+        recipe_model=model_repo,
     )
     await _stop_non_final_submitted_runs(
         endpoint_model=endpoint_model,
@@ -827,8 +871,37 @@ async def _provision_endpoint_with_agent(
             "status": EndpointStatus.RUNNING,
             "status_message": None,
             "service_run_id": run_model.id,
+            "model_base": model_base,
+            "model_repo": model_repo,
         }
     )
+
+
+def _get_agent_report_models(
+    *,
+    endpoint_configuration: EndpointConfiguration,
+    report,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    exact_model_repo = endpoint_configuration.model.exact_repo
+    if report.base is None:
+        return None, None, "Server agent final report did not identify the base model repo"
+    if endpoint_configuration.model.allows_variant_selection:
+        requested_base = endpoint_configuration.model.api_model_name
+        if report.base != requested_base:
+            return (
+                None,
+                None,
+                "Server agent final report base does not match the requested base model",
+            )
+    if report.model is None:
+        return None, None, "Server agent final report did not identify the selected model repo"
+    if exact_model_repo is not None and report.model != exact_model_repo:
+        return (
+            None,
+            None,
+            "Server agent final report model does not match the requested model repo",
+        )
+    return report.base, report.model, None
 
 
 def _format_agent_status_message(
@@ -1006,15 +1079,23 @@ async def _try_save_agent_endpoint_preset(
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
+        base_model=endpoint_model.model_base,
+        recipe_model=endpoint_model.model_repo,
     )
 
 
 async def _save_agent_endpoint_preset(
     endpoint_model: EndpointModel,
     run_model: RunModel,
+    base_model: Optional[str] = None,
+    recipe_model: Optional[str] = None,
 ) -> None:
     try:
-        preset = build_endpoint_preset_from_run(run_model)
+        preset = build_endpoint_preset_from_run(
+            run_model,
+            base_model=base_model,
+            recipe_model=recipe_model,
+        )
         saved_preset = await get_endpoint_preset_service().save_preset(
             endpoint_model.project.name,
             preset,
@@ -1036,7 +1117,7 @@ async def _save_agent_endpoint_preset(
     recipe_ids = ", ".join(recipe.id for recipe in saved_preset.recipes)
     logger.info(
         "Saved endpoint preset for model %s recipes %s for endpoint %s",
-        saved_preset.model,
+        saved_preset.base,
         recipe_ids,
         endpoint_model.name,
     )
@@ -1153,8 +1234,9 @@ async def _submit_endpoint_from_preset(
         return _PresetSubmissionResult(
             submission=_PresetSubmission(
                 run_id=run.id,
-                preset_model=preset_plan.preset.model,
+                preset_base=preset_plan.preset.base,
                 recipe_id=preset_plan.recipe.id,
+                model_repo=preset_plan.recipe.model,
             )
         )
 
@@ -1224,7 +1306,7 @@ def _get_no_provisioning_path_message(
 
 
 def _format_preset_plan_label(preset_plan) -> str:
-    return f"for model {preset_plan.preset.model} recipe {preset_plan.recipe.id}"
+    return f"for model {preset_plan.preset.base} recipe {preset_plan.recipe.id}"
 
 
 async def _stop_backing_run(

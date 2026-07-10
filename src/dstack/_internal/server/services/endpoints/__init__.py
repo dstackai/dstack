@@ -479,7 +479,7 @@ def _get_unprovisionable_preset_reason(
     if preset_plan is None:
         return None
     return (
-        f"Endpoint preset for model {preset_plan.preset.model} "
+        f"Endpoint preset for model {preset_plan.preset.base} "
         f"recipe {preset_plan.recipe.id} matched but has no available offers."
     )
 
@@ -490,7 +490,7 @@ def _endpoint_preset_plan_to_provisioning_plan(
     run_spec = preset_plan.run_plan.get_effective_run_spec()
     service_name = run_spec.run_name or run_spec.configuration.name or "(generated)"
     return EndpointProvisioningPlanPreset(
-        preset_model=preset_plan.preset.model,
+        preset_base=preset_plan.preset.base,
         recipe_id=preset_plan.recipe.id,
         service_name=service_name,
         job_offers=[
@@ -545,6 +545,8 @@ async def create_endpoint(
                 endpoint_model.user = user
                 endpoint_model.service_run_id = None
                 endpoint_model.service_run = None
+                endpoint_model.model_base = None
+                endpoint_model.model_repo = None
                 endpoint_model.configuration = configuration.json()
                 endpoint_model.status = EndpointStatus.SUBMITTED
                 endpoint_model.status_message = None
@@ -685,6 +687,8 @@ def endpoint_model_to_endpoint(endpoint_model: EndpointModel) -> Endpoint:
         status_message=endpoint_model.status_message,
         run_name=run_name,
         url=url,
+        model_base=endpoint_model.model_base,
+        model_repo=endpoint_model.model_repo,
         error=(
             endpoint_model.status_message
             if endpoint_model.status == EndpointStatus.FAILED
@@ -752,7 +756,7 @@ async def generate_endpoint_name(session: AsyncSession, project: ProjectModel) -
 
 
 def _validate_endpoint_configuration(configuration: EndpointConfiguration):
-    if not configuration.model.strip():
+    if not configuration.model.api_model_name.strip():
         raise ServerClientError("Endpoint must specify model")
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)

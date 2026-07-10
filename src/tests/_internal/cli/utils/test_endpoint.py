@@ -18,6 +18,7 @@ def _get_endpoint(
     status: EndpointStatus = EndpointStatus.FAILED,
     status_message: str | None = "No matching endpoint presets found.",
     created_at: datetime | None = None,
+    model_repo: str | None = None,
 ) -> Endpoint:
     if created_at is None:
         created_at = datetime.now(timezone.utc)
@@ -31,6 +32,7 @@ def _get_endpoint(
         last_processed_at=created_at,
         status=status,
         status_message=status_message,
+        model_repo=model_repo,
     )
 
 
@@ -127,11 +129,21 @@ class TestGetEndpointsTable:
         status_column = next(column for column in table.columns if column.header == "STATUS")
         assert status_column._cells == ["[grey62]stopped[/]"]
 
+    def test_shows_repo_row_when_repo_differs_from_model(self):
+        table = get_endpoints_table([_get_endpoint(model_repo="groxaxo/Qwen3-0.6B-GPTQ-4Bit")])
+
+        model_column = next(column for column in table.columns if column.header == "MODEL")
+        assert model_column._cells == [
+            "Qwen/Qwen3-0.6B",
+            "   repo=groxaxo/Qwen3-0.6B-GPTQ-4Bit",
+        ]
+
 
 class TestGetEndpointTable:
     def test_shows_endpoint_details(self):
         endpoint = _get_endpoint(
             status_message="No matching endpoint presets found.",
+            model_repo="groxaxo/Qwen3-0.6B-GPTQ-4Bit",
         )
 
         table = get_endpoint_table(endpoint, format_date=lambda _: "now")
@@ -141,6 +153,7 @@ class TestGetEndpointTable:
             "[bold]User[/bold]",
             "[bold]Endpoint[/bold]",
             "[bold]Model[/bold]",
+            "[bold]Repo[/bold]",
             "[bold]Status[/bold]",
             "[bold]Preset policy[/bold]",
             "[bold]Service run[/bold]",
@@ -153,6 +166,7 @@ class TestGetEndpointTable:
             "test-user",
             "qwen-endpoint",
             "Qwen/Qwen3-0.6B",
+            "groxaxo/Qwen3-0.6B-GPTQ-4Bit",
             "[indian_red1]no preset[/]",
             "reuse-or-create",
             "-",
