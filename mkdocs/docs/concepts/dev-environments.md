@@ -642,6 +642,26 @@ The `schedule` property can be combined with `max_duration` or `utilization_poli
 By default, `dstack` uses on-demand instances. However, you can change that
 via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
+### Server access
+
+Set `server` to `true` when a dev environment needs to use the dstack CLI. dstack configures the
+server and current project automatically. To run authenticated commands, pass `DSTACK_TOKEN`
+explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+image: dstackai/dstack
+server: true
+env:
+  - DSTACK_TOKEN
+init:
+  - dstack ps
+```
+
+</div>
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 !!! info "Reference"

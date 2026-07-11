@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.volumes import VolumeStatus
@@ -32,6 +33,7 @@ from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_job_runtime_data,
+    get_run_spec,
     get_volume_configuration,
     get_volume_provisioning_data,
     list_events,
@@ -248,6 +250,44 @@ class TestJobTerminatingFetcher:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("image_config_mock")
 class TestJobTerminatingWorker:
+    async def test_closes_requested_server_access(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                repo_id=repo.name,
+                configuration=TaskConfiguration(
+                    image="debian",
+                    commands=["true"],
+                    server=True,
+                ),
+            ),
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+        )
+        _lock_job(job)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating."
+            "job_server_connections_pool.remove",
+            new_callable=AsyncMock,
+        ) as remove_server_connection_mock:
+            await worker.process(_job_to_pipeline_item(job))
+
+        remove_server_connection_mock.assert_awaited_once_with(job.id)
+
     async def test_stops_job_gracefully_before_terminating_container(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
     ):

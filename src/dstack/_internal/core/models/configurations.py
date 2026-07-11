@@ -693,6 +693,18 @@ class ConfigurationWithCommandsParams(CoreModel):
         return values
 
 
+class ConfigurationWithServerParams(CoreModel):
+    server: Annotated[
+        bool,
+        Field(
+            description=(
+                "Make the dstack server accessible inside the run. "
+                "No authentication credentials are provided"
+            )
+        ),
+    ] = False
+
+
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
         Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"], Literal["zed"]]],
@@ -762,6 +774,7 @@ class DevEnvironmentConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
+    ConfigurationWithServerParams,
     DevEnvironmentConfigurationParams,
     generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
@@ -793,6 +806,7 @@ class TaskConfiguration(
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
+    ConfigurationWithServerParams,
     TaskConfigurationParams,
     generate_dual_core_model(TaskConfigurationConfig),
 ):

@@ -9,6 +9,10 @@ import orjson
 from cachetools import TTLCache, cached
 
 from dstack._internal import settings
+from dstack._internal.core.consts import (
+    DSTACK_RUN_SERVER_URL,
+    DSTACK_SERVER_URL_ENV,
+)
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
@@ -274,7 +278,13 @@ class JobConfigurator(ABC):
         return specs
 
     def _env(self) -> Dict[str, str]:
-        return self.run_spec.configuration.env.as_dict()
+        env = self.run_spec.configuration.env.as_dict()
+        if self._server():
+            env.setdefault(DSTACK_SERVER_URL_ENV, DSTACK_RUN_SERVER_URL)
+        return env
+
+    def _server(self) -> bool:
+        return bool(getattr(self.run_spec.configuration, "server", False))
 
     def _home_dir(self) -> Optional[str]:
         return self.run_spec.configuration.home_dir

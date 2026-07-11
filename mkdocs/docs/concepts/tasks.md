@@ -864,6 +864,25 @@ schedule:
 By default, `dstack` uses on-demand instances. However, you can change that
 via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
+### Server access
+
+Set `server` to `true` when a task needs to use the dstack CLI. dstack configures the server and
+current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+image: dstackai/dstack
+server: true
+env:
+  - DSTACK_TOKEN
+commands:
+  - dstack ps
+```
+
+</div>
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 !!! info "Reference"

@@ -53,6 +53,7 @@ from dstack._internal.server.routers import (
 )
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool
+from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
@@ -213,6 +214,7 @@ async def lifespan(app: FastAPI):
     if pipeline_manager is not None:
         await pipeline_manager.drain()
     await gateway_connections_pool.remove_all()
+    await job_server_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()
     if settings.SERVER_SSH_POOL_ENABLED:

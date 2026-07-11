@@ -5,6 +5,7 @@ import time
 from typing import Dict, List, Optional, Type
 
 import requests
+import requests_unixsocket
 
 from dstack import version
 from dstack._internal.core.errors import (
@@ -64,6 +65,8 @@ class APIClient:
         """
         self._base_url = base_url.rstrip("/")
         self._s = requests.session()
+        if self._base_url.startswith("http+unix://"):
+            self._s.mount("http+unix://", requests_unixsocket.UnixAdapter())
         self._token = None
         if token is not None:
             self._token = token

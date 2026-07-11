@@ -11,6 +11,7 @@ import requests.exceptions
 import requests_unixsocket
 from typing_extensions import Self
 
+from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.envs import Env
@@ -126,7 +127,8 @@ class RunnerClient:
         # API modification. Both layers are merged into a deep-copied job_spec
         # so the shared spec object held by the caller is not mutated.
         job_spec = job.job_spec
-        if instance_env is not None or router_env is not None:
+        server_access = bool(getattr(run.run_spec.configuration, "server", False))
+        if instance_env is not None or router_env is not None or server_access:
             merged_env: Dict[str, str] = {}
             if instance_env is not None:
                 if isinstance(instance_env, Env):
@@ -136,6 +138,8 @@ class RunnerClient:
             merged_env.update(job_spec.env)
             if router_env is not None:
                 merged_env.update(router_env)
+            if server_access:
+                merged_env.setdefault(DSTACK_PROJECT_ENV, run.project_name)
             job_spec = job_spec.copy(deep=True)
             job_spec.env = merged_env
         quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR

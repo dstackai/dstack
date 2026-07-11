@@ -977,6 +977,82 @@ class TestJobRunningWorker:
         await session.refresh(job)
         assert job.status == JobStatus.PULLING
 
+    async def test_pulling_waits_for_requested_server_access_before_starting_job(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                repo_id=repo.name,
+                configuration=TaskConfiguration(
+                    image="debian",
+                    commands=["true"],
+                    server=True,
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            submitted_at=get_current_datetime(),
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running."
+                "job_server_connections_pool.ensure",
+                new_callable=AsyncMock,
+                return_value=False,
+            ) as ensure_server_connection_mock,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running."
+                "job_server_connections_pool.retry_timed_out",
+                return_value=False,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
+        ):
+            await _process_job(session, worker, job)
+
+        ensure_server_connection_mock.assert_awaited_once()
+        runner_client_mock.submit_job.assert_not_called()
+        get_job_file_archives_mock.assert_not_awaited()
+        get_job_code_mock.assert_not_awaited()
+        await session.refresh(job)
+        assert job.status == JobStatus.PULLING
+        assert job.disconnected_at is None
+
     async def test_pulling_shim_uses_runtime_port_mapping_for_runner_calls(
         self,
         test_db,

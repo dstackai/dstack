@@ -16,6 +16,39 @@ from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 
 
 class TestParseConfiguration:
+    @pytest.mark.parametrize("configuration_type", ["task", "dev-environment"])
+    def test_server_access_supported(self, configuration_type: str):
+        conf = {"type": configuration_type, "server": True}
+        if configuration_type == "task":
+            conf["commands"] = ["true"]
+
+        parsed = parse_run_configuration(conf)
+
+        assert parsed.server is True
+
+    def test_server_access_not_supported_for_service(self):
+        with pytest.raises(ConfigurationError, match="extra fields not permitted"):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "commands": ["python3 -m http.server"],
+                    "port": 8000,
+                    "server": True,
+                }
+            )
+
+    def test_server_access_allows_unresolved_passthrough_env(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "commands": ["true"],
+                "server": True,
+                "env": ["DSTACK_TOKEN"],
+            }
+        )
+
+        assert "DSTACK_TOKEN" in parsed.env
+
     def test_service_model_probes_none_when_omitted(self):
         """When model is set but probes omitted, probes should remain None.
         The default probe is generated server-side in the job configurator."""

@@ -168,6 +168,17 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
 
 The following environment variables are supported by the CLI.
 
+- `DSTACK_TOKEN`{ #DSTACK_TOKEN } – The user token used by the CLI. Set `DSTACK_TOKEN`,
+  `DSTACK_SERVER_URL`, and `DSTACK_PROJECT` together to use the CLI without a project in
+  `~/.dstack/config.yml`, or to override the configured server, project, and user.
+
+  ```shell
+  DSTACK_SERVER_URL=https://server.example.com \
+  DSTACK_PROJECT=main \
+  DSTACK_TOKEN=your-token \
+  dstack ps
+  ```
+
 - `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stdout. Defaults to `INFO`.
 
 Example:
