@@ -33,6 +33,16 @@ _PROBE_TIMEOUT = 3
 _REMOTE_SOCKET_PATH = Path(DSTACK_RUN_SERVER_SOCKET_PATH)
 
 
+def _get_server_socket() -> IPSocket:
+    # The server may be bound to a specific address, making loopback unreachable
+    host = settings.SERVER_HOST
+    if not host or host in ("0.0.0.0", "localhost"):
+        host = "127.0.0.1"
+    elif host == "::":
+        host = "::1"
+    return IPSocket(host=host, port=settings.SERVER_PORT)
+
+
 class JobServerConnection:
     """A private reverse SSH tunnel from one job to the dstack server."""
 
@@ -85,9 +95,10 @@ class JobServerConnection:
             await self._tunnel.aexec(
                 f"mkdir -p {remote_dir} && chmod 755 {remote_dir} && rm -f {remote_socket}"
             )
+            server_socket = _get_server_socket()
             self._tunnel.reverse_forwarded_sockets = [
                 SocketPair(
-                    local=IPSocket(host="127.0.0.1", port=settings.SERVER_PORT),
+                    local=server_socket,
                     remote=UnixSocket(path=_REMOTE_SOCKET_PATH),
                 )
             ]
@@ -104,7 +115,10 @@ class JobServerConnection:
             # lets configurations using a non-root `user` reach it as well.
             await self._tunnel.aexec(f"chmod 666 {remote_socket}")
             if not await self._server_is_reachable():
-                raise SSHError("dstack server is not reachable from the job")
+                raise SSHError(
+                    "dstack server is not reachable from the job"
+                    f" (forward target {server_socket.render()})"
+                )
         except Exception:
             await self._tunnel.aclose()
             raise

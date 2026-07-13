@@ -41,6 +41,27 @@ def tunnel_mock(tmp_path, monkeypatch: pytest.MonkeyPatch):
     return tunnel, tunnel_class
 
 
+@pytest.mark.parametrize(
+    ("server_host", "expected_host"),
+    [
+        ("localhost", "127.0.0.1"),
+        ("127.0.0.1", "127.0.0.1"),
+        ("0.0.0.0", "127.0.0.1"),
+        ("", "127.0.0.1"),
+        ("::", "::1"),
+        ("10.0.0.5", "10.0.0.5"),
+    ],
+)
+def test_get_server_socket_follows_server_bind_host(
+    monkeypatch: pytest.MonkeyPatch, server_host: str, expected_host: str
+):
+    monkeypatch.setattr(server_connection.settings, "SERVER_HOST", server_host)
+
+    assert server_connection._get_server_socket() == IPSocket(
+        host=expected_host, port=server_connection.settings.SERVER_PORT
+    )
+
+
 class TestJobServerConnection:
     @pytest.mark.asyncio
     async def test_opens_private_reverse_socket(self, tunnel_mock):
