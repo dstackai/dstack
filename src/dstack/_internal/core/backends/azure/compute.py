@@ -148,14 +148,14 @@ class AzureCompute(
             location=location,
             allocate_public_ip=allocate_public_ip,
         )
-        network_security_group = (
-            instance_config.security_group
-            or self.config.network_security_group
-            or azure_utils.get_default_network_security_group_name(
+        network_security_group = instance_config.security_group
+        if network_security_group is None and self.config.network_security_group_ids is not None:
+            network_security_group = self.config.network_security_group_ids.get(location)
+        if network_security_group is None:
+            network_security_group = azure_utils.get_default_network_security_group_name(
                 resource_group=self.config.resource_group,
                 location=location,
             )
-        )
 
         managed_identity_resource_group, managed_identity_name = parse_vm_managed_identity(
             self.config.vm_managed_identity

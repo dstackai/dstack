@@ -69,14 +69,16 @@ class OCIBackendConfig(CoreModel):
             )
         ),
     ] = None
-    network_security_group_id: Annotated[
-        Optional[str],
+    network_security_group_ids: Annotated[
+        Optional[Dict[str, str]],
         Field(
             description=(
-                "The OCID of an existing network security group to use for instances instead of the"
-                " one `dstack` creates and manages automatically."
-                " When set, `dstack` does not add, remove, or modify any rules on this network"
-                " security group — you are responsible for SSH reachability and, for multi-node"
+                "The mapping from OCI regions to the OCIDs of existing network security groups to"
+                " use for instances instead of the one `dstack` creates and manages automatically."
+                " Regions not present in this mapping fall back to dstack's auto-created network"
+                " security group."
+                " When set, `dstack` does not add, remove, or modify any rules on these network"
+                " security groups — you are responsible for SSH reachability and, for multi-node"
                 " clusters, for allowing traffic between instances in the group"
             )
         ),

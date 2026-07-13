@@ -245,7 +245,8 @@ There are two ways to configure AWS: using an access key or using the default cr
 ??? info "Custom security group"
     By default, `dstack` creates and manages its own security group per project (opening SSH to `0.0.0.0/0`
     and allowing all traffic within the group so multi-node clusters work out of the box).
-    To use a security group you manage yourself instead, set `security_group_id`:
+    To use a security group you manage yourself instead, set `security_group_name` if you create a
+    security group with the same name in every configured region's VPC:
 
     ```yaml
     projects:
@@ -255,12 +256,30 @@ There are two ways to configure AWS: using an access key or using the default cr
             creds:
               type: default
 
-            security_group_id: sg-0a1b2c3d4e5f6g7h8
+            security_group_name: my-security-group
     ```
 
-    When `security_group_id` is set, `dstack` attaches it to instances as-is and never adds, removes, or modifies
-    its rules. You're responsible for SSH reachability (from wherever the `dstack` server and users connect from)
-    and, for multi-node clusters, for allowing traffic between instances in the group.
+    If your security groups have different names (or IDs are more convenient) per region, use
+    `security_group_ids` instead:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            security_group_ids:
+              us-east-1: sg-0a1b2c3d4e5f6g7h8
+              us-west-2: sg-1b2c3d4e5f6g7h8i9
+    ```
+
+    Regions not covered by `security_group_ids` fall back to `security_group_name` if set, or to
+    dstack's auto-created security group otherwise. Either way, `dstack` attaches the security group
+    to instances as-is and never adds, removes, or modifies its rules. You're responsible for SSH
+    reachability (from wherever the `dstack` server and users connect from) and, for multi-node
+    clusters, for allowing traffic between instances in the group.
 
     You can also override this per fleet or run using the `security_group` profile property.
 
@@ -469,7 +488,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
 ??? info "Custom network security group"
     By default, `dstack` creates and manages its own network security group (opening SSH to the internet
     and allowing all traffic within the group so multi-node clusters work out of the box).
-    To use a network security group you manage yourself instead, set `network_security_group`:
+    Azure NSG names must be unique within a resource group regardless of region, so a custom NSG is
+    configured per location via `network_security_group_ids`:
 
     ```yaml
     projects:
@@ -478,12 +498,16 @@ There are two ways to configure Azure: using a client secret or using the defaul
           - type: azure
             creds:
               type: default
-            network_security_group: my-network-security-group
+            regions: [westeurope, eastus]
+            network_security_group_ids:
+              westeurope: my-network-security-group-we
+              eastus: my-network-security-group-eus
     ```
 
-    When `network_security_group` is set, `dstack` attaches it to instances as-is and never adds, removes, or
-    modifies its rules. You're responsible for SSH reachability and, for multi-node clusters, for allowing
-    traffic between instances in the group.
+    Locations not covered by `network_security_group_ids` fall back to dstack's auto-created network
+    security group. Either way, `dstack` attaches the network security group to instances as-is and
+    never adds, removes, or modifies its rules. You're responsible for SSH reachability and, for
+    multi-node clusters, for allowing traffic between instances in the group.
 
     You can also override this per fleet or run using the `security_group` profile property.
 
@@ -1136,7 +1160,8 @@ There are two ways to configure OCI: using client credentials or using the defau
 ??? info "Custom network security group"
     By default, `dstack` creates and manages its own network security group per project (opening SSH to
     `0.0.0.0/0` and allowing all traffic within the VCN so multi-node clusters work out of the box).
-    To use a network security group you manage yourself instead, set `network_security_group_id`:
+    OCI network security groups are region-scoped, so a custom NSG is configured per region via
+    `network_security_group_ids`:
 
     ```yaml
     projects:
@@ -1145,12 +1170,15 @@ There are two ways to configure OCI: using client credentials or using the defau
       - type: oci
         creds:
           type: default
-        network_security_group_id: ocid1.networksecuritygroup.oc1..aaaaaaaa
+        network_security_group_ids:
+          eu-frankfurt-1: ocid1.networksecuritygroup.oc1..aaaaaaaa
+          us-ashburn-1: ocid1.networksecuritygroup.oc1..bbbbbbbb
     ```
 
-    When `network_security_group_id` is set, `dstack` attaches it to instances as-is and never adds, removes,
-    or modifies its rules. You're responsible for SSH reachability and, for multi-node clusters, for allowing
-    traffic between instances in the group.
+    Regions not covered by `network_security_group_ids` fall back to dstack's auto-created network
+    security group. Either way, `dstack` attaches the network security group to instances as-is and
+    never adds, removes, or modifies its rules. You're responsible for SSH reachability and, for
+    multi-node clusters, for allowing traffic between instances in the group.
 
     You can also override this per fleet or run using the `security_group` profile property.
 

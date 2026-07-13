@@ -11,6 +11,7 @@ from dstack._internal.core.backends.aws.resources import (
     create_instances_struct,
     create_security_group,
     get_image_id_and_username,
+    get_security_group_id_by_name,
     validate_tags,
 )
 from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError
@@ -356,6 +357,51 @@ class TestCreateSecurityGroup:
         ec2_client_mock.create_security_group.assert_not_called()
         ec2_client_mock.authorize_security_group_ingress.assert_not_called()
         ec2_client_mock.authorize_security_group_egress.assert_not_called()
+
+
+class TestGetSecurityGroupIdByName:
+    def test_returns_id_when_found(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {
+            "SecurityGroups": [{"GroupId": "sg-found"}]
+        }
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id="vpc-1",
+        )
+        assert result == "sg-found"
+        ec2_client_mock.describe_security_groups.assert_called_once_with(
+            Filters=[
+                {"Name": "group-name", "Values": ["my-sg"]},
+                {"Name": "vpc-id", "Values": ["vpc-1"]},
+            ]
+        )
+
+    def test_omits_vpc_filter_when_vpc_id_none(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {
+            "SecurityGroups": [{"GroupId": "sg-found"}]
+        }
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id=None,
+        )
+        assert result == "sg-found"
+        ec2_client_mock.describe_security_groups.assert_called_once_with(
+            Filters=[{"Name": "group-name", "Values": ["my-sg"]}]
+        )
+
+    def test_returns_none_when_not_found(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {"SecurityGroups": []}
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id="vpc-1",
+        )
+        assert result is None
 
 
 class TestCreateNetworkInterfacesStruct:

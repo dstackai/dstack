@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
 )
 
 
-def _make_config(network_security_group_id=None) -> OCIConfig:
+def _make_config(network_security_group_ids=None) -> OCIConfig:
     return OCIConfig(
         creds=OCIClientCreds(
             user="user",
@@ -29,7 +29,7 @@ def _make_config(network_security_group_id=None) -> OCIConfig:
         regions=["us-ashburn-1"],
         compartment_id="ocid1.compartment.oc1..compartment",
         subnet_ids_per_region={"us-ashburn-1": "ocid1.subnet.oc1..subnet"},
-        network_security_group_id=network_security_group_id,
+        network_security_group_ids=network_security_group_ids,
     )
 
 
@@ -90,8 +90,12 @@ class TestOCIComputeSecurityGroup:
             == "ocid1.nsg.oc1..managed"
         )
 
-    def test_project_level_custom_nsg_is_left_untouched(self):
-        compute = _make_compute(_make_config(network_security_group_id="ocid1.nsg.oc1..custom"))
+    def test_per_region_custom_nsg_is_left_untouched(self):
+        compute = _make_compute(
+            _make_config(
+                network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..custom"}
+            )
+        )
         res = self._run_create_instance(compute, _make_instance_config())
 
         res.get_or_create_security_group.assert_not_called()
@@ -100,6 +104,21 @@ class TestOCIComputeSecurityGroup:
         assert (
             res.launch_instance.call_args.kwargs["security_group_id"]
             == "ocid1.nsg.oc1..custom"
+        )
+
+    def test_region_not_in_mapping_falls_back_to_managed(self):
+        compute = _make_compute(
+            _make_config(
+                network_security_group_ids={"us-phoenix-1": "ocid1.nsg.oc1..other"}
+            )
+        )
+        res = self._run_create_instance(compute, _make_instance_config())
+
+        res.get_or_create_security_group.assert_called_once()
+        res.update_security_group_rules_for_runner_instances.assert_called_once()
+        assert (
+            res.launch_instance.call_args.kwargs["security_group_id"]
+            == "ocid1.nsg.oc1..managed"
         )
 
     def test_instance_level_custom_nsg_is_left_untouched(self):
@@ -115,8 +134,12 @@ class TestOCIComputeSecurityGroup:
             res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..run"
         )
 
-    def test_instance_level_overrides_project_level(self):
-        compute = _make_compute(_make_config(network_security_group_id="ocid1.nsg.oc1..project"))
+    def test_instance_level_overrides_per_region_mapping(self):
+        compute = _make_compute(
+            _make_config(
+                network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..project"}
+            )
+        )
         res = self._run_create_instance(
             compute, _make_instance_config(security_group="ocid1.nsg.oc1..run")
         )

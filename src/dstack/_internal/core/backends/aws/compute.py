@@ -331,7 +331,20 @@ class AWSCompute(
                 instance_type=instance_offer.instance.name,
                 image_config=self.config.os_images,
             )
-            security_group_id = instance_config.security_group or self.config.security_group_id
+            security_group_id = instance_config.security_group
+            if security_group_id is None and self.config.security_group_ids is not None:
+                security_group_id = self.config.security_group_ids.get(instance_offer.region)
+            if security_group_id is None and self.config.security_group_name is not None:
+                security_group_id = aws_resources.get_security_group_id_by_name(
+                    ec2_client=ec2_client,
+                    name=self.config.security_group_name,
+                    vpc_id=vpc_id,
+                )
+                if security_group_id is None:
+                    raise ComputeError(
+                        f"Security group '{self.config.security_group_name}' not found in"
+                        f" VPC {vpc_id} (region {instance_offer.region})"
+                    )
             if security_group_id is None:
                 security_group_id = self._create_security_group(
                     ec2_client=ec2_client,

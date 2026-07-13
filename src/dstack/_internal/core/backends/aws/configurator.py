@@ -77,6 +77,7 @@ class AWSConfigurator(
                 raise_invalid_credentials_error(fields=[["creds"]])
         self._check_config_tags(config)
         self._check_config_iam_instance_profile(session, config)
+        self._check_config_security_group(config)
         self._check_config_vpc(session, config)
 
     def create_backend(
@@ -144,6 +145,12 @@ class AWSConfigurator(
             logger.exception("Got exception when checking iam_instance_profile")
             raise ServerClientError(
                 f"Failed to check IAM instance profile {config.iam_instance_profile}"
+            )
+
+    def _check_config_security_group(self, config: AWSBackendConfigWithCreds):
+        if config.security_group_name is not None and config.security_group_ids is not None:
+            raise ServerClientError(
+                msg="Only one of `security_group_name` and `security_group_ids` can be specified"
             )
 
     def _check_config_vpc(self, session: Session, config: AWSBackendConfigWithCreds):

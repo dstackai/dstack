@@ -138,9 +138,11 @@ class OCICompute(
         subnet: oci.core.models.Subnet = region.virtual_network_client.get_subnet(
             self.config.subnet_ids_per_region[instance_offer.region]
         ).data
-        security_group_id = (
-            instance_config.security_group or self.config.network_security_group_id
-        )
+        security_group_id = instance_config.security_group
+        if security_group_id is None and self.config.network_security_group_ids is not None:
+            security_group_id = self.config.network_security_group_ids.get(
+                instance_offer.region
+            )
         if security_group_id is None:
             security_group = resources.get_or_create_security_group(
                 f"dstack-{instance_config.project_name}-default-security-group",

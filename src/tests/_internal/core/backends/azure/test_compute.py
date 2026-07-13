@@ -85,25 +85,25 @@ class TestVMImageVariant:
         assert variant.get_image_name() == expected_name
 
 
-def _config(network_security_group=None) -> AzureConfig:
+def _config(network_security_group_ids=None) -> AzureConfig:
     return AzureConfig(
         creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
         tenant_id="ten1",
         subscription_id="sub1",
         resource_group="my-rg",
-        regions=["eastus"],
-        network_security_group=network_security_group,
+        regions=["eastus", "westeurope"],
+        network_security_group_ids=network_security_group_ids,
     )
 
 
-def _offer() -> InstanceOfferWithAvailability:
+def _offer(region="eastus") -> InstanceOfferWithAvailability:
     return InstanceOfferWithAvailability(
         backend="azure",
         instance=InstanceType(
             name="Standard_DS1_v2",
             resources=Resources(cpus=1, memory_mib=3500, gpus=[], spot=False),
         ),
-        region="eastus",
+        region=region,
         price=0.1,
         availability=InstanceAvailability.AVAILABLE,
     )
@@ -121,17 +121,32 @@ def _instance_config(security_group=None) -> InstanceConfiguration:
 
 class TestAzureComputeNetworkSecurityGroup:
     @pytest.mark.parametrize(
-        ["instance_sg", "config_nsg", "expected"],
+        ["instance_sg", "nsg_ids", "region", "expected"],
         [
-            [None, None, azure_utils.get_default_network_security_group_name("my-rg", "eastus")],
-            [None, "config-nsg", "config-nsg"],
-            ["instance-nsg", None, "instance-nsg"],
-            # instance_config.security_group takes precedence over config.network_security_group
-            ["instance-nsg", "config-nsg", "instance-nsg"],
+            # No mapping, no instance security_group -> auto-derived default per location.
+            [
+                None,
+                None,
+                "eastus",
+                azure_utils.get_default_network_security_group_name("my-rg", "eastus"),
+            ],
+            # Location present in the mapping resolves to the mapped NSG name.
+            [None, {"eastus": "config-nsg"}, "eastus", "config-nsg"],
+            # Location absent from the mapping falls back to the auto-derived default name.
+            [
+                None,
+                {"eastus": "config-nsg"},
+                "westeurope",
+                azure_utils.get_default_network_security_group_name("my-rg", "westeurope"),
+            ],
+            # instance_config.security_group takes precedence when no mapping is set.
+            ["instance-nsg", None, "eastus", "instance-nsg"],
+            # instance_config.security_group takes precedence over the mapping.
+            ["instance-nsg", {"eastus": "config-nsg"}, "eastus", "instance-nsg"],
         ],
     )
     def test_create_instance_resolves_network_security_group(
-        self, instance_sg, config_nsg, expected
+        self, instance_sg, nsg_ids, region, expected
     ):
         with (
             patch("dstack._internal.core.backends.azure.compute.compute_mgmt"),
@@ -154,10 +169,10 @@ class TestAzureComputeNetworkSecurityGroup:
             vm_mock.name = "test-vm-id"
             create_and_wait_mock.return_value = vm_mock
             compute = AzureCompute(
-                config=_config(network_security_group=config_nsg), credential=Mock()
+                config=_config(network_security_group_ids=nsg_ids), credential=Mock()
             )
             compute.create_instance(
-                instance_offer=_offer(),
+                instance_offer=_offer(region=region),
                 instance_config=_instance_config(security_group=instance_sg),
                 placement_group=None,
             )
