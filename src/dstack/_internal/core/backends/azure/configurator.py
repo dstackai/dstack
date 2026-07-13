@@ -126,6 +126,7 @@ class AzureConfigurator(
             resource_group=config.resource_group,
             locations=config.regions,
             create_default_network=config.vpc_ids is None and config.subnet_ids is None,
+            create_instance_network_security_group=config.network_security_group is None,
         )
         return BackendRecord(
             config=AzureStoredConfig(
@@ -340,6 +341,7 @@ class AzureConfigurator(
         resource_group: str,
         locations: List[str],
         create_default_network: bool,
+        create_instance_network_security_group: bool = True,
     ):
         def func(location: str):
             network_manager = NetworkManager(
@@ -352,11 +354,16 @@ class AzureConfigurator(
                     name=azure_utils.get_default_network_name(resource_group, location),
                     subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
                 )
-            network_manager.create_network_security_group(
-                resource_group=resource_group,
-                location=location,
-                name=azure_utils.get_default_network_security_group_name(resource_group, location),
-            )
+            if create_instance_network_security_group:
+                # Skipped when the user supplies their own network security group via
+                # `network_security_group` - dstack does not create or manage it in that case.
+                network_manager.create_network_security_group(
+                    resource_group=resource_group,
+                    location=location,
+                    name=azure_utils.get_default_network_security_group_name(
+                        resource_group, location
+                    ),
+                )
             network_manager.create_gateway_network_security_group(
                 resource_group=resource_group,
                 location=location,

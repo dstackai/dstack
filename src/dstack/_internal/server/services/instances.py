@@ -879,6 +879,7 @@ def create_instance_model(
     instance_name: str,
     instance_num: int,
     reservation: Optional[str],
+    security_group: Optional[str],
     blocks: Union[Literal["auto"], int],
     tags: Optional[Dict[str, str]],
     instance_id: Optional[uuid.UUID] = None,
@@ -899,6 +900,7 @@ def create_instance_model(
         ssh_keys=[project_ssh_key],
         instance_id=str(instance_id),
         reservation=reservation,
+        security_group=security_group,
         tags=tags,
     )
     now = common_utils.get_current_datetime()

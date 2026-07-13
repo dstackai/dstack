@@ -242,6 +242,28 @@ There are two ways to configure AWS: using an access key or using the default cr
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by NAT Gateway, Transit Gateway, or other mechanism.
 
+??? info "Custom security group"
+    By default, `dstack` creates and manages its own security group per project (opening SSH to `0.0.0.0/0`
+    and allowing all traffic within the group so multi-node clusters work out of the box).
+    To use a security group you manage yourself instead, set `security_group_id`:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            security_group_id: sg-0a1b2c3d4e5f6g7h8
+    ```
+
+    When `security_group_id` is set, `dstack` attaches it to instances as-is and never adds, removes, or modifies
+    its rules. You're responsible for SSH reachability (from wherever the `dstack` server and users connect from)
+    and, for multi-node clusters, for allowing traffic between instances in the group.
+
+    You can also override this per fleet or run using the `security_group` profile property.
+
 ??? info "OS images"
     By default, `dstack` uses its own [AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
     optimized for `dstack`.
@@ -443,6 +465,27 @@ There are two ways to configure Azure: using a client secret or using the defaul
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by [NAT Gateway or other mechanism](https://learn.microsoft.com/en-us/azure/nat-gateway/nat-overview).
+
+??? info "Custom network security group"
+    By default, `dstack` creates and manages its own network security group (opening SSH to the internet
+    and allowing all traffic within the group so multi-node clusters work out of the box).
+    To use a network security group you manage yourself instead, set `network_security_group`:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+            network_security_group: my-network-security-group
+    ```
+
+    When `network_security_group` is set, `dstack` attaches it to instances as-is and never adds, removes, or
+    modifies its rules. You're responsible for SSH reachability and, for multi-node clusters, for allowing
+    traffic between instances in the group.
+
+    You can also override this per fleet or run using the `security_group` profile property.
 
 ### GCP
 
@@ -661,6 +704,28 @@ gcloud projects list --format="json(projectId)"
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
+
+??? info "Custom firewall rules"
+    By default, `dstack` creates VPC firewall rules allowing inbound SSH (and, for gateways, HTTP/HTTPS) from
+    the internet, scoped to the `dstack-runner-instance` and `dstack-gateway-instance` target tags.
+    Unlike AWS/Azure/OCI, GCP firewall rules apply to the whole VPC rather than to a single attachable resource,
+    so there's no per-fleet override — if you manage your own firewall rules and don't want `dstack` creating
+    rules that open ports to `0.0.0.0/0`, disable this at the project level with `create_firewall_rules: false`:
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+
+          create_firewall_rules: false
+    ```
+
+    You're then responsible for ensuring your VPC's own firewall rules allow whatever SSH and cluster traffic
+    `dstack` needs.
 
 ### Lambda
 
@@ -1067,6 +1132,27 @@ There are two ways to configure OCI: using client credentials or using the defau
           type: default
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
+
+??? info "Custom network security group"
+    By default, `dstack` creates and manages its own network security group per project (opening SSH to
+    `0.0.0.0/0` and allowing all traffic within the VCN so multi-node clusters work out of the box).
+    To use a network security group you manage yourself instead, set `network_security_group_id`:
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+        network_security_group_id: ocid1.networksecuritygroup.oc1..aaaaaaaa
+    ```
+
+    When `network_security_group_id` is set, `dstack` attaches it to instances as-is and never adds, removes,
+    or modifies its rules. You're responsible for SSH reachability and, for multi-node clusters, for allowing
+    traffic between instances in the group.
+
+    You can also override this per fleet or run using the `security_group` profile property.
 
 SSH fleets support the same features as [VM-based](#vm-based) backends.
 

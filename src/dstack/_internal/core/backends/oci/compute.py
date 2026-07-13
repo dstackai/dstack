@@ -12,6 +12,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithSecurityGroupSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -58,6 +59,7 @@ class OCICompute(
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(self, config: OCIConfig):
@@ -136,15 +138,20 @@ class OCICompute(
         subnet: oci.core.models.Subnet = region.virtual_network_client.get_subnet(
             self.config.subnet_ids_per_region[instance_offer.region]
         ).data
-        security_group = resources.get_or_create_security_group(
-            f"dstack-{instance_config.project_name}-default-security-group",
-            subnet.vcn_id,
-            self.config.compartment_id,
-            region.virtual_network_client,
+        security_group_id = (
+            instance_config.security_group or self.config.network_security_group_id
         )
-        resources.update_security_group_rules_for_runner_instances(
-            security_group.id, region.virtual_network_client
-        )
+        if security_group_id is None:
+            security_group = resources.get_or_create_security_group(
+                f"dstack-{instance_config.project_name}-default-security-group",
+                subnet.vcn_id,
+                self.config.compartment_id,
+                region.virtual_network_client,
+            )
+            resources.update_security_group_rules_for_runner_instances(
+                security_group.id, region.virtual_network_client
+            )
+            security_group_id = security_group.id
 
         cloud_init_user_data = get_user_data(
             authorized_keys=instance_config.get_public_keys(),
@@ -158,7 +165,7 @@ class OCICompute(
                 availability_domain=availability_domain,
                 compartment_id=self.config.compartment_id,
                 subnet_id=subnet.id,
-                security_group_id=security_group.id,
+                security_group_id=security_group_id,
                 display_name=display_name,
                 cloud_init_user_data=cloud_init_user_data,
                 shape=instance_offer.instance.name,

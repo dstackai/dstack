@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithSecurityGroupSupport,
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.backends.base.configurator import Configurator
@@ -60,6 +61,10 @@ BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT = _get_backends_with_compute_feature(
 BACKENDS_WITH_RESERVATION_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,
     compute_feature_class=ComputeWithReservationSupport,
+)
+BACKENDS_WITH_SECURITY_GROUP_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithSecurityGroupSupport,
 )
 BACKENDS_WITH_GATEWAY_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,

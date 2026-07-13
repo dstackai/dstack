@@ -1,8 +1,20 @@
+from unittest.mock import Mock, patch
+
 import pytest
 
 from dstack._internal import settings
-from dstack._internal.core.backends.azure.compute import VMImageVariant
-from dstack._internal.core.models.instances import Gpu, InstanceType, Resources
+from dstack._internal.core.backends.azure import utils as azure_utils
+from dstack._internal.core.backends.azure.compute import AzureCompute, VMImageVariant
+from dstack._internal.core.backends.azure.models import AzureClientCreds, AzureConfig
+from dstack._internal.core.models.instances import (
+    Gpu,
+    InstanceAvailability,
+    InstanceConfiguration,
+    InstanceOfferWithAvailability,
+    InstanceType,
+    Resources,
+    SSHKey,
+)
 
 
 class TestVMImageVariant:
@@ -71,3 +83,83 @@ class TestVMImageVariant:
     )
     def test_get_image_name(self, variant: VMImageVariant, expected_name: str):
         assert variant.get_image_name() == expected_name
+
+
+def _config(network_security_group=None) -> AzureConfig:
+    return AzureConfig(
+        creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
+        tenant_id="ten1",
+        subscription_id="sub1",
+        resource_group="my-rg",
+        regions=["eastus"],
+        network_security_group=network_security_group,
+    )
+
+
+def _offer() -> InstanceOfferWithAvailability:
+    return InstanceOfferWithAvailability(
+        backend="azure",
+        instance=InstanceType(
+            name="Standard_DS1_v2",
+            resources=Resources(cpus=1, memory_mib=3500, gpus=[], spot=False),
+        ),
+        region="eastus",
+        price=0.1,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+
+
+def _instance_config(security_group=None) -> InstanceConfiguration:
+    return InstanceConfiguration(
+        project_name="main",
+        instance_name="test-instance",
+        user="test-user",
+        ssh_keys=[SSHKey(public="ssh-rsa test")],
+        security_group=security_group,
+    )
+
+
+class TestAzureComputeNetworkSecurityGroup:
+    @pytest.mark.parametrize(
+        ["instance_sg", "config_nsg", "expected"],
+        [
+            [None, None, azure_utils.get_default_network_security_group_name("my-rg", "eastus")],
+            [None, "config-nsg", "config-nsg"],
+            ["instance-nsg", None, "instance-nsg"],
+            # instance_config.security_group takes precedence over config.network_security_group
+            ["instance-nsg", "config-nsg", "instance-nsg"],
+        ],
+    )
+    def test_create_instance_resolves_network_security_group(
+        self, instance_sg, config_nsg, expected
+    ):
+        with (
+            patch("dstack._internal.core.backends.azure.compute.compute_mgmt"),
+            patch("dstack._internal.core.backends.azure.compute.network_mgmt"),
+            patch(
+                "dstack._internal.core.backends.azure.compute"
+                ".get_resource_group_network_subnet_or_error",
+                return_value=("net-rg", "net", "subnet"),
+            ),
+            patch("dstack._internal.core.backends.azure.compute._get_image_ref"),
+            patch(
+                "dstack._internal.core.backends.azure.compute._create_instance_and_wait"
+            ) as create_and_wait_mock,
+            patch(
+                "dstack._internal.core.backends.azure.compute._get_vm_public_private_ips",
+                return_value=("1.2.3.4", "10.0.0.1"),
+            ),
+        ):
+            vm_mock = Mock()
+            vm_mock.name = "test-vm-id"
+            create_and_wait_mock.return_value = vm_mock
+            compute = AzureCompute(
+                config=_config(network_security_group=config_nsg), credential=Mock()
+            )
+            compute.create_instance(
+                instance_offer=_offer(),
+                instance_config=_instance_config(security_group=instance_sg),
+                placement_group=None,
+            )
+            _, kwargs = create_and_wait_mock.call_args
+            assert kwargs["network_security_group"] == expected

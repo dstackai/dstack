@@ -81,6 +81,18 @@ class AzureBackendConfig(CoreModel):
             )
         ),
     ] = None
+    network_security_group: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of an existing network security group (in the configured resource group)"
+                " to use for instances instead of the one `dstack` creates and manages automatically."
+                " When set, `dstack` does not add, remove, or modify any rules on this network"
+                " security group — you are responsible for SSH reachability and, for multi-node"
+                " clusters, for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),

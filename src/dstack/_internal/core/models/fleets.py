@@ -240,6 +240,21 @@ class BackendFleetConfiguraionProps(CoreModel):
             )
         ),
     ] = None
+    security_group: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The existing security group to use for instance provisioning instead of the one"
+                " `dstack` creates and manages automatically."
+                " Supported on AWS (security group ID), Azure (network security group name),"
+                " and OCI (network security group ID). Not supported on GCP;"
+                " use the GCP backend's `create_firewall_rules: false` setting instead."
+                " When set, `dstack` does not add, remove, or modify any rules on this security group"
+                " — you are responsible for SSH reachability and, for multi-node clusters,"
+                " for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
     resources: Annotated[
         Optional[ResourcesSpec],
         Field(description="The resources requirements"),

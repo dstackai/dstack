@@ -31,6 +31,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithSecurityGroupSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -124,6 +125,7 @@ class AWSCompute(
     ComputeWithGatewaySupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(
@@ -329,12 +331,14 @@ class AWSCompute(
                 instance_type=instance_offer.instance.name,
                 image_config=self.config.os_images,
             )
-            security_group_id = self._create_security_group(
-                ec2_client=ec2_client,
-                region=instance_offer.region,
-                project_id=project_name,
-                vpc_id=vpc_id,
-            )
+            security_group_id = instance_config.security_group or self.config.security_group_id
+            if security_group_id is None:
+                security_group_id = self._create_security_group(
+                    ec2_client=ec2_client,
+                    region=instance_offer.region,
+                    project_id=project_name,
+                    vpc_id=vpc_id,
+                )
             try:
                 response = ec2_resource.create_instances(  # pyright: ignore[reportAttributeAccessIssue]
                     **aws_resources.create_instances_struct(

@@ -156,6 +156,7 @@ class InstanceConfiguration(CoreModel):
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
     reservation: Optional[str] = None
+    security_group: Optional[str] = None
     volumes: Optional[List[Volume]] = None
     tags: Optional[Dict[str, str]] = None
 

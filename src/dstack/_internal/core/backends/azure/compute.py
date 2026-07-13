@@ -45,6 +45,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithSecurityGroupSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
@@ -89,6 +90,7 @@ class AzureCompute(
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(self, config: AzureConfig, credential: TokenCredential):
@@ -146,9 +148,13 @@ class AzureCompute(
             location=location,
             allocate_public_ip=allocate_public_ip,
         )
-        network_security_group = azure_utils.get_default_network_security_group_name(
-            resource_group=self.config.resource_group,
-            location=location,
+        network_security_group = (
+            instance_config.security_group
+            or self.config.network_security_group
+            or azure_utils.get_default_network_security_group_name(
+                resource_group=self.config.resource_group,
+                location=location,
+            )
         )
 
         managed_identity_resource_group, managed_identity_name = parse_vm_managed_identity(

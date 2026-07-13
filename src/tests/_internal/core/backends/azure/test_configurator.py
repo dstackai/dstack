@@ -129,3 +129,36 @@ class TestCheckConfigVpc:
             subnet_ids={"eastus": "rg/net/subnet"},
         )
         self._check(config)
+
+
+class TestCreateBackendNetworkSecurityGroup:
+    def _make_config(self, **kwargs):
+        return AzureBackendConfigWithCreds(
+            creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
+            tenant_id="ten1",
+            subscription_id="sub1",
+            resource_group="my-rg",
+            regions=["eastus"],
+            **kwargs,
+        )
+
+    def _create_backend(self, config):
+        with (
+            patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
+            patch(
+                "dstack._internal.core.backends.azure.configurator.NetworkManager"
+            ) as NetworkManagerMock,
+        ):
+            authenticate_mock.return_value = Mock(), Mock()
+            AzureConfigurator().create_backend("proj", config)
+            return NetworkManagerMock.return_value
+
+    def test_creates_instance_nsg_by_default(self):
+        network_manager = self._create_backend(self._make_config())
+        network_manager.create_network_security_group.assert_called_once()
+
+    def test_skips_instance_nsg_when_configured(self):
+        network_manager = self._create_backend(self._make_config(network_security_group="my-nsg"))
+        network_manager.create_network_security_group.assert_not_called()
+        # The gateway NSG is unaffected and still created.
+        network_manager.create_gateway_network_security_group.assert_called_once()

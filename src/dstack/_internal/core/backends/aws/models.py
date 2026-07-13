@@ -96,6 +96,18 @@ class AWSBackendConfig(CoreModel):
             )
         ),
     ] = None
+    security_group_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The ID of an existing security group to use for instances instead of the one"
+                " `dstack` creates and manages automatically (`dstack_security_group_<project>`)."
+                " When set, `dstack` does not add, remove, or modify any rules on this security group"
+                " — you are responsible for SSH reachability and, for multi-node clusters,"
+                " for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),

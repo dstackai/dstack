@@ -69,6 +69,18 @@ class OCIBackendConfig(CoreModel):
             )
         ),
     ] = None
+    network_security_group_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The OCID of an existing network security group to use for instances instead of the"
+                " one `dstack` creates and manages automatically."
+                " When set, `dstack` does not add, remove, or modify any rules on this network"
+                " security group — you are responsible for SSH reachability and, for multi-node"
+                " clusters, for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
 
 
 class OCIBackendConfigWithCreds(OCIBackendConfig):

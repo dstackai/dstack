@@ -262,7 +262,7 @@ class GCPCompute(
         if len(zones) == 0:
             raise NoCapacityError("No eligible availability zones")
         # If a shared VPC is not used, we can create firewall rules for user
-        if self.config.vpc_project_id is None:
+        if self.config.vpc_project_id is None and self.config.create_firewall_rules is not False:
             gcp_resources.create_runner_firewall_rules(
                 firewalls_client=self.firewalls_client,
                 project_id=self.config.project_id,
@@ -561,7 +561,7 @@ class GCPCompute(
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
-        if self.config.vpc_project_id is None:
+        if self.config.vpc_project_id is None and self.config.create_firewall_rules is not False:
             gcp_resources.create_gateway_firewall_rules(
                 firewalls_client=self.firewalls_client,
                 project_id=self.config.project_id,
