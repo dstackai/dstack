@@ -34,3 +34,22 @@ class TestGetAPIClient:
 
         assert client.base_url == "https://server.example.com"
         assert project_name == "configured-project"
+
+    def test_token_alone_overrides_configured_token(self, monkeypatch):
+        monkeypatch.delenv("DSTACK_SERVER_URL", raising=False)
+        monkeypatch.delenv("DSTACK_PROJECT", raising=False)
+        monkeypatch.setenv("DSTACK_TOKEN", "environment-token")
+        project = ProjectConfig(
+            name="configured-project",
+            url="https://server.example.com",
+            token="configured-token",
+            default=True,
+        )
+
+        with patch("dstack._internal.core.services.api_client.configs.ConfigManager") as manager:
+            manager.return_value.get_project_config.return_value = project
+            client, project_name = get_api_client()
+
+        assert client.base_url == "https://server.example.com"
+        assert client._s.headers["Authorization"] == "Bearer environment-token"
+        assert project_name == "configured-project"
