@@ -128,6 +128,7 @@ class Compute(ABC):
         project_ssh_private_key: str,
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
@@ -307,6 +308,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         project_ssh_private_key: str,
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         """
         The default `run_job()` implementation for all backends that support `create_instance()`.
@@ -358,6 +360,7 @@ class ComputeWithGroupProvisioningSupport(ABC):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> ComputeGroupProvisioningData:
         pass
 
