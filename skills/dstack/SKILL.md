@@ -34,7 +34,7 @@ submits and exits.
 
 1) Show plan: `echo "n" | dstack apply -f <config>`
 2) If plan is OK and user confirms, apply detached: `dstack apply -f <config> -y -d`
-3) Check status once: `dstack ps -v`
+3) Check the run: `dstack run get <run-name> --json`
 4) If dev-environment or task with ports and running: attach to surface IDE link/ports/SSH alias (agent runs attach in background); ask to open link
 5) If attach fails in sandbox: request escalation; if not approved, ask the user to run `dstack attach` locally and share the output
 
@@ -76,7 +76,15 @@ submits and exits.
 - `dstack apply` without `-d` for runs
 - `dstack ps -w`
 
-Agents should avoid blocking: use `-d`, timeouts, or background attach. When attach is needed, run it in the background by default (`nohup ...`), but describe it to the user simply as "attach" unless they ask for a live foreground session. Prefer `dstack ps -v` and poll in a loop if the user wants to watch status.
+Agents should avoid blocking: use `-d`, timeouts, or background attach. When attach is needed, run it in the background by default (`nohup ...`), but describe it to the user simply as "attach" unless they ask for a live foreground session.
+
+When waiting programmatically for a specific run, use
+`dstack run get <run-name> --json` and read its top-level `status`. Run statuses
+are `pending`, `submitted`, `provisioning`, `running`, `terminating`,
+`terminated`, `failed`, and `done`; the last three are terminal. Stop waiting
+when the run reaches the state needed for the next action or a terminal status.
+Never parse or grep human-readable `dstack ps` output; its status column may
+display a job message such as `no offers`.
 
 **All other commands:** Use 10-60s timeout. Most complete within this range. **While waiting, monitor the output** - it may contain errors, warnings, or prompts requiring attention.
 
@@ -94,9 +102,9 @@ Agents should avoid blocking: use `-d`, timeouts, or background attach. When att
 
 After submitting a run with `-d` (dev-environment, task, service), first determine whether submission failed. If the apply output shows errors (validation, no offers, etc.), stop and surface the error.
 
-If the run was submitted, do a quick status check with `dstack ps -v`, then guide the user through relevant next steps:
+If the run was submitted, check it with `dstack run get <run-name> --json`, then guide the user through relevant next steps:
 If you need to prompt for next actions, be explicit about the dstack step and command (avoid vague questions). When speaking to the user, refer to the action as "attach" (not "background attach").
-- **Monitor status:** Report the current status (provisioning/pulling/running/finished) and offer to keep watching. Poll `dstack ps -v` every 10-20s if the user wants updates.
+- **Monitor status:** Report the current status and offer to keep watching. If watching, poll `dstack run get <run-name> --json` every 10-20 seconds until it reaches the state needed for the next action or a terminal status.
 - **Attach when running:** For agents, run attach in the background by default so the session does not block. Use it to capture IDE links/SSH alias or enable port forwarding; when describing the action to the user, just say "attach".
 - **Dev environments or tasks with ports:** Once `running`, attach to surface the IDE link/port forwarding/SSH alias, then ask whether to open the IDE link. Never open links without explicit approval.
 - **Services:** Prefer using service endpoints. Attach only if the user explicitly needs port forwarding or full log replay.
@@ -368,7 +376,7 @@ domain: example.com
 
 4. **Verify apply status:**
    ```bash
-   dstack ps -v
+   dstack run get <run-name> --json
    ```
 
 **Workflow for infrastructure (fleet, volume, gateway):**
@@ -533,7 +541,7 @@ Common issues:
 - **No offers:** Check `dstack offer`; if submitting a run, ensure at least one fleet can provision or reuse matching instances
 - **No fleet:** Ensure at least one fleet is created
 - **Configuration errors:** Validate YAML syntax; check `dstack apply` output for specific errors
-- **Provisioning timeouts:** Use `dstack ps -v` to see provisioning status; consider spot vs on-demand
+- **Provisioning timeouts:** Inspect the run with `dstack run get <run-name> --json`; consider spot vs on-demand
 - **Connection issues:** Verify server status, check authentication, ensure network access to backends
 
 **When errors occur:**

@@ -6,8 +6,9 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set, TypeVar
+from typing import Dict, Generic, List, Optional, Set, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -54,9 +55,10 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos import RepoHeadWithCreds
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunPlan, RunSpec, RunStatus
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
@@ -80,6 +82,13 @@ logger = get_logger(__name__)
 RunConfigurationT = TypeVar("RunConfigurationT", bound=AnyRunConfiguration)
 
 
+@dataclass(frozen=True)
+class PreparedRunConfiguration(Generic[RunConfigurationT]):
+    configuration: RunConfigurationT
+    repo: Repo
+    run_plan: RunPlan
+
+
 class BaseRunConfigurator(
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator[RunConfigurationT],
@@ -91,6 +100,23 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
     ):
+        prepared = self.prepare_configuration(
+            conf=conf,
+            configuration_path=configuration_path,
+            configurator_args=configurator_args,
+        )
+        return self.apply_prepared_configuration(
+            prepared=prepared,
+            command_args=command_args,
+            configurator_args=configurator_args,
+        )
+
+    def prepare_configuration(
+        self,
+        conf: RunConfigurationT,
+        configuration_path: str,
+        configurator_args: argparse.Namespace,
+    ) -> PreparedRunConfiguration[RunConfigurationT]:
         if configurator_args.repo and configurator_args.no_repo:
             raise CLIError("Either --repo or --no-repo can be specified")
 
@@ -121,6 +147,21 @@ class BaseRunConfigurator(
                 profile=profile,
                 ssh_identity_file=configurator_args.ssh_identity_file,
             )
+        return PreparedRunConfiguration(
+            configuration=conf,
+            repo=repo,
+            run_plan=run_plan,
+        )
+
+    def apply_prepared_configuration(
+        self,
+        prepared: PreparedRunConfiguration[RunConfigurationT],
+        command_args: argparse.Namespace,
+        configurator_args: argparse.Namespace,
+    ):
+        conf = prepared.configuration
+        repo = prepared.repo
+        run_plan = prepared.run_plan
 
         no_fleets = False
         if len(run_plan.job_plans[0].offers) == 0:
@@ -721,7 +762,7 @@ class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator)
         super().register_args(parser)
         cls.register_commands_args(parser)
 
-    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+    def apply_args(self, conf: ServiceConfiguration, args: argparse.Namespace):
         super().apply_args(conf, args)
         self.apply_commands_args(conf, args)
 

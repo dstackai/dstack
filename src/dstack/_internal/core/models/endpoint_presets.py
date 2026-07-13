@@ -1,0 +1,172 @@
+import re
+import uuid
+from typing import Annotated, Any, Literal, Optional, Union
+
+from pydantic import (
+    Field,
+    PositiveFloat,
+    PositiveInt,
+    parse_obj_as,
+    root_validator,
+    validator,
+)
+
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
+
+
+class EndpointBenchmarkWorkload(CoreModel):
+    dataset_name: str
+    streaming: bool
+    max_concurrency: PositiveInt
+    request_rate: Optional[Union[Literal["inf"], PositiveFloat]] = None
+    num_prompts: PositiveInt
+    input_tokens: PositiveInt
+    output_tokens: PositiveInt
+    ignore_eos: Optional[bool] = None
+    random_range_ratio: Annotated[Optional[float], Field(ge=0, le=1)] = None
+
+    @validator("dataset_name")
+    def validate_dataset_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("dataset_name must be non-empty")
+        return value
+
+
+class EndpointBenchmarkTarget(CoreModel):
+    type: Literal["gateway", "server-proxy"]
+
+
+class EndpointBenchmarkClient(CoreModel):
+    type: Literal["local"]
+
+
+class EndpointBenchmark(CoreModel):
+    success: bool
+    run_name: str
+    run_type: Literal["service"]
+    tool: str
+    command: str
+    workload: EndpointBenchmarkWorkload
+    metrics: Optional[dict[str, Any]] = None
+    failure_summary: Optional[str] = None
+    run_id: Optional[uuid.UUID] = None
+    tool_version: Optional[str] = None
+    target: Optional[EndpointBenchmarkTarget] = None
+    client: Optional[EndpointBenchmarkClient] = None
+
+    @validator("run_name", "tool", "command")
+    def validate_non_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("value must be non-empty")
+        return value
+
+    @validator("command")
+    def validate_command_has_no_bearer_token(cls, value: str) -> str:
+        for match in re.finditer(r"(?i)\bbearer\s+([^\s\"']+)", value):
+            token = match.group(1)
+            if token.startswith("$") or "redacted" in token.lower() or set(token) == {"*"}:
+                continue
+            raise ValueError("command must not contain a bearer token value")
+        return value
+
+    @root_validator
+    def validate_result(cls, values: dict) -> dict:
+        if values.get("success"):
+            if not values.get("metrics"):
+                raise ValueError("successful benchmark must include metrics")
+        elif not values.get("failure_summary"):
+            raise ValueError("failed benchmark must include failure_summary")
+        return values
+
+
+class EndpointPresetValidationReplica(CoreModel):
+    resources: list[ResourcesSpec]
+    """Exact resources for each running replica in this service replica group."""
+
+
+class EndpointPresetValidation(CoreModel):
+    replicas: list[EndpointPresetValidationReplica]
+    """Ordered to match `ServiceConfiguration.replica_groups`."""
+    benchmarks: list[EndpointBenchmark] = Field(default_factory=list)
+
+
+class EndpointPresetRecipe(CoreModel):
+    base: str
+    """Base model used for local preset lookup."""
+    id: str
+    model: str
+    """Exact repo/path loaded by the service command."""
+    context_length: PositiveInt
+    """Token context length this recipe was verified to support."""
+    service: ServiceConfiguration
+    validations: list[EndpointPresetValidation]
+
+    @validator("base", "id", "model")
+    def validate_non_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("value must be non-empty")
+        return value
+
+    @root_validator
+    def validate_recipe(cls, values: dict) -> dict:
+        service = values.get("service")
+        validations = values.get("validations")
+        if service is None or validations is None:
+            return values
+        if service.model is None:
+            raise ValueError("preset recipe service must specify model")
+        if any(group.resources is None for group in service.replica_groups):
+            raise ValueError("preset recipe service must specify resources")
+        if service.name is not None or service.gateway is not None:
+            raise ValueError("preset recipe service must not specify name or gateway")
+        if any(getattr(service, field) is not None for field in ProfileParams.__fields__):
+            raise ValueError("preset recipe service must not specify placement constraints")
+        if not validations:
+            raise ValueError("preset recipe must include validation evidence")
+        for validation in validations:
+            if len(validation.replicas) != len(service.replica_groups):
+                raise ValueError(
+                    "preset validation replicas must match service replica group order"
+                )
+            if not validation.benchmarks or any(
+                not benchmark.success for benchmark in validation.benchmarks
+            ):
+                raise ValueError("preset validation must include a successful benchmark")
+            if any(
+                benchmark.target is None or benchmark.client is None
+                for benchmark in validation.benchmarks
+            ):
+                raise ValueError("preset benchmark must specify target and client")
+            for replica_group in validation.replicas:
+                if not replica_group.resources:
+                    raise ValueError("preset validation replicas must specify resources")
+                for resources in replica_group.resources:
+                    _validate_exact_resources(resources)
+        return values
+
+
+def _validate_exact_resources(resources: ResourcesSpec) -> None:
+    cpu = parse_obj_as(CPUSpec, resources.cpu)
+    if not _is_exact(cpu.count) or not _is_exact(resources.memory):
+        raise ValueError("preset validation resources must be exact")
+    if resources.disk is None or not _is_exact(resources.disk.size):
+        raise ValueError("preset validation resources must be exact")
+    gpu = resources.gpu
+    if gpu is None or not _is_exact(gpu.count):
+        raise ValueError("preset validation resources must be exact")
+    if gpu.count.min == 0:
+        return
+    if gpu.name is None or len(gpu.name) != 1 or not _is_exact(gpu.memory):
+        raise ValueError("preset validation resources must be exact")
+
+
+def _is_exact(value) -> bool:
+    return (
+        value is not None
+        and value.min is not None
+        and value.max is not None
+        and value.min == value.max
+    )
