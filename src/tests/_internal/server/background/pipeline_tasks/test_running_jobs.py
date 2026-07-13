@@ -39,6 +39,7 @@ from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMount
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.jobs_running import (
+    JOB_DISCONNECTED_RETRY_TIMEOUT,
     ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS,
     JobRunningFetcher,
     JobRunningPipeline,
@@ -61,6 +62,8 @@ from dstack._internal.server.schemas.runner import (
     PullResponse,
     TaskStatus,
 )
+from dstack._internal.server.services.jobs import server_connection
+from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.runner.client import RunnerClient, ShimClient
 from dstack._internal.server.services.runs.replicas import RouterEnvStatus
 from dstack._internal.server.services.volumes import volume_model_to_volume
@@ -1035,6 +1038,11 @@ class TestJobRunningWorker:
                 return_value=False,
             ),
             patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running."
+                "job_server_connections_pool.remove",
+                new_callable=AsyncMock,
+            ) as remove_server_connection_mock,
+            patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running._get_job_file_archives",
                 new_callable=AsyncMock,
             ) as get_job_file_archives_mock,
@@ -1046,12 +1054,109 @@ class TestJobRunningWorker:
             await _process_job(session, worker, job)
 
         ensure_server_connection_mock.assert_awaited_once()
+        # Removing the connection here would reset the failure time tracked by the pool
+        remove_server_connection_mock.assert_not_awaited()
         runner_client_mock.submit_job.assert_not_called()
         get_job_file_archives_mock.assert_not_awaited()
         get_job_code_mock.assert_not_awaited()
         await session.refresh(job)
         assert job.status == JobStatus.PULLING
         assert job.disconnected_at is None
+
+    async def test_provisioning_server_access_failure_terminates_job_after_retry_timeout(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                repo_id=repo.name,
+                configuration=TaskConfiguration(
+                    image="debian",
+                    commands=["true"],
+                    server=True,
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            submitted_at=get_current_datetime(),
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            job_runtime_data=get_job_runtime_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        last_processed_at = job.last_processed_at
+        monkeypatch.setattr(server_connection, "CONNECTIONS_DIR", tmp_path)
+        failing_connection = MagicMock()
+        failing_connection.job_id = job.id
+        failing_connection.open = AsyncMock(side_effect=SSHError("cannot open tunnel"))
+        failing_connection.close = AsyncMock()
+        monkeypatch.setattr(
+            server_connection, "JobServerConnection", Mock(return_value=failing_connection)
+        )
+
+        try:
+            with (
+                patch("dstack._internal.server.services.runner.pool.SSHTunnel"),
+                patch.object(RunnerClient, "_healthcheck") as healthcheck_mock,
+                patch.object(RunnerClient, "submit_job") as submit_job_mock,
+            ):
+                healthcheck_mock.return_value = HealthcheckResponse(
+                    service="dstack-runner", version="0.0.1.dev2"
+                )
+                await _process_job(session, worker, job)
+
+                submit_job_mock.assert_not_called()
+                await session.refresh(job)
+                assert job.status == JobStatus.PROVISIONING
+                failure_started_at = job_server_connections_pool._failure_started_at.get(job.id)
+                assert failure_started_at is not None
+
+                # The connection failure time must survive further processing iterations,
+                # otherwise the retry timeout can never elapse
+                job.last_processed_at = last_processed_at
+                await session.commit()
+                await _process_job(session, worker, job)
+
+                submit_job_mock.assert_not_called()
+                await session.refresh(job)
+                assert job.status == JobStatus.PROVISIONING
+                assert (
+                    job_server_connections_pool._failure_started_at.get(job.id)
+                    == failure_started_at
+                )
+
+                job_server_connections_pool._failure_started_at[job.id] = (
+                    failure_started_at - JOB_DISCONNECTED_RETRY_TIMEOUT.total_seconds() - 1
+                )
+                job.last_processed_at = last_processed_at
+                await session.commit()
+                await _process_job(session, worker, job)
+
+                submit_job_mock.assert_not_called()
+                await session.refresh(job)
+                assert job.status == JobStatus.TERMINATING
+                assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+                assert job.termination_reason_message == "Could not establish dstack server access"
+        finally:
+            job_server_connections_pool._connections.pop(job.id, None)
+            job_server_connections_pool._failure_started_at.pop(job.id, None)
 
     async def test_pulling_shim_uses_runtime_port_mapping_for_runner_calls(
         self,

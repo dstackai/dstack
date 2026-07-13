@@ -493,7 +493,9 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
             )
         await _maybe_register_replica(context=context, result=result)
         await _check_gpu_utilization(context=context, result=result)
-    elif _server_access_enabled(context):
+    elif _server_access_enabled(context) and context.job_model.status == JobStatus.RUNNING:
+        # Removing on PROVISIONING/PULLING iterations would reset the failure time
+        # tracked by the pool, breaking retry_timed_out()
         await job_server_connections_pool.remove(context.job_model.id)
     return result
 
