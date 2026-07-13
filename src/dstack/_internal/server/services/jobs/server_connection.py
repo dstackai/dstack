@@ -157,14 +157,13 @@ class JobServerConnectionsPool:
         self._connections: dict[uuid.UUID, JobServerConnection] = {}
         self._failure_started_at: dict[uuid.UUID, float] = {}
         self._locks: WeakValueDictionary[uuid.UUID, asyncio.Lock] = WeakValueDictionary()
-        self._pool_lock = asyncio.Lock()
 
     async def ensure(
         self,
         job: JobModel,
         job_runtime_data: Optional[JobRuntimeData],
     ) -> bool:
-        lock = await self._get_lock(job.id)
+        lock = self._get_lock(job.id)
         async with lock:
             connection = self._connections.get(job.id)
             if connection is not None and await connection.is_alive():
@@ -193,7 +192,7 @@ class JobServerConnectionsPool:
         return time.monotonic() - failure_started_at > timeout
 
     async def remove(self, job_id: uuid.UUID) -> None:
-        lock = await self._get_lock(job_id)
+        lock = self._get_lock(job_id)
         async with lock:
             connection = self._connections.pop(job_id, None)
             if connection is not None:
@@ -202,13 +201,12 @@ class JobServerConnectionsPool:
             shutil.rmtree(CONNECTIONS_DIR / str(job_id), ignore_errors=True)
 
     async def remove_all(self) -> None:
-        async with self._pool_lock:
-            job_ids = set(self._connections).union(self._failure_started_at)
+        job_ids = set(self._connections).union(self._failure_started_at)
         await asyncio.gather(*(self.remove(job_id) for job_id in job_ids))
 
-    async def _get_lock(self, job_id: uuid.UUID) -> asyncio.Lock:
-        async with self._pool_lock:
-            return self._locks.setdefault(job_id, asyncio.Lock())
+    def _get_lock(self, job_id: uuid.UUID) -> asyncio.Lock:
+        # setdefault is atomic under the single-threaded event loop, so no extra lock is needed
+        return self._locks.setdefault(job_id, asyncio.Lock())
 
     @staticmethod
     async def _close(connection: JobServerConnection) -> None:
