@@ -2292,6 +2292,7 @@ async def _provision_new_capacity(
                     project_ssh_public_key,
                     project_ssh_private_key,
                     placement_group_model_to_placement_group_optional(placement_group_model),
+                    requirements,
                 )
                 return _ProvisionNewCapacityResult(
                     provisioning_data=compute_group_provisioning_data,
@@ -2315,6 +2316,7 @@ async def _provision_new_capacity(
                 project_ssh_private_key,
                 offer_volumes,
                 placement_group_model_to_placement_group_optional(placement_group_model),
+                requirements,
             )
             return _ProvisionNewCapacityResult(
                 provisioning_data=job_provisioning_data,
