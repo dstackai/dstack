@@ -41,13 +41,13 @@ class TestSSHKey:
 @pytest.mark.usefixtures("image_config_mock")
 class TestServerAccess:
     async def test_adds_transport_without_credentials(self):
-        configuration = TaskConfiguration(image="debian", commands=["true"], server=True)
+        configuration = TaskConfiguration(image="debian", commands=["true"], dstack=True)
         run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
         configurator = TaskJobConfigurator(run_spec)
 
         job_spec = (await configurator.get_job_specs(replica_num=0))[0]
 
-        assert "server" not in job_spec.dict()
+        assert "dstack" not in job_spec.dict()
         assert job_spec.env == {
             "DSTACK_SERVER_URL": "http+unix://%2Frun%2Fdstack%2Fserver.sock",
         }
@@ -65,7 +65,7 @@ class TestServerAccess:
         configuration = TaskConfiguration(
             image="debian",
             commands=["true"],
-            server=True,
+            dstack=True,
             env={
                 "DSTACK_SERVER_URL": "https://server.example.com",
             },

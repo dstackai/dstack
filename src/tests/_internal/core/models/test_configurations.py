@@ -18,13 +18,13 @@ from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 class TestParseConfiguration:
     @pytest.mark.parametrize("configuration_type", ["task", "dev-environment"])
     def test_server_access_supported(self, configuration_type: str):
-        conf = {"type": configuration_type, "server": True}
+        conf = {"type": configuration_type, "dstack": True}
         if configuration_type == "task":
             conf["commands"] = ["true"]
 
         parsed = parse_run_configuration(conf)
 
-        assert parsed.server is True
+        assert parsed.dstack is True
 
     def test_server_access_not_supported_for_service(self):
         with pytest.raises(ConfigurationError, match="extra fields not permitted"):
@@ -33,7 +33,7 @@ class TestParseConfiguration:
                     "type": "service",
                     "commands": ["python3 -m http.server"],
                     "port": 8000,
-                    "server": True,
+                    "dstack": True,
                 }
             )
 
@@ -42,7 +42,7 @@ class TestParseConfiguration:
             {
                 "type": "task",
                 "commands": ["true"],
-                "server": True,
+                "dstack": True,
                 "env": ["DSTACK_TOKEN"],
             }
         )

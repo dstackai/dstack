@@ -98,9 +98,9 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
             run_spec.configuration,
             (DevEnvironmentConfiguration, TaskConfiguration),
         )
-        and not run_spec.configuration.server
+        and not run_spec.configuration.dstack
     ):
-        configuration_excludes["server"] = True
+        configuration_excludes["dstack"] = True
 
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.configuration.probes:

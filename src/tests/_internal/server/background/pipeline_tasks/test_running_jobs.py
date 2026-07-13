@@ -1002,7 +1002,7 @@ class TestJobRunningWorker:
                 configuration=TaskConfiguration(
                     image="debian",
                     commands=["true"],
-                    server=True,
+                    dstack=True,
                 ),
             ),
         )
@@ -1084,7 +1084,7 @@ class TestJobRunningWorker:
                 configuration=TaskConfiguration(
                     image="debian",
                     commands=["true"],
-                    server=True,
+                    dstack=True,
                 ),
             ),
         )

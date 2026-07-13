@@ -279,12 +279,12 @@ class JobConfigurator(ABC):
 
     def _env(self) -> Dict[str, str]:
         env = self.run_spec.configuration.env.as_dict()
-        if self._server():
+        if self._dstack():
             env.setdefault(DSTACK_SERVER_URL_ENV, DSTACK_RUN_SERVER_URL)
         return env
 
-    def _server(self) -> bool:
-        return bool(getattr(self.run_spec.configuration, "server", False))
+    def _dstack(self) -> bool:
+        return bool(getattr(self.run_spec.configuration, "dstack", False))
 
     def _home_dir(self) -> Optional[str]:
         return self.run_spec.configuration.home_dir

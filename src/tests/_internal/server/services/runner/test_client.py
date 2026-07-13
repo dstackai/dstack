@@ -77,7 +77,7 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
     def test_adds_default_project_for_server_access(self, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/submit", json={})
         run_spec = get_run_spec(
-            repo_id="repo", configuration=TaskConfiguration(commands=["true"], server=True)
+            repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
         run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
         job = Job.construct(
@@ -109,7 +109,7 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
     def test_preserves_explicit_project_for_server_access(self, adapter: requests_mock.Adapter):
         adapter.register_uri("POST", "/api/submit", json={})
         run_spec = get_run_spec(
-            repo_id="repo", configuration=TaskConfiguration(commands=["true"], server=True)
+            repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
         run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
         job = Job.construct(

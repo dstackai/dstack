@@ -127,7 +127,7 @@ class RunnerClient:
         # API modification. Both layers are merged into a deep-copied job_spec
         # so the shared spec object held by the caller is not mutated.
         job_spec = job.job_spec
-        server_access = bool(getattr(run.run_spec.configuration, "server", False))
+        server_access = bool(getattr(run.run_spec.configuration, "dstack", False))
         if instance_env is not None or router_env is not None or server_access:
             merged_env: Dict[str, str] = {}
             if instance_env is not None:

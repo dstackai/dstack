@@ -644,7 +644,7 @@ via the [`spot_policy`](../reference/dstack.yml/dev-environment.md#spot_policy) 
 
 ### Server access
 
-Set `server` to `true` when a dev environment needs to use the dstack CLI. dstack configures the
+Set `dstack` to `true` when a dev environment needs to use the dstack CLI. dstack configures the
 server and current project automatically. To run authenticated commands, pass `DSTACK_TOKEN`
 explicitly.
 
@@ -653,7 +653,7 @@ explicitly.
 ```yaml
 type: dev-environment
 image: dstackai/dstack
-server: true
+dstack: true
 env:
   - DSTACK_TOKEN
 init:

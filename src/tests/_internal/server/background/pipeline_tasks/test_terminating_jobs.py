@@ -266,7 +266,7 @@ class TestJobTerminatingWorker:
                 configuration=TaskConfiguration(
                     image="debian",
                     commands=["true"],
-                    server=True,
+                    dstack=True,
                 ),
             ),
         )

@@ -693,8 +693,8 @@ class ConfigurationWithCommandsParams(CoreModel):
         return values
 
 
-class ConfigurationWithServerParams(CoreModel):
-    server: Annotated[
+class ConfigurationWithDstackParams(CoreModel):
+    dstack: Annotated[
         bool,
         Field(
             description=(
@@ -774,7 +774,7 @@ class DevEnvironmentConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
-    ConfigurationWithServerParams,
+    ConfigurationWithDstackParams,
     DevEnvironmentConfigurationParams,
     generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
@@ -806,7 +806,7 @@ class TaskConfiguration(
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
-    ConfigurationWithServerParams,
+    ConfigurationWithDstackParams,
     TaskConfigurationParams,
     generate_dual_core_model(TaskConfigurationConfig),
 ):

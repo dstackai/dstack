@@ -29,18 +29,18 @@ def test_run_termination_reason_to_status_works_with_all_enum_variants():
 
 
 @pytest.mark.parametrize("configuration_type", ["task", "dev-environment"])
-@pytest.mark.parametrize("server", [False, True])
-def test_server_access_run_spec_compatibility(configuration_type: str, server: bool):
+@pytest.mark.parametrize("dstack", [False, True])
+def test_server_access_run_spec_compatibility(configuration_type: str, dstack: bool):
     if configuration_type == "task":
-        configuration = TaskConfiguration(commands=["true"], server=server)
+        configuration = TaskConfiguration(commands=["true"], dstack=dstack)
     else:
-        configuration = DevEnvironmentConfiguration(server=server)
+        configuration = DevEnvironmentConfiguration(dstack=dstack)
     configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
         "configuration"
     )
 
     assert isinstance(configuration_excludes, dict)
-    assert ("server" in configuration_excludes) is not server
+    assert ("dstack" in configuration_excludes) is not dstack
 
 
 def test_job_termination_reason_to_status_works_with_all_enum_variants():
