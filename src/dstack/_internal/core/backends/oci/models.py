@@ -77,12 +77,17 @@ class OCIBackendConfig(CoreModel):
                 " use for instances instead of the one `dstack` creates and manages automatically."
                 " Regions not present in this mapping fall back to dstack's auto-created network"
                 " security group."
+                " Because OCI requires a network security group to belong to the same VCN as the"
+                " instances it's attached to, and `dstack` provisions instances into its own"
+                " default VCN for each project, the network security group must be created in that"
+                " VCN (named `dstack-<project>-default-vcn`)."
+                " `dstack`'s default subnet in that VCN has no OCI security list attached, so"
+                " whichever network security group is attached to an instance - yours or dstack's"
+                " own - is the sole security boundary for it."
                 " When set, `dstack` does not add, remove, or modify any rules on these network"
-                " security groups, and it places the affected instances in a separate subnet that"
-                " has no OCI security list, so the network security group becomes the sole security"
-                " boundary. You are fully responsible for the network security group's rules,"
-                " including ingress (e.g. SSH), egress (e.g. outbound access to pull Docker images),"
-                " and, for multi-node clusters, traffic between instances in the group"
+                " security groups. You are fully responsible for their rules, including ingress"
+                " (e.g. SSH), egress (e.g. outbound access to pull Docker images), and, for"
+                " multi-node clusters, traffic between instances in the group"
             )
         ),
     ] = None

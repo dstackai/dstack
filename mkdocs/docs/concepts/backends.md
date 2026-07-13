@@ -1162,12 +1162,11 @@ There are two ways to configure OCI: using client credentials or using the defau
     ```
 
 ??? info "Custom network security group"
-    By default, `dstack` places instances in a shared subnet whose OCI security list opens SSH
-    (TCP port 22) to `0.0.0.0/0` and permits all outbound traffic. On top of that, `dstack` creates
-    and manages its own network security group (NSG) per project, which only adds a rule allowing all
-    traffic within the group so multi-node clusters work out of the box. In other words, the
-    permissive SSH ingress and the outbound access come from the subnet's security list, not from the
-    auto-managed NSG.
+    By default, `dstack` places instances in a shared subnet that has **no** OCI security list
+    attached. On top of that, `dstack` creates and manages its own network security group (NSG) per
+    project, which grants everything instances need: SSH ingress (TCP port 22) from `0.0.0.0/0`,
+    unrestricted egress, and — so multi-node clusters work out of the box — all traffic between
+    instances in the group.
 
     OCI network security groups are region-scoped, so a custom NSG is configured per region via
     `network_security_group_ids`:
@@ -1185,14 +1184,16 @@ There are two ways to configure OCI: using client credentials or using the defau
     ```
 
     Regions not covered by `network_security_group_ids` fall back to dstack's auto-created network
-    security group and shared subnet.
+    security group.
 
-    When a custom NSG is used, `dstack` never adds, removes, or modifies its rules, and it places the
-    affected instances in a separate VCN and subnet that has **no** OCI security list (a second subnet
-    in the same VCN isn't possible here, since the default subnet already occupies the whole VCN's
-    address space). This makes the NSG the sole security boundary — there is no longer any implicit
-    SSH-from-anywhere or implicit outbound-all coming from a security list. As a result, your custom
-    NSG is fully responsible for:
+    OCI requires a network security group to belong to the same VCN as the instances it's attached
+    to. Since `dstack` provisions instances into its own default VCN per project
+    (`dstack-<project>-default-vcn`), your custom NSG must be created in that VCN.
+
+    When a custom NSG is used, `dstack` never adds, removes, or modifies its rules. Because the shared
+    subnet has no security list, the NSG is the sole security boundary for these instances — there is
+    no implicit SSH-from-anywhere or implicit outbound-all falling back from a security list. As a
+    result, your custom NSG is fully responsible for:
 
     - **Ingress**, including SSH (TCP port 22) from wherever you connect.
     - **Egress**, including outbound internet access. Without an egress rule (e.g. allow all to

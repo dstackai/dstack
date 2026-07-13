@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHKey,
 )
+from dstack._internal.server.testing.common import get_gateway_compute_configuration
 
 
 class TestVMImageVariant:
@@ -178,3 +179,56 @@ class TestAzureComputeNetworkSecurityGroup:
             )
             _, kwargs = create_and_wait_mock.call_args
             assert kwargs["network_security_group"] == expected
+
+
+class TestAzureComputeGatewayNetworkSecurityGroup:
+    @pytest.mark.parametrize(
+        ["nsg_names", "region"],
+        [
+            # No custom NSG configured anywhere.
+            [None, "eastus"],
+            # The instance-level default NSG is skipped for this exact location
+            # because a custom one is configured - the gateway must still use its
+            # own, always-created NSG, not the (now-nonexistent) instance default.
+            [{"eastus": "config-nsg"}, "eastus"],
+            [{"eastus": "config-nsg"}, "westeurope"],
+        ],
+    )
+    def test_create_gateway_always_uses_gateway_network_security_group(self, nsg_names, region):
+        with (
+            patch("dstack._internal.core.backends.azure.compute.compute_mgmt"),
+            patch("dstack._internal.core.backends.azure.compute.network_mgmt"),
+            patch(
+                "dstack._internal.core.backends.azure.compute"
+                ".get_resource_group_network_subnet_or_error",
+                return_value=("net-rg", "net", "subnet"),
+            ),
+            patch("dstack._internal.core.backends.azure.compute._get_gateway_image_ref"),
+            patch(
+                "dstack._internal.core.backends.azure.compute._create_instance_and_wait"
+            ) as create_and_wait_mock,
+            patch(
+                "dstack._internal.core.backends.azure.compute.get_gateway_user_data",
+                return_value="",
+            ),
+            patch(
+                "dstack._internal.core.backends.azure.compute._get_vm_public_private_ips",
+                return_value=("1.2.3.4", "10.0.0.1"),
+            ),
+        ):
+            vm_mock = Mock()
+            vm_mock.name = "test-gateway-vm-id"
+            create_and_wait_mock.return_value = vm_mock
+            compute = AzureCompute(
+                config=_config(network_security_group_names=nsg_names), credential=Mock()
+            )
+            compute.create_gateway(
+                get_gateway_compute_configuration(region=region, backend="azure")
+            )
+            _, kwargs = create_and_wait_mock.call_args
+            # Never the per-location default/custom instance NSG - always the
+            # dedicated gateway NSG, which is created unconditionally regardless
+            # of `network_security_group_names`.
+            assert kwargs["network_security_group"] == (
+                azure_utils.get_gateway_network_security_group_name("my-rg", region)
+            )

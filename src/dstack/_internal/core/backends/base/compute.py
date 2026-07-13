@@ -320,8 +320,8 @@ class ComputeWithCreateInstanceSupport(ABC):
             user=run.user,
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             volumes=volumes,
-            reservation=job.job_spec.requirements.reservation,
-            security_group=job.job_spec.requirements.security_group,
+            reservation=requirements.reservation,
+            security_group=requirements.security_group,
             tags=run.run_spec.merged_profile.tags,
         )
         instance_offer = instance_offer.copy()
