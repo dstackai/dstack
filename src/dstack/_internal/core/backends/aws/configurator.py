@@ -148,9 +148,16 @@ class AWSConfigurator(
             )
 
     def _check_config_security_group(self, config: AWSBackendConfigWithCreds):
-        if config.security_group_name is not None and config.security_group_ids is not None:
+        if config.security_group_ids is None:
+            return
+        regions = config.regions if config.regions is not None else DEFAULT_REGIONS
+        unknown_regions = [r for r in config.security_group_ids if r not in regions]
+        if unknown_regions:
             raise ServerClientError(
-                msg="Only one of `security_group_name` and `security_group_ids` can be specified"
+                msg=(
+                    f"`security_group_ids` specifies regions not in `regions`: {unknown_regions}."
+                    " This is likely a typo — remove the extra keys or add them to `regions`"
+                )
             )
 
     def _check_config_vpc(self, session: Session, config: AWSBackendConfigWithCreds):

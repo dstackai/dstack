@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import botocore.exceptions
 import pytest
 
 from dstack._internal.core.backends.aws.compute import AWSCompute
@@ -184,3 +185,29 @@ class TestAWSComputeSecurityGroupSupport:
         assert security_group_id == "sg-run"
         compute._create_security_group.assert_not_called()
         lookup_mock.assert_not_called()
+
+    def test_invalid_security_group_raises_compute_error(self):
+        # A security group in the wrong VPC/region is a misconfiguration, not a
+        # capacity issue: surface a clear ComputeError instead of retrying AZs.
+        compute = _compute(_config(security_group_ids={"us-east-1": "sg-wrong-vpc"}))
+        error = botocore.exceptions.ClientError(
+            error_response={
+                "Error": {
+                    "Code": "InvalidGroup.NotFound",
+                    "Message": "The security group 'sg-wrong-vpc' does not exist",
+                }
+            },
+            operation_name="RunInstances",
+        )
+        with patch(
+            "dstack._internal.core.backends.aws.compute.aws_resources.create_instances_struct",
+            return_value={},
+        ):
+            ec2_resource = compute.session.resource.return_value
+            ec2_resource.create_instances.side_effect = error
+            with pytest.raises(ComputeError, match="Security group not found"):
+                compute.create_instance(
+                    instance_offer=_offer(),
+                    instance_config=_instance_config(),
+                    placement_group=None,
+                )

@@ -38,6 +38,9 @@ REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE = 25
 ADD_SECURITY_RULES_MAX_CHUNK_SIZE = 25
 LIST_OBJECTS_MAX_LIMIT = 1000
 VCN_CIDR = "10.0.0.0/16"
+# CIDR for the dedicated VCN used for custom-NSG instances (see `get_or_create_restricted_vcn`).
+# Must not overlap `VCN_CIDR` in case the two VCNs are ever peered.
+RESTRICTED_VCN_CIDR = "10.1.0.0/16"
 WAIT_FOR_COMPARTMENT_ATTEMPS = 36
 WAIT_FOR_COMPARTMENT_DELAY = 5
 
@@ -570,6 +573,89 @@ def get_or_create_subnet(
             vcn_id=vcn_id,
         )
     ).data
+
+
+def get_or_create_restricted_vcn(
+    name: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.Vcn:
+    """
+    Like `get_or_create_vcn`, but a separate VCN (own CIDR block) dedicated to
+    custom-NSG instances. A *separate* VCN is used - rather than a second subnet
+    in the existing default VCN - because the default subnet already occupies
+    the default VCN's entire CIDR block, and adding a second CIDR block to an
+    existing VCN requires an async OCI operation (`add_vcn_cidr`) that takes
+    the VCN out of service for subnet/route-table updates for its duration.
+    A brand new VCN avoids that entirely and keeps the default VCN/subnet used
+    by dstack's auto-managed instances completely untouched.
+    """
+    query_results = chain_paginated_responses(
+        client.list_vcns, compartment_id=compartment_id, display_name=name
+    )
+    if vcn := next(query_results, None):
+        return vcn
+
+    return client.create_vcn(
+        oci.core.models.CreateVcnDetails(
+            cidr_blocks=[RESTRICTED_VCN_CIDR],
+            compartment_id=compartment_id,
+            display_name=name,
+        )
+    ).data
+
+
+def get_or_create_restricted_subnet(
+    name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.Subnet:
+    """
+    Like `get_or_create_subnet`, but creates the subnet with an empty list of
+    security lists (`security_list_ids=[]`) instead of letting OCI attach the
+    VCN's permissive default security list. Must be created in a VCN returned
+    by `get_or_create_restricted_vcn`, not the default VCN.
+
+    This is used for instances that run with a user-managed (custom) network
+    security group. With no security list contributing rules, the NSG becomes
+    the sole source of truth for what traffic is allowed to and from these
+    instances. OCI evaluates security lists and NSGs as a union of allows, so an
+    empty security list list simply means "the security-list layer grants
+    nothing"; it does not deny anything on its own.
+    """
+    query_results = chain_paginated_responses(
+        client.list_subnets, compartment_id=compartment_id, display_name=name
+    )
+    if subnet := next(query_results, None):
+        return subnet
+
+    return client.create_subnet(
+        oci.core.models.CreateSubnetDetails(
+            cidr_block=RESTRICTED_VCN_CIDR,
+            compartment_id=compartment_id,
+            display_name=name,
+            vcn_id=vcn_id,
+            security_list_ids=[],
+        )
+    ).data
+
+
+def set_up_restricted_network_resources_in_region(
+    compartment_id: str, project_name: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.Subnet:
+    """
+    Like `set_up_network_resources_in_region`, but for the dedicated VCN/subnet
+    used by custom-NSG instances (see `get_or_create_restricted_vcn` and
+    `get_or_create_restricted_subnet`). Idempotent - safe to call on every
+    instance launch, mirroring how `get_or_create_security_group` is already
+    called on every launch for the default (non-custom-NSG) path.
+    """
+    vcn = get_or_create_restricted_vcn(
+        f"dstack-{project_name}-restricted-vcn", compartment_id, client
+    )
+    internet_gateway = get_or_create_internet_gateway(
+        f"dstack-{project_name}-restricted-internet-gateway", vcn.id, compartment_id, client
+    )
+    update_route_table(vcn.default_route_table_id, internet_gateway.id, client)
+    return get_or_create_restricted_subnet(
+        f"dstack-{project_name}-restricted-subnet", vcn.id, compartment_id, client
+    )
 
 
 def get_or_create_internet_gateway(

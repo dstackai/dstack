@@ -561,7 +561,10 @@ class GCPCompute(
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
-        if self.config.vpc_project_id is None and self.config.create_firewall_rules is not False:
+        if self.config.vpc_project_id is None:
+            # Gateway firewall rules are intentionally not gated by `create_firewall_rules`:
+            # gateways are meant to be internet-reachable, and this keeps behavior consistent
+            # with AWS/Azure/OCI, where gateway security groups/NSGs are always auto-managed.
             gcp_resources.create_gateway_firewall_rules(
                 firewalls_client=self.firewalls_client,
                 project_id=self.config.project_id,

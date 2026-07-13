@@ -489,7 +489,9 @@ There are two ways to configure Azure: using a client secret or using the defaul
     By default, `dstack` creates and manages its own network security group (opening SSH to the internet
     and allowing all traffic within the group so multi-node clusters work out of the box).
     Azure NSG names must be unique within a resource group regardless of region, so a custom NSG is
-    configured per location via `network_security_group_ids`:
+    configured per location via `network_security_group_names`. The values are plain NSG names
+    within the configured `resource_group` (not full Azure resource IDs), so NSGs in a different
+    resource group cannot be referenced:
 
     ```yaml
     projects:
@@ -499,12 +501,12 @@ There are two ways to configure Azure: using a client secret or using the defaul
             creds:
               type: default
             regions: [westeurope, eastus]
-            network_security_group_ids:
+            network_security_group_names:
               westeurope: my-network-security-group-we
               eastus: my-network-security-group-eus
     ```
 
-    Locations not covered by `network_security_group_ids` fall back to dstack's auto-created network
+    Locations not covered by `network_security_group_names` fall back to dstack's auto-created network
     security group. Either way, `dstack` attaches the network security group to instances as-is and
     never adds, removes, or modifies its rules. You're responsible for SSH reachability and, for
     multi-node clusters, for allowing traffic between instances in the group.
@@ -730,11 +732,11 @@ gcloud projects list --format="json(projectId)"
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
 ??? info "Custom firewall rules"
-    By default, `dstack` creates VPC firewall rules allowing inbound SSH (and, for gateways, HTTP/HTTPS) from
-    the internet, scoped to the `dstack-runner-instance` and `dstack-gateway-instance` target tags.
+    By default, `dstack` creates a VPC firewall rule allowing inbound SSH from the internet to instances,
+    scoped to the `dstack-runner-instance` target tag.
     Unlike AWS/Azure/OCI, GCP firewall rules apply to the whole VPC rather than to a single attachable resource,
     so there's no per-fleet override — if you manage your own firewall rules and don't want `dstack` creating
-    rules that open ports to `0.0.0.0/0`, disable this at the project level with `create_firewall_rules: false`:
+    a rule that opens port 22 to `0.0.0.0/0`, disable this at the project level with `create_firewall_rules: false`:
 
     ```yaml
     projects:
@@ -749,7 +751,9 @@ gcloud projects list --format="json(projectId)"
     ```
 
     You're then responsible for ensuring your VPC's own firewall rules allow whatever SSH and cluster traffic
-    `dstack` needs.
+    `dstack` needs. This setting only affects the instance SSH rule — the separate firewall rule `dstack`
+    creates for gateways (allowing HTTP/HTTPS from the internet, scoped to the `dstack-gateway-instance`
+    target tag) is always auto-managed, since gateways are meant to be internet-reachable.
 
 ### Lambda
 
@@ -1158,8 +1162,13 @@ There are two ways to configure OCI: using client credentials or using the defau
     ```
 
 ??? info "Custom network security group"
-    By default, `dstack` creates and manages its own network security group per project (opening SSH to
-    `0.0.0.0/0` and allowing all traffic within the VCN so multi-node clusters work out of the box).
+    By default, `dstack` places instances in a shared subnet whose OCI security list opens SSH
+    (TCP port 22) to `0.0.0.0/0` and permits all outbound traffic. On top of that, `dstack` creates
+    and manages its own network security group (NSG) per project, which only adds a rule allowing all
+    traffic within the group so multi-node clusters work out of the box. In other words, the
+    permissive SSH ingress and the outbound access come from the subnet's security list, not from the
+    auto-managed NSG.
+
     OCI network security groups are region-scoped, so a custom NSG is configured per region via
     `network_security_group_ids`:
 
@@ -1176,9 +1185,20 @@ There are two ways to configure OCI: using client credentials or using the defau
     ```
 
     Regions not covered by `network_security_group_ids` fall back to dstack's auto-created network
-    security group. Either way, `dstack` attaches the network security group to instances as-is and
-    never adds, removes, or modifies its rules. You're responsible for SSH reachability and, for
-    multi-node clusters, for allowing traffic between instances in the group.
+    security group and shared subnet.
+
+    When a custom NSG is used, `dstack` never adds, removes, or modifies its rules, and it places the
+    affected instances in a separate VCN and subnet that has **no** OCI security list (a second subnet
+    in the same VCN isn't possible here, since the default subnet already occupies the whole VCN's
+    address space). This makes the NSG the sole security boundary — there is no longer any implicit
+    SSH-from-anywhere or implicit outbound-all coming from a security list. As a result, your custom
+    NSG is fully responsible for:
+
+    - **Ingress**, including SSH (TCP port 22) from wherever you connect.
+    - **Egress**, including outbound internet access. Without an egress rule (e.g. allow all to
+      `0.0.0.0/0`), instances will have no outbound connectivity and will fail to pull Docker images
+      and start runs.
+    - For multi-node clusters, **traffic between instances** in the group.
 
     You can also override this per fleet or run using the `security_group` profile property.
 

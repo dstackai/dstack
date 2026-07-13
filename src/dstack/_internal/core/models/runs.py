@@ -222,6 +222,7 @@ class Requirements(CoreModel):
     max_price: Optional[float] = None
     spot: Optional[bool] = None
     reservation: Optional[str] = None
+    security_group: Optional[str] = None
     multinode: Optional[bool] = None
     """Backends can use `multinode` to filter out offers when some offers support multinode and some do not.
     """

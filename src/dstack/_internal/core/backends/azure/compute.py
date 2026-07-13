@@ -149,8 +149,8 @@ class AzureCompute(
             allocate_public_ip=allocate_public_ip,
         )
         network_security_group = instance_config.security_group
-        if network_security_group is None and self.config.network_security_group_ids is not None:
-            network_security_group = self.config.network_security_group_ids.get(location)
+        if network_security_group is None and self.config.network_security_group_names is not None:
+            network_security_group = self.config.network_security_group_names.get(location)
         if network_security_group is None:
             network_security_group = azure_utils.get_default_network_security_group_name(
                 resource_group=self.config.resource_group,

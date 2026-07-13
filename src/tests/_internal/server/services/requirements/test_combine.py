@@ -132,6 +132,37 @@ class TestCombineFleetAndRunProfiles:
     ):
         assert combine_fleet_and_run_profiles(fleet_profile, run_profile) == expected_profile
 
+    @pytest.mark.parametrize(
+        argnames=["fleet_value", "run_value", "expected_value"],
+        argvalues=[
+            pytest.param(None, None, None, id="both_unset"),
+            pytest.param("sg-1", None, "sg-1", id="only_fleet_set"),
+            pytest.param(None, "sg-2", "sg-2", id="only_run_set"),
+            pytest.param("sg-1", "sg-1", "sg-1", id="both_same"),
+        ],
+    )
+    def test_combines_security_group(
+        self,
+        fleet_value: Optional[str],
+        run_value: Optional[str],
+        expected_value: Optional[str],
+    ):
+        combined = combine_fleet_and_run_profiles(
+            Profile(security_group=fleet_value),
+            Profile(security_group=run_value),
+        )
+        assert combined is not None
+        assert combined.security_group == expected_value
+
+    def test_incompatible_security_group_returns_none(self):
+        assert (
+            combine_fleet_and_run_profiles(
+                Profile(security_group="sg-1"),
+                Profile(security_group="sg-2"),
+            )
+            is None
+        )
+
 
 class TestCombineFleetAndRunRequirements:
     def test_returns_the_same_requirements_if_requirements_identical(self):
@@ -211,6 +242,59 @@ class TestCombineFleetAndRunRequirements:
             combine_fleet_and_run_requirements(fleet_requirements, run_requirements)
             == expected_requirements
         )
+
+    @pytest.mark.parametrize(
+        argnames=["fleet_value", "run_value", "expected_value"],
+        argvalues=[
+            pytest.param(None, None, None, id="both_unset"),
+            pytest.param("sg-1", None, "sg-1", id="only_fleet_set"),
+            pytest.param(None, "sg-2", "sg-2", id="only_run_set"),
+            pytest.param("sg-1", "sg-1", "sg-1", id="both_same"),
+        ],
+    )
+    def test_combines_security_group(
+        self,
+        fleet_value: Optional[str],
+        run_value: Optional[str],
+        expected_value: Optional[str],
+    ):
+        combined = combine_fleet_and_run_requirements(
+            Requirements(resources=ResourcesSpec(), security_group=fleet_value),
+            Requirements(resources=ResourcesSpec(), security_group=run_value),
+        )
+        assert combined is not None
+        assert combined.security_group == expected_value
+
+    def test_incompatible_security_group_returns_none(self):
+        assert (
+            combine_fleet_and_run_requirements(
+                Requirements(resources=ResourcesSpec(), security_group="sg-1"),
+                Requirements(resources=ResourcesSpec(), security_group="sg-2"),
+            )
+            is None
+        )
+
+    def test_fleet_security_group_reaches_run_without_own_security_group(self):
+        # Regression test for Bug 1: a run provisioned into a fleet must inherit the
+        # fleet's `security_group` even when the run does not set its own.
+        from dstack._internal.core.models.fleets import FleetConfiguration, FleetNodesSpec
+        from dstack._internal.server.services.fleets import get_fleet_requirements
+        from dstack._internal.server.testing.common import get_fleet_spec
+
+        fleet_spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="test-fleet",
+                nodes=FleetNodesSpec(min=1, target=1, max=1),
+                security_group="sg-fleet",
+            )
+        )
+        fleet_requirements = get_fleet_requirements(fleet_spec)
+        assert fleet_requirements.security_group == "sg-fleet"
+
+        run_requirements = Requirements(resources=ResourcesSpec())
+        combined = combine_fleet_and_run_requirements(fleet_requirements, run_requirements)
+        assert combined is not None
+        assert combined.security_group == "sg-fleet"
 
     def test_unconstrained_fleet_resources_pass_through_run_requirements(self):
         unconstrained_fleet = Requirements(

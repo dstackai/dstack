@@ -85,6 +85,9 @@ class TestCreateFirewallRules:
         create_rules_mock = _run_create_gateway(_make_compute(create_firewall_rules=True))
         create_rules_mock.assert_called_once()
 
-    def test_gateway_firewall_rules_skipped_when_disabled(self):
+    def test_gateway_firewall_rules_not_affected_by_create_firewall_rules(self):
+        # `create_firewall_rules` only gates the runner (instance) firewall rule, not the
+        # gateway one - gateways are meant to be internet-reachable and are always auto-managed,
+        # consistent with how gateway security groups/NSGs are handled on AWS/Azure/OCI.
         create_rules_mock = _run_create_gateway(_make_compute(create_firewall_rules=False))
-        create_rules_mock.assert_not_called()
+        create_rules_mock.assert_called_once()

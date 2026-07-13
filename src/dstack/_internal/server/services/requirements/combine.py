@@ -41,6 +41,9 @@ def combine_fleet_and_run_profiles(
             reservation=get_single_value_optional(
                 fleet_profile.reservation, run_profile.reservation
             ),
+            security_group=get_single_value_optional(
+                fleet_profile.security_group, run_profile.security_group
+            ),
             spot_policy=_combine_spot_policy_optional(
                 fleet_profile.spot_policy, run_profile.spot_policy
             ),
@@ -67,6 +70,9 @@ def combine_fleet_and_run_requirements(
             spot=_combine_spot_optional(fleet_requirements.spot, run_requirements.spot),
             reservation=get_single_value_optional(
                 fleet_requirements.reservation, run_requirements.reservation
+            ),
+            security_group=get_single_value_optional(
+                fleet_requirements.security_group, run_requirements.security_group
             ),
             multinode=fleet_requirements.multinode or run_requirements.multinode,
             backend_options=_combine_backend_options_optional(

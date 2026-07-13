@@ -62,6 +62,28 @@ class TestGetOffersByRequirements:
             assert res == [(aws_backend_mock, aws_offer)]
 
     @pytest.mark.asyncio
+    async def test_returns_only_security_group_supporting_offers(self):
+        profile = Profile(name="test")
+        requirements = Requirements(resources=ResourcesSpec(), security_group="sg-1")
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            aws_backend_mock = Mock()
+            aws_backend_mock.TYPE = BackendType.AWS
+            aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
+            runpod_backend_mock = Mock()
+            runpod_backend_mock.TYPE = BackendType.RUNPOD
+            runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+            runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
+            m.return_value = [aws_backend_mock, runpod_backend_mock]
+            res = await get_offers_by_requirements(
+                project=Mock(),
+                profile=profile,
+                requirements=requirements,
+            )
+            m.assert_awaited_once()
+            assert res == [(aws_backend_mock, aws_offer)]
+
+    @pytest.mark.asyncio
     async def test_returns_volume_offers(self):
         profile = Profile(name="test")
         requirements = Requirements(resources=ResourcesSpec())

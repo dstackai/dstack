@@ -85,14 +85,14 @@ class TestVMImageVariant:
         assert variant.get_image_name() == expected_name
 
 
-def _config(network_security_group_ids=None) -> AzureConfig:
+def _config(network_security_group_names=None) -> AzureConfig:
     return AzureConfig(
         creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
         tenant_id="ten1",
         subscription_id="sub1",
         resource_group="my-rg",
         regions=["eastus", "westeurope"],
-        network_security_group_ids=network_security_group_ids,
+        network_security_group_names=network_security_group_names,
     )
 
 
@@ -121,7 +121,7 @@ def _instance_config(security_group=None) -> InstanceConfiguration:
 
 class TestAzureComputeNetworkSecurityGroup:
     @pytest.mark.parametrize(
-        ["instance_sg", "nsg_ids", "region", "expected"],
+        ["instance_sg", "nsg_names", "region", "expected"],
         [
             # No mapping, no instance security_group -> auto-derived default per location.
             [
@@ -146,7 +146,7 @@ class TestAzureComputeNetworkSecurityGroup:
         ],
     )
     def test_create_instance_resolves_network_security_group(
-        self, instance_sg, nsg_ids, region, expected
+        self, instance_sg, nsg_names, region, expected
     ):
         with (
             patch("dstack._internal.core.backends.azure.compute.compute_mgmt"),
@@ -169,7 +169,7 @@ class TestAzureComputeNetworkSecurityGroup:
             vm_mock.name = "test-vm-id"
             create_and_wait_mock.return_value = vm_mock
             compute = AzureCompute(
-                config=_config(network_security_group_ids=nsg_ids), credential=Mock()
+                config=_config(network_security_group_names=nsg_names), credential=Mock()
             )
             compute.create_instance(
                 instance_offer=_offer(region=region),

@@ -78,8 +78,11 @@ class OCIBackendConfig(CoreModel):
                 " Regions not present in this mapping fall back to dstack's auto-created network"
                 " security group."
                 " When set, `dstack` does not add, remove, or modify any rules on these network"
-                " security groups — you are responsible for SSH reachability and, for multi-node"
-                " clusters, for allowing traffic between instances in the group"
+                " security groups, and it places the affected instances in a separate subnet that"
+                " has no OCI security list, so the network security group becomes the sole security"
+                " boundary. You are fully responsible for the network security group's rules,"
+                " including ingress (e.g. SSH), egress (e.g. outbound access to pull Docker images),"
+                " and, for multi-node clusters, traffic between instances in the group"
             )
         ),
     ] = None

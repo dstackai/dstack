@@ -380,9 +380,18 @@ class AWSCompute(
                 )
             except botocore.exceptions.ClientError as e:
                 logger.warning("Got botocore.exceptions.ClientError: %s", e)
-                if e.response["Error"]["Code"] == "InvalidParameterValue":
+                error_code = e.response["Error"]["Code"]
+                if error_code == "InvalidParameterValue":
                     msg = e.response["Error"].get("Message", "")
                     raise ComputeError(f"Invalid AWS request: {msg}")
+                if error_code == "InvalidGroup.NotFound":
+                    # A misconfigured security group (e.g. wrong VPC/region) is not a
+                    # capacity issue, so surface it clearly instead of retrying other AZs.
+                    msg = e.response["Error"].get("Message", "")
+                    raise ComputeError(
+                        f"Security group not found for instance in region"
+                        f" {instance_offer.region}: {msg}"
+                    )
                 continue
             instance = response[0]
             # wait_until_running() is only needed so that instance is immediately ready for volume attach.

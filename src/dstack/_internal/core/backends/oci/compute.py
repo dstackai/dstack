@@ -143,7 +143,8 @@ class OCICompute(
             security_group_id = self.config.network_security_group_ids.get(
                 instance_offer.region
             )
-        if security_group_id is None:
+        using_custom_security_group = security_group_id is not None
+        if not using_custom_security_group:
             security_group = resources.get_or_create_security_group(
                 f"dstack-{instance_config.project_name}-default-security-group",
                 subnet.vcn_id,
@@ -154,10 +155,25 @@ class OCICompute(
                 security_group.id, region.virtual_network_client
             )
             security_group_id = security_group.id
+            firewall_allow_from_subnet = resources.VCN_CIDR
+        else:
+            # A user-managed (custom) NSG is in use. Place the instance in a
+            # dedicated VCN/subnet that has no OCI security list, so the NSG is
+            # the sole security boundary. This is a *separate* VCN, not a second
+            # subnet in the default one: the default subnet already occupies the
+            # default VCN's entire CIDR block, so a second subnet there would
+            # conflict. The default VCN/subnet is left completely untouched,
+            # so instances using dstack's auto-managed NSG are unaffected.
+            subnet = resources.set_up_restricted_network_resources_in_region(
+                compartment_id=self.config.compartment_id,
+                project_name=instance_config.project_name,
+                client=region.virtual_network_client,
+            )
+            firewall_allow_from_subnet = resources.RESTRICTED_VCN_CIDR
 
         cloud_init_user_data = get_user_data(
             authorized_keys=instance_config.get_public_keys(),
-            firewall_allow_from_subnets=[resources.VCN_CIDR],
+            firewall_allow_from_subnets=[firewall_allow_from_subnet],
         )
 
         display_name = generate_unique_instance_name(instance_config)

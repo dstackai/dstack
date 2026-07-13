@@ -168,7 +168,7 @@ class TestCreateBackendNetworkSecurityGroup:
         network_manager = self._create_backend(
             self._make_config(
                 regions=["eastus", "westeurope"],
-                network_security_group_ids={"eastus": "my-nsg"},
+                network_security_group_names={"eastus": "my-nsg"},
             )
         )
         assert self._default_nsg_locations(network_manager) == ["westeurope"]
@@ -179,7 +179,7 @@ class TestCreateBackendNetworkSecurityGroup:
         network_manager = self._create_backend(
             self._make_config(
                 regions=["eastus", "westeurope"],
-                network_security_group_ids={
+                network_security_group_names={
                     "eastus": "my-nsg",
                     "westeurope": "my-other-nsg",
                 },
@@ -187,3 +187,43 @@ class TestCreateBackendNetworkSecurityGroup:
         )
         network_manager.create_network_security_group.assert_not_called()
         assert network_manager.create_gateway_network_security_group.call_count == 2
+
+
+class TestCheckConfigNetworkSecurityGroups:
+    def _make_config(self, **kwargs):
+        return AzureBackendConfigWithCreds(
+            creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
+            tenant_id="ten1",
+            subscription_id="sub1",
+            resource_group="my-rg",
+            **kwargs,
+        )
+
+    def test_unknown_location_raises(self):
+        config = self._make_config(
+            regions=["eastus", "westeurope"],
+            network_security_group_names={"eastu": "my-nsg"},
+        )
+        with pytest.raises(ServerClientError, match="eastu"):
+            AzureConfigurator()._check_config_network_security_groups(config)
+
+    def test_configured_location_passes(self):
+        config = self._make_config(
+            regions=["eastus", "westeurope"],
+            network_security_group_names={"eastus": "my-nsg", "westeurope": "my-other-nsg"},
+        )
+        AzureConfigurator()._check_config_network_security_groups(config)
+
+    def test_partial_coverage_passes(self):
+        config = self._make_config(
+            regions=["eastus", "westeurope"],
+            network_security_group_names={"eastus": "my-nsg"},
+        )
+        AzureConfigurator()._check_config_network_security_groups(config)
+
+    def test_regions_none_skips_check(self):
+        config = self._make_config(
+            regions=None,
+            network_security_group_names={"eastus": "my-nsg"},
+        )
+        AzureConfigurator()._check_config_network_security_groups(config)
