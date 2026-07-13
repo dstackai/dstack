@@ -269,7 +269,6 @@ async def _process_submitted_item(item: GatewayPipelineItem):
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
-        await _apply_replica_scaling(session, result.scale_result)
         now = get_current_datetime()
         resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
@@ -292,6 +291,7 @@ async def _process_submitted_item(item: GatewayPipelineItem):
             new_status=update_map.get("status", gateway_model.status),
             status_message=update_map.get("status_message", gateway_model.status_message),
         )
+        await _apply_replica_scaling(session, result.scale_result)
 
 
 class _GatewayUpdateMap(ItemUpdateMap, total=False):
@@ -347,7 +347,6 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
     set_unlock_update_map_fields(gateway_update_map)
 
     async with get_session_ctx() as session:
-        await _apply_replica_scaling(session, result.scale_result)
         now = get_current_datetime()
         resolve_now_placeholders(gateway_update_map, now=now)
         res = await session.execute(
@@ -370,6 +369,7 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             new_status=gateway_update_map.get("status", gateway_model.status),
             status_message=gateway_update_map.get("status_message", gateway_model.status_message),
         )
+        await _apply_replica_scaling(session, result.scale_result)
 
 
 @dataclass
@@ -442,7 +442,6 @@ async def _process_running_item(item: GatewayPipelineItem):
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
-        await _apply_replica_scaling(session, scale_result)
         now = get_current_datetime()
         resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
@@ -458,6 +457,7 @@ async def _process_running_item(item: GatewayPipelineItem):
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
             return
+        await _apply_replica_scaling(session, scale_result)
 
 
 async def _process_to_be_deleted_item(item: GatewayPipelineItem):

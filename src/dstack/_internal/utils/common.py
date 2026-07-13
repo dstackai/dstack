@@ -313,7 +313,6 @@ def get_lowest_unused_nums(used_nums: set[int]) -> Iterator[int]:
     for num in itertools.count():
         if num not in used_nums:
             yield num
-    assert False, "unreachable"
 
 
 StrT = TypeVar("StrT", str, bytes)
