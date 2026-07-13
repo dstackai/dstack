@@ -37,6 +37,20 @@ class TestParseConfiguration:
                 }
             )
 
+    def test_server_access_not_supported_with_inactivity_duration(self):
+        with pytest.raises(ConfigurationError, match="inactivity_duration"):
+            parse_run_configuration(
+                {
+                    "type": "dev-environment",
+                    "dstack": True,
+                    "inactivity_duration": "1h",
+                }
+            )
+
+    def test_server_access_and_inactivity_duration_allowed_separately(self):
+        parse_run_configuration({"type": "dev-environment", "dstack": True})
+        parse_run_configuration({"type": "dev-environment", "inactivity_duration": "1h"})
+
     def test_server_access_allows_unresolved_passthrough_env(self):
         parsed = parse_run_configuration(
             {

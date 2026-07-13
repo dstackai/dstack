@@ -786,6 +786,13 @@ class DevEnvironmentConfiguration(
             raise ValueError("entrypoint is not supported for dev-environment")
         return v
 
+    @root_validator
+    def validate_dstack_and_inactivity_duration(cls, values):
+        if values.get("dstack") and values.get("inactivity_duration") is not None:
+            # The persistent server connection counts as activity, so inactivity is never detected
+            raise ValueError("`dstack` is not supported together with `inactivity_duration`")
+        return values
+
 
 class TaskConfigurationParams(CoreModel):
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
