@@ -93,51 +93,36 @@ class TestOCIComputeSecurityGroup:
         res.get_or_create_security_group.assert_called_once()
         res.update_security_group_rules_for_runner_instances.assert_called_once()
         assert (
-            res.launch_instance.call_args.kwargs["security_group_id"]
-            == "ocid1.nsg.oc1..managed"
+            res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..managed"
         )
-        assert (
-            res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
-        )
+        assert res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
 
     def test_per_region_custom_nsg_is_left_untouched(self):
         compute = _make_compute(
-            _make_config(
-                network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..custom"}
-            )
+            _make_config(network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..custom"})
         )
         res = self._run_create_instance(compute, _make_instance_config())
 
         res.get_or_create_security_group.assert_not_called()
         res.update_security_group_rules_for_runner_instances.assert_not_called()
         res.update_security_group_rules.assert_not_called()
-        assert (
-            res.launch_instance.call_args.kwargs["security_group_id"]
-            == "ocid1.nsg.oc1..custom"
-        )
+        assert res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..custom"
         # A custom NSG uses the same shared default subnet as auto-managed
         # instances - there is no separate subnet/VCN for custom-NSG instances.
-        assert (
-            res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
-        )
+        assert res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
 
     def test_region_not_in_mapping_falls_back_to_managed(self):
         compute = _make_compute(
-            _make_config(
-                network_security_group_ids={"us-phoenix-1": "ocid1.nsg.oc1..other"}
-            )
+            _make_config(network_security_group_ids={"us-phoenix-1": "ocid1.nsg.oc1..other"})
         )
         res = self._run_create_instance(compute, _make_instance_config())
 
         res.get_or_create_security_group.assert_called_once()
         res.update_security_group_rules_for_runner_instances.assert_called_once()
         assert (
-            res.launch_instance.call_args.kwargs["security_group_id"]
-            == "ocid1.nsg.oc1..managed"
+            res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..managed"
         )
-        assert (
-            res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
-        )
+        assert res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
 
     def test_instance_level_custom_nsg_is_left_untouched(self):
         compute = _make_compute(_make_config())
@@ -148,18 +133,12 @@ class TestOCIComputeSecurityGroup:
         res.get_or_create_security_group.assert_not_called()
         res.update_security_group_rules_for_runner_instances.assert_not_called()
         res.update_security_group_rules.assert_not_called()
-        assert (
-            res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..run"
-        )
-        assert (
-            res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
-        )
+        assert res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..run"
+        assert res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
 
     def test_instance_level_overrides_per_region_mapping(self):
         compute = _make_compute(
-            _make_config(
-                network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..project"}
-            )
+            _make_config(network_security_group_ids={"us-ashburn-1": "ocid1.nsg.oc1..project"})
         )
         res = self._run_create_instance(
             compute, _make_instance_config(security_group="ocid1.nsg.oc1..run")
@@ -167,12 +146,8 @@ class TestOCIComputeSecurityGroup:
 
         res.get_or_create_security_group.assert_not_called()
         res.update_security_group_rules_for_runner_instances.assert_not_called()
-        assert (
-            res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..run"
-        )
-        assert (
-            res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
-        )
+        assert res.launch_instance.call_args.kwargs["security_group_id"] == "ocid1.nsg.oc1..run"
+        assert res.launch_instance.call_args.kwargs["subnet_id"] == "ocid1.subnet.oc1..subnet"
 
 
 class TestGetOrCreateSubnet:
@@ -269,17 +244,14 @@ class TestUpdateSecurityGroupRulesForRunnerInstances:
         (_, details), _ = client.add_network_security_group_security_rules.call_args
         rules = details.security_rules
         directions = {rule.direction for rule in rules}
-        assert (
-            oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS in directions
-        )
+        assert oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS in directions
         assert oci.core.models.AddSecurityRuleDetails.DIRECTION_EGRESS in directions
 
         ssh_rules = [
             rule
             for rule in rules
             if rule.direction == oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS
-            and rule.source_type
-            == oci.core.models.AddSecurityRuleDetails.SOURCE_TYPE_CIDR_BLOCK
+            and rule.source_type == oci.core.models.AddSecurityRuleDetails.SOURCE_TYPE_CIDR_BLOCK
         ]
         assert len(ssh_rules) == 1
         assert ssh_rules[0].source == "0.0.0.0/0"
