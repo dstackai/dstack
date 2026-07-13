@@ -2,7 +2,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Optional
+from typing import Optional, cast
 
 import git
 import git.cmd
@@ -205,8 +205,12 @@ def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
     # See: https://github.com/git/git/commit/3d4355712b9fe77a96ad4ad877d92dc7ff6e0874
     # See: https://gist.github.com/ChrisTollefson/ab9c0a5d1dd4dd615217345c6936a307
     _git = git.cmd.Git()(c="credential.helper=")
+    # Type cast is required since GitPython 3.1.51 where Git.ls_remote() was implemented as
+    # an actual method wrapping Git.execute() but no proper @overload signatures were added.
+    # Our call is translated to:
+    # Git.execute(..., with_extended_output=False, as_process=False, stdout_as_string=True) -> str
+    output = cast(str, _git.ls_remote("--symref", url, "HEAD", env=env))
     # output example: "ref: refs/heads/dev\tHEAD\n545344f77c0df78367085952a97fc3a058eb4c65\tHEAD"
-    output: str = _git.ls_remote("--symref", url, "HEAD", env=env)
     for line in output.splitlines():
         # line format: `<oid> TAB <ref> LF`
         oid, _, ref = line.partition("\t")
