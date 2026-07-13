@@ -1359,6 +1359,7 @@ class ServiceConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
+    ConfigurationWithDstackParams,
     ServiceConfigurationParams,
     generate_dual_core_model(ServiceConfigurationConfig),
 ):

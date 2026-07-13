@@ -16,26 +16,18 @@ from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 
 
 class TestParseConfiguration:
-    @pytest.mark.parametrize("configuration_type", ["task", "dev-environment"])
+    @pytest.mark.parametrize("configuration_type", ["task", "dev-environment", "service"])
     def test_server_access_supported(self, configuration_type: str):
         conf = {"type": configuration_type, "dstack": True}
         if configuration_type == "task":
             conf["commands"] = ["true"]
+        elif configuration_type == "service":
+            conf["commands"] = ["true"]
+            conf["port"] = 8000
 
         parsed = parse_run_configuration(conf)
 
         assert parsed.dstack is True
-
-    def test_server_access_not_supported_for_service(self):
-        with pytest.raises(ConfigurationError, match="extra fields not permitted"):
-            parse_run_configuration(
-                {
-                    "type": "service",
-                    "commands": ["python3 -m http.server"],
-                    "port": 8000,
-                    "dstack": True,
-                }
-            )
 
     def test_server_access_not_supported_with_inactivity_duration(self):
         with pytest.raises(ConfigurationError, match="inactivity_duration"):

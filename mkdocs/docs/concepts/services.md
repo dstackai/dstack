@@ -1048,6 +1048,27 @@ resources:
   gpu: H100:1
 ```
 
+### `dstack` inside `dstack`
+
+Set `dstack` to `true` when a service needs to use the dstack CLI. dstack configures the server and
+current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+image: dstackai/dstack
+dstack: true
+port: 8000
+env:
+  - DSTACK_TOKEN
+commands:
+  - dstack ps
+  - python -m http.server 8000
+```
+
+</div>
+
 ### Environment variables
 
 <div editor-title=".dstack.yml">
