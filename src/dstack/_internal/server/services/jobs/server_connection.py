@@ -91,17 +91,6 @@ class JobServerConnection:
         try:
             remote_dir = shlex.quote(str(_REMOTE_SOCKET_PATH.parent))
             remote_socket = shlex.quote(str(_REMOTE_SOCKET_PATH))
-            # A new server owner replaces the stable path, making an orphaned forward unreachable.
-            await self._tunnel.aexec(
-                f"mkdir -p {remote_dir} && chmod 755 {remote_dir} && rm -f {remote_socket}"
-            )
-            server_socket = _get_server_socket()
-            self._tunnel.reverse_forwarded_sockets = [
-                SocketPair(
-                    local=server_socket,
-                    remote=UnixSocket(path=_REMOTE_SOCKET_PATH),
-                )
-            ]
             # Probe through the job socket itself: a socket path can remain after its listener
             # becomes unreachable.
             self._tunnel.forwarded_sockets = [
@@ -111,14 +100,34 @@ class JobServerConnection:
                 )
             ]
             await self._tunnel.aopen()
-            # The socket carries no credentials. World access inside the isolated job container
-            # lets configurations using a non-root `user` reach it as well.
-            await self._tunnel.aexec(f"chmod 666 {remote_socket}")
+            # With multiple server replicas, do not overwrite a socket that another replica already
+            # serves: create the reverse forward only when the current one is missing or
+            # unreachable. This keeps a single stable owner and avoids ownership churn (replicas
+            # repeatedly stealing the socket) and the brief unavailability of overwriting a live one.
             if not await self._server_is_reachable():
-                raise SSHError(
-                    "dstack server is not reachable from the job"
-                    f" (forward target {server_socket.render()})"
+                # A new server owner replaces the stable path, making an orphaned forward
+                # unreachable.
+                await self._tunnel.aexec(
+                    f"mkdir -p {remote_dir} && chmod 755 {remote_dir} && rm -f {remote_socket}"
                 )
+                server_socket = _get_server_socket()
+                self._tunnel.reverse_forwarded_sockets = [
+                    SocketPair(
+                        local=server_socket,
+                        remote=UnixSocket(path=_REMOTE_SOCKET_PATH),
+                    )
+                ]
+                # The probe forward is already established; do not request it again.
+                self._tunnel.forwarded_sockets = []
+                await self._tunnel.aopen()
+                # The socket carries no credentials. World access inside the isolated job container
+                # lets configurations using a non-root `user` reach it as well.
+                await self._tunnel.aexec(f"chmod 666 {remote_socket}")
+                if not await self._server_is_reachable():
+                    raise SSHError(
+                        "dstack server is not reachable from the job"
+                        f" (forward target {server_socket.render()})"
+                    )
         except Exception:
             await self._tunnel.aclose()
             raise
