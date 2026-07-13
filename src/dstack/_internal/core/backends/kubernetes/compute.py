@@ -7,6 +7,7 @@ import time
 from contextlib import ExitStack
 from decimal import Decimal
 from enum import Enum
+from functools import partial
 from typing import List, Optional
 
 from gpuhunt import AcceleratorVendor
@@ -15,7 +16,7 @@ from typing_extensions import Self
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
-    ComputeWithFilteredOffersCached,
+    ComputeWithAllOffersCached,
     ComputeWithGatewaySupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
@@ -29,27 +30,33 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_commands,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import RegionalSkipOfferCache, gpu_matches_gpu_spec
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    RegionalSkipOfferCache,
+    gpu_matches_gpu_spec,
+)
 from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCEPTIONS
 from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_DEVICE_ID_LABEL_PREFIX,
     AMD_GPU_NAME_TO_DEVICE_IDS,
     AMD_GPU_NODE_TAINT,
-    AMD_GPU_RESOURCE,
     LABEL_VALUE_MAX_LENGTH,
     NVIDIA_GPU_NODE_TAINT,
     NVIDIA_GPU_PRODUCT_LABEL,
-    NVIDIA_GPU_RESOURCE,
     OBJECT_NAME_MAX_LENGTH,
+    AnyKubernetesGPUResource,
+    KubernetesResource,
     PodPhase,
+    ResourceLimits,
+    ResourceRequests,
     TaintEffect,
+    adjust_resources_by_resource_requests,
     build_base_labels,
     build_dockerconfigjson,
     filter_invalid_labels,
     format_memory,
     get_amd_gpu_from_node_labels,
-    get_gpu_request_from_gpu_spec,
     get_instance_offer_from_node,
     get_instance_offers,
     get_node_labels,
@@ -80,7 +87,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.resources import CPUSpec, GPUSpec
+from dstack._internal.core.models.resources import GPUSpec
 from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import (
     Job,
@@ -125,7 +132,7 @@ class KubernetesBackendData(CoreModel):
 
 
 class KubernetesCompute(
-    ComputeWithFilteredOffersCached,
+    ComputeWithAllOffersCached,
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithVolumeSupport,
@@ -138,9 +145,7 @@ class KubernetesCompute(
         self.region_cluster_map = {c.region: c for c in get_clusters_from_backend_config(config)}
         self.skip_offer_cache = RegionalSkipOfferCache(ttl=60)
 
-    def get_offers_by_requirements(
-        self, requirements: Requirements
-    ) -> list[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> list[InstanceOfferWithAvailability]:
         offers: list[InstanceOfferWithAvailability] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_cluster_map: dict[
@@ -148,7 +153,7 @@ class KubernetesCompute(
             ] = {}
             for region, cluster in self.region_cluster_map.items():
                 api = client.CoreV1Api(cluster.api_client)
-                future = executor.submit(get_instance_offers, api, region, requirements)
+                future = executor.submit(get_instance_offers, api, region)
                 future_cluster_map[future] = cluster
             for future in concurrent.futures.as_completed(future_cluster_map):
                 try:
@@ -163,6 +168,10 @@ class KubernetesCompute(
                     continue
                 offers.extend(cluster_offers)
         return offers
+
+    def get_offers_modifiers(self, requirements: Requirements) -> list[OfferModifier]:
+        resource_requests = ResourceRequests.from_resources_spec(requirements.resources)
+        return [partial(_offer_modifier, resource_requests)]
 
     def run_job(
         self,
@@ -385,18 +394,15 @@ class KubernetesCompute(
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
         pod_spec = get_or_error(pod.spec)
         node = api.read_node(name=get_or_error(pod_spec.node_name))
-        # In the original offer, the resources have already been adjusted according to
-        # the run configuration resource requirements, see get_offers_by_requirements()
-        original_resources = provisioning_data.instance_type.resources
-        instance_offer = get_instance_offer_from_node(
-            node=node,
-            region=cluster.region,
-            cpu_request=original_resources.cpus,
-            memory_mib_request=original_resources.memory_mib,
-            gpu_request=len(original_resources.gpus),
-            disk_mib_request=original_resources.disk.size_mib,
-        )
+        instance_offer = get_instance_offer_from_node(node=node, region=cluster.region)
         if instance_offer is not None:
+            resource_requirements = get_or_error(pod_spec.containers[0].resources)
+            resource_requests = ResourceRequests.from_kubernetes_map(
+                resource_requirements.requests or {}
+            )
+            adjust_resources_by_resource_requests(
+                instance_offer.instance.resources, resource_requests, force=True
+            )
             provisioning_data.instance_type = instance_offer.instance
             provisioning_data.price = instance_offer.price
 
@@ -730,7 +736,7 @@ class KubernetesCompute(
 
 def _get_pod_spec_parameters_for_gpu(
     api: client.CoreV1Api, gpu_spec: GPUSpec
-) -> tuple[str, client.V1NodeAffinity, str]:
+) -> tuple[AnyKubernetesGPUResource, client.V1NodeAffinity, str]:
     nodes = api.list_node().items
     gpu_vendor = gpu_spec.vendor
     # If no vendor specified, we assume it's NVIDIA. Technically, it's possible to request either
@@ -738,10 +744,10 @@ def _get_pod_spec_parameters_for_gpu(
     # but we ignore such configurations as it's hard to translate them to K8s request.
     if gpu_vendor is None or gpu_vendor == AcceleratorVendor.NVIDIA:
         node_affinity = _get_nvidia_gpu_node_affinity(gpu_spec, nodes)
-        return NVIDIA_GPU_RESOURCE, node_affinity, NVIDIA_GPU_NODE_TAINT
+        return KubernetesResource.NVIDIA_GPU, node_affinity, NVIDIA_GPU_NODE_TAINT
     if gpu_vendor == AcceleratorVendor.AMD:
         node_affinity = _get_amd_gpu_node_affinity(gpu_spec, nodes)
-        return AMD_GPU_RESOURCE, node_affinity, AMD_GPU_NODE_TAINT
+        return KubernetesResource.AMD_GPU, node_affinity, AMD_GPU_NODE_TAINT
     raise ComputeError(f"Unsupported GPU vendor: {gpu_vendor}")
 
 
@@ -802,6 +808,14 @@ def _get_amd_gpu_node_affinity(
             ],
         ),
     )
+
+
+def _offer_modifier(
+    resource_requests: ResourceRequests, offer: InstanceOfferWithAvailability
+) -> InstanceOfferWithAvailability:
+    offer_copy = offer.copy(deep=True)
+    adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
+    return offer_copy
 
 
 def _create_jump_pod_service_if_not_exists(
@@ -1103,8 +1117,6 @@ def _create_job_pod(
     requirements: Requirements,
     authorized_keys: list[str],
 ) -> None:
-    resources_requests: dict[str, str] = {}
-    resources_limits: dict[str, str] = {}
     node_affinity: Optional[client.V1NodeAffinity] = None
     tolerations: list[client.V1Toleration] = []
     volumes_: list[client.V1Volume] = []
@@ -1112,18 +1124,14 @@ def _create_job_pod(
     env_vars: list[client.V1EnvVar] = []
 
     resources_spec = requirements.resources
-    assert isinstance(resources_spec.cpu, CPUSpec)
-    if (cpu_min := resources_spec.cpu.count.min) is not None:
-        resources_requests["cpu"] = str(cpu_min)
-    if (cpu_max := resources_spec.cpu.count.max) is not None:
-        resources_limits["cpu"] = str(cpu_max)
-    gpu_spec = resources_spec.gpu
-    if gpu_spec is not None and (gpu_request := get_gpu_request_from_gpu_spec(gpu_spec)) > 0:
+    resource_requests = ResourceRequests.from_resources_spec(resources_spec)
+    resource_limits = ResourceLimits.from_resources_spec(resources_spec)
+    gpu_resource: Optional[AnyKubernetesGPUResource] = None
+    if resource_requests.gpu > 0:
+        gpu_spec = resources_spec.gpu
+        assert gpu_spec is not None
         gpu_resource, node_affinity, node_taint = _get_pod_spec_parameters_for_gpu(api, gpu_spec)
-        logger.debug("Requesting GPU resource: %s=%d", gpu_resource, gpu_request)
-        resources_requests[gpu_resource] = str(gpu_request)
-        # Limit must be set (GPU resources cannot be overcommitted) and must be equal to request.
-        resources_limits[gpu_resource] = str(gpu_request)
+        logger.debug("Requesting GPU resource: %s=%d", gpu_resource, resource_requests.gpu)
         # It should be NoSchedule, but we also add NoExecute toleration just in case.
         for effect in [TaintEffect.NO_SCHEDULE, TaintEffect.NO_EXECUTE]:
             tolerations.append(
@@ -1134,15 +1142,6 @@ def _create_job_pod(
         # into the image (NVIDIA images and images based on them including dstackai/base)
         # See https://github.com/NVIDIA/k8s-device-plugin/issues/61
         env_vars.append(client.V1EnvVar(name="NVIDIA_VISIBLE_DEVICES", value="void"))
-    if (memory_min := resources_spec.memory.min) is not None:
-        resources_requests["memory"] = format_memory(memory_min)
-    if (memory_max := resources_spec.memory.max) is not None:
-        resources_limits["memory"] = format_memory(memory_max)
-    if (disk_spec := resources_spec.disk) is not None:
-        if (disk_min := disk_spec.size.min) is not None:
-            resources_requests["ephemeral-storage"] = format_memory(disk_min)
-        if (disk_max := disk_spec.size.max) is not None:
-            resources_limits["ephemeral-storage"] = format_memory(disk_max)
     if (shm_size := resources_spec.shm_size) is not None:
         shm_volume_name = "dev-shm"
         volumes_.append(
@@ -1249,8 +1248,8 @@ def _create_job_pod(
                         ),
                     ),
                     resources=client.V1ResourceRequirements(
-                        requests=resources_requests,
-                        limits=resources_limits,
+                        requests=resource_requests.to_kubernetes_map(gpu_resource),
+                        limits=resource_limits.to_kubernetes_map(gpu_resource),
                     ),
                     volume_mounts=volume_mounts,
                     env=env_vars,
