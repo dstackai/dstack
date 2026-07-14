@@ -104,11 +104,13 @@ def create_app() -> FastAPI:
         ],
     )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
-    if settings.ENABLE_OTEL_TRACES:
+    if settings.OTEL_TRACES_ENABLED:
         # Must be configured before the app starts serving. In particular,
         # the FastAPI instrumentation has no effect if the app's middleware
-        # stack is already built, which happens on the first ASGI event.
+        # stack is already built, which happens on the first ASGI event (lifespan).
         otel.configure_tracing(app, get_db().engine)
+    if settings.OTEL_LOGS_ENABLED:
+        otel.configure_log_export()
     return app
 
 

@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -6,7 +9,11 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import Decision
 
 from dstack._internal.server.utils import tracing
-from dstack._internal.server.utils.otel.utils import _get_db_span_name, _RootSpanNameSampler
+from dstack._internal.server.utils.otel.utils import (
+    _build_log_handler,
+    _get_db_span_name,
+    _RootSpanNameSampler,
+)
 
 _span_exporter = InMemorySpanExporter()
 
@@ -48,6 +55,35 @@ class TestInstrumentNamedTask:
         assert task_span.name == "task"
         assert task_span.parent is None
         assert task_span.context.trace_id != outer_span.context.trace_id
+
+
+class TestBuildLogHandler:
+    def test_exports_records_with_trace_context(self, span_exporter: InMemorySpanExporter):
+        from opentelemetry.sdk._logs import LoggerProvider
+        from opentelemetry.sdk._logs.export import (
+            InMemoryLogRecordExporter,
+            SimpleLogRecordProcessor,
+        )
+
+        log_exporter = InMemoryLogRecordExporter()
+        logger_provider = LoggerProvider()
+        logger_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
+        logger = logging.getLogger("test_otel_logs")
+        logger.addHandler(_build_log_handler(logger_provider))
+
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("op") as span:
+            logger.warning("something happened")
+        try:
+            logger.error("cancelled", exc_info=asyncio.CancelledError())
+        except Exception:
+            pass
+
+        records = [d.log_record for d in log_exporter.get_finished_logs()]
+        assert len(records) == 1
+        assert records[0].body == "something happened"
+        assert records[0].severity_text == "WARN"
+        assert records[0].trace_id == span.get_span_context().trace_id
 
 
 class TestGetDBSpanName:

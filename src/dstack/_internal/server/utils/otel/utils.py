@@ -1,14 +1,19 @@
+import logging
 import re
 from typing import Optional, Sequence
 
 from fastapi import FastAPI
 from opentelemetry import trace
+from opentelemetry._logs import set_logger_provider
 from opentelemetry.context import Context
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -28,21 +33,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from dstack._internal import settings as core_settings
 from dstack._internal.server import settings
 from dstack._internal.server.utils.common import is_background_task_name
+from dstack._internal.server.utils.logging import AsyncioCancelledErrorFilter
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 def configure_tracing(app: FastAPI, engine: AsyncEngine) -> None:
-    resource = Resource.create(
-        {
-            "service.name": "dstack-server",
-            "service.version": core_settings.DSTACK_VERSION or "dev",
-            "deployment.environment.name": settings.SERVER_ENVIRONMENT,
-        }
-    )
     provider = TracerProvider(
-        resource=resource,
+        resource=_get_resource(),
         sampler=ParentBased(
             root=_RootSpanNameSampler(
                 default_rate=settings.OTEL_TRACES_SAMPLE_RATE,
@@ -58,6 +57,30 @@ def configure_tracing(app: FastAPI, engine: AsyncEngine) -> None:
     HTTPXClientInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     logger.info("OpenTelemetry tracing enabled")
+
+
+def configure_log_export() -> None:
+    logger_provider = LoggerProvider(resource=_get_resource())
+    logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
+    set_logger_provider(logger_provider)
+    logging.getLogger().addHandler(_build_log_handler(logger_provider))
+    logger.info("OpenTelemetry log export enabled")
+
+
+def _get_resource() -> Resource:
+    return Resource.create(
+        {
+            "service.name": "dstack-server",
+            "service.version": core_settings.DSTACK_VERSION or "dev",
+            "deployment.environment.name": settings.SERVER_ENVIRONMENT,
+        }
+    )
+
+
+def _build_log_handler(logger_provider: LoggerProvider) -> logging.Handler:
+    handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
+    handler.addFilter(AsyncioCancelledErrorFilter())
+    return handler
 
 
 def _register_db_span_renaming(engine: Engine) -> None:
