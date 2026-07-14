@@ -104,6 +104,11 @@ def create_app() -> FastAPI:
         ],
     )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
+    if settings.ENABLE_OTEL_TRACES:
+        # Must be configured before the app starts serving. In particular,
+        # the FastAPI instrumentation has no effect if the app's middleware
+        # stack is already built, which happens on the first ASGI event.
+        otel.configure_tracing(app, get_db().engine)
     return app
 
 
@@ -120,8 +125,6 @@ async def lifespan(app: FastAPI):
             profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
             before_send=sentry_utils.AsyncioCancelledErrorFilterEventProcessor(),
         )
-    if settings.ENABLE_OTEL_TRACES:
-        otel.configure_tracing(app, get_db().engine)
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
     asyncio.get_running_loop().set_default_executor(server_executor)
     await migrate()
