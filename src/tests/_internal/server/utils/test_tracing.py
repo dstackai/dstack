@@ -6,7 +6,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import Decision
 
 from dstack._internal.server.utils import tracing
-from dstack._internal.server.utils.otel.utils import _RootSpanNameSampler
+from dstack._internal.server.utils.otel.utils import _get_db_span_name, _RootSpanNameSampler
 
 _span_exporter = InMemorySpanExporter()
 
@@ -48,6 +48,24 @@ class TestInstrumentNamedTask:
         assert task_span.name == "task"
         assert task_span.parent is None
         assert task_span.context.trace_id != outer_span.context.trace_id
+
+
+class TestGetDBSpanName:
+    @pytest.mark.parametrize(
+        ("statement", "expected"),
+        [
+            ("SELECT * FROM instances WHERE id = ?", "SELECT instances"),
+            ("select id\nfrom jobs join runs on ...", "SELECT jobs"),
+            ("INSERT INTO volumes (id) VALUES (?)", "INSERT volumes"),
+            ("UPDATE fleets SET status = ?", "UPDATE fleets"),
+            ('DELETE FROM "users"', "DELETE users"),
+            ("PRAGMA journal_mode=WAL;", "PRAGMA"),
+            ("BEGIN", "BEGIN"),
+            ("", None),
+        ],
+    )
+    def test_returns_expected(self, statement, expected):
+        assert _get_db_span_name(statement) == expected
 
 
 class TestRootSpanNameSampler:

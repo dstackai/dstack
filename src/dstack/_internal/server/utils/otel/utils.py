@@ -1,3 +1,4 @@
+import re
 from typing import Optional, Sequence
 
 from fastapi import FastAPI
@@ -20,6 +21,8 @@ from opentelemetry.sdk.trace.sampling import (
 from opentelemetry.trace import Link, SpanKind
 from opentelemetry.trace.span import TraceState
 from opentelemetry.util.types import Attributes
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from dstack._internal import settings as core_settings
@@ -51,9 +54,46 @@ def configure_tracing(app: FastAPI, engine: AsyncEngine) -> None:
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app)
     SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
+    _register_db_span_renaming(engine.sync_engine)
     HTTPXClientInstrumentor().instrument()
     RequestsInstrumentor().instrument()
     logger.info("OpenTelemetry tracing enabled")
+
+
+def _register_db_span_renaming(engine: Engine) -> None:
+    """Renames DB spans from `<operation> <db name>` to `<operation> <table>`.
+
+    The default names are not useful for trace lists and span metrics:
+    the db name is the same for all spans and is a file path on SQLite.
+    Must be called after the engine is instrumented so that the listener
+    runs after the instrumentation creates the span.
+
+    NOTE: This hack is needed because SQLAlchemyInstrumentor does not provide any hooks
+    to update spans unlike most other instrumentors.
+    """
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _rename_db_span(conn, cursor, statement, parameters, context, executemany):
+        # The instrumentation stores the still-recording span on the execution context
+        span = getattr(context, "_otel_span", None)
+        if span is None or not span.is_recording():
+            return
+        name = _get_db_span_name(statement)
+        if name is not None:
+            span.update_name(name)
+
+
+_DB_TABLE_RE = re.compile(r'\b(?:FROM|INTO|UPDATE|JOIN)\s+["\'`]?(\w+)', re.IGNORECASE)
+
+
+def _get_db_span_name(statement: str) -> Optional[str]:
+    operation = statement.split(None, 1)[0].upper() if statement.split() else None
+    if operation is None:
+        return None
+    match = _DB_TABLE_RE.search(statement)
+    if match is None:
+        return operation
+    return f"{operation} {match.group(1)}"
 
 
 class _RootSpanNameSampler(Sampler):
