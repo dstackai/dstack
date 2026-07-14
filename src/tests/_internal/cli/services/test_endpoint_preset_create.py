@@ -1,26 +1,31 @@
 import asyncio
 import json
+import uuid
 from types import SimpleNamespace
 
 import pytest
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
     ClaudeAuth,
+    EndpointAgentDebugSession,
     EndpointAgentProcessOutput,
     EndpointAgentWorkspace,
 )
 from dstack._internal.cli.services.endpoint_preset_create import (
+    EndpointPresetCreateResult,
     _build_prompt,
     _cleanup_runs,
     _create_endpoint_preset,
     _get_build_name,
+    create_endpoint_preset,
 )
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.endpoint_presets import (
-    get_endpoint_benchmark,
+    get_endpoint_preset_recipe,
     get_running_service_run,
     get_successful_endpoint_report,
 )
@@ -56,7 +61,14 @@ def creation_context(tmp_path, monkeypatch):
         model={"base": "Qwen/Qwen3.5-27B"},
         context_length=8192,
         fleets=["gpu-fleet"],
-        env={"LICENSE": "license-secret"},
+        env={"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
+    )
+    recipe_configuration = EndpointConfiguration(
+        name="qwen-build",
+        model={"base": "Qwen/Qwen3.5-27B"},
+        context_length=8192,
+        fleets=["gpu-fleet"],
+        env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
     )
     monkeypatch.setattr(
         "dstack._internal.cli.services.endpoint_preset_create.get_claude_auth",
@@ -69,6 +81,7 @@ def creation_context(tmp_path, monkeypatch):
     return SimpleNamespace(
         api=api,
         configuration=configuration,
+        recipe_configuration=recipe_configuration,
         run=run,
         run_apis=run_apis,
         store=EndpointPresetStore(tmp_path / "presets"),
@@ -76,6 +89,86 @@ def creation_context(tmp_path, monkeypatch):
 
 
 class TestCreateEndpointPreset:
+    def test_debug_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.setenv("HF_TOKEN", "hf-secret")
+        recipe = get_endpoint_preset_recipe()
+
+        async def create(**kwargs):
+            assert kwargs["configuration"].env.as_dict() == {
+                "HF_TOKEN": "hf-secret",
+                "TOKENIZERS_PARALLELISM": "false",
+            }
+            assert isinstance(kwargs["recipe_configuration"].env["HF_TOKEN"], EnvSentinel)
+            assert kwargs["recipe_configuration"].env["TOKENIZERS_PARALLELISM"] == "false"
+            kwargs["debug_session"].write_prompt("test prompt")
+            return EndpointPresetCreateResult(
+                recipe=recipe,
+                path=tmp_path / "recipe.yaml",
+                final_run_id=uuid.uuid4(),
+                final_run_name="qwen-build-2",
+            )
+
+        def fail_finish(self, recipe_id=None):
+            raise OSError("rename failed")
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            create,
+        )
+        monkeypatch.setattr(EndpointAgentDebugSession, "finish", fail_finish)
+
+        result = create_endpoint_preset(
+            api=SimpleNamespace(),
+            configuration=EndpointConfiguration(
+                name="qwen",
+                model={"base": "Qwen/Qwen3.5-27B"},
+                env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
+            ),
+            store=EndpointPresetStore(tmp_path / "presets"),
+            debug=True,
+        )
+
+        paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
+        assert len(paths) == 1
+        assert paths[0].name.endswith("-running")
+        assert result.recipe == recipe
+        assert {path.name for path in paths[0].iterdir()} == {
+            "endpoint.dstack.yml",
+            "prompt.md",
+            "trace.jsonl",
+        }
+        assert "hf-secret" not in (paths[0] / "endpoint.dstack.yml").read_text()
+        assert "Files remain at" in capsys.readouterr().out
+
+    def test_debug_finalization_does_not_mask_creation_error(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+        async def create(**kwargs):
+            raise RuntimeError("creation failed")
+
+        def fail_finish(self, recipe_id=None):
+            raise OSError("rename failed")
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            create,
+        )
+        monkeypatch.setattr(EndpointAgentDebugSession, "finish", fail_finish)
+
+        with pytest.raises(RuntimeError, match="creation failed"):
+            create_endpoint_preset(
+                api=SimpleNamespace(),
+                configuration=EndpointConfiguration(
+                    name="qwen",
+                    model={"base": "Qwen/Qwen3.5-27B"},
+                ),
+                store=EndpointPresetStore(tmp_path / "presets"),
+                debug=True,
+            )
+
     @pytest.mark.asyncio
     async def test_checks_active_fleets_before_claude_auth(self, tmp_path, monkeypatch):
         api = SimpleNamespace(
@@ -120,6 +213,7 @@ class TestCreateEndpointPreset:
             await _create_endpoint_preset(
                 api=creation_context.api,
                 configuration=creation_context.configuration,
+                recipe_configuration=creation_context.recipe_configuration,
                 store=creation_context.store,
             )
 
@@ -132,15 +226,16 @@ class TestCreateEndpointPreset:
     )
     @pytest.mark.asyncio
     async def test_saves_recipe_and_cleans_up_runs(
-        self, creation_context, monkeypatch, keep_service, stopped_names
+        self, creation_context, monkeypatch, keep_service, stopped_names, tmp_path
     ):
+        debug_path = tmp_path / "debug-running"
+        debug_path.mkdir()
+        (debug_path / "trace.jsonl").touch()
+        debug_session = EndpointAgentDebugSession(path=debug_path, timestamp="20260714-120000Z")
+
         async def run_agent(**kwargs):
-            workspace = kwargs["workspace"]
-            benchmark = get_endpoint_benchmark(
-                run_id=creation_context.run.id,
-                run_name=creation_context.run.run_spec.run_name,
-            )
-            workspace.benchmarks_path.write_text(benchmark.json() + "\n")
+            assert kwargs["debug_session"] is debug_session
+            assert (debug_path / "prompt.md").is_file()
             return EndpointAgentProcessOutput(
                 report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
             )
@@ -152,14 +247,17 @@ class TestCreateEndpointPreset:
         result = await _create_endpoint_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
+            recipe_configuration=creation_context.recipe_configuration,
             store=creation_context.store,
             keep_service=keep_service,
+            debug_session=debug_session,
         )
 
         assert result.recipe.base == "Qwen/Qwen3.5-27B"
         assert result.path.is_file()
         assert creation_context.store.list() == [result.recipe]
         assert "license-secret" not in result.path.read_text()
+        assert result.recipe.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert creation_context.run_apis.stopped_names == stopped_names
 
 

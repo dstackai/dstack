@@ -31,6 +31,7 @@ def apply_endpoint_preset(
     configuration: EndpointConfiguration,
     configuration_path: str,
     recipe_id: Optional[str],
+    profile_name: Optional[str],
     command_args: argparse.Namespace,
     store: EndpointPresetStore,
 ) -> None:
@@ -47,6 +48,7 @@ def apply_endpoint_preset(
 
     configurator = ServiceConfigurator(api_client=api)
     service_args = configurator.get_parser().parse_args([])
+    service_args.profile = profile_name
     selected = _select_plan(
         configuration=configuration,
         configuration_path=configuration_path,

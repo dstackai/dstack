@@ -47,6 +47,10 @@ Set either `DSTACK_AGENT_ANTHROPIC_API_KEY` or
 | `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. |
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. |
 
+Pass `--debug` to save the agent trace under
+`~/.dstack/agent/<endpoint-name>/<timestamp>-<recipe-id>/`. Failed attempts use
+the `-failed` suffix.
+
 ## dstack endpoint preset apply
 
 The `dstack endpoint preset apply` command selects a matching local recipe and

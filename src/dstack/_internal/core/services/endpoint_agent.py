@@ -24,7 +24,6 @@ def format_endpoint_constraints(
     lines = [
         "Fixed endpoint constraints:",
         "- Do not submit any task or service that conflicts with these values.",
-        "- Put applicable fixed constraints into the final service YAML.",
     ]
     for field in ProfileParams.__fields__:
         if field == "fleets":
@@ -36,10 +35,7 @@ def format_endpoint_constraints(
         lines.append(f"- fleets: {', '.join(allowed_fleets)}")
     if configuration.gateway is not None:
         lines.append(f"- gateway: {_format_constraint_value(configuration.gateway)}")
-    lines.append(
-        "- Endpoint env keys available in the agent environment: "
-        + (", ".join(endpoint_env) if endpoint_env else "none")
-    )
+    lines.append("- endpoint_env_keys: " + (", ".join(endpoint_env) if endpoint_env else "none"))
     return "\n".join(lines)
 
 

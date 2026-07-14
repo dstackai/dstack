@@ -13,23 +13,27 @@ from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
 
 import psutil
+import yaml
 from rich.text import Text
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
+from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.utils.common import get_dstack_dir
 from dstack.api import Client
 
 _SKILL_NAMES = ("dstack", "dstack-prototyping")
 _PROGRESS_FILENAME = "progress.jsonl"
 _SUBMISSIONS_FILENAME = "submissions.jsonl"
-_BENCHMARKS_FILENAME = "benchmarks.jsonl"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
 _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+_CLAUDE_STREAM_LIMIT = 16 * 1024 * 1024
 _MAX_RUN_NAME_LENGTH = 41
 _MAX_UNIX_SOCKET_PATH_BYTES = 103
 _INHERITED_ENV_NAMES = (
@@ -91,20 +95,28 @@ class EndpointAgentWorkspace:
         return self.path / _SUBMISSIONS_FILENAME
 
     @property
-    def benchmarks_path(self) -> Path:
-        return self.path / _BENCHMARKS_FILENAME
-
-    @property
     def final_report_path(self) -> Path:
         return self.path / _FINAL_REPORT_FILENAME
 
-    @property
-    def stdout_path(self) -> Path:
-        return self.path / "agent_stdout.jsonl"
+
+@dataclass
+class EndpointAgentDebugSession:
+    path: Path
+    timestamp: str
 
     @property
-    def stderr_path(self) -> Path:
-        return self.path / "agent_stderr.jsonl"
+    def trace_path(self) -> Path:
+        return self.path / "trace.jsonl"
+
+    def write_prompt(self, prompt: str) -> None:
+        _write_private_text(self.path / "prompt.md", prompt + "\n")
+
+    def finish(self, recipe_id: Optional[str] = None) -> Path:
+        suffix = recipe_id or "failed"
+        target = self.path.with_name(f"{self.timestamp}-{suffix}")
+        self.path.rename(target)
+        self.path = target
+        return target
 
 
 @dataclass(frozen=True)
@@ -130,6 +142,27 @@ def endpoint_agent_workspace() -> Iterator[EndpointAgentWorkspace]:
         workspace = EndpointAgentWorkspace(path=root / "w", dstack_home=root / "h")
         _prepare_workspace(workspace)
         yield workspace
+
+
+def create_endpoint_agent_debug_session(
+    configuration: EndpointConfiguration,
+) -> EndpointAgentDebugSession:
+    if configuration.name is None:
+        raise CLIError("Endpoint name is required to save agent debug output")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
+    path = get_dstack_dir() / "agent" / configuration.name / f"{timestamp}-running"
+    path.mkdir(mode=0o700, parents=True)
+    data = json.loads(configuration.json(exclude_none=True))
+    if configuration.env:
+        data["env"] = list(configuration.env)
+    else:
+        data.pop("env", None)
+    _write_private_text(
+        path / "endpoint.dstack.yml",
+        yaml.safe_dump(data, sort_keys=False),
+    )
+    _write_private_text(path / "trace.jsonl", "")
+    return EndpointAgentDebugSession(path=path, timestamp=timestamp)
 
 
 def get_claude_auth() -> ClaudeAuth:
@@ -171,6 +204,14 @@ def build_endpoint_agent_env(
     workspace: EndpointAgentWorkspace,
     token: str,
 ) -> dict[str, str]:
+    config_manager = ConfigManager(workspace.dstack_home / ".dstack")
+    config_manager.configure_project(
+        name=api.project,
+        url=api.client.base_url,
+        token=token,
+        default=True,
+    )
+    config_manager.save()
     env = {name: value for name in _INHERITED_ENV_NAMES if (value := os.getenv(name))}
     env.update(endpoint_env)
     if IS_WINDOWS:
@@ -205,6 +246,7 @@ async def run_endpoint_agent(
     workspace: EndpointAgentWorkspace,
     auth: ClaudeAuth,
     redacted_values: Sequence[str],
+    debug_session: Optional[EndpointAgentDebugSession] = None,
 ) -> EndpointAgentProcessOutput:
     command = _prepare_subprocess_command(_build_claude_command(auth=auth))
     progress_tailer = _ProgressTailer(
@@ -222,6 +264,7 @@ async def run_endpoint_agent(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             start_new_session=not IS_WINDOWS,
+            limit=_CLAUDE_STREAM_LIMIT,
         )
         assert proc.stdin is not None
         assert proc.stdout is not None
@@ -233,17 +276,19 @@ async def run_endpoint_agent(
         stdout_task = asyncio.create_task(
             _read_process_stream(
                 stream=proc.stdout,
-                path=workspace.stdout_path,
+                stream_name="stdout",
                 parse_result=True,
                 redacted_values=redacted_values,
+                debug_session=debug_session,
             )
         )
         stderr_task = asyncio.create_task(
             _read_process_stream(
                 stream=proc.stderr,
-                path=workspace.stderr_path,
+                stream_name="stderr",
                 parse_result=False,
                 redacted_values=redacted_values,
+                debug_session=debug_session,
             )
         )
         stdout_output, stderr_output, returncode = await asyncio.gather(
@@ -334,7 +379,6 @@ def _prepare_workspace(workspace: EndpointAgentWorkspace) -> None:
     for path in [
         workspace.progress_path,
         workspace.submissions_path,
-        workspace.benchmarks_path,
     ]:
         path.touch()
     workspace.bin_path.mkdir()
@@ -488,45 +532,94 @@ def _prepare_subprocess_command(command: list[str]) -> list[str]:
     return [comspec, "/d", "/s", "/c", subprocess.list2cmdline(command)]
 
 
+def _write_private_text(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8")
+    if not IS_WINDOWS:
+        path.chmod(0o600)
+
+
+def _write_debug_trace(
+    session: EndpointAgentDebugSession,
+    *,
+    stream_name: str,
+    text: str,
+    redacted_values: Sequence[str],
+) -> None:
+    timestamp = (
+        datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
+    try:
+        event = _redact_trace_value(json.loads(text), redacted_values)
+        record = {"timestamp": timestamp, "stream": stream_name, "event": event}
+    except json.JSONDecodeError:
+        record = {
+            "timestamp": timestamp,
+            "stream": stream_name,
+            "text": redact(text.rstrip("\r\n"), redacted_values),
+        }
+    line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+    with session.trace_path.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+        f.flush()
+
+
+def _redact_trace_value(value: Any, redacted_values: Sequence[str]) -> Any:
+    if isinstance(value, str):
+        return redact(value, redacted_values)
+    if isinstance(value, list):
+        return [_redact_trace_value(item, redacted_values) for item in value]
+    if isinstance(value, dict):
+        return {
+            redact(key, redacted_values): _redact_trace_value(item, redacted_values)
+            for key, item in value.items()
+        }
+    return value
+
+
 async def _read_process_stream(
     *,
     stream: asyncio.StreamReader,
-    path: Path,
+    stream_name: str,
     parse_result: bool,
     redacted_values: Sequence[str],
+    debug_session: Optional[EndpointAgentDebugSession],
 ) -> EndpointAgentProcessOutput:
     output = EndpointAgentProcessOutput()
-    with path.open("a", encoding="utf-8") as f:
-        while True:
-            line = await stream.readline()
-            if not line:
-                return output
-            text = line.decode(errors="replace")
-            f.write(redact(text, redacted_values))
-            f.flush()
-            if not parse_result:
-                continue
+    while True:
+        line = await stream.readline()
+        if not line:
+            return output
+        text = line.decode(errors="replace")
+        if debug_session is not None:
+            _write_debug_trace(
+                debug_session,
+                stream_name=stream_name,
+                text=text,
+                redacted_values=redacted_values,
+            )
+        if not parse_result:
+            continue
+        try:
+            message = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(message, dict) or message.get("type") != "result":
+            continue
+        if message.get("is_error"):
+            error = message.get("result") or "Claude failed"
+            output.error = redact(str(error), redacted_values)
+        structured_output = message.get("structured_output")
+        if isinstance(structured_output, dict):
+            output.report_data = structured_output
+            continue
+        result = message.get("result")
+        if isinstance(result, str):
             try:
-                message = json.loads(text)
+                parsed = json.loads(result)
             except json.JSONDecodeError:
                 continue
-            if not isinstance(message, dict) or message.get("type") != "result":
-                continue
-            if message.get("is_error"):
-                error = message.get("result") or "Claude failed"
-                output.error = redact(str(error), redacted_values)
-            structured_output = message.get("structured_output")
-            if isinstance(structured_output, dict):
-                output.report_data = structured_output
-                continue
-            result = message.get("result")
-            if isinstance(result, str):
-                try:
-                    parsed = json.loads(result)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(parsed, dict):
-                    output.report_data = parsed
+            if isinstance(parsed, dict):
+                output.report_data = parsed
 
 
 async def _terminate_process(proc: asyncio.subprocess.Process) -> None:

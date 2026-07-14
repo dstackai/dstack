@@ -16,26 +16,35 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
 
 
-def get_endpoint_benchmark(*, run_id=None, run_name: str = "qwen-build-2") -> EndpointBenchmark:
-    return EndpointBenchmark(
-        success=True,
-        run_id=run_id,
-        run_name=run_name,
-        run_type="service",
+def get_endpoint_benchmark(*, verified: bool = True) -> EndpointBenchmark:
+    benchmark = EndpointBenchmark(
         tool="vllm bench serve",
+        tool_version="0.11.0",
         command="vllm bench serve --base-url $SERVICE_URL",
         workload={
-            "dataset_name": "random",
-            "streaming": True,
-            "max_concurrency": 1,
-            "request_rate": "inf",
-            "num_prompts": 16,
+            "api": "chat_completions",
+            "num_requests": 16,
             "input_tokens": 1024,
             "output_tokens": 128,
+            "concurrency": 1,
         },
-        metrics={"output_throughput": 42.1},
-        target=EndpointBenchmarkTarget(type="server-proxy"),
-        client=EndpointBenchmarkClient(type="local"),
+        metrics={
+            "successful_requests": 16,
+            "failed_requests": 0,
+            "duration_seconds": 48.64,
+            "total_input_tokens": 16384,
+            "total_output_tokens": 2048,
+            "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+            "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1},
+        },
+    )
+    if not verified:
+        return benchmark
+    return benchmark.copy(
+        update={
+            "target": EndpointBenchmarkTarget(type="server-proxy"),
+            "client": EndpointBenchmarkClient(type="local"),
+        }
     )
 
 
@@ -70,7 +79,7 @@ def get_endpoint_preset_recipe(
         validations=[
             EndpointPresetValidation(
                 replicas=[EndpointPresetValidationReplica(resources=[resources])],
-                benchmarks=[get_endpoint_benchmark()],
+                benchmark=get_endpoint_benchmark(),
             )
         ],
     )
@@ -91,7 +100,7 @@ def get_running_service_run() -> Run:
             "backends": ["verda"],
             "spot_policy": "auto",
             "max_price": 0.5,
-            "env": {"LICENSE": "license-secret"},
+            "env": {"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
             "resources": {"gpu": "40GB..48GB:1"},
         }
     )
@@ -134,4 +143,5 @@ def get_successful_endpoint_report(run: Run) -> AgentFinalReport:
         base="Qwen/Qwen3.5-27B",
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=32768,
+        benchmark=get_endpoint_benchmark(verified=False),
     )

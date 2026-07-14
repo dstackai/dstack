@@ -1,9 +1,11 @@
 import argparse
 import os
+from pathlib import Path
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import BaseCommand
+from dstack._internal.cli.models.endpoint import EndpointPresetListOutput
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.endpoint_preset_apply import apply_endpoint_preset
 from dstack._internal.cli.services.endpoint_preset_create import create_endpoint_preset
@@ -11,13 +13,15 @@ from dstack._internal.cli.services.endpoint_presets import (
     EndpointPresetStore,
     load_endpoint_configuration,
 )
+from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.endpoint_presets import print_endpoint_presets
-from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.endpoints import EndpointConfiguration
-from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack.api import Client
+from dstack.api.utils import load_profile
 
 
 class EndpointCommand(BaseCommand):
@@ -38,6 +42,7 @@ class EndpointCommand(BaseCommand):
             help="Manage endpoint presets",
             formatter_class=self._parser.formatter_class,
         )
+        _add_list_args(preset_parser)
         preset_parser.set_defaults(subfunc=self._list)
         preset_subparsers = preset_parser.add_subparsers(dest="preset_action")
 
@@ -46,7 +51,7 @@ class EndpointCommand(BaseCommand):
             help="List endpoint presets",
             formatter_class=self._parser.formatter_class,
         )
-        list_parser.add_argument("-v", "--verbose", action="store_true")
+        _add_list_args(list_parser)
         list_parser.set_defaults(subfunc=self._list)
 
         create_parser = preset_subparsers.add_parser(
@@ -55,10 +60,16 @@ class EndpointCommand(BaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         _add_configuration_args(create_parser)
+        register_profile_args(create_parser)
         create_parser.add_argument(
             "--keep-service",
             action="store_true",
             help="Leave the verified service running",
+        )
+        create_parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Save the agent trace",
         )
         create_parser.set_defaults(subfunc=self._create)
 
@@ -68,6 +79,7 @@ class EndpointCommand(BaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         _add_configuration_args(apply_parser)
+        register_profile_args(apply_parser)
         apply_parser.add_argument("--recipe", metavar="ID", help="The recipe ID to use")
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -114,20 +126,21 @@ class EndpointCommand(BaseCommand):
             exit(0)
 
     def _list(self, args: argparse.Namespace) -> None:
-        print_endpoint_presets(
-            EndpointPresetStore().list(),
-            verbose=getattr(args, "verbose", False),
-        )
+        recipes = EndpointPresetStore().list()
+        if getattr(args, "json", False):
+            print(EndpointPresetListOutput(recipes=recipes).json())
+            return
+        print_endpoint_presets(recipes, verbose=getattr(args, "verbose", False))
 
     def _create(self, args: argparse.Namespace) -> None:
         _, configuration = load_endpoint_configuration(args.configuration_file)
-        _apply_name(configuration, args.name)
-        _resolve_endpoint_env(configuration)
+        configuration = _get_effective_configuration(configuration, args)
         result = create_endpoint_preset(
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             store=EndpointPresetStore(),
             keep_service=args.keep_service,
+            debug=args.debug,
         )
         console.print(
             f"Endpoint preset recipe [code]{result.recipe.id}[/] for "
@@ -138,12 +151,13 @@ class EndpointCommand(BaseCommand):
 
     def _apply(self, args: argparse.Namespace) -> None:
         configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
-        _apply_name(configuration, args.name)
+        configuration = _get_effective_configuration(configuration, args)
         apply_endpoint_preset(
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             configuration_path=configuration_path,
             recipe_id=args.recipe or configuration.recipe,
+            profile_name=args.profile,
             command_args=args,
             store=EndpointPresetStore(),
         )
@@ -200,6 +214,15 @@ def _add_configuration_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_list_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output in JSON format",
+    )
+
+
 def _apply_name(configuration: EndpointConfiguration, name: str | None) -> None:
     if name is not None:
         configuration.name = name
@@ -209,11 +232,14 @@ def _apply_name(configuration: EndpointConfiguration, name: str | None) -> None:
         raise CLIError("Endpoint name must match '^[a-z][a-z0-9-]{1,40}$'")
 
 
-def _resolve_endpoint_env(configuration: EndpointConfiguration) -> None:
-    for key, value in configuration.env.items():
-        if not isinstance(value, EnvSentinel):
-            continue
-        try:
-            configuration.env[key] = value.from_env(os.environ)
-        except ValueError as e:
-            raise ConfigurationError(str(e)) from e
+def _get_effective_configuration(
+    configuration: EndpointConfiguration,
+    args: argparse.Namespace,
+) -> EndpointConfiguration:
+    _apply_name(configuration, args.name)
+    profile = load_profile(Path.cwd(), args.profile)
+    for field in ProfileParams.__fields__:
+        if getattr(configuration, field) is None:
+            setattr(configuration, field, getattr(profile, field))
+    apply_profile_args(args, configuration)
+    return EndpointConfiguration.parse_obj(configuration.dict())

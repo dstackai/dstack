@@ -97,16 +97,17 @@ Use `dstack endpoint preset` to list existing presets:
 
 ```shell
 $ dstack endpoint preset list
- MODEL                       GPU
+ MODEL                       GPU                    CONTEXT  BENCHMARK
  Qwen/Qwen2.5-7B-Instruct
-    recipe=8f3a12c4          L4:24GB:1..
+    recipe=8f3a12c4          nvidia:16GB..24GB:1.. 32K      L4:24GB:1 n=32 c=4 1K->128 464 tok/s TTFT p50=312ms
 ```
 
 </div>
 
 Each base model corresponds to one preset. A preset may contain multiple recipes built for specific hardware. Each recipe includes benchmark data.
 
-Pass `-v` to include the full service resources and verified context length.
+Pass `-v` to include validation resources and all benchmark metrics, or `--json`
+to output complete recipe objects.
 
 ## Apply a preset
 

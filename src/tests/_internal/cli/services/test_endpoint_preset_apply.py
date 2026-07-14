@@ -122,10 +122,12 @@ class TestSelectPlan:
             ),
             configuration_path="endpoint.dstack.yml",
             recipe_id=None,
+            profile_name="gpu",
             command_args=command_args,
             store=Mock(list=Mock(return_value=[recipe])),
         )
 
+        assert configurator.get_parser.return_value.parse_args.return_value.profile == "gpu"
         configurator.apply_prepared_configuration.assert_called_once_with(
             prepared=prepared,
             command_args=command_args,

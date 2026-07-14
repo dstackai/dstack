@@ -1,6 +1,5 @@
 import hashlib
 import json
-import re
 from typing import Any
 
 import gpuhunt
@@ -18,8 +17,6 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import format_mib_as_gb
 
-_SECRET_ENV_PATTERN = re.compile(r"(token|key|secret|password)", re.IGNORECASE)
-
 
 def build_endpoint_preset_recipe(
     *,
@@ -28,7 +25,7 @@ def build_endpoint_preset_recipe(
     base_model: str,
     recipe_model: str,
     context_length: int,
-    benchmarks: list[EndpointBenchmark],
+    benchmark: EndpointBenchmark,
 ) -> EndpointPresetRecipe:
     service = service.copy(deep=True)
     service.name = None
@@ -37,7 +34,7 @@ def build_endpoint_preset_recipe(
         setattr(service, field, None)
     validation = EndpointPresetValidation(
         replicas=validation_replicas,
-        benchmarks=benchmarks,
+        benchmark=benchmark,
     )
     set_service_gpu_vendors_from_validations(service, [validation])
     return EndpointPresetRecipe(
@@ -148,15 +145,9 @@ def set_service_gpu_vendors_from_validations(
 
 
 def _env_item_to_preset_data(key: str, value: str | EnvSentinel) -> str:
-    if isinstance(value, EnvSentinel) or _is_secret_like_env(key, value):
+    if isinstance(value, EnvSentinel):
         return key
     return f"{key}={value}"
-
-
-def _is_secret_like_env(key: str, value: str | EnvSentinel) -> bool:
-    if _SECRET_ENV_PATTERN.search(key):
-        return True
-    return isinstance(value, str) and _SECRET_ENV_PATTERN.search(value) is not None
 
 
 def _get_validation_group_gpu_vendor(

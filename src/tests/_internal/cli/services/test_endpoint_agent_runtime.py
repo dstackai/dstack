@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import shutil
 import subprocess
@@ -7,9 +8,11 @@ from types import SimpleNamespace
 
 import psutil
 import pytest
+import yaml
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
     ClaudeAuth,
+    EndpointAgentDebugSession,
     EndpointAgentWorkspace,
     _build_claude_command,
     _prepare_subprocess_command,
@@ -17,12 +20,15 @@ from dstack._internal.cli.services.endpoint_agent_runtime import (
     _terminate_process,
     build_endpoint_agent_env,
     contains_redacted_value,
+    create_endpoint_agent_debug_session,
     endpoint_agent_workspace,
     get_claude_auth,
     run_endpoint_agent,
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.services.configs import ConfigManager
 
 pytestmark = pytest.mark.windows
 
@@ -104,6 +110,11 @@ class TestAgentIsolation:
         assert env["DSTACK_TOKEN"] == "dstack-secret"
         assert env["HF_TOKEN"] == "hf-secret"
         assert "UNRELATED_SECRET" not in env
+        project = ConfigManager(tmp_path / "home" / ".dstack").get_project_config()
+        assert project is not None
+        assert project.name == "main"
+        assert project.url == "http://127.0.0.1:3000"
+        assert project.token == "dstack-secret"
 
     def test_creates_private_cli_home_and_dstack_wrapper(self):
         with endpoint_agent_workspace() as workspace:
@@ -136,9 +147,36 @@ class TestAgentIsolation:
         )
 
 
+class TestAgentDebugSession:
+    def test_saves_effective_configuration_without_env_values(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        configuration = EndpointConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3.5-27B"},
+            max_price=0.5,
+            env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
+        )
+
+        success_session = create_endpoint_agent_debug_session(configuration)
+        data = yaml.safe_load((success_session.path / "endpoint.dstack.yml").read_text())
+
+        assert success_session.path.parent == tmp_path / ".dstack" / "agent" / "qwen"
+        assert success_session.path.name.endswith("-running")
+        assert data["max_price"] == 0.5
+        assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
+        assert "false" not in (success_session.path / "endpoint.dstack.yml").read_text()
+        success_path = success_session.finish("8f3a12c4")
+        assert success_path.name.endswith("-8f3a12c4")
+
+        failed_session = create_endpoint_agent_debug_session(configuration)
+        failed_path = failed_session.finish()
+        assert failed_path.name.endswith("-failed")
+
+
 class TestAgentOutput:
     @pytest.mark.asyncio
-    async def test_sends_prompt_and_redacts_raw_output(self, tmp_path, monkeypatch):
+    async def test_sends_prompt_and_redacts_raw_output(self, tmp_path, monkeypatch, capsys):
         script = tmp_path / "fake_claude.py"
         script.write_text(
             """import json
@@ -149,6 +187,7 @@ print(json.dumps({
     "type": "result",
     "is_error": True,
     "result": "bad secret-token",
+    "secret-token": "must be redacted",
     "structured_output": {"prompt": prompt},
 }))
 """
@@ -160,17 +199,57 @@ print(json.dumps({
         )
 
         workspace = EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        debug_path = tmp_path / "debug-running"
+        debug_path.mkdir()
+        (debug_path / "trace.jsonl").touch()
+        debug_session = EndpointAgentDebugSession(path=debug_path, timestamp="20260714-120000Z")
         output = await run_endpoint_agent(
             prompt="full endpoint prompt",
             env=os.environ.copy(),
             workspace=workspace,
             auth=_claude_auth(),
             redacted_values=("secret-token",),
+            debug_session=debug_session,
         )
 
         assert output.report_data == {"prompt": "full endpoint prompt"}
         assert output.error == "bad [redacted]"
-        assert "secret-token" not in workspace.stdout_path.read_text()
+        trace = [json.loads(line) for line in debug_session.trace_path.read_text().splitlines()]
+        assert len(trace) == 1
+        assert trace[0]["timestamp"].endswith("Z")
+        assert trace[0]["stream"] == "stdout"
+        assert trace[0]["event"]["result"] == "bad [redacted]"
+        assert "[redacted]" in trace[0]["event"]
+        assert capsys.readouterr().out == ""
+
+    @pytest.mark.asyncio
+    async def test_accepts_stream_event_larger_than_64_kib(self, tmp_path, monkeypatch):
+        script = tmp_path / "fake_claude.py"
+        script.write_text(
+            """import json
+
+print(json.dumps({
+    "type": "result",
+    "structured_output": {"value": "x" * (128 * 1024)},
+}))
+"""
+        )
+        (tmp_path / "progress.jsonl").touch()
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoint_agent_runtime._build_claude_command",
+            lambda **_: [sys.executable, str(script)],
+        )
+
+        output = await run_endpoint_agent(
+            prompt="prompt",
+            env=os.environ.copy(),
+            workspace=EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
+            auth=_claude_auth(),
+            redacted_values=(),
+        )
+
+        assert output.report_data is not None
+        assert len(output.report_data["value"]) == 128 * 1024
 
     def test_progress_stream_prints_only_redacted_messages(self, tmp_path, capsys):
         progress_path = tmp_path / "progress.jsonl"

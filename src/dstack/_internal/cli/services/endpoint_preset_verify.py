@@ -14,7 +14,6 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.endpoint_agent import AgentFinalReport
 from dstack._internal.core.models.endpoint_presets import (
-    EndpointBenchmark,
     EndpointBenchmarkClient,
     EndpointBenchmarkTarget,
     EndpointPresetRecipe,
@@ -57,40 +56,11 @@ def load_endpoint_agent_report(
     return report
 
 
-def load_endpoint_benchmarks(
-    workspace: EndpointAgentWorkspace,
-    *,
-    report: AgentFinalReport,
-) -> list[EndpointBenchmark]:
-    path = workspace.benchmarks_path
-    if not path.exists():
-        raise CLIError(f"{path.name} is missing")
-    benchmarks: list[EndpointBenchmark] = []
-    for line_num, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            benchmark = EndpointBenchmark.parse_raw(line)
-        except (ValidationError, ValueError) as e:
-            raise CLIError(f"{path.name} line {line_num} is invalid") from e
-        if benchmark.run_name != report.run_name:
-            continue
-        if benchmark.run_id is not None and benchmark.run_id != report.run_id:
-            continue
-        benchmarks.append(benchmark)
-    if not benchmarks:
-        raise CLIError("Claude did not benchmark the final service run")
-    if any(not benchmark.success for benchmark in benchmarks):
-        raise CLIError("Claude reported a failed benchmark for the final service run")
-    return benchmarks
-
-
 def build_verified_endpoint_preset(
     *,
     run: Run,
     endpoint_configuration: EndpointConfiguration,
     report: AgentFinalReport,
-    benchmarks: list[EndpointBenchmark],
 ) -> EndpointPresetRecipe:
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
@@ -104,6 +74,7 @@ def build_verified_endpoint_preset(
     assert report.base is not None
     assert report.model is not None
     assert report.context_length is not None
+    assert report.benchmark is not None
     if endpoint_configuration.model.allows_variant_selection:
         if report.base != endpoint_configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the endpoint request")
@@ -118,27 +89,24 @@ def build_verified_endpoint_preset(
     target_type = (
         "gateway" if urlparse(run.service.url).scheme in {"http", "https"} else "server-proxy"
     )
-    benchmarks = [
-        benchmark.copy(
-            update={
-                "target": EndpointBenchmarkTarget(type=target_type),
-                "client": EndpointBenchmarkClient(type="local"),
-            }
-        )
-        for benchmark in benchmarks
-    ]
+    benchmark = report.benchmark.copy(
+        update={
+            "target": EndpointBenchmarkTarget(type=target_type),
+            "client": EndpointBenchmarkClient(type="local"),
+        }
+    )
     portable_service = service.copy(deep=True)
     # The CLI resolved endpoint env references before submission; presets retain the references.
-    for key in endpoint_configuration.env:
-        if key in portable_service.env:
-            portable_service.env[key] = EnvSentinel(key=key)
+    for key, value in endpoint_configuration.env.items():
+        if isinstance(value, EnvSentinel) and key in portable_service.env:
+            portable_service.env[key] = value
     return build_endpoint_preset_recipe(
         service=portable_service,
         validation_replicas=_get_validation_replicas(run, service),
         base_model=report.base,
         recipe_model=report.model,
         context_length=report.context_length,
-        benchmarks=benchmarks,
+        benchmark=benchmark,
     )
 
 

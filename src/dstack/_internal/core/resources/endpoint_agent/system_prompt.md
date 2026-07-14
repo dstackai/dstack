@@ -220,39 +220,51 @@ it as `final_report.json.context_length`.
 
 # Benchmark
 
-Run one bounded benchmark using the same absolute dstack service URL and bearer
-authentication used for final service verification. Do not benchmark localhost.
-Run the benchmark client on the agent host, not inside the final service run.
+Send benchmark requests to the final service run's absolute dstack service URL
+using the bearer authentication used for service verification. Do not send them
+to a server used during task prototyping or an SSH-forwarded local port.
 
-Use the serving framework's benchmark tool when applicable; otherwise use
-another trusted benchmark tool. Do not create or download a custom dataset.
+Run one benchmark with streaming responses. Choose a benchmark tool and workload
+that can produce every required field below.
 
-Write benchmark results to `benchmarks.jsonl`. Each line must include
-`success`, `run_name`, `run_type: service`, `tool`, `command`, `workload`, and
-either `metrics` or `failure_summary`.
-
-`tool` identifies the benchmark entrypoint without its version or arguments,
-for example `vllm bench serve`. Put its version in `tool_version` and the exact
-invocation in `command`.
-
-Configure and record an explicit maximum concurrency. `workload` must include
-`dataset_name`, `streaming`, `max_concurrency`, `request_rate`, `num_prompts`,
-`input_tokens`, and `output_tokens`. It may also include `ignore_eos` and
-`random_range_ratio`.
-
-Example format (values are illustrative):
+Report the benchmark as `final_report.json.benchmark` using exactly the
+following structure and field names (values are illustrative):
 
 ```json
-{"success":true,"run_name":"endpoint-1","run_type":"service","tool":"vllm bench serve","tool_version":"0.11.0","command":"vllm bench serve ...","workload":{"dataset_name":"random","streaming":true,"max_concurrency":1,"request_rate":"inf","num_prompts":16,"input_tokens":1024,"output_tokens":128},"metrics":{"completed":16,"output_throughput":42.1,"mean_ttft_ms":110.9,"p99_ttft_ms":121.6}}
+{
+  "tool": "vllm bench serve",
+  "tool_version": "0.11.0",
+  "command": "vllm bench serve ...",
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 1},
+  "metrics": {
+    "successful_requests": 16, "failed_requests": 0, "duration_seconds": 4.0,
+    "total_input_tokens": 16384, "total_output_tokens": 2048,
+    "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+    "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1}
+  }
+}
 ```
 
-Set `success` to `true` only when every benchmark request succeeds.
+Set `tool` to the command name and subcommands, without options or values (for
+example, `vllm bench serve`). Set `tool_version` to the exact version and
+`command` to the secret-free invocation. `api` must be `chat_completions` or
+`completions`. `num_requests` is the number of measured requests;
+`input_tokens` and `output_tokens` are the selected per-request lengths; and
+`concurrency` is the maximum number of simultaneous requests.
 
-Do not invent missing metrics or percentiles.
+Calculate all metrics from the `num_requests` benchmark requests only. Exclude
+setup, health-check, and warmup requests. `successful_requests` and
+`failed_requests` are request counts; all requests must succeed.
+`duration_seconds` is the elapsed wall-clock time from starting the first
+measured request until the last measured request completes. `total_input_tokens`
+and `total_output_tokens` are actual measured token totals. `ttft_ms` is the
+time-to-first-token distribution across requests. `tpot_ms` is the
+time-per-output-token distribution: for each request, divide the time from the
+first output token to the last by one less than the actual output token count.
+For both distributions, `mean`, `p50`, and `p99` are the arithmetic mean, 50th
+percentile, and 99th percentile. Do not invent missing values.
 
-Choose the workload before starting the benchmark and do not retry with a
-different workload. If benchmarking fails, write a failed benchmark record and
-a failed `final_report.json`.
+If benchmarking fails, write a failed `final_report.json`.
 
 Do not write a successful `final_report.json` until the final service answers a
 request using `service_model_name` from `Endpoint context:` through the dstack
@@ -264,14 +276,12 @@ The dstack CLI is already configured. Do not inspect `~/.dstack/config.yml` or
 print, copy, or summarize tokens, secrets, or environment variable values.
 
 Do not expose the value of `DSTACK_TOKEN`, `DSTACK_ENDPOINT_BEARER_TOKEN`, or
-the value of any environment variable named by `Endpoint env keys available in
-the agent environment:` under `Fixed endpoint constraints:`.
+the value of any environment variable listed under `endpoint_env_keys` in
+`Fixed endpoint constraints:`.
 
-Do not put secret values in `final_report.json` or `benchmarks.jsonl`, and do
-not print them because stdout and stderr are stored in `agent_stdout.jsonl` and
-`agent_stderr.jsonl`. Use env references in `final_report.json.service_yaml`;
-use environment variable names or redacted values in
-`benchmarks.jsonl.command`.
+Do not put secret values in `final_report.json` or print them. Use env
+references in `final_report.json.service_yaml`; use environment variable names or redacted values in
+`final_report.json.benchmark.command`.
 
 # Resume
 
@@ -282,14 +292,20 @@ the next run number and record why the old run is not enough.
 
 # Final Report
 
-On success, write `final_report.json`, then return the structured final report.
-The successful report must include:
+`final_report.json` may contain only `success`, `run_id`, `run_name`,
+`service_yaml`, `base`, `model`, `context_length`, `benchmark`, and
+`failure_summary`.
 
-- `final_report.json.base`: the base model repo for the deployed model
-- `final_report.json.model`: the exact repo/path loaded by the final service
-  command
-- `final_report.json.context_length`: the context length verified for the final
-  service
+On success, include exactly:
+
+- `success`: `true`
+- `run_id`: the final verified service run ID
+- `run_name`: the final verified service run name
+- `service_yaml`: the full reusable service YAML described in `# Final Service`
+- `base`: the base model repo, determined by the rules below
+- `model`: the exact repo/path loaded by the final service command
+- `context_length`: the context length verified for the final service
+- `benchmark`: the final service benchmark described in `# Benchmark`
 
 Set `final_report.json.base` as follows:
 
@@ -301,12 +317,16 @@ Set `final_report.json.base` as follows:
   `model_repo`.
 - Do not infer `final_report.json.base` only from the repo name.
 
-On failure, write `final_report.json` with a useful
-`final_report.json.failure_summary`, then return the structured final report.
+On failure, include exactly:
 
-`final_report.json` must contain only the schema fields: `success`, `run_id`,
-`run_name`, `service_yaml`, `base`, `model`, `context_length`, and
-`failure_summary`.
+- `success`: `false`
+- `failure_summary`: the reason a preset could not be created and any change
+  required from the user or administrator
+
+Write the report to `final_report.json`, then submit the identical JSON object
+through `StructuredOutput`.
+
+Verify that `final_report.json` is correct and matches the required schema.
 
 Stop after one correct service is verified and benchmarked. P/D disaggregation
 is not covered by the current endpoint agent or `/dstack-prototyping` skill.

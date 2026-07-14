@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import secrets
 import uuid
 from contextlib import suppress
@@ -8,9 +9,11 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
+    EndpointAgentDebugSession,
     EndpointAgentWorkspace,
     build_endpoint_agent_env,
     contains_redacted_value,
+    create_endpoint_agent_debug_session,
     endpoint_agent_workspace,
     get_claude_auth,
     get_redacted_values,
@@ -21,13 +24,14 @@ from dstack._internal.cli.services.endpoint_agent_runtime import (
 from dstack._internal.cli.services.endpoint_preset_verify import (
     build_verified_endpoint_preset,
     load_endpoint_agent_report,
-    load_endpoint_benchmarks,
 )
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.core.errors import CLIError
+from dstack._internal.cli.utils.common import warn
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.endpoint_agent import AgentFinalReport
 from dstack._internal.core.models.endpoint_presets import EndpointPresetRecipe
 from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.services.endpoint_agent import (
     format_endpoint_constraints,
@@ -54,16 +58,30 @@ def create_endpoint_preset(
     store: EndpointPresetStore,
     keep_service: bool = False,
     build_name: Optional[str] = None,
+    debug: bool = False,
 ) -> EndpointPresetCreateResult:
-    return asyncio.run(
-        _create_endpoint_preset(
-            api=api,
-            configuration=configuration,
-            store=store,
-            keep_service=keep_service,
-            build_name=build_name,
+    debug_session = create_endpoint_agent_debug_session(configuration) if debug else None
+    try:
+        resolved_configuration = _resolve_endpoint_env(configuration)
+        result = asyncio.run(
+            _create_endpoint_preset(
+                api=api,
+                configuration=resolved_configuration,
+                recipe_configuration=configuration,
+                store=store,
+                keep_service=keep_service,
+                build_name=build_name,
+                debug_session=debug_session,
+            )
         )
-    )
+    except BaseException:
+        if debug_session is not None:
+            with suppress(Exception):
+                _finish_debug_session(debug_session)
+        raise
+    if debug_session is not None:
+        _finish_debug_session(debug_session, result.recipe.id)
+    return result
 
 
 async def _create_endpoint_preset(
@@ -71,9 +89,12 @@ async def _create_endpoint_preset(
     api: Client,
     configuration: EndpointConfiguration,
     store: EndpointPresetStore,
+    recipe_configuration: Optional[EndpointConfiguration] = None,
     keep_service: bool = False,
     build_name: Optional[str] = None,
+    debug_session: Optional[EndpointAgentDebugSession] = None,
 ) -> EndpointPresetCreateResult:
+    recipe_configuration = recipe_configuration or configuration
     build_name = build_name or _get_build_name(configuration.name)
     allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
@@ -110,6 +131,8 @@ async def _create_endpoint_preset(
             build_name=build_name,
             allowed_fleets=allowed_fleets,
         )
+        if debug_session is not None:
+            debug_session.write_prompt(prompt)
         print_endpoint_progress(
             f"Starting endpoint preset creation for {configuration.model.api_model_name}. "
             f"Allowed fleets: {', '.join(allowed_fleets)}."
@@ -121,19 +144,18 @@ async def _create_endpoint_preset(
                 workspace=workspace,
                 auth=auth,
                 redacted_values=redacted_values,
+                debug_session=debug_session,
             )
             report = load_endpoint_agent_report(
                 output=process_output,
                 workspace=workspace,
                 redacted_values=redacted_values,
             )
-            benchmarks = load_endpoint_benchmarks(workspace, report=report)
             run = api.client.runs.get(api.project, report.run_name)
             recipe = build_verified_endpoint_preset(
                 run=run,
-                endpoint_configuration=configuration,
+                endpoint_configuration=recipe_configuration,
                 report=report,
-                benchmarks=benchmarks,
             )
             if contains_redacted_value(endpoint_preset_recipe_to_data(recipe), redacted_values):
                 raise CLIError("Generated endpoint preset contains a secret value")
@@ -176,6 +198,28 @@ async def _create_endpoint_preset(
         final_run_id=report.run_id,
         final_run_name=report.run_name,
     )
+
+
+def _resolve_endpoint_env(configuration: EndpointConfiguration) -> EndpointConfiguration:
+    configuration = configuration.copy(deep=True)
+    for key, value in configuration.env.items():
+        if not isinstance(value, EnvSentinel):
+            continue
+        try:
+            configuration.env[key] = value.from_env(os.environ)
+        except ValueError as e:
+            raise ConfigurationError(str(e)) from e
+    return configuration
+
+
+def _finish_debug_session(
+    session: EndpointAgentDebugSession,
+    recipe_id: Optional[str] = None,
+) -> None:
+    try:
+        session.finish(recipe_id)
+    except OSError as e:
+        warn(f"Could not finalize agent debug output. Files remain at {session.path}: {e}")
 
 
 def _get_build_name(endpoint_name: Optional[str]) -> str:

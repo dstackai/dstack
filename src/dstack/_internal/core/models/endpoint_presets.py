@@ -1,6 +1,5 @@
 import re
-import uuid
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Literal, Optional
 
 from pydantic import (
     Field,
@@ -18,21 +17,27 @@ from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
 
 
 class EndpointBenchmarkWorkload(CoreModel):
-    dataset_name: str
-    streaming: bool
-    max_concurrency: PositiveInt
-    request_rate: Optional[Union[Literal["inf"], PositiveFloat]] = None
-    num_prompts: PositiveInt
+    api: Literal["chat_completions", "completions"]
+    num_requests: PositiveInt
     input_tokens: PositiveInt
-    output_tokens: PositiveInt
-    ignore_eos: Optional[bool] = None
-    random_range_ratio: Annotated[Optional[float], Field(ge=0, le=1)] = None
+    output_tokens: Annotated[int, Field(ge=2)]
+    concurrency: PositiveInt
 
-    @validator("dataset_name")
-    def validate_dataset_name(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("dataset_name must be non-empty")
-        return value
+
+class EndpointBenchmarkLatency(CoreModel):
+    mean: Annotated[float, Field(ge=0)]
+    p50: Annotated[float, Field(ge=0)]
+    p99: Annotated[float, Field(ge=0)]
+
+
+class EndpointBenchmarkMetrics(CoreModel):
+    successful_requests: Annotated[int, Field(ge=0)]
+    failed_requests: Annotated[int, Field(ge=0)]
+    duration_seconds: PositiveFloat
+    total_input_tokens: Annotated[int, Field(ge=0)]
+    total_output_tokens: Annotated[int, Field(ge=0)]
+    ttft_ms: EndpointBenchmarkLatency
+    tpot_ms: EndpointBenchmarkLatency
 
 
 class EndpointBenchmarkTarget(CoreModel):
@@ -44,20 +49,15 @@ class EndpointBenchmarkClient(CoreModel):
 
 
 class EndpointBenchmark(CoreModel):
-    success: bool
-    run_name: str
-    run_type: Literal["service"]
     tool: str
+    tool_version: str
     command: str
     workload: EndpointBenchmarkWorkload
-    metrics: Optional[dict[str, Any]] = None
-    failure_summary: Optional[str] = None
-    run_id: Optional[uuid.UUID] = None
-    tool_version: Optional[str] = None
+    metrics: EndpointBenchmarkMetrics
     target: Optional[EndpointBenchmarkTarget] = None
     client: Optional[EndpointBenchmarkClient] = None
 
-    @validator("run_name", "tool", "command")
+    @validator("tool", "tool_version", "command")
     def validate_non_empty(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("value must be non-empty")
@@ -72,13 +72,14 @@ class EndpointBenchmark(CoreModel):
             raise ValueError("command must not contain a bearer token value")
         return value
 
-    @root_validator
-    def validate_result(cls, values: dict) -> dict:
-        if values.get("success"):
-            if not values.get("metrics"):
-                raise ValueError("successful benchmark must include metrics")
-        elif not values.get("failure_summary"):
-            raise ValueError("failed benchmark must include failure_summary")
+    @root_validator(skip_on_failure=True)
+    def validate_metrics(cls, values: dict) -> dict:
+        metrics = values.get("metrics")
+        workload = values.get("workload")
+        if metrics.failed_requests != 0:
+            raise ValueError("benchmark must not include failed requests")
+        if metrics.successful_requests != workload.num_requests:
+            raise ValueError("benchmark request count must match workload.num_requests")
         return values
 
 
@@ -90,7 +91,7 @@ class EndpointPresetValidationReplica(CoreModel):
 class EndpointPresetValidation(CoreModel):
     replicas: list[EndpointPresetValidationReplica]
     """Ordered to match `ServiceConfiguration.replica_groups`."""
-    benchmarks: list[EndpointBenchmark] = Field(default_factory=list)
+    benchmark: EndpointBenchmark
 
 
 class EndpointPresetRecipe(CoreModel):
@@ -131,14 +132,7 @@ class EndpointPresetRecipe(CoreModel):
                 raise ValueError(
                     "preset validation replicas must match service replica group order"
                 )
-            if not validation.benchmarks or any(
-                not benchmark.success for benchmark in validation.benchmarks
-            ):
-                raise ValueError("preset validation must include a successful benchmark")
-            if any(
-                benchmark.target is None or benchmark.client is None
-                for benchmark in validation.benchmarks
-            ):
+            if validation.benchmark.target is None or validation.benchmark.client is None:
                 raise ValueError("preset benchmark must specify target and client")
             for replica_group in validation.replicas:
                 if not replica_group.resources:
