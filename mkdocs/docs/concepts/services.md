@@ -1069,6 +1069,8 @@ commands:
 
 </div>
 
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
+
 ### Environment variables
 
 <div editor-title=".dstack.yml">

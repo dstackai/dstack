@@ -188,6 +188,26 @@ Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g.,
                 optional: true
         ```
 
+## dstack in dstack
+
+Set `dstack` to `true` when a run needs to use the dstack CLI. dstack configures the server and current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+image: dstackai/dstack
+dstack: true
+env:
+  - DSTACK_TOKEN
+commands:
+  - dstack ps
+```
+
+</div>
+
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
+
 ## Fleets
 
 ### Creation policy

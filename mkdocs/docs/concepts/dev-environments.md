@@ -662,6 +662,8 @@ init:
 
 </div>
 
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
+
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 
 !!! info "Reference"
