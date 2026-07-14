@@ -12,7 +12,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.base.profile_options import get_backend_profile_options
-from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
+from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient, VastAIRateLimitError
 from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.backends.vastai.profile_options import (
     VASTAI_DEFAULT_MIN_RELIABILITY,
@@ -162,7 +162,14 @@ class VastAICompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
-        resp = self.api_client.get_instance(provisioning_data.instance_id)
+        try:
+            resp = self.api_client.get_instance(provisioning_data.instance_id)
+        except VastAIRateLimitError:
+            logger.warning(
+                "Reached Vast.ai rate limit when updating instance %s provisioning data",
+                provisioning_data.instance_id,
+            )
+            return
         if resp is not None:
             if resp["actual_status"] == "running":
                 provisioning_data.hostname = resp["public_ipaddr"].strip()
