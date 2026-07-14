@@ -16,7 +16,7 @@ def run_dstack_cli(
         cwd = os.getcwd()
         os.chdir(repo_dir)
     if home_dir is not None:
-        prev_home_dir = os.environ["HOME"]
+        prev_home_dir = os.environ.get("HOME")
         os.environ["HOME"] = str(home_dir)
     with patch("sys.argv", ["dstack"] + cli_args):
         try:
@@ -25,7 +25,10 @@ def run_dstack_cli(
             exit_code = e.code
         finally:
             if home_dir is not None:
-                os.environ["HOME"] = prev_home_dir
+                if prev_home_dir is None:
+                    os.environ.pop("HOME", None)
+                else:
+                    os.environ["HOME"] = prev_home_dir
             if repo_dir is not None:
                 os.chdir(cwd)
     return exit_code

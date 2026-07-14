@@ -389,7 +389,8 @@ def _install_python_command(bin_dir: Path, name: str, script: str) -> None:
         path.chmod(0o755)
         return
 
-    script_path = bin_dir / f"{name}.py"
+    # Avoid shadowing packages with the same name when Python adds this directory to sys.path.
+    script_path = bin_dir / f"_{name}.py"
     script_path.write_text(script, encoding="utf-8")
     command = subprocess.list2cmdline([sys.executable, str(script_path)])
     (bin_dir / f"{name}.cmd").write_text(
