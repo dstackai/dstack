@@ -2,14 +2,13 @@ import argparse
 from dataclasses import dataclass
 from typing import Optional
 
-from rich.table import Table
+from rich.markup import escape
 
 from dstack._internal.cli.services.configurators.run import (
     PreparedRunConfiguration,
     ServiceConfigurator,
 )
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.endpoint_presets import EndpointPresetRecipe
@@ -56,11 +55,11 @@ def apply_endpoint_preset(
         configurator=configurator,
         service_args=service_args,
     )
-    _print_selected_recipe(selected.recipe)
     configurator.apply_prepared_configuration(
         prepared=selected.prepared,
         command_args=command_args,
         configurator_args=service_args,
+        plan_properties={"Preset": _format_selected_recipe(selected.recipe)},
     )
 
 
@@ -137,11 +136,5 @@ def _has_available_offers(plan: RunPlan) -> bool:
     )
 
 
-def _print_selected_recipe(recipe: EndpointPresetRecipe) -> None:
-    table = Table(box=None, show_header=False)
-    table.add_column(no_wrap=True)
-    table.add_column()
-    table.add_row("[bold]Preset[/]", recipe.base)
-    table.add_row("[bold]Recipe[/]", recipe.id)
-    console.print(table)
-    console.print()
+def _format_selected_recipe(recipe: EndpointPresetRecipe) -> str:
+    return f"{escape(recipe.base)} ([secondary]recipe={escape(recipe.id)}[/])"

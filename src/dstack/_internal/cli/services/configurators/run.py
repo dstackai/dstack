@@ -158,6 +158,7 @@ class BaseRunConfigurator(
         prepared: PreparedRunConfiguration[RunConfigurationT],
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
+        plan_properties: Optional[Dict[str, str]] = None,
     ):
         conf = prepared.configuration
         repo = prepared.repo
@@ -173,6 +174,7 @@ class BaseRunConfigurator(
             max_offers=configurator_args.max_offers,
             no_fleets=no_fleets,
             verbose=command_args.verbose,
+            extra_properties=plan_properties,
         )
 
         confirm_message = "Submit a new run?"

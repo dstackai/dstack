@@ -132,6 +132,7 @@ class TestSelectPlan:
             prepared=prepared,
             command_args=command_args,
             configurator_args=configurator.get_parser.return_value.parse_args.return_value,
+            plan_properties={"Preset": "Qwen/Qwen3.5-27B ([secondary]recipe=8f3a12c4[/])"},
         )
 
 

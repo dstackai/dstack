@@ -117,6 +117,19 @@ To deploy a preset as a service, pass the endpoint configuration to the `dstack 
 
 ```shell
 $ dstack endpoint preset apply -f endpoint.dstack.yml
+ Preset         Qwen/Qwen2.5-7B-Instruct (recipe=8f3a12c4)
+
+ #  BACKEND            RESOURCES                      INSTANCE TYPE     PRICE
+ 1  runpod (CA-MTL-1)  cpu=9 mem=50GB disk=200GB      NVIDIA RTX A5000  $0.27
+                       gpu=A5000:24GB:1
+ 2  runpod (CA-MTL-1)  cpu=9 mem=50GB disk=200GB      NVIDIA RTX A5000  $0.27
+                       gpu=A5000:24GB:1 (spot)
+ 3  runpod (US-IL-1)   cpu=12 mem=25GB disk=200GB     NVIDIA RTX A5000  $0.27
+                       gpu=A5000:24GB:1
+    ...
+ Shown 3 of 4 offers, $0.27max
+
+Submit the run qwen25-7b? [y/n]: y
 ```
 
 </div>
@@ -132,7 +145,7 @@ You can delete a specific recipe or the entire preset.
 <div class="termy">
 
 ```shell
-dstack endpoint preset delete --recipe 8f3a12c4
+$ dstack endpoint preset delete --recipe 8f3a12c4
 ```
 
 </div>
@@ -142,7 +155,7 @@ To delete the entire preset and all its recipes, pass the base model:
 <div class="termy">
 
 ```shell
-dstack endpoint preset delete Qwen/Qwen2.5-7B-Instruct
+$ dstack endpoint preset delete Qwen/Qwen2.5-7B-Instruct
 ```
 
 </div>
