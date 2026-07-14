@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter, Retry
 
 import dstack._internal.utils.docker as docker
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.common import RegistryAuth
 
 
@@ -86,19 +86,15 @@ class VastAIAPIClient:
         self._invalidate_cache()
         return data
 
-    def destroy_instance(self, instance_id: Union[str, int]) -> bool:
-        """
-        Args:
-            instance_id: instance to destroy
-
-        Returns:
-            True if instance was destroyed successfully
-        """
+    def destroy_instance(self, instance_id: Union[str, int]) -> None:
         resp = self.s.delete(self._url(f"/instances/{instance_id}/"))
-        if resp.status_code != 200 or not resp.json()["success"]:
-            return False
-        self._invalidate_cache()
-        return True
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError:
+            raise ComputeError(resp.text)
+        if resp.status_code != 200 or not data["success"]:
+            if data.get("error") != "no_such_instance":
+                raise ComputeError(resp.text)
 
     def get_instances(self, cache_ttl: float = 3.0) -> List[dict]:
         with self.lock:
