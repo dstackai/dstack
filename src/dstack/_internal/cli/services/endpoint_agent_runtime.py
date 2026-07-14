@@ -348,12 +348,14 @@ def _prepare_workspace(workspace: EndpointAgentWorkspace) -> None:
 def _install_dstack_wrapper(bin_dir: Path, home: Path) -> None:
     script = f"""#!{sys.executable}
 import os
+import sys
 
 from dstack._internal.cli.main import main
 
 os.environ["HOME"] = {json.dumps(str(home))}
 if os.name == "nt":
     os.environ["USERPROFILE"] = {json.dumps(str(home))}
+sys.argv[0] = "dstack"
 raise SystemExit(main())
 """
     _install_python_command(bin_dir, "dstack", script)
