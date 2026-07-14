@@ -124,6 +124,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – Timeout in seconds for HTTP requests sent from the in-server proxy and gateways to service replicas. Defaults to 60.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
+- `DSTACK_FORBID_DSTACK_IN_RUNS`{ #DSTACK_FORBID_DSTACK_IN_RUNS } – Forbids submitting runs with `dstack: true` (dstack server access inside runs) if set to any value.
 - `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to `0` to disable size limits. Defaults to `2MiB`.
 - `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 - `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
