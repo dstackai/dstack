@@ -36,7 +36,7 @@ from dstack._internal.server.services.runs.router_worker_sync import (
     run_model_has_sglang_router_replica_group,
     sync_router_workers_for_run_model,
 )
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -107,7 +107,7 @@ class ServiceRouterWorkerSyncPipeline(Pipeline[ServiceRouterWorkerSyncPipelineIt
 
 
 class ServiceRouterWorkerSyncFetcher(Fetcher[ServiceRouterWorkerSyncPipelineItem]):
-    @sentry_utils.instrument_pipeline_task("ServiceRouterWorkerSyncFetcher.fetch")
+    @tracing.instrument_pipeline_task("ServiceRouterWorkerSyncFetcher.fetch")
     async def fetch(self, limit: int) -> list[ServiceRouterWorkerSyncPipelineItem]:
         sync_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             ServiceRouterWorkerSyncModel.__tablename__
@@ -192,7 +192,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("ServiceRouterWorkerSyncWorker.process")
+    @tracing.instrument_pipeline_task("ServiceRouterWorkerSyncWorker.process")
     async def process(self, item: ServiceRouterWorkerSyncPipelineItem) -> None:
         async with get_session_ctx() as session:
             res = await session.execute(

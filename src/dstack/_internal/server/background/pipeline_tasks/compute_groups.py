@@ -33,7 +33,7 @@ from dstack._internal.server.services.compute_groups import compute_group_model_
 from dstack._internal.server.services.instances import emit_instance_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -120,7 +120,7 @@ class ComputeGroupFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("ComputeGroupFetcher.fetch")
+    @tracing.instrument_pipeline_task("ComputeGroupFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         compute_group_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             ComputeGroupModel.__tablename__
@@ -188,7 +188,7 @@ class ComputeGroupWorker(Worker[PipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("ComputeGroupWorker.process")
+    @tracing.instrument_pipeline_task("ComputeGroupWorker.process")
     async def process(self, item: PipelineItem):
         async with get_session_ctx() as session:
             res = await session.execute(

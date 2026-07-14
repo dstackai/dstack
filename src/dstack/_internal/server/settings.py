@@ -119,6 +119,17 @@ SENTRY_TRACES_BACKGROUND_SAMPLE_RATE = float(
 )
 SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv("DSTACK_SENTRY_PROFILES_SAMPLE_RATE", 0))
 
+ENABLE_OTEL_TRACES = os.getenv("DSTACK_ENABLE_OTEL_TRACES") is not None
+"""Enables OpenTelemetry tracing. Requires the `otel` extra to be installed.
+The exporter is configured via standard `OTEL_*` env vars, e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`.
+"""
+OTEL_TRACES_SAMPLE_RATE = float(os.getenv("DSTACK_OTEL_TRACES_SAMPLE_RATE", 1.0))
+"""Head sampling rate for traces. The default assumes sampling is done in an OTel collector."""
+OTEL_TRACES_BACKGROUND_SAMPLE_RATE = float(
+    os.getenv("DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE", 1.0)
+)
+"""Head sampling rate for background task traces."""
+
 DEFAULT_CREDS_DISABLED = os.getenv("DSTACK_DEFAULT_CREDS_DISABLED") is not None
 DEFAULT_CREDS_ENABLED = not DEFAULT_CREDS_DISABLED
 

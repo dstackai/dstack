@@ -53,3 +53,11 @@ def join_byte_stream_checked(stream: Iterable[bytes], max_size: int) -> Optional
             return None
         result += chunk
     return result
+
+
+SCHEDULED_TASKS_PREFIX = "scheduled_tasks"
+PIPELINE_TASKS_PREFIX = "pipeline_tasks"
+
+
+def is_background_task_name(name: str) -> bool:
+    return name.startswith(SCHEDULED_TASKS_PREFIX) or name.startswith(PIPELINE_TASKS_PREFIX)

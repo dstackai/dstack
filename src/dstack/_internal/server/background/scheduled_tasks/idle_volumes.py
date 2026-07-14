@@ -14,14 +14,14 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
     get_volume_configuration,
 )
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-@sentry_utils.instrument_scheduled_task
+@tracing.instrument_scheduled_task
 async def process_idle_volumes():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:

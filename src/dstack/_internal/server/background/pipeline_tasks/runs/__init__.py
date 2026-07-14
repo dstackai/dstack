@@ -35,7 +35,7 @@ from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import emit_run_status_change_event, get_run_spec
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -129,7 +129,7 @@ class RunFetcher(Fetcher[RunPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("RunFetcher.fetch")
+    @tracing.instrument_pipeline_task("RunFetcher.fetch")
     async def fetch(self, limit: int) -> list[RunPipelineItem]:
         if limit <= 0:
             return []
@@ -246,7 +246,7 @@ class RunWorker(Worker[RunPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("RunWorker.process")
+    @tracing.instrument_pipeline_task("RunWorker.process")
     async def process(self, item: RunPipelineItem):
         # Currently `dstack` supports runs with
         # * one multi-node replica (multi-node tasks)

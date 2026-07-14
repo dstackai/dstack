@@ -56,7 +56,7 @@ from dstack._internal.server.services.instances import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -140,7 +140,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("FleetFetcher.fetch")
+    @tracing.instrument_pipeline_task("FleetFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         fleet_lock, _ = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
         async with fleet_lock:
@@ -209,7 +209,7 @@ class FleetWorker(Worker[PipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("FleetWorker.process")
+    @tracing.instrument_pipeline_task("FleetWorker.process")
     async def process(self, item: PipelineItem):
         process_context = await _load_process_context(item)
         if process_context is None:
