@@ -50,7 +50,7 @@ class TestEndpointPresetLocalCommands:
         assert "BENCHMARK" in output
         assert "32K" in output
         assert "42.1" in output
-        assert "concurrency=1" in output
+        assert "concurrency=1" in "".join(output.split())
         assert "tok/s" in output
         assert "TTFT" in output
         assert "108ms" in output
@@ -61,7 +61,7 @@ class TestEndpointPresetLocalCommands:
         assert "hardware=" in verbose_output
         assert "api=" in verbose_output
         assert "n=16" in verbose_output
-        assert "concurrency=1" in verbose_output
+        assert "concurrency=1" in "".join(verbose_output.split())
         assert "1K->128" in verbose_output
 
         with patch("dstack.api.Client.from_config") as from_config:
