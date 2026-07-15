@@ -16,6 +16,11 @@ pytestmark = pytest.mark.windows
 
 
 class TestEndpointPresetLocalCommands:
+    @pytest.fixture(autouse=True)
+    def mock_ssh_client_info(self):
+        with patch("dstack._internal.cli.main.get_ssh_client_info"):
+            yield
+
     def test_formats_second_scale_ttft_without_scientific_notation(self):
         preset = get_endpoint_preset()
         ttft = preset.validations[0].benchmark.metrics.ttft_ms
@@ -72,7 +77,6 @@ class TestEndpointPresetLocalCommands:
         )
 
         with (
-            patch("dstack._internal.cli.main.get_ssh_client_info"),
             patch("dstack.api.Client.from_config"),
             patch(
                 "dstack._internal.cli.commands.endpoint.create_endpoint_preset",
