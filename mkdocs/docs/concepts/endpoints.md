@@ -158,7 +158,7 @@ You can delete a specific preset by ID or all presets for a base model.
 <div class="termy">
 
 ```shell
-$ dstack endpoint preset delete --preset 8f3a12c4
+$ dstack endpoint preset delete 8f3a12c4
 ```
 
 </div>

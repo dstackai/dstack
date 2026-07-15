@@ -53,6 +53,21 @@ the `-failed` suffix. Pass `--debug` to also save the effective endpoint
 configuration (`endpoint.dstack.yml`), agent prompt (`prompt.md`), and raw trace
 (`trace.jsonl`).
 
+## dstack endpoint preset get
+
+The `dstack endpoint preset get` command outputs one locally stored preset as JSON.
+
+##### Usage
+
+<div class="termy">
+
+```shell
+$ dstack endpoint preset get --help
+#GENERATE#
+```
+
+</div>
+
 ## dstack endpoint preset apply
 
 The `dstack endpoint preset apply` command selects a matching local preset and

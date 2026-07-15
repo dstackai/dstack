@@ -54,6 +54,20 @@ class EndpointCommand(BaseCommand):
         _add_list_args(list_parser)
         list_parser.set_defaults(subfunc=self._list)
 
+        get_parser = preset_subparsers.add_parser(
+            "get",
+            help="Get an endpoint preset",
+            formatter_class=self._parser.formatter_class,
+        )
+        get_parser.add_argument("preset", metavar="ID", help="The preset ID")
+        get_parser.add_argument(
+            "--json",
+            action="store_true",
+            required=True,
+            help="Output in JSON format",
+        )
+        get_parser.set_defaults(subfunc=self._get)
+
         create_parser = preset_subparsers.add_parser(
             "create",
             help="Create an endpoint preset",
@@ -102,14 +116,15 @@ class EndpointCommand(BaseCommand):
         )
         delete_target = delete_parser.add_mutually_exclusive_group(required=True)
         delete_target.add_argument(
+            "preset",
+            nargs="?",
+            metavar="ID",
+            help="The preset ID",
+        )
+        delete_target.add_argument(
             "--model",
             metavar="MODEL",
             help="Delete all presets for a base model",
-        )
-        delete_target.add_argument(
-            "--preset",
-            metavar="ID",
-            help="Delete one preset by ID",
         )
         delete_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -147,6 +162,12 @@ class EndpointCommand(BaseCommand):
         )
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
+
+    def _get(self, args: argparse.Namespace) -> None:
+        preset = EndpointPresetStore().get(args.preset)
+        if preset is None:
+            raise CLIError(f"Endpoint preset {args.preset!r} does not exist")
+        print(preset.json())
 
     def _apply(self, args: argparse.Namespace) -> None:
         configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
