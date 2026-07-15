@@ -590,6 +590,15 @@ class BaseRunConfiguration(CoreModel):
         list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
+    dstack: Annotated[
+        bool,
+        Field(
+            description=(
+                "Make the dstack server accessible inside the run. "
+                "No authentication credentials are provided"
+            )
+        ),
+    ] = False
     setup: CommandsList = []
     """
     setup: Deprecated since 0.18.31. It has no effect for tasks and services; for
@@ -693,18 +702,6 @@ class ConfigurationWithCommandsParams(CoreModel):
         return values
 
 
-class ConfigurationWithDstackParams(CoreModel):
-    dstack: Annotated[
-        bool,
-        Field(
-            description=(
-                "Make the dstack server accessible inside the run. "
-                "No authentication credentials are provided"
-            )
-        ),
-    ] = False
-
-
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
         Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"], Literal["zed"]]],
@@ -774,7 +771,6 @@ class DevEnvironmentConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
-    ConfigurationWithDstackParams,
     DevEnvironmentConfigurationParams,
     generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
@@ -813,7 +809,6 @@ class TaskConfiguration(
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
-    ConfigurationWithDstackParams,
     TaskConfigurationParams,
     generate_dual_core_model(TaskConfigurationConfig),
 ):
@@ -1359,7 +1354,6 @@ class ServiceConfiguration(
     ProfileParams,
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
-    ConfigurationWithDstackParams,
     ServiceConfigurationParams,
     generate_dual_core_model(ServiceConfigurationConfig),
 ):
