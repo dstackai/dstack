@@ -1003,7 +1003,7 @@ async def _ensure_job_server_connection(
 
 
 def _server_access_enabled(context: _ProcessContext) -> bool:
-    return bool(getattr(context.run.run_spec.configuration, "dstack", False))
+    return context.run.run_spec.configuration.dstack
 
 
 async def _apply_process_result(
