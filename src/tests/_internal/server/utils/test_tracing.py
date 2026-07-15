@@ -12,6 +12,7 @@ from dstack._internal.server.utils import tracing
 from dstack._internal.server.utils.otel.utils import (
     _build_log_handler,
     _get_db_span_name,
+    _get_metrics_exporters,
     _RootSpanNameSampler,
 )
 
@@ -84,6 +85,24 @@ class TestBuildLogHandler:
         assert records[0].body == "something happened"
         assert records[0].severity_text == "WARN"
         assert records[0].trace_id == span.get_span_context().trace_id
+
+
+class TestGetMetricsExporters:
+    @pytest.mark.parametrize(
+        ("exporters", "prometheus_enabled", "expected"),
+        [
+            (None, True, ["prometheus"]),
+            (None, False, ["otlp"]),
+            ("otlp", True, ["otlp"]),
+            ("prometheus, otlp", False, ["prometheus", "otlp"]),
+        ],
+    )
+    def test_returns_expected(self, monkeypatch, exporters, prometheus_enabled, expected):
+        from dstack._internal.server import settings
+
+        monkeypatch.setattr(settings, "OTEL_METRICS_EXPORTERS", exporters)
+        monkeypatch.setattr(settings, "ENABLE_PROMETHEUS_METRICS", prometheus_enabled)
+        assert _get_metrics_exporters() == expected
 
 
 class TestGetDBSpanName:

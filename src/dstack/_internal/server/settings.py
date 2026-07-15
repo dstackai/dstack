@@ -133,6 +133,13 @@ OTEL_LOGS_ENABLED = os.getenv("DSTACK_OTEL_LOGS_ENABLED") is not None
 """Enables log export via OTLP. Requires the `otel` extra to be installed.
 The exporter is configured via standard `OTEL_*` env vars, e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`.
 """
+OTEL_METRICS_ENABLED = os.getenv("DSTACK_OTEL_METRICS_ENABLED") is not None
+"""Enables OpenTelemetry metrics. Requires the `otel` extra to be installed."""
+OTEL_METRICS_EXPORTERS = os.getenv("DSTACK_OTEL_METRICS_EXPORTERS")
+"""A comma-separated list of metrics exporters: `prometheus` (expose via the /metrics endpoint)
+and/or `otlp` (push via OTLP, configured by standard `OTEL_*` env vars).
+Defaults to `prometheus` if the /metrics endpoint is enabled, otherwise `otlp`.
+"""
 
 DEFAULT_CREDS_DISABLED = os.getenv("DSTACK_DEFAULT_CREDS_DISABLED") is not None
 DEFAULT_CREDS_ENABLED = not DEFAULT_CREDS_DISABLED

@@ -15,23 +15,16 @@ except ImportError:
 _TRACER_NAME = "dstack.server"
 
 
-def configure_tracing(app: "FastAPI", engine: "AsyncEngine") -> None:
-    _import_utils("DSTACK_OTEL_TRACES_ENABLED").configure_tracing(app, engine)
-
-
-def configure_log_export() -> None:
-    _import_utils("DSTACK_OTEL_LOGS_ENABLED").configure_log_export()
-
-
-def _import_utils(enabled_by: str):
+def configure(app: "FastAPI", engine: "AsyncEngine") -> None:
+    """Sets up the OTel signals enabled by the `DSTACK_OTEL_*_ENABLED` env vars."""
     try:
         from dstack._internal.server.utils.otel import utils
     except ImportError as e:
         raise RuntimeError(
-            f"{enabled_by} is set but OpenTelemetry packages are not installed."
+            "DSTACK_OTEL_*_ENABLED is set but OpenTelemetry packages are not installed."
             " Install them with `pip install 'dstack[otel]'`."
         ) from e
-    return utils
+    utils.configure(app, engine)
 
 
 @contextmanager
