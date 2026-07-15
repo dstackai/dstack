@@ -90,9 +90,20 @@ class TestEndpointPresetLocalCommands:
     def test_lists_and_deletes_preset_without_api_client(self, tmp_path, capsys):
         preset = get_endpoint_preset()
         EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
+        list_output = StringIO()
 
         with (
             patch("dstack.api.Client.from_config") as from_config,
+            patch.object(
+                endpoint_presets_utils,
+                "console",
+                Console(
+                    file=list_output,
+                    width=160,
+                    color_system=None,
+                    theme=Theme({"secondary": "grey58"}),
+                ),
+            ),
             patch.object(
                 endpoint_presets_utils, "pretty_date", return_value="2 months ago"
             ) as pretty_date,
@@ -101,7 +112,7 @@ class TestEndpointPresetLocalCommands:
             from_config.assert_not_called()
             pretty_date.assert_called_once_with(preset.created_at)
 
-        output = capsys.readouterr().out
+        output = list_output.getvalue()
         assert "Qwen/Qwen3.5-27B" in output
         assert "preset=8f3a12c4" in output
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in output
@@ -130,7 +141,6 @@ class TestEndpointPresetLocalCommands:
                         "endpoint",
                         "preset",
                         "delete",
-                        "--preset",
                         preset.id,
                         "-y",
                     ],
@@ -142,6 +152,26 @@ class TestEndpointPresetLocalCommands:
 
         assert EndpointPresetStore(tmp_path / ".dstack" / "presets").list() == []
         assert not (tmp_path / ".dstack" / "presets" / "models--Qwen--Qwen3.5-27B").exists()
+
+    def test_gets_complete_preset_as_json_without_api_client(self, tmp_path, capsys):
+        preset = get_endpoint_preset()
+        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
+
+        with patch("dstack.api.Client.from_config") as from_config:
+            assert (
+                run_dstack_cli(
+                    ["endpoint", "preset", "get", preset.id, "--json"],
+                    home_dir=tmp_path,
+                )
+                == 0
+            )
+            from_config.assert_not_called()
+
+        data = json.loads(capsys.readouterr().out)
+        assert data["id"] == preset.id
+        assert data["created_at"] == preset.created_at.isoformat()
+        assert data["context_length"] == 32768
+        assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize(
         "args",
