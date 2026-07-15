@@ -1,3 +1,4 @@
+import asyncio
 import functools
 
 import sentry_sdk
@@ -21,7 +22,16 @@ def instrument_named_task(name: str):
             with sentry_sdk.isolation_scope():
                 with sentry_sdk.start_transaction(name=name):
                     with otel.task_span(name):
-                        return await f(*args, **kwargs)
+                        try:
+                            result = await f(*args, **kwargs)
+                        except asyncio.CancelledError:
+                            # Interrupted, e.g. on server shutdown — not a task failure
+                            raise
+                        except Exception:
+                            otel.record_task_run(name, error=True)
+                            raise
+                        otel.record_task_run(name, error=False)
+                        return result
 
         return wrapper
 

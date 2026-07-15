@@ -58,6 +58,45 @@ class TestInstrumentNamedTask:
         assert task_span.context.trace_id != outer_span.context.trace_id
 
 
+class TestRecordTaskRun:
+    @pytest.mark.asyncio
+    async def test_counts_runs_by_status(self):
+        from opentelemetry import metrics
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
+        reader = InMemoryMetricReader()
+        # The global meter provider can only be set once per process
+        if not isinstance(metrics.get_meter_provider(), MeterProvider):
+            metrics.set_meter_provider(MeterProvider(metric_readers=[reader]))
+        else:
+            pytest.skip("global meter provider already set")
+
+        @tracing.instrument_named_task("task")
+        async def ok_task():
+            return 1
+
+        @tracing.instrument_named_task("task")
+        async def failing_task():
+            raise ValueError()
+
+        await ok_task()
+        await ok_task()
+        with pytest.raises(ValueError):
+            await failing_task()
+
+        points = (
+            reader.get_metrics_data()
+            .resource_metrics[0]
+            .scope_metrics[0]
+            .metrics[0]
+            .data.data_points
+        )
+        counts = {p.attributes["status"]: p.value for p in points}
+        assert counts == {"success": 2, "error": 1}
+        assert all(p.attributes["task"] == "task" for p in points)
+
+
 class TestBuildLogHandler:
     def test_exports_records_with_trace_context(self, span_exporter: InMemorySpanExporter):
         from opentelemetry.sdk._logs import LoggerProvider
