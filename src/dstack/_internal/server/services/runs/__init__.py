@@ -40,6 +40,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services.diff import format_diff_fields_for_event
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
@@ -1157,6 +1158,10 @@ async def _validate_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ):
+    if server_settings.FORBID_DSTACK_IN_RUNS and getattr(run_spec.configuration, "dstack", False):
+        raise ServerClientError(
+            "This dstack-server installation forbids `dstack: true` in run configurations."
+        )
     await _validate_run_volumes(
         session=session,
         project=project,

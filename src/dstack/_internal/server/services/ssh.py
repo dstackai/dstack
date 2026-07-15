@@ -1,7 +1,9 @@
 from collections.abc import Iterable
+from typing import Optional
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.runs import JobRuntimeData
 from dstack._internal.core.services.ssh.tunnel import SSH_DEFAULT_OPTIONS, SocketPair, SSHTunnel
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.instances import get_instance_remote_connection_info
@@ -10,7 +12,10 @@ from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.path import FileContent
 
 
-def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionParams, FileContent]]:
+def get_container_ssh_credentials(
+    job: JobModel,
+    job_runtime_data: Optional[JobRuntimeData] = None,
+) -> list[tuple[SSHConnectionParams, FileContent]]:
     """
     Returns the information needed to connect to the SSH server inside the job container.
 
@@ -21,6 +26,7 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
 
     Args:
         job: `JobModel` with `project`, `instance` and `instance.project` fields loaded.
+        job_runtime_data: Runtime data to use before it has been persisted to `job`.
 
     Returns:
         A list of hosts credentials as (host's `SSHConnectionParams`, private key's `FileContent`)
@@ -51,7 +57,7 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
         instance_project_key = FileContent(instance.project.ssh_private_key)
         hosts.append((instance_proxy, instance_project_key))
         ssh_port = DSTACK_RUNNER_SSH_PORT
-        jrd = get_job_runtime_data(job)
+        jrd = job_runtime_data or get_job_runtime_data(job)
         if jrd is not None and jrd.ports is not None:
             ssh_port = jrd.ports.get(ssh_port, ssh_port)
         target_host = SSHConnectionParams(

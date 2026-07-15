@@ -39,6 +39,47 @@ class TestSSHKey:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("image_config_mock")
+class TestServerAccess:
+    async def test_adds_transport_without_credentials(self):
+        configuration = TaskConfiguration(image="debian", commands=["true"], dstack=True)
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_spec = (await configurator.get_job_specs(replica_num=0))[0]
+
+        assert "dstack" not in job_spec.dict()
+        assert job_spec.env == {
+            "DSTACK_SERVER_URL": "http+unix://%2Frun%2Fdstack%2Fserver.sock",
+        }
+
+    async def test_disabled_by_default(self):
+        configuration = TaskConfiguration(image="debian", commands=["true"])
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_spec = (await configurator.get_job_specs(replica_num=0))[0]
+
+        assert "DSTACK_SERVER_URL" not in job_spec.env
+
+    async def test_preserves_explicit_transport_env(self):
+        configuration = TaskConfiguration(
+            image="debian",
+            commands=["true"],
+            dstack=True,
+            env={
+                "DSTACK_SERVER_URL": "https://server.example.com",
+            },
+        )
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_spec = (await configurator.get_job_specs(replica_num=0))[0]
+
+        assert job_spec.env["DSTACK_SERVER_URL"] == "https://server.example.com"
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("image_config_mock")
 class TestCommands:
     @pytest.mark.parametrize(
         ["commands", "expected_commands"],

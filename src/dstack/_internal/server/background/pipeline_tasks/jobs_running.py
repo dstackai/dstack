@@ -91,6 +91,9 @@ from dstack._internal.server.services.jobs import (
     is_master_job,
     job_model_to_job_submission,
 )
+from dstack._internal.server.services.jobs.server_connection import (
+    job_server_connections_pool,
+)
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.metrics import get_job_metrics
@@ -474,6 +477,11 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
             context=context, startup_context=startup_context, result=result
         )
     elif context.job_model.status == JobStatus.RUNNING:
+        if _server_access_enabled(context):
+            await job_server_connections_pool.ensure(
+                context.job_model,
+                context.job_submission.job_runtime_data,
+            )
         await _process_running_status(context=context, result=result)
 
     if _get_result_status(context.job_model, result) == JobStatus.RUNNING:
@@ -485,6 +493,10 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
             )
         await _maybe_register_replica(context=context, result=result)
         await _check_gpu_utilization(context=context, result=result)
+    elif _server_access_enabled(context) and context.job_model.status == JobStatus.RUNNING:
+        # Removing on PROVISIONING/PULLING iterations would reset the failure time
+        # tracked by the pool, breaking retry_timed_out()
+        await job_server_connections_pool.remove(context.job_model.id)
     return result
 
 
@@ -614,6 +626,7 @@ async def _refetch_locked_job_model(
             JobModel.lock_token == item.lock_token,
         )
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+        .options(joinedload(JobModel.project))
         .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
         .options(
             joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec, RunModel.status)
@@ -780,6 +793,8 @@ async def _process_provisioning_status(
             None,
         )
         if runner_availability == _RunnerAvailability.AVAILABLE:
+            if not await _ensure_job_server_connection(context, result):
+                return
             file_archives = await _get_job_file_archives(
                 archive_mappings=context.job.job_spec.file_archives,
                 user=context.run_model.user,
@@ -891,6 +906,8 @@ async def _process_pulling_status(
             return
 
         if runner_availability == _RunnerAvailability.AVAILABLE:
+            if not await _ensure_job_server_connection(context, result):
+                return
             file_archives = await _get_job_file_archives(
                 archive_mappings=context.job.job_spec.file_archives,
                 user=context.run_model.user,
@@ -957,6 +974,36 @@ async def _process_running_status(
         return
 
     _handle_instance_unreachable(context, result, job_provisioning_data)
+
+
+async def _ensure_job_server_connection(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> bool:
+    if not _server_access_enabled(context):
+        return True
+    connected = await job_server_connections_pool.ensure(
+        context.job_model,
+        _get_result_job_runtime_data(context.job_model, result),
+    )
+    if connected:
+        return True
+
+    if job_server_connections_pool.retry_timed_out(
+        context.job_model.id,
+        JOB_DISCONNECTED_RETRY_TIMEOUT.total_seconds(),
+    ):
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message="Could not establish dstack server access",
+        )
+    return False
+
+
+def _server_access_enabled(context: _ProcessContext) -> bool:
+    return context.run.run_spec.configuration.dstack
 
 
 async def _apply_process_result(

@@ -1,14 +1,17 @@
 import uuid
 from collections.abc import Generator
+from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
 import requests_mock
 
-from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.resources import Memory
+from dstack._internal.core.models.runs import ClusterInfo, Job, JobSpec, JobSubmission, Run
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
     VolumeAttachment,
@@ -25,11 +28,16 @@ from dstack._internal.server.schemas.runner import (
     TaskStatus,
 )
 from dstack._internal.server.services.runner.client import (
+    RunnerClient,
     ShimClient,
     ShimHTTPError,
     _parse_version,
 )
-from dstack._internal.server.testing.common import get_volume, get_volume_configuration
+from dstack._internal.server.testing.common import (
+    get_run_spec,
+    get_volume,
+    get_volume_configuration,
+)
 
 
 class BaseShimClientTest:
@@ -63,6 +71,68 @@ class BaseShimClientTest:
         assert req.path == path
         if json is not None:
             assert req.json() == json
+
+
+class TestRunnerClientSubmitJob(BaseShimClientTest):
+    def test_adds_default_project_for_server_access(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/submit", json={})
+        run_spec = get_run_spec(
+            repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
+        )
+        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.construct(
+            job_spec=JobSpec.construct(env={"DSTACK_TOKEN": "token"}),
+            job_submissions=[
+                JobSubmission.construct(
+                    id=uuid.uuid4(),
+                    submitted_at=datetime.now(timezone.utc),
+                )
+            ],
+        )
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        client.submit_job(
+            run=run,
+            job=job,
+            cluster_info=ClusterInfo(job_ips=[], master_job_ip="", gpus_per_job=0),
+            secrets={},
+            repo_credentials=None,
+        )
+
+        assert adapter.last_request is not None
+        assert adapter.last_request.json()["job_spec"]["env"] == {
+            "DSTACK_PROJECT": "main",
+            "DSTACK_TOKEN": "token",
+        }
+        assert job.job_spec.env == {"DSTACK_TOKEN": "token"}
+
+    def test_preserves_explicit_project_for_server_access(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/submit", json={})
+        run_spec = get_run_spec(
+            repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
+        )
+        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.construct(
+            job_spec=JobSpec.construct(env={"DSTACK_PROJECT": "other"}),
+            job_submissions=[
+                JobSubmission.construct(
+                    id=uuid.uuid4(),
+                    submitted_at=datetime.now(timezone.utc),
+                )
+            ],
+        )
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        client.submit_job(
+            run=run,
+            job=job,
+            cluster_info=ClusterInfo(job_ips=[], master_job_ip="", gpus_per_job=0),
+            secrets={},
+            repo_credentials=None,
+        )
+
+        assert adapter.last_request is not None
+        assert adapter.last_request.json()["job_spec"]["env"]["DSTACK_PROJECT"] == "other"
 
 
 class TestShimClientNegotiate(BaseShimClientTest):

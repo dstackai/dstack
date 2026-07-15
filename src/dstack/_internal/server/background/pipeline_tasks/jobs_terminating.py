@@ -64,6 +64,9 @@ from dstack._internal.server.services.jobs import (
     get_job_spec,
     stop_runner,
 )
+from dstack._internal.server.services.jobs.server_connection import (
+    job_server_connections_pool,
+)
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -268,6 +271,7 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
                     return
 
         if job_model.volumes_detached_at is None:
+            await job_server_connections_pool.remove(job_model.id)
             result = await _process_terminating_job(
                 job_model=job_model,
                 instance_model=instance_model,
