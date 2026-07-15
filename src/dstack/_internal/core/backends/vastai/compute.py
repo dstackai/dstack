@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 
 import gpuhunt
@@ -12,7 +13,11 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.base.profile_options import get_backend_profile_options
-from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient, VastAIRateLimitError
+from dstack._internal.core.backends.vastai.api_client import (
+    VastAIAPIClient,
+    VastAICreateInstanceError,
+    VastAIRateLimitError,
+)
 from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.backends.vastai.profile_options import (
     VASTAI_DEFAULT_MIN_RELIABILITY,
@@ -21,8 +26,9 @@ from dstack._internal.core.backends.vastai.profile_options import (
     VastAIProfileOptions,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ProvisioningError
+from dstack._internal.core.errors import ComputeError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -125,23 +131,39 @@ class VastAICompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
+        offer_backend_data: VastAIOfferBackendData = VastAIOfferBackendData.__response__.parse_obj(
+            instance_offer.backend_data
+        )
         bid = None
         if instance_offer.instance.resources.spot:
-            bid = instance_offer.price
-        resp = self.api_client.create_instance(
-            instance_name=instance_name,
-            bundle_id=instance_offer.instance.name,
-            image_name=job.job_spec.image_name,
-            onstart=" && ".join(commands),
-            disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
-            registry_auth=job.job_spec.registry_auth,
-            bid=bid,
-        )
-        instance_id = resp["new_contract"]
+            if offer_backend_data.min_bid is None:
+                raise ComputeError(
+                    "VastAIOfferBackendData.min_bid is unexpectedly missing for a spot offer"
+                )
+            bid = offer_backend_data.min_bid
+        try:
+            instance_id = self.api_client.create_instance(
+                instance_name=instance_name,
+                bundle_id=instance_offer.instance.name,
+                image_name=job.job_spec.image_name,
+                onstart=" && ".join(commands),
+                disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
+                registry_auth=job.job_spec.registry_auth,
+                bid=bid,
+            )
+        except VastAICreateInstanceError as e:
+            if e.created_instance_id is not None:
+                _terminate_instance_with_rate_limit_retry(
+                    self.api_client, e.created_instance_id, retries=4
+                )
+                logger.debug(
+                    "Terminated Vast.ai instance %s that failed to start", e.created_instance_id
+                )
+            raise NoCapacityError(e.resp) from e
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
-            instance_id=instance_id,
+            instance_id=str(instance_id),
             hostname=None,
             internal_ip=None,
             region=instance_offer.region,
@@ -183,3 +205,38 @@ class VastAICompute(
                 and ": OCI runtime create failed:" in resp["status_msg"]
             ):
                 raise ProvisioningError(resp["status_msg"])
+
+
+class VastAIOfferBackendData(CoreModel):
+    min_bid: float | None = None
+
+
+def _terminate_instance_with_rate_limit_retry(
+    client: VastAIAPIClient, instance_id: int, retries: int
+) -> bool:
+    for attempt in range(retries):
+        try:
+            client.destroy_instance(instance_id)
+            return True
+        except VastAIRateLimitError:
+            if attempt + 1 < retries:
+                logger.warning(
+                    "Hit rate limit when terminating Vast.ai instance %s. Attempt %s/%s",
+                    instance_id,
+                    attempt + 1,
+                    retries,
+                )
+                time.sleep(attempt + 1)
+        except BaseException as e:
+            logger.error(
+                "Failed to terminate Vast.ai instance %s. Terminate it manually to avoid accumulating charges. Error: %r",
+                instance_id,
+                e,
+            )
+            raise
+    logger.error(
+        "Failed to terminate Vast.ai instance %s after %s attempts hit rate limits. Terminate it manually to avoid accumulating charges",
+        instance_id,
+        retries,
+    )
+    return False

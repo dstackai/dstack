@@ -23,7 +23,9 @@ def _requirements() -> Requirements:
     return Requirements(resources=ResourcesSpec())
 
 
-def _offer(*, spot: bool, price: float = 0.5) -> InstanceOfferWithAvailability:
+def _offer(
+    *, spot: bool, price: float = 0.5, min_bid: float | None = None
+) -> InstanceOfferWithAvailability:
     return InstanceOfferWithAvailability(
         backend=BackendType.VASTAI,
         instance=InstanceType(
@@ -39,6 +41,9 @@ def _offer(*, spot: bool, price: float = 0.5) -> InstanceOfferWithAvailability:
         region="Hong Kong, HK",
         price=price,
         availability=InstanceAvailability.AVAILABLE,
+        backend_data={
+            **({"min_bid": min_bid} if min_bid is not None else {}),
+        },
     )
 
 
@@ -115,9 +120,9 @@ def test_vastai_compute_can_disable_community_cloud():
 def test_vastai_run_job_bids_on_spot_offer():
     compute = VastAICompute(_config())
     compute.api_client = MagicMock()
-    compute.api_client.create_instance.return_value = {"new_contract": 123}
+    compute.api_client.create_instance.return_value = 123
 
-    _run_job(compute, _offer(spot=True, price=0.1244444))
+    _run_job(compute, _offer(spot=True, price=0.14, min_bid=0.1244444))
 
     assert compute.api_client.create_instance.call_args.kwargs["bid"] == 0.1244444
 
@@ -125,7 +130,7 @@ def test_vastai_run_job_bids_on_spot_offer():
 def test_vastai_run_job_does_not_bid_on_ondemand_offer():
     compute = VastAICompute(_config())
     compute.api_client = MagicMock()
-    compute.api_client.create_instance.return_value = {"new_contract": 123}
+    compute.api_client.create_instance.return_value = 123
 
     _run_job(compute, _offer(spot=False, price=0.24))
 

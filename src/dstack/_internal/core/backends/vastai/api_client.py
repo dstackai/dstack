@@ -4,12 +4,29 @@ import requests
 
 import dstack._internal.utils.docker as docker
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ComputeError, NoCapacityError
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.common import RegistryAuth
 
 
 class VastAIRateLimitError(Exception):
     pass
+
+
+class VastAICreateInstanceError(Exception):
+    """
+    Attributes:
+        resp: Full API response.
+        created_instance_id: ID of the instance that was created despite the error. For example,
+            Vast.ai creates spot instances in the stopped state and returns an error if the bid is
+            insufficient.
+    """
+
+    def __init__(
+        self, *args, resp: str, created_instance_id: Optional[int] = None, **kwargs
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.resp = resp
+        self.created_instance_id = created_instance_id
 
 
 class VastAIAPIClient:
@@ -27,7 +44,7 @@ class VastAIAPIClient:
         disk_size: int,
         registry_auth: Optional[RegistryAuth] = None,
         bid: Optional[float] = None,
-    ) -> dict:
+    ) -> int:
         """
         Args:
             instance_name: instance label
@@ -39,10 +56,10 @@ class VastAIAPIClient:
                 (spot) instance is created; if None, an on-demand instance.
 
         Raises:
-            NoCapacityError: if instance cannot be created
+            VastAICreateInstanceError: if instance cannot be created
 
         Returns:
-            create instance response
+            Instance ID
         """
         image_login = None
         if registry_auth:
@@ -70,12 +87,20 @@ class VastAIAPIClient:
             "force": False,
         }
         resp = self.s.put(self._url(f"/v0/asks/{bundle_id}/"), json=payload)
-        if resp.status_code != 200 or not (data := resp.json())["success"]:
-            raise NoCapacityError(resp.text)
-        return data
+        try:
+            data = resp.json()
+        except requests.exceptions.JSONDecodeError:
+            raise VastAICreateInstanceError(resp=resp.text)
+        if resp.status_code != 200 or not data["success"]:
+            raise VastAICreateInstanceError(
+                resp=resp.text, created_instance_id=data.get("new_contract")
+            )
+        return data["new_contract"]
 
     def destroy_instance(self, instance_id: Union[str, int]) -> None:
         resp = self.s.delete(self._url(f"/v0/instances/{instance_id}/"))
+        if resp.status_code == 429:
+            raise VastAIRateLimitError()
         try:
             data = resp.json()
         except requests.exceptions.JSONDecodeError:
