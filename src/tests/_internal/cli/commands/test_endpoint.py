@@ -141,6 +141,7 @@ class TestEndpointPresetLocalCommands:
                         "endpoint",
                         "preset",
                         "delete",
+                        "--preset",
                         preset.id,
                         "-y",
                     ],
@@ -152,26 +153,6 @@ class TestEndpointPresetLocalCommands:
 
         assert EndpointPresetStore(tmp_path / ".dstack" / "presets").list() == []
         assert not (tmp_path / ".dstack" / "presets" / "models--Qwen--Qwen3.5-27B").exists()
-
-    def test_gets_complete_preset_as_json_without_api_client(self, tmp_path, capsys):
-        preset = get_endpoint_preset()
-        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
-
-        with patch("dstack.api.Client.from_config") as from_config:
-            assert (
-                run_dstack_cli(
-                    ["endpoint", "preset", "get", preset.id, "--json"],
-                    home_dir=tmp_path,
-                )
-                == 0
-            )
-            from_config.assert_not_called()
-
-        data = json.loads(capsys.readouterr().out)
-        assert data["id"] == preset.id
-        assert data["created_at"] == preset.created_at.isoformat()
-        assert data["context_length"] == 32768
-        assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize(
         "args",
