@@ -1,10 +1,14 @@
 import json
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from rich.console import Console
+from rich.theme import Theme
 
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
+from dstack._internal.cli.utils import endpoint_presets as endpoint_presets_utils
 from tests._internal.cli.common import run_dstack_cli
 from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
@@ -12,6 +16,23 @@ pytestmark = pytest.mark.windows
 
 
 class TestEndpointPresetLocalCommands:
+    def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
+        output = StringIO()
+        monkeypatch.setattr(
+            endpoint_presets_utils,
+            "console",
+            Console(
+                file=output,
+                width=79,
+                color_system=None,
+                theme=Theme({"secondary": "grey58"}),
+            ),
+        )
+
+        endpoint_presets_utils.print_endpoint_presets([get_endpoint_preset()])
+
+        assert "concurrency=1" in "".join(output.getvalue().split())
+
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "endpoint.dstack.yml"
         configuration_path.write_text(

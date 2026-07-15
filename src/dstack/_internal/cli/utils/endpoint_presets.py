@@ -15,7 +15,7 @@ def print_endpoint_presets(presets: list[EndpointPreset], verbose: bool = False)
     table.add_column("MODEL", no_wrap=True)
     table.add_column("RESOURCES" if verbose else "GPU")
     table.add_column("CONTEXT", justify="right")
-    table.add_column("BENCHMARK")
+    table.add_column("BENCHMARK", min_width=len("concurrency=1"), overflow="fold")
     presets_by_base: dict[str, list[EndpointPreset]] = defaultdict(list)
     for preset in presets:
         presets_by_base[preset.base].append(preset)
