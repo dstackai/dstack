@@ -68,6 +68,11 @@ To create a preset, pass the configuration file to the `dstack endpoint preset c
 
 ```shell
 $ dstack endpoint preset create -f endpoint.dstack.yml
+[2026-07-15 11:32:01] Starting endpoint preset creation for Qwen/Qwen2.5-7B-Instruct. Allowed fleets: gpu-fleet.
+[2026-07-15 11:41:06] Prototype task qwen25-7b-a1b2c3-2 verified vLLM on an L4:24GB.
+[2026-07-15 11:52:06] Final service qwen25-7b-a1b2c3-3 verified with context length 32768.
+[2026-07-15 11:52:18] Benchmark via guidellm 0.7.1: 32/32 requests succeeded.
+[2026-07-15 11:52:18] Saved endpoint preset 8f3a12c4 for Qwen/Qwen2.5-7B-Instruct.
 ```
 
 </div>
