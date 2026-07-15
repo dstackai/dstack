@@ -177,6 +177,7 @@ async def add_ssh_instance(instance_model: InstanceModel) -> ProcessResult:
         dockerized=True,
         backend_data=None,
         ssh_proxy=remote_details.ssh_proxy,
+        gpu_driver=health.gpu_driver,
     )
     instance_offer = InstanceOfferWithAvailability(
         backend=BackendType.REMOTE,

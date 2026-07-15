@@ -5,10 +5,12 @@ import (
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
 type DummyRunner struct {
 	tasks map[string]bool
+	gpus  []host.GpuInfo
 	mu    sync.Mutex
 }
 
@@ -44,6 +46,10 @@ func (ds *DummyRunner) TaskInfo(taskID string) shim.TaskInfo {
 
 func (ds *DummyRunner) Resources(context.Context) shim.Resources {
 	return shim.Resources{}
+}
+
+func (ds *DummyRunner) Gpus(context.Context) []host.GpuInfo {
+	return ds.gpus
 }
 
 func NewDummyRunner() *DummyRunner {

@@ -4,10 +4,12 @@ from typing import Optional
 
 import pytest
 import requests_mock
+from gpuhunt import AcceleratorVendor
 
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
@@ -28,6 +30,7 @@ from dstack._internal.server.services.runner.client import (
     ShimClient,
     ShimHTTPError,
     _parse_version,
+    healthcheck_response_to_instance_check,
 )
 from dstack._internal.server.testing.common import get_volume, get_volume_configuration
 
@@ -528,3 +531,43 @@ class TestParseVersion:
     @pytest.mark.parametrize("value", ["", "foo", "1.12.3-next.20241231"])
     def test_invalid(self, value: str):
         assert _parse_version(value) is None
+
+
+class TestHealthcheckResponseToInstanceCheck:
+    def test_reachable_without_gpu_driver(self):
+        response = HealthcheckResponse(service="dstack-shim", version="0.19.0")
+        check = healthcheck_response_to_instance_check(response)
+        assert check.reachable
+        assert check.gpu_driver is None
+
+    def test_reachable_with_gpu_driver(self):
+        response = HealthcheckResponse(
+            service="dstack-shim",
+            version="0.19.0",
+            gpu_vendor="nvidia",
+            gpu_driver_version="570.86.15",
+        )
+        check = healthcheck_response_to_instance_check(response)
+        assert check.reachable
+        assert check.gpu_driver == GpuDriverInfo(
+            vendor=AcceleratorVendor.NVIDIA, version="570.86.15"
+        )
+
+    def test_reachable_with_unknown_gpu_vendor(self):
+        response = HealthcheckResponse(
+            service="dstack-shim",
+            version="0.19.0",
+            gpu_vendor="quantumx",
+            gpu_driver_version="1.2.3",
+        )
+        check = healthcheck_response_to_instance_check(response)
+        assert check.reachable
+        assert check.gpu_driver is not None
+        assert check.gpu_driver.vendor is None
+        assert check.gpu_driver.version == "1.2.3"
+
+    def test_unexpected_service(self):
+        response = HealthcheckResponse(service="not-dstack-shim", version="0.19.0")
+        check = healthcheck_response_to_instance_check(response)
+        assert not check.reachable
+        assert check.gpu_driver is None

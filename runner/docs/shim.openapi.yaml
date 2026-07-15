@@ -479,6 +479,21 @@ components:
           type: string
           examples:
             - 0.18.34
+        gpu_vendor:
+          description: >
+            (since [0.20.28](https://github.com/dstackai/dstack/releases/tag/0.20.28))
+            Host GPU vendor. Omitted on hosts without GPUs.
+          type: string
+          examples:
+            - nvidia
+        gpu_driver_version:
+          description: >
+            (since [0.20.28](https://github.com/dstackai/dstack/releases/tag/0.20.28))
+            Host GPU driver version. Omitted on hosts without GPUs
+            or if detection failed.
+          type: string
+          examples:
+            - 570.86.15
       required:
         - service
         - version

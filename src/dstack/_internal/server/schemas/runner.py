@@ -125,6 +125,11 @@ class SubmitBody(CoreModel):
 class HealthcheckResponse(CoreModel):
     service: str
     version: str
+    gpu_vendor: Optional[str] = None
+    """`gpu_vendor` is not set by old shims and on hosts without GPUs."""
+    gpu_driver_version: Optional[str] = None
+    """`gpu_driver_version` is not set by old shims, on hosts without GPUs,
+    and when driver detection fails."""
 
 
 class InstanceHealthResponse(CoreModel):

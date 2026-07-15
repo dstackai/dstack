@@ -2,12 +2,14 @@ import uuid
 from unittest.mock import Mock, call
 
 import pytest
+from gpuhunt import AcceleratorVendor
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
     Instance,
     InstanceStatus,
     InstanceTerminationReason,
@@ -502,6 +504,7 @@ class TestInstanceModelToInstance:
             price=1.0,
             total_blocks=1,
             busy_blocks=0,
+            gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
         )
         im = InstanceModel(
             id=instance_id,
@@ -512,7 +515,7 @@ class TestInstanceModelToInstance:
             unreachable=False,
             health=HealthStatus.WARNING,
             project=project,
-            job_provisioning_data='{"ssh_proxy":null, "backend":"aws","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            job_provisioning_data='{"ssh_proxy":null, "backend":"aws","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","gpu_driver":{"vendor":"nvidia","version":"570.86.15"},"instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             offer='{"price":1.0, "backend":"aws", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             total_blocks=1,
             busy_blocks=0,

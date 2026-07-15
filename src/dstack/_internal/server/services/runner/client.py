@@ -14,6 +14,7 @@ from typing_extensions import Self
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, Job, Run
@@ -680,8 +681,16 @@ def healthcheck_response_to_instance_check(
             and instance_health_response.dcgm.incidents
         ):
             message = instance_health_response.dcgm.incidents[0].error_message
+        gpu_driver = None
+        if response.gpu_driver_version:
+            gpu_driver = GpuDriverInfo.parse_obj(
+                {"vendor": response.gpu_vendor, "version": response.gpu_driver_version}
+            )
         return InstanceCheck(
-            reachable=True, health_response=instance_health_response, message=message
+            reachable=True,
+            health_response=instance_health_response,
+            message=message,
+            gpu_driver=gpu_driver,
         )
     return InstanceCheck(
         reachable=False,

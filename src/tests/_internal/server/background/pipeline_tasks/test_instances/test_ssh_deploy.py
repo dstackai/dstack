@@ -3,15 +3,23 @@ from typing import Optional
 from unittest.mock import Mock
 
 import pytest
+from gpuhunt import AcceleratorVendor
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import GoArchType
 from dstack._internal.core.errors import SSHProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
+from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
+    InstanceStatus,
+    InstanceTerminationReason,
+)
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server.background.pipeline_tasks.instances import InstanceWorker
 from dstack._internal.server.background.pipeline_tasks.instances import (
     ssh_deploy as instances_ssh_deploy,
 )
+from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.testing.common import (
     create_instance,
     create_project,
@@ -97,6 +105,41 @@ class TestSSHDeploy:
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
         deploy_instance_mock.assert_called_once()
+
+    async def test_adds_ssh_instance_with_gpu_driver(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        host_info: dict,
+        deploy_instance_mock: Mock,
+    ):
+        deploy_instance_mock.return_value = (
+            InstanceCheck(
+                reachable=True,
+                gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
+            ),
+            host_info,
+            GoArchType.AMD64,
+        )
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+        )
+        await session.commit()
+
+        await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.job_provisioning_data is not None
+        jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+        assert jpd.gpu_driver is not None
+        assert jpd.gpu_driver.version == "570.86.15"
 
     async def test_retries_ssh_instance_if_provisioning_fails(
         self,

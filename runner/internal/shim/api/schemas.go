@@ -9,6 +9,10 @@ import (
 type HealthcheckResponse struct {
 	Service string `json:"service"`
 	Version string `json:"version"`
+	// Optional host GPU driver info; empty on hosts without GPUs or if
+	// detection failed. Old servers ignore these fields.
+	GpuVendor        string `json:"gpu_vendor,omitempty"`
+	GpuDriverVersion string `json:"gpu_driver_version,omitempty"`
 }
 
 type ShutdownRequest struct {

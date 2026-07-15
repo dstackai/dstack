@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -41,6 +42,10 @@ type GpuInfo struct {
 	// AMD: empty string
 	// Intel: accelerator index: ("0", "1", ...), as reported by `hl-smi -Q index`
 	Index string
+	// Version of the installed host driver, e.g., "570.86.15" (NVIDIA),
+	// "6.10.5" (AMD amdgpu), "2.0.0" (Tenstorrent TT-KMD).
+	// Empty string if detection failed. All GPUs on a host share the same driver.
+	DriverVersion string
 }
 
 func GetGpuInfo(ctx context.Context) []GpuInfo {
@@ -59,12 +64,23 @@ func GetGpuInfo(ctx context.Context) []GpuInfo {
 	return []GpuInfo{}
 }
 
+// normalizeDriverVersion filters out placeholder values SMI tools emit when a
+// query field is not available, e.g., "N/A" or "[Not Supported]".
+func normalizeDriverVersion(value string) string {
+	value = strings.TrimSpace(value)
+	switch strings.ToUpper(value) {
+	case "N/A", "[N/A]", "UNKNOWN", "[UNKNOWN]", "[NOT SUPPORTED]", "[NOT AVAILABLE]":
+		return ""
+	}
+	return value
+}
+
 func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 	gpus := []GpuInfo{}
 
 	cmd := execute.ExecTask{
 		Command:     "nvidia-smi",
-		Args:        []string{"--query-gpu=name,memory.total,uuid", "--format=csv,noheader,nounits"},
+		Args:        []string{"--query-gpu=name,memory.total,uuid,driver_version", "--format=csv,noheader,nounits"},
 		StreamStdio: false,
 	}
 	res, err := cmd.Execute(ctx)
@@ -90,8 +106,8 @@ func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 			log.Error(ctx, "cannot read csv", "err", err)
 			return gpus
 		}
-		if len(record) != 3 {
-			log.Error(ctx, "3 csv fields expected", "len", len(record))
+		if len(record) != 4 {
+			log.Error(ctx, "4 csv fields expected", "len", len(record))
 			return gpus
 		}
 		vram, err := strconv.Atoi(strings.TrimSpace(record[1]))
@@ -100,19 +116,43 @@ func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: gpu.GpuVendorNvidia,
-			Name:   strings.TrimSpace(record[0]),
-			Vram:   vram,
-			ID:     strings.TrimSpace(record[2]),
+			Vendor:        gpu.GpuVendorNvidia,
+			Name:          strings.TrimSpace(record[0]),
+			Vram:          vram,
+			ID:            strings.TrimSpace(record[2]),
+			DriverVersion: normalizeDriverVersion(record[3]),
 		})
 	}
 	return gpus
 }
 
 type amdGpu struct {
-	Asic amdAsic `json:"asic"`
-	Vram amdVram `json:"vram"`
-	Bus  amdBus  `json:"bus"`
+	Asic   amdAsic   `json:"asic"`
+	Vram   amdVram   `json:"vram"`
+	Bus    amdBus    `json:"bus"`
+	Driver amdDriver `json:"driver"`
+}
+
+// amdDriver is the `driver` section of `amd-smi static --driver`.
+// Key names and value shapes differ between amd-smi versions, so it is parsed
+// defensively: an unexpected format leaves Version empty instead of failing
+// the whole GPU detection. Key matching is case-insensitive (encoding/json).
+type amdDriver struct {
+	Version string
+}
+
+func (d *amdDriver) UnmarshalJSON(data []byte) error {
+	var section struct {
+		Version       string `json:"version"`
+		DriverVersion string `json:"driver_version"`
+	}
+	// The error is ignored deliberately: an unexpected shape leaves Version empty.
+	_ = json.Unmarshal(data, &section)
+	d.Version = section.Version
+	if d.Version == "" {
+		d.Version = section.DriverVersion
+	}
+	return nil
 }
 
 // amd-smi >= 7.x wraps the array in {"gpu_data": [...]}
@@ -151,38 +191,53 @@ func parseAmdSmiOutput(data []byte) ([]amdGpu, error) {
 	return wrapped.GpuData, nil
 }
 
-func getAmdGpuInfo(ctx context.Context) []GpuInfo {
-	gpus := []GpuInfo{}
-
+func execAmdSmiStatic(ctx context.Context, withDriver bool) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
+	args := []string{
+		"run",
+		"--rm",
+		"--device", "/dev/kfd",
+		"--device", "/dev/dri",
+		amdSmiImage,
+		"static", "--json", "--asic", "--vram", "--bus",
+	}
+	if withDriver {
+		args = append(args, "--driver")
+	}
 	cmd := execute.ExecTask{
-		Command: "docker",
-		Args: []string{
-			"run",
-			"--rm",
-			"--device", "/dev/kfd",
-			"--device", "/dev/dri",
-			amdSmiImage,
-			"static", "--json", "--asic", "--vram", "--bus",
-		},
+		Command:     "docker",
+		Args:        args,
 		StreamStdio: false,
 	}
 	res, err := cmd.Execute(ctx)
 	if err != nil {
+		return "", err
+	}
+	if res.ExitCode != 0 {
+		return "", fmt.Errorf(
+			"exitcode: %d, stdout: %s, stderr: %s", res.ExitCode, res.Stdout, res.Stderr,
+		)
+	}
+	return res.Stdout, nil
+}
+
+func getAmdGpuInfo(ctx context.Context) []GpuInfo {
+	gpus := []GpuInfo{}
+
+	stdout, err := execAmdSmiStatic(ctx, true)
+	if err != nil {
+		// Fall back for amd-smi versions without the --driver option.
+		log.Error(ctx, "failed to execute amd-smi with --driver, retrying without", "err", err)
+		stdout, err = execAmdSmiStatic(ctx, false)
+	}
+	if err != nil {
 		log.Error(ctx, "failed to execute amd-smi", "err", err)
 		return gpus
 	}
-	if res.ExitCode != 0 {
-		log.Error(
-			ctx, "failed to execute amd-smi",
-			"exitcode", res.ExitCode, "stdout", res.Stdout, "stderr", res.Stderr,
-		)
-		return gpus
-	}
 
-	amdGpus, err := parseAmdSmiOutput([]byte(res.Stdout))
+	amdGpus, err := parseAmdSmiOutput([]byte(stdout))
 	if err != nil {
 		log.Error(ctx, "cannot read json", "err", err)
 		return gpus
@@ -198,6 +253,7 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 			Name:           amdGpu.Asic.Name,
 			Vram:           amdGpu.Vram.Size.Value,
 			RenderNodePath: renderNodePath,
+			DriverVersion:  amdGpu.Driver.Version,
 		})
 	}
 	return gpus
@@ -413,6 +469,20 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 	return gpus
 }
 
+// tenstorrentDriverVersionPath is the TT-KMD version file; it is what tt-smi
+// itself reads to report the driver version. It is a variable so tests can
+// override it.
+var tenstorrentDriverVersionPath = "/sys/module/tenstorrent/version"
+
+func getTenstorrentDriverVersion(ctx context.Context) string {
+	data, err := os.ReadFile(tenstorrentDriverVersionPath)
+	if err != nil {
+		log.Error(ctx, "failed to read tenstorrent driver version", "err", err)
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
 	gpus := []GpuInfo{}
 
@@ -447,7 +517,13 @@ func getTenstorrentGpuInfo(ctx context.Context) []GpuInfo {
 		return gpus
 	}
 
-	return getGpusFromTtSmiSnapshot(ttSmiSnapshot)
+	gpus = getGpusFromTtSmiSnapshot(ttSmiSnapshot)
+	if driverVersion := getTenstorrentDriverVersion(ctx); driverVersion != "" {
+		for i := range gpus {
+			gpus[i].DriverVersion = driverVersion
+		}
+	}
+	return gpus
 }
 
 func getAmdRenderNodePath(bdf string) (string, error) {

@@ -15,6 +15,108 @@ func loadTestData(filename string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
+func TestParseAmdSmiOutputWithDriver(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       string
+		wantName   string
+		wantDriver string
+	}{
+		{
+			name: "rocm 6.x flat array with driver",
+			data: `[{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592, "unit": "MB"}},` +
+				` "bus": {"bdf": "0000:05:00.0"}, "driver": {"name": "amdgpu", "version": "6.10.5"}}]`,
+			wantName:   "MI300X",
+			wantDriver: "6.10.5",
+		},
+		{
+			name: "version preferred over driver_version when both present",
+			data: `[{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592}},` +
+				` "bus": {"bdf": "0000:05:00.0"}, "driver": {"version": "6.10.5", "driver_version": "6.8.5"}}]`,
+			wantName:   "MI300X",
+			wantDriver: "6.10.5",
+		},
+		{
+			name: "rocm 7.x wrapped with uppercase driver keys",
+			data: `{"gpu_data": [{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592}},` +
+				` "bus": {"bdf": "0000:05:00.0"}, "driver": {"NAME": "amdgpu", "VERSION": "6.12.12"}}]}`,
+			wantName:   "MI300X",
+			wantDriver: "6.12.12",
+		},
+		{
+			name: "driver_version key variant",
+			data: `[{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592}},` +
+				` "bus": {"bdf": "0000:05:00.0"}, "driver": {"driver_name": "amdgpu", "driver_version": "6.8.5"}}]`,
+			wantName:   "MI300X",
+			wantDriver: "6.8.5",
+		},
+		{
+			name: "no driver section",
+			data: `[{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592}},` +
+				` "bus": {"bdf": "0000:05:00.0"}}]`,
+			wantName:   "MI300X",
+			wantDriver: "",
+		},
+		{
+			name: "unexpected driver section shape does not fail parsing",
+			data: `[{"gpu": 0, "asic": {"market_name": "MI300X"}, "vram": {"size": {"value": 196592}},` +
+				` "bus": {"bdf": "0000:05:00.0"}, "driver": "amdgpu 6.8.5"}]`,
+			wantName:   "MI300X",
+			wantDriver: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			amdGpus, err := parseAmdSmiOutput([]byte(tt.data))
+			if err != nil {
+				t.Fatalf("parseAmdSmiOutput() error = %v", err)
+			}
+			if len(amdGpus) != 1 {
+				t.Fatalf("parseAmdSmiOutput() returned %d GPUs, want 1", len(amdGpus))
+			}
+			if amdGpus[0].Asic.Name != tt.wantName {
+				t.Errorf("name = %q, want %q", amdGpus[0].Asic.Name, tt.wantName)
+			}
+			if amdGpus[0].Driver.Version != tt.wantDriver {
+				t.Errorf("driver version = %q, want %q", amdGpus[0].Driver.Version, tt.wantDriver)
+			}
+		})
+	}
+}
+
+func TestNormalizeDriverVersion(t *testing.T) {
+	for input, want := range map[string]string{
+		" 570.86.15 ":     "570.86.15",
+		"N/A":             "",
+		"[Not Supported]": "",
+		"Unknown":         "",
+	} {
+		if got := normalizeDriverVersion(input); got != want {
+			t.Errorf("normalizeDriverVersion(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestGetTenstorrentDriverVersion(t *testing.T) {
+	versionFile := filepath.Join(t.TempDir(), "version")
+	if err := os.WriteFile(versionFile, []byte("2.0.0\n"), 0o644); err != nil {
+		t.Fatalf("failed to write version file: %v", err)
+	}
+	origPath := tenstorrentDriverVersionPath
+	tenstorrentDriverVersionPath = versionFile
+	defer func() { tenstorrentDriverVersionPath = origPath }()
+
+	if got := getTenstorrentDriverVersion(t.Context()); got != "2.0.0" {
+		t.Errorf("getTenstorrentDriverVersion() = %q, want %q", got, "2.0.0")
+	}
+
+	tenstorrentDriverVersionPath = filepath.Join(t.TempDir(), "nonexistent")
+	if got := getTenstorrentDriverVersion(t.Context()); got != "" {
+		t.Errorf("getTenstorrentDriverVersion() = %q, want empty string", got)
+	}
+}
+
 func TestUnmarshalTtSmiSnapshot(t *testing.T) {
 	tests := []struct {
 		name     string

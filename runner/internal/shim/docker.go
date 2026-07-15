@@ -324,6 +324,12 @@ func (d *DockerRunner) Resources(ctx context.Context) Resources {
 	}
 }
 
+// Gpus returns the GPUs detected at startup without collecting other host
+// resources, making it suitable for frequently called paths.
+func (d *DockerRunner) Gpus(ctx context.Context) []host.GpuInfo {
+	return d.gpus
+}
+
 func (d *DockerRunner) TaskList() []*TaskListItem {
 	tasks := d.tasks.List()
 	result := make([]*TaskListItem, 0, len(tasks))
