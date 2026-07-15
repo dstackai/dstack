@@ -40,7 +40,6 @@ def _claude_auth() -> ClaudeAuth:
         executable="claude",
         effort=None,
         model="claude-test",
-        use_existing=False,
     )
 
 

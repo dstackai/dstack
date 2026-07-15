@@ -152,7 +152,6 @@ class ClaudeAuth:
     executable: str
     effort: Optional[str]
     model: str
-    use_existing: bool
 
 
 @dataclass
@@ -219,17 +218,6 @@ def _create_agent_session_directory(parent: Path, timestamp: str) -> Path:
 
 def get_claude_auth() -> ClaudeAuth:
     api_key = os.getenv("DSTACK_AGENT_ANTHROPIC_API_KEY") or None
-    use_existing = _get_bool_env("DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH")
-    if api_key and use_existing:
-        raise CLIError(
-            "DSTACK_AGENT_ANTHROPIC_API_KEY and "
-            "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH cannot both be set"
-        )
-    if not api_key and not use_existing:
-        raise CLIError(
-            "DSTACK_AGENT_ANTHROPIC_API_KEY is not set. Set it or opt in to existing "
-            "Claude CLI auth with DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1"
-        )
     configured_path = os.getenv("DSTACK_AGENT_CLAUDE_PATH") or "claude"
     executable = shutil.which(configured_path)
     if executable is None:
@@ -244,7 +232,6 @@ def get_claude_auth() -> ClaudeAuth:
         executable=executable,
         effort=effort,
         model=os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-opus-4-8"),
-        use_existing=use_existing,
     )
 
 
@@ -411,18 +398,6 @@ def redact(value: str, redacted_values: Sequence[str]) -> str:
     return value
 
 
-def _get_bool_env(name: str) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return False
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off", ""}:
-        return False
-    raise CLIError(f"{name} must be a boolean")
-
-
 def _validate_control_socket_path(build_root: Path) -> None:
     if IS_WINDOWS:
         return
@@ -573,7 +548,7 @@ def _build_claude_command(*, auth: ClaudeAuth) -> list[str]:
         "--json-schema",
         json.dumps(AGENT_FINAL_REPORT_JSON_SCHEMA),
     ]
-    if auth.use_existing:
+    if auth.api_key is None:
         command[2:2] = ["--setting-sources", "project,local"]
     else:
         command[2:2] = ["--bare"]

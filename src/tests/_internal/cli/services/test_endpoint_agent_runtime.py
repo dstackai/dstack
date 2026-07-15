@@ -36,39 +36,38 @@ from dstack._internal.core.services.configs import ConfigManager
 pytestmark = pytest.mark.windows
 
 
-def _claude_auth(*, use_existing: bool = False, effort=None) -> ClaudeAuth:
+def _claude_auth(*, api_key: str | None = "anthropic-secret", effort=None) -> ClaudeAuth:
     return ClaudeAuth(
-        api_key=None if use_existing else "anthropic-secret",
+        api_key=api_key,
         executable="claude",
         effort=effort,
         model="claude-test",
-        use_existing=use_existing,
     )
 
 
 class TestClaudeAuth:
-    def test_rejects_api_key_and_existing_auth_together(self, monkeypatch):
+    def test_uses_api_key_when_set(self, monkeypatch):
         monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_API_KEY", "key")
-        monkeypatch.setenv("DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH", "1")
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
 
-        with pytest.raises(CLIError, match="cannot both be set"):
-            get_claude_auth()
+        auth = get_claude_auth()
 
-    def test_requires_an_auth_mode(self, monkeypatch):
+        assert auth.api_key == "key"
+
+    def test_uses_existing_auth_when_api_key_is_unset(self, monkeypatch):
         monkeypatch.delenv("DSTACK_AGENT_ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.delenv("DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH", raising=False)
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
 
-        with pytest.raises(CLIError, match="DSTACK_AGENT_ANTHROPIC_API_KEY is not set"):
-            get_claude_auth()
+        auth = get_claude_auth()
 
-    @pytest.mark.parametrize("use_existing", [False, True])
-    def test_builds_command_for_selected_auth_mode(self, use_existing):
-        command = _build_claude_command(
-            auth=_claude_auth(use_existing=use_existing, effort="high")
-        )
+        assert auth.api_key is None
 
-        assert ("--bare" in command) is not use_existing
-        assert ("--setting-sources" in command) is use_existing
+    @pytest.mark.parametrize("api_key", ["key", None])
+    def test_builds_command_for_selected_auth_mode(self, api_key):
+        command = _build_claude_command(auth=_claude_auth(api_key=api_key, effort="high"))
+
+        assert ("--bare" in command) is (api_key is not None)
+        assert ("--setting-sources" in command) is (api_key is None)
         assert command[command.index("--effort") + 1] == "high"
 
     @pytest.mark.windows_only
@@ -112,6 +111,8 @@ class TestAgentIsolation:
         assert env["DSTACK_PROJECT"] == "main"
         assert env["DSTACK_TOKEN"] == "dstack-secret"
         assert env["HF_TOKEN"] == "hf-secret"
+        assert env["ANTHROPIC_API_KEY"] == "anthropic-secret"
+        assert env["HOME"] == str(tmp_path / "home")
         assert "UNRELATED_SECRET" not in env
         project = ConfigManager(tmp_path / "home" / ".dstack").get_project_config()
         assert project is not None
