@@ -32,6 +32,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
     can_terminate_fleet_instances_on_idle_duration,
     get_instance_idle_duration,
     get_provisioning_deadline,
+    set_gpu_driver_update,
     set_health_update,
     set_status_update,
     set_unreachable_update,
@@ -181,6 +182,11 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
 
     if instance_check.reachable:
         result.instance_update_map["termination_deadline"] = None
+        set_gpu_driver_update(
+            update_map=result.instance_update_map,
+            job_provisioning_data=job_provisioning_data,
+            gpu_driver=instance_check.gpu_driver,
+        )
         if instance_model.status == InstanceStatus.PROVISIONING:
             set_status_update(
                 update_map=result.instance_update_map,

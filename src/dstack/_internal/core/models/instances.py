@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import Field, root_validator
+from pydantic import Field, root_validator, validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -44,6 +44,21 @@ class Gpu(CoreModel):
         else:
             values["vendor"] = gpuhunt.AcceleratorVendor.cast(vendor)
         return values
+
+
+class GpuDriverInfo(CoreModel):
+    vendor: Optional[gpuhunt.AcceleratorVendor] = None
+    version: str
+
+    @validator("vendor", pre=True)
+    def _cast_vendor(cls, v: Any) -> Optional[gpuhunt.AcceleratorVendor]:
+        if v is None or isinstance(v, gpuhunt.AcceleratorVendor):
+            return v
+        try:
+            return gpuhunt.AcceleratorVendor.cast(v)
+        except ValueError:
+            # Tolerate vendors unknown to this server/client version
+            return None
 
 
 class Disk(CoreModel):
@@ -324,3 +339,5 @@ class Instance(CoreModel):
     price: Optional[float] = None
     total_blocks: Optional[int] = None
     busy_blocks: int = 0
+    gpu_driver: Optional[GpuDriverInfo] = None
+    """`gpu_driver` is the accelerator driver installed on the host, when known."""

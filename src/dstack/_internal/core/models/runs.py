@@ -30,6 +30,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
     InstanceOfferWithAvailability,
     InstanceType,
     SSHConnectionParams,
@@ -336,6 +337,12 @@ class JobProvisioningData(CoreModel):
     ssh_proxy: Optional[SSHConnectionParams] = None
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
+    gpu_driver: Optional[GpuDriverInfo] = None
+    """`gpu_driver` is the accelerator driver installed on the host, when known.
+    Detected via the shim for VM-based backends and SSH fleets; taken from the
+    provider API or node labels for some container-based backends. May be set
+    after provisioning.
+    """
 
     def get_base_backend(self) -> BackendType:
         if self.base_backend is not None:

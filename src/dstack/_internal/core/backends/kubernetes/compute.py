@@ -394,6 +394,10 @@ class KubernetesCompute(
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
         pod_spec = get_or_error(pod.spec)
         node = api.read_node(name=get_or_error(pod_spec.node_name))
+        # TODO: Set provisioning_data.gpu_driver from the node labels:
+        # nvidia.com/cuda.driver-version.full set by GPU Feature Discovery
+        # (or nvidia.com/cuda.driver.{major,minor,rev} set by older GFD versions),
+        # amd.com/gpu.driver-version set by the AMD GPU Operator.
         instance_offer = get_instance_offer_from_node(node=node, region=cluster.region)
         if instance_offer is not None:
             resource_requirements = get_or_error(pod_spec.containers[0].resources)

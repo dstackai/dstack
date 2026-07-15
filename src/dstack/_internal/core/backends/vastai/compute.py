@@ -169,6 +169,7 @@ class VastAICompute(
                 provisioning_data.ssh_port = int(
                     resp["ports"][f"{DSTACK_RUNNER_SSH_PORT}/tcp"][0]["HostPort"]
                 )
+                # TODO: Set provisioning_data.gpu_driver from resp["driver_version"]
             if (
                 resp["actual_status"] == "created"
                 and ": OCI runtime create failed:" in resp["status_msg"]

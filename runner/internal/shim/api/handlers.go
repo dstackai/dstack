@@ -16,10 +16,15 @@ func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return &HealthcheckResponse{
+	response := &HealthcheckResponse{
 		Service: "dstack-shim",
 		Version: s.version,
-	}, nil
+	}
+	if gpus := s.runner.Gpus(r.Context()); len(gpus) > 0 {
+		response.GpuVendor = string(gpus[0].Vendor)
+		response.GpuDriverVersion = gpus[0].DriverVersion
+	}
+	return response, nil
 }
 
 func (s *ShimServer) ShutdownHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {

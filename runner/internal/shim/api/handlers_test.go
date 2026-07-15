@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	commonapi "github.com/dstackai/dstack/runner/internal/common/api"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
 func TestHealthcheck(t *testing.T) {
@@ -23,6 +25,30 @@ func TestHealthcheck(t *testing.T) {
 	}
 
 	expected := "{\"service\":\"dstack-shim\",\"version\":\"0.0.1.dev2\"}"
+
+	if strings.TrimSpace(responseRecorder.Body.String()) != expected {
+		t.Errorf("Want '%s', got '%s'", expected, responseRecorder.Body.String())
+	}
+}
+
+func TestHealthcheckWithGpus(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/healthcheck", nil)
+	responseRecorder := httptest.NewRecorder()
+
+	runner := NewDummyRunner()
+	runner.gpus = []host.GpuInfo{
+		{Vendor: gpu.GpuVendorNvidia, Name: "T4", Vram: 16384, DriverVersion: "570.86.15"},
+	}
+	server := NewShimServer(context.Background(), ":12346", "0.0.1.dev2", runner, nil, nil, nil, nil)
+
+	f := commonapi.JSONResponseHandler(server.HealthcheckHandler)
+	f(responseRecorder, request)
+
+	if responseRecorder.Code != 200 {
+		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
+	}
+
+	expected := `{"service":"dstack-shim","version":"0.0.1.dev2","gpu_vendor":"nvidia","gpu_driver_version":"570.86.15"}`
 
 	if strings.TrimSpace(responseRecorder.Body.String()) != expected {
 		t.Errorf("Want '%s', got '%s'", expected, responseRecorder.Body.String())

@@ -37,6 +37,8 @@ def get_fleets_table(
         table.add_column("GPU")
     table.add_column("SPOT")
     table.add_column("BACKEND")
+    if verbose:
+        table.add_column("DRIVER")
     table.add_column("PRICE")
     table.add_column("STATUS", no_wrap=True)
     table.add_column("CREATED", no_wrap=True)
@@ -123,6 +125,7 @@ def get_fleets_table(
                 "RESOURCES": _format_instance_resources(instance),
                 "GPU": _format_instance_gpu(instance),
                 "BACKEND": backend_with_region,
+                "DRIVER": instance.gpu_driver.version if instance.gpu_driver else "-",
                 "PRICE": instance_price,
                 "SPOT": instance_spot,
                 "STATUS": _format_instance_status(instance),

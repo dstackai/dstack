@@ -13,6 +13,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
 type TaskRunner interface {
@@ -22,6 +23,7 @@ type TaskRunner interface {
 	Remove(ctx context.Context, taskID string) error
 
 	Resources(context.Context) shim.Resources
+	Gpus(context.Context) []host.GpuInfo
 	TaskList() []*shim.TaskListItem
 	TaskInfo(taskID string) shim.TaskInfo
 }

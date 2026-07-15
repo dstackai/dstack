@@ -1006,6 +1006,7 @@ class TestApplyFleetPlan:
                     "price": None,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 }
             ],
         }
@@ -1138,6 +1139,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 }
             ],
         }
@@ -1358,6 +1360,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 },
                 {
                     "id": SomeUUID4Str(),
@@ -1393,6 +1396,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 },
             ],
         }
