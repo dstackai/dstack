@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
@@ -100,9 +100,15 @@ class EndpointAgentWorkspace:
 
 
 @dataclass
-class EndpointAgentDebugSession:
+class EndpointAgentSession:
     path: Path
     timestamp: str
+    debug: bool
+    _log_enabled: bool = field(default=True, init=False, repr=False)
+
+    @property
+    def log_path(self) -> Path:
+        return self.path / "agent.log"
 
     @property
     def trace_path(self) -> Path:
@@ -111,12 +117,33 @@ class EndpointAgentDebugSession:
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
 
+    def append_log(self, line: str) -> None:
+        if not self._log_enabled:
+            return
+        try:
+            with self.log_path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+                f.flush()
+        except OSError as e:
+            self._log_enabled = False
+            console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
+
     def finish(self, preset_id: Optional[str] = None) -> Path:
         suffix = preset_id or "failed"
-        target = self.path.with_name(f"{self.timestamp}-{suffix}")
-        self.path.rename(target)
-        self.path = target
-        return target
+        name = f"{self.timestamp}-{suffix}"
+        index = 0
+        while True:
+            target = self.path.with_name(name if index == 0 else f"{name}-{index}")
+            if target.exists():
+                index += 1
+                continue
+            try:
+                self.path.rename(target)
+            except FileExistsError:
+                index += 1
+                continue
+            self.path = target
+            return target
 
 
 @dataclass(frozen=True)
@@ -144,25 +171,50 @@ def endpoint_agent_workspace() -> Iterator[EndpointAgentWorkspace]:
         yield workspace
 
 
-def create_endpoint_agent_debug_session(
+def create_endpoint_agent_session(
     configuration: EndpointConfiguration,
-) -> EndpointAgentDebugSession:
+    *,
+    debug: bool = False,
+) -> EndpointAgentSession:
     if configuration.name is None:
-        raise CLIError("Endpoint name is required to save agent debug output")
+        raise CLIError("Endpoint name is required to save agent output")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
-    path = get_dstack_dir() / "agent" / configuration.name / f"{timestamp}-running"
-    path.mkdir(mode=0o700, parents=True)
-    data = json.loads(configuration.json(exclude_none=True))
-    if configuration.env:
-        data["env"] = list(configuration.env)
-    else:
-        data.pop("env", None)
-    _write_private_text(
-        path / "endpoint.dstack.yml",
-        yaml.safe_dump(data, sort_keys=False),
-    )
-    _write_private_text(path / "trace.jsonl", "")
-    return EndpointAgentDebugSession(path=path, timestamp=timestamp)
+    parent = get_dstack_dir() / "agent" / configuration.name
+    path: Optional[Path] = None
+    try:
+        parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path = _create_agent_session_directory(parent, timestamp)
+        _write_private_text(path / "agent.log", "")
+        if debug:
+            data = json.loads(configuration.json(exclude_none=True))
+            if configuration.env:
+                data["env"] = list(configuration.env)
+            else:
+                data.pop("env", None)
+            _write_private_text(
+                path / "endpoint.dstack.yml",
+                yaml.safe_dump(data, sort_keys=False),
+            )
+            _write_private_text(path / "trace.jsonl", "")
+    except OSError as e:
+        if path is not None:
+            shutil.rmtree(path, ignore_errors=True)
+        raise CLIError(f"Could not create agent output under {parent}: {e}") from e
+    assert path is not None
+    return EndpointAgentSession(path=path, timestamp=timestamp, debug=debug)
+
+
+def _create_agent_session_directory(parent: Path, timestamp: str) -> Path:
+    index = 0
+    while True:
+        name = f"{timestamp}-running" if index == 0 else f"{timestamp}-{index}-running"
+        path = parent / name
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            index += 1
+            continue
+        return path
 
 
 def get_claude_auth() -> ClaudeAuth:
@@ -246,12 +298,13 @@ async def run_endpoint_agent(
     workspace: EndpointAgentWorkspace,
     auth: ClaudeAuth,
     redacted_values: Sequence[str],
-    debug_session: Optional[EndpointAgentDebugSession] = None,
+    agent_session: EndpointAgentSession,
 ) -> EndpointAgentProcessOutput:
     command = _prepare_subprocess_command(_build_claude_command(auth=auth))
     progress_tailer = _ProgressTailer(
         path=workspace.progress_path,
         redacted_values=redacted_values,
+        agent_session=agent_session,
     )
     progress_task = asyncio.create_task(progress_tailer.run())
     proc: Optional[asyncio.subprocess.Process] = None
@@ -279,7 +332,7 @@ async def run_endpoint_agent(
                 stream_name="stdout",
                 parse_result=True,
                 redacted_values=redacted_values,
-                debug_session=debug_session,
+                agent_session=agent_session,
             )
         )
         stderr_task = asyncio.create_task(
@@ -288,7 +341,7 @@ async def run_endpoint_agent(
                 stream_name="stderr",
                 parse_result=False,
                 redacted_values=redacted_values,
-                debug_session=debug_session,
+                agent_session=agent_session,
             )
         )
         stdout_output, stderr_output, returncode = await asyncio.gather(
@@ -316,11 +369,13 @@ async def run_endpoint_agent(
     return output
 
 
-def print_endpoint_progress(message: str) -> None:
+def print_endpoint_progress(message: str, *, agent_session: EndpointAgentSession) -> None:
     timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    message = message.rstrip("\r\n")
+    agent_session.append_log(f"[{timestamp}] {message}")
     console.print(
         Text(f"[{timestamp}]", style="log.time"),
-        Text(message.rstrip("\r\n"), style="log.message"),
+        Text(message, style="log.message"),
         soft_wrap=True,
     )
 
@@ -348,7 +403,11 @@ def get_sensitive_inherited_env_values() -> list[str]:
 
 def redact(value: str, redacted_values: Sequence[str]) -> str:
     for redacted_value in redacted_values:
-        value = value.replace(redacted_value, _REDACTION)
+        if value == redacted_value:
+            return _REDACTION
+        # Replacing short values such as "1" or "false" corrupts unrelated diagnostics.
+        if len(redacted_value) >= 8:
+            value = value.replace(redacted_value, _REDACTION)
     return value
 
 
@@ -539,7 +598,7 @@ def _write_private_text(path: Path, content: str) -> None:
 
 
 def _write_debug_trace(
-    session: EndpointAgentDebugSession,
+    session: EndpointAgentSession,
     *,
     stream_name: str,
     text: str,
@@ -582,7 +641,7 @@ async def _read_process_stream(
     stream_name: str,
     parse_result: bool,
     redacted_values: Sequence[str],
-    debug_session: Optional[EndpointAgentDebugSession],
+    agent_session: EndpointAgentSession,
 ) -> EndpointAgentProcessOutput:
     output = EndpointAgentProcessOutput()
     while True:
@@ -590,9 +649,9 @@ async def _read_process_stream(
         if not line:
             return output
         text = line.decode(errors="replace")
-        if debug_session is not None:
+        if agent_session.debug:
             _write_debug_trace(
-                debug_session,
+                agent_session,
                 stream_name=stream_name,
                 text=text,
                 redacted_values=redacted_values,
@@ -660,9 +719,16 @@ def _terminate_windows_process_tree(pid: int) -> None:
 
 
 class _ProgressTailer:
-    def __init__(self, *, path: Path, redacted_values: Sequence[str]) -> None:
+    def __init__(
+        self,
+        *,
+        path: Path,
+        redacted_values: Sequence[str],
+        agent_session: EndpointAgentSession,
+    ) -> None:
         self._path = path
         self._redacted_values = redacted_values
+        self._agent_session = agent_session
         self._offset = 0
 
     async def run(self) -> None:
@@ -680,7 +746,10 @@ class _ProgressTailer:
         for line in lines:
             message = _parse_progress(line)
             if message is not None:
-                print_endpoint_progress(redact(message, self._redacted_values))
+                print_endpoint_progress(
+                    redact(message, self._redacted_values),
+                    agent_session=self._agent_session,
+                )
 
 
 def _parse_progress(line: str) -> Optional[str]:

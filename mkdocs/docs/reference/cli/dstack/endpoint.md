@@ -47,9 +47,11 @@ Set either `DSTACK_AGENT_ANTHROPIC_API_KEY` or
 | `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. |
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. |
 
-Pass `--debug` to save the agent trace under
+Agent progress is written to `agent.log` under
 `~/.dstack/agent/<endpoint-name>/<timestamp>-<preset-id>/`. Failed attempts use
-the `-failed` suffix.
+the `-failed` suffix. Pass `--debug` to also save the effective endpoint
+configuration (`endpoint.dstack.yml`), agent prompt (`prompt.md`), and raw trace
+(`trace.jsonl`).
 
 ## dstack endpoint preset apply
 

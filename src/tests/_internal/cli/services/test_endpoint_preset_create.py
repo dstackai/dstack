@@ -7,9 +7,10 @@ import pytest
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
     ClaudeAuth,
-    EndpointAgentDebugSession,
     EndpointAgentProcessOutput,
+    EndpointAgentSession,
     EndpointAgentWorkspace,
+    print_endpoint_progress,
 )
 from dstack._internal.cli.services.endpoint_preset_create import (
     EndpointPresetCreateResult,
@@ -89,6 +90,42 @@ def creation_context(tmp_path, monkeypatch):
 
 
 class TestCreateEndpointPreset:
+    def test_saves_agent_log_without_debug(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        preset = get_endpoint_preset()
+
+        async def create(**kwargs):
+            print_endpoint_progress("testing preset", agent_session=kwargs["agent_session"])
+            return EndpointPresetCreateResult(
+                preset=preset,
+                path=tmp_path / "preset.yaml",
+                final_run_id=uuid.uuid4(),
+                final_run_name="qwen-build-2",
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            create,
+        )
+
+        create_endpoint_preset(
+            api=SimpleNamespace(),
+            configuration=EndpointConfiguration(
+                name="qwen",
+                model={"base": "Qwen/Qwen3.5-27B"},
+            ),
+            store=EndpointPresetStore(tmp_path / "presets"),
+        )
+
+        paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
+        assert len(paths) == 1
+        assert paths[0].name.endswith(f"-{preset.id}")
+        assert {path.name for path in paths[0].iterdir()} == {"agent.log"}
+        assert "testing preset" in (paths[0] / "agent.log").read_text()
+        output = capsys.readouterr().out.replace("\n", "")
+        assert f"Agent log saved to {paths[0] / 'agent.log'}" in output
+
     def test_debug_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
@@ -102,7 +139,7 @@ class TestCreateEndpointPreset:
             }
             assert isinstance(kwargs["source_configuration"].env["HF_TOKEN"], EnvSentinel)
             assert kwargs["source_configuration"].env["TOKENIZERS_PARALLELISM"] == "false"
-            kwargs["debug_session"].write_prompt("test prompt")
+            kwargs["agent_session"].write_prompt("test prompt")
             return EndpointPresetCreateResult(
                 preset=preset,
                 path=tmp_path / "preset.yaml",
@@ -117,7 +154,7 @@ class TestCreateEndpointPreset:
             "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
             create,
         )
-        monkeypatch.setattr(EndpointAgentDebugSession, "finish", fail_finish)
+        monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
 
         result = create_endpoint_preset(
             api=SimpleNamespace(),
@@ -136,6 +173,7 @@ class TestCreateEndpointPreset:
         assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
             "endpoint.dstack.yml",
+            "agent.log",
             "prompt.md",
             "trace.jsonl",
         }
@@ -156,7 +194,7 @@ class TestCreateEndpointPreset:
             "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
             create,
         )
-        monkeypatch.setattr(EndpointAgentDebugSession, "finish", fail_finish)
+        monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
 
         with pytest.raises(RuntimeError, match="creation failed"):
             create_endpoint_preset(
@@ -188,10 +226,11 @@ class TestCreateEndpointPreset:
                     model={"base": "Qwen/Qwen3.5-27B"},
                 ),
                 store=EndpointPresetStore(tmp_path / "presets"),
+                agent_session=_agent_session(tmp_path),
             )
 
     @pytest.mark.asyncio
-    async def test_cleans_up_runs_when_cancelled(self, creation_context, monkeypatch):
+    async def test_cleans_up_runs_when_cancelled(self, creation_context, monkeypatch, tmp_path):
         async def run_agent(**_):
             raise asyncio.CancelledError
 
@@ -215,6 +254,7 @@ class TestCreateEndpointPreset:
                 configuration=creation_context.configuration,
                 source_configuration=creation_context.source_configuration,
                 store=creation_context.store,
+                agent_session=_agent_session(tmp_path),
             )
 
         assert len(cleanup_calls) == 1
@@ -228,14 +268,19 @@ class TestCreateEndpointPreset:
     async def test_saves_preset_and_cleans_up_runs(
         self, creation_context, monkeypatch, keep_service, stopped_names, tmp_path
     ):
-        debug_path = tmp_path / "debug-running"
-        debug_path.mkdir()
-        (debug_path / "trace.jsonl").touch()
-        debug_session = EndpointAgentDebugSession(path=debug_path, timestamp="20260714-120000Z")
+        session_path = tmp_path / "debug-running"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        (session_path / "trace.jsonl").touch()
+        agent_session = EndpointAgentSession(
+            path=session_path,
+            timestamp="20260714-120000Z",
+            debug=True,
+        )
 
         async def run_agent(**kwargs):
-            assert kwargs["debug_session"] is debug_session
-            assert (debug_path / "prompt.md").is_file()
+            assert kwargs["agent_session"] is agent_session
+            assert (session_path / "prompt.md").is_file()
             return EndpointAgentProcessOutput(
                 report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
             )
@@ -250,7 +295,7 @@ class TestCreateEndpointPreset:
             source_configuration=creation_context.source_configuration,
             store=creation_context.store,
             keep_service=keep_service,
-            debug_session=debug_session,
+            agent_session=agent_session,
         )
 
         assert result.preset.base == "Qwen/Qwen3.5-27B"
@@ -332,9 +377,23 @@ class TestCleanupRuns:
             ),
             final_run_name="qwen-build-2",
             keep_final_service=True,
+            agent_session=_agent_session(tmp_path),
         )
 
         assert runs.stopped_names == ["qwen-build-1"]
+
+
+def _agent_session(tmp_path, *, debug: bool = False) -> EndpointAgentSession:
+    path = tmp_path / "agent-running"
+    path.mkdir()
+    (path / "agent.log").touch()
+    if debug:
+        (path / "trace.jsonl").touch()
+    return EndpointAgentSession(
+        path=path,
+        timestamp="20260714-120000Z",
+        debug=debug,
+    )
 
 
 class _FakeRuns:

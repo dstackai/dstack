@@ -12,17 +12,20 @@ import yaml
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
     ClaudeAuth,
-    EndpointAgentDebugSession,
+    EndpointAgentSession,
     EndpointAgentWorkspace,
     _build_claude_command,
+    _create_agent_session_directory,
     _prepare_subprocess_command,
     _ProgressTailer,
     _terminate_process,
     build_endpoint_agent_env,
     contains_redacted_value,
-    create_endpoint_agent_debug_session,
+    create_endpoint_agent_session,
     endpoint_agent_workspace,
     get_claude_auth,
+    print_endpoint_progress,
+    redact,
     run_endpoint_agent,
 )
 from dstack._internal.compat import IS_WINDOWS
@@ -147,8 +150,8 @@ class TestAgentIsolation:
         )
 
 
-class TestAgentDebugSession:
-    def test_saves_effective_configuration_without_env_values(self, tmp_path, monkeypatch):
+class TestAgentSession:
+    def test_saves_log_and_debug_files(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         configuration = EndpointConfiguration(
@@ -158,20 +161,96 @@ class TestAgentDebugSession:
             env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
         )
 
-        success_session = create_endpoint_agent_debug_session(configuration)
-        data = yaml.safe_load((success_session.path / "endpoint.dstack.yml").read_text())
+        session = create_endpoint_agent_session(configuration)
 
-        assert success_session.path.parent == tmp_path / ".dstack" / "agent" / "qwen"
-        assert success_session.path.name.endswith("-running")
+        assert session.path.parent == tmp_path / ".dstack" / "agent" / "qwen"
+        assert session.path.name.endswith("-running")
+        assert {path.name for path in session.path.iterdir()} == {"agent.log"}
+        print_endpoint_progress("creating preset", agent_session=session)
+        assert "creating preset" in session.log_path.read_text()
+        assert "creating preset" in capsys.readouterr().out
+        if not IS_WINDOWS:
+            assert session.path.stat().st_mode & 0o777 == 0o700
+            assert session.log_path.stat().st_mode & 0o777 == 0o600
+
+        debug_session = create_endpoint_agent_session(configuration, debug=True)
+        data = yaml.safe_load((debug_session.path / "endpoint.dstack.yml").read_text())
+
+        assert {path.name for path in debug_session.path.iterdir()} == {
+            "agent.log",
+            "endpoint.dstack.yml",
+            "trace.jsonl",
+        }
         assert data["max_price"] == 0.5
         assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
-        assert "false" not in (success_session.path / "endpoint.dstack.yml").read_text()
-        success_path = success_session.finish("8f3a12c4")
+        assert "false" not in (debug_session.path / "endpoint.dstack.yml").read_text()
+        success_path = debug_session.finish("8f3a12c4")
         assert success_path.name.endswith("-8f3a12c4")
 
-        failed_session = create_endpoint_agent_debug_session(configuration)
+        failed_session = create_endpoint_agent_session(configuration)
         failed_path = failed_session.finish()
         assert failed_path.name.endswith("-failed")
+
+    def test_avoids_existing_session_directories(self, tmp_path):
+        timestamp = "20260714-120000-000000Z"
+        (tmp_path / f"{timestamp}-running").mkdir()
+
+        path = _create_agent_session_directory(tmp_path, timestamp)
+
+        assert path.name == f"{timestamp}-1-running"
+
+    def test_finish_does_not_replace_existing_directory(self, tmp_path):
+        running = tmp_path / "20260714-120000-000000Z-running"
+        running.mkdir()
+        (running / "agent.log").touch()
+        existing = tmp_path / "20260714-120000-000000Z-failed"
+        existing.mkdir()
+        (existing / "keep").touch()
+        session = EndpointAgentSession(
+            path=running,
+            timestamp="20260714-120000-000000Z",
+            debug=False,
+        )
+
+        path = session.finish()
+
+        assert path.name == "20260714-120000-000000Z-failed-1"
+        assert (existing / "keep").is_file()
+
+    def test_reports_invalid_existing_parent(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        parent = tmp_path / ".dstack" / "agent"
+        parent.mkdir(parents=True)
+        (parent / "qwen").write_text("not a directory")
+
+        with pytest.raises(CLIError, match="Could not create agent output"):
+            create_endpoint_agent_session(
+                EndpointConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"})
+            )
+
+    def test_log_write_failure_warns_once(self, tmp_path, capsys):
+        path = tmp_path / "agent-running"
+        path.mkdir()
+        (path / "agent.log").touch()
+        session = EndpointAgentSession(
+            path=path,
+            timestamp="20260714-120000-000000Z",
+            debug=False,
+        )
+        shutil.rmtree(path)
+
+        session.append_log("first")
+        session.append_log("second")
+
+        assert capsys.readouterr().out.count("Could not write agent log") == 1
+
+
+class TestRedaction:
+    def test_does_not_replace_short_values_inside_diagnostics(self):
+        assert redact("DEBUG=1; enabled=false", ("1", "false")) == "DEBUG=1; enabled=false"
+        assert redact("false", ("false",)) == "[redacted]"
+        assert redact("token=secret-token", ("secret-token",)) == "token=[redacted]"
 
 
 class TestAgentOutput:
@@ -199,22 +278,27 @@ print(json.dumps({
         )
 
         workspace = EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
-        debug_path = tmp_path / "debug-running"
-        debug_path.mkdir()
-        (debug_path / "trace.jsonl").touch()
-        debug_session = EndpointAgentDebugSession(path=debug_path, timestamp="20260714-120000Z")
+        session_path = tmp_path / "debug-running"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        (session_path / "trace.jsonl").touch()
+        agent_session = EndpointAgentSession(
+            path=session_path,
+            timestamp="20260714-120000Z",
+            debug=True,
+        )
         output = await run_endpoint_agent(
             prompt="full endpoint prompt",
             env=os.environ.copy(),
             workspace=workspace,
             auth=_claude_auth(),
             redacted_values=("secret-token",),
-            debug_session=debug_session,
+            agent_session=agent_session,
         )
 
         assert output.report_data == {"prompt": "full endpoint prompt"}
         assert output.error == "bad [redacted]"
-        trace = [json.loads(line) for line in debug_session.trace_path.read_text().splitlines()]
+        trace = [json.loads(line) for line in agent_session.trace_path.read_text().splitlines()]
         assert len(trace) == 1
         assert trace[0]["timestamp"].endswith("Z")
         assert trace[0]["stream"] == "stdout"
@@ -235,6 +319,9 @@ print(json.dumps({
 """
         )
         (tmp_path / "progress.jsonl").touch()
+        session_path = tmp_path / "agent-running"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
         monkeypatch.setattr(
             "dstack._internal.cli.services.endpoint_agent_runtime._build_claude_command",
             lambda **_: [sys.executable, str(script)],
@@ -246,6 +333,11 @@ print(json.dumps({
             workspace=EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
             auth=_claude_auth(),
             redacted_values=(),
+            agent_session=EndpointAgentSession(
+                path=session_path,
+                timestamp="20260714-120000Z",
+                debug=False,
+            ),
         )
 
         assert output.report_data is not None
@@ -254,12 +346,27 @@ print(json.dumps({
     def test_progress_stream_prints_only_redacted_messages(self, tmp_path, capsys):
         progress_path = tmp_path / "progress.jsonl"
         progress_path.write_text('{"message":"using secret-token"}\n')
+        session_path = tmp_path / "agent-running"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        agent_session = EndpointAgentSession(
+            path=session_path,
+            timestamp="20260714-120000Z",
+            debug=False,
+        )
 
-        _ProgressTailer(path=progress_path, redacted_values=("secret-token",)).flush()
+        _ProgressTailer(
+            path=progress_path,
+            redacted_values=("secret-token",),
+            agent_session=agent_session,
+        ).flush()
 
         output = capsys.readouterr().out
         assert "using [redacted]" in output
         assert "secret-token" not in output
+        log = agent_session.log_path.read_text()
+        assert "using [redacted]" in log
+        assert "secret-token" not in log
 
 
 class TestProcessCleanup:

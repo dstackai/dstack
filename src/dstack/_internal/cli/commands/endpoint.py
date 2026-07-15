@@ -69,7 +69,7 @@ class EndpointCommand(BaseCommand):
         create_parser.add_argument(
             "--debug",
             action="store_true",
-            help="Save the agent trace",
+            help="Save the agent prompt and raw trace",
         )
         create_parser.set_defaults(subfunc=self._create)
 

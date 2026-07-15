@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from dstack._internal.cli.services.endpoint_agent_runtime import (
-    EndpointAgentDebugSession,
+    EndpointAgentSession,
     EndpointAgentWorkspace,
     build_endpoint_agent_env,
     contains_redacted_value,
-    create_endpoint_agent_debug_session,
+    create_endpoint_agent_session,
     endpoint_agent_workspace,
     get_claude_auth,
     get_redacted_values,
@@ -26,7 +26,7 @@ from dstack._internal.cli.services.endpoint_preset_verify import (
     load_endpoint_agent_report,
 )
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.cli.utils.common import warn
+from dstack._internal.cli.utils.common import console, warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.endpoint_agent import AgentFinalReport
 from dstack._internal.core.models.endpoint_presets import EndpointPreset
@@ -60,7 +60,7 @@ def create_endpoint_preset(
     build_name: Optional[str] = None,
     debug: bool = False,
 ) -> EndpointPresetCreateResult:
-    debug_session = create_endpoint_agent_debug_session(configuration) if debug else None
+    agent_session = create_endpoint_agent_session(configuration, debug=debug)
     try:
         resolved_configuration = _resolve_endpoint_env(configuration)
         result = asyncio.run(
@@ -71,16 +71,13 @@ def create_endpoint_preset(
                 store=store,
                 keep_service=keep_service,
                 build_name=build_name,
-                debug_session=debug_session,
+                agent_session=agent_session,
             )
         )
     except BaseException:
-        if debug_session is not None:
-            with suppress(Exception):
-                _finish_debug_session(debug_session)
+        _finish_agent_session(agent_session)
         raise
-    if debug_session is not None:
-        _finish_debug_session(debug_session, result.preset.id)
+    _finish_agent_session(agent_session, result.preset.id)
     return result
 
 
@@ -92,7 +89,7 @@ async def _create_endpoint_preset(
     source_configuration: Optional[EndpointConfiguration] = None,
     keep_service: bool = False,
     build_name: Optional[str] = None,
-    debug_session: Optional[EndpointAgentDebugSession] = None,
+    agent_session: EndpointAgentSession,
 ) -> EndpointPresetCreateResult:
     source_configuration = source_configuration or configuration
     build_name = build_name or _get_build_name(configuration.name)
@@ -131,11 +128,12 @@ async def _create_endpoint_preset(
             build_name=build_name,
             allowed_fleets=allowed_fleets,
         )
-        if debug_session is not None:
-            debug_session.write_prompt(prompt)
+        if agent_session.debug:
+            agent_session.write_prompt(prompt)
         print_endpoint_progress(
             f"Starting endpoint preset creation for {configuration.model.api_model_name}. "
-            f"Allowed fleets: {', '.join(allowed_fleets)}."
+            f"Allowed fleets: {', '.join(allowed_fleets)}.",
+            agent_session=agent_session,
         )
         try:
             process_output = await run_endpoint_agent(
@@ -144,7 +142,7 @@ async def _create_endpoint_preset(
                 workspace=workspace,
                 auth=auth,
                 redacted_values=redacted_values,
-                debug_session=debug_session,
+                agent_session=agent_session,
             )
             report = load_endpoint_agent_report(
                 output=process_output,
@@ -161,7 +159,8 @@ async def _create_endpoint_preset(
                 raise CLIError("Generated endpoint preset contains a secret value")
             preset_path = store.save(preset)
             print_endpoint_progress(
-                f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}."
+                f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}.",
+                agent_session=agent_session,
             )
             creation_succeeded = True
         finally:
@@ -173,6 +172,7 @@ async def _create_endpoint_preset(
                     workspace=workspace,
                     final_run_name=report.run_name if report is not None else None,
                     keep_final_service=keep_final_service,
+                    agent_session=agent_session,
                 )
             except Exception as e:
                 cleanup_error = str(e)
@@ -183,6 +183,7 @@ async def _create_endpoint_preset(
                             build_name=build_name,
                             workspace=workspace,
                             final_run_name=report.run_name if report is not None else None,
+                            agent_session=agent_session,
                         )
 
     if cleanup_error is not None:
@@ -212,14 +213,16 @@ def _resolve_endpoint_env(configuration: EndpointConfiguration) -> EndpointConfi
     return configuration
 
 
-def _finish_debug_session(
-    session: EndpointAgentDebugSession,
+def _finish_agent_session(
+    session: EndpointAgentSession,
     preset_id: Optional[str] = None,
 ) -> None:
     try:
-        session.finish(preset_id)
+        path = session.finish(preset_id)
     except OSError as e:
-        warn(f"Could not finalize agent debug output. Files remain at {session.path}: {e}")
+        path = session.path
+        warn(f"Could not finalize agent output. Files remain at {path}: {e}")
+    console.print(f"Agent log saved to [code]{path / 'agent.log'}[/]")
 
 
 def _get_build_name(endpoint_name: Optional[str]) -> str:
@@ -280,6 +283,7 @@ async def _cleanup_runs(
     build_name: str,
     workspace: EndpointAgentWorkspace,
     final_run_name: Optional[str],
+    agent_session: EndpointAgentSession,
     keep_final_service: bool = False,
 ) -> None:
     run_names = _load_submitted_run_names(workspace.submissions_path)
@@ -297,7 +301,10 @@ async def _cleanup_runs(
             active_names.append(name)
     if not active_names:
         return
-    print_endpoint_progress(f"Stopping preset creation runs: {', '.join(active_names)}.")
+    print_endpoint_progress(
+        f"Stopping preset creation runs: {', '.join(active_names)}.",
+        agent_session=agent_session,
+    )
     api.client.runs.stop(api.project, active_names, abort=False)
     deadline = asyncio.get_running_loop().time() + _RUN_STOP_TIMEOUT_SECONDS
     pending = set(active_names)
@@ -310,7 +317,7 @@ async def _cleanup_runs(
                 pending.remove(name)
         if pending:
             await asyncio.sleep(2)
-    print_endpoint_progress("All preset creation runs stopped.")
+    print_endpoint_progress("All preset creation runs stopped.", agent_session=agent_session)
 
 
 def _load_submitted_run_names(path: Path) -> list[str]:
