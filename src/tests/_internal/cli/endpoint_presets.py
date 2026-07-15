@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -66,6 +67,7 @@ def get_endpoint_preset(
         id=preset_id,
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=context_length,
+        created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         service=ServiceConfiguration.parse_obj(
             {
                 "image": "vllm/vllm-openai:v0.11.0",

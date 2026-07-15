@@ -7,7 +7,7 @@ from dstack._internal.core.models.endpoint_presets import (
     EndpointPreset,
     EndpointPresetValidation,
 )
-from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.common import pretty_date, pretty_resources
 
 
 def print_endpoint_presets(presets: list[EndpointPreset], verbose: bool = False) -> None:
@@ -16,6 +16,7 @@ def print_endpoint_presets(presets: list[EndpointPreset], verbose: bool = False)
     table.add_column("RESOURCES" if verbose else "GPU")
     table.add_column("CONTEXT", justify="right")
     table.add_column("BENCHMARK", min_width=len("concurrency=1"), overflow="fold")
+    table.add_column("CREATED", no_wrap=True)
     presets_by_base: dict[str, list[EndpointPreset]] = defaultdict(list)
     for preset in presets:
         presets_by_base[preset.base].append(preset)
@@ -38,6 +39,7 @@ def _add_preset(table: Table, preset: EndpointPreset, *, verbose: bool) -> None:
             column: _format_resources(groups[0].resources, verbose=verbose),
             "CONTEXT": format_endpoint_context_length(preset),
             "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),
+            "CREATED": pretty_date(preset.created_at),
         },
     )
     if preset.model != preset.base:

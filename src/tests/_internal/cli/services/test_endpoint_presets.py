@@ -73,6 +73,7 @@ class TestEndpointPresetStore:
         assert data["base"] == preset.base
         assert data["id"] == preset.id
         assert data["model"] == preset.model
+        assert data["created_at"] == preset.created_at.isoformat()
         assert "presets" not in data
         assert store.list() == [preset]
         assert store.get(preset.id) == preset

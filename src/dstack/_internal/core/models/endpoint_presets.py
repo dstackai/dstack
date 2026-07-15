@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import Annotated, Literal, Optional
 
 from pydantic import (
@@ -102,6 +103,7 @@ class EndpointPreset(CoreModel):
     """Exact repo/path loaded by the service command."""
     context_length: PositiveInt
     """Token context length this preset was verified to support."""
+    created_at: datetime
     service: ServiceConfiguration
     validations: list[EndpointPresetValidation]
 

@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from unittest.mock import patch
+
 import pytest
 from pydantic import ValidationError
 
@@ -28,22 +31,28 @@ class TestBuildVerifiedEndpointPreset:
 
     def test_builds_portable_self_contained_preset(self):
         run = get_running_service_run()
+        created_at = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
 
-        preset = build_verified_endpoint_preset(
-            run=run,
-            endpoint_configuration=EndpointConfiguration(
-                name="qwen-build",
-                model={"base": "Qwen/Qwen3.5-27B"},
-                context_length=8192,
-                gateway="benchmark-gateway",
-                env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
-            ),
-            report=get_successful_endpoint_report(run),
-        )
+        with patch(
+            "dstack._internal.core.services.endpoint_presets.get_current_datetime",
+            return_value=created_at,
+        ):
+            preset = build_verified_endpoint_preset(
+                run=run,
+                endpoint_configuration=EndpointConfiguration(
+                    name="qwen-build",
+                    model={"base": "Qwen/Qwen3.5-27B"},
+                    context_length=8192,
+                    gateway="benchmark-gateway",
+                    env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
+                ),
+                report=get_successful_endpoint_report(run),
+            )
 
         assert preset.base == "Qwen/Qwen3.5-27B"
         assert preset.model == "community/Qwen3.5-27B-GPTQ-Int4"
         assert preset.context_length == 32768
+        assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
         assert all(getattr(preset.service, field) is None for field in ProfileParams.__fields__)

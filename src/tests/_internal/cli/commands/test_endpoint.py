@@ -46,6 +46,25 @@ class TestEndpointPresetLocalCommands:
 
         assert "concurrency=1" in "".join(output.getvalue().split())
 
+    def test_prints_created_column(self, monkeypatch):
+        output = StringIO()
+        monkeypatch.setattr(
+            endpoint_presets_utils,
+            "console",
+            Console(
+                file=output,
+                width=160,
+                color_system=None,
+                theme=Theme({"secondary": "grey58"}),
+            ),
+        )
+        monkeypatch.setattr(endpoint_presets_utils, "pretty_date", lambda _: "2 months ago")
+
+        endpoint_presets_utils.print_endpoint_presets([get_endpoint_preset()])
+
+        assert "CREATED" in output.getvalue()
+        assert "2 months ago" in output.getvalue()
+
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "endpoint.dstack.yml"
         configuration_path.write_text(
@@ -72,9 +91,15 @@ class TestEndpointPresetLocalCommands:
         preset = get_endpoint_preset()
         EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
-        with patch("dstack.api.Client.from_config") as from_config:
+        with (
+            patch("dstack.api.Client.from_config") as from_config,
+            patch.object(
+                endpoint_presets_utils, "pretty_date", return_value="2 months ago"
+            ) as pretty_date,
+        ):
             assert run_dstack_cli(["endpoint", "preset", "list"], home_dir=tmp_path) == 0
             from_config.assert_not_called()
+            pretty_date.assert_called_once_with(preset.created_at)
 
         output = capsys.readouterr().out
         assert "Qwen/Qwen3.5-27B" in output
@@ -135,6 +160,7 @@ class TestEndpointPresetLocalCommands:
         assert len(output["presets"]) == 1
         data = output["presets"][0]
         assert data["id"] == preset.id
+        assert data["created_at"] == preset.created_at.isoformat()
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 

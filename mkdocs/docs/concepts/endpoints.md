@@ -111,9 +111,9 @@ Use `dstack endpoint preset` to list existing presets:
 
 ```shell
 $ dstack endpoint preset list
- MODEL                     GPU                    CONTEXT  BENCHMARK
+ MODEL                     GPU                    CONTEXT  BENCHMARK                           CREATED
  Qwen/Qwen2.5-7B-Instruct
-    preset=8f3a12c4        nvidia:16GB..24GB:1..  32K      concurrency=1 464 tok/s TTFT 312ms
+    preset=8f3a12c4        nvidia:16GB..24GB:1..  32K      concurrency=1 464 tok/s TTFT 312ms  1 hour ago
 ```
 
 </div>

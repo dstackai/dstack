@@ -15,7 +15,7 @@ from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.utils.common import format_mib_as_gb
+from dstack._internal.utils.common import format_mib_as_gb, get_current_datetime
 
 
 def build_endpoint_preset(
@@ -42,6 +42,7 @@ def build_endpoint_preset(
         id=make_endpoint_preset_id(service, context_length=context_length),
         model=model,
         context_length=context_length,
+        created_at=get_current_datetime(),
         service=service,
         validations=[validation],
     )
@@ -68,6 +69,7 @@ def endpoint_preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
         "id": preset.id,
         "model": preset.model,
         "context_length": preset.context_length,
+        "created_at": preset.created_at.isoformat(),
         "service": service_configuration_to_preset_data(preset.service),
         "validations": [
             json.loads(validation.json(exclude_none=True)) for validation in preset.validations
