@@ -4,49 +4,46 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.endpoint_presets import (
-    EndpointBenchmark,
-    EndpointPresetRecipe,
+    EndpointPreset,
     EndpointPresetValidation,
 )
 from dstack._internal.utils.common import pretty_resources
 
 
-def print_endpoint_presets(recipes: list[EndpointPresetRecipe], verbose: bool = False) -> None:
+def print_endpoint_presets(presets: list[EndpointPreset], verbose: bool = False) -> None:
     table = Table(box=None)
     table.add_column("MODEL", no_wrap=True)
     table.add_column("RESOURCES" if verbose else "GPU")
     table.add_column("CONTEXT", justify="right")
     table.add_column("BENCHMARK")
-    recipes_by_base: dict[str, list[EndpointPresetRecipe]] = defaultdict(list)
-    for recipe in recipes:
-        recipes_by_base[recipe.base].append(recipe)
+    presets_by_base: dict[str, list[EndpointPreset]] = defaultdict(list)
+    for preset in presets:
+        presets_by_base[preset.base].append(preset)
 
-    for base, base_recipes in recipes_by_base.items():
+    for base, base_presets in presets_by_base.items():
         add_row_from_dict(table, {"MODEL": f"[bold]{base}[/]"})
-        for recipe in base_recipes:
-            _add_recipe(table, recipe, verbose=verbose)
+        for preset in base_presets:
+            _add_preset(table, preset, verbose=verbose)
     console.print(table)
     console.print()
 
 
-def _add_recipe(table: Table, recipe: EndpointPresetRecipe, *, verbose: bool) -> None:
-    groups = recipe.service.replica_groups
+def _add_preset(table: Table, preset: EndpointPreset, *, verbose: bool) -> None:
+    groups = preset.service.replica_groups
     column = "RESOURCES" if verbose else "GPU"
-    validation = recipe.validations[0]
-    benchmark = validation.benchmark
     add_row_from_dict(
         table,
         {
-            "MODEL": f"[secondary]   recipe={recipe.id}[/]",
+            "MODEL": f"[secondary]   preset={preset.id}[/]",
             column: _format_resources(groups[0].resources, verbose=verbose),
-            "CONTEXT": _format_token_count(recipe.context_length),
-            "BENCHMARK": _format_benchmark(validation, benchmark, verbose=verbose),
+            "CONTEXT": format_endpoint_context_length(preset),
+            "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),
         },
     )
-    if recipe.model != recipe.base:
+    if preset.model != preset.base:
         add_row_from_dict(
             table,
-            {"MODEL": f"   repo={recipe.model}"},
+            {"MODEL": f"   repo={preset.model}"},
             style="secondary",
         )
     if len(groups) > 1:
@@ -61,17 +58,19 @@ def _add_recipe(table: Table, recipe: EndpointPresetRecipe, *, verbose: bool) ->
             )
 
 
-def _format_benchmark(
-    validation: EndpointPresetValidation,
-    benchmark: EndpointBenchmark,
-    *,
-    verbose: bool,
-) -> str:
+def format_endpoint_context_length(preset: EndpointPreset) -> str:
+    return _format_token_count(preset.context_length)
+
+
+def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) -> str:
+    validation = preset.validations[0]
+    benchmark = validation.benchmark
     workload = benchmark.workload
     metrics = benchmark.metrics
     requests_per_second = metrics.successful_requests / metrics.duration_seconds
     output_tokens_per_second = metrics.total_output_tokens / metrics.duration_seconds
     parts = [
+        f"concurrency={workload.concurrency}",
         f"{_format_number(output_tokens_per_second)} tok/s",
         f"TTFT {_format_number(metrics.ttft_ms.p50)}ms",
     ]
@@ -81,7 +80,6 @@ def _format_benchmark(
                 f"hardware={_format_validation_gpus(validation)}",
                 f"api={workload.api}",
                 f"n={workload.num_requests}",
-                f"c={workload.concurrency}",
                 f"{_format_token_count(workload.input_tokens)}"
                 f"->{_format_token_count(workload.output_tokens)}",
                 f"{_format_number(requests_per_second)} req/s",

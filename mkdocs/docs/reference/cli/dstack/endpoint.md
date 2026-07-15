@@ -1,11 +1,11 @@
 # dstack endpoint
 
-The `dstack endpoint` commands create, list, apply, and delete local endpoint
-[preset recipes](../../../concepts/endpoints.md).
+The `dstack endpoint` commands create, list, apply, and delete local
+[endpoint presets](../../../concepts/endpoints.md).
 
 ## dstack endpoint preset list
 
-The `dstack endpoint preset list` command lists locally stored recipes.
+The `dstack endpoint preset list` command lists locally stored presets.
 
 ##### Usage
 
@@ -21,7 +21,7 @@ $ dstack endpoint preset list --help
 ## dstack endpoint preset create
 
 The `dstack endpoint preset create` command uses an agent to create and save a
-verified recipe from an endpoint configuration.
+verified preset from an endpoint configuration.
 
 ##### Usage
 
@@ -48,12 +48,12 @@ Set either `DSTACK_AGENT_ANTHROPIC_API_KEY` or
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. |
 
 Pass `--debug` to save the agent trace under
-`~/.dstack/agent/<endpoint-name>/<timestamp>-<recipe-id>/`. Failed attempts use
+`~/.dstack/agent/<endpoint-name>/<timestamp>-<preset-id>/`. Failed attempts use
 the `-failed` suffix.
 
 ## dstack endpoint preset apply
 
-The `dstack endpoint preset apply` command selects a matching local recipe and
+The `dstack endpoint preset apply` command selects a matching local preset and
 submits its service.
 
 ##### Usage
@@ -69,8 +69,8 @@ $ dstack endpoint preset apply --help
 
 ## dstack endpoint preset delete
 
-The `dstack endpoint preset delete` command deletes one local recipe by ID or
-all recipes for a base model.
+The `dstack endpoint preset delete` command deletes one local preset by ID or
+all presets for a base model.
 
 ##### Usage
 

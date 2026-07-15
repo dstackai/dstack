@@ -26,10 +26,10 @@ class TestBuildVerifiedEndpointPreset:
         with pytest.raises(ValidationError, match="benchmark"):
             AgentFinalReport.parse_obj(data)
 
-    def test_builds_portable_self_contained_recipe(self):
+    def test_builds_portable_self_contained_preset(self):
         run = get_running_service_run()
 
-        recipe = build_verified_endpoint_preset(
+        preset = build_verified_endpoint_preset(
             run=run,
             endpoint_configuration=EndpointConfiguration(
                 name="qwen-build",
@@ -41,16 +41,16 @@ class TestBuildVerifiedEndpointPreset:
             report=get_successful_endpoint_report(run),
         )
 
-        assert recipe.base == "Qwen/Qwen3.5-27B"
-        assert recipe.model == "community/Qwen3.5-27B-GPTQ-Int4"
-        assert recipe.context_length == 32768
-        assert recipe.service.name is None
-        assert recipe.service.gateway is None
-        assert all(getattr(recipe.service, field) is None for field in ProfileParams.__fields__)
-        assert isinstance(recipe.service.env["LICENSE"], EnvSentinel)
-        assert recipe.service.env["TOKENIZERS_PARALLELISM"] == "false"
-        assert recipe.service.resources.gpu.vendor.value == "nvidia"
-        validation = recipe.validations[0]
+        assert preset.base == "Qwen/Qwen3.5-27B"
+        assert preset.model == "community/Qwen3.5-27B-GPTQ-Int4"
+        assert preset.context_length == 32768
+        assert preset.service.name is None
+        assert preset.service.gateway is None
+        assert all(getattr(preset.service, field) is None for field in ProfileParams.__fields__)
+        assert isinstance(preset.service.env["LICENSE"], EnvSentinel)
+        assert preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
+        assert preset.service.resources.gpu.vendor.value == "nvidia"
+        validation = preset.validations[0]
         assert validation.replicas[0].resources[0].gpu.name == ["A6000"]
         assert validation.benchmark.target.type == "server-proxy"
         assert validation.benchmark.client.type == "local"

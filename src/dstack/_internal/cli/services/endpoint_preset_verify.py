@@ -16,14 +16,14 @@ from dstack._internal.core.models.endpoint_agent import AgentFinalReport
 from dstack._internal.core.models.endpoint_presets import (
     EndpointBenchmarkClient,
     EndpointBenchmarkTarget,
-    EndpointPresetRecipe,
+    EndpointPreset,
     EndpointPresetValidationReplica,
 )
 from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 from dstack._internal.core.services.endpoint_presets import (
-    build_endpoint_preset_recipe,
+    build_endpoint_preset,
     resources_spec_from_instance_resources,
 )
 
@@ -61,7 +61,7 @@ def build_verified_endpoint_preset(
     run: Run,
     endpoint_configuration: EndpointConfiguration,
     report: AgentFinalReport,
-) -> EndpointPresetRecipe:
+) -> EndpointPreset:
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
     if run.status != RunStatus.RUNNING or run.service is None:
@@ -100,11 +100,11 @@ def build_verified_endpoint_preset(
     for key, value in endpoint_configuration.env.items():
         if isinstance(value, EnvSentinel) and key in portable_service.env:
             portable_service.env[key] = value
-    return build_endpoint_preset_recipe(
+    return build_endpoint_preset(
         service=portable_service,
         validation_replicas=_get_validation_replicas(run, service),
         base_model=report.base,
-        recipe_model=report.model,
+        model=report.model,
         context_length=report.context_length,
         benchmark=benchmark,
     )

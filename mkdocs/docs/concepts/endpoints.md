@@ -1,11 +1,11 @@
 ---
 title: Endpoints
-description: Creating and reusing optimized model inference recipes
+description: Creating and reusing optimized model inference endpoint configurations
 ---
 
 # Endpoints
 
-An endpoint configuration is a new `dstack` feature that lets you use an agent to create presets: validated and optimized model inference endpoint recipes. Once a preset is created, it can be reused to deploy model inference on validated hardware without an agent.
+An endpoint configuration lets you use an agent to create a preset: a validated and optimized model inference configuration. Once created, the preset can be reused to deploy model inference on validated hardware without an agent.
 
 The value of presets comes from combining two fundamental features: agent-driven model inference optimization and the `dstack` [service](services.md) primitive, which can deploy model inference to any cloud, Kubernetes, or on-prem cluster.
 
@@ -72,7 +72,7 @@ $ dstack endpoint preset create -f endpoint.dstack.yml
 
 </div>
 
-This command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving recipe matching the available fleet offers. Once the recipe is found, it submits a `dstack` service for a final benchmark. The validated recipe is saved locally under `~/.dstack/presets`.
+This command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers. It then submits the configuration as a `dstack` service for a final benchmark. The validated preset is saved locally under `~/.dstack/presets`.
 
 ??? info "Claude authorization"
     Preset creation supports two Claude authorization methods. To use an Anthropic API key, set:
@@ -99,15 +99,15 @@ Use `dstack endpoint preset` to list existing presets:
 $ dstack endpoint preset list
  MODEL                     GPU                    CONTEXT  BENCHMARK
  Qwen/Qwen2.5-7B-Instruct
-    recipe=8f3a12c4        nvidia:16GB..24GB:1..  32K      464 tok/s TTFT 312ms
+    preset=8f3a12c4        nvidia:16GB..24GB:1..  32K      concurrency=1 464 tok/s TTFT 312ms
 ```
 
 </div>
 
-Each base model corresponds to one preset. A preset may contain multiple recipes built for specific hardware. Each recipe includes benchmark data.
+Presets are grouped by base model. Each preset contains an optimized serving configuration for a specific model variant, along with its hardware requirements, validation, and benchmark data.
 
 Pass `-v` to include validation resources and all benchmark metrics, or `--json`
-to output complete recipe objects.
+to output complete preset objects.
 
 ## Apply a preset
 
@@ -117,7 +117,8 @@ To deploy a preset as a service, pass the endpoint configuration to the `dstack 
 
 ```shell
 $ dstack endpoint preset apply -f endpoint.dstack.yml
- Preset         Qwen/Qwen2.5-7B-Instruct (recipe=8f3a12c4)
+ Model          Qwen/Qwen2.5-7B-Instruct (base)
+ Preset         8f3a12c4 (context=32K, concurrency=1 464 tok/s TTFT 312ms)
 
  #  BACKEND            RESOURCES                      INSTANCE TYPE     PRICE
  1  runpod (CA-MTL-1)  cpu=9 mem=50GB disk=200GB      NVIDIA RTX A5000  $0.27
@@ -134,28 +135,26 @@ Submit the run qwen25-7b? [y/n]: y
 
 </div>
 
-If you don't pass `--recipe ID` (or specify it in the endpoint configuration), `dstack` automatically picks one of the recipes that matches the available fleet offers.
+If you don't pass `--preset ID` or specify `preset` in the endpoint configuration, `dstack` automatically selects a matching preset based on the available fleet offers. It then deploys the preset as a service.
 
-If a recipe matches, `dstack` deploys it as a service.
+## Delete presets
 
-## Delete a preset
-
-You can delete a specific recipe or the entire preset.
+You can delete a specific preset by ID or all presets for a base model.
 
 <div class="termy">
 
 ```shell
-$ dstack endpoint preset delete --recipe 8f3a12c4
+$ dstack endpoint preset delete --preset 8f3a12c4
 ```
 
 </div>
 
-To delete the entire preset and all its recipes, pass the base model:
+To delete all presets for a base model, pass `--model`:
 
 <div class="termy">
 
 ```shell
-$ dstack endpoint preset delete Qwen/Qwen2.5-7B-Instruct
+$ dstack endpoint preset delete --model Qwen/Qwen2.5-7B-Instruct
 ```
 
 </div>

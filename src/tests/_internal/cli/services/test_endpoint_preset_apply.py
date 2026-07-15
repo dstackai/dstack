@@ -5,22 +5,22 @@ import pytest
 
 from dstack._internal.cli.services.endpoint_preset_apply import (
     _build_service,
-    _get_matching_recipes,
+    _get_matching_presets,
     _select_plan,
     apply_endpoint_preset,
 )
 from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
-from tests._internal.cli.endpoint_presets import get_endpoint_preset_recipe
+from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
 pytestmark = pytest.mark.windows
 
 
-class TestGetMatchingRecipes:
-    def test_matches_base_model_context_and_recipe(self):
-        recipes = [
-            get_endpoint_preset_recipe(recipe_id="small", context_length=4096),
-            get_endpoint_preset_recipe(recipe_id="large", context_length=32768),
+class TestGetMatchingPresets:
+    def test_matches_base_model_context_and_preset(self):
+        presets = [
+            get_endpoint_preset(preset_id="small", context_length=4096),
+            get_endpoint_preset(preset_id="large", context_length=32768),
         ]
         configuration = EndpointConfiguration(
             name="qwen",
@@ -28,16 +28,16 @@ class TestGetMatchingRecipes:
             context_length=8192,
         )
 
-        assert _get_matching_recipes(recipes, configuration=configuration, recipe_id=None) == [
-            recipes[1]
+        assert _get_matching_presets(presets, configuration=configuration, preset_id=None) == [
+            presets[1]
         ]
-        assert _get_matching_recipes(recipes, configuration=configuration, recipe_id="large") == [
-            recipes[1]
+        assert _get_matching_presets(presets, configuration=configuration, preset_id="large") == [
+            presets[1]
         ]
-        assert not _get_matching_recipes(recipes, configuration=configuration, recipe_id="small")
+        assert not _get_matching_presets(presets, configuration=configuration, preset_id="small")
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
-        matching = get_endpoint_preset_recipe(recipe_id="matching")
+        matching = get_endpoint_preset(preset_id="matching")
         configuration = EndpointConfiguration(
             name="qwen",
             model={
@@ -46,13 +46,13 @@ class TestGetMatchingRecipes:
             },
         )
 
-        assert _get_matching_recipes([matching], configuration=configuration, recipe_id=None) == [
+        assert _get_matching_presets([matching], configuration=configuration, preset_id=None) == [
             matching
         ]
-        assert not _get_matching_recipes(
+        assert not _get_matching_presets(
             [matching.copy(update={"model": "other/repo"})],
             configuration=configuration,
-            recipe_id=None,
+            preset_id=None,
         )
 
 
@@ -67,7 +67,7 @@ class TestBuildService:
             max_price=1,
         )
 
-        service = _build_service(configuration, get_endpoint_preset_recipe())
+        service = _build_service(configuration, get_endpoint_preset())
 
         assert service.name == "qwen-production"
         assert service.gateway == "inference"
@@ -77,10 +77,10 @@ class TestBuildService:
 
 
 class TestSelectPlan:
-    def test_selects_first_recipe_with_available_offer(self):
-        recipes = [
-            get_endpoint_preset_recipe(recipe_id="unavailable"),
-            get_endpoint_preset_recipe(recipe_id="available"),
+    def test_selects_first_preset_with_available_offer(self):
+        presets = [
+            get_endpoint_preset(preset_id="unavailable"),
+            get_endpoint_preset(preset_id="available"),
         ]
         configurator = Mock()
         prepared = [
@@ -93,17 +93,17 @@ class TestSelectPlan:
         selected = _select_plan(
             configuration=EndpointConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
             configuration_path="endpoint.dstack.yml",
-            recipes=recipes,
+            presets=presets,
             configurator=configurator,
             service_args=service_args,
         )
 
-        assert selected.recipe.id == "available"
+        assert selected.preset.id == "available"
         assert selected.prepared is prepared[1]
         assert configurator.prepare_configuration.call_count == 2
 
     def test_applies_the_selected_prepared_plan(self, monkeypatch):
-        recipe = get_endpoint_preset_recipe()
+        preset = get_endpoint_preset()
         prepared = Mock(run_plan=_plan(InstanceAvailability.AVAILABLE))
         configurator = Mock()
         configurator.get_parser.return_value.parse_args.return_value = SimpleNamespace()
@@ -121,10 +121,10 @@ class TestSelectPlan:
                 model={"base": "Qwen/Qwen3.5-27B"},
             ),
             configuration_path="endpoint.dstack.yml",
-            recipe_id=None,
+            preset_id=None,
             profile_name="gpu",
             command_args=command_args,
-            store=Mock(list=Mock(return_value=[recipe])),
+            store=Mock(list=Mock(return_value=[preset])),
         )
 
         assert configurator.get_parser.return_value.parse_args.return_value.profile == "gpu"
@@ -132,7 +132,11 @@ class TestSelectPlan:
             prepared=prepared,
             command_args=command_args,
             configurator_args=configurator.get_parser.return_value.parse_args.return_value,
-            plan_properties={"Preset": "Qwen/Qwen3.5-27B ([secondary]recipe=8f3a12c4[/])"},
+            plan_properties={
+                "Model": "Qwen/Qwen3.5-27B ([secondary]base[/])",
+                "Preset": "8f3a12c4 "
+                "([secondary]context=32K, concurrency=1 42.1 tok/s TTFT 108ms[/])",
+            },
         )
 
 

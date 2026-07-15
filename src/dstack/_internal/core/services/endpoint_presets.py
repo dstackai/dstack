@@ -7,7 +7,7 @@ import gpuhunt
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.endpoint_presets import (
     EndpointBenchmark,
-    EndpointPresetRecipe,
+    EndpointPreset,
     EndpointPresetValidation,
     EndpointPresetValidationReplica,
 )
@@ -18,15 +18,15 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import format_mib_as_gb
 
 
-def build_endpoint_preset_recipe(
+def build_endpoint_preset(
     *,
     service: ServiceConfiguration,
     validation_replicas: list[EndpointPresetValidationReplica],
     base_model: str,
-    recipe_model: str,
+    model: str,
     context_length: int,
     benchmark: EndpointBenchmark,
-) -> EndpointPresetRecipe:
+) -> EndpointPreset:
     service = service.copy(deep=True)
     service.name = None
     service.gateway = None
@@ -37,17 +37,17 @@ def build_endpoint_preset_recipe(
         benchmark=benchmark,
     )
     set_service_gpu_vendors_from_validations(service, [validation])
-    return EndpointPresetRecipe(
+    return EndpointPreset(
         base=base_model,
-        id=make_endpoint_preset_recipe_id(service, context_length=context_length),
-        model=recipe_model,
+        id=make_endpoint_preset_id(service, context_length=context_length),
+        model=model,
         context_length=context_length,
         service=service,
         validations=[validation],
     )
 
 
-def make_endpoint_preset_recipe_id(
+def make_endpoint_preset_id(
     service: ServiceConfiguration,
     context_length: int,
 ) -> str:
@@ -62,15 +62,15 @@ def make_endpoint_preset_recipe_id(
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
 
 
-def endpoint_preset_recipe_to_data(recipe: EndpointPresetRecipe) -> dict[str, Any]:
+def endpoint_preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
     return {
-        "base": recipe.base,
-        "id": recipe.id,
-        "model": recipe.model,
-        "context_length": recipe.context_length,
-        "service": service_configuration_to_preset_data(recipe.service),
+        "base": preset.base,
+        "id": preset.id,
+        "model": preset.model,
+        "context_length": preset.context_length,
+        "service": service_configuration_to_preset_data(preset.service),
         "validations": [
-            json.loads(validation.json(exclude_none=True)) for validation in recipe.validations
+            json.loads(validation.json(exclude_none=True)) for validation in preset.validations
         ],
     }
 

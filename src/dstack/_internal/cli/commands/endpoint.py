@@ -80,7 +80,7 @@ class EndpointCommand(BaseCommand):
         )
         _add_configuration_args(apply_parser)
         register_profile_args(apply_parser)
-        apply_parser.add_argument("--recipe", metavar="ID", help="The recipe ID to use")
+        apply_parser.add_argument("--preset", metavar="ID", help="The preset ID to use")
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
         )
@@ -97,20 +97,19 @@ class EndpointCommand(BaseCommand):
 
         delete_parser = preset_subparsers.add_parser(
             "delete",
-            help="Delete an endpoint preset or recipe",
+            help="Delete endpoint presets",
             formatter_class=self._parser.formatter_class,
         )
         delete_target = delete_parser.add_mutually_exclusive_group(required=True)
         delete_target.add_argument(
-            "base",
-            nargs="?",
-            metavar="BASE",
-            help="The base model whose preset to delete",
+            "--model",
+            metavar="MODEL",
+            help="Delete all presets for a base model",
         )
         delete_target.add_argument(
-            "--recipe",
+            "--preset",
             metavar="ID",
-            help="Delete one recipe by ID",
+            help="Delete one preset by ID",
         )
         delete_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -126,11 +125,11 @@ class EndpointCommand(BaseCommand):
             exit(0)
 
     def _list(self, args: argparse.Namespace) -> None:
-        recipes = EndpointPresetStore().list()
+        presets = EndpointPresetStore().list()
         if getattr(args, "json", False):
-            print(EndpointPresetListOutput(recipes=recipes).json())
+            print(EndpointPresetListOutput(presets=presets).json())
             return
-        print_endpoint_presets(recipes, verbose=getattr(args, "verbose", False))
+        print_endpoint_presets(presets, verbose=getattr(args, "verbose", False))
 
     def _create(self, args: argparse.Namespace) -> None:
         _, configuration = load_endpoint_configuration(args.configuration_file)
@@ -143,8 +142,8 @@ class EndpointCommand(BaseCommand):
             debug=args.debug,
         )
         console.print(
-            f"Endpoint preset recipe [code]{result.recipe.id}[/] for "
-            f"[code]{result.recipe.base}[/] saved to [code]{result.path}[/]"
+            f"Endpoint preset [code]{result.preset.id}[/] for "
+            f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
         )
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
@@ -156,7 +155,7 @@ class EndpointCommand(BaseCommand):
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             configuration_path=configuration_path,
-            recipe_id=args.recipe or configuration.recipe,
+            preset_id=args.preset or configuration.preset,
             profile_name=args.profile,
             command_args=args,
             store=EndpointPresetStore(),
@@ -164,36 +163,34 @@ class EndpointCommand(BaseCommand):
 
     def _delete(self, args: argparse.Namespace) -> None:
         store = EndpointPresetStore()
-        recipe = None
-        if args.recipe is not None:
-            recipe = store.get(args.recipe)
-            if recipe is None:
-                raise CLIError(f"Endpoint preset recipe {args.recipe!r} does not exist")
-            message = (
-                f"Delete endpoint preset recipe [code]{recipe.id}[/] for [code]{recipe.base}[/]?"
-            )
+        preset = None
+        if args.preset is not None:
+            preset = store.get(args.preset)
+            if preset is None:
+                raise CLIError(f"Endpoint preset {args.preset!r} does not exist")
+            message = f"Delete endpoint preset [code]{preset.id}[/] for [code]{preset.base}[/]?"
         else:
-            recipes = [recipe for recipe in store.list() if recipe.base == args.base]
-            if not recipes:
-                raise CLIError(f"Endpoint preset {args.base!r} does not exist")
+            presets = [preset for preset in store.list() if preset.base == args.model]
+            if not presets:
+                raise CLIError(f"No endpoint presets found for base model {args.model!r}")
             message = (
-                f"Delete endpoint preset [code]{args.base}[/] and its "
-                f"{len(recipes)} recipe{'s' if len(recipes) != 1 else ''}?"
+                f"Delete {len(presets)} endpoint preset"
+                f"{'s' if len(presets) != 1 else ''} for [code]{args.model}[/]?"
             )
         if not args.yes and not confirm_ask(message):
             console.print("\nExiting...")
             return
-        if args.recipe is not None:
-            assert recipe is not None
-            store.delete_recipe(args.recipe)
+        if args.preset is not None:
+            assert preset is not None
+            store.delete(args.preset)
             console.print(
-                f"Endpoint preset recipe [code]{recipe.id}[/] for [code]{recipe.base}[/] deleted"
+                f"Endpoint preset [code]{preset.id}[/] for [code]{preset.base}[/] deleted"
             )
         else:
-            count = store.delete_preset(args.base)
+            count = store.delete_for_base(args.model)
             console.print(
-                f"Endpoint preset [code]{args.base}[/] deleted "
-                f"({count} recipe{'s' if count != 1 else ''})"
+                f"Deleted {count} endpoint preset{'s' if count != 1 else ''} "
+                f"for [code]{args.model}[/]"
             )
 
 

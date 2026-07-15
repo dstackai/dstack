@@ -8,17 +8,17 @@ description: |
 
 Use `/dstack` for CLI commands, YAML fields, apply/attach behavior, service URLs,
 and other dstack syntax. This skill explains how to use dstack runs while the
-model-serving recipe is still unknown.
+model-serving configuration is still unknown.
 
 ## Goal
 
-Find a working dstack service recipe for the requested model.
+Find a working dstack service configuration for the requested model.
 
 Before submitting a service, use a task on real hardware to test the serving
 image, install/runtime assumptions, model download, cache path, command, port,
 launch flags, resources, env vars, backend/fleet choice, and local model
-request. Then submit the same recipe as a service and verify the model through
-the dstack service URL.
+request. Then submit the same configuration as a service and verify the model
+through the dstack service URL.
 
 ## Choose Where To Run
 
@@ -43,7 +43,7 @@ For vLLM and SGLang, use these as credible sources:
 
 Use deeper serving-engine writeups, such as
 `https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development`, when
-recipes and docs do not explain the model, hardware, or serving failure.
+these references do not explain the model, hardware, or serving failure.
 
 ## Use A Task Before Service
 
@@ -86,15 +86,15 @@ instance volumes when available.
 
 ## Verify As A Service
 
-Submit the service after the task has verified the recipe: image, command, port,
-resources, env vars, cache mounts if used, backend/fleet choice, and model
-request.
+Submit the service after the task has verified the configuration: image,
+command, port, resources, env vars, cache mounts if used, backend/fleet choice,
+and model request.
 
-Use the service as a duplicate check of the same recipe under dstack service
-runtime. The model request that worked locally in the task must also work
+Use the service as a duplicate check of the same configuration under dstack
+service runtime. The model request that worked locally in the task must also work
 through the dstack service URL.
 
 If service verification fails because the image, install, model download,
 command, resources, cache, or model behavior needs to change, go back to a task.
-If the recipe is still right and only the service config is wrong, fix the
-service config and submit the service again.
+If the tested serving setup is still right and only the dstack service
+configuration is wrong, fix the configuration and submit the service again.

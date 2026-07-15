@@ -111,8 +111,8 @@ class EndpointAgentDebugSession:
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
 
-    def finish(self, recipe_id: Optional[str] = None) -> Path:
-        suffix = recipe_id or "failed"
+    def finish(self, preset_id: Optional[str] = None) -> Path:
+        suffix = preset_id or "failed"
         target = self.path.with_name(f"{self.timestamp}-{suffix}")
         self.path.rename(target)
         self.path = target

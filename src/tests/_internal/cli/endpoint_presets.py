@@ -7,7 +7,7 @@ from dstack._internal.core.models.endpoint_presets import (
     EndpointBenchmark,
     EndpointBenchmarkClient,
     EndpointBenchmarkTarget,
-    EndpointPresetRecipe,
+    EndpointPreset,
     EndpointPresetValidation,
     EndpointPresetValidationReplica,
 )
@@ -48,11 +48,11 @@ def get_endpoint_benchmark(*, verified: bool = True) -> EndpointBenchmark:
     )
 
 
-def get_endpoint_preset_recipe(
+def get_endpoint_preset(
     *,
-    recipe_id: str = "8f3a12c4",
+    preset_id: str = "8f3a12c4",
     context_length: int = 32768,
-) -> EndpointPresetRecipe:
+) -> EndpointPreset:
     resources = ResourcesSpec.parse_obj(
         {
             "cpu": "16",
@@ -61,9 +61,9 @@ def get_endpoint_preset_recipe(
             "gpu": {"name": "A6000", "memory": "48GB", "count": 1},
         }
     )
-    return EndpointPresetRecipe(
+    return EndpointPreset(
         base="Qwen/Qwen3.5-27B",
-        id=recipe_id,
+        id=preset_id,
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=context_length,
         service=ServiceConfiguration.parse_obj(

@@ -74,8 +74,8 @@ class EndpointConfiguration(ProfileParams):
     ]
     context_length: Optional[PositiveInt] = None
     """Minimum context length required from the endpoint."""
-    recipe: Optional[str] = None
-    """Recipe ID to use when applying an endpoint preset."""
+    preset: Optional[str] = None
+    """Preset ID to use when applying an endpoint preset."""
     gateway: Optional[Union[bool, EntityReference, str]] = None
     env: Env = Env()
 
@@ -85,10 +85,10 @@ class EndpointConfiguration(ProfileParams):
             return {"repo": _validate_model(value, field="model")}
         return value
 
-    @validator("recipe")
-    def validate_recipe(cls, value: Optional[str]) -> Optional[str]:
+    @validator("preset")
+    def validate_preset(cls, value: Optional[str]) -> Optional[str]:
         if value is not None and not value.strip():
-            raise ValueError("Endpoint recipe must be a non-empty string")
+            raise ValueError("Endpoint preset must be a non-empty string")
         return value
 
 

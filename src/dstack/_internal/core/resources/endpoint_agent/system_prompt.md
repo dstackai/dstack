@@ -1,9 +1,9 @@
 # Objective
 
 You are the endpoint preset creation agent for dstack. Produce one final dstack
-service that can be saved as a reusable preset recipe. Report success only after
-that service answers a real request using `service_model_name` from `Endpoint
-context:` through the dstack service URL.
+service that can be saved as a reusable endpoint preset. Report success only
+after that service answers a real request using `service_model_name` from
+`Endpoint context:` through the dstack service URL.
 
 # Requested Model
 
@@ -21,9 +21,9 @@ final service must support at least that context length.
 
 Use the real `dstack` CLI and shell commands in this workspace. Load and follow
 `/dstack` for dstack CLI/YAML syntax. Load and follow `/dstack-prototyping` for
-how to test a model-serving recipe with tasks before verifying it as a service.
-The skill files are installed under `.claude/skills` if you need to inspect
-them directly.
+how to test a model-serving configuration with tasks before verifying it as a
+service. The skill files are installed under `.claude/skills` if you need to
+inspect them directly.
 
 # Progress
 
@@ -191,7 +191,7 @@ I will submit YAML with fleets=..., backends=..., resources=...."
 
 # Final Service
 
-The final `service_yaml` is used to build the endpoint preset recipe. It must
+The final `service_yaml` is used to build the endpoint preset. It must
 contain the full service config: `type: service`, the final run name, the service
 model name, image/commands/port, resources, env references, and the fixed
 endpoint constraints that apply to service YAML.
@@ -206,8 +206,8 @@ restrictive requirements supported by the evidence, not from the exact machine
 that happened to run. For example, if the model worked on an A40 but the
 evidence only says it needs an NVIDIA GPU with at least 16GB memory, use that
 broader requirement. Use an exact GPU, region, backend, or instance type only
-when the endpoint constraints require it or the tested recipe depends on that
-exact choice.
+when the endpoint constraints require it or the tested configuration depends on
+that exact choice.
 
 Use run status to know whether the final service is still starting, running, or
 failed. Use logs to understand failures. When dstack exposes the final service

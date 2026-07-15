@@ -29,7 +29,7 @@ from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.endpoint_agent import AgentFinalReport
-from dstack._internal.core.models.endpoint_presets import EndpointPresetRecipe
+from dstack._internal.core.models.endpoint_presets import EndpointPreset
 from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
@@ -37,7 +37,7 @@ from dstack._internal.core.services.endpoint_agent import (
     format_endpoint_constraints,
     get_endpoint_agent_system_prompt,
 )
-from dstack._internal.core.services.endpoint_presets import endpoint_preset_recipe_to_data
+from dstack._internal.core.services.endpoint_presets import endpoint_preset_to_data
 from dstack.api import Client
 
 _RUN_STOP_TIMEOUT_SECONDS = 10 * 60
@@ -45,7 +45,7 @@ _RUN_STOP_TIMEOUT_SECONDS = 10 * 60
 
 @dataclass(frozen=True)
 class EndpointPresetCreateResult:
-    recipe: EndpointPresetRecipe
+    preset: EndpointPreset
     path: Path
     final_run_id: uuid.UUID
     final_run_name: str
@@ -67,7 +67,7 @@ def create_endpoint_preset(
             _create_endpoint_preset(
                 api=api,
                 configuration=resolved_configuration,
-                recipe_configuration=configuration,
+                source_configuration=configuration,
                 store=store,
                 keep_service=keep_service,
                 build_name=build_name,
@@ -80,7 +80,7 @@ def create_endpoint_preset(
                 _finish_debug_session(debug_session)
         raise
     if debug_session is not None:
-        _finish_debug_session(debug_session, result.recipe.id)
+        _finish_debug_session(debug_session, result.preset.id)
     return result
 
 
@@ -89,12 +89,12 @@ async def _create_endpoint_preset(
     api: Client,
     configuration: EndpointConfiguration,
     store: EndpointPresetStore,
-    recipe_configuration: Optional[EndpointConfiguration] = None,
+    source_configuration: Optional[EndpointConfiguration] = None,
     keep_service: bool = False,
     build_name: Optional[str] = None,
     debug_session: Optional[EndpointAgentDebugSession] = None,
 ) -> EndpointPresetCreateResult:
-    recipe_configuration = recipe_configuration or configuration
+    source_configuration = source_configuration or configuration
     build_name = build_name or _get_build_name(configuration.name)
     allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
@@ -114,7 +114,7 @@ async def _create_endpoint_preset(
         ]
     )
     report: Optional[AgentFinalReport] = None
-    recipe: Optional[EndpointPresetRecipe] = None
+    preset: Optional[EndpointPreset] = None
     preset_path: Optional[Path] = None
     creation_succeeded = False
     cleanup_error: Optional[str] = None
@@ -152,16 +152,16 @@ async def _create_endpoint_preset(
                 redacted_values=redacted_values,
             )
             run = api.client.runs.get(api.project, report.run_name)
-            recipe = build_verified_endpoint_preset(
+            preset = build_verified_endpoint_preset(
                 run=run,
-                endpoint_configuration=recipe_configuration,
+                endpoint_configuration=source_configuration,
                 report=report,
             )
-            if contains_redacted_value(endpoint_preset_recipe_to_data(recipe), redacted_values):
+            if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
                 raise CLIError("Generated endpoint preset contains a secret value")
-            preset_path = store.save(recipe)
+            preset_path = store.save(preset)
             print_endpoint_progress(
-                f"Saved endpoint preset recipe {recipe.id} for {recipe.base} at {preset_path}."
+                f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}."
             )
             creation_succeeded = True
         finally:
@@ -187,13 +187,13 @@ async def _create_endpoint_preset(
 
     if cleanup_error is not None:
         raise CLIError(f"Failed to clean up preset creation runs: {cleanup_error}")
-    assert recipe is not None
+    assert preset is not None
     assert preset_path is not None
     assert report is not None
     assert report.run_id is not None
     assert report.run_name is not None
     return EndpointPresetCreateResult(
-        recipe=recipe,
+        preset=preset,
         path=preset_path,
         final_run_id=report.run_id,
         final_run_name=report.run_name,
@@ -214,10 +214,10 @@ def _resolve_endpoint_env(configuration: EndpointConfiguration) -> EndpointConfi
 
 def _finish_debug_session(
     session: EndpointAgentDebugSession,
-    recipe_id: Optional[str] = None,
+    preset_id: Optional[str] = None,
 ) -> None:
     try:
-        session.finish(recipe_id)
+        session.finish(preset_id)
     except OSError as e:
         warn(f"Could not finalize agent debug output. Files remain at {session.path}: {e}")
 

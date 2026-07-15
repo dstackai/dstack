@@ -94,14 +94,14 @@ class EndpointPresetValidation(CoreModel):
     benchmark: EndpointBenchmark
 
 
-class EndpointPresetRecipe(CoreModel):
+class EndpointPreset(CoreModel):
     base: str
     """Base model used for local preset lookup."""
     id: str
     model: str
     """Exact repo/path loaded by the service command."""
     context_length: PositiveInt
-    """Token context length this recipe was verified to support."""
+    """Token context length this preset was verified to support."""
     service: ServiceConfiguration
     validations: list[EndpointPresetValidation]
 
@@ -112,21 +112,21 @@ class EndpointPresetRecipe(CoreModel):
         return value
 
     @root_validator
-    def validate_recipe(cls, values: dict) -> dict:
+    def validate_preset(cls, values: dict) -> dict:
         service = values.get("service")
         validations = values.get("validations")
         if service is None or validations is None:
             return values
         if service.model is None:
-            raise ValueError("preset recipe service must specify model")
+            raise ValueError("preset service must specify model")
         if any(group.resources is None for group in service.replica_groups):
-            raise ValueError("preset recipe service must specify resources")
+            raise ValueError("preset service must specify resources")
         if service.name is not None or service.gateway is not None:
-            raise ValueError("preset recipe service must not specify name or gateway")
+            raise ValueError("preset service must not specify name or gateway")
         if any(getattr(service, field) is not None for field in ProfileParams.__fields__):
-            raise ValueError("preset recipe service must not specify placement constraints")
+            raise ValueError("preset service must not specify placement constraints")
         if not validations:
-            raise ValueError("preset recipe must include validation evidence")
+            raise ValueError("preset must include validation evidence")
         for validation in validations:
             if len(validation.replicas) != len(service.replica_groups):
                 raise ValueError(

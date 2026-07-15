@@ -6,7 +6,7 @@ import pytest
 
 from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
 from tests._internal.cli.common import run_dstack_cli
-from tests._internal.cli.endpoint_presets import get_endpoint_preset_recipe
+from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
 pytestmark = pytest.mark.windows
 
@@ -34,9 +34,9 @@ class TestEndpointPresetLocalCommands:
         assert exit_code == 0
         assert "Operation interrupted by user" in capsys.readouterr().out
 
-    def test_lists_and_deletes_recipe_without_api_client(self, tmp_path, capsys):
-        recipe = get_endpoint_preset_recipe()
-        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(recipe)
+    def test_lists_and_deletes_preset_without_api_client(self, tmp_path, capsys):
+        preset = get_endpoint_preset()
+        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
         with patch("dstack.api.Client.from_config") as from_config:
             assert run_dstack_cli(["endpoint", "preset", "list"], home_dir=tmp_path) == 0
@@ -44,14 +44,16 @@ class TestEndpointPresetLocalCommands:
 
         output = capsys.readouterr().out
         assert "Qwen/Qwen3.5-27B" in output
-        assert "recipe=8f3a12c4" in output
+        assert "preset=8f3a12c4" in output
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in output
         assert "CONTEXT" in output
         assert "BENCHMARK" in output
         assert "32K" in output
         assert "42.1" in output
+        assert "concurrency=1" in output
         assert "tok/s" in output
-        assert "TTFT 108ms" in output
+        assert "TTFT" in output
+        assert "108ms" in output
         assert "A6000:48GB:1" not in output
 
         assert run_dstack_cli(["endpoint", "preset", "list", "-v"], home_dir=tmp_path) == 0
@@ -59,7 +61,7 @@ class TestEndpointPresetLocalCommands:
         assert "hardware=" in verbose_output
         assert "api=" in verbose_output
         assert "n=16" in verbose_output
-        assert "c=1" in verbose_output
+        assert "concurrency=1" in verbose_output
         assert "1K->128" in verbose_output
 
         with patch("dstack.api.Client.from_config") as from_config:
@@ -69,8 +71,8 @@ class TestEndpointPresetLocalCommands:
                         "endpoint",
                         "preset",
                         "delete",
-                        "--recipe",
-                        recipe.id,
+                        "--preset",
+                        preset.id,
                         "-y",
                     ],
                     home_dir=tmp_path,
@@ -89,29 +91,29 @@ class TestEndpointPresetLocalCommands:
             ["endpoint", "preset", "list", "--json"],
         ],
     )
-    def test_lists_complete_recipes_as_json(self, tmp_path, capsys, args):
-        recipe = get_endpoint_preset_recipe()
-        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(recipe)
+    def test_lists_complete_presets_as_json(self, tmp_path, capsys, args):
+        preset = get_endpoint_preset()
+        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
         assert run_dstack_cli(args, home_dir=tmp_path) == 0
 
         output = json.loads(capsys.readouterr().out)
-        assert len(output["recipes"]) == 1
-        data = output["recipes"][0]
-        assert data["id"] == recipe.id
+        assert len(output["presets"]) == 1
+        data = output["presets"][0]
+        assert data["id"] == preset.id
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     def test_deletes_preset_without_api_client(self, tmp_path):
-        recipe = get_endpoint_preset_recipe()
+        preset = get_endpoint_preset()
         store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
-        store.save(recipe)
-        store.save(recipe.copy(update={"id": "01234567"}))
+        store.save(preset)
+        store.save(preset.copy(update={"id": "01234567"}))
 
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
                 run_dstack_cli(
-                    ["endpoint", "preset", "delete", recipe.base, "-y"],
+                    ["endpoint", "preset", "delete", "--model", preset.base, "-y"],
                     home_dir=tmp_path,
                 )
                 == 0
@@ -144,10 +146,10 @@ env:
   - HF_TOKEN
 """
         )
-        recipe = get_endpoint_preset_recipe()
+        preset = get_endpoint_preset()
         result = SimpleNamespace(
-            recipe=recipe,
-            path=tmp_path / "recipe.yaml",
+            preset=preset,
+            path=tmp_path / "preset.yaml",
             final_run_name="qwen-build-2",
         )
 
@@ -189,34 +191,41 @@ env:
         assert [fleet.format() for fleet in configuration.fleets] == ["cli-fleet"]
         assert create.call_args.kwargs["debug"] is True
 
-    def test_apply_passes_selected_profile(self, tmp_path):
+    @pytest.mark.parametrize(
+        ("extra_args", "expected_preset"),
+        [([], "file-preset"), (["--preset", "cli-preset"], "cli-preset")],
+    )
+    def test_apply_passes_selected_profile_and_preset(self, tmp_path, extra_args, expected_preset):
         (tmp_path / ".dstack").mkdir()
         (tmp_path / ".dstack" / "profiles.yml").write_text(
             "profiles:\n  - name: gpu\n    max_price: 0.5\n"
         )
         configuration_path = tmp_path / "endpoint.dstack.yml"
         configuration_path.write_text(
-            "type: endpoint\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+            "type: endpoint\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\npreset: file-preset\n"
         )
 
         with (
             patch("dstack.api.Client.from_config"),
             patch("dstack._internal.cli.commands.endpoint.apply_endpoint_preset") as apply,
         ):
+            args = [
+                "endpoint",
+                "preset",
+                "apply",
+                "-f",
+                str(configuration_path),
+                "--profile",
+                "gpu",
+                *extra_args,
+            ]
             exit_code = run_dstack_cli(
-                [
-                    "endpoint",
-                    "preset",
-                    "apply",
-                    "-f",
-                    str(configuration_path),
-                    "--profile",
-                    "gpu",
-                ],
+                args,
                 home_dir=tmp_path,
                 repo_dir=tmp_path,
             )
 
         assert exit_code == 0
         assert apply.call_args.kwargs["profile_name"] == "gpu"
+        assert apply.call_args.kwargs["preset_id"] == expected_preset
         assert apply.call_args.kwargs["configuration"].max_price == 0.5

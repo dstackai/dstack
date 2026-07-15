@@ -25,7 +25,7 @@ from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.endpoint_presets import (
-    get_endpoint_preset_recipe,
+    get_endpoint_preset,
     get_running_service_run,
     get_successful_endpoint_report,
 )
@@ -63,7 +63,7 @@ def creation_context(tmp_path, monkeypatch):
         fleets=["gpu-fleet"],
         env={"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
     )
-    recipe_configuration = EndpointConfiguration(
+    source_configuration = EndpointConfiguration(
         name="qwen-build",
         model={"base": "Qwen/Qwen3.5-27B"},
         context_length=8192,
@@ -81,7 +81,7 @@ def creation_context(tmp_path, monkeypatch):
     return SimpleNamespace(
         api=api,
         configuration=configuration,
-        recipe_configuration=recipe_configuration,
+        source_configuration=source_configuration,
         run=run,
         run_apis=run_apis,
         store=EndpointPresetStore(tmp_path / "presets"),
@@ -93,24 +93,24 @@ class TestCreateEndpointPreset:
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         monkeypatch.setenv("HF_TOKEN", "hf-secret")
-        recipe = get_endpoint_preset_recipe()
+        preset = get_endpoint_preset()
 
         async def create(**kwargs):
             assert kwargs["configuration"].env.as_dict() == {
                 "HF_TOKEN": "hf-secret",
                 "TOKENIZERS_PARALLELISM": "false",
             }
-            assert isinstance(kwargs["recipe_configuration"].env["HF_TOKEN"], EnvSentinel)
-            assert kwargs["recipe_configuration"].env["TOKENIZERS_PARALLELISM"] == "false"
+            assert isinstance(kwargs["source_configuration"].env["HF_TOKEN"], EnvSentinel)
+            assert kwargs["source_configuration"].env["TOKENIZERS_PARALLELISM"] == "false"
             kwargs["debug_session"].write_prompt("test prompt")
             return EndpointPresetCreateResult(
-                recipe=recipe,
-                path=tmp_path / "recipe.yaml",
+                preset=preset,
+                path=tmp_path / "preset.yaml",
                 final_run_id=uuid.uuid4(),
                 final_run_name="qwen-build-2",
             )
 
-        def fail_finish(self, recipe_id=None):
+        def fail_finish(self, preset_id=None):
             raise OSError("rename failed")
 
         monkeypatch.setattr(
@@ -133,7 +133,7 @@ class TestCreateEndpointPreset:
         paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
         assert len(paths) == 1
         assert paths[0].name.endswith("-running")
-        assert result.recipe == recipe
+        assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
             "endpoint.dstack.yml",
             "prompt.md",
@@ -149,7 +149,7 @@ class TestCreateEndpointPreset:
         async def create(**kwargs):
             raise RuntimeError("creation failed")
 
-        def fail_finish(self, recipe_id=None):
+        def fail_finish(self, preset_id=None):
             raise OSError("rename failed")
 
         monkeypatch.setattr(
@@ -213,7 +213,7 @@ class TestCreateEndpointPreset:
             await _create_endpoint_preset(
                 api=creation_context.api,
                 configuration=creation_context.configuration,
-                recipe_configuration=creation_context.recipe_configuration,
+                source_configuration=creation_context.source_configuration,
                 store=creation_context.store,
             )
 
@@ -225,7 +225,7 @@ class TestCreateEndpointPreset:
         [(False, ["qwen-build-2"]), (True, [])],
     )
     @pytest.mark.asyncio
-    async def test_saves_recipe_and_cleans_up_runs(
+    async def test_saves_preset_and_cleans_up_runs(
         self, creation_context, monkeypatch, keep_service, stopped_names, tmp_path
     ):
         debug_path = tmp_path / "debug-running"
@@ -247,17 +247,17 @@ class TestCreateEndpointPreset:
         result = await _create_endpoint_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
-            recipe_configuration=creation_context.recipe_configuration,
+            source_configuration=creation_context.source_configuration,
             store=creation_context.store,
             keep_service=keep_service,
             debug_session=debug_session,
         )
 
-        assert result.recipe.base == "Qwen/Qwen3.5-27B"
+        assert result.preset.base == "Qwen/Qwen3.5-27B"
         assert result.path.is_file()
-        assert creation_context.store.list() == [result.recipe]
+        assert creation_context.store.list() == [result.preset]
         assert "license-secret" not in result.path.read_text()
-        assert result.recipe.service.env["TOKENIZERS_PARALLELISM"] == "false"
+        assert result.preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert creation_context.run_apis.stopped_names == stopped_names
 
 
