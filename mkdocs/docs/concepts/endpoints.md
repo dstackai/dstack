@@ -168,6 +168,13 @@ $ dstack endpoint preset delete --model Qwen/Qwen2.5-7B-Instruct
 For command options and agent settings, see the
 [`dstack endpoint` CLI reference](../reference/cli/dstack/endpoint.md).
 
+!!! info "Roadmap"
+    Here's what's coming soon in endpoint presets:
+
+    1. Support multiple trials, allowing the agent to improve benchmark results based on previous trials.
+    2. Allow the endpoint configuration to define custom agent instructions, such as target metrics and the experimentation approach.
+    3. Control which experiments the agent may perform, including modifying serving framework code and generating custom kernels.
+
 !!! info "What's next?"
     1. Learn how dstack [services](services.md) work
     2. Learn how to configure [fleets](fleets.md)
