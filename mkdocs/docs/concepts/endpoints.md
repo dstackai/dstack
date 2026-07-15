@@ -79,7 +79,7 @@ $ dstack endpoint preset create -f endpoint.dstack.yml
 
 This command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers. It then submits the configuration as a `dstack` service for a final benchmark. The validated preset is saved locally under `~/.dstack/presets`.
 
-??? info "Claude authorization"
+??? info "Claude configuration"
     Preset creation supports two Claude authorization methods. To use an Anthropic API key, set:
 
     ```shell
@@ -93,6 +93,15 @@ This command executes entirely locally and uses the locally installed `claude` C
     ```
 
     These options are mutually exclusive.
+
+    By default, the agent uses `claude-opus-4-8` and the default `claude` CLI effort. To override them, set:
+
+    ```shell
+    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-fable-5
+    export DSTACK_AGENT_CLAUDE_EFFORT=high
+    ```
+
+    Supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`.
 
 ## List presets
 

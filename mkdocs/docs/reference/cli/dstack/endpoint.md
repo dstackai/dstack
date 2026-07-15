@@ -44,8 +44,8 @@ Set either `DSTACK_AGENT_ANTHROPIC_API_KEY` or
 | `DSTACK_AGENT_ANTHROPIC_API_KEY` | Anthropic API key used by the agent. |
 | `DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH` | Use the existing `claude` login. |
 | `DSTACK_AGENT_CLAUDE_PATH` | `claude` executable name or path. Defaults to `claude` from `PATH`. |
-| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. |
-| `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. |
+| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. Defaults to `claude-opus-4-8`. |
+| `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used. |
 
 Agent progress is written to `agent.log` under
 `~/.dstack/agent/<endpoint-name>/<timestamp>-<preset-id>/`. Failed attempts use

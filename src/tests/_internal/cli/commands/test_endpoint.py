@@ -16,6 +16,19 @@ pytestmark = pytest.mark.windows
 
 
 class TestEndpointPresetLocalCommands:
+    def test_formats_second_scale_ttft_without_scientific_notation(self):
+        preset = get_endpoint_preset()
+        ttft = preset.validations[0].benchmark.metrics.ttft_ms
+        ttft.mean = 8148.3
+        ttft.p50 = 8151.4
+        ttft.p99 = 8334.2
+
+        output = endpoint_presets_utils.format_endpoint_benchmark(preset, verbose=True)
+
+        assert "TTFT 8.15s" in output
+        assert "TTFT mean/p50/p99=8.15/8.15/8.33s" in output
+        assert "e+03" not in output
+
     def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
         output = StringIO()
         monkeypatch.setattr(

@@ -72,9 +72,15 @@ def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) 
     parts = [
         f"concurrency={workload.concurrency}",
         f"{_format_number(output_tokens_per_second)} tok/s",
-        f"TTFT {_format_number(metrics.ttft_ms.p50)}ms",
+        f"TTFT {_format_latency(metrics.ttft_ms.p50)}",
     ]
     if verbose:
+        ttft = _format_latency_summary(
+            metrics.ttft_ms.mean, metrics.ttft_ms.p50, metrics.ttft_ms.p99
+        )
+        tpot = _format_latency_summary(
+            metrics.tpot_ms.mean, metrics.tpot_ms.p50, metrics.tpot_ms.p99
+        )
         parts.extend(
             [
                 f"hardware={_format_validation_gpus(validation)}",
@@ -84,14 +90,8 @@ def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) 
                 f"->{_format_token_count(workload.output_tokens)}",
                 f"{_format_number(requests_per_second)} req/s",
                 f"duration={_format_number(metrics.duration_seconds)}s",
-                "TTFT mean/p50/p99="
-                f"{_format_number(metrics.ttft_ms.mean)}/"
-                f"{_format_number(metrics.ttft_ms.p50)}/"
-                f"{_format_number(metrics.ttft_ms.p99)}ms",
-                "TPOT mean/p50/p99="
-                f"{_format_number(metrics.tpot_ms.mean)}/"
-                f"{_format_number(metrics.tpot_ms.p50)}/"
-                f"{_format_number(metrics.tpot_ms.p99)}ms",
+                f"TTFT mean/p50/p99={ttft}",
+                f"TPOT mean/p50/p99={tpot}",
                 f"{benchmark.tool} {benchmark.tool_version}",
             ]
         )
@@ -116,6 +116,17 @@ def _format_token_count(value: int) -> str:
 
 def _format_number(value: float) -> str:
     return f"{value:.3g}"
+
+
+def _format_latency(value_ms: float) -> str:
+    if value_ms >= 1000:
+        return f"{_format_number(value_ms / 1000)}s"
+    return f"{_format_number(value_ms)}ms"
+
+
+def _format_latency_summary(*values_ms: float) -> str:
+    divisor, unit = (1000, "s") if max(values_ms) >= 1000 else (1, "ms")
+    return "/".join(_format_number(value / divisor) for value in values_ms) + unit
 
 
 def _format_resources(resources, *, verbose: bool) -> str:
