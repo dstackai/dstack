@@ -6,9 +6,8 @@ import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Generic, List, Optional, Set, TypeVar
+from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
 from pydantic import parse_obj_as
@@ -82,13 +81,6 @@ logger = get_logger(__name__)
 RunConfigurationT = TypeVar("RunConfigurationT", bound=AnyRunConfiguration)
 
 
-@dataclass(frozen=True)
-class PreparedRunConfiguration(Generic[RunConfigurationT]):
-    configuration: RunConfigurationT
-    repo: Repo
-    run_plan: RunPlan
-
-
 class BaseRunConfigurator(
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator[RunConfigurationT],
@@ -100,23 +92,25 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
     ):
-        prepared = self.prepare_configuration(
+        run_plan, repo = self.get_plan(
             conf=conf,
             configuration_path=configuration_path,
             configurator_args=configurator_args,
         )
-        return self.apply_prepared_configuration(
-            prepared=prepared,
+        return self.apply_plan(
+            run_plan=run_plan,
+            repo=repo,
             command_args=command_args,
             configurator_args=configurator_args,
         )
 
-    def prepare_configuration(
+    def get_plan(
         self,
         conf: RunConfigurationT,
         configuration_path: str,
         configurator_args: argparse.Namespace,
-    ) -> PreparedRunConfiguration[RunConfigurationT]:
+    ) -> tuple[RunPlan, Repo]:
+        """Apply CLI arguments and validation, then return the run plan and its repo."""
         if configurator_args.repo and configurator_args.no_repo:
             raise CLIError("Either --repo or --no-repo can be specified")
 
@@ -147,22 +141,18 @@ class BaseRunConfigurator(
                 profile=profile,
                 ssh_identity_file=configurator_args.ssh_identity_file,
             )
-        return PreparedRunConfiguration(
-            configuration=conf,
-            repo=repo,
-            run_plan=run_plan,
-        )
+        return run_plan, repo
 
-    def apply_prepared_configuration(
+    def apply_plan(
         self,
-        prepared: PreparedRunConfiguration[RunConfigurationT],
+        run_plan: RunPlan,
+        repo: Repo,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         plan_properties: Optional[Dict[str, str]] = None,
     ):
-        conf = prepared.configuration
-        repo = prepared.repo
-        run_plan = prepared.run_plan
+        """Apply a run plan using the standard CLI behavior."""
+        run_name = run_plan.run_spec.run_name
 
         no_fleets = False
         if len(run_plan.job_plans[0].offers) == 0:
@@ -178,8 +168,8 @@ class BaseRunConfigurator(
         )
 
         confirm_message = "Submit a new run?"
-        if conf.name:
-            confirm_message = f"Submit the run [code]{conf.name}[/]?"
+        if run_name:
+            confirm_message = f"Submit the run [code]{run_name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
             diff = render_run_spec_diff(
@@ -188,14 +178,14 @@ class BaseRunConfigurator(
             )
             if run_plan.action == ApplyAction.UPDATE and diff is not None:
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
+                    f"Active run [code]{run_name}[/] already exists."
                     f" Detected changes that [code]can[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Update the run?"
             elif run_plan.action == ApplyAction.UPDATE and diff is None:
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists. Detected no changes."
+                    f"Active run [code]{run_name}[/] already exists. Detected no changes."
                 )
                 if command_args.yes and not command_args.force:
                     console.print("Use --force to apply anyway.")
@@ -206,7 +196,7 @@ class BaseRunConfigurator(
                 # TODO: Highlight only the fields that block in-place update instead of
                 # showing the full detected diff here.
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
+                    f"Active run [code]{run_name}[/] already exists."
                     f" Detected changes that [error]cannot[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Stop and override the run?"

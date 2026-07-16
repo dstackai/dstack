@@ -81,13 +81,14 @@ class TestSelectPlan:
         presets = [
             get_endpoint_preset(preset_id="unavailable"),
             get_endpoint_preset(preset_id="available"),
+            get_endpoint_preset(preset_id="never-probed"),
         ]
         configurator = Mock()
-        prepared = [
-            Mock(run_plan=_plan(InstanceAvailability.NOT_AVAILABLE)),
-            Mock(run_plan=_plan(InstanceAvailability.AVAILABLE)),
+        plans = [
+            (_plan(InstanceAvailability.NOT_AVAILABLE), Mock()),
+            (_plan(InstanceAvailability.AVAILABLE), Mock()),
         ]
-        configurator.prepare_configuration.side_effect = prepared
+        configurator.get_plan.side_effect = plans
         service_args = SimpleNamespace(profile=None)
 
         selected = _select_plan(
@@ -99,15 +100,18 @@ class TestSelectPlan:
         )
 
         assert selected.preset.id == "available"
-        assert selected.prepared is prepared[1]
-        assert configurator.prepare_configuration.call_count == 2
+        assert selected.run_plan is plans[1][0]
+        assert selected.repo is plans[1][1]
+        assert configurator.get_plan.call_count == 2
 
-    def test_applies_the_selected_prepared_plan(self, monkeypatch):
+    def test_applies_the_selected_plan(self, monkeypatch):
         preset = get_endpoint_preset()
-        prepared = Mock(run_plan=_plan(InstanceAvailability.AVAILABLE))
+        run_plan = _plan(InstanceAvailability.AVAILABLE)
+        repo = Mock()
+        service_args = SimpleNamespace(profile="gpu")
         configurator = Mock()
-        configurator.get_parser.return_value.parse_args.return_value = SimpleNamespace()
-        configurator.prepare_configuration.return_value = prepared
+        configurator.get_parser.return_value.parse_args.return_value = service_args
+        configurator.get_plan.return_value = (run_plan, repo)
         monkeypatch.setattr(
             "dstack._internal.cli.services.endpoints.apply.ServiceConfigurator",
             lambda api_client: configurator,
@@ -127,11 +131,12 @@ class TestSelectPlan:
             store=Mock(list=Mock(return_value=[preset])),
         )
 
-        assert configurator.get_parser.return_value.parse_args.return_value.profile == "gpu"
-        configurator.apply_prepared_configuration.assert_called_once_with(
-            prepared=prepared,
+        assert service_args.profile == "gpu"
+        configurator.apply_plan.assert_called_once_with(
+            run_plan=run_plan,
+            repo=repo,
             command_args=command_args,
-            configurator_args=configurator.get_parser.return_value.parse_args.return_value,
+            configurator_args=service_args,
             plan_properties={
                 "Model": "Qwen/Qwen3.5-27B ([secondary]base[/])",
                 "Preset": "8f3a12c4 "

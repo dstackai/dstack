@@ -6,10 +6,7 @@ from rich.markup import escape
 
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.configurators.run import (
-    PreparedRunConfiguration,
-    ServiceConfigurator,
-)
+from dstack._internal.cli.services.configurators.run import ServiceConfigurator
 from dstack._internal.cli.services.endpoints.output import (
     format_endpoint_benchmark,
     format_endpoint_context_length,
@@ -18,6 +15,7 @@ from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import RunPlan
 from dstack.api import Client
 
@@ -25,7 +23,8 @@ from dstack.api import Client
 @dataclass(frozen=True)
 class _PresetPlan:
     preset: EndpointPreset
-    prepared: PreparedRunConfiguration[ServiceConfiguration]
+    run_plan: RunPlan
+    repo: Repo
 
 
 def apply_endpoint_preset(
@@ -59,8 +58,9 @@ def apply_endpoint_preset(
         configurator=configurator,
         service_args=service_args,
     )
-    configurator.apply_prepared_configuration(
-        prepared=selected.prepared,
+    configurator.apply_plan(
+        run_plan=selected.run_plan,
+        repo=selected.repo,
         command_args=command_args,
         configurator_args=service_args,
         plan_properties={
@@ -107,15 +107,15 @@ def _select_plan(
     first_plan: Optional[_PresetPlan] = None
     for preset in presets:
         service = _build_service(configuration, preset)
-        prepared = configurator.prepare_configuration(
+        run_plan, repo = configurator.get_plan(
             conf=service,
             configuration_path=configuration_path,
             configurator_args=service_args,
         )
-        plan = _PresetPlan(preset=preset, prepared=prepared)
+        plan = _PresetPlan(preset=preset, run_plan=run_plan, repo=repo)
         if first_plan is None:
             first_plan = plan
-        if _has_available_offers(prepared.run_plan):
+        if _has_available_offers(run_plan):
             return plan
     assert first_plan is not None
     return first_plan
