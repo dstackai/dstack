@@ -121,6 +121,16 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_ELASTICSEARCH_INDEX`{ #DSTACK_SERVER_ELASTICSEARCH_INDEX } – The Elasticsearch/OpenSearch index pattern. Defaults to `dstack-logs`.
 - `DSTACK_SERVER_ELASTICSEARCH_API_KEY`{ #DSTACK_SERVER_ELASTICSEARCH_API_KEY } – The Elasticsearch/OpenSearch API key for authentication.
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
+- `DSTACK_SENTRY_DSN`{ #DSTACK_SENTRY_DSN } – The Sentry DSN. If set, enables error reporting and tracing via the Sentry SDK. See [observability](../guides/server-deployment.md#observability).
+- `DSTACK_SENTRY_TRACES_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_SAMPLE_RATE } – The Sentry sample rate for API request traces. Defaults to `0.1`.
+- `DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE } – The Sentry sample rate for background task traces. Defaults to `0.01`.
+- `DSTACK_SENTRY_PROFILES_SAMPLE_RATE`{ #DSTACK_SENTRY_PROFILES_SAMPLE_RATE } – The Sentry profiling sample rate, relative to the traces sample rate. Defaults to `0`.
+- `DSTACK_OTEL_TRACES_ENABLED`{ #DSTACK_OTEL_TRACES_ENABLED } – Enables OpenTelemetry tracing if set to any value. Requires the `otel` extra. The exporter is configured via standard `OTEL_*` env vars such as `OTEL_EXPORTER_OTLP_ENDPOINT`. See [observability](../guides/server-deployment.md#observability).
+- `DSTACK_OTEL_TRACES_SAMPLE_RATE`{ #DSTACK_OTEL_TRACES_SAMPLE_RATE } – The head sampling rate for API request traces. Defaults to `1.0`, which assumes sampling is done downstream, e.g. in an OTel collector.
+- `DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE } – The head sampling rate for background task traces. Defaults to `1.0`.
+- `DSTACK_OTEL_LOGS_ENABLED`{ #DSTACK_OTEL_LOGS_ENABLED } – Enables server log export via OTLP if set to any value. Requires the `otel` extra.
+- `DSTACK_OTEL_METRICS_ENABLED`{ #DSTACK_OTEL_METRICS_ENABLED } – Enables OpenTelemetry metrics if set to any value. Requires the `otel` extra.
+- `DSTACK_OTEL_METRICS_EXPORTERS`{ #DSTACK_OTEL_METRICS_EXPORTERS } – A comma-separated list of OpenTelemetry metrics exporters: `prometheus` (expose on the `/metrics` endpoint) and/or `otlp` (push via OTLP). Defaults to `prometheus` if `DSTACK_ENABLE_PROMETHEUS_METRICS` is set, otherwise `otlp`.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – Timeout in seconds for HTTP requests sent from the in-server proxy and gateways to service replicas. Defaults to 60.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.

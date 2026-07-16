@@ -386,6 +386,70 @@ To deploy the SSH proxy, follow its [deployment guide](https://github.com/dstack
 > For a local setup running [PostgreSQL](#postgresql) and the SSH proxy together, see the example
 > [`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml).
 
+## Observability
+
+Besides [workload metrics](../concepts/metrics.md), the `dstack` server can report its own errors, traces, logs,
+and metrics for monitoring the server. Two integrations are supported: Sentry and OpenTelemetry.
+They are independent and can be enabled together, e.g. Sentry for error tracking and OpenTelemetry for tracing.
+
+### Sentry
+
+To report server errors and traces via the Sentry SDK, set the `DSTACK_SENTRY_DSN` environment variable.
+
+The DSN can point to [Sentry :material-arrow-top-right-thin:{.external }](https://sentry.io/)
+or any Sentry-compatible error tracker such as
+[Bugsink :material-arrow-top-right-thin:{.external }](https://www.bugsink.com/) or
+[GlitchTip :material-arrow-top-right-thin:{.external }](https://glitchtip.com/).
+
+The following optional environment variables control sampling:
+
+- `DSTACK_SENTRY_TRACES_SAMPLE_RATE` – The sample rate for API request traces. Defaults to `0.1`.
+- `DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE` – The sample rate for background task traces. Defaults to `0.01`.
+- `DSTACK_SENTRY_PROFILES_SAMPLE_RATE` – The profiling sample rate, relative to the traces sample rate. Defaults to `0`.
+
+### OpenTelemetry
+
+The server can export traces, logs, and metrics using OpenTelemetry. Each signal is enabled independently:
+
+- `DSTACK_OTEL_TRACES_ENABLED` – Enables tracing. API requests, DB queries, outgoing HTTP requests, and background tasks are instrumented automatically.
+- `DSTACK_OTEL_LOGS_ENABLED` – Enables server log export. When tracing is also enabled, logs are correlated with traces via `trace_id`.
+- `DSTACK_OTEL_METRICS_ENABLED` – Enables metrics: HTTP server and client request durations, process CPU/memory/GC metrics, etc.
+
+The export destination and protocol are configured via the standard
+[`OTEL_*` environment variables :material-arrow-top-right-thin:{.external }](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
+Traces and logs are exported via OTLP over HTTP. Example:
+
+```shell
+$ DSTACK_OTEL_TRACES_ENABLED=1 \
+  DSTACK_OTEL_LOGS_ENABLED=1 \
+  DSTACK_OTEL_METRICS_ENABLED=1 \
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.example.com:4318 \
+  dstack server
+```
+
+??? info "Required dependencies"
+    To use the OpenTelemetry integration, install the `otel` extras:
+
+    ```shell
+    $ pip install "dstack[all]" -U
+    # or
+    $ pip install "dstack[otel]" -U
+    ```
+
+??? info "Trace sampling"
+    By default, all traces are exported (sample rate `1.0`), assuming sampling is done downstream,
+    e.g. in an OTel Collector. To sample in the server instead, set:
+
+    - `DSTACK_OTEL_TRACES_SAMPLE_RATE` – The head sampling rate for API request traces.
+    - `DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE` – The head sampling rate for background task traces.
+
+??? info "Metrics exporters"
+    By default, if the [Prometheus `/metrics` endpoint](../concepts/metrics.md) is enabled via
+    `DSTACK_ENABLE_PROMETHEUS_METRICS`, OpenTelemetry metrics are exposed there alongside the built-in
+    `dstack` metrics; otherwise they are pushed via OTLP. Set `DSTACK_OTEL_METRICS_EXPORTERS`
+    to a comma-separated list of `prometheus` and/or `otlp` to override, e.g. force OTLP push
+    even when `/metrics` is enabled.
+
 ## Encryption
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
