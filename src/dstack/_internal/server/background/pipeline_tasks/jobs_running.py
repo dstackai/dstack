@@ -113,7 +113,7 @@ from dstack._internal.server.services.runs.replicas import (
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
@@ -212,7 +212,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("JobRunningFetcher.fetch")
+    @tracing.instrument_pipeline_task("JobRunningFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobRunningPipelineItem]:
         job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
         async with job_lock:
@@ -311,7 +311,7 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("JobRunningWorker.process")
+    @tracing.instrument_pipeline_task("JobRunningWorker.process")
     async def process(self, item: JobRunningPipelineItem):
         context = await _load_process_context(item=item)
         if context is None:

@@ -68,7 +68,7 @@ from dstack._internal.server.settings import (
     SERVER_URL,
     UPDATE_DEFAULT_PROJECT,
 )
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
@@ -105,6 +105,11 @@ def create_app() -> FastAPI:
         ],
     )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
+    if settings.OTEL_TRACES_ENABLED or settings.OTEL_METRICS_ENABLED or settings.OTEL_LOGS_ENABLED:
+        # Must be configured before the app starts serving. In particular,
+        # the FastAPI instrumentation has no effect if the app's middleware
+        # stack is already built, which happens on the first ASGI event (lifespan).
+        otel.configure(app, get_db().engine)
     return app
 
 

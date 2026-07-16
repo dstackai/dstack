@@ -42,7 +42,7 @@ from dstack._internal.server.services.volumes import (
     emit_volume_status_change_event,
     volume_model_to_volume,
 )
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -132,7 +132,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("VolumeFetcher.fetch")
+    @tracing.instrument_pipeline_task("VolumeFetcher.fetch")
     async def fetch(self, limit: int) -> list[VolumePipelineItem]:
         volume_lock, _ = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
         async with volume_lock:
@@ -209,7 +209,7 @@ class VolumeWorker(Worker[VolumePipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("VolumeWorker.process")
+    @tracing.instrument_pipeline_task("VolumeWorker.process")
     async def process(self, item: VolumePipelineItem):
         volume_model = await _refetch_locked_volume(item)
         if volume_model is None:

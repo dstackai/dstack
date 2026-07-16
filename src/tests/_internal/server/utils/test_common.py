@@ -1,6 +1,8 @@
 import pytest
 
-from dstack._internal.server.utils.common import join_byte_stream_checked
+from dstack._internal.server.utils.common import (
+    join_byte_stream_checked,
+)
 
 
 @pytest.mark.parametrize(

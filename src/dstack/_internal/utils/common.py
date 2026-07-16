@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import enum
 import itertools
 import re
@@ -47,7 +48,10 @@ R = TypeVar("R")
 
 
 async def run_async(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
-    func_with_args = partial(func, *args, **kwargs)
+    # Copy the context so that context-dependent features such as tracing
+    # work in the executor thread, same as asyncio.to_thread()
+    ctx = contextvars.copy_context()
+    func_with_args = partial(ctx.run, func, *args, **kwargs)
     return await asyncio.get_running_loop().run_in_executor(None, func_with_args)
 
 

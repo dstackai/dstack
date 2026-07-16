@@ -38,7 +38,7 @@ from dstack._internal.server.services.gateways.pool import gateway_connections_p
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -127,7 +127,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("GatewayReplicaFetcher.fetch")
+    @tracing.instrument_pipeline_task("GatewayReplicaFetcher.fetch")
     async def fetch(self, limit: int) -> list[GatewayReplicaPipelineItem]:
         replica_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             GatewayComputeModel.__tablename__
@@ -227,7 +227,7 @@ class GatewayReplicaWorker(Worker[GatewayReplicaPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("GatewayReplicaWorker.process")
+    @tracing.instrument_pipeline_task("GatewayReplicaWorker.process")
     async def process(self, item: GatewayReplicaPipelineItem):
         if item.status == GatewayReplicaStatus.SUBMITTED:
             await _process_submitted_item(item)
