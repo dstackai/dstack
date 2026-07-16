@@ -26,6 +26,7 @@ class VastAIAPIClient:
         onstart: str,
         disk_size: int,
         registry_auth: Optional[RegistryAuth] = None,
+        bid: Optional[float] = None,
     ) -> dict:
         """
         Args:
@@ -34,6 +35,8 @@ class VastAIAPIClient:
             image_name: docker image name
             onstart: commands to run on start
             registry_auth: registry auth credentials for private images
+            bid: per-machine bid price in $/hour. If set, an interruptible
+                (spot) instance is created; if None, an on-demand instance.
 
         Raises:
             NoCapacityError: if instance cannot be created
@@ -48,6 +51,7 @@ class VastAIAPIClient:
         payload = {
             "client_id": "me",
             "image": image_name,
+            "price": bid,
             "disk": disk_size,
             "label": instance_name,
             "env": {

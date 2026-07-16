@@ -94,8 +94,6 @@ class VastAICompute(
             backend=BackendType.VASTAI,
             locations=self.config.regions or None,
             requirements=requirements,
-            # TODO(egor-s): spots currently not supported
-            extra_filter=lambda offer: not offer.instance.resources.spot,
             catalog=self._make_catalog(vastai_options),
         )
         offers = [
@@ -127,6 +125,9 @@ class VastAICompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
+        bid = None
+        if instance_offer.instance.resources.spot:
+            bid = instance_offer.price
         resp = self.api_client.create_instance(
             instance_name=instance_name,
             bundle_id=instance_offer.instance.name,
@@ -134,6 +135,7 @@ class VastAICompute(
             onstart=" && ".join(commands),
             disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
             registry_auth=job.job_spec.registry_auth,
+            bid=bid,
         )
         instance_id = resp["new_contract"]
         return JobProvisioningData(
