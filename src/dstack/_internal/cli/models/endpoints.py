@@ -2,16 +2,21 @@ from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import Field, PositiveInt, validator
 
-from dstack._internal.core.models.common import CoreModel, EntityReference
+from dstack._internal.core.models.common import (
+    CoreModel,
+    EntityReference,
+    generate_dual_core_model,
+)
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.profiles import ProfileParams, ProfileParamsConfig
+from dstack._internal.utils.json_schema import add_extra_schema_types
 
 
 class EndpointModelRepo(CoreModel):
-    repo: str
-    """Exact repo/path to deploy."""
-    name: Optional[str] = None
-    """Client-facing model name. Defaults to `repo`."""
+    repo: Annotated[str, Field(description="The exact model repo or path to deploy")]
+    name: Annotated[
+        Optional[str], Field(description="The client-facing model name. Defaults to `repo`")
+    ] = None
 
     @property
     def api_model_name(self) -> str:
@@ -37,8 +42,10 @@ class EndpointModelRepo(CoreModel):
 
 
 class EndpointModelBase(CoreModel):
-    base: str
-    """Base model for which the agent may select a compatible variant."""
+    base: Annotated[
+        str,
+        Field(description="The base model for which the agent may select a compatible variant"),
+    ]
 
     @property
     def api_model_name(self) -> str:
@@ -60,9 +67,25 @@ class EndpointModelBase(CoreModel):
 EndpointModelSpec = Union[EndpointModelRepo, EndpointModelBase]
 
 
-class EndpointConfiguration(ProfileParams):
-    type: Literal["endpoint"] = "endpoint"
-    name: Optional[str] = None
+class EndpointConfigurationConfig(ProfileParamsConfig):
+    @staticmethod
+    def schema_extra(schema: dict[str, Any]):
+        ProfileParamsConfig.schema_extra(schema)
+        add_extra_schema_types(
+            schema["properties"]["model"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class EndpointConfiguration(
+    ProfileParams,
+    generate_dual_core_model(EndpointConfigurationConfig),
+):
+    type: Annotated[Literal["endpoint"], Field(description="The configuration type")] = "endpoint"
+    name: Annotated[
+        Optional[str],
+        Field(description="The endpoint name. Required unless passed with `--name`"),
+    ] = None
     model: Annotated[
         EndpointModelSpec,
         Field(
@@ -72,12 +95,25 @@ class EndpointConfiguration(ProfileParams):
             )
         ),
     ]
-    context_length: Optional[PositiveInt] = None
-    """Minimum context length required from the endpoint."""
-    preset: Optional[str] = None
-    """Preset ID to use when applying an endpoint preset."""
-    gateway: Optional[Union[bool, EntityReference, str]] = None
-    env: Env = Env()
+    context_length: Annotated[
+        Optional[PositiveInt], Field(description="The minimum required context length")
+    ] = None
+    preset: Annotated[
+        Optional[str], Field(description="The preset ID to use when applying the endpoint")
+    ] = None
+    gateway: Annotated[
+        Optional[Union[bool, EntityReference, str]],
+        Field(
+            description=(
+                "The name of the gateway. Specify boolean `false` to run without a gateway."
+                " Specify boolean `true` to run with the default gateway."
+                " Omit to run with the default gateway if there is one, or without a gateway otherwise"
+            )
+        ),
+    ] = None
+    env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (
+        Env()
+    )
 
     @validator("model", pre=True)
     def parse_model(cls, value: Any) -> Any:

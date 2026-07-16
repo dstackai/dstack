@@ -11,6 +11,14 @@ pytestmark = pytest.mark.windows
 
 
 class TestEndpointConfiguration:
+    def test_schema_documents_supported_input(self):
+        assert all(
+            field.field_info.description for field in EndpointConfiguration.__fields__.values()
+        )
+        assert all(field.field_info.description for field in EndpointModelBase.__fields__.values())
+        assert all(field.field_info.description for field in EndpointModelRepo.__fields__.values())
+        assert {"type": "string"} in EndpointConfiguration.schema()["properties"]["model"]["anyOf"]
+
     def test_parses_string_as_exact_repo(self):
         configuration = EndpointConfiguration(model="Qwen/Qwen3.5-27B")
 
