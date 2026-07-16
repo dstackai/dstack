@@ -146,7 +146,19 @@ def _get_resource() -> Resource:
 def _build_log_handler(logger_provider: LoggerProvider) -> logging.Handler:
     handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
     handler.addFilter(AsyncioCancelledErrorFilter())
+    handler.addFilter(_OTelSDKLogFilter())
     return handler
+
+
+class _OTelSDKLogFilter(logging.Filter):
+    """Drops log records emitted by the OTel SDK itself.
+
+    Exporting them would be a feedback loop: an OTLP export failure is logged,
+    the record is queued for the same failing exporter, and so on indefinitely.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not (record.name + ".").startswith("opentelemetry.")
 
 
 def _register_db_span_renaming(engine: Engine) -> None:

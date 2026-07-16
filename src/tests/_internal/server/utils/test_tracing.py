@@ -125,6 +125,26 @@ class TestBuildLogHandler:
         assert records[0].severity_text == "WARN"
         assert records[0].trace_id == span.get_span_context().trace_id
 
+    def test_does_not_export_otel_sdk_records(self):
+        from opentelemetry.sdk._logs import LoggerProvider
+        from opentelemetry.sdk._logs.export import (
+            InMemoryLogRecordExporter,
+            SimpleLogRecordProcessor,
+        )
+
+        log_exporter = InMemoryLogRecordExporter()
+        logger_provider = LoggerProvider()
+        logger_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
+        handler = _build_log_handler(logger_provider)
+
+        # An OTLP export failure logged by the SDK must not be re-exported —
+        # that would be a feedback loop through the same failing exporter
+        sdk_logger = logging.getLogger("opentelemetry.exporter.otlp.proto.http._log_exporter")
+        sdk_logger.addHandler(handler)
+        sdk_logger.error("Failed to export logs batch")
+
+        assert log_exporter.get_finished_logs() == ()
+
 
 class TestGetMetricsExporters:
     @pytest.mark.parametrize(

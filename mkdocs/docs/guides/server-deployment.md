@@ -417,7 +417,7 @@ The server can export traces, logs, and metrics using OpenTelemetry. Each signal
 
 The export destination and protocol are configured via the standard
 [`OTEL_*` environment variables :material-arrow-top-right-thin:{.external }](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
-Traces and logs are exported via OTLP over HTTP. Example:
+Traces and logs are exported via OTLP over HTTP (`OTEL_EXPORTER_OTLP_PROTOCOL` has no effect). Example:
 
 ```shell
 $ DSTACK_OTEL_TRACES_ENABLED=1 \
