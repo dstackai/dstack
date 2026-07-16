@@ -661,9 +661,10 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
         await asyncio.to_thread(_terminate_windows_process_tree, proc.pid)
         await proc.wait()
         return
+    # The Windows branch returns above; Pyright still checks these POSIX-only APIs on Windows.
     if hasattr(os, "killpg"):
         with suppress(ProcessLookupError):
-            os.killpg(proc.pid, signal.SIGTERM)
+            os.killpg(proc.pid, signal.SIGTERM)  # pyright: ignore[reportAttributeAccessIssue]
     else:
         proc.terminate()
     try:
@@ -671,7 +672,10 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
     except asyncio.TimeoutError:
         if hasattr(os, "killpg"):
             with suppress(ProcessLookupError):
-                os.killpg(proc.pid, signal.SIGKILL)
+                os.killpg(  # pyright: ignore[reportAttributeAccessIssue]
+                    proc.pid,
+                    signal.SIGKILL,  # pyright: ignore[reportAttributeAccessIssue]
+                )
         else:
             proc.kill()
         await proc.wait()
