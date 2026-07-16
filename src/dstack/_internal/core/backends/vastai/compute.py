@@ -205,6 +205,16 @@ class VastAICompute(
                 and ": OCI runtime create failed:" in resp["status_msg"]
             ):
                 raise ProvisioningError(resp["status_msg"])
+            if (
+                resp.get("cur_state")
+                == resp.get("intended_status")
+                == resp.get("next_state")
+                == "stopped"
+            ):
+                # Can happen, among other cases, when a spot instance is outbid (interrupted)
+                raise ProvisioningError(
+                    "Vast.ai reports current and intended instance state as `stopped`"
+                )
 
 
 class VastAIOfferBackendData(CoreModel):
