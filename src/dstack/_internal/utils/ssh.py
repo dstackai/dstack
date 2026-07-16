@@ -101,12 +101,12 @@ def normalize_path(path: PathLike, *, collapse_user: bool = False) -> str:
     :param collapse_user: try to replace user home prefix with `~`. `False` by default.
     :return: Normalized path as string
     """
-    if collapse_user:
+    if collapse_user and (openssh_home := _get_openssh_home()) is not None:
         # The following "reverse" expanduser operation not only makes paths shorter and "nicer",
         # but also fixes one specific issue with OpenSSH bundled with Git for Windows (MSYS2),
         # see :func:`include_ssh_config` for details.
         try:
-            path = Path(path).relative_to(Path.home())
+            path = Path(path).relative_to(openssh_home)
             path = f"~/{path}"
         except ValueError:
             pass
@@ -128,6 +128,20 @@ def normalize_path(path: PathLike, *, collapse_user: bool = False) -> str:
         # no backslash-escaping pitfalls)
         return str(path).replace("\\", "/")
     return str(path)
+
+
+def _get_openssh_home() -> Optional[Path]:
+    if IS_WINDOWS:
+        return Path.home()
+
+    # POSIX OpenSSH expands `~` from the passwd entry, even when `HOME` is overridden.
+    # Match that behavior so paths under a temporary `HOME` remain absolute in SSH config.
+    import pwd
+
+    try:
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except KeyError:
+        return None
 
 
 def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_config_path):

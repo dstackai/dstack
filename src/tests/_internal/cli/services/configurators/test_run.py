@@ -9,6 +9,7 @@ from gpuhunt import KNOWN_TENSTORRENT_ACCELERATORS, AcceleratorVendor
 from dstack._internal.cli.services.configurators import get_run_configurator_class
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
+    ServiceConfigurator,
     render_run_spec_diff,
 )
 from dstack._internal.core.errors import ConfigurationError
@@ -330,6 +331,32 @@ class TestValidateCPUArchAndImage:
     def test_x86(self, cpu_spec: str, image: Optional[str]):
         conf = self.prepare_conf(cpu_spec=cpu_spec, gpu_spec="H100", image=image)
         self.validate(conf)
+
+
+class TestApplyConfiguration:
+    def test_composes_get_plan_and_apply_plan(self, monkeypatch):
+        run_plan, repo = Mock(), Mock()
+        get_plan = Mock(return_value=(run_plan, repo))
+        apply_plan = Mock()
+        monkeypatch.setattr(ServiceConfigurator, "get_plan", get_plan)
+        monkeypatch.setattr(ServiceConfigurator, "apply_plan", apply_plan)
+        conf, command_args, configurator_args = Mock(), Mock(), Mock()
+
+        ServiceConfigurator(api_client=Mock()).apply_configuration(
+            conf, "svc.dstack.yml", command_args, configurator_args
+        )
+
+        get_plan.assert_called_once_with(
+            conf=conf,
+            configuration_path="svc.dstack.yml",
+            configurator_args=configurator_args,
+        )
+        apply_plan.assert_called_once_with(
+            run_plan=run_plan,
+            repo=repo,
+            command_args=command_args,
+            configurator_args=configurator_args,
+        )
 
 
 class TestRenderRunSpecDiff:

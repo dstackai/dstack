@@ -297,6 +297,7 @@ nav:
           - Services: docs/concepts/services.md
           - Volumes: docs/concepts/volumes.md
           - More:
+            - Endpoints: docs/concepts/endpoints.md
             - Gateways: docs/concepts/gateways.md
             - Secrets: docs/concepts/secrets.md
             - Projects: docs/concepts/projects.md
@@ -347,6 +348,7 @@ nav:
               - fleet: docs/reference/dstack.yml/fleet.md
               - gateway: docs/reference/dstack.yml/gateway.md
               - volume: docs/reference/dstack.yml/volume.md
+              - endpoint: docs/reference/dstack.yml/endpoint.md
           - server/config.yml: docs/reference/server/config.yml.md
           - CLI:
               - dstack server: docs/reference/cli/dstack/server.md
@@ -366,6 +368,7 @@ nav:
               - dstack volume: docs/reference/cli/dstack/volume.md
               - dstack gateway: docs/reference/cli/dstack/gateway.md
               - dstack secret: docs/reference/cli/dstack/secret.md
+              - dstack endpoint: docs/reference/cli/dstack/endpoint.md
               - dstack export: docs/reference/cli/dstack/export.md
               - dstack import: docs/reference/cli/dstack/import.md
           - HTTP API:
