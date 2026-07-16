@@ -1,6 +1,7 @@
+import json
 from typing import Optional, Union
 
-import requests
+import httpx
 
 import dstack._internal.utils.docker as docker
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
@@ -31,9 +32,11 @@ class VastAICreateInstanceError(Exception):
 
 class VastAIAPIClient:
     def __init__(self, api_key: str):
-        self.api_url = "https://console.vast.ai/api"
-        self.api_key = api_key
-        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
+        self.s = httpx.Client(
+            base_url="https://console.vast.ai/api/",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30,
+        )
 
     def create_instance(
         self,
@@ -86,10 +89,10 @@ class VastAIAPIClient:
             "create_from": None,
             "force": False,
         }
-        resp = self.s.put(self._url(f"/v0/asks/{bundle_id}/"), json=payload)
+        resp = self.s.put(f"/v0/asks/{bundle_id}/", json=payload)
         try:
             data = resp.json()
-        except requests.exceptions.JSONDecodeError:
+        except json.JSONDecodeError:
             raise VastAICreateInstanceError(resp=resp.text)
         if resp.status_code != 200 or not data["success"]:
             raise VastAICreateInstanceError(
@@ -98,19 +101,19 @@ class VastAIAPIClient:
         return data["new_contract"]
 
     def destroy_instance(self, instance_id: Union[str, int]) -> None:
-        resp = self.s.delete(self._url(f"/v0/instances/{instance_id}/"))
+        resp = self.s.delete(f"/v0/instances/{instance_id}/")
         if resp.status_code == 429:
             raise VastAIRateLimitError()
         try:
             data = resp.json()
-        except requests.exceptions.JSONDecodeError:
+        except json.JSONDecodeError:
             raise ComputeError(resp.text)
         if resp.status_code != 200 or not data["success"]:
             if data.get("error") != "no_such_instance":
                 raise ComputeError(resp.text)
 
     def get_instance(self, instance_id: Union[str, int]) -> Optional[dict]:
-        resp = self.s.get(self._url(f"/v0/instances/{instance_id}/"))
+        resp = self.s.get(f"/v0/instances/{instance_id}/")
         if resp.status_code == 429:
             raise VastAIRateLimitError()
         resp.raise_for_status()
@@ -119,10 +122,7 @@ class VastAIAPIClient:
 
     def auth_test(self) -> bool:
         try:
-            self.s.get(self._url("/v1/instances/")).raise_for_status()
+            self.s.get("/v1/instances/").raise_for_status()
             return True
-        except requests.HTTPError:
+        except httpx.HTTPError:
             return False
-
-    def _url(self, path):
-        return f"{self.api_url}/{path.lstrip('/')}?api_key={self.api_key}"
