@@ -1,7 +1,6 @@
 import pytest
 
 from dstack._internal.server.utils.common import (
-    is_background_task_name,
     join_byte_stream_checked,
 )
 
@@ -34,15 +33,3 @@ def test_join_byte_stream_checked_stops_iteration_when_limit_reached(stream, max
         raise RuntimeError("Stream end reached, but next value was requested")
 
     assert join_byte_stream_checked(generator(stream), max_size) is None
-
-
-@pytest.mark.parametrize(
-    ["name", "expected"],
-    [
-        ["pipeline_tasks.VolumeWorker.process", True],
-        ["scheduled_tasks.process_metrics", True],
-        ["GET /api/project", False],
-    ],
-)
-def test_is_background_task_name(name, expected):
-    assert is_background_task_name(name) is expected
