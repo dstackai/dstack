@@ -4,19 +4,19 @@ from typing import Optional
 
 from rich.markup import escape
 
+from dstack._internal.cli.models.endpoint_presets import EndpointPreset
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.configurators.run import (
     PreparedRunConfiguration,
     ServiceConfigurator,
 )
-from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.cli.utils.endpoint_presets import (
+from dstack._internal.cli.services.endpoints.output import (
     format_endpoint_benchmark,
     format_endpoint_context_length,
 )
+from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoint_presets import EndpointPreset
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.runs import RunPlan
 from dstack.api import Client

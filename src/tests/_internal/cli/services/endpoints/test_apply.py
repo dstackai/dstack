@@ -3,13 +3,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from dstack._internal.cli.services.endpoint_preset_apply import (
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.apply import (
     _build_service,
     _get_matching_presets,
     _select_plan,
     apply_endpoint_preset,
 )
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.instances import InstanceAvailability
 from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
@@ -109,7 +109,7 @@ class TestSelectPlan:
         configurator.get_parser.return_value.parse_args.return_value = SimpleNamespace()
         configurator.prepare_configuration.return_value = prepared
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_apply.ServiceConfigurator",
+            "dstack._internal.cli.services.endpoints.apply.ServiceConfigurator",
             lambda api_client: configurator,
         )
         command_args = SimpleNamespace()

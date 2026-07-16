@@ -144,6 +144,10 @@ class EndpointPreset(CoreModel):
         return values
 
 
+class EndpointPresetListOutput(CoreModel):
+    presets: list[EndpointPreset]
+
+
 def _validate_exact_resources(resources: ResourcesSpec) -> None:
     cpu = parse_obj_as(CPUSpec, resources.cpu)
     if not _is_exact(cpu.count) or not _is_exact(resources.memory):

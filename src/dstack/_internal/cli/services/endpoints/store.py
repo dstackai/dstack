@@ -7,10 +7,10 @@ from typing import List, TextIO
 import yaml
 from pydantic import ValidationError
 
+from dstack._internal.cli.models.endpoint_presets import EndpointPreset
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.endpoint_presets import EndpointPreset
-from dstack._internal.core.models.endpoints import EndpointConfiguration
-from dstack._internal.core.services.endpoint_presets import endpoint_preset_to_data
 from dstack._internal.utils.common import get_dstack_dir
 
 

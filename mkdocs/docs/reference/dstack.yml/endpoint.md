@@ -5,7 +5,7 @@ used to create or apply an [endpoint preset](../../concepts/endpoints.md).
 
 ## Root reference
 
-#SCHEMA# dstack._internal.core.models.endpoints.EndpointConfiguration
+#SCHEMA# dstack._internal.cli.models.endpoints.EndpointConfiguration
     overrides:
       show_root_heading: false
       type:
@@ -17,7 +17,7 @@ used to create or apply an [endpoint preset](../../concepts/endpoints.md).
 
     Allows the creation agent to select a compatible model variant.
 
-    #SCHEMA# dstack._internal.core.models.endpoints.EndpointModelBase
+    #SCHEMA# dstack._internal.cli.models.endpoints.EndpointModelBase
         overrides:
           show_root_heading: false
 
@@ -26,7 +26,7 @@ used to create or apply an [endpoint preset](../../concepts/endpoints.md).
     Requires an exact model repo or path and optionally sets another
     client-facing model name.
 
-    #SCHEMA# dstack._internal.core.models.endpoints.EndpointModelRepo
+    #SCHEMA# dstack._internal.cli.models.endpoints.EndpointModelRepo
         overrides:
           show_root_heading: false
 

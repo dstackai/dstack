@@ -2,11 +2,11 @@ from collections import defaultdict
 
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import add_row_from_dict, console
-from dstack._internal.core.models.endpoint_presets import (
+from dstack._internal.cli.models.endpoint_presets import (
     EndpointPreset,
     EndpointPresetValidation,
 )
+from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 

@@ -4,15 +4,15 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
-from dstack._internal.core.models.endpoint_presets import (
+from dstack._internal.cli.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
+from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmark,
     EndpointBenchmarkLatency,
     EndpointBenchmarkMetrics,
     EndpointBenchmarkWorkload,
 )
+from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
 from tests._internal.cli.endpoint_presets import (
     get_endpoint_benchmark,

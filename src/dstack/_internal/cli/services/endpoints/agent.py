@@ -16,11 +16,11 @@ import psutil
 import yaml
 from rich.text import Text
 
+from dstack._internal.cli.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import get_dstack_dir
 from dstack.api import Client
@@ -519,8 +519,8 @@ def _install_skills(workspace: Path) -> None:
 def _get_skills_dir() -> Path:
     source_path = Path(__file__).resolve()
     candidates = (
-        source_path.parents[2] / "core" / "resources" / "endpoint_agent" / "skills",
-        source_path.parents[5] / "skills",
+        source_path.parent / "resources" / "skills",
+        source_path.parents[6] / "skills",
     )
     for candidate in candidates:
         if (candidate / "dstack" / "SKILL.md").is_file():

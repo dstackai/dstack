@@ -5,19 +5,19 @@ from pathlib import Path
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.models.endpoint import EndpointPresetListOutput
+from dstack._internal.cli.models.endpoint_presets import EndpointPresetListOutput
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.completion import ProjectNameCompleter
-from dstack._internal.cli.services.endpoint_preset_apply import apply_endpoint_preset
-from dstack._internal.cli.services.endpoint_preset_create import create_endpoint_preset
-from dstack._internal.cli.services.endpoint_presets import (
+from dstack._internal.cli.services.endpoints.apply import apply_endpoint_preset
+from dstack._internal.cli.services.endpoints.create import create_endpoint_preset
+from dstack._internal.cli.services.endpoints.output import print_endpoint_presets
+from dstack._internal.cli.services.endpoints.store import (
     EndpointPresetStore,
     load_endpoint_configuration,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.cli.utils.endpoint_presets import print_endpoint_presets
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack.api import Client

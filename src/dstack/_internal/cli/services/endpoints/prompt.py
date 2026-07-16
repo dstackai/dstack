@@ -3,12 +3,10 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-from dstack._internal.core.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 
-_SYSTEM_PROMPT_PATH = (
-    Path(__file__).resolve().parent.parent / "resources" / "endpoint_agent" / "system_prompt.md"
-)
+_SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent / "resources" / "system_prompt.md"
 
 
 def get_endpoint_agent_system_prompt() -> str:

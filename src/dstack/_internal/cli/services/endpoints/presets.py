@@ -4,13 +4,13 @@ from typing import Any
 
 import gpuhunt
 
-from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoint_presets import (
+from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmark,
     EndpointPreset,
     EndpointPresetValidation,
     EndpointPresetValidationReplica,
 )
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.profiles import ProfileParams

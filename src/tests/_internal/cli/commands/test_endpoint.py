@@ -7,8 +7,8 @@ import pytest
 from rich.console import Console
 from rich.theme import Theme
 
-from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.cli.utils import endpoint_presets as endpoint_presets_utils
+from dstack._internal.cli.services.endpoints import output as endpoint_presets_utils
+from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from tests._internal.cli.common import run_dstack_cli
 from tests._internal.cli.endpoint_presets import get_endpoint_preset
 

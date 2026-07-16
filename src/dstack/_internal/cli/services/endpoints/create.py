@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
-from dstack._internal.cli.services.endpoint_agent_runtime import (
+from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
+from dstack._internal.cli.models.endpoint_presets import EndpointPreset
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
     build_endpoint_agent_env,
@@ -21,23 +24,20 @@ from dstack._internal.cli.services.endpoint_agent_runtime import (
     print_endpoint_progress,
     run_endpoint_agent,
 )
-from dstack._internal.cli.services.endpoint_preset_verify import (
-    build_verified_endpoint_preset,
-    load_endpoint_agent_report,
-)
-from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
-from dstack._internal.cli.utils.common import console, warn
-from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.endpoint_agent import AgentFinalReport
-from dstack._internal.core.models.endpoint_presets import EndpointPreset
-from dstack._internal.core.models.endpoints import EndpointConfiguration
-from dstack._internal.core.models.envs import EnvSentinel
-from dstack._internal.core.models.fleets import FleetStatus
-from dstack._internal.core.services.endpoint_agent import (
+from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
+from dstack._internal.cli.services.endpoints.prompt import (
     format_endpoint_constraints,
     get_endpoint_agent_system_prompt,
 )
-from dstack._internal.core.services.endpoint_presets import endpoint_preset_to_data
+from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
+from dstack._internal.cli.services.endpoints.verify import (
+    build_verified_endpoint_preset,
+    load_endpoint_agent_report,
+)
+from dstack._internal.cli.utils.common import console, warn
+from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.fleets import FleetStatus
 from dstack.api import Client
 
 _RUN_STOP_TIMEOUT_SECONDS = 10 * 60

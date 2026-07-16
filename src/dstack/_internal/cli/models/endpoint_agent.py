@@ -3,8 +3,8 @@ from typing import Optional
 
 from pydantic import PositiveInt, root_validator
 
+from dstack._internal.cli.models.endpoint_presets import EndpointBenchmark
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.endpoint_presets import EndpointBenchmark
 
 _LATENCY_JSON_SCHEMA = {
     "type": "object",

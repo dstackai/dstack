@@ -5,27 +5,27 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from dstack._internal.cli.services.endpoint_agent_runtime import (
-    EndpointAgentProcessOutput,
-    EndpointAgentWorkspace,
-    redact,
-)
-from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoint_agent import AgentFinalReport
-from dstack._internal.core.models.endpoint_presets import (
+from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
+from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmarkClient,
     EndpointBenchmarkTarget,
     EndpointPreset,
     EndpointPresetValidationReplica,
 )
-from dstack._internal.core.models.endpoints import EndpointConfiguration
-from dstack._internal.core.models.envs import EnvSentinel
-from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
-from dstack._internal.core.services.endpoint_presets import (
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.agent import (
+    EndpointAgentProcessOutput,
+    EndpointAgentWorkspace,
+    redact,
+)
+from dstack._internal.cli.services.endpoints.presets import (
     build_endpoint_preset,
     resources_spec_from_instance_resources,
 )
+from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 
 
 def load_endpoint_agent_report(

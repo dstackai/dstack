@@ -5,14 +5,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from dstack._internal.cli.services.endpoint_agent_runtime import (
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.agent import (
     ClaudeAuth,
     EndpointAgentProcessOutput,
     EndpointAgentSession,
     EndpointAgentWorkspace,
     print_endpoint_progress,
 )
-from dstack._internal.cli.services.endpoint_preset_create import (
+from dstack._internal.cli.services.endpoints.create import (
     EndpointPresetCreateResult,
     _build_prompt,
     _cleanup_runs,
@@ -20,9 +21,8 @@ from dstack._internal.cli.services.endpoint_preset_create import (
     _get_build_name,
     create_endpoint_preset,
 )
-from dstack._internal.cli.services.endpoint_presets import EndpointPresetStore
+from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.endpoint_presets import (
@@ -71,11 +71,11 @@ def creation_context(tmp_path, monkeypatch):
         env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
     )
     monkeypatch.setattr(
-        "dstack._internal.cli.services.endpoint_preset_create.get_claude_auth",
+        "dstack._internal.cli.services.endpoints.create.get_claude_auth",
         _claude_auth,
     )
     monkeypatch.setattr(
-        "dstack._internal.cli.services.endpoint_preset_create._get_build_name",
+        "dstack._internal.cli.services.endpoints.create._get_build_name",
         lambda _: "qwen-build",
     )
     return SimpleNamespace(
@@ -104,7 +104,7 @@ class TestCreateEndpointPreset:
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
             create,
         )
 
@@ -150,7 +150,7 @@ class TestCreateEndpointPreset:
             raise OSError("rename failed")
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
             create,
         )
         monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
@@ -190,7 +190,7 @@ class TestCreateEndpointPreset:
             raise OSError("rename failed")
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create._create_endpoint_preset",
+            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
             create,
         )
         monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
@@ -213,7 +213,7 @@ class TestCreateEndpointPreset:
             client=SimpleNamespace(fleets=SimpleNamespace(list=lambda *args, **kwargs: [])),
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create.get_claude_auth",
+            "dstack._internal.cli.services.endpoints.create.get_claude_auth",
             lambda: pytest.fail("Claude auth must not be checked without an active fleet"),
         )
 
@@ -239,11 +239,11 @@ class TestCreateEndpointPreset:
             cleanup_calls.append(kwargs)
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create.run_endpoint_agent",
+            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
             run_agent,
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create._cleanup_runs",
+            "dstack._internal.cli.services.endpoints.create._cleanup_runs",
             cleanup_runs,
         )
 
@@ -285,7 +285,7 @@ class TestCreateEndpointPreset:
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create.run_endpoint_agent",
+            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
             run_agent,
         )
         result = await _create_endpoint_preset(
@@ -310,7 +310,7 @@ class TestBuildName:
         with pytest.raises(CLIError, match="Endpoint name is required"):
             _get_build_name(None)
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_preset_create.secrets.token_hex",
+            "dstack._internal.cli.services.endpoints.create.secrets.token_hex",
             lambda _: "a1b2c3",
         )
 

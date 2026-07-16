@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
-from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.endpoint_agent import AgentFinalReport
-from dstack._internal.core.models.endpoint_presets import (
+from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
+from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmark,
     EndpointBenchmarkClient,
     EndpointBenchmarkTarget,
@@ -12,6 +11,7 @@ from dstack._internal.core.models.endpoint_presets import (
     EndpointPresetValidation,
     EndpointPresetValidationReplica,
 )
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec

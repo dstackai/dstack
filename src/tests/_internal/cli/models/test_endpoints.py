@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.core.models.endpoints import (
+from dstack._internal.cli.models.endpoints import (
     EndpointConfiguration,
     EndpointModelBase,
     EndpointModelRepo,

@@ -10,7 +10,8 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.services.endpoint_agent_runtime import (
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.agent import (
     ClaudeAuth,
     EndpointAgentSession,
     EndpointAgentWorkspace,
@@ -30,7 +31,6 @@ from dstack._internal.cli.services.endpoint_agent_runtime import (
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.services.configs import ConfigManager
 
 pytestmark = pytest.mark.windows
@@ -274,7 +274,7 @@ print(json.dumps({
         )
         (tmp_path / "progress.jsonl").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_agent_runtime._build_claude_command",
+            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
             lambda **_: [sys.executable, str(script)],
         )
 
@@ -324,7 +324,7 @@ print(json.dumps({
         session_path.mkdir()
         (session_path / "agent.log").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoint_agent_runtime._build_claude_command",
+            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
             lambda **_: [sys.executable, str(script)],
         )
 

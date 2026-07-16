@@ -4,12 +4,12 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.services.endpoint_preset_verify import (
+from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.verify import (
     build_verified_endpoint_preset,
 )
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.endpoint_agent import AgentFinalReport
-from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
 from tests._internal.cli.endpoint_presets import (
@@ -34,7 +34,7 @@ class TestBuildVerifiedEndpointPreset:
         created_at = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
 
         with patch(
-            "dstack._internal.core.services.endpoint_presets.get_current_datetime",
+            "dstack._internal.cli.services.endpoints.presets.get_current_datetime",
             return_value=created_at,
         ):
             preset = build_verified_endpoint_preset(
