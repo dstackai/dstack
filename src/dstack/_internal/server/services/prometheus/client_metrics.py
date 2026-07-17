@@ -1,3 +1,5 @@
+from typing import Optional
+
 from prometheus_client import Counter, Histogram
 
 
@@ -53,3 +55,44 @@ class RunMetrics:
 
 
 run_metrics = RunMetrics()
+
+
+class HTTPMetrics:
+    """Wrapper class for server HTTP Prometheus metrics.
+
+    Deprecated in favor of the OpenTelemetry HTTP metrics
+    (`DSTACK_OTEL_METRICS_ENABLED`), which are correct in multi-replica
+    deployments. Kept for backward compatibility.
+    """
+
+    def __init__(self):
+        self._requests_total = Counter(
+            "dstack_server_requests_total",
+            "Total number of HTTP requests",
+            labelnames=["method", "endpoint", "http_status", "project_name"],
+        )
+        self._request_duration = Histogram(
+            "dstack_server_request_duration_seconds",
+            "HTTP request duration in seconds",
+            labelnames=["method", "endpoint", "http_status", "project_name"],
+        )
+
+    def log_request(
+        self,
+        method: str,
+        endpoint: str,
+        http_status: int,
+        project_name: Optional[str],
+        duration_seconds: float,
+    ):
+        labels = {
+            "method": method,
+            "endpoint": endpoint,
+            "http_status": http_status,
+            "project_name": project_name,
+        }
+        self._request_duration.labels(**labels).observe(duration_seconds)
+        self._requests_total.labels(**labels).inc()
+
+
+http_metrics = HTTPMetrics()
