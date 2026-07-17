@@ -85,7 +85,6 @@ _PER_FLEET_MAX_OFFERS = 100
 async def get_job_plans(
     session: AsyncSession,
     project: ProjectModel,
-    profile: Profile,
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> list[JobPlan]:
@@ -140,34 +139,7 @@ async def get_job_plans(
             replica_num=0,
             replica_group_name=replica_group_name,
         )
-        if candidate_fleet_models is None:
-            if profile.instances is not None:
-                instance_offers = await get_targeted_instance_offers(
-                    session=session,
-                    project=project,
-                    run_spec=run_spec,
-                    job=jobs[0],
-                    volumes=volumes,
-                )
-                backend_offers = []
-            elif profile.fleets is None:
-                instance_offers, backend_offers = await _get_non_fleet_offers(
-                    session=session,
-                    project=project,
-                    profile=profile,
-                    run_spec=run_spec,
-                    job=jobs[0],
-                    volumes=volumes,
-                )
-            else:
-                instance_offers, backend_offers = await _get_offers_in_run_candidate_fleets(
-                    session=session,
-                    project=project,
-                    run_spec=run_spec,
-                    job=jobs[0],
-                    volumes=volumes,
-                )
-        else:
+        if candidate_fleet_models is not None:
             fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
                 project=project,
                 fleet_models=candidate_fleet_models,
@@ -178,12 +150,37 @@ async def get_job_plans(
                 volumes=volumes,
                 exclude_not_available=False,
             )
+        elif run_spec.merged_profile.instances is not None:
+            instance_offers = await get_targeted_instance_offers(
+                session=session,
+                project=project,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=volumes,
+            )
+            backend_offers = []
+        elif run_spec.merged_profile.fleets is not None:
+            instance_offers, backend_offers = await _get_offers_in_run_candidate_fleets(
+                session=session,
+                project=project,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=volumes,
+            )
+        else:
+            instance_offers, backend_offers = await _get_non_fleet_offers(
+                session=session,
+                project=project,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=volumes,
+            )
 
         for job in jobs:
             job_plan = _get_job_plan(
                 instance_offers=instance_offers,
                 backend_offers=backend_offers,
-                profile=profile,
+                profile=run_spec.merged_profile,
                 job=job,
                 max_offers=max_offers,
             )
@@ -783,7 +780,6 @@ async def _get_pool_offers(
 async def _get_non_fleet_offers(
     session: AsyncSession,
     project: ProjectModel,
-    profile: Profile,
     run_spec: RunSpec,
     job: Job,
     volumes: list[list[Volume]],
@@ -792,19 +788,9 @@ async def _get_non_fleet_offers(
     list[tuple[Backend, InstanceOfferWithAvailability]],
 ]:
     """
-    Returns instance and backend offers for job irrespective of fleets,
+    Returns instance and backend offers for job irrespective of fleets or instances,
     i.e. all pool instances and project backends matching the spec.
     """
-    if profile.instances is not None:
-        instance_offers = await get_targeted_instance_offers(
-            session=session,
-            project=project,
-            run_spec=run_spec,
-            job=job,
-            volumes=volumes,
-        )
-        return instance_offers, []
-
     instance_offers = await _get_pool_offers(
         session=session,
         project=project,
@@ -814,7 +800,7 @@ async def _get_non_fleet_offers(
     )
     backend_offers = await get_offers_by_requirements(
         project=project,
-        profile=profile,
+        profile=run_spec.merged_profile,
         requirements=job.job_spec.requirements,
         exclude_not_available=False,
         multinode=is_multinode_job(job),
@@ -887,16 +873,6 @@ async def _get_offers_in_run_candidate_fleets(
     offers from each selected fleet, keeps existing instances as separate reusable options, and
     deduplicates identical backend offers across fleets.
     """
-    if run_spec.merged_profile.instances is not None:
-        instance_offers = await get_targeted_instance_offers(
-            session=session,
-            project=project,
-            run_spec=run_spec,
-            job=job,
-            volumes=volumes,
-        )
-        return instance_offers, []
-
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
         project=project,
