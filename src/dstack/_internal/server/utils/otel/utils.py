@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from dstack._internal import settings as core_settings
 from dstack._internal.server import settings
+from dstack._internal.server.identity import SERVER_REPLICA_ID
 from dstack._internal.server.utils.common import is_background_task_name
 from dstack._internal.server.utils.logging import AsyncioCancelledErrorFilter
 from dstack._internal.utils.logging import get_logger
@@ -110,10 +111,12 @@ def _instrument(app: FastAPI, engine: AsyncEngine) -> None:
 
 
 def _get_metrics_exporters() -> List[str]:
+    # OTLP by default, like traces and logs. The prometheus exporter (metrics on
+    # the /metrics endpoint) is opt-in: scraping /metrics through a load
+    # balancer with multiple server replicas interleaves the replicas' counters
+    # into the same series, silently corrupting rates.
     if settings.OTEL_METRICS_EXPORTERS is not None:
         return [e.strip() for e in settings.OTEL_METRICS_EXPORTERS.split(",") if e.strip()]
-    if settings.ENABLE_PROMETHEUS_METRICS:
-        return ["prometheus"]
     return ["otlp"]
 
 
@@ -137,6 +140,9 @@ def _get_resource() -> Resource:
     return Resource.create(
         {
             "service.name": "dstack-server",
+            # Distinguishes replicas: without it, metrics pushed by multiple
+            # server replicas collapse into the same series, corrupting counters
+            "service.instance.id": SERVER_REPLICA_ID,
             "service.version": core_settings.DSTACK_VERSION or "dev",
             "deployment.environment.name": settings.SERVER_ENVIRONMENT,
         }
