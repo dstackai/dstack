@@ -6,7 +6,7 @@ from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
 )
-from dstack._internal.cli.services.profile import register_profile_args
+from dstack._internal.cli.services.profile import load_profile_from_args, register_profile_args
 from dstack._internal.cli.services.resources import register_resources_args
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.gpu import print_gpu_json, print_gpu_table
@@ -15,7 +15,6 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType, TaskConfiguration
 from dstack._internal.core.models.gpus import GpuGroup
 from dstack._internal.core.models.runs import RunSpec
-from dstack.api.utils import load_profile
 
 
 class OfferConfigurator(BaseRunConfigurator):
@@ -81,7 +80,7 @@ class OfferCommand(APIBaseCommand):
 
         configurator = OfferConfigurator(api_client=self.api)
         configurator.apply_args(conf, args)
-        profile = load_profile(Path.cwd(), profile_name=args.profile)
+        profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
 
         run_spec = RunSpec(
             configuration=conf,

@@ -3,12 +3,15 @@ import os
 
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
+    Profile,
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
     parse_duration,
     parse_max_duration,
 )
+from dstack._internal.utils.path import PathLike
+from dstack.api.utils import load_profile
 
 
 def register_profile_args(parser: argparse.ArgumentParser):
@@ -17,12 +20,19 @@ def register_profile_args(parser: argparse.ArgumentParser):
     CLI arguments that override `profiles.yml` settings.
     """
     profile_group = parser.add_argument_group("Profile")
-    profile_group.add_argument(
+    profile_exc = profile_group.add_mutually_exclusive_group()
+    profile_exc.add_argument(
         "--profile",
         metavar="NAME",
         help="The name of the profile. Defaults to [code]$DSTACK_PROFILE[/]",
         default=os.getenv("DSTACK_PROFILE"),
         dest="profile",
+    )
+    profile_exc.add_argument(
+        "--no-profile",
+        help="Don't load any profile",
+        action="store_true",
+        dest="no_profile",
     )
     profile_group.add_argument(
         "--max-price",
@@ -129,6 +139,12 @@ def register_profile_args(parser: argparse.ArgumentParser):
     retry_group_exc.add_argument(
         "--retry-duration", type=retry_duration, dest="retry_duration", metavar="DURATION"
     )
+
+
+def load_profile_from_args(args: argparse.Namespace, repo_dir: PathLike) -> Profile:
+    if args.no_profile:
+        return Profile(name="no-profile")
+    return load_profile(repo_dir=repo_dir, profile_name=args.profile)
 
 
 def apply_profile_args(
