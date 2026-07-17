@@ -100,6 +100,7 @@ def print_run_plan(
     no_fleets: bool = False,
     verbose: bool = False,
     show_offer_fleet_hint: bool = False,
+    extra_properties: Optional[Dict[str, str]] = None,
 ):
     run_spec = run_plan.get_effective_run_spec()
     job_plan = run_plan.job_plans[0]
@@ -170,6 +171,8 @@ def print_run_plan(
             props.add_row(th("Inactivity duration"), inactivity_duration)
     if verbose or run_spec.configuration.reservation:
         props.add_row(th("Reservation"), run_spec.configuration.reservation or "no")
+    for key, value in (extra_properties or {}).items():
+        props.add_row(th(key), value)
 
     offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     offers.add_column("#")

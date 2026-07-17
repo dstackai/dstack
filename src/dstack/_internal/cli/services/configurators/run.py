@@ -54,9 +54,10 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos import RepoHeadWithCreds
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunPlan, RunSpec, RunStatus
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
@@ -91,6 +92,25 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
     ):
+        run_plan, repo = self.get_plan(
+            conf=conf,
+            configuration_path=configuration_path,
+            configurator_args=configurator_args,
+        )
+        return self.apply_plan(
+            run_plan=run_plan,
+            repo=repo,
+            command_args=command_args,
+            configurator_args=configurator_args,
+        )
+
+    def get_plan(
+        self,
+        conf: RunConfigurationT,
+        configuration_path: str,
+        configurator_args: argparse.Namespace,
+    ) -> tuple[RunPlan, Repo]:
+        """Apply CLI arguments and validation, then return the run plan and its repo."""
         if configurator_args.repo and configurator_args.no_repo:
             raise CLIError("Either --repo or --no-repo can be specified")
 
@@ -121,6 +141,18 @@ class BaseRunConfigurator(
                 profile=profile,
                 ssh_identity_file=configurator_args.ssh_identity_file,
             )
+        return run_plan, repo
+
+    def apply_plan(
+        self,
+        run_plan: RunPlan,
+        repo: Repo,
+        command_args: argparse.Namespace,
+        configurator_args: argparse.Namespace,
+        plan_properties: Optional[Dict[str, str]] = None,
+    ):
+        """Apply a run plan using the standard CLI behavior."""
+        run_name = run_plan.run_spec.run_name
 
         no_fleets = False
         if len(run_plan.job_plans[0].offers) == 0:
@@ -132,11 +164,12 @@ class BaseRunConfigurator(
             max_offers=configurator_args.max_offers,
             no_fleets=no_fleets,
             verbose=command_args.verbose,
+            extra_properties=plan_properties,
         )
 
         confirm_message = "Submit a new run?"
-        if conf.name:
-            confirm_message = f"Submit the run [code]{conf.name}[/]?"
+        if run_name:
+            confirm_message = f"Submit the run [code]{run_name}[/]?"
         stop_run_name = None
         if run_plan.current_resource is not None:
             diff = render_run_spec_diff(
@@ -145,14 +178,14 @@ class BaseRunConfigurator(
             )
             if run_plan.action == ApplyAction.UPDATE and diff is not None:
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
+                    f"Active run [code]{run_name}[/] already exists."
                     f" Detected changes that [code]can[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Update the run?"
             elif run_plan.action == ApplyAction.UPDATE and diff is None:
                 stop_run_name = run_plan.current_resource.run_spec.run_name
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists. Detected no changes."
+                    f"Active run [code]{run_name}[/] already exists. Detected no changes."
                 )
                 if command_args.yes and not command_args.force:
                     console.print("Use --force to apply anyway.")
@@ -163,7 +196,7 @@ class BaseRunConfigurator(
                 # TODO: Highlight only the fields that block in-place update instead of
                 # showing the full detected diff here.
                 console.print(
-                    f"Active run [code]{conf.name}[/] already exists."
+                    f"Active run [code]{run_name}[/] already exists."
                     f" Detected changes that [error]cannot[/] be updated in-place:\n{diff}"
                 )
                 confirm_message = "Stop and override the run?"
@@ -721,7 +754,7 @@ class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator)
         super().register_args(parser)
         cls.register_commands_args(parser)
 
-    def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
+    def apply_args(self, conf: ServiceConfiguration, args: argparse.Namespace):
         super().apply_args(conf, args)
         self.apply_commands_args(conf, args)
 

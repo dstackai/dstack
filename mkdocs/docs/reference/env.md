@@ -121,9 +121,20 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_ELASTICSEARCH_INDEX`{ #DSTACK_SERVER_ELASTICSEARCH_INDEX } – The Elasticsearch/OpenSearch index pattern. Defaults to `dstack-logs`.
 - `DSTACK_SERVER_ELASTICSEARCH_API_KEY`{ #DSTACK_SERVER_ELASTICSEARCH_API_KEY } – The Elasticsearch/OpenSearch API key for authentication.
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
+- `DSTACK_SENTRY_DSN`{ #DSTACK_SENTRY_DSN } – The Sentry DSN. If set, enables error reporting and tracing via the Sentry SDK. See [observability](../guides/server-deployment.md#observability).
+- `DSTACK_SENTRY_TRACES_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_SAMPLE_RATE } – The Sentry sample rate for API request traces. Defaults to `0.1`.
+- `DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE } – The Sentry sample rate for background task traces. Defaults to `0.01`.
+- `DSTACK_SENTRY_PROFILES_SAMPLE_RATE`{ #DSTACK_SENTRY_PROFILES_SAMPLE_RATE } – The Sentry profiling sample rate, relative to the traces sample rate. Defaults to `0`.
+- `DSTACK_OTEL_TRACES_ENABLED`{ #DSTACK_OTEL_TRACES_ENABLED } – Enables OpenTelemetry tracing if set to any value. Requires the `otel` extra. The exporter is configured via standard `OTEL_*` env vars such as `OTEL_EXPORTER_OTLP_ENDPOINT`. See [observability](../guides/server-deployment.md#observability).
+- `DSTACK_OTEL_TRACES_SAMPLE_RATE`{ #DSTACK_OTEL_TRACES_SAMPLE_RATE } – The head sampling rate for API request traces. Defaults to `1.0`, which assumes sampling is done downstream, e.g. in an OTel collector.
+- `DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE } – The head sampling rate for background task traces. Defaults to `1.0`.
+- `DSTACK_OTEL_LOGS_ENABLED`{ #DSTACK_OTEL_LOGS_ENABLED } – Enables server log export via OTLP if set to any value. Requires the `otel` extra.
+- `DSTACK_OTEL_METRICS_ENABLED`{ #DSTACK_OTEL_METRICS_ENABLED } – Enables OpenTelemetry metrics if set to any value. Requires the `otel` extra.
+- `DSTACK_OTEL_METRICS_EXPORTERS`{ #DSTACK_OTEL_METRICS_EXPORTERS } – A comma-separated list of OpenTelemetry metrics exporters: `prometheus` (expose on the `/metrics` endpoint) and/or `otlp` (push via OTLP). Defaults to `prometheus` if `DSTACK_ENABLE_PROMETHEUS_METRICS` is set, otherwise `otlp`.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – Timeout in seconds for HTTP requests sent from the in-server proxy and gateways to service replicas. Defaults to 60.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
+- `DSTACK_FORBID_DSTACK_IN_RUNS`{ #DSTACK_FORBID_DSTACK_IN_RUNS } – Forbids submitting runs with `dstack: true` (dstack server access inside runs) if set to any value.
 - `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to `0` to disable size limits. Defaults to `2MiB`.
 - `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 - `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
@@ -168,6 +179,17 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
 
 The following environment variables are supported by the CLI.
 
+- `DSTACK_TOKEN`{ #DSTACK_TOKEN } – The user token used by the CLI. Set `DSTACK_TOKEN`,
+  `DSTACK_SERVER_URL`, and `DSTACK_PROJECT` together to use the CLI without a project in
+  `~/.dstack/config.yml`, or to override the configured server, project, and user.
+
+  ```shell
+  DSTACK_SERVER_URL=https://server.example.com \
+  DSTACK_PROJECT=main \
+  DSTACK_TOKEN=your-token \
+  dstack ps
+  ```
+
 - `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stdout. Defaults to `INFO`.
 
 Example:
@@ -194,3 +216,7 @@ $ find ~/.dstack/logs/cli/
 </div>
 
 - `DSTACK_PROJECT`{ #DSTACK_PROJECT } – Has the same effect as `--project`. Defaults to `None`.
+- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the endpoint preset agent. If unset, the existing `claude` login is used.
+- `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the endpoint preset agent. Defaults to `claude` from `PATH`.
+- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the endpoint preset agent. Defaults to `claude-opus-4-8`.
+- `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the endpoint preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.

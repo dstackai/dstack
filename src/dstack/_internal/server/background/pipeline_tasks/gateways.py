@@ -43,7 +43,7 @@ from dstack._internal.server.services.gateways import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, get_lowest_unused_nums
 from dstack._internal.utils.logging import get_logger
 
@@ -133,7 +133,7 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("GatewayFetcher.fetch")
+    @tracing.instrument_pipeline_task("GatewayFetcher.fetch")
     async def fetch(self, limit: int) -> list[GatewayPipelineItem]:
         gateway_lock, _ = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
         async with gateway_lock:
@@ -229,7 +229,7 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("GatewayWorker.process")
+    @tracing.instrument_pipeline_task("GatewayWorker.process")
     async def process(self, item: GatewayPipelineItem):
         if item.to_be_deleted:
             await _process_to_be_deleted_item(item)

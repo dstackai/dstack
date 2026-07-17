@@ -325,9 +325,9 @@ p {
   left: 0;
   z-index: 1000;
   width: 360px;
-  padding: 6px;
+  padding: 0;
   background: var(--cs-bg);
-  border: 0.5px solid var(--cs-text);
+  border: 1px solid var(--cs-text);
   border-radius: 12px;
 }
 
@@ -338,10 +338,10 @@ p {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 14px;
+  padding: 11px 10px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #002aff, #002aff, #e165fe);
-  color: #fff;
+  background: var(--cs-text);
+  color: var(--cs-bg);
   text-decoration: none;
 }
 /* Left column: the icon tile (same as the Sky/Enterprise rows) with the star count beneath it. */
@@ -363,8 +363,8 @@ p {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  border: 0.5px solid rgba(255, 255, 255, 0.5);
-  color: #fff;
+  border: 0.5px solid color-mix(in srgb, var(--cs-bg) 50%, transparent);
+  color: var(--cs-bg);
 }
 .site-products-menu__feat-ic svg {
   width: 20px;
@@ -372,14 +372,14 @@ p {
 }
 .site-products-menu__feat-name {
   display: block;
-  color: #fff;
+  color: var(--cs-bg);
   font-size: 16px;
   font-weight: 600;
 }
 .site-products-menu__feat-desc {
   display: block;
-  margin: 8px 0 13px;
-  color: rgba(255, 255, 255, 0.88);
+  margin: 8px 0 0;
+  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -391,21 +391,21 @@ p {
   gap: 5px;
   padding: 7px 14px;
   border-radius: 8px;
-  background: #fff;
-  color: #16191f;
+  background: var(--cs-bg);
+  color: var(--cs-text);
   font-size: 12.5px;
   font-weight: 600;
   transition: background-color 0.15s ease;
 }
 .site-products-menu__feat:hover .site-products-menu__feat-cta {
-  background: #e9ebef;
+  background: var(--cs-panel);
 }
 
 /* Live GitHub star count, centered beneath the icon tile (only shown once the API responds). */
 .site-products-menu__gh {
-  color: rgba(255, 255, 255, 0.88);
+  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
 
@@ -413,7 +413,6 @@ p {
 .site-products-menu__list {
   display: flex;
   flex-direction: column;
-  margin-top: 6px;
 }
 .site-products-menu__row {
   display: flex;
@@ -465,7 +464,6 @@ p {
 .home-hero {
   position: relative;
   overflow: visible;
-  background: var(--cs-bg);
 }
 
 .home-hero__content {
@@ -992,13 +990,13 @@ p {
   width: 100%;
   color: var(--cs-text);
   --arch-border-width: max(1px, 0.22cqw); /* placeholder badge stroke */
-  --arch-gradient: linear-gradient(45deg, #002aff, #002aff, #e165fe);
+  --arch-gradient: var(--cs-text);
 }
 
-/* Dotted outline: an inline <svg> with one rounded rect, stroked with the exact 2-on / 6-off
-   dash. Geometry is set in CSS (modern browsers allow x/y/width/height/rx as CSS so we can inset
-   by the half stroke with calc — no edge clipping, crisp dots) and the stroke takes the text
-   color so it matches the labels and flips with the theme. */
+/* Thin hairline outline: an inline <svg> with one rounded rect, stroked with a solid 0.5px line
+   (dasharray 1 0). Geometry is set in CSS (modern browsers allow x/y/width/height/rx as CSS so we
+   can inset by the half stroke with calc — no edge clipping) and the stroke takes the text color
+   so it matches the labels and flips with the theme. */
 .arch-dash {
   position: absolute;
   inset: 0;
@@ -1008,15 +1006,15 @@ p {
   pointer-events: none;
 }
 .arch-dash rect {
-  x: 0.75px;
-  y: 0.75px;
-  width: calc(100% - 1.5px);
-  height: calc(100% - 1.5px);
+  x: 0.25px;
+  y: 0.25px;
+  width: calc(100% - 0.5px);
+  height: calc(100% - 0.5px);
   rx: 12px;
   fill: none;
   stroke: var(--arch-dash-stroke, var(--cs-text));
-  stroke-width: 1.5px;
-  stroke-dasharray: 2 6;
+  stroke-width: 0.5px;
+  stroke-dasharray: 1 0;
   stroke-linecap: butt;
 }
 
@@ -1056,6 +1054,13 @@ p {
   justify-content: space-between;
 }
 
+/* "Any model": spans the last two columns so it lines up with Kubernetes + on-prem below;
+   label pinned left, model logos pushed to the right edge. */
+.arch-cell--model {
+  grid-column: span 2;
+  justify-content: space-between;
+}
+
 /* "Any hardware": label pinned left, logos centered across the full row. */
 .arch-cell--hw {
   justify-content: center;
@@ -1079,17 +1084,21 @@ p {
   flex-direction: column;
   align-items: center;
   gap: 3cqw;
-  padding: 3.2cqw 5.07cqw 3.48cqw;
+  padding: 3.2cqw 3.2cqw 3.48cqw;
   border-radius: 1.6cqw;
   background: var(--arch-gradient);
-  color: #fff;
+  color: var(--cs-bg);
 }
 
 /* Same size/weight as the cell labels (e.g. "Any framework"). */
 .arch-orchestration__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2cqw;
+  width: 100%; /* stretch full width so the title pins left and the Docker marker pins right */
   font-size: 2.55cqw;
   font-weight: 500;
-  text-align: center;
 }
 
 /* Five primitives — NOT equal width: "Dev environments" (2nd) is wider so its label fits. */
@@ -1112,7 +1121,7 @@ p {
   font-size: 2.25cqw;
   font-weight: 500;
   line-height: 1.2;
-  --arch-dash-stroke: #fff; /* white dotted outline on the gradient */
+  --arch-dash-stroke: var(--cs-bg); /* dotted outline on the fill */
 }
 
 .arch-logos {
@@ -1153,6 +1162,14 @@ p {
 .arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; }
 .arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; }
 .arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
+/* "Any model" marks (top row) — square icons; plus the Docker marker on the orchestration band. */
+/* Heights tuned per-logo so the visible marks read equal, compensating for differing padding
+   inside each source viewBox (GLM's glyph is tight; DeepSeek/Qwen/Kimi sit inset in their boxes). */
+.arch-logo--glm { height: 3.4cqw; aspect-ratio: 19 / 16; }
+.arch-logo--deepseek { height: 4.8cqw; aspect-ratio: 1; transform: translateY(-1px); }
+.arch-logo--qwen { height: 4.9cqw; aspect-ratio: 1; transform: translateY(1px); }
+.arch-logo--kimi { height: 4.3cqw; aspect-ratio: 1; }
+.arch-logo--docker { height: 2.8cqw; aspect-ratio: 122.88 / 88.17; }
 
 /* Placeholder badge (fallback if a logo ever lacks a source). Overrides the mask fill. */
 .arch-logo--placeholder {
@@ -1383,7 +1400,9 @@ p {
 .gs-rail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  padding: 0;
+  border: 1px solid var(--cs-text);
+  border-radius: 12px;
 }
 .gs-opt {
   position: relative;
@@ -1403,8 +1422,8 @@ p {
 }
 .gs-opt--on,
 .gs-opt--on:hover {
-  background: linear-gradient(135deg, #002aff, #002aff, #e165fe);
-  color: #fff;
+  background: var(--cs-text);
+  color: var(--cs-bg);
 }
 .gs-opt__name {
   display: block;
@@ -1419,13 +1438,13 @@ p {
   color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
 }
 .gs-opt--on .gs-opt__desc {
-  color: rgba(255, 255, 255, 0.88);
+  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
 }
 
 /* Open-source: the featured card — bigger, but now with an icon tile (like the Sky/Enterprise rows)
    and the star count moved beneath the name, so all three controls read consistently. */
 .gs-opt--feat {
-  padding: 20px;
+  padding: 13px 14px;
   display: flex;
   align-items: flex-start;
   gap: 14px;
@@ -1441,7 +1460,7 @@ p {
 }
 .gs-opt__stars {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
   color: inherit;
 }
@@ -1469,7 +1488,7 @@ p {
   height: 20px;
 }
 .gs-opt--on .gs-opt__ic {
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: color-mix(in srgb, var(--cs-bg) 50%, transparent);
 }
 .gs-opt__body {
   flex: 1 1 auto;

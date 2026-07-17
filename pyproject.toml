@@ -13,11 +13,12 @@ classifiers = [
 dependencies = [
     "pyyaml",
     "requests",
+    "requests-unixsocket>=0.4.1",
     "typing-extensions>=4.0.0",
     "cryptography",
     "packaging",
     "python-dateutil",
-    "cachetools<7.1.0",  # Pin to work around https://github.com/tkem/cachetools/issues/394
+    "cachetools",
     "gitpython",
     "jsonschema",
     "paramiko>=3.2.0",
@@ -32,7 +33,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.26",
+    "gpuhunt==0.1.27",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -62,10 +63,18 @@ artifacts = [
     "src/dstack/_internal/server/statics/**",
 ]
 
+[tool.hatch.build.targets.sdist.force-include]
+"skills/dstack/SKILL.md" = "skills/dstack/SKILL.md"
+"skills/dstack-prototyping/SKILL.md" = "skills/dstack-prototyping/SKILL.md"
+
 [tool.hatch.build.targets.wheel]
 artifacts = [
     "src/dstack/_internal/server/statics/**",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills/dstack/SKILL.md" = "dstack/_internal/cli/services/endpoints/resources/skills/dstack/SKILL.md"
+"skills/dstack-prototyping/SKILL.md" = "dstack/_internal/cli/services/endpoints/resources/skills/dstack-prototyping/SKILL.md"
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
@@ -106,6 +115,7 @@ include = [
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
     "src/dstack/_internal/cli/services/configurators",
+    "src/dstack/_internal/cli/services/endpoints",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
@@ -187,7 +197,6 @@ server = [
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",
-    "requests-unixsocket>=0.4.1",
     "jinja2",
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",
@@ -264,9 +273,20 @@ fluentbit = [
     "elasticsearch>=8.0.0",
     "dstack[server]",
 ]
+otel = [
+    "opentelemetry-sdk>=1.30.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.30.0",
+    "opentelemetry-exporter-prometheus>=0.51b0",
+    "opentelemetry-instrumentation-fastapi>=0.51b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.51b0",
+    "opentelemetry-instrumentation-httpx>=0.51b0",
+    "opentelemetry-instrumentation-requests>=0.51b0",
+    "opentelemetry-instrumentation-system-metrics>=0.51b0",
+    "dstack[server]",
+]
 crusoe = [
     "dstack[server]",
 ]
 all = [
-    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci,crusoe,fluentbit]",
+    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci,crusoe,fluentbit,otel]",
 ]

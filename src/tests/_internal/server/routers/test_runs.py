@@ -173,6 +173,7 @@ def get_dev_env_run_plan_dict(
             "privileged": privileged,
             "init": [],
             "ports": [],
+            "dstack": False,
             "python": "3.13" if not docker else None,
             "nvcc": None,
             "registry_auth": None,
@@ -424,6 +425,7 @@ def get_dev_env_run_dict(
                 "privileged": privileged,
                 "init": [],
                 "ports": [],
+                "dstack": False,
                 "python": "3.13" if not docker else None,
                 "nvcc": None,
                 "registry_auth": None,
@@ -3461,6 +3463,36 @@ class TestSubmitRun:
                 json=body,
             )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_dstack_in_runs_forbidden(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_dict = get_dev_env_run_dict(
+            project_name=project.name,
+            username=user.name,
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        run_dict["run_spec"]["configuration"]["dstack"] = True
+        body = {"run_spec": run_dict["run_spec"]}
+        with patch(
+            "dstack._internal.server.services.runs.server_settings.FORBID_DSTACK_IN_RUNS", True
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/submit",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 400
+        assert "forbids" in response.json()["detail"][0]["msg"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

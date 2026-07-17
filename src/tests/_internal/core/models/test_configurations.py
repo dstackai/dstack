@@ -16,6 +16,45 @@ from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 
 
 class TestParseConfiguration:
+    @pytest.mark.parametrize("configuration_type", ["task", "dev-environment", "service"])
+    def test_server_access_supported(self, configuration_type: str):
+        conf = {"type": configuration_type, "dstack": True}
+        if configuration_type == "task":
+            conf["commands"] = ["true"]
+        elif configuration_type == "service":
+            conf["commands"] = ["true"]
+            conf["port"] = 8000
+
+        parsed = parse_run_configuration(conf)
+
+        assert parsed.dstack is True
+
+    def test_server_access_not_supported_with_inactivity_duration(self):
+        with pytest.raises(ConfigurationError, match="inactivity_duration"):
+            parse_run_configuration(
+                {
+                    "type": "dev-environment",
+                    "dstack": True,
+                    "inactivity_duration": "1h",
+                }
+            )
+
+    def test_server_access_and_inactivity_duration_allowed_separately(self):
+        parse_run_configuration({"type": "dev-environment", "dstack": True})
+        parse_run_configuration({"type": "dev-environment", "inactivity_duration": "1h"})
+
+    def test_server_access_allows_unresolved_passthrough_env(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "commands": ["true"],
+                "dstack": True,
+                "env": ["DSTACK_TOKEN"],
+            }
+        )
+
+        assert "DSTACK_TOKEN" in parsed.env
+
     def test_service_model_probes_none_when_omitted(self):
         """When model is set but probes omitted, probes should remain None.
         The default probe is generated server-side in the job configurator."""

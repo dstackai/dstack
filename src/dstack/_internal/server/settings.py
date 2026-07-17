@@ -119,6 +119,28 @@ SENTRY_TRACES_BACKGROUND_SAMPLE_RATE = float(
 )
 SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv("DSTACK_SENTRY_PROFILES_SAMPLE_RATE", 0))
 
+OTEL_TRACES_ENABLED = os.getenv("DSTACK_OTEL_TRACES_ENABLED") is not None
+"""Enables OpenTelemetry tracing. Requires the `otel` extra to be installed.
+The exporter is configured via standard `OTEL_*` env vars, e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`.
+"""
+OTEL_TRACES_SAMPLE_RATE = float(os.getenv("DSTACK_OTEL_TRACES_SAMPLE_RATE", 1.0))
+"""Head sampling rate for traces. The default assumes sampling is done in an OTel collector."""
+OTEL_TRACES_BACKGROUND_SAMPLE_RATE = float(
+    os.getenv("DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE", 1.0)
+)
+"""Head sampling rate for background task traces."""
+OTEL_LOGS_ENABLED = os.getenv("DSTACK_OTEL_LOGS_ENABLED") is not None
+"""Enables log export via OTLP. Requires the `otel` extra to be installed.
+The exporter is configured via standard `OTEL_*` env vars, e.g. `OTEL_EXPORTER_OTLP_ENDPOINT`.
+"""
+OTEL_METRICS_ENABLED = os.getenv("DSTACK_OTEL_METRICS_ENABLED") is not None
+"""Enables OpenTelemetry metrics. Requires the `otel` extra to be installed."""
+OTEL_METRICS_EXPORTERS = os.getenv("DSTACK_OTEL_METRICS_EXPORTERS")
+"""A comma-separated list of metrics exporters: `prometheus` (expose via the /metrics endpoint)
+and/or `otlp` (push via OTLP, configured by standard `OTEL_*` env vars).
+Defaults to `prometheus` if the /metrics endpoint is enabled, otherwise `otlp`.
+"""
+
 DEFAULT_CREDS_DISABLED = os.getenv("DSTACK_DEFAULT_CREDS_DISABLED") is not None
 DEFAULT_CREDS_ENABLED = not DEFAULT_CREDS_DISABLED
 
@@ -139,6 +161,7 @@ SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD = (
 
 USER_PROJECT_DEFAULT_QUOTA = int(os.getenv("DSTACK_USER_PROJECT_DEFAULT_QUOTA", 10))
 FORBID_SERVICES_WITHOUT_GATEWAY = os.getenv("DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY") is not None
+FORBID_DSTACK_IN_RUNS = os.getenv("DSTACK_FORBID_DSTACK_IN_RUNS") is not None
 
 SERVER_CODE_UPLOAD_LIMIT = int(os.getenv("DSTACK_SERVER_CODE_UPLOAD_LIMIT", 2 * 2**20))
 

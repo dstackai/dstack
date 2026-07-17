@@ -590,6 +590,15 @@ class BaseRunConfiguration(CoreModel):
         list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
+    dstack: Annotated[
+        bool,
+        Field(
+            description=(
+                "Make the dstack server accessible inside the run. "
+                "No authentication credentials are provided"
+            )
+        ),
+    ] = False
     setup: CommandsList = []
     """
     setup: Deprecated since 0.18.31. It has no effect for tasks and services; for
@@ -772,6 +781,13 @@ class DevEnvironmentConfiguration(
         if v is not None:
             raise ValueError("entrypoint is not supported for dev-environment")
         return v
+
+    @root_validator
+    def validate_dstack_and_inactivity_duration(cls, values):
+        if values.get("dstack") and values.get("inactivity_duration") is not None:
+            # The persistent server connection counts as activity, so inactivity is never detected
+            raise ValueError("`dstack` is not supported together with `inactivity_duration`")
+        return values
 
 
 class TaskConfigurationParams(CoreModel):

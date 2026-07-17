@@ -129,6 +129,7 @@ export function GetStartedSection() {
     'aria-selected': tab === id,
     tabIndex: 0,
     onClick: () => setTab(id),
+    onMouseEnter: () => setTab(id),
     onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -159,19 +160,19 @@ export function GetStartedSection() {
             </span>
           </div>
 
-          <div className={`gs-opt gs-opt--row${tab === 'sky' ? ' gs-opt--on' : ''}`} {...optionProps('sky')}>
-            <span className="gs-opt__ic"><CloudUploadGlyph /></span>
-            <span className="gs-opt__body">
-              <span className="gs-opt__name">dstack Sky</span>
-              <span className="gs-opt__desc">Access GPU marketplace, or bring your own clouds. Hosted and managed by us.</span>
-            </span>
-          </div>
-
           <div className={`gs-opt gs-opt--row${tab === 'ent' ? ' gs-opt--on' : ''}`} {...optionProps('ent')}>
             <span className="gs-opt__ic"><FingerprintGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">Enterprise</span>
               <span className="gs-opt__desc">Self-hosted with SSO, air-gapped setup, dedicated support, and more.</span>
+            </span>
+          </div>
+
+          <div className={`gs-opt gs-opt--row${tab === 'sky' ? ' gs-opt--on' : ''}`} {...optionProps('sky')}>
+            <span className="gs-opt__ic"><CloudUploadGlyph /></span>
+            <span className="gs-opt__body">
+              <span className="gs-opt__name">dstack Sky</span>
+              <span className="gs-opt__desc">Access GPU marketplace, or bring your own clouds. Hosted and managed by us.</span>
             </span>
           </div>
         </div>

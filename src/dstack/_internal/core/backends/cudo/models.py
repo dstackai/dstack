@@ -4,6 +4,8 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
+# TODO: Cudo is deprecated and will be removed in the future
+
 
 class CudoAPIKeyCreds(CoreModel):
     type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"

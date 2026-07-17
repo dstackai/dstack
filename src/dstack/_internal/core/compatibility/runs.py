@@ -6,7 +6,9 @@ from dstack._internal.core.models.common import (
     IncludeExcludeDictType,
     IncludeExcludeSetType,
 )
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.routers import SGLangServiceRouterConfig
 from dstack._internal.core.models.runs import (
     DEFAULT_PROBE_UNTIL_READY,
@@ -88,6 +90,9 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
 
     if run_spec.configuration.backend_options is None:
         configuration_excludes["backend_options"] = True
+
+    if not run_spec.configuration.dstack:
+        configuration_excludes["dstack"] = True
 
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.configuration.probes:

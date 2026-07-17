@@ -64,6 +64,9 @@ from dstack._internal.server.services.jobs import (
     get_job_spec,
     stop_runner,
 )
+from dstack._internal.server.services.jobs.server_connection import (
+    job_server_connections_pool,
+)
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -72,7 +75,7 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.utils import common
 from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
@@ -162,7 +165,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_pipeline_task("JobTerminatingFetcher.fetch")
+    @tracing.instrument_pipeline_task("JobTerminatingFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobTerminatingPipelineItem]:
         job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
         async with job_lock:
@@ -248,7 +251,7 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_pipeline_task("JobTerminatingWorker.process")
+    @tracing.instrument_pipeline_task("JobTerminatingWorker.process")
     async def process(self, item: JobTerminatingPipelineItem):
         async with get_session_ctx() as session:
             job_model = await _refetch_locked_job(session=session, item=item)
@@ -268,6 +271,7 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
                     return
 
         if job_model.volumes_detached_at is None:
+            await job_server_connections_pool.remove(job_model.id)
             result = await _process_terminating_job(
                 job_model=job_model,
                 instance_model=instance_model,

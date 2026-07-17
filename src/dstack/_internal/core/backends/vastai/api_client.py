@@ -1,37 +1,42 @@
-import threading
-import time
-from typing import List, Optional, Union
+import json
+from typing import Optional, Union
 
-import requests
-from requests.adapters import HTTPAdapter, Retry
+import httpx
 
 import dstack._internal.utils.docker as docker
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.common import RegistryAuth
+
+
+class VastAIRateLimitError(Exception):
+    pass
+
+
+class VastAICreateInstanceError(Exception):
+    """
+    Attributes:
+        resp: Full API response.
+        created_instance_id: ID of the instance that was created despite the error. For example,
+            Vast.ai creates spot instances in the stopped state and returns an error if the bid is
+            insufficient.
+    """
+
+    def __init__(
+        self, *args, resp: str, created_instance_id: Optional[int] = None, **kwargs
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.resp = resp
+        self.created_instance_id = created_instance_id
 
 
 class VastAIAPIClient:
     def __init__(self, api_key: str):
-        self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
-        self.api_key = api_key
-        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
-        retries = Retry(
-            total=5,
-            backoff_factor=1,
-            status_forcelist=[429, 504],
+        self.s = httpx.Client(
+            base_url="https://console.vast.ai/api/",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30,
         )
-        self.s.mount(prefix=self._url("/instances/"), adapter=HTTPAdapter(max_retries=retries))
-        self.lock = threading.Lock()
-        self.instances_cache_ts: float = 0
-        self.instances_cache: List[dict] = []
-
-    def get_bundle(self, bundle_id: Union[str, int]) -> Optional[dict]:
-        resp = self.s.post(self._url("/bundles/"), json={"id": {"eq": bundle_id}})
-        resp.raise_for_status()
-        data = resp.json()
-        offers = data["offers"]
-        return offers[0] if offers else None
 
     def create_instance(
         self,
@@ -41,7 +46,8 @@ class VastAIAPIClient:
         onstart: str,
         disk_size: int,
         registry_auth: Optional[RegistryAuth] = None,
-    ) -> dict:
+        bid: Optional[float] = None,
+    ) -> int:
         """
         Args:
             instance_name: instance label
@@ -49,12 +55,14 @@ class VastAIAPIClient:
             image_name: docker image name
             onstart: commands to run on start
             registry_auth: registry auth credentials for private images
+            bid: per-machine bid price in $/hour. If set, an interruptible
+                (spot) instance is created; if None, an on-demand instance.
 
         Raises:
-            NoCapacityError: if instance cannot be created
+            VastAICreateInstanceError: if instance cannot be created
 
         Returns:
-            create instance response
+            Instance ID
         """
         image_login = None
         if registry_auth:
@@ -63,6 +71,7 @@ class VastAIAPIClient:
         payload = {
             "client_id": "me",
             "image": image_name,
+            "price": bid,
             "disk": disk_size,
             "label": instance_name,
             "env": {
@@ -80,64 +89,40 @@ class VastAIAPIClient:
             "create_from": None,
             "force": False,
         }
-        resp = self.s.put(self._url(f"/asks/{bundle_id}/"), json=payload)
-        if resp.status_code != 200 or not (data := resp.json())["success"]:
-            raise NoCapacityError(resp.text)
-        self._invalidate_cache()
-        return data
+        resp = self.s.put(f"/v0/asks/{bundle_id}/", json=payload)
+        try:
+            data = resp.json()
+        except json.JSONDecodeError:
+            raise VastAICreateInstanceError(resp=resp.text)
+        if resp.status_code != 200 or not data["success"]:
+            raise VastAICreateInstanceError(
+                resp=resp.text, created_instance_id=data.get("new_contract")
+            )
+        return data["new_contract"]
 
-    def destroy_instance(self, instance_id: Union[str, int]) -> bool:
-        """
-        Args:
-            instance_id: instance to destroy
-
-        Returns:
-            True if instance was destroyed successfully
-        """
-        resp = self.s.delete(self._url(f"/instances/{instance_id}/"))
-        if resp.status_code != 200 or not resp.json()["success"]:
-            return False
-        self._invalidate_cache()
-        return True
-
-    def get_instances(self, cache_ttl: float = 3.0) -> List[dict]:
-        with self.lock:
-            if time.time() - self.instances_cache_ts > cache_ttl:
-                resp = self.s.get(self._url("/instances/"))
-                resp.raise_for_status()
-                data = resp.json()
-                self.instances_cache_ts = time.time()
-                self.instances_cache = data["instances"]
-            return self.instances_cache
+    def destroy_instance(self, instance_id: Union[str, int]) -> None:
+        resp = self.s.delete(f"/v0/instances/{instance_id}/")
+        if resp.status_code == 429:
+            raise VastAIRateLimitError()
+        try:
+            data = resp.json()
+        except json.JSONDecodeError:
+            raise ComputeError(resp.text)
+        if resp.status_code != 200 or not data["success"]:
+            if data.get("error") != "no_such_instance":
+                raise ComputeError(resp.text)
 
     def get_instance(self, instance_id: Union[str, int]) -> Optional[dict]:
-        instances = self.get_instances()
-        for instance in instances:
-            if instance["id"] == int(instance_id):
-                return instance
-        return None
-
-    def request_logs(self, instance_id: Union[str, int]) -> dict:
-        resp = self.s.put(
-            self._url(f"/instances/request_logs/{instance_id}/"), json={"tail": "1000"}
-        )
+        resp = self.s.get(f"/v0/instances/{instance_id}/")
+        if resp.status_code == 429:
+            raise VastAIRateLimitError()
         resp.raise_for_status()
         data = resp.json()
-        if not data["success"]:
-            raise requests.HTTPError(data)
-        return data
+        return data["instances"]
 
     def auth_test(self) -> bool:
         try:
-            self.get_instances()
+            self.s.get("/v1/instances/").raise_for_status()
             return True
-        except requests.HTTPError:
+        except httpx.HTTPError:
             return False
-
-    def _url(self, path):
-        return f"{self.api_url}/{path.lstrip('/')}?api_key={self.api_key}"
-
-    def _invalidate_cache(self):
-        with self.lock:
-            self.instances_cache_ts = 0
-            self.instances_cache = []

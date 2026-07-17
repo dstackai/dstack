@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 
 import gpuhunt
@@ -12,7 +13,11 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.base.profile_options import get_backend_profile_options
-from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
+from dstack._internal.core.backends.vastai.api_client import (
+    VastAIAPIClient,
+    VastAICreateInstanceError,
+    VastAIRateLimitError,
+)
 from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.backends.vastai.profile_options import (
     VASTAI_DEFAULT_MIN_RELIABILITY,
@@ -21,8 +26,9 @@ from dstack._internal.core.backends.vastai.profile_options import (
     VastAIProfileOptions,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ProvisioningError
+from dstack._internal.core.errors import ComputeError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -94,8 +100,6 @@ class VastAICompute(
             backend=BackendType.VASTAI,
             locations=self.config.regions or None,
             requirements=requirements,
-            # TODO(egor-s): spots currently not supported
-            extra_filter=lambda offer: not offer.instance.resources.spot,
             catalog=self._make_catalog(vastai_options),
         )
         offers = [
@@ -118,6 +122,7 @@ class VastAICompute(
         project_ssh_private_key: str,
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
+        requirements: Requirements,
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(
             run, job, max_length=MAX_INSTANCE_NAME_LEN
@@ -126,19 +131,39 @@ class VastAICompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        resp = self.api_client.create_instance(
-            instance_name=instance_name,
-            bundle_id=instance_offer.instance.name,
-            image_name=job.job_spec.image_name,
-            onstart=" && ".join(commands),
-            disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
-            registry_auth=job.job_spec.registry_auth,
+        offer_backend_data: VastAIOfferBackendData = VastAIOfferBackendData.__response__.parse_obj(
+            instance_offer.backend_data
         )
-        instance_id = resp["new_contract"]
+        bid = None
+        if instance_offer.instance.resources.spot:
+            if offer_backend_data.min_bid is None:
+                raise ComputeError(
+                    "VastAIOfferBackendData.min_bid is unexpectedly missing for a spot offer"
+                )
+            bid = offer_backend_data.min_bid
+        try:
+            instance_id = self.api_client.create_instance(
+                instance_name=instance_name,
+                bundle_id=instance_offer.instance.name,
+                image_name=job.job_spec.image_name,
+                onstart=" && ".join(commands),
+                disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
+                registry_auth=job.job_spec.registry_auth,
+                bid=bid,
+            )
+        except VastAICreateInstanceError as e:
+            if e.created_instance_id is not None:
+                _terminate_instance_with_rate_limit_retry(
+                    self.api_client, e.created_instance_id, retries=4
+                )
+                logger.debug(
+                    "Terminated Vast.ai instance %s that failed to start", e.created_instance_id
+                )
+            raise NoCapacityError(e.resp) from e
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
-            instance_id=instance_id,
+            instance_id=str(instance_id),
             hostname=None,
             internal_ip=None,
             region=instance_offer.region,
@@ -161,7 +186,14 @@ class VastAICompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
-        resp = self.api_client.get_instance(provisioning_data.instance_id)
+        try:
+            resp = self.api_client.get_instance(provisioning_data.instance_id)
+        except VastAIRateLimitError:
+            logger.warning(
+                "Reached Vast.ai rate limit when updating instance %s provisioning data",
+                provisioning_data.instance_id,
+            )
+            return
         if resp is not None:
             if resp["actual_status"] == "running":
                 provisioning_data.hostname = resp["public_ipaddr"].strip()
@@ -173,3 +205,48 @@ class VastAICompute(
                 and ": OCI runtime create failed:" in resp["status_msg"]
             ):
                 raise ProvisioningError(resp["status_msg"])
+            if (
+                resp.get("cur_state")
+                == resp.get("intended_status")
+                == resp.get("next_state")
+                == "stopped"
+            ):
+                # Can happen, among other cases, when a spot instance is outbid (interrupted)
+                raise ProvisioningError(
+                    "Vast.ai reports current and intended instance state as `stopped`"
+                )
+
+
+class VastAIOfferBackendData(CoreModel):
+    min_bid: float | None = None
+
+
+def _terminate_instance_with_rate_limit_retry(
+    client: VastAIAPIClient, instance_id: int, retries: int
+) -> bool:
+    for attempt in range(retries):
+        try:
+            client.destroy_instance(instance_id)
+            return True
+        except VastAIRateLimitError:
+            if attempt + 1 < retries:
+                logger.warning(
+                    "Hit rate limit when terminating Vast.ai instance %s. Attempt %s/%s",
+                    instance_id,
+                    attempt + 1,
+                    retries,
+                )
+                time.sleep(attempt + 1)
+        except BaseException as e:
+            logger.error(
+                "Failed to terminate Vast.ai instance %s. Terminate it manually to avoid accumulating charges. Error: %r",
+                instance_id,
+                e,
+            )
+            raise
+    logger.error(
+        "Failed to terminate Vast.ai instance %s after %s attempts hit rate limits. Terminate it manually to avoid accumulating charges",
+        instance_id,
+        retries,
+    )
+    return False

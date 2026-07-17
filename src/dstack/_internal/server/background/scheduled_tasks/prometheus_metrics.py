@@ -20,7 +20,7 @@ from dstack._internal.server.services.instances import get_instance_ssh_private_
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils import sentry_utils
+from dstack._internal.server.utils import tracing
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
@@ -36,7 +36,7 @@ MIN_COLLECT_INTERVAL_SECONDS = 9
 METRICS_TTL_SECONDS = 600
 
 
-@sentry_utils.instrument_scheduled_task
+@tracing.instrument_scheduled_task
 async def collect_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=MIN_COLLECT_INTERVAL_SECONDS)
@@ -64,7 +64,7 @@ async def collect_prometheus_metrics():
         await _collect_jobs_metrics(batch, now)
 
 
-@sentry_utils.instrument_scheduled_task
+@tracing.instrument_scheduled_task
 async def delete_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=METRICS_TTL_SECONDS)
