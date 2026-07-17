@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -10,8 +11,12 @@ from dstack._internal.core.models.profiles import (
     parse_duration,
     parse_max_duration,
 )
+from dstack._internal.utils.env import environ
 from dstack._internal.utils.path import PathLike
 from dstack.api.utils import load_profile
+
+_PROFILE_ENV_VAR = "DSTACK_PROFILE"
+_NO_PROFILE_ENV_VAR = "DSTACK_NO_PROFILE"
 
 
 def register_profile_args(parser: argparse.ArgumentParser):
@@ -24,13 +29,15 @@ def register_profile_args(parser: argparse.ArgumentParser):
     profile_exc.add_argument(
         "--profile",
         metavar="NAME",
-        help="The name of the profile. Defaults to [code]$DSTACK_PROFILE[/]",
-        default=os.getenv("DSTACK_PROFILE"),
+        help=f"The name of the profile. Defaults to [code]${_PROFILE_ENV_VAR}[/]",
         dest="profile",
     )
     profile_exc.add_argument(
         "--no-profile",
-        help="Don't load any profile",
+        help=(
+            "Don't load any profile."
+            f" Enabled by default if [code]${_NO_PROFILE_ENV_VAR}[/] is set and [code]--profile[/] is not specified"
+        ),
         action="store_true",
         dest="no_profile",
     )
@@ -142,9 +149,18 @@ def register_profile_args(parser: argparse.ArgumentParser):
 
 
 def load_profile_from_args(args: argparse.Namespace, repo_dir: PathLike) -> Profile:
+    # precedence: --no-profile > --profile=name > DSTACK_NO_PROFILE=1 > DSTACK_PROFILE=name
     if args.no_profile:
-        return Profile(name="no-profile")
-    return load_profile(repo_dir=repo_dir, profile_name=args.profile)
+        return _build_dummy_no_profile()
+    if args.profile is not None:
+        return load_profile(repo_dir=repo_dir, profile_name=args.profile)
+    try:
+        no_profile_from_env = environ.get_bool(_NO_PROFILE_ENV_VAR, default=False)
+    except ValueError as e:
+        raise CLIError(str(e)) from e
+    if no_profile_from_env:
+        return _build_dummy_no_profile()
+    return load_profile(repo_dir=repo_dir, profile_name=os.getenv(_PROFILE_ENV_VAR))
 
 
 def apply_profile_args(
@@ -194,3 +210,7 @@ def max_duration(v: str) -> int:
 
 def retry_duration(v: str) -> int:
     return parse_duration(v)
+
+
+def _build_dummy_no_profile() -> Profile:
+    return Profile(name="no-profile")
