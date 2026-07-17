@@ -453,6 +453,12 @@ $ DSTACK_OTEL_TRACES_ENABLED=1 \
     scrapes each replica directly. Scraping through a load balancer interleaves the
     replicas' counters into the same series and silently corrupts all rates.
 
+    When pushed metrics end up in Prometheus (e.g. via an OTel Collector), the sample
+    cadence is set by `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds; defaults to `60000`).
+    If it's much larger than Prometheus' configured `timeInterval` (defaults to 15s),
+    `rate()` queries may be empty. Set e.g. `OTEL_METRIC_EXPORT_INTERVAL=30000`,
+    and make sure the datasource's `timeInterval` reflects the cadence you choose.
+
 ## Encryption
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
