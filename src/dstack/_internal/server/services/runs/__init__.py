@@ -547,7 +547,6 @@ async def get_plan(
         run_spec=effective_run_spec,
         legacy_repo_dir=legacy_repo_dir,
     )
-    profile = effective_run_spec.merged_profile
 
     current_resource = None
     action = ApplyAction.CREATE
@@ -569,7 +568,6 @@ async def get_plan(
     job_plans = await get_job_plans(
         session=session,
         project=project,
-        profile=profile,
         run_spec=effective_run_spec,
         max_offers=max_offers,
     )
