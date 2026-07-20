@@ -15,13 +15,16 @@ from dstack._internal.cli.services.endpoints.store import (
     EndpointPresetStore,
     load_endpoint_configuration,
 )
-from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
+from dstack._internal.cli.services.profile import (
+    apply_profile_args,
+    load_profile_from_args,
+    register_profile_args,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack.api import Client
-from dstack.api.utils import load_profile
 
 
 class EndpointCommand(BaseCommand):
@@ -255,7 +258,7 @@ def _get_effective_configuration(
     args: argparse.Namespace,
 ) -> EndpointConfiguration:
     _apply_name(configuration, args.name)
-    profile = load_profile(Path.cwd(), args.profile)
+    profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
     for field in ProfileParams.__fields__:
         if getattr(configuration, field) is None:
             setattr(configuration, field, getattr(profile, field))
