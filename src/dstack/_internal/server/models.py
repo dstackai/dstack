@@ -615,6 +615,10 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     desired_replica_count: Mapped[Optional[int]] = mapped_column(Integer)
     """Only `None` for pre-0.20.28 gateways that were never scaled"""
+    replica_scale_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_replica_scale_attempt_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    last_update_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """Latest in-place update timestamp"""
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     forbid_new_services: Mapped[bool] = mapped_column(Boolean, server_default=false())

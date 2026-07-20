@@ -13,6 +13,7 @@ from dstack._internal.core.models.gateways import (
     GatewayStatus,
 )
 from dstack._internal.server.background.pipeline_tasks.gateways import (
+    _MAX_REPLICA_SCALE_ATTEMPTS,
     GatewayFetcher,
     GatewayPipeline,
     GatewayPipelineItem,
@@ -285,6 +286,35 @@ class TestGatewayFetcher:
         items = await fetcher.fetch(limit=10)
 
         assert items == []
+
+    async def test_fetch_includes_running_gateway_with_pending_scale_attempt_even_if_count_matches(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            last_processed_at=stale,
+        )
+        await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            ip_address=None,
+            instance_id=None,
+            region=None,
+            status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
+        )
+        gateway.replica_scale_attempt = 1
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+        assert {item.id for item in items} == {gateway.id}
 
     @pytest.mark.parametrize("legacy_compute", [False, True])
     async def test_fetch_includes_running_gateway_when_replica_count_not_matches(
@@ -621,6 +651,8 @@ class TestGatewayWorkerProvisioning:
         )
         assert [c.replica_num for c in computes] == [0, 1]
         assert computes[1].status == GatewayReplicaStatus.SUBMITTED
+        assert gateway.replica_scale_attempt == 1
+        assert gateway.last_replica_scale_attempt_at is not None
         events = await list_events(session)
         assert len(events) == 0
 
@@ -739,6 +771,7 @@ class TestGatewayWorkerRunning:
                 status=GatewayReplicaStatus.RUNNING,
                 replica_num=0,
             )
+        gateway.replica_scale_attempt = 3
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         original_last_processed_at = gateway.last_processed_at
@@ -752,6 +785,7 @@ class TestGatewayWorkerRunning:
         computes = await _fetch_all_gateway_computes(session, gateway.id)
         assert len(computes) == 1
         assert computes[0].scale_in is False
+        assert gateway.replica_scale_attempt == 0  # The desired count is met, reset counter
 
     @pytest.mark.parametrize("legacy_compute", [False, True])
     @pytest.mark.parametrize("populate_configuration", [True, False])
@@ -806,6 +840,8 @@ class TestGatewayWorkerRunning:
             GatewayReplicaStatus.SUBMITTED,
             GatewayReplicaStatus.SUBMITTED,
         ]
+        assert gateway.replica_scale_attempt == 1
+        assert gateway.last_replica_scale_attempt_at is not None
 
     async def test_scales_in_oldest_replicas_when_desired_replica_count_decreased(
         self, test_db, session: AsyncSession, worker: GatewayWorker
@@ -919,6 +955,215 @@ class TestGatewayWorkerRunning:
         computes = await _fetch_all_gateway_computes(session, gateway.id)
         assert len(computes) == 1
         assert computes[0].scale_in is False
+
+    async def test_scale_out_skipped_before_retry_delay_elapses(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = 1
+        gateway.last_replica_scale_attempt_at = get_current_datetime()
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 1
+        assert gateway.replica_scale_attempt == 1
+
+    async def test_scale_out_retries_after_retry_delay_elapses(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = 1
+        gateway.last_replica_scale_attempt_at = get_current_datetime() - timedelta(minutes=5)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 2
+        assert gateway.replica_scale_attempt == 2
+
+    async def test_scale_out_stops_after_reaching_attempt_limit(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = _MAX_REPLICA_SCALE_ATTEMPTS
+        gateway.last_replica_scale_attempt_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 1
+        assert gateway.replica_scale_attempt == _MAX_REPLICA_SCALE_ATTEMPTS
+        events = await list_events(session)
+        assert len(events) == 0
+
+    async def test_scale_out_emits_event_on_reaching_attempt_limit(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = _MAX_REPLICA_SCALE_ATTEMPTS - 1
+        gateway.last_replica_scale_attempt_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        # Last allowed attempt still creates the missing replica
+        assert len(computes) == 2
+        assert gateway.replica_scale_attempt == _MAX_REPLICA_SCALE_ATTEMPTS
+        events = await list_events(session)
+        assert len(events) == 1
+        assert "final replica scale-out attempt" in events[0].message
+
+    async def test_attempt_counter_not_reset_while_replacement_replica_still_provisioning(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address=None,
+            instance_id=None,
+            region=None,
+            status=GatewayReplicaStatus.PROVISIONING,
+            replica_num=0,
+            configuration=get_gateway_compute_configuration().json(),
+        )
+        gateway.replica_scale_attempt = 2
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.replica_scale_attempt == 2
+
+    async def test_attempt_counter_resets_and_scales_out_immediately_after_in_place_update(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = _MAX_REPLICA_SCALE_ATTEMPTS
+        gateway.last_replica_scale_attempt_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        # updated after previous scale attempt
+        gateway.last_update_at = datetime(2025, 1, 2, 3, 5, tzinfo=timezone.utc)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 5, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 2
+        assert gateway.replica_scale_attempt == 1
+
+    async def test_attempt_counter_not_reset_when_update_precedes_last_scale_attempt(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+        )
+        await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        gateway.replica_scale_attempt = _MAX_REPLICA_SCALE_ATTEMPTS
+        gateway.last_replica_scale_attempt_at = get_current_datetime()
+        gateway.last_update_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 1
+        assert gateway.replica_scale_attempt == _MAX_REPLICA_SCALE_ATTEMPTS
 
 
 @pytest.mark.asyncio

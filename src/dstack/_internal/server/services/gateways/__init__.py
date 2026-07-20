@@ -1057,6 +1057,7 @@ async def apply_plan(
                 else GATEWAY_REPLICAS_DEFAULT
             )
         gateway_model.configuration = new_configuration.json()
+        gateway_model.last_update_at = get_current_datetime()
         events.emit(
             session,
             f"Gateway updated. Changed fields: {format_diff_fields_for_event(diff)}",
