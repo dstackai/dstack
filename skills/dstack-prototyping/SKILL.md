@@ -22,10 +22,10 @@ through the dstack service URL.
 
 ## Choose Where To Run
 
-Choose only VM-based backends, SSH fleets, or Kubernetes fleets because they support idle instances and/or instance volumes. That lets later runs reuse the provisioned/idle instance or instance volumes used by runs for caching model weights (and possibly other writes). You must follow this rule even if there are fleets/backends/offers that are cheaper. The only exception from this rule is when the required GPU class (regardless of the price) is not available through VM-based backend, SSH fleet, or Kubernetes fleet.
+Pick the offer whose hardware best fits the goal at hand. Only when several offers fit comparably, choose a VM-based backend, an SSH fleet, or a Kubernetes fleet: they support idle instances and/or instance volumes, so later runs reuse the provisioned/idle instance or instance volumes for caching model weights (and possibly other writes), while container-based backends start clean on every run.
 
-Read `https://dstack.ai/docs/concepts/backends.md` to know exactly which
-backends are VM-based.
+Fetch `https://dstack.ai/docs/concepts/backends.md` and classify backends
+from the fetched document, not from memory.
 
 ## Check Serving Sources
 
@@ -37,13 +37,13 @@ For vLLM and SGLang, use these as credible sources:
 
 - vLLM recipes and model index: `https://recipes.vllm.ai/` and
   `https://recipes.vllm.ai/models.json`
-- vLLM recipe docs: `https://docs.vllm.ai/projects/recipes/en/stable/`
-- SGLang docs and cookbook: `https://docs.sglang.ai/` and
-  `https://lmsysorg.mintlify.app/cookbook/intro`
-
-Use deeper serving-engine writeups, such as
-`https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development`, when
-these references do not explain the model, hardware, or serving failure.
+- SGLang docs: `https://docs.sglang.io/` (fetch `/llms.txt` for the page
+  index)
+- SGLang model recipes: `https://docs.sglang.io/cookbook/autoregressive/intro`
+- Release notes: `https://github.com/vllm-project/vllm/releases` and
+  `https://github.com/sgl-project/sglang/releases`
+- Performance-loop methodology (profiling, benchmark contracts):
+  `https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development`
 
 ## Use A Task Before Service
 

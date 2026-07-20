@@ -15,10 +15,11 @@ from dstack._internal.cli.services.endpoints.agent import (
 )
 from dstack._internal.cli.services.endpoints.create import (
     EndpointPresetCreateResult,
-    _build_prompt,
+    _build_constraints,
     _cleanup_runs,
     _create_endpoint_preset,
     _get_build_name,
+    _save_final_report_copy,
     create_endpoint_preset,
 )
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
@@ -119,8 +120,11 @@ class TestCreateEndpointPreset:
 
         paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
         assert len(paths) == 1
-        assert paths[0].name.endswith(f"-{preset.id}")
-        assert {path.name for path in paths[0].iterdir()} == {"agent.log"}
+        assert {path.name for path in paths[0].iterdir()} == {"agent.log", "session.json"}
+        assert json.loads((paths[0] / "session.json").read_text()) == {
+            "status": "success",
+            "preset_id": preset.id,
+        }
         assert "testing preset" in (paths[0] / "agent.log").read_text()
         output = capsys.readouterr().out.replace("\n", "")
         assert f"Agent log saved to {paths[0] / 'agent.log'}" in output
@@ -168,13 +172,17 @@ class TestCreateEndpointPreset:
 
         paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
         assert len(paths) == 1
-        assert paths[0].name.endswith("-running")
         assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
             "endpoint.dstack.yml",
             "agent.log",
             "prompt.md",
+            "session.json",
             "trace.jsonl",
+        }
+        assert json.loads((paths[0] / "session.json").read_text()) == {
+            "status": "running",
+            "preset_id": None,
         }
         assert "hf-secret" not in (paths[0] / "endpoint.dstack.yml").read_text()
         assert "Files remain at" in capsys.readouterr().out
@@ -319,41 +327,10 @@ class TestBuildName:
         assert len(f"{build_name}-99999") <= 41
 
 
-class TestBuildPrompt:
-    def test_distinguishes_base_from_exact_model(self):
-        base_prompt = _build_prompt(
-            configuration=EndpointConfiguration(
-                name="qwen",
-                model={"base": "Qwen/Qwen3.5-27B"},
-                context_length=8192,
-            ),
-            build_name="qwen-build",
-            allowed_fleets=("gpu-fleet",),
-        )
-        exact_prompt = _build_prompt(
-            configuration=EndpointConfiguration(
-                name="qwen",
-                model={
-                    "repo": "community/Qwen3.5-27B-GPTQ-Int4",
-                    "name": "Qwen/Qwen3.5-27B",
-                },
-            ),
-            build_name="qwen-build",
-            allowed_fleets=("gpu-fleet",),
-        )
-
-        assert "- base_model: Qwen/Qwen3.5-27B" in base_prompt
-        assert "- model_repo:" not in base_prompt
-        assert "- context_length: 8192" in base_prompt
-        assert "- model_repo: community/Qwen3.5-27B-GPTQ-Int4" in exact_prompt
-        assert "- base_model:" not in exact_prompt
-        assert "- context_length:" not in exact_prompt
-
-
 class TestCleanupRuns:
     @pytest.mark.asyncio
     async def test_stops_only_recorded_build_runs(self, tmp_path, monkeypatch):
-        (tmp_path / "submissions.jsonl").write_text(
+        (tmp_path / "runs.jsonl").write_text(
             '{"name":"qwen-build-1"}\n{"name":"unrelated-run"}\n{"name":"qwen-build-2"}\n'
         )
         runs = _FakeRuns()
@@ -423,3 +400,85 @@ class _FakeRunAPIs:
         assert abort is False
         self.stopped_names.extend(names)
         self.run.status = RunStatus.TERMINATED
+
+
+class TestBuildConstraints:
+    def test_renders_all_fields_with_explicit_nulls_and_defaults(self):
+        configuration = EndpointConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3-32B"},
+            env=["HF_TOKEN"],
+        )
+
+        text = _build_constraints(
+            configuration=configuration,
+            build_name="qwen-abc123",
+            allowed_fleets=("gpu-fleet",),
+        )
+
+        assert text.endswith("\n")
+        assert json.loads(text) == {
+            "run_name_prefix": "qwen-abc123",
+            "model": {"base": "Qwen/Qwen3-32B"},
+            "context_length": None,
+            "max_trials": 3,
+            "concurrency": 8,
+            "fleets": ["gpu-fleet"],
+            "env": ["HF_TOKEN"],
+        }
+
+    def test_renders_configured_values(self):
+        configuration = EndpointConfiguration(
+            name="qwen",
+            model={"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"},
+            context_length=32768,
+            max_trials=10,
+            concurrency=16,
+        )
+
+        data = json.loads(
+            _build_constraints(
+                configuration=configuration,
+                build_name="qwen-abc123",
+                allowed_fleets=("a", "b"),
+            )
+        )
+
+        assert data["model"] == {"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"}
+        assert data["context_length"] == 32768
+        assert data["max_trials"] == 10
+        assert data["concurrency"] == 16
+        assert data["fleets"] == ["a", "b"]
+
+
+class TestSaveFinalReportCopy:
+    def test_copies_report_redacted(self, tmp_path):
+        workspace = EndpointAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
+        workspace.path.mkdir()
+        workspace.final_report_path.write_text(
+            '{"success": true, "note": "token dstack-secret"}', encoding="utf-8"
+        )
+        session = _agent_session(tmp_path, debug=True)
+
+        _save_final_report_copy(
+            workspace=workspace,
+            agent_session=session,
+            redacted_values=["dstack-secret"],
+        )
+
+        copied = (session.path / "final_report.json").read_text()
+        assert "dstack-secret" not in copied
+        assert "[redacted]" in copied
+
+    def test_missing_report_is_no_op(self, tmp_path):
+        workspace = EndpointAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
+        workspace.path.mkdir()
+        session = _agent_session(tmp_path, debug=True)
+
+        _save_final_report_copy(
+            workspace=workspace,
+            agent_session=session,
+            redacted_values=["dstack-secret"],
+        )
+
+        assert not (session.path / "final_report.json").exists()

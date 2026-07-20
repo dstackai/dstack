@@ -11,6 +11,9 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import ProfileParams, ProfileParamsConfig
 from dstack._internal.utils.json_schema import add_extra_schema_types
 
+DEFAULT_MAX_TRIALS = 3
+DEFAULT_CONCURRENCY = 8
+
 
 class EndpointModelRepo(CoreModel):
     repo: Annotated[str, Field(description="The exact model repo or path to deploy")]
@@ -101,6 +104,24 @@ class EndpointConfiguration(
     preset: Annotated[
         Optional[str], Field(description="The preset ID to use when applying the endpoint")
     ] = None
+    max_trials: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The maximum number of benchmarked trials during preset creation"
+                f" before the best one is promoted. Defaults to `{DEFAULT_MAX_TRIALS}`"
+            )
+        ),
+    ] = None
+    concurrency: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of simultaneous requests used for benchmarks during"
+                f" preset creation. Defaults to `{DEFAULT_CONCURRENCY}`"
+            )
+        ),
+    ] = None
     gateway: Annotated[
         Optional[Union[bool, EntityReference, str]],
         Field(
@@ -115,6 +136,14 @@ class EndpointConfiguration(
         Env()
     )
 
+    @property
+    def effective_max_trials(self) -> int:
+        return self.max_trials if self.max_trials is not None else DEFAULT_MAX_TRIALS
+
+    @property
+    def effective_concurrency(self) -> int:
+        return self.concurrency if self.concurrency is not None else DEFAULT_CONCURRENCY
+
     @validator("model", pre=True)
     def parse_model(cls, value: Any) -> Any:
         if isinstance(value, str):
@@ -126,6 +155,19 @@ class EndpointConfiguration(
         if value is not None and not value.strip():
             raise ValueError("Endpoint preset must be a non-empty string")
         return value
+
+
+class EndpointPresetConstraints(CoreModel):
+    """The effective constraints for endpoint preset creation, saved as `constraints.json`
+    in the agent workspace. Field semantics are documented in the agent system prompt."""
+
+    run_name_prefix: str
+    model: EndpointModelSpec
+    context_length: Optional[PositiveInt] = None
+    max_trials: PositiveInt
+    concurrency: PositiveInt
+    fleets: list[str] = Field(min_items=1)
+    env: list[str] = []
 
 
 def _validate_model(value: Any, *, field: str) -> str:

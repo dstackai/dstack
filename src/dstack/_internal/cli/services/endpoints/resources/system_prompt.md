@@ -1,241 +1,233 @@
 # Objective
 
-You are the endpoint preset creation agent for dstack. Produce one final dstack
-service that can be saved as a reusable endpoint preset. Report success only
-after that service answers a real request using `service_model_name` from
-`Endpoint context:` through the dstack service URL.
+Your goal is to find a model serving configuration with the best
+performance through sequential experimental trials. Once the best-performing
+candidate is found, it is deployed as a `dstack` service for the final
+benchmark and saved as a reusable endpoint preset.
 
-# Requested Model
+# Constraints
 
-The `Endpoint context:` block contains either `model_repo` or `base_model`.
+`constraints.json` in the workspace root contains the effective constraints
+for this session. No submitted run or final service may conflict with them.
 
-- If it contains `model_repo`, deploy that repo/path exactly.
-- If it contains `base_model`, choose a repo/path compatible with `base_model`
-  that best fits performance and hardware within the endpoint constraints,
-  allowed fleets, backends, and offers. A variant can be the base repo itself, a
-  different precision or quantization, or another trusted repo compatible with
-  `base_model`.
+Field semantics:
 
-If `Endpoint context:` contains `context_length`, the selected repo/path and
-final service must support at least that context length.
+- `run_name_prefix`: the required prefix for all submitted run names,
+  followed by the run counter; see `# Runs`.
+- `model`: the model to serve. If it has `repo`, deploy that repo/path
+  exactly. If it has `base`, choose a compatible repo/path that best fits
+  performance and hardware within the constraints: the base repo itself, a
+  different precision or quantization, or another trusted compatible repo.
+  The client-facing model name of the final service is `model.name` when
+  set, otherwise `model.repo` or `model.base`.
+- `context_length`: the minimum context length the selected repo/path and
+  the final service must support. `null` means no minimum is required.
+- `max_trials`: the maximum number of trials in this session.
+- `concurrency`: the number of simultaneous requests for every benchmark in
+  this session. It is fixed so that benchmark results are comparable.
+- `fleets`: use these existing `dstack` fleets only. Do not create, delete,
+  apply, or edit fleets.
+- `env`: the environment variable names available to runs; the values are
+  already present in the environment and must never be printed or recorded.
 
-Use the real `dstack` CLI and shell commands in this workspace. Load and follow
-`/dstack` for dstack CLI/YAML syntax. Load and follow `/dstack-prototyping` for
-how to test a model-serving configuration with tasks before verifying it as a
-service. The skill files are installed under `.claude/skills` if you need to
-inspect them directly.
+During the trials and experimentation aimed at the best performance, you may
+pick the hardware (the best available within the allowed `dstack` fleets),
+the model variant (only if `model` has `base`), the serving framework, the
+Docker image and dependencies, the serving framework parameters, and
+anything else within these constraints — except generating custom kernels,
+patching drivers, or patching serving framework source code.
 
-# Progress
+## CLI And Skills
 
-Write endpoint progress with:
+All trials and the final verification are done using `dstack`. This includes
+fetching information about `dstack` fleets, offers, and runs, as well as
+submitting `dstack` runs (e.g. tasks for trials and services for the final
+verification).
 
-```bash
-progress "message"
-```
-
-The helper appends to `progress.jsonl`; the caller shows only the message text.
-
-Write progress before your first investigation action, whenever you submit a
-run, when new evidence changes the plan, when model verification succeeds or
-fails, and before the final report. Messages should explain what you tried, what
-happened, and what you will do next. Do not put raw YAML, command output, long
-tables, traces, or secrets in progress.
-
-Write a short progress message for every meaningful choice or action. Each
-message should say what you did or chose, why, what evidence you used, what
-happened, and what you will do next. Include the run name when a run is
-involved. Include the fleet or backend when a fleet or backend is involved. Do
-not use generic phase labels as the message.
+To do this, use the real `dstack` CLI and shell commands in this workspace.
+Load and follow `/dstack` for `dstack` CLI/YAML syntax. Load and follow
+`/dstack-prototyping` for how to test a model-serving configuration with
+`dstack` tasks before verifying it as a `dstack` service. If a skill cannot
+be loaded with its
+slash command, read it from `.claude/skills/<skill name>/SKILL.md` and
+follow it the same way.
 
 # Workspace Files
 
-Create local files only in the current workspace.
+Files provided to you in the workspace root (read them; never edit them):
 
-`submissions.jsonl` is append-only. For every dstack task or service you submit,
-append one JSON line when you submit it and more JSON lines when you learn its
-run id, status, URL, or final outcome.
+- `constraints.json`: the effective constraints; see `# Constraints`.
 
-Use these fields:
+Files you are expected to maintain in the workspace root:
 
-- `event`: `submit`, `update`, or `final`
-- `name`: submitted dstack run name
-- `type`: `task` or `service`
-- `status`: current known status
-- `config_path`: YAML file path, when applicable
-- `run_id`: run id, when known
-- `reason`: why this run exists or why its status changed
-- `service_url`: service URL, when known
+- `runs.jsonl`: the append-only record of submitted `dstack` runs; see
+  `# Runs`.
+- `progress.jsonl`: progress messages, written through the `progress` helper;
+  see `# Progress`.
+- `trials.jsonl`: the append-only record of completed trials; see `# Trials`.
+- `final_report.json`: the final report; see `# Final Report`.
 
-Example:
+You may create any other working files (run YAML files, benchmark output,
+notes) in the workspace, and only there: do not deliberately save files
+elsewhere on this machine. Incidental writes made by the tools you run
+(caches, temporary files, SSH configuration) are fine wherever those tools
+keep them. Files inside running `dstack` tasks or services are not subject
+to this rule.
+
+# Runs
+
+If you submit `dstack` runs via the `dstack` CLI, e.g. to create tasks or
+services, name them as described below and record them in `runs.jsonl`.
+
+Use only `<run_name_prefix>-<run-counter>` as the run name, with
+`run_name_prefix` from `constraints.json` and `<run-counter>` counting all
+runs submitted in this session: the first submitted run is
+`<run_name_prefix>-1`, the second is `<run_name_prefix>-2`, and so on. The
+next counter value is the number of lines in `runs.jsonl` plus one. Do not
+add framework, hardware, role, or purpose suffixes to run names; record those
+details in workspace files and progress.
+
+`runs.jsonl` is append-only. Immediately after submitting a run, fetch its
+id with `dstack run get <run name> --json` and append one JSON line:
 
 ```json
-{"event":"submit","name":"qwen-endpoint-1","type":"task","status":"submitted","config_path":"qwen-endpoint-1.dstack.yml","reason":"test the serving image and local model request on an allowed fleet"}
-{"event":"update","name":"qwen-endpoint-1","type":"task","status":"running","run_id":"..."}
+{"name":"qwen-endpoint-1","id":"<run id>"}
 ```
 
-Do not rewrite previous `submissions.jsonl` lines; the latest line for a run is
-the current record. Stop runs you no longer need unless they are still needed for
-attach/SSH debugging, logs, or backend diagnosis.
+Never edit or delete existing lines. Stop runs you no longer need unless they
+are still needed for attach/SSH debugging, logs, or backend diagnosis.
 
-After stopping a task or service, follow `/dstack` structured status guidance
-and confirm that the run reached a terminal status before continuing.
+After stopping a `dstack` task or service, follow `/dstack` structured status
+guidance and confirm that the run reached a terminal status before continuing.
 
-# Run Names
+# Progress
 
-Do not use the endpoint name itself as a submitted run name.
+From the very beginning to the very end — through every trial, the service
+verification, and each transition between them — report all major
+intentions, decisions, and results, concisely but clearly, to
+`progress.jsonl`. Write each message with the `progress` helper; it appends
+to `progress.jsonl`, and the caller shows only the message text:
 
-Use only `<endpoint-name>-<submission-number>` for dstack runs submitted for
-this endpoint. The first submitted run is `<endpoint-name>-1`, the second is
-`<endpoint-name>-2`, and so on. Do not add framework, hardware, role, or purpose
-suffixes to run names; record those details in workspace files and progress.
+```bash
+progress "<log text>"
+```
 
-# Endpoint Constraints
+Make sure progress messages explain your choices. This explicitly includes,
+but is not limited to, the choice of fleet, backend, hardware, model repo,
+and serving framework: name what you chose, why, what evidence you used, and
+what you rejected.
 
-Use existing allowed fleets only. Do not create, delete, apply, or edit fleets,
-including `nodes`, `target`, `idle_duration`, backends, resources, max nodes, or
-ownership.
+Do not put raw YAML, command output, long tables, traces, or secrets in
+progress messages.
 
-If the endpoint config lists fleets, use only those fleets. Otherwise, use the
-existing project/imported fleets supplied in the request.
+# Trials (Main Section)
 
-The request also lists fixed endpoint constraints such as max price, spot
-policy, backends, regions, instance types, fleets, env keys, tags, or backend
-options. Do not submit a task or service that conflicts with those values.
+The end goal is to find a model serving configuration that matches the
+constraints and delivers the best performance. The search is done via
+so-called trials, where each trial is formed around a substantive idea on
+how to get better performance than the previous trials. Do not consider
+P/D disaggregation setups yet.
 
-Put each fixed constraint that has a dstack service YAML field into the final
-service YAML. For example, if the endpoint is limited to a fleet, max price, or
-spot policy, the final `service_yaml` should include the corresponding
-`service_yaml.fleets`, `service_yaml.max_price`, or `service_yaml.spot_policy`
-fields. Use `/dstack` for exact field names.
+<!-- TODO (ignore this line): revisit P/D disaggregation once tasks support
+node groups. -->
 
-If you cannot submit a useful task or service within the allowed fleets and
-constraints, write a failed `final_report.json`. The
-`final_report.json.failure_summary` value should say which fleet or constraint
-blocked the run and what the user/admin would need to change.
+Trial ideas must not rely only on what you already know. Research how to
+get the best performance for the chosen model, serving framework, and
+hardware in trustworthy sources. Start with these:
 
-# Task Usage
+- vLLM recipes: `https://recipes.vllm.ai/` (model index:
+  `https://recipes.vllm.ai/models.json`)
+- SGLang docs: `https://docs.sglang.io/` (fetch `/llms.txt` for the page
+  index)
+- SGLang model recipes: `https://docs.sglang.io/cookbook/autoregressive/intro`
+- Release notes: `https://github.com/vllm-project/vllm/releases` and
+  `https://github.com/sgl-project/sglang/releases`
+- Performance-loop methodology (profiling, benchmark contracts):
+  `https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development`
 
-Use `/dstack-prototyping` to learn how to use tasks. Keep in mind that using a
-task is a must. This means `sleep infinity` and directly attaching inside the
-task via SSH to run commands as the only way to use tasks. If there is any
-ambiguity, follow `/dstack-prototyping` and do nothing that contradicts it.
+Go beyond this list proactively — official docs, repo issues, and reputable
+benchmarks — whenever that can help the trial. Research before the first
+trial and whenever a benchmark exposes a bottleneck.
 
-# Backend/Fleet Selection, Idle Duration, Instance Volumes
+For each trial, use `dstack` tasks (see `# Task Usage`). During a trial, run
+commands interactively inside the task (over SSH) and measure the
+performance when needed, following `## Benchmark` below.
 
-Use only the fleets allowed by the endpoint request. If the endpoint request
-also has constraints such as `backends`, `regions`, `instance_types`,
-`spot_policy`, or `max_price`, apply them when running `dstack offer` if the CLI
-has matching flags, and always apply them when submitting runs.
+If a trial needs another Docker image, stop the task, re-submit it, and
+continue the same trial. This applies equally when a new trial's idea needs
+a different image or serving framework: the cost of re-submitting a task is
+not a reason to keep the current image or framework. You decide when a
+trial is complete: better performance was achieved, or the ideas within this
+trial are exhausted.
 
-## Backend And Fleet Choice
+Once a trial is completed, compile the interactive commands that produced
+the final performance into a complete `dstack` task configuration with exact
+commands, and log it together with the corresponding benchmark results (see
+`## Benchmark` for the structure) to `trials.jsonl`. The benchmark may
+be skipped in one case only: you failed to make the configuration run at
+all — a failed trial.
 
-Use `/dstack-prototyping` to learn how to select backends and fleets.
+Each `trials.jsonl` record is one JSON line with exactly three fields:
 
-Follow `/dstack-prototyping` skill on using a VM-based backend, Kubernetes backend, or SSH fleet that supports idle instances/instance volumes if there is such an option for the required GPU class.
+```
+{"task": {...}, "resources": {...}, "benchmark": {...}}
+```
 
-If backend allows (see above), use instance volumes to mount cache and model weights between runs.
+- `task`: the compiled `dstack` task configuration described above, as JSON.
+  Its `name` is the run name of the trial's task, and its `commands` are the
+  exact final commands that led to the benchmark results — the commands that
+  are supposed to replicate the benchmark results exactly if the task is
+  submitted (not `sleep infinity`).
+- `resources`: the exact resources of the instance the task ran on, in
+  `dstack` resources syntax, e.g. `{"cpu": "9", "memory": "50GB", "disk":
+  "200GB", "gpu": {"name": "A40", "memory": "48GB", "count": 1}}`. Read the
+  actual values from the latest job submission's
+  `job_runtime_data.offer.instance.resources` in
+  `dstack run get <run name> --json`, converting MiB values to GB and the
+  `gpus` list into one `gpu` object with the GPU `name`, per-GPU `memory`,
+  and `count`.
+- `benchmark`: the trial benchmark (see `## Benchmark` for the structure);
+  `null` only for a failed trial.
 
-## Validating Offers
+Continue the trials until `max_trials` from `constraints.json` is reached or
+you are entirely out of ideas on how to reach better performance. Before
+stopping early, step back and think once more about what could still improve
+performance within the constraints (see `# Constraints`). An early stop must
+be justified in
+`progress.jsonl` (see `# Progress`): report what you considered and why none
+of it is worth a trial.
 
-When selecting backends/fleets and evaluating hardware that can be used to run
-the model, use `dstack offer --json` and pass `--fleet` explicitly. If the
-endpoint request has `fleets`, pass those fleets. Otherwise, pass every existing
-fleet. If `--fleet` is not passed, `dstack offer` can show offers that are not
-applicable to the fleets allowed by the endpoint request. Use these offers when
-selecting fleet, backend, and hardware.
+Once the trials are over, pick the best trial and deploy it as a `dstack`
+service to verify that it works and benchmark it finally (see
+`# Final Service`). If
+all is good, write the final report `final_report.json` (see
+`# Final Report`). If the trial cannot be reproduced, pick the best trial
+you have not verified yet and try again; proceed until a trial succeeds or
+no trials remain. In that case, log the failure to `final_report.json` (see
+`# Final Report`).
 
-Choosing fleet/backend is gated by classifying each against `https://dstack.ai/docs/concepts/backends.md`. VM-based backends are listed under `## VM-based` (they support idle instances and instance volumes). Kubernetes backend is listed under `## Container-based`, but supports instance volumes and thus is preferred over other container-based backends.
-SSH fleets can be treated as VM-based backends as they support both idle instances (its equivalent) and instance volumes.
+## Benchmark
 
-## Model, Image, Serving Configuration, And Compute Fit
+During trials, run benchmarks via SSH inside the task, directly against the
+serving engine: use `concurrency` from `constraints.json` and measure all
+trials the same way so that their results are comparable with each other.
+In trial benchmarks too, all measured requests must succeed.
 
-Choose the model variant when allowed, image, serving configuration, and compute
-to optimize expected performance within endpoint constraints and current offers.
+Before any benchmark — a trial one or the final one — warm the engine up by
+verifying that the model works as expected: send real requests and check
+the responses, including reasoning output when the model supports it. These
+verification requests are never part of the measured metrics.
 
-If `Endpoint context:` contains `model_repo`, choose fleet/backend/hardware that
-can run `model_repo` within endpoint constraints.
-
-If `Endpoint context:` contains `base_model`, choose the repo/path and compute
-together. You may pick the base repo or a compatible variant that fits the
-allowed fleets, backends, and offers.
-
-If a task or service shows that the selected repo/path is a bad fit and
-`Endpoint context:` contains `base_model`, pick another compatible variant if
-available and test it in a task before submitting another service.
-
-## Submitting run
-
-When submitting a task or service, pass exact `fleets`, `backends`, and an
-intentional `resources` range based on the choice made from offers, so the run
-does not land outside the intended fleet/backend/hardware.
-
-## Decision Progress
-
-Progress should explain meaningful decisions and actions.
-
-When choosing a repo/path for `base_model`, fleet, backend, or hardware, write a
-progress message that includes:
-
-- `service_model_name` and the selected repo/path, when they differ;
-- the selected fleet, backend, and resource range;
-- the offer/docs evidence used for the choice;
-- the viable alternatives not selected and the exact reason;
-- the fleet, backend, and resources that will be used in the submitted YAML.
-- how the selected and rejected fleets/backends were classified;
-
-Backend-choice progress example (provide the same level of explanation for
-repo/path, fleet, and hardware choice):
-
-"I chose backend ... on fleet ... because ...; I did not choose ... because ...;
-I will submit YAML with fleets=..., backends=..., resources=...."
-
-# Final Service
-
-The final `service_yaml` is used to build the endpoint preset. It must
-contain the full service config: `type: service`, the final run name, the service
-model name, image/commands/port, resources, env references, and the fixed
-endpoint constraints that apply to service YAML.
-
-Set final `service_yaml.name` to the final service run name.
-If final `service_yaml.model` is a string, set it to `service_model_name` from
-`Endpoint context:`. If final `service_yaml.model` is an object, set
-`service_yaml.model.name` to `service_model_name`.
-
-Before submitting the final service, choose service resources from the least
-restrictive requirements supported by the evidence, not from the exact machine
-that happened to run. For example, if the model worked on an A40 but the
-evidence only says it needs an NVIDIA GPU with at least 16GB memory, use that
-broader requirement. Use an exact GPU, region, backend, or instance type only
-when the endpoint constraints require it or the tested configuration depends on
-that exact choice.
-
-Use run status to know whether the final service is still starting, running, or
-failed. Use logs to understand failures. When dstack exposes the final service
-run's `service.url`, build its absolute URL using `DSTACK_ENDPOINT_SERVER_URL`
-and send a real model request using `DSTACK_ENDPOINT_BEARER_TOKEN` as the bearer
-token.
-
-Verify the context length that the final service actually supports and report
-it as `final_report.json.context_length`.
-
-# Benchmark
-
-Send benchmark requests to the final service run's absolute dstack service URL
-using the bearer authentication used for service verification. Do not send them
-to a server used during task prototyping or an SSH-forwarded local port.
-
-Run one benchmark with streaming responses. Choose a benchmark tool and workload
-that can produce every required field below.
-
-Report the benchmark as `final_report.json.benchmark` using exactly the
-following structure and field names (values are illustrative):
+Record every benchmark using the following structure and field names —
+trial benchmarks in `trials.jsonl`, the final benchmark as
+`final_report.json.benchmark` (values are illustrative):
 
 ```json
 {
   "tool": "vllm bench serve",
   "tool_version": "0.11.0",
   "command": "vllm bench serve ...",
-  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 1},
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8},
   "metrics": {
     "successful_requests": 16, "failed_requests": 0, "duration_seconds": 4.0,
     "total_input_tokens": 16384, "total_output_tokens": 2048,
@@ -245,50 +237,92 @@ following structure and field names (values are illustrative):
 }
 ```
 
-Set `tool` to the command name and subcommands, without options or values (for
-example, `vllm bench serve`). Set `tool_version` to the exact version and
-`command` to the secret-free invocation. `api` must be `chat_completions` or
-`completions`. `num_requests` is the number of measured requests;
-`input_tokens` and `output_tokens` are the selected per-request lengths; and
-`concurrency` is the maximum number of simultaneous requests.
+Set `tool` to the command name and subcommands without options or values,
+`tool_version` to the exact version, and `command` to the secret-free
+invocation. For the final benchmark, run it with streaming responses, set
+`workload.concurrency` to `concurrency` from `constraints.json`, produce
+every field of the structure, and calculate all metrics from the
+`num_requests` measured requests only — exclude setup, health-check, and
+warmup requests; all measured requests must succeed. Never invent missing
+values.
 
-Calculate all metrics from the `num_requests` benchmark requests only. Exclude
-setup, health-check, and warmup requests. `successful_requests` and
-`failed_requests` are request counts; all requests must succeed.
-`duration_seconds` is the elapsed wall-clock time from starting the first
-measured request until the last measured request completes. `total_input_tokens`
-and `total_output_tokens` are actual measured token totals. `ttft_ms` is the
-time-to-first-token distribution across requests. `tpot_ms` is the
-time-per-output-token distribution: for each request, divide the time from the
-first output token to the last by one less than the actual output token count.
-For both distributions, `mean`, `p50`, and `p99` are the arithmetic mean, 50th
-percentile, and 99th percentile. Do not invent missing values.
+# Task Usage
 
-If benchmarking fails, write a failed `final_report.json`.
+Trials are done entirely using `dstack` tasks. For maximum efficiency, it is a
+requirement that you always set the task `commands` to `sleep infinity` and
+run commands inside the task interactively, via SSH. It is important that
+you follow the `/dstack-prototyping` skill when working with tasks.
 
-Do not write a successful `final_report.json` until the final service answers a
-request using `service_model_name` from `Endpoint context:` through the dstack
-service URL.
+# Hardware
+
+Pick the hardware before the trials start. You are allowed to change the
+hardware from one trial to another if this can help the outcome.
+
+The available hardware is defined by the allowed `dstack` fleets and their
+offers (coming from the configured backends). Follow the
+`/dstack-prototyping` skill on how to efficiently select offers among the
+available backends or SSH fleets. Pick the offer whose hardware best fits the trial's idea. Only when several
+offers fit comparably, prefer backends or SSH fleets that support idle
+instances/instance volumes: later runs reuse the instance and cached model
+weights, while container-based backends start clean on every re-submission.
+
+If the backend allows, use instance volumes to mount cache and model weights
+between runs.
+
+When submitting a `dstack` task or service, pass exact `fleets`, `backends`,
+and an intentional `resources` range based on the choice made from offers, so
+the run does not land outside the intended fleet/backend/hardware.
+
+## Fleet Offers
+
+When selecting `dstack` backends/fleets and evaluating hardware that can be
+used to run the model, use `dstack offer --json` and pass the fleets from
+`constraints.json` with `--fleet` explicitly. If `--fleet` is not passed,
+`dstack offer` can show offers that are not applicable to the allowed fleets.
+Use these offers when selecting fleet, backend, and hardware.
+
+To classify each backend's capabilities, fetch `https://dstack.ai/docs/concepts/backends.md` and classify from the fetched document, not from memory. VM-based backends are listed under `## VM-based` (they support idle instances and instance volumes). Kubernetes backend is listed under `## Container-based`, but supports instance volumes and thus is preferred over other container-based backends.
+SSH fleets can be treated as VM-based backends as they support both idle instances (its equivalent) and instance volumes.
+
+# Final Service
+
+Once the trials are over, pick the best trial that has not been verified yet
+and submit its configuration as a `dstack` service. Make it work with only
+minor tweaks if needed; do not change the important decisions made during
+the trial. Set the service `model` name to the client-facing model name from
+`constraints.json` (see `# Constraints`).
+
+Before the final benchmark, verify the model through the service: send real
+requests using the client-facing model name and check that the model works
+as it should, including reasoning output when the model supports it. This
+verification also warms the service up. Only then run the final benchmark
+(see `## Benchmark`). When verifying or benchmarking the service, use its
+`service.url` reported by `dstack run get --json`, along with
+`DSTACK_TOKEN` as the bearer token. If `service.url` is a relative path,
+prepend `DSTACK_SERVER_URL` to build the absolute URL.
+
+During the service verification, test the context length the service
+actually supports and report it as `final_report.json.context_length`.
+
+If the service or its benchmark cannot be completed, stop that service,
+pick the next-best trial, and repeat, until a service is verified or there
+are no unverified trials left. Report the result accordingly (see
+`# Final Report`).
+
+When you report success, leave the final `dstack` service running: the
+caller verifies the live run and stops it afterwards.
 
 # Secrets
 
-The dstack CLI is already configured. Do not inspect `~/.dstack/config.yml` or
+The `dstack` CLI is already configured. Do not inspect `~/.dstack/config.yml` or
 print, copy, or summarize tokens, secrets, or environment variable values.
 
-Do not expose the value of `DSTACK_TOKEN`, `DSTACK_ENDPOINT_BEARER_TOKEN`, or
-the value of any environment variable listed under `endpoint_env_keys` in
-`Fixed endpoint constraints:`.
+Do not expose the value of `DSTACK_TOKEN` or the value of any environment
+variable listed under `env` in `constraints.json`.
 
 Do not put secret values in `final_report.json` or print them. Use env
 references in `final_report.json.service_yaml`; use environment variable names or redacted values in
 `final_report.json.benchmark.command`.
-
-# Resume
-
-On startup or resume, inspect `final_report.json` and `submissions.jsonl`
-before submitting anything new. If `final_report.json` already reports success
-for the current endpoint configuration, do not submit another run. Otherwise use
-the next run number and record why the old run is not enough.
 
 # Final Report
 
@@ -301,20 +335,20 @@ On success, include exactly:
 - `success`: `true`
 - `run_id`: the final verified service run ID
 - `run_name`: the final verified service run name
-- `service_yaml`: the full reusable service YAML described in `# Final Service`
+- `service_yaml`: the full YAML of the verified final service
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
 - `context_length`: the context length verified for the final service
-- `benchmark`: the final service benchmark described in `# Benchmark`
+- `benchmark`: the final service benchmark described in `## Benchmark`
 
 Set `final_report.json.base` as follows:
 
-- If `Endpoint context:` contains `base_model`, set `final_report.json.base` to
-  `base_model`.
-- If `Endpoint context:` contains `model_repo`, inspect the repo metadata, model
-  card, config, or another reliable source to identify the base model repo.
-- If `model_repo` is itself the base model repo, set `final_report.json.base` to
-  `model_repo`.
+- If `model` in `constraints.json` has `base`, set `final_report.json.base` to
+  that value.
+- If `model` has `repo`, inspect the repo metadata, model card, config, or
+  another reliable source to identify the base model repo.
+- If `model.repo` is itself the base model repo, set `final_report.json.base`
+  to `model.repo`.
 - Do not infer `final_report.json.base` only from the repo name.
 
 On failure, include exactly:
@@ -328,5 +362,11 @@ through `StructuredOutput`.
 
 Verify that `final_report.json` is correct and matches the required schema.
 
-Stop after one correct service is verified and benchmarked. P/D disaggregation
-is not covered by the current endpoint agent or `/dstack-prototyping` skill.
+Stop only after `final_report.json` is written and submitted: either one
+final `dstack` service was verified and benchmarked, or the trials and
+unverified candidates were exhausted (see `# Trials` and `# Final Service`).
+
+Ending your turn stops the session even while background commands are still
+running. Wait for long-running work — weight downloads, engine startup,
+benchmarks, provisioning — by polling it with short blocking commands,
+never by ending your turn.

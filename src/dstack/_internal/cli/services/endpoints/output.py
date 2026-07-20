@@ -117,6 +117,9 @@ def _format_token_count(value: int) -> str:
 
 
 def _format_number(value: float) -> str:
+    # `g` switches to scientific notation for values >= 1000 (after rounding).
+    if abs(value) >= 999.5:
+        return f"{value:.0f}"
     return f"{value:.3g}"
 
 

@@ -10,7 +10,10 @@ from typing import Optional, Sequence
 
 from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.models.endpoints import (
+    EndpointConfiguration,
+    EndpointPresetConstraints,
+)
 from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
@@ -22,13 +25,11 @@ from dstack._internal.cli.services.endpoints.agent import (
     get_redacted_values,
     get_sensitive_inherited_env_values,
     print_endpoint_progress,
+    redact,
     run_endpoint_agent,
 )
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
-from dstack._internal.cli.services.endpoints.prompt import (
-    format_endpoint_constraints,
-    get_endpoint_agent_system_prompt,
-)
+from dstack._internal.cli.services.endpoints.prompt import get_endpoint_agent_system_prompt
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.cli.services.endpoints.verify import (
     build_verified_endpoint_preset,
@@ -123,18 +124,17 @@ async def _create_endpoint_preset(
             workspace=workspace,
             token=token,
         )
-        prompt = _build_prompt(
+        constraints_text = _build_constraints(
             configuration=configuration,
             build_name=build_name,
             allowed_fleets=allowed_fleets,
         )
+        workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
+        prompt = get_endpoint_agent_system_prompt()
         if agent_session.debug:
             agent_session.write_prompt(prompt)
-        print_endpoint_progress(
-            f"Starting endpoint preset creation for {configuration.model.api_model_name}. "
-            f"Allowed fleets: {', '.join(allowed_fleets)}.",
-            agent_session=agent_session,
-        )
+            agent_session.write_constraints(constraints_text)
+            agent_session.write_agent_info(auth)
         try:
             process_output = await run_endpoint_agent(
                 prompt=prompt,
@@ -164,6 +164,12 @@ async def _create_endpoint_preset(
             )
             creation_succeeded = True
         finally:
+            if agent_session.debug:
+                _save_final_report_copy(
+                    workspace=workspace,
+                    agent_session=agent_session,
+                    redacted_values=redacted_values,
+                )
             keep_final_service = keep_service and creation_succeeded
             try:
                 await _cleanup_runs(
@@ -248,33 +254,40 @@ def _get_allowed_fleets(api: Client, configuration: EndpointConfiguration) -> tu
     )
 
 
-def _build_prompt(
+def _build_constraints(
     *,
     configuration: EndpointConfiguration,
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
-    context_lines = [f"- service_model_name: {configuration.model.api_model_name}"]
-    if configuration.model.allows_variant_selection:
-        context_lines.append(f"- base_model: {configuration.model.api_model_name}")
-    else:
-        context_lines.append(f"- model_repo: {configuration.model.exact_repo}")
-    if configuration.context_length is not None:
-        context_lines.append(f"- context_length: {configuration.context_length}")
-    return f"""{get_endpoint_agent_system_prompt()}
+    constraints = EndpointPresetConstraints.parse_obj(
+        {
+            "run_name_prefix": build_name,
+            "model": json.loads(configuration.model.json(exclude_none=True)),
+            "context_length": configuration.context_length,
+            "max_trials": configuration.effective_max_trials,
+            "concurrency": configuration.effective_concurrency,
+            "fleets": list(allowed_fleets),
+            "env": list(configuration.env),
+        }
+    )
+    # All fields are always present; unset optional constraints render as null.
+    return json.dumps(json.loads(constraints.json()), indent=2) + "\n"
 
-Endpoint context:
-- endpoint_name: {build_name}
-{chr(10).join(context_lines)}
 
-{
-        format_endpoint_constraints(
-            configuration,
-            configuration.env.as_dict(),
-            allowed_fleets=allowed_fleets,
-        )
-    }
-"""
+def _save_final_report_copy(
+    *,
+    workspace: EndpointAgentWorkspace,
+    agent_session: EndpointAgentSession,
+    redacted_values: Sequence[str],
+) -> None:
+    if not workspace.final_report_path.exists():
+        return
+    try:
+        report_text = workspace.final_report_path.read_text(encoding="utf-8", errors="replace")
+        agent_session.write_final_report(redact(report_text, redacted_values))
+    except OSError as e:
+        warn(f"Could not save a final report copy: {e}")
 
 
 async def _cleanup_runs(
@@ -286,7 +299,7 @@ async def _cleanup_runs(
     agent_session: EndpointAgentSession,
     keep_final_service: bool = False,
 ) -> None:
-    run_names = _load_submitted_run_names(workspace.submissions_path)
+    run_names = _load_submitted_run_names(workspace.runs_path)
     if final_run_name is not None:
         run_names.append(final_run_name)
     run_names = list(dict.fromkeys(run_names))
@@ -301,10 +314,6 @@ async def _cleanup_runs(
             active_names.append(name)
     if not active_names:
         return
-    print_endpoint_progress(
-        f"Stopping preset creation runs: {', '.join(active_names)}.",
-        agent_session=agent_session,
-    )
     api.client.runs.stop(api.project, active_names, abort=False)
     deadline = asyncio.get_running_loop().time() + _RUN_STOP_TIMEOUT_SECONDS
     pending = set(active_names)
@@ -317,7 +326,8 @@ async def _cleanup_runs(
                 pending.remove(name)
         if pending:
             await asyncio.sleep(2)
-    print_endpoint_progress("All preset creation runs stopped.", agent_session=agent_session)
+    if agent_session.debug:
+        print_endpoint_progress("All preset creation runs stopped.", agent_session=agent_session)
 
 
 def _load_submitted_run_names(path: Path) -> list[str]:

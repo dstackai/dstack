@@ -16,7 +16,10 @@ import psutil
 import yaml
 from rich.text import Text
 
-from dstack._internal.cli.models.endpoint_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
+from dstack._internal.cli.models.endpoint_agent import (
+    AGENT_FINAL_REPORT_JSON_SCHEMA,
+    ClaudeAgentInfo,
+)
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
@@ -27,8 +30,11 @@ from dstack.api import Client
 
 _SKILL_NAMES = ("dstack", "dstack-prototyping")
 _PROGRESS_FILENAME = "progress.jsonl"
-_SUBMISSIONS_FILENAME = "submissions.jsonl"
+_RUNS_FILENAME = "runs.jsonl"
+_TRIALS_FILENAME = "trials.jsonl"
+_CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
+_SESSION_FILENAME = "session.json"
 _PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
 _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
@@ -91,8 +97,16 @@ class EndpointAgentWorkspace:
         return self.path / _PROGRESS_FILENAME
 
     @property
-    def submissions_path(self) -> Path:
-        return self.path / _SUBMISSIONS_FILENAME
+    def runs_path(self) -> Path:
+        return self.path / _RUNS_FILENAME
+
+    @property
+    def trials_path(self) -> Path:
+        return self.path / _TRIALS_FILENAME
+
+    @property
+    def constraints_path(self) -> Path:
+        return self.path / _CONSTRAINTS_FILENAME
 
     @property
     def final_report_path(self) -> Path:
@@ -114,8 +128,38 @@ class EndpointAgentSession:
     def trace_path(self) -> Path:
         return self.path / "trace.jsonl"
 
+    @property
+    def runs_path(self) -> Path:
+        return self.path / _RUNS_FILENAME
+
+    @property
+    def trials_path(self) -> Path:
+        return self.path / _TRIALS_FILENAME
+
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
+
+    def write_constraints(self, constraints_text: str) -> None:
+        _write_private_text(self.path / _CONSTRAINTS_FILENAME, constraints_text)
+
+    def write_final_report(self, report_text: str) -> None:
+        _write_private_text(self.path / _FINAL_REPORT_FILENAME, report_text)
+
+    def write_agent_info(self, auth: "ClaudeAuth") -> None:
+        info = ClaudeAgentInfo.parse_obj(
+            {
+                "executable": auth.executable,
+                "version": _get_claude_version(auth),
+                "model": {
+                    "name": auth.model,
+                    "effort": auth.effort or "default",
+                },
+                "auth": _get_claude_auth_status(auth),
+            }
+        )
+        _write_private_text(
+            self.path / "agent.json", json.dumps(json.loads(info.json()), indent=2) + "\n"
+        )
 
     def append_log(self, line: str) -> None:
         if not self._log_enabled:
@@ -129,21 +173,12 @@ class EndpointAgentSession:
             console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
 
     def finish(self, preset_id: Optional[str] = None) -> Path:
-        suffix = preset_id or "failed"
-        name = f"{self.timestamp}-{suffix}"
-        index = 0
-        while True:
-            target = self.path.with_name(name if index == 0 else f"{name}-{index}")
-            if target.exists():
-                index += 1
-                continue
-            try:
-                self.path.rename(target)
-            except FileExistsError:
-                index += 1
-                continue
-            self.path = target
-            return target
+        status = {
+            "status": "success" if preset_id is not None else "failed",
+            "preset_id": preset_id,
+        }
+        _write_private_text(self.path / _SESSION_FILENAME, json.dumps(status, indent=2) + "\n")
+        return self.path
 
 
 @dataclass(frozen=True)
@@ -184,6 +219,10 @@ def create_endpoint_agent_session(
         parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         path = _create_agent_session_directory(parent, timestamp)
         _write_private_text(path / "agent.log", "")
+        _write_private_text(
+            path / _SESSION_FILENAME,
+            json.dumps({"status": "running", "preset_id": None}, indent=2) + "\n",
+        )
         if debug:
             data = json.loads(configuration.json(exclude_none=True))
             if configuration.env:
@@ -203,10 +242,41 @@ def create_endpoint_agent_session(
     return EndpointAgentSession(path=path, timestamp=timestamp, debug=debug)
 
 
+def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
+    try:
+        result = subprocess.run(
+            [auth.executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
+    if auth.api_key:
+        return {"authMethod": "api-key"}
+    try:
+        result = subprocess.run(
+            [auth.executable, "auth", "status", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        status = json.loads(result.stdout)
+        if isinstance(status, dict):
+            return status
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        pass
+    return {"authMethod": "unknown"}
+
+
 def _create_agent_session_directory(parent: Path, timestamp: str) -> Path:
     index = 0
     while True:
-        name = f"{timestamp}-running" if index == 0 else f"{timestamp}-{index}-running"
+        name = timestamp if index == 0 else f"{timestamp}-{index}"
         path = parent / name
         try:
             path.mkdir(mode=0o700)
@@ -261,8 +331,6 @@ def build_endpoint_agent_env(
     env["DSTACK_SERVER_URL"] = api.client.base_url
     env["DSTACK_PROJECT"] = api.project
     env["DSTACK_TOKEN"] = token
-    env["DSTACK_ENDPOINT_SERVER_URL"] = api.client.base_url
-    env["DSTACK_ENDPOINT_BEARER_TOKEN"] = token
     env[_PROGRESS_ENV] = str(workspace.progress_path)
     for name in ["TMPDIR", "TEMP", "TMP"]:
         env[name] = str(workspace.temp_path)
@@ -293,7 +361,21 @@ async def run_endpoint_agent(
         redacted_values=redacted_values,
         agent_session=agent_session,
     )
-    progress_task = asyncio.create_task(progress_tailer.run())
+    record_mirrors = [
+        _RecordMirror(
+            source=workspace.runs_path,
+            target=agent_session.runs_path,
+            redacted_values=redacted_values,
+        ),
+        _RecordMirror(
+            source=workspace.trials_path,
+            target=agent_session.trials_path,
+            redacted_values=redacted_values,
+        ),
+    ]
+    tailer_tasks = [
+        asyncio.create_task(tailer.run()) for tailer in [progress_tailer, *record_mirrors]
+    ]
     proc: Optional[asyncio.subprocess.Process] = None
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -341,10 +423,14 @@ async def run_endpoint_agent(
             await _terminate_process(proc)
         raise
     finally:
-        progress_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await progress_task
+        for task in tailer_tasks:
+            task.cancel()
+        for task in tailer_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
         progress_tailer.flush()
+        for mirror in record_mirrors:
+            mirror.flush()
 
     output = stdout_output
     if output.report_data is None:
@@ -412,7 +498,8 @@ def _prepare_workspace(workspace: EndpointAgentWorkspace) -> None:
     workspace.temp_path.mkdir(mode=0o700)
     for path in [
         workspace.progress_path,
-        workspace.submissions_path,
+        workspace.runs_path,
+        workspace.trials_path,
     ]:
         path.touch()
     workspace.bin_path.mkdir()
@@ -729,6 +816,44 @@ class _ProgressTailer:
                     redact(message, self._redacted_values),
                     agent_session=self._agent_session,
                 )
+
+
+class _RecordMirror:
+    """Mirrors a workspace record file into the persistent session directory, redacted."""
+
+    def __init__(self, *, source: Path, target: Path, redacted_values: Sequence[str]) -> None:
+        self._source = source
+        self._target = target
+        self._redacted_values = redacted_values
+        self._offset = 0
+        self._enabled = True
+
+    async def run(self) -> None:
+        while True:
+            self.flush()
+            await asyncio.sleep(1)
+
+    def flush(self) -> None:
+        if not self._enabled or not self._source.exists():
+            return
+        with self._source.open("rb") as f:
+            f.seek(self._offset)
+            data = f.read()
+        # Mirror complete lines only; a partial line is kept for the next flush.
+        end = data.rfind(b"\n")
+        if end < 0:
+            return
+        chunk = data[: end + 1].decode("utf-8", errors="replace")
+        self._offset += end + 1
+        try:
+            if not self._target.exists():
+                _write_private_text(self._target, "")
+            with self._target.open("a", encoding="utf-8") as f:
+                f.write(redact(chunk, self._redacted_values))
+                f.flush()
+        except OSError as e:
+            self._enabled = False
+            console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
 
 
 def _parse_progress(line: str) -> Optional[str]:

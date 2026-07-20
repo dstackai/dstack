@@ -19,6 +19,7 @@ from dstack._internal.cli.services.endpoints.agent import (
     _create_agent_session_directory,
     _prepare_subprocess_command,
     _ProgressTailer,
+    _RecordMirror,
     _terminate_process,
     build_endpoint_agent_env,
     contains_redacted_value,
@@ -165,8 +166,8 @@ class TestAgentSession:
         session = create_endpoint_agent_session(configuration)
 
         assert session.path.parent == tmp_path / ".dstack" / "agent" / "qwen"
-        assert session.path.name.endswith("-running")
-        assert {path.name for path in session.path.iterdir()} == {"agent.log"}
+        assert session.path.name == session.timestamp
+        assert {path.name for path in session.path.iterdir()} == {"agent.log", "session.json"}
         print_endpoint_progress("creating preset", agent_session=session)
         assert "creating preset" in session.log_path.read_text()
         assert "creating preset" in capsys.readouterr().out
@@ -180,43 +181,52 @@ class TestAgentSession:
         assert {path.name for path in debug_session.path.iterdir()} == {
             "agent.log",
             "endpoint.dstack.yml",
+            "session.json",
             "trace.jsonl",
         }
         assert data["max_price"] == 0.5
         assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
         assert "false" not in (debug_session.path / "endpoint.dstack.yml").read_text()
         success_path = debug_session.finish("8f3a12c4")
-        assert success_path.name.endswith("-8f3a12c4")
+        assert success_path == debug_session.path
+        assert json.loads((debug_session.path / "session.json").read_text()) == {
+            "status": "success",
+            "preset_id": "8f3a12c4",
+        }
 
         failed_session = create_endpoint_agent_session(configuration)
         failed_path = failed_session.finish()
-        assert failed_path.name.endswith("-failed")
+        assert failed_path == failed_session.path
+        assert json.loads((failed_session.path / "session.json").read_text()) == {
+            "status": "failed",
+            "preset_id": None,
+        }
 
     def test_avoids_existing_session_directories(self, tmp_path):
         timestamp = "20260714-120000-000000Z"
-        (tmp_path / f"{timestamp}-running").mkdir()
+        (tmp_path / timestamp).mkdir()
 
         path = _create_agent_session_directory(tmp_path, timestamp)
 
-        assert path.name == f"{timestamp}-1-running"
+        assert path.name == f"{timestamp}-1"
 
-    def test_finish_does_not_replace_existing_directory(self, tmp_path):
-        running = tmp_path / "20260714-120000-000000Z-running"
-        running.mkdir()
-        (running / "agent.log").touch()
-        existing = tmp_path / "20260714-120000-000000Z-failed"
-        existing.mkdir()
-        (existing / "keep").touch()
+    def test_finish_writes_status_in_place(self, tmp_path):
+        session_dir = tmp_path / "20260714-120000-000000Z"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
         session = EndpointAgentSession(
-            path=running,
+            path=session_dir,
             timestamp="20260714-120000-000000Z",
             debug=False,
         )
 
         path = session.finish()
 
-        assert path.name == "20260714-120000-000000Z-failed-1"
-        assert (existing / "keep").is_file()
+        assert path == session_dir
+        assert json.loads((session_dir / "session.json").read_text()) == {
+            "status": "failed",
+            "preset_id": None,
+        }
 
     def test_reports_invalid_existing_parent(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -391,3 +401,64 @@ class TestProcessCleanup:
 
         assert proc.returncode is not None
         assert not psutil.pid_exists(child_pid)
+
+
+class TestRecordMirror:
+    def test_mirrors_complete_lines_redacted(self, tmp_path):
+        source = tmp_path / "runs.jsonl"
+        target = tmp_path / "mirror" / "runs.jsonl"
+        target.parent.mkdir()
+        mirror = _RecordMirror(source=source, target=target, redacted_values=["dstack-secret"])
+
+        source.write_text(
+            '{"name":"run-1","note":"dstack-secret"}\n{"name":"run-2"', encoding="utf-8"
+        )
+        mirror.flush()
+
+        assert target.read_text() == '{"name":"run-1","note":"[redacted]"}\n'
+
+        with source.open("a", encoding="utf-8") as f:
+            f.write("}\n")
+        mirror.flush()
+
+        assert target.read_text().splitlines() == [
+            '{"name":"run-1","note":"[redacted]"}',
+            '{"name":"run-2"}',
+        ]
+
+    def test_missing_source_is_no_op(self, tmp_path):
+        mirror = _RecordMirror(
+            source=tmp_path / "absent.jsonl",
+            target=tmp_path / "target.jsonl",
+            redacted_values=[],
+        )
+
+        mirror.flush()
+
+        assert not (tmp_path / "target.jsonl").exists()
+
+
+class TestWriteAgentInfo:
+    def test_writes_model_params_and_auth(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.agent._get_claude_version",
+            lambda auth: "2.1.0 (Claude Code)",
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.agent._get_claude_auth_status",
+            lambda auth: {"authMethod": "claude.ai", "loggedIn": True},
+        )
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        session = EndpointAgentSession(path=session_dir, timestamp="t", debug=True)
+
+        session.write_agent_info(
+            ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
+        )
+
+        assert json.loads((session_dir / "agent.json").read_text()) == {
+            "executable": "claude",
+            "version": "2.1.0 (Claude Code)",
+            "model": {"name": "claude-opus-4-8", "effort": "default"},
+            "auth": {"authMethod": "claude.ai", "loggedIn": True},
+        }

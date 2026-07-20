@@ -81,6 +81,12 @@ class EndpointCommand(BaseCommand):
             help="Leave the verified service running",
         )
         create_parser.add_argument(
+            "--max-trials",
+            type=int,
+            metavar="N",
+            help="The maximum number of benchmarked trials before the best one is promoted",
+        )
+        create_parser.add_argument(
             "--debug",
             action="store_true",
             help="Save the agent prompt and raw trace",
@@ -255,6 +261,8 @@ def _get_effective_configuration(
     args: argparse.Namespace,
 ) -> EndpointConfiguration:
     _apply_name(configuration, args.name)
+    if getattr(args, "max_trials", None) is not None:
+        configuration.max_trials = args.max_trials
     profile = load_profile(Path.cwd(), args.profile)
     for field in ProfileParams.__fields__:
         if getattr(configuration, field) is None:
