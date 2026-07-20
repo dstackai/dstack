@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 from rich.markup import escape
 from rich.table import Table
 
-from dstack._internal.cli.models.offers import OfferCommandOutput, OfferRequirements
 from dstack._internal.cli.models.runs import PsCommandOutput
 from dstack._internal.cli.utils.common import (
     NO_FLEETS_WARNING,
@@ -13,8 +12,8 @@ from dstack._internal.cli.utils.common import (
     add_row_from_dict,
     console,
     format_backend,
-    format_instance_availability,
 )
+from dstack._internal.cli.utils.offers import print_offers_table
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -23,7 +22,6 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
-    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -35,7 +33,6 @@ from dstack._internal.core.models.runs import (
     ProbeSpec,
     RunPlan,
     RunStatus,
-    get_policy_map,
 )
 from dstack._internal.core.models.runs import (
     Run as CoreRun,
@@ -56,34 +53,6 @@ class RunWaitStatus(str, Enum):
     WAITING_FOR_SCHEDULE = "waiting for schedule"
 
 
-_OFFER_FLEET_HINT = (
-    "Hint: Existing fleets are ignored, and all available offers are shown."
-    " To filter by fleet, pass --fleet NAME."
-)
-
-
-def print_offers_json(run_plan: RunPlan, run_spec):
-    """Print offers information in JSON format."""
-    job_plan = run_plan.job_plans[0]
-
-    requirements = OfferRequirements(
-        resources=job_plan.job_spec.requirements.resources,
-        max_price=job_plan.job_spec.requirements.max_price,
-        spot=get_policy_map(run_spec.configuration.spot_policy, default=SpotPolicy.AUTO),
-        reservation=run_plan.run_spec.configuration.reservation,
-    )
-
-    output = OfferCommandOutput(
-        project=run_plan.project_name,
-        user=run_plan.user,
-        requirements=requirements,
-        offers=job_plan.offers,
-        total_offers=job_plan.total_offers,
-    )
-
-    print(output.json())
-
-
 def print_runs_json(project: str, runs: List[Run]) -> None:
     """Print runs information in JSON format."""
     output = PsCommandOutput(
@@ -96,10 +65,8 @@ def print_runs_json(project: str, runs: List[Run]) -> None:
 def print_run_plan(
     run_plan: RunPlan,
     max_offers: Optional[int] = None,
-    include_run_properties: bool = True,
     no_fleets: bool = False,
     verbose: bool = False,
-    show_offer_fleet_hint: bool = False,
     extra_properties: Optional[Dict[str, str]] = None,
 ):
     run_spec = run_plan.get_effective_run_spec()
@@ -153,78 +120,35 @@ def print_run_plan(
 
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
-    if include_run_properties:
-        configuration_type = run_spec.configuration.type
-        if run_spec.configuration.type == "task":
-            configuration_type += f" (nodes={run_spec.configuration.nodes})"
-        props.add_row(th("Type"), configuration_type)
+    configuration_type = run_spec.configuration.type
+    if run_spec.configuration.type == "task":
+        configuration_type += f" (nodes={run_spec.configuration.nodes})"
+    props.add_row(th("Type"), configuration_type)
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Max price"), max_price)
-    if include_run_properties:
-        props.add_row(th("Retry policy"), retry)
-        if verbose or creation_policy != CreationPolicy.REUSE_OR_CREATE:
-            props.add_row(th("Creation policy"), creation_policy)
-        props.add_row(th("Idle duration"), idle_duration)
-        props.add_row(th("Max duration"), max_duration)
-        if inactivity_duration is not None:  # only set for dev-environment
-            props.add_row(th("Inactivity duration"), inactivity_duration)
+    props.add_row(th("Retry policy"), retry)
+    if verbose or creation_policy != CreationPolicy.REUSE_OR_CREATE:
+        props.add_row(th("Creation policy"), creation_policy)
+    props.add_row(th("Idle duration"), idle_duration)
+    props.add_row(th("Max duration"), max_duration)
+    if inactivity_duration is not None:  # only set for dev-environment
+        props.add_row(th("Inactivity duration"), inactivity_duration)
     if verbose or run_spec.configuration.reservation:
         props.add_row(th("Reservation"), run_spec.configuration.reservation or "no")
     for key, value in (extra_properties or {}).items():
         props.add_row(th(key), value)
-
-    offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
-    offers.add_column("#")
-    offers.add_column("BACKEND", style="grey58", ratio=2)
-    offers.add_column("RESOURCES", ratio=4)
-    offers.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=2)
-    offers.add_column("PRICE", style="grey58", ratio=1)
-    offers.add_column()
-
-    displayed_offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
-
-    for i, offer in enumerate(displayed_offers, start=1):
-        r = offer.instance.resources
-
-        instance = offer.instance.name
-        if offer.total_blocks > 1:
-            instance += f" ({offer.blocks}/{offer.total_blocks})"
-        offers.add_row(
-            f"{i}",
-            format_backend(offer.backend, offer.region),
-            r.pretty_format(include_spot=True),
-            instance,
-            f"${offer.price:.4f}".rstrip("0").rstrip("."),
-            format_instance_availability(offer.availability),
-            style=None if i == 1 or not include_run_properties else "secondary",
-        )
-    if job_plan.total_offers > len(displayed_offers):
-        offers.add_row("", "...", style="secondary")
-
     console.print(props)
     console.print()
+
+    displayed_offers = job_plan.offers[:max_offers] if max_offers else job_plan.offers
     if len(displayed_offers) > 0:
-        show_offer_fleet_hint_before_table = (
-            show_offer_fleet_hint
-            and job_plan.total_offers <= len(displayed_offers)
-            and len(displayed_offers) < 3
+        print_offers_table(
+            offers=displayed_offers,
+            total_offers=job_plan.total_offers,
+            max_price=job_plan.max_price or 0.0,
+            mute_tail_rows=True,
         )
-        show_offer_fleet_hint_after_table = (
-            show_offer_fleet_hint and not show_offer_fleet_hint_before_table
-        )
-        if show_offer_fleet_hint_before_table:
-            console.print(f"[secondary]{_OFFER_FLEET_HINT}[/]")
-            console.print()
-        console.print(offers)
-        if job_plan.total_offers > len(displayed_offers):
-            console.print(
-                f"[secondary] Shown {len(displayed_offers)} of {job_plan.total_offers} offers, "
-                f"${job_plan.max_price:3f}".rstrip("0").rstrip(".")
-                + "max[/]"
-            )
-        if show_offer_fleet_hint_after_table:
-            console.print(f"[secondary]{_OFFER_FLEET_HINT}[/]")
         console.print()
     else:
         console.print(NO_FLEETS_WARNING if no_fleets else NO_OFFERS_WARNING)
