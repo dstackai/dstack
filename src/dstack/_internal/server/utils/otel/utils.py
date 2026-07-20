@@ -105,7 +105,10 @@ def _instrument(app: FastAPI, engine: AsyncEngine) -> None:
     SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
     _register_db_span_renaming(engine.sync_engine)
     HTTPXClientInstrumentor().instrument()
-    RequestsInstrumentor().instrument()
+    # unixsocket calls to runners should not be instrumented: every runner
+    # tunnel has a unique socket path that becomes the net.peer.name metric
+    # attribute, so the SDK would accumulate state for an unbounded number of series.
+    RequestsInstrumentor().instrument(excluded_urls=r"http\+unix://")
     if settings.OTEL_METRICS_ENABLED:
         SystemMetricsInstrumentor(config=_PROCESS_METRICS_CONFIG).instrument()
 
