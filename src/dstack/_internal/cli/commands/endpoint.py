@@ -33,8 +33,8 @@ from dstack.api.utils import load_profile
 
 
 class EndpointCommand(BaseCommand):
-    NAME = "endpoint"
-    DESCRIPTION = "Manage model inference endpoints"
+    NAME = "preset"
+    DESCRIPTION = "Manage model serving presets"
 
     def _register(self) -> None:
         self._parser.add_argument(
@@ -43,20 +43,13 @@ class EndpointCommand(BaseCommand):
             metavar="NAME",
             default=os.getenv("DSTACK_PROJECT"),
         ).completer = ProjectNameCompleter()  # type: ignore[attr-defined]
-        self._parser.set_defaults(subfunc=lambda _: self._parser.print_help())
-        subparsers = self._parser.add_subparsers(dest="action")
-        preset_parser = subparsers.add_parser(
-            "preset",
-            help="Manage endpoint presets",
-            formatter_class=self._parser.formatter_class,
-        )
-        _add_list_args(preset_parser)
-        preset_parser.set_defaults(subfunc=self._list)
-        preset_subparsers = preset_parser.add_subparsers(dest="preset_action")
+        _add_list_args(self._parser)
+        self._parser.set_defaults(subfunc=self._list)
+        preset_subparsers = self._parser.add_subparsers(dest="action")
 
         list_parser = preset_subparsers.add_parser(
             "list",
-            help="List endpoint presets",
+            help="List presets",
             formatter_class=self._parser.formatter_class,
         )
         _add_list_args(list_parser)
@@ -64,7 +57,7 @@ class EndpointCommand(BaseCommand):
 
         get_parser = preset_subparsers.add_parser(
             "get",
-            help="Get an endpoint preset",
+            help="Get a preset",
             formatter_class=self._parser.formatter_class,
         )
         get_parser.add_argument("preset", metavar="ID", help="The preset ID")
@@ -78,7 +71,7 @@ class EndpointCommand(BaseCommand):
 
         create_parser = preset_subparsers.add_parser(
             "create",
-            help="Create an endpoint preset",
+            help="Create a preset",
             formatter_class=self._parser.formatter_class,
         )
         _add_configuration_args(create_parser)
@@ -108,12 +101,18 @@ class EndpointCommand(BaseCommand):
 
         apply_parser = preset_subparsers.add_parser(
             "apply",
-            help="Apply an endpoint preset",
+            help="Apply a preset",
             formatter_class=self._parser.formatter_class,
         )
         _add_configuration_args(apply_parser)
         register_profile_args(apply_parser)
-        apply_parser.add_argument("--preset", metavar="ID", help="The preset ID to use")
+        apply_parser.add_argument(
+            "--id",
+            action="append",
+            dest="preset_ids",
+            metavar="ID",
+            help="Deploy the best available preset among these IDs. Can be repeated",
+        )
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
         )
@@ -130,7 +129,7 @@ class EndpointCommand(BaseCommand):
 
         delete_parser = preset_subparsers.add_parser(
             "delete",
-            help="Delete endpoint presets",
+            help="Delete presets",
             formatter_class=self._parser.formatter_class,
         )
         delete_target = delete_parser.add_mutually_exclusive_group(required=True)
@@ -211,7 +210,7 @@ class EndpointCommand(BaseCommand):
             resume_session=resume_session,
         )
         console.print(
-            f"Endpoint preset [code]{result.preset.id}[/] for "
+            f"Preset [code]{result.preset.id}[/] for "
             f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
         )
         if args.keep_service:
@@ -220,7 +219,7 @@ class EndpointCommand(BaseCommand):
     def _get(self, args: argparse.Namespace) -> None:
         preset = EndpointPresetStore().get(args.preset)
         if preset is None:
-            raise CLIError(f"Endpoint preset {args.preset!r} does not exist")
+            raise CLIError(f"Preset {args.preset!r} does not exist")
         print(preset.json())
 
     def _apply(self, args: argparse.Namespace) -> None:
@@ -230,7 +229,7 @@ class EndpointCommand(BaseCommand):
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             configuration_path=configuration_path,
-            preset_id=args.preset or configuration.preset,
+            preset_ids=args.preset_ids,
             profile_name=args.profile,
             command_args=args,
             store=EndpointPresetStore(),
@@ -241,17 +240,17 @@ class EndpointCommand(BaseCommand):
         if args.preset is not None:
             preset = store.get(args.preset)
             if preset is None:
-                raise CLIError(f"Endpoint preset {args.preset!r} does not exist")
+                raise CLIError(f"Preset {args.preset!r} does not exist")
             presets = [preset]
-            message = f"Delete endpoint preset [code]{preset.id}[/] for [code]{preset.base}[/]?"
+            message = f"Delete preset [code]{preset.id}[/] for [code]{preset.base}[/]?"
         else:
             target = args.base or args.repo
             presets = _filter_presets(store.list(), base=args.base, repo=args.repo)
             if not presets:
                 kind = "base model" if args.base else "model repo"
-                raise CLIError(f"No endpoint presets found for {kind} {target!r}")
+                raise CLIError(f"No presets found for {kind} {target!r}")
             message = (
-                f"Delete {len(presets)} endpoint preset"
+                f"Delete {len(presets)} preset"
                 f"{'s' if len(presets) != 1 else ''} for [code]{target}[/]?"
             )
         if not args.yes and not confirm_ask(message):
@@ -261,11 +260,11 @@ class EndpointCommand(BaseCommand):
             store.delete(preset.id)
         if args.preset is not None:
             console.print(
-                f"Endpoint preset [code]{presets[0].id}[/] for [code]{presets[0].base}[/] deleted"
+                f"Preset [code]{presets[0].id}[/] for [code]{presets[0].base}[/] deleted"
             )
         else:
             console.print(
-                f"Deleted {len(presets)} endpoint preset{'s' if len(presets) != 1 else ''} "
+                f"Deleted {len(presets)} preset{'s' if len(presets) != 1 else ''} "
                 f"for [code]{args.base or args.repo}[/]"
             )
 
@@ -277,13 +276,13 @@ def _add_configuration_args(parser: argparse.ArgumentParser) -> None:
         required=True,
         metavar="FILE",
         dest="configuration_file",
-        help="The endpoint configuration file",
+        help="The preset configuration file",
     ).completer = FilesCompleter(allowednames=["*.yml", "*.yaml"])  # type: ignore[attr-defined]
     parser.add_argument(
         "-n",
         "--name",
         metavar="NAME",
-        help="The endpoint name. Required when the configuration omits name",
+        help="The service name. Required when the configuration omits name",
     )
 
 
@@ -345,9 +344,11 @@ def _apply_name(configuration: EndpointConfiguration, name: str | None) -> None:
     if name is not None:
         configuration.name = name
     if configuration.name is None:
-        raise CLIError("Endpoint name is required. Set `name` in the configuration or use --name")
+        raise CLIError(
+            "The service name is required. Set `name` in the configuration or use --name"
+        )
     if not is_valid_dstack_resource_name(configuration.name):
-        raise CLIError("Endpoint name must match '^[a-z][a-z0-9-]{1,40}$'")
+        raise CLIError("The name must match '^[a-z][a-z0-9-]{1,40}$'")
 
 
 def _get_effective_configuration(

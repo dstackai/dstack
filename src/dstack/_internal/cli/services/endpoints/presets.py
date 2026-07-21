@@ -116,7 +116,7 @@ def resources_spec_from_instance_resources(resources: Resources) -> ResourcesSpe
             or gpu.vendor != first_gpu.vendor
             for gpu in resources.gpus
         ):
-            raise ValueError("endpoint preset cannot be built from mixed-GPU instances")
+            raise ValueError("preset cannot be built from mixed-GPU instances")
         data["gpu"] = {
             "name": first_gpu.name,
             "memory": format_mib_as_gb(first_gpu.memory_mib),

@@ -156,7 +156,7 @@ class TestEndpointPresetStore:
 class TestParseEndpointConfiguration:
     @pytest.mark.parametrize("key", ["base", "repo"])
     def test_warns_on_nested_model_without_name(self, key: str):
-        stream = StringIO(f"type: endpoint\nmodel:\n  {key}: Qwen/Qwen3.5-27B\n")
+        stream = StringIO(f"type: preset\nmodel:\n  {key}: Qwen/Qwen3.5-27B\n")
 
         with patch.object(store_module, "warn") as warn:
             configuration = store_module._parse_endpoint_configuration(stream)
@@ -176,7 +176,7 @@ class TestParseEndpointConfiguration:
         ],
     )
     def test_does_not_warn_on_preferred_syntax(self, body: str):
-        stream = StringIO(f"type: endpoint\n{body}")
+        stream = StringIO(f"type: preset\n{body}")
 
         with patch.object(store_module, "warn") as warn:
             configuration = store_module._parse_endpoint_configuration(stream)

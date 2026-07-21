@@ -6,10 +6,12 @@ import pytest
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.endpoints.apply import (
     _build_service,
+    _get_candidate_presets,
     _get_matching_presets,
     _select_plan,
     apply_endpoint_preset,
 )
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.instances import InstanceAvailability
 from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
@@ -28,13 +30,25 @@ class TestGetMatchingPresets:
             context_length=8192,
         )
 
-        assert _get_matching_presets(presets, configuration=configuration, preset_id=None) == [
-            presets[1]
+        assert _get_matching_presets(presets, configuration=configuration) == [presets[1]]
+        assert _get_matching_presets(
+            _get_candidate_presets(presets, preset_ids=["large"]), configuration=configuration
+        ) == [presets[1]]
+        assert not _get_matching_presets(
+            _get_candidate_presets(presets, preset_ids=["small"]), configuration=configuration
+        )
+
+    def test_candidates_preserve_id_order_and_reject_unknown_ids(self):
+        presets = [
+            get_endpoint_preset(preset_id="aa11bb22"),
+            get_endpoint_preset(preset_id="cc33dd44"),
         ]
-        assert _get_matching_presets(presets, configuration=configuration, preset_id="large") == [
-            presets[1]
-        ]
-        assert not _get_matching_presets(presets, configuration=configuration, preset_id="small")
+
+        ordered = _get_candidate_presets(presets, preset_ids=["cc33dd44", "aa11bb22"])
+        assert [preset.id for preset in ordered] == ["cc33dd44", "aa11bb22"]
+        assert _get_candidate_presets(presets, preset_ids=None) == presets
+        with pytest.raises(CLIError, match="does not exist"):
+            _get_candidate_presets(presets, preset_ids=["aa11bb22", "ee55ff66"])
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
         matching = get_endpoint_preset(preset_id="matching")
@@ -46,13 +60,10 @@ class TestGetMatchingPresets:
             },
         )
 
-        assert _get_matching_presets([matching], configuration=configuration, preset_id=None) == [
-            matching
-        ]
+        assert _get_matching_presets([matching], configuration=configuration) == [matching]
         assert not _get_matching_presets(
             [matching.copy(update={"model": "other/repo"})],
             configuration=configuration,
-            preset_id=None,
         )
 
 
@@ -124,8 +135,8 @@ class TestSelectPlan:
                 name="qwen",
                 model={"base": "Qwen/Qwen3.5-27B"},
             ),
-            configuration_path="endpoint.dstack.yml",
-            preset_id=None,
+            configuration_path="preset.dstack.yml",
+            preset_ids=None,
             profile_name="gpu",
             command_args=command_args,
             store=Mock(list=Mock(return_value=[preset])),

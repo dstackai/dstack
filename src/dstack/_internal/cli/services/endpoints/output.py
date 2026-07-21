@@ -12,7 +12,7 @@ from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
-    "ready": ("done", "grey"),
+    "ready": ("success", "green"),
     "running": ("clauding", "bold deep_sky_blue1"),
     "interrupted": ("interrupted", "bold gold1"),
     "failed": ("failed", "indian_red1"),
@@ -22,6 +22,21 @@ _STATUS_DISPLAY = {
 def _format_status(status: str) -> str:
     text, style = _STATUS_DISPLAY.get(status, (status, None))
     return f"[{style}]{text}[/]" if style else text
+
+
+def _format_trial_progress(session: Optional[dict[str, Any]]) -> str:
+    """The ` (N/M)` suffix; stays outside the status markup to render in the
+    default color."""
+    if not isinstance(session, dict):
+        return ""
+    trials = session.get("trials")
+    max_trials = session.get("max_trials")
+    if not isinstance(trials, dict) or not (trials.get("count") or isinstance(max_trials, int)):
+        return ""
+    progress = str(trials.get("count") or 0)
+    if isinstance(max_trials, int):
+        progress += f"/{max_trials}"
+    return f" [secondary]({progress})[/]"
 
 
 def print_endpoint_presets(
@@ -44,17 +59,22 @@ def print_endpoint_presets(
         presets_by_base[preset.base].append(preset)
         repo_to_base[preset.model] = preset.base
     sessions_by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    creations_by_id: dict[str, dict[str, Any]] = {}
     for session in sessions or []:
+        if str(session.get("status")) == "success":
+            # A completed creation session decorates its preset row.
+            creations_by_id[str(session.get("id"))] = session
+            continue
         model = str(session.get("model") or "unknown")
         sessions_by_model[repo_to_base.get(model, model)].append(session)
 
     for base in sorted({*presets_by_base, *sessions_by_model}, key=str.lower):
-        add_row_from_dict(table, {"BASE": f"[bold]{base}[/]"})
+        add_row_from_dict(table, {"BASE": f"[secondary]{base}[/]"})
         # Newest first within a group, as in `dstack ps`.
         for preset in sorted(
             presets_by_base.get(base, []), key=lambda p: p.created_at, reverse=True
         ):
-            _add_preset(table, preset, verbose=verbose)
+            _add_preset(table, preset, verbose=verbose, creation=creations_by_id.get(preset.id))
         for session in sorted(
             sessions_by_model.get(base, []),
             key=lambda s: str(s.get("created_at") or ""),
@@ -65,7 +85,7 @@ def print_endpoint_presets(
     console.print()
 
 
-def _add_session(table: Table, session: dict[str, Any]) -> None:
+def _add_session(table: Table, session: dict[str, Any], base_label: Optional[str] = None) -> None:
     created = ""
     created_at = session.get("created_at")
     if isinstance(created_at, str):
@@ -75,16 +95,9 @@ def _add_session(table: Table, session: dict[str, Any]) -> None:
             created = created_at
     benchmark = ""
     gpu = ""
-    status = _format_status(str(session.get("status", "")))
+    status = _format_status(str(session.get("status", ""))) + _format_trial_progress(session)
     trials = session.get("trials")
-    max_trials = session.get("max_trials")
-    if isinstance(trials, dict) and (trials.get("count") or isinstance(max_trials, int)):
-        progress = str(trials.get("count") or 0)
-        if isinstance(max_trials, int):
-            progress += f"/{max_trials}"
-        # The trial progress stays outside the status markup to render in the
-        # default color.
-        status += f" ({progress})"
+    if isinstance(trials, dict):
         best = trials.get("best")
         if isinstance(best, dict):
             parts = ["best trial:"]
@@ -106,13 +119,19 @@ def _add_session(table: Table, session: dict[str, Any]) -> None:
     )
 
 
-def _add_preset(table: Table, preset: EndpointPreset, *, verbose: bool) -> None:
+def _add_preset(
+    table: Table,
+    preset: EndpointPreset,
+    *,
+    verbose: bool,
+    creation: Optional[dict[str, Any]] = None,
+) -> None:
     groups = preset.service.replica_groups
     column = "RESOURCES" if verbose else "GPU"
     row = {
         "ID": preset.id,
         column: _format_resources(groups[0].resources, verbose=verbose),
-        "STATUS": _format_status("ready"),
+        "STATUS": _format_status("ready") + _format_trial_progress(creation),
         "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),
         "SUBMITTED": pretty_date(preset.created_at),
     }
@@ -122,7 +141,7 @@ def _add_preset(table: Table, preset: EndpointPreset, *, verbose: bool) -> None:
     if verbose and preset.model != preset.base:
         add_row_from_dict(
             table,
-            {"BASE": f"   repo={preset.model}"},
+            {"BASE": f"  repo={preset.model}"},
             style="secondary",
         )
     if len(groups) > 1:
@@ -130,7 +149,7 @@ def _add_preset(table: Table, preset: EndpointPreset, *, verbose: bool) -> None:
             add_row_from_dict(
                 table,
                 {
-                    "BASE": f"   group={group.name}",
+                    "BASE": f"  group={group.name}",
                     column: _format_resources(group.resources, verbose=verbose),
                 },
                 style="secondary",

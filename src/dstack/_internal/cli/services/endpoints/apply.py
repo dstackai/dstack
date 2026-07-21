@@ -1,6 +1,6 @@
 import argparse
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 
 from rich.markup import escape
 
@@ -32,21 +32,18 @@ def apply_endpoint_preset(
     api: Client,
     configuration: EndpointConfiguration,
     configuration_path: str,
-    preset_id: Optional[str],
+    preset_ids: Optional[Sequence[str]],
     profile_name: Optional[str],
     command_args: argparse.Namespace,
     store: EndpointPresetStore,
 ) -> None:
-    presets = _get_matching_presets(
-        store.list(),
-        configuration=configuration,
-        preset_id=preset_id,
-    )
+    candidates = _get_candidate_presets(store.list(), preset_ids=preset_ids)
+    presets = _get_matching_presets(candidates, configuration=configuration)
     if not presets:
-        qualifier = f" preset {preset_id!r}" if preset_id else ""
-        raise CLIError(
-            f"No matching endpoint preset{qualifier} for {configuration.model.api_model_name}"
-        )
+        qualifier = ""
+        if preset_ids:
+            qualifier = f" among {', '.join(preset_ids)}"
+        raise CLIError(f"No matching preset{qualifier} for {configuration.model.api_model_name}")
 
     configurator = ServiceConfigurator(api_client=api)
     service_args = configurator.get_parser().parse_args([])
@@ -70,18 +67,32 @@ def apply_endpoint_preset(
     )
 
 
+def _get_candidate_presets(
+    presets: list[EndpointPreset],
+    *,
+    preset_ids: Optional[Sequence[str]],
+) -> list[EndpointPreset]:
+    if not preset_ids:
+        return presets
+    presets_by_id = {preset.id: preset for preset in presets}
+    missing = [preset_id for preset_id in preset_ids if preset_id not in presets_by_id]
+    if len(missing) == 1:
+        raise CLIError(f"Preset {missing[0]} does not exist")
+    if missing:
+        raise CLIError(f"Presets {', '.join(missing)} do not exist")
+    # Preserve the order given: capacity-aware selection tries ids in turn.
+    return [presets_by_id[preset_id] for preset_id in preset_ids]
+
+
 def _get_matching_presets(
     presets: list[EndpointPreset],
     *,
     configuration: EndpointConfiguration,
-    preset_id: Optional[str],
 ) -> list[EndpointPreset]:
     model_name = configuration.model.api_model_name
     matches = []
     for preset in presets:
         service_model = preset.service.model
-        if preset_id is not None and preset.id != preset_id:
-            continue
         if service_model is None or service_model.name.lower() != model_name.lower():
             continue
         if configuration.context_length is not None:

@@ -73,7 +73,7 @@ class TestEndpointPresetLocalCommands:
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "endpoint.dstack.yml"
         configuration_path.write_text(
-            "type: endpoint\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
         )
 
         with (
@@ -84,7 +84,7 @@ class TestEndpointPresetLocalCommands:
             ),
         ):
             exit_code = run_dstack_cli(
-                ["endpoint", "preset", "create", "-f", str(configuration_path)],
+                ["preset", "create", "-f", str(configuration_path)],
                 home_dir=tmp_path,
             )
 
@@ -112,7 +112,7 @@ class TestEndpointPresetLocalCommands:
                 endpoint_presets_utils, "pretty_date", return_value="2 months ago"
             ) as pretty_date,
         ):
-            assert run_dstack_cli(["endpoint", "preset", "list"], home_dir=tmp_path) == 0
+            assert run_dstack_cli(["preset", "list"], home_dir=tmp_path) == 0
             from_config.assert_not_called()
             pretty_date.assert_called_once_with(preset.created_at)
 
@@ -132,7 +132,7 @@ class TestEndpointPresetLocalCommands:
         assert "108ms" in output
         assert "A6000:48GB:1" not in output
 
-        assert run_dstack_cli(["endpoint", "preset", "list", "-v"], home_dir=tmp_path) == 0
+        assert run_dstack_cli(["preset", "list", "-v"], home_dir=tmp_path) == 0
         verbose_output = capsys.readouterr().out
         joined_verbose = "".join(verbose_output.split())
         assert "hardware=" in joined_verbose
@@ -145,7 +145,6 @@ class TestEndpointPresetLocalCommands:
             assert (
                 run_dstack_cli(
                     [
-                        "endpoint",
                         "preset",
                         "delete",
                         preset.id,
@@ -167,7 +166,7 @@ class TestEndpointPresetLocalCommands:
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
                 run_dstack_cli(
-                    ["endpoint", "preset", "get", preset.id, "--json"],
+                    ["preset", "get", preset.id, "--json"],
                     home_dir=tmp_path,
                 )
                 == 0
@@ -183,8 +182,8 @@ class TestEndpointPresetLocalCommands:
     @pytest.mark.parametrize(
         "args",
         [
-            ["endpoint", "preset", "--json"],
-            ["endpoint", "preset", "list", "--json"],
+            ["preset", "--json"],
+            ["preset", "list", "--json"],
         ],
     )
     def test_lists_complete_presets_as_json(self, tmp_path, capsys, args):
@@ -212,7 +211,7 @@ class TestEndpointPresetLocalCommands:
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
                 run_dstack_cli(
-                    ["endpoint", "preset", "delete", flag, getattr(preset, attribute), "-y"],
+                    ["preset", "delete", flag, getattr(preset, attribute), "-y"],
                     home_dir=tmp_path,
                 )
                 == 0
@@ -232,7 +231,7 @@ class TestEndpointPresetLocalCommands:
 
         assert (
             run_dstack_cli(
-                ["endpoint", "preset", "delete", "--base", preset.base, "-y"],
+                ["preset", "delete", "--base", preset.base, "-y"],
                 home_dir=tmp_path,
             )
             == 0
@@ -250,7 +249,7 @@ class TestEndpointPresetLocalCommands:
             preset.copy(update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"})
         )
 
-        args = ["endpoint", "preset", "list", "--json", flag, getattr(preset, attribute)]
+        args = ["preset", "list", "--json", flag, getattr(preset, attribute)]
         assert run_dstack_cli(args, home_dir=tmp_path) == 0
 
         output = json.loads(capsys.readouterr().out)
@@ -270,7 +269,7 @@ class TestEndpointPresetLocalCommands:
         )
         configuration_path = tmp_path / "endpoint.dstack.yml"
         configuration_path.write_text(
-            """type: endpoint
+            """type: preset
 name: file-name
 model:
   base: Qwen/Qwen3.5-27B
@@ -296,7 +295,6 @@ env:
         ):
             exit_code = run_dstack_cli(
                 [
-                    "endpoint",
                     "preset",
                     "create",
                     "-f",
@@ -326,17 +324,23 @@ env:
         assert create.call_args.kwargs["debug"] is True
 
     @pytest.mark.parametrize(
-        ("extra_args", "expected_preset"),
-        [([], "file-preset"), (["--preset", "cli-preset"], "cli-preset")],
+        ("extra_args", "expected_ids"),
+        [
+            ([], None),
+            (["--id", "cli-preset"], ["cli-preset"]),
+            (["--id", "a1", "--id", "b2"], ["a1", "b2"]),
+        ],
     )
-    def test_apply_passes_selected_profile_and_preset(self, tmp_path, extra_args, expected_preset):
+    def test_apply_passes_selected_profile_and_preset_ids(
+        self, tmp_path, extra_args, expected_ids
+    ):
         (tmp_path / ".dstack").mkdir()
         (tmp_path / ".dstack" / "profiles.yml").write_text(
             "profiles:\n  - name: gpu\n    max_price: 0.5\n"
         )
-        configuration_path = tmp_path / "endpoint.dstack.yml"
+        configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: endpoint\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\npreset: file-preset\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
         )
 
         with (
@@ -344,7 +348,6 @@ env:
             patch("dstack._internal.cli.commands.endpoint.apply_endpoint_preset") as apply,
         ):
             args = [
-                "endpoint",
                 "preset",
                 "apply",
                 "-f",
@@ -361,5 +364,5 @@ env:
 
         assert exit_code == 0
         assert apply.call_args.kwargs["profile_name"] == "gpu"
-        assert apply.call_args.kwargs["preset_id"] == expected_preset
+        assert apply.call_args.kwargs["preset_ids"] == expected_ids
         assert apply.call_args.kwargs["configuration"].max_price == 0.5

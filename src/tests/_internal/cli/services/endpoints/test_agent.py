@@ -202,17 +202,17 @@ class TestAgentSession:
             assert session.log_path.stat().st_mode & 0o777 == 0o600
 
         debug_session = create_endpoint_agent_session(configuration, debug=True)
-        data = yaml.safe_load((debug_session.path / "endpoint.dstack.yml").read_text())
+        data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
 
         assert {path.name for path in debug_session.path.iterdir()} == {
             "agent.log",
-            "endpoint.dstack.yml",
+            "preset.dstack.yml",
             "session.json",
             "trace.jsonl",
         }
         assert data["max_price"] == 0.5
         assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
-        assert "false" not in (debug_session.path / "endpoint.dstack.yml").read_text()
+        assert "false" not in (debug_session.path / "preset.dstack.yml").read_text()
         success_path = debug_session.finish("success")
         assert success_path == debug_session.path
         assert json.loads((debug_session.path / "session.json").read_text())["status"] == "success"
@@ -860,7 +860,7 @@ class TestLoadResumableSession:
 
 
 class TestSummarizeSessionTrials:
-    def test_counts_distinct_task_names_not_benchmark_records(self, tmp_path):
+    def test_counts_records_even_when_trials_share_a_task(self, tmp_path):
         record = {
             "task": {"name": "qwen-ab12cd34-1"},
             "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
@@ -881,5 +881,7 @@ class TestSummarizeSessionTrials:
 
         summary = _summarize_session_trials(path)
 
-        assert summary["count"] == 3
+        # 4 records = 4 trials: one long-lived task commonly hosts several
+        # trials, so shared task names must not collapse the count.
+        assert summary["count"] == 4
         assert summary["best"] == {"tok_s": 2300.0, "concurrency": 8, "gpu": "A40:48GB:1"}

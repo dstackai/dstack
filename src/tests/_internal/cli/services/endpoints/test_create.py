@@ -183,14 +183,14 @@ class TestCreateEndpointPreset:
         assert len(paths) == 1
         assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
-            "endpoint.dstack.yml",
+            "preset.dstack.yml",
             "agent.log",
             "prompt.md",
             "session.json",
             "trace.jsonl",
         }
         assert json.loads((paths[0] / "session.json").read_text())["status"] == "running"
-        assert "hf-secret" not in (paths[0] / "endpoint.dstack.yml").read_text()
+        assert "hf-secret" not in (paths[0] / "preset.dstack.yml").read_text()
         assert "Files remain at" in capsys.readouterr().out
 
     def test_debug_finalization_does_not_mask_creation_error(self, tmp_path, monkeypatch):
@@ -321,7 +321,7 @@ class TestCreateEndpointPreset:
 
 class TestBuildName:
     def test_requires_name_and_keeps_generated_prefix_bounded(self):
-        with pytest.raises(CLIError, match="Endpoint name is required"):
+        with pytest.raises(CLIError, match="The service name is required"):
             _get_build_name(None, "a1b2c3d4")
 
         build_name = _get_build_name("qwen-endpoint-with-a-name-that-is-forty-one", "a1b2c3d4")

@@ -84,10 +84,10 @@ class EndpointConfiguration(
     ProfileParams,
     generate_dual_core_model(EndpointConfigurationConfig),
 ):
-    type: Annotated[Literal["endpoint"], Field(description="The configuration type")] = "endpoint"
+    type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
     name: Annotated[
         Optional[str],
-        Field(description="The endpoint name. Required unless passed with `--name`"),
+        Field(description="The service name. Required unless passed with `--name`"),
     ] = None
     model: Annotated[
         EndpointModelSpec,
@@ -114,9 +114,6 @@ class EndpointConfiguration(
     ] = None
     context_length: Annotated[
         Optional[PositiveInt], Field(description="The minimum required context length")
-    ] = None
-    preset: Annotated[
-        Optional[str], Field(description="The preset ID to use when applying the endpoint")
     ] = None
     max_trials: Annotated[
         Optional[PositiveInt],
@@ -178,12 +175,6 @@ class EndpointConfiguration(
     def parse_model(cls, value: Any) -> Any:
         if isinstance(value, str):
             return {"repo": _validate_model(value, field="model")}
-        return value
-
-    @validator("preset")
-    def validate_preset(cls, value: Optional[str]) -> Optional[str]:
-        if value is not None and not value.strip():
-            raise ValueError("Endpoint preset must be a non-empty string")
         return value
 
 

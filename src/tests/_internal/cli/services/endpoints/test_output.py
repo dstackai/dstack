@@ -1,7 +1,14 @@
-import pytest
-from rich.table import Table
+from datetime import timedelta
+from io import StringIO
 
+import pytest
+from rich.console import Console
+from rich.table import Table
+from rich.theme import Theme
+
+from dstack._internal.cli.services.endpoints import output as output_module
 from dstack._internal.cli.services.endpoints.output import _add_session, _format_number
+from tests._internal.cli.endpoint_presets import get_endpoint_preset
 
 pytestmark = pytest.mark.windows
 
@@ -41,7 +48,7 @@ class TestSessionRow:
             }
         )
 
-        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] (2/3)"
+        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] [secondary](2/3)[/]"
         assert row["BENCHMARK"] == "best trial: con=8 2339 tok/s"
         assert row["GPU"] == "A40:48GB:1"
 
@@ -50,7 +57,7 @@ class TestSessionRow:
             {"id": "ab12cd34", "status": "running", "max_trials": 3, "trials": {"count": 0}}
         )
 
-        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] (0/3)"
+        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] [secondary](0/3)[/]"
         assert row["BENCHMARK"] == ""
 
     def test_omits_progress_without_trials_data(self):
@@ -61,20 +68,11 @@ class TestSessionRow:
     def test_counts_without_max_trials(self):
         row = _session_row({"id": "ab12cd34", "status": "interrupted", "trials": {"count": 2}})
 
-        assert row["STATUS"] == "[bold gold1]interrupted[/] (2)"
+        assert row["STATUS"] == "[bold gold1]interrupted[/] [secondary](2)[/]"
 
 
 class TestGroupOrdering:
     def test_sorts_presets_and_sessions_newest_first(self, monkeypatch):
-        from datetime import timedelta
-        from io import StringIO
-
-        from rich.console import Console
-        from rich.theme import Theme
-
-        from dstack._internal.cli.services.endpoints import output as output_module
-        from tests._internal.cli.endpoint_presets import get_endpoint_preset
-
         buffer = StringIO()
         monkeypatch.setattr(
             output_module,
@@ -105,3 +103,31 @@ class TestGroupOrdering:
         text = buffer.getvalue()
         assert text.index("11aa22bb") < text.index(old.id)
         assert text.index(old.id) < text.index("bbbbbbbb") < text.index("aaaaaaaa")
+
+
+class TestDoneProgress:
+    def test_completed_creation_decorates_preset_row_without_extra_session_row(self, monkeypatch):
+        buffer = StringIO()
+        monkeypatch.setattr(
+            output_module,
+            "console",
+            Console(
+                file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
+            ),
+        )
+        preset = get_endpoint_preset()
+        sessions = [
+            {
+                "id": preset.id,
+                "status": "success",
+                "model": preset.base,
+                "max_trials": 4,
+                "trials": {"count": 3},
+            }
+        ]
+
+        output_module.print_endpoint_presets([preset], sessions=sessions)
+
+        text = buffer.getvalue()
+        assert "success (3/4)" in text
+        assert text.count(preset.id) == 1

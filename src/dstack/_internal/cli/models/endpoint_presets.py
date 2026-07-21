@@ -70,6 +70,10 @@ class EndpointBenchmark(CoreModel):
             token = match.group(1)
             if token.startswith("$") or "redacted" in token.lower() or set(token) == {"*"}:
                 continue
+            # Prose such as "auth via bearer header from env" is not a
+            # credential: only credential-shaped values are rejected.
+            if len(token) < 16 or not any(char.isdigit() for char in token):
+                continue
             raise ValueError("command must not contain a bearer token value")
         return value
 
@@ -77,6 +81,7 @@ class EndpointBenchmark(CoreModel):
     def validate_metrics(cls, values: dict) -> dict:
         metrics = values.get("metrics")
         workload = values.get("workload")
+        assert metrics is not None and workload is not None
         if metrics.failed_requests != 0:
             raise ValueError("benchmark must not include failed requests")
         if metrics.successful_requests != workload.num_requests:

@@ -185,10 +185,10 @@ async def _create_endpoint_preset(
             preset_id=agent_session.preset_id or None,
         )
         if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
-            raise CLIError("Generated endpoint preset contains a secret value")
+            raise CLIError("Generated preset contains a secret value")
         preset_path = store.save(preset)
         print_endpoint_progress(
-            f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}.",
+            f"Saved preset {preset.id} for {preset.base} at {preset_path}.",
             agent_session=agent_session,
         )
         creation_succeeded = True
@@ -274,14 +274,16 @@ def _suspend_agent_session(session: EndpointAgentSession) -> None:
         "Its runs may still be active and accruing cost."
     )
     console.print(
-        f"Resume with [code]dstack endpoint preset create -f <configuration> "
+        f"Resume with [code]dstack preset create -f <configuration> "
         f"--resume {session.preset_id}[/], or stop the runs with [code]dstack stop[/]."
     )
 
 
 def _get_build_name(endpoint_name: Optional[str], suffix: str) -> str:
     if endpoint_name is None:
-        raise CLIError("Endpoint name is required. Set `name` in the configuration or use --name")
+        raise CLIError(
+            "The service name is required. Set `name` in the configuration or use --name"
+        )
     # Leave room for the preset id and numeric submission suffix while retaining
     # a recognizable prefix.
     prefix = endpoint_name[:26].rstrip("-")

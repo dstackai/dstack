@@ -85,14 +85,14 @@ def build_verified_endpoint_preset(
     if not isinstance(service, ServiceConfiguration) or service.model is None:
         raise CLIError("Claude final run is not a model service")
     if service.model.name != endpoint_configuration.model.api_model_name:
-        raise CLIError("Claude final service model name does not match the endpoint request")
+        raise CLIError("Claude final service model name does not match the requested model")
     assert report.base is not None
     assert report.model is not None
     assert report.context_length is not None
     assert report.benchmark is not None
     if endpoint_configuration.model.allows_variant_selection:
         if report.base != endpoint_configuration.model.api_model_name:
-            raise CLIError("Claude final report base does not match the endpoint request")
+            raise CLIError("Claude final report base does not match the requested model")
     elif report.model != endpoint_configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
     if (

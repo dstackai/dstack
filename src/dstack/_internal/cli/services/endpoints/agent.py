@@ -298,7 +298,7 @@ def create_endpoint_agent_session(
     debug: bool = False,
 ) -> EndpointAgentSession:
     if configuration.name is None:
-        raise CLIError("Endpoint name is required to save agent output")
+        raise CLIError("The service name is required to save agent output")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
     parent = get_presets_dir()
     path: Optional[Path] = None
@@ -332,7 +332,7 @@ def create_endpoint_agent_session(
             else:
                 data.pop("env", None)
             _write_private_text(
-                path / "endpoint.dstack.yml",
+                path / "preset.dstack.yml",
                 yaml.safe_dump(data, sort_keys=False),
             )
             _write_private_text(path / "trace.jsonl", "")
@@ -414,7 +414,7 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
         manifest = session.read_manifest()
         status = manifest.get("status")
-        if status not in ("running", "interrupted"):
+        if status not in ("running", "interrupted", "success"):
             continue
         pid = manifest.get("pid")
         if status == "running" and not (
@@ -436,7 +436,6 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
     except OSError:
         lines = []
     count = 0
-    task_names: set[str] = set()
     best: Optional[dict[str, Any]] = None
     for line in lines:
         try:
@@ -445,14 +444,9 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
             continue
         if not isinstance(record, dict):
             continue
-        # A trial may log several benchmark records (e.g. a re-run); records
-        # sharing a task name are one trial.
-        task = record.get("task")
-        task_name = task.get("name") if isinstance(task, dict) else None
-        if isinstance(task_name, str) and task_name:
-            task_names.add(task_name)
-        else:
-            count += 1
+        # One record per trial (the agent contract); trials may share a task,
+        # so task names must not be deduplicated.
+        count += 1
         benchmark = record.get("benchmark")
         if not isinstance(benchmark, dict):
             continue
@@ -480,7 +474,7 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
                 "concurrency": workload.get("concurrency"),
                 "gpu": gpu_text,
             }
-    return {"count": count + len(task_names), "best": best}
+    return {"count": count, "best": best}
 
 
 def get_claude_auth() -> ClaudeAuth:
@@ -792,7 +786,7 @@ def _install_home_wrapper(bin_dir: Path, command: str, home: Path) -> None:
         script = f"""#!{sys.executable}
 import sys
 
-print("Endpoint preset creation could not find the {command} executable.", file=sys.stderr)
+print("Preset creation could not find the {command} executable.", file=sys.stderr)
 raise SystemExit(127)
 """
     else:
@@ -859,7 +853,7 @@ def _install_skills(workspace: Path) -> None:
     for skill_name in _SKILL_NAMES:
         source = source_dir / skill_name
         if not (source / "SKILL.md").is_file():
-            raise CLIError(f"Missing endpoint agent skill: {skill_name}")
+            raise CLIError(f"Missing preset agent skill: {skill_name}")
         shutil.copytree(source, target_dir / skill_name)
 
 

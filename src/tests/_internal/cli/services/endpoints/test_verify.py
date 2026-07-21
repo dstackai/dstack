@@ -119,3 +119,19 @@ class TestLoadEndpointAgentReport:
 
         with pytest.raises(CLIError, match="bearer token"):
             self._load(tmp_path, data, redacted_values=("some-other-secret-value",))
+
+    def test_allows_bearer_prose_without_credential(self, tmp_path):
+        # Regression: "(auth via DSTACK_TOKEN bearer header from env)" failed
+        # two live sessions — the word after "bearer" is prose, not a token.
+        run = get_running_service_run()
+        data = get_successful_endpoint_report(run).dict()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"]["command"] = (
+            "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"
+            " (auth via DSTACK_TOKEN bearer header from env)"
+        )
+
+        report = self._load(tmp_path, data, redacted_values=())
+
+        assert report.benchmark is not None
+        assert "bearer header" in report.benchmark.command

@@ -42,7 +42,7 @@ class EndpointPresetStore:
             return None
         preset = self._load(path)
         if preset.id != preset_id:
-            raise CLIError(f"Endpoint preset file {path} does not match its path")
+            raise CLIError(f"Preset file {path} does not match its path")
         return preset
 
     def save(self, preset: EndpointPreset) -> Path:
@@ -105,12 +105,12 @@ class EndpointPresetStore:
             with path.open(encoding="utf-8") as f:
                 return EndpointPreset.parse_obj(yaml.safe_load(f))
         except (OSError, ValidationError, yaml.YAMLError) as e:
-            raise CLIError(f"Invalid endpoint preset file {path}: {e}") from e
+            raise CLIError(f"Invalid preset file {path}: {e}") from e
 
 
 def _validate_preset_id(preset_id: str) -> None:
     if not preset_id or preset_id.startswith(".") or any(char in preset_id for char in "/\\"):
-        raise CLIError(f"Invalid endpoint preset ID: {preset_id!r}")
+        raise CLIError(f"Invalid preset ID: {preset_id!r}")
 
 
 def load_endpoint_configuration(path: str) -> tuple[str, EndpointConfiguration]:
@@ -131,12 +131,12 @@ def _parse_endpoint_configuration(stream: TextIO) -> EndpointConfiguration:
     try:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
-            raise ConfigurationError("Endpoint configuration must be a YAML object")
+            raise ConfigurationError("Preset configuration must be a YAML object")
         configuration = EndpointConfiguration.parse_obj(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
     except yaml.YAMLError as e:
-        raise ConfigurationError(f"Invalid endpoint configuration: {e}") from e
+        raise ConfigurationError(f"Invalid preset configuration: {e}") from e
     model = data.get("model")
     if isinstance(model, dict) and model.get("name") is None:
         key = "base" if "base" in model else "repo"
