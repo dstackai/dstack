@@ -514,6 +514,7 @@ async def _select_assignment(
     preconditions: _ProcessedPreconditions,
     candidate_fleet_models: list[FleetModel],
 ) -> _AssignmentResult:
+    creation_policy = context.run.run_spec.merged_profile.creation_policy
     # Getting backend offers can be slow, so fleet selection must happen outside the DB transaction.
     fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
         project=context.project,
@@ -524,6 +525,8 @@ async def _select_assignment(
         master_job_provisioning_data=preconditions.master_job_provisioning_data,
         volumes=preconditions.prepared_job_volumes.volumes,
         exclude_not_available=True,
+        skip_backend_offers=context.run.run_spec.merged_profile.creation_policy
+        == CreationPolicy.REUSE,
         skip_backend_offers_on_pool_capacity=True,
     )
 
@@ -535,6 +538,12 @@ async def _select_assignment(
             fleet_id=fleet_model.id,
             master_job_provisioning_data=preconditions.master_job_provisioning_data,
             volumes=preconditions.prepared_job_volumes.volumes,
+        )
+
+    if creation_policy == CreationPolicy.REUSE:
+        return _TerminateSubmittedJobResult(
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message="Could not reuse any instance for this job",
         )
 
     return _NewCapacityAssignment(fleet_id=fleet_model.id)
@@ -1239,7 +1248,7 @@ async def _process_provisioning(
         logger.debug("%s: reuse instance failed", fmt(context.job_model))
         return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-            message="Could not reuse any instances for this job",
+            message="Could not reuse any instance for this job",
         )
 
     return await _process_new_capacity_provisioning(
