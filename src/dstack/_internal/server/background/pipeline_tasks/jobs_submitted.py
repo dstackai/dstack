@@ -525,8 +525,7 @@ async def _select_assignment(
         master_job_provisioning_data=preconditions.master_job_provisioning_data,
         volumes=preconditions.prepared_job_volumes.volumes,
         exclude_not_available=True,
-        skip_backend_offers=context.run.run_spec.merged_profile.creation_policy
-        == CreationPolicy.REUSE,
+        skip_backend_offers=creation_policy == CreationPolicy.REUSE,
         skip_backend_offers_on_pool_capacity=True,
     )
 
@@ -1242,13 +1241,6 @@ async def _process_provisioning(
             item=item,
             context=context,
             prepared_job_volumes=preconditions.prepared_job_volumes,
-        )
-
-    if context.run.run_spec.merged_profile.creation_policy == CreationPolicy.REUSE:
-        logger.debug("%s: reuse instance failed", fmt(context.job_model))
-        return _TerminateSubmittedJobResult(
-            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-            message="Could not reuse any instance for this job",
         )
 
     return await _process_new_capacity_provisioning(
