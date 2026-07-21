@@ -2628,14 +2628,14 @@ class TestGetRunPlan:
         global_offer = get_instance_offer_with_availability(price=1.0)
         with (
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(return_value=([(Mock(), global_offer)], [])),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(
                     side_effect=AssertionError(
-                        "_get_offers_in_run_candidate_fleets should not be called"
+                        "get_offers_in_run_candidate_fleets should not be called"
                     )
                 ),
             ) as get_offers_in_run_candidate_fleets_mock,
@@ -2693,13 +2693,13 @@ class TestGetRunPlan:
         fleet_offer = get_instance_offer_with_availability(price=2.0)
         with (
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(
-                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                    side_effect=AssertionError("get_non_fleet_offers should not be called")
                 ),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(return_value=([(Mock(), fleet_offer)], [])),
             ) as get_offers_in_run_candidate_fleets_mock,
             patch(
@@ -2761,16 +2761,16 @@ class TestGetRunPlan:
                 new=AsyncMock(return_value=(Mock(), [(Mock(), chosen_fleet_offer)], [])),
             ) as find_optimal_fleet_with_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(
-                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                    side_effect=AssertionError("get_non_fleet_offers should not be called")
                 ),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(
                     side_effect=AssertionError(
-                        "_get_offers_in_run_candidate_fleets should not be called"
+                        "get_offers_in_run_candidate_fleets should not be called"
                     )
                 ),
             ) as get_offers_in_run_candidate_fleets_mock,

@@ -166,7 +166,7 @@ async def get_job_plans(
             )
             backend_offers = []
         elif run_spec.merged_profile.fleets is not None:
-            instance_offers, backend_offers = await _get_offers_in_run_candidate_fleets(
+            instance_offers, backend_offers = await get_offers_in_run_candidate_fleets(
                 session=session,
                 project=project,
                 run_spec=run_spec,
@@ -175,7 +175,7 @@ async def get_job_plans(
                 skip_backend_offers=skip_backend_offers,
             )
         else:
-            instance_offers, backend_offers = await _get_non_fleet_offers(
+            instance_offers, backend_offers = await get_non_fleet_offers(
                 session=session,
                 project=project,
                 run_spec=run_spec,
@@ -755,7 +755,7 @@ async def _get_pool_offers(
     project: ProjectModel,
     run_spec: RunSpec,
     job: Job,
-    volumes: list[list[Volume]],
+    volumes: Optional[list[list[Volume]]],
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     pool_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
@@ -786,12 +786,12 @@ async def _get_pool_offers(
     return pool_offers
 
 
-async def _get_non_fleet_offers(
+async def get_non_fleet_offers(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
     job: Job,
-    volumes: list[list[Volume]],
+    volumes: Optional[list[list[Volume]]] = None,
     skip_backend_offers: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
@@ -836,7 +836,7 @@ async def get_backend_offers_in_run_candidate_fleets(
     """
     Returns backend offers across the run's selected candidate fleets.
 
-    Used by `dstack offer --fleet ...` and `dstack offer --group-by ... --fleet ...`.
+    Helper of `get_offers_in_run_candidate_fleets()` that collects the backend part of its offers.
     It resolves the selected fleets from `run_spec`, requests backend offers in each fleet,
     merges them, and deduplicates identical backend offers across fleets.
     """
@@ -869,12 +869,12 @@ async def get_backend_offers_in_run_candidate_fleets(
     return offers
 
 
-async def _get_offers_in_run_candidate_fleets(
+async def get_offers_in_run_candidate_fleets(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
     job: Job,
-    volumes: list[list[Volume]],
+    volumes: Optional[list[list[Volume]]] = None,
     skip_backend_offers: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
@@ -883,10 +883,10 @@ async def _get_offers_in_run_candidate_fleets(
     """
     Returns existing-instance and backend offers across the run's candidate fleets.
 
-    Used by `dstack offer --fleet ...` without `--group-by`. Unlike normal `dstack apply`, it
-    does not choose a single best fleet. Instead, it gathers existing-instance and backend
-    offers from each selected fleet, keeps existing instances as separate reusable options, and
-    deduplicates identical backend offers across fleets.
+    Used by `dstack offer --fleet ...` (with or without `--group-by`). Unlike normal
+    `dstack apply`, it does not choose a single best fleet. Instead, it gathers existing-instance
+    and backend offers from each selected fleet, keeps existing instances as separate reusable
+    options, and deduplicates identical backend offers across fleets.
     """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,

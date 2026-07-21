@@ -7,15 +7,16 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gpus import BackendGpu, BackendGpus, GpuGroup
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.profiles import CreationPolicy
 from dstack._internal.core.models.resources import Range
-from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
-from dstack._internal.server.models import ProjectModel
+from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.server.models import InstanceModel, ProjectModel
 from dstack._internal.server.schemas.gpus import ListGpusResponse
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
-from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.runs.plan import (
-    get_backend_offers_in_run_candidate_fleets,
+    get_non_fleet_offers,
+    get_offers_in_run_candidate_fleets,
+    get_targeted_instance_offers,
 )
 from dstack._internal.utils.common import get_or_error
 
@@ -57,46 +58,52 @@ async def _get_gpu_offers(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+) -> list[InstanceOfferWithAvailability]:
     """Fetches all available instance offers that match the run spec's GPU requirements."""
+    # NOTE: Basically, this is a simplified version of get_job_plans(); keep them in sync
+    jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+    if len(jobs) == 0:
+        return []
+    job = jobs[0]
     profile = run_spec.merged_profile
-    if profile.fleets is not None:
-        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
-        if len(jobs) == 0:
-            return []
-        return await get_backend_offers_in_run_candidate_fleets(
+    skip_backend_offers = profile.creation_policy == CreationPolicy.REUSE
+
+    instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
+    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    if profile.instances is not None:
+        instance_offers = await get_targeted_instance_offers(
             session=session,
             project=project,
             run_spec=run_spec,
-            job=jobs[0],
-            volumes=None,
-            max_offers_per_fleet=None,
+            job=job,
         )
-    requirements = Requirements(
-        resources=run_spec.configuration.resources,
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
-        reservation=profile.reservation,
-    )
-    return await get_offers_by_requirements(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=False,
-        multinode=False,
-        volumes=None,
-        privileged=False,
-        instance_mounts=False,
-    )
+        backend_offers = []
+    elif profile.fleets is not None:
+        instance_offers, backend_offers = await get_offers_in_run_candidate_fleets(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job=job,
+            skip_backend_offers=skip_backend_offers,
+        )
+    else:
+        instance_offers, backend_offers = await get_non_fleet_offers(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job=job,
+            skip_backend_offers=skip_backend_offers,
+        )
+    return [offer for _, offer in instance_offers] + [offer for _, offer in backend_offers]
 
 
 def _process_offers_into_backend_gpus(
-    offers: List[Tuple[Backend, InstanceOfferWithAvailability]],
+    offers: list[InstanceOfferWithAvailability],
 ) -> List[BackendGpus]:
     """Transforms raw offers into a structured list of BackendGpus, aggregating GPU info."""
     backend_data: Dict[BackendType, Dict] = {}
 
-    for _, offer in offers:
+    for offer in offers:
         backend_type = offer.backend
         if backend_type not in backend_data:
             backend_data[backend_type] = {"gpus": {}, "regions": set()}
