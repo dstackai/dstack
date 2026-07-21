@@ -6,7 +6,6 @@ from rich.table import Table
 
 from dstack._internal.cli.models.endpoint_presets import (
     EndpointPreset,
-    EndpointPresetValidation,
 )
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
@@ -48,8 +47,6 @@ def print_endpoint_presets(
     table.add_column("BASE", no_wrap=True)
     table.add_column("ID", no_wrap=True)
     table.add_column("RESOURCES" if verbose else "GPU", style="secondary")
-    if verbose:
-        table.add_column("CONTEXT", justify="right", style="secondary")
     table.add_column("BENCHMARK", min_width=len("con=1"), overflow="fold")
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", no_wrap=True, style="secondary")
@@ -69,7 +66,7 @@ def print_endpoint_presets(
         sessions_by_model[repo_to_base.get(model, model)].append(session)
 
     for base in sorted({*presets_by_base, *sessions_by_model}, key=str.lower):
-        add_row_from_dict(table, {"BASE": f"[secondary]{base}[/]"})
+        add_row_from_dict(table, {"BASE": base})
         # Newest first within a group, as in `dstack ps`.
         for preset in sorted(
             presets_by_base.get(base, []), key=lambda p: p.created_at, reverse=True
@@ -135,15 +132,9 @@ def _add_preset(
         "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),
         "SUBMITTED": pretty_date(preset.created_at),
     }
-    if verbose:
-        row["CONTEXT"] = format_endpoint_context_length(preset)
-    add_row_from_dict(table, row)
     if verbose and preset.model != preset.base:
-        add_row_from_dict(
-            table,
-            {"BASE": f"  repo={preset.model}"},
-            style="secondary",
-        )
+        row["BASE"] = f"[secondary]  repo={preset.model}[/]"
+    add_row_from_dict(table, row)
     if len(groups) > 1:
         for group in groups:
             add_row_from_dict(
@@ -156,16 +147,10 @@ def _add_preset(
             )
 
 
-def format_endpoint_context_length(preset: EndpointPreset) -> str:
-    return _format_token_count(preset.context_length)
-
-
 def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) -> str:
-    validation = preset.validations[0]
-    benchmark = validation.benchmark
+    benchmark = preset.validations[0].benchmark
     workload = benchmark.workload
     metrics = benchmark.metrics
-    requests_per_second = metrics.successful_requests / metrics.duration_seconds
     output_tokens_per_second = metrics.total_output_tokens / metrics.duration_seconds
     parts = [
         f"con={workload.concurrency}",
@@ -173,36 +158,8 @@ def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) 
         f"TTFT {_format_latency(metrics.ttft_ms.p50)}",
     ]
     if verbose:
-        ttft = _format_latency_summary(
-            metrics.ttft_ms.mean, metrics.ttft_ms.p50, metrics.ttft_ms.p99
-        )
-        tpot = _format_latency_summary(
-            metrics.tpot_ms.mean, metrics.tpot_ms.p50, metrics.tpot_ms.p99
-        )
-        parts.extend(
-            [
-                f"hardware={_format_validation_gpus(validation)}",
-                f"api={workload.api}",
-                f"n={workload.num_requests}",
-                f"{_format_token_count(workload.input_tokens)}"
-                f"->{_format_token_count(workload.output_tokens)}",
-                f"{_format_number(requests_per_second)} req/s",
-                f"duration={_format_number(metrics.duration_seconds)}s",
-                f"TTFT mean/p50/p99={ttft}",
-                f"TPOT mean/p50/p99={tpot}",
-                f"{benchmark.tool} {benchmark.tool_version}",
-            ]
-        )
+        parts.insert(0, f"ctx={_format_token_count(preset.context_length)}")
     return " ".join(parts)
-
-
-def _format_validation_gpus(validation: EndpointPresetValidation) -> str:
-    gpus = [
-        _format_resources(resources, verbose=False)
-        for replica_group in validation.replicas
-        for resources in replica_group.resources
-    ]
-    return "+".join(gpus) or "-"
 
 
 def _format_token_count(value: int) -> str:
@@ -223,11 +180,6 @@ def _format_latency(value_ms: float) -> str:
     if value_ms >= 1000:
         return f"{_format_number(value_ms / 1000)}s"
     return f"{_format_number(value_ms)}ms"
-
-
-def _format_latency_summary(*values_ms: float) -> str:
-    divisor, unit = (1000, "s") if max(values_ms) >= 1000 else (1, "ms")
-    return "/".join(_format_number(value / divisor) for value in values_ms) + unit
 
 
 def _format_resources(resources, *, verbose: bool) -> str:

@@ -30,8 +30,8 @@ class TestEndpointPresetLocalCommands:
 
         output = endpoint_presets_utils.format_endpoint_benchmark(preset, verbose=True)
 
+        assert output.startswith("ctx=32K ")
         assert "TTFT 8.15s" in output
-        assert "TTFT mean/p50/p99=8.15/8.15/8.33s" in output
         assert "e+03" not in output
 
     def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
@@ -103,7 +103,7 @@ class TestEndpointPresetLocalCommands:
                 "console",
                 Console(
                     file=list_output,
-                    width=160,
+                    width=250,
                     color_system=None,
                     theme=Theme({"secondary": "grey58"}),
                 ),
@@ -115,8 +115,10 @@ class TestEndpointPresetLocalCommands:
             assert run_dstack_cli(["preset", "list"], home_dir=tmp_path) == 0
             from_config.assert_not_called()
             pretty_date.assert_called_once_with(preset.created_at)
+            output = list_output.getvalue()
+            assert run_dstack_cli(["preset", "list", "-v"], home_dir=tmp_path) == 0
+            verbose_output = list_output.getvalue()[len(output) :]
 
-        output = list_output.getvalue()
         assert "Qwen/Qwen3.5-27B" in output
         assert "8f3a12c4" in output
         # The repo row is shown only in verbose mode.
@@ -132,14 +134,12 @@ class TestEndpointPresetLocalCommands:
         assert "108ms" in output
         assert "A6000:48GB:1" not in output
 
-        assert run_dstack_cli(["preset", "list", "-v"], home_dir=tmp_path) == 0
-        verbose_output = capsys.readouterr().out
         joined_verbose = "".join(verbose_output.split())
-        assert "hardware=" in joined_verbose
-        assert "api=" in joined_verbose
-        assert "n=16" in joined_verbose
+        # Verbose adds only the repo and the ctx= benchmark prefix.
+        assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in joined_verbose
+        assert "ctx=32K" in joined_verbose
         assert "con=1" in joined_verbose
-        assert "1K->128" in joined_verbose
+        assert "hardware=" not in joined_verbose
 
         with patch("dstack.api.Client.from_config") as from_config:
             assert (

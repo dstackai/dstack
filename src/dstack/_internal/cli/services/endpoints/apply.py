@@ -9,7 +9,6 @@ from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.configurators.run import ServiceConfigurator
 from dstack._internal.cli.services.endpoints.output import (
     format_endpoint_benchmark,
-    format_endpoint_context_length,
 )
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
@@ -162,7 +161,5 @@ def _format_requested_model(configuration: EndpointConfiguration) -> str:
 
 
 def _format_selected_preset(preset: EndpointPreset) -> str:
-    details = (
-        f"context={format_endpoint_context_length(preset)}, {format_endpoint_benchmark(preset)}"
-    )
+    details = format_endpoint_benchmark(preset, verbose=True)
     return f"{escape(preset.id)} ([secondary]{details}[/])"
