@@ -80,8 +80,8 @@ class EndpointPresetStore:
                 return preset
         return None
 
-    def detach_name(self, name: str) -> EndpointPreset | None:
-        """Detaches `name` from the preset holding it, keeping the preset."""
+    def release_name(self, name: str) -> EndpointPreset | None:
+        """Releases `name` from the preset holding it, keeping the preset."""
         preset = self.find_by_name(name)
         if preset is None:
             return None

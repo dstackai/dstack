@@ -21,7 +21,10 @@ from dstack._internal.cli.services.endpoints.create import (
     _cleanup_runs,
     _create_endpoint_preset,
     _get_build_name,
+    _print_fleet_offers,
     _save_final_report_copy,
+    _stop_active_session_runs,
+    attach_endpoint_preset,
     create_endpoint_preset,
 )
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
@@ -126,7 +129,11 @@ class TestCreateEndpointPreset:
             if path.is_dir() and not path.name.startswith(".")
         ]
         assert len(paths) == 1
-        assert {path.name for path in paths[0].iterdir()} == {"agent.log", "session.json"}
+        assert {path.name for path in paths[0].iterdir()} == {
+            "agent.log",
+            "session.json",
+            "preset.dstack.yml",
+        }
         manifest = json.loads((paths[0] / "session.json").read_text())
         assert manifest["status"] == "success"
         assert manifest["id"] == paths[0].name
@@ -643,3 +650,146 @@ class TestInterruptAndResume:
         assert "A different prompt." not in captured["prompt"]
         assert "keepsitsoriginalprompt" in "".join(capsys.readouterr().out.split())
         remove_agent_workspace(agent_session)
+
+
+class TestFleetOffersPreview:
+    def test_no_offers_shows_the_shared_warning_without_failing(self, capsys):
+        plan = SimpleNamespace(
+            project_name="main",
+            user="admin",
+            job_plans=[SimpleNamespace(offers=[], total_offers=0, max_price=None)],
+        )
+        api = SimpleNamespace(
+            project="main",
+            client=SimpleNamespace(runs=SimpleNamespace(get_plan=lambda *a, **k: plan)),
+        )
+
+        _print_fleet_offers(api, ("arm-fleet",))
+
+        out = capsys.readouterr().out
+        assert "arm-fleet" in out
+        assert "No matching instance offers available" in out
+
+
+class TestAttachEndpointPreset:
+    def _detached_session(self, tmp_path, configuration_yaml: str) -> EndpointAgentSession:
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
+        (session_dir / "preset.dstack.yml").write_text(configuration_yaml)
+        session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
+        )
+        workspace = create_agent_workspace(session)
+        workspace.constraints_path.write_text('{"run_name_prefix": "qwen-build"}')
+        session.update_manifest(status="running", agent_pid=987654321)
+        return session
+
+    def test_finalizes_a_detached_session(self, creation_context, monkeypatch, tmp_path):
+        session = self._detached_session(
+            tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            lambda preset_id: session,
+        )
+
+        async def fake_attach(**kwargs):
+            return EndpointAgentProcessOutput(
+                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.attach_endpoint_agent",
+            fake_attach,
+        )
+
+        result = attach_endpoint_preset(
+            api=creation_context.api,
+            store=creation_context.store,
+            preset_id="ab12cd34",
+        )
+
+        assert result.preset.id == "ab12cd34"
+        assert creation_context.store.get("ab12cd34") is not None
+        assert session.read_manifest()["status"] == "success"
+
+    def test_agent_death_without_report_suspends_instead_of_failing(
+        self, creation_context, monkeypatch, tmp_path
+    ):
+        session = self._detached_session(
+            tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            lambda preset_id: session,
+        )
+
+        async def fake_attach(**kwargs):
+            return EndpointAgentProcessOutput(error="agent died")
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.attach_endpoint_agent",
+            fake_attach,
+        )
+
+        with pytest.raises(CLIError, match="agent died"):
+            attach_endpoint_preset(
+                api=creation_context.api,
+                store=creation_context.store,
+                preset_id="ab12cd34",
+            )
+
+        assert session.read_manifest()["status"] == "interrupted"
+
+
+class TestStopActiveSessionRuns:
+    def _session(self, tmp_path) -> EndpointAgentSession:
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        (session_dir / "runs.jsonl").write_text(
+            '{"name":"qwen-build-1","id":"a"}\n{"name":"qwen-build-2","id":"b"}\n'
+        )
+        return EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
+        )
+
+    def _api(self, statuses: dict, stopped: list) -> SimpleNamespace:
+        def get(project, name):
+            return SimpleNamespace(status=statuses[name])
+
+        def stop(project, names, abort):
+            stopped.extend(names)
+
+        return SimpleNamespace(
+            project="main",
+            client=SimpleNamespace(runs=SimpleNamespace(get=get, stop=stop)),
+        )
+
+    def test_stops_only_non_terminal_runs(self, tmp_path):
+        from dstack._internal.core.models.runs import RunStatus
+
+        stopped: list = []
+        api = self._api(
+            {"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.RUNNING}, stopped
+        )
+
+        assert _stop_active_session_runs(api, self._session(tmp_path), assume_yes=True) is True
+        assert stopped == ["qwen-build-2"]
+
+    def test_declined_confirmation_leaves_runs_active(self, tmp_path, monkeypatch):
+        from dstack._internal.cli.services.endpoints import create as create_module
+        from dstack._internal.core.models.runs import RunStatus
+
+        monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)
+        stopped: list = []
+        api = self._api(
+            {"qwen-build-1": RunStatus.RUNNING, "qwen-build-2": RunStatus.DONE}, stopped
+        )
+
+        assert _stop_active_session_runs(api, self._session(tmp_path), assume_yes=False) is False
+        assert stopped == []

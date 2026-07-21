@@ -14,13 +14,16 @@ from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.endpoints.agent import (
     find_session_name_claims,
+    get_presets_dir,
     list_agent_sessions,
     load_resumable_agent_session,
 )
 from dstack._internal.cli.services.endpoints.apply import apply_endpoint_preset
 from dstack._internal.cli.services.endpoints.create import (
+    attach_endpoint_preset,
     create_endpoint_preset,
     plan_endpoint_preset,
+    stop_endpoint_session,
 )
 from dstack._internal.cli.services.endpoints.output import print_endpoint_presets
 from dstack._internal.cli.services.endpoints.store import (
@@ -106,6 +109,30 @@ class EndpointCommand(BaseCommand):
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
         )
         create_parser.set_defaults(subfunc=self._create)
+
+        attach_parser = preset_subparsers.add_parser(
+            "attach",
+            help="Attach to a detached preset creation session",
+            formatter_class=self._parser.formatter_class,
+        )
+        attach_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
+        attach_parser.add_argument(
+            "--keep-service",
+            action="store_true",
+            help="Leave the verified service running",
+        )
+        attach_parser.set_defaults(subfunc=self._attach)
+
+        stop_parser = preset_subparsers.add_parser(
+            "stop",
+            help="Stop a running preset creation session",
+            formatter_class=self._parser.formatter_class,
+        )
+        stop_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
+        stop_parser.add_argument(
+            "-y", "--yes", action="store_true", help="Do not ask for confirmation"
+        )
+        stop_parser.set_defaults(subfunc=self._stop)
 
         apply_parser = preset_subparsers.add_parser(
             "apply",
@@ -234,6 +261,31 @@ class EndpointCommand(BaseCommand):
         )
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
+
+    def _attach(self, args: argparse.Namespace) -> None:
+        result = attach_endpoint_preset(
+            api=Client.from_config(project_name=args.project),
+            store=EndpointPresetStore(),
+            preset_id=_resolve_session_ref(args.preset),
+            keep_service=args.keep_service,
+        )
+        console.print(
+            f"Preset [code]{result.preset.id}[/] for "
+            f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
+        )
+        if args.keep_service:
+            console.print(f"Final service [code]{result.final_run_name}[/] kept running")
+
+    def _stop(self, args: argparse.Namespace) -> None:
+        preset_id = _resolve_session_ref(args.preset)
+        if not args.yes and not confirm_ask(
+            f"Stop the preset creation session [code]{preset_id}[/]?"
+        ):
+            console.print("\nExiting...")
+            return
+        stop_endpoint_session(
+            Client.from_config(project_name=args.project), preset_id, assume_yes=args.yes
+        )
 
     def _get(self, args: argparse.Namespace) -> None:
         store = EndpointPresetStore()
@@ -373,10 +425,20 @@ def _apply_name(configuration: EndpointConfiguration, name: str | None, *, requi
         raise CLIError("The name must match '^[a-z][a-z0-9-]{1,40}$'")
 
 
+def _resolve_session_ref(ref: str) -> str:
+    """A session reference may be a preset id or a claimed name."""
+    if (get_presets_dir() / ref).is_dir():
+        return ref
+    claims = find_session_name_claims(ref)
+    if len(claims) == 1:
+        return claims[0].preset_id
+    return ref
+
+
 def _confirm_preset_creation(
     store: EndpointPresetStore, name: str | None, *, assume_yes: bool
 ) -> bool:
-    """One apply-style confirmation; detaches the name from any holder on yes."""
+    """One apply-style confirmation; reassigns the name from any holder on yes."""
     preset_holder = None
     session_holders = []
     if name is not None:
@@ -393,7 +455,7 @@ def _confirm_preset_creation(
     if holders:
         message = (
             f"The name [code]{name}[/] is already used by {', '.join(holders)}."
-            f" Detach it and create a new preset?"
+            f" Reassign it to a new preset?"
         )
     elif name is not None:
         message = f"Create the preset [code]{name}[/]?"
@@ -402,7 +464,7 @@ def _confirm_preset_creation(
     if not assume_yes and not confirm_ask(message):
         return False
     if preset_holder is not None and name is not None:
-        store.detach_name(name)
+        store.release_name(name)
     for session in session_holders:
         session.update_manifest(name=None)
     return True

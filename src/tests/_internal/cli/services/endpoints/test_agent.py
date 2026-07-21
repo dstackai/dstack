@@ -22,8 +22,6 @@ from dstack._internal.cli.services.endpoints.agent import (
     _prepare_subprocess_command,
     _ProgressTailer,
     _RecordMirror,
-    _start_agent_watchdog,
-    _stop_agent_watchdog,
     _summarize_session_trials,
     _terminate_process,
     attach_agent_workspace,
@@ -187,7 +185,11 @@ class TestAgentSession:
         assert session.path.parent == tmp_path / ".dstack" / "presets"
         assert session.path.name == session.preset_id
         assert len(session.preset_id) == 8
-        assert {path.name for path in session.path.iterdir()} == {"agent.log", "session.json"}
+        assert {path.name for path in session.path.iterdir()} == {
+            "agent.log",
+            "session.json",
+            "preset.dstack.yml",
+        }
         manifest = json.loads((session.path / "session.json").read_text())
         assert manifest["id"] == session.preset_id
         assert manifest["status"] == "running"
@@ -409,57 +411,6 @@ class TestProcessCleanup:
 
         assert proc.returncode is not None
         assert not psutil.pid_exists(child_pid)
-
-
-class TestAgentWatchdog:
-    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX signals and sessions")
-    def test_kills_agent_when_cli_dies_hard(self):
-        # A fake CLI spawns a fake agent in its own session, arms the real
-        # watchdog, and hangs. SIGKILL of the CLI must take the agent down.
-        cli_script = (
-            "import subprocess, sys, time\n"
-            "from dstack._internal.cli.services.endpoints.agent import _start_agent_watchdog\n"
-            "agent = subprocess.Popen(\n"
-            "    [sys.executable, '-c', 'import time; time.sleep(300)'], start_new_session=True\n"
-            ")\n"
-            "_start_agent_watchdog(agent.pid)\n"
-            "print(agent.pid, flush=True)\n"
-            "time.sleep(300)\n"
-        )
-        cli = subprocess.Popen(
-            [sys.executable, "-c", cli_script], stdout=subprocess.PIPE, text=True
-        )
-        try:
-            assert cli.stdout is not None
-            agent_pid = int(cli.stdout.readline())
-            assert psutil.pid_exists(agent_pid)
-
-            cli.kill()
-            cli.wait(timeout=10)
-
-            try:
-                psutil.Process(agent_pid).wait(timeout=20)
-            except psutil.NoSuchProcess:
-                pass
-            assert not psutil.pid_exists(agent_pid)
-        finally:
-            with suppress(OSError):
-                cli.kill()
-
-    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX signals and sessions")
-    def test_disarmed_watchdog_leaves_agent_untouched(self):
-        agent = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True
-        )
-        try:
-            watchdog = _start_agent_watchdog(agent.pid)
-            _stop_agent_watchdog(watchdog)
-
-            assert watchdog.poll() is not None
-            assert agent.poll() is None
-        finally:
-            with suppress(OSError):
-                os.killpg(agent.pid, signal.SIGKILL)
 
 
 class TestRecordMirror:
@@ -885,3 +836,70 @@ class TestSummarizeSessionTrials:
         # trials, so shared task names must not collapse the count.
         assert summary["count"] == 4
         assert summary["best"] == {"tok_s": 2300.0, "concurrency": 8, "gpu": "A40:48GB:1"}
+
+
+class TestFileLineReader:
+    @pytest.mark.asyncio
+    async def test_reads_lines_and_continues_from_persisted_offset(self, tmp_path):
+        from dstack._internal.cli.services.endpoints.agent import _FileLineReader, _OffsetStore
+
+        stream = tmp_path / "stdout.jsonl"
+        state = tmp_path / ".offsets.json"
+        stream.write_bytes(b"first\nsecond\n")
+        alive = True
+
+        reader = _FileLineReader(
+            stream,
+            offset_store=_OffsetStore(state),
+            offset_key="agent_stdout",
+            is_alive=lambda: alive,
+        )
+        assert await reader.readline() == b"first\n"
+        assert await reader.readline() == b"second\n"
+
+        # A new reader (a later attach) continues where the previous stopped.
+        with stream.open("ab") as f:
+            f.write(b"third\npartial")
+        alive = False
+        attached = _FileLineReader(
+            stream,
+            offset_store=_OffsetStore(state),
+            offset_key="agent_stdout",
+            is_alive=lambda: alive,
+        )
+        assert await attached.readline() == b"third\n"
+        assert await attached.readline() == b"partial"
+        assert await attached.readline() == b""
+
+
+class TestStopOrDetach:
+    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX process groups")
+    def test_detach_keeps_the_agent_and_stop_terminates_it(self, tmp_path, monkeypatch, capsys):
+        from dstack._internal.cli.services.endpoints import create as create_module
+        from dstack._internal.cli.services.endpoints.create import _stop_or_detach_agent_session
+
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
+        session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
+        )
+        agent = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True
+        )
+        try:
+            session.update_manifest(status="running", agent_pid=agent.pid)
+
+            monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)
+            _stop_or_detach_agent_session(session)
+            assert agent.poll() is None
+            assert session.read_manifest()["status"] == "running"
+            assert "Detached" in capsys.readouterr().out
+
+            monkeypatch.setattr(create_module, "confirm_ask", lambda *_: True)
+            _stop_or_detach_agent_session(session)
+            psutil.Process(agent.pid).wait(timeout=10)
+            assert session.read_manifest()["status"] == "interrupted"
+        finally:
+            with suppress(OSError):
+                os.killpg(agent.pid, signal.SIGKILL)

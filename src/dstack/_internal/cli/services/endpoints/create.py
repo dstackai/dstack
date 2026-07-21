@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
+import yaml
 from rich.table import Table
 
 from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
@@ -21,6 +22,7 @@ from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
     attach_agent_workspace,
+    attach_endpoint_agent,
     build_endpoint_agent_env,
     claimed_session_name,
     contains_redacted_value,
@@ -29,10 +31,13 @@ from dstack._internal.cli.services.endpoints.agent import (
     get_claude_auth,
     get_redacted_values,
     get_sensitive_inherited_env_values,
+    load_attachable_agent_session,
     print_endpoint_progress,
     redact,
     remove_agent_workspace,
     run_endpoint_agent,
+    session_process_alive,
+    terminate_agent_process,
 )
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
 from dstack._internal.cli.services.endpoints.prompt import get_endpoint_agent_system_prompt
@@ -41,11 +46,11 @@ from dstack._internal.cli.services.endpoints.verify import (
     build_verified_endpoint_preset,
     load_endpoint_agent_report,
 )
-from dstack._internal.cli.utils.common import console, warn
+from dstack._internal.cli.utils.common import confirm_ask, console, warn
 from dstack._internal.cli.utils.run import print_offers
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import TaskConfiguration
-from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.runs import RunSpec
 from dstack.api import Client
@@ -59,6 +64,127 @@ class EndpointPresetCreateResult:
     path: Path
     final_run_id: uuid.UUID
     final_run_name: str
+
+
+class AgentExitedWithoutReport(Exception):
+    """A detached agent died without submitting a report; the session is
+    resumable rather than failed."""
+
+    def __init__(self, error: Optional[str]) -> None:
+        super().__init__(error or "The agent exited without a report")
+        self.error = error
+
+
+def attach_endpoint_preset(
+    *,
+    api: Client,
+    store: EndpointPresetStore,
+    preset_id: str,
+    keep_service: bool = False,
+) -> EndpointPresetCreateResult:
+    agent_session = load_attachable_agent_session(preset_id)
+    configuration_path = agent_session.path / "preset.dstack.yml"
+    if not configuration_path.is_file():
+        raise CLIError(
+            f"Session {preset_id} has no configuration copy and cannot be attached;"
+            f" resume it with [code]--resume {preset_id}[/] instead"
+        )
+    # The session copy is canonical output, not user input: parse it without
+    # the user-facing deprecation warnings.
+    try:
+        configuration = EndpointConfiguration.parse_obj(
+            yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
+        )
+    except (OSError, ValueError) as e:
+        raise CLIError(f"Could not read the session configuration: {e}") from e
+    try:
+        result = asyncio.run(
+            _create_endpoint_preset(
+                api=api,
+                configuration=_resolve_endpoint_env_best_effort(configuration),
+                source_configuration=configuration,
+                store=store,
+                keep_service=keep_service,
+                agent_session=agent_session,
+                attach=True,
+            )
+        )
+    except KeyboardInterrupt:
+        _stop_or_detach_agent_session(agent_session, api)
+        raise
+    except AgentExitedWithoutReport as e:
+        runs_stopped = _stop_active_session_runs(api, agent_session, assume_yes=False)
+        _suspend_agent_session(agent_session, runs_left_active=not runs_stopped)
+        raise CLIError(str(e)) from e
+    except BaseException:
+        _finish_agent_session(agent_session, "failed")
+        remove_agent_workspace(agent_session)
+        raise
+    _finish_agent_session(agent_session, "success")
+    remove_agent_workspace(agent_session)
+    return result
+
+
+def stop_endpoint_session(api: Client, preset_id: str, *, assume_yes: bool = False) -> None:
+    session = load_attachable_agent_session(preset_id)
+    terminate_agent_process(session.read_manifest())
+    runs_stopped = _stop_active_session_runs(api, session, assume_yes=assume_yes)
+    _suspend_agent_session(session, runs_left_active=not runs_stopped)
+
+
+def _stop_active_session_runs(
+    api: Client, session: EndpointAgentSession, *, assume_yes: bool
+) -> bool:
+    """Offers to stop the session's non-terminal runs; returns whether none
+    are left active."""
+    try:
+        lines = session.runs_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    names = []
+    for line in lines:
+        try:
+            name = json.loads(line).get("name")
+        except json.JSONDecodeError:
+            continue
+        if isinstance(name, str) and name:
+            names.append(name)
+    active = []
+    for name in names:
+        try:
+            run = api.client.runs.get(api.project, name)
+        except Exception:  # noqa: BLE001
+            continue
+        if not run.status.is_finished():
+            active.append(name)
+    if not active:
+        return True
+    plural = "s" if len(active) != 1 else ""
+    if not assume_yes and not confirm_ask(
+        f"Stop {len(active)} active preset creation run{plural} ([code]{', '.join(active)}[/])?"
+    ):
+        return False
+    with console.status("Stopping runs..."):
+        api.client.runs.stop(api.project, active, abort=False)
+    return True
+
+
+def _resolve_endpoint_env_best_effort(
+    configuration: EndpointConfiguration,
+) -> EndpointConfiguration:
+    """For attach: env values only feed redaction, and the agent already runs,
+    so missing variables are tolerable."""
+    configuration = configuration.copy(deep=True)
+    kept: dict[str, str] = {}
+    for key, value in configuration.env.items():
+        if isinstance(value, EnvSentinel):
+            resolved = os.environ.get(key)
+            if resolved:
+                kept[key] = resolved
+        else:
+            kept[key] = value
+    configuration.env = Env.parse_obj(kept)
+    return configuration
 
 
 def create_endpoint_preset(
@@ -91,7 +217,7 @@ def create_endpoint_preset(
             )
         )
     except KeyboardInterrupt:
-        _suspend_agent_session(agent_session)
+        _stop_or_detach_agent_session(agent_session, api)
         raise
     except BaseException:
         _finish_agent_session(agent_session, "failed")
@@ -112,12 +238,18 @@ async def _create_endpoint_preset(
     build_name: Optional[str] = None,
     agent_session: EndpointAgentSession,
     resume: bool = False,
+    attach: bool = False,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
 ) -> EndpointPresetCreateResult:
     source_configuration = source_configuration or configuration
     initial_resume_session_id: Optional[str] = None
-    if resume:
+    if attach:
+        auth = None
+        workspace = attach_agent_workspace(agent_session)
+        build_name = build_name or _load_build_name(workspace)
+        allowed_fleets = ()
+    elif resume:
         # The prompt is fixed at session creation, like the constraints.
         pinned_prompt = agent_session.read_user_prompt()
         if user_prompt is not None and user_prompt != pinned_prompt:
@@ -146,7 +278,10 @@ async def _create_endpoint_preset(
         build_name = build_name or _get_build_name(
             configuration.name, configuration.model.api_model_name, agent_session.preset_id
         )
-    agent_session.update_manifest(status="running", pid=os.getpid(), claude_model=auth.model)
+    if auth is not None:
+        agent_session.update_manifest(status="running", pid=os.getpid(), claude_model=auth.model)
+    else:
+        agent_session.update_manifest(status="running", pid=os.getpid())
 
     endpoint_env = configuration.env.as_dict()
     token = getattr(api.client, "_token", None)
@@ -155,26 +290,28 @@ async def _create_endpoint_preset(
     redacted_values = get_redacted_values(
         [
             token,
-            auth.api_key or "",
+            (auth.api_key if auth is not None else None) or "",
             *endpoint_env.values(),
             *get_sensitive_inherited_env_values(),
         ]
     )
+    env: dict[str, str] = {}
     report: Optional[AgentFinalReport] = None
     preset: Optional[EndpointPreset] = None
     preset_path: Optional[Path] = None
     creation_succeeded = False
     interrupted = False
     cleanup_error: Optional[str] = None
-    env = build_endpoint_agent_env(
-        api=api,
-        endpoint_env=endpoint_env,
-        auth=auth,
-        workspace=workspace,
-        token=token,
-    )
+    if auth is not None:
+        env = build_endpoint_agent_env(
+            api=api,
+            endpoint_env=endpoint_env,
+            auth=auth,
+            workspace=workspace,
+            token=token,
+        )
     prompt = get_endpoint_agent_system_prompt(user_prompt=user_prompt)
-    if not resume:
+    if not resume and not attach:
         if user_prompt:
             agent_session.write_user_prompt(user_prompt)
         constraints_text = _build_constraints(
@@ -186,17 +323,28 @@ async def _create_endpoint_preset(
         if agent_session.debug:
             agent_session.write_prompt(prompt)
             agent_session.write_constraints(constraints_text)
-            agent_session.write_agent_info(auth)
+            if auth is not None:
+                agent_session.write_agent_info(auth)
     try:
-        process_output = await run_endpoint_agent(
-            prompt=prompt,
-            env=env,
-            workspace=workspace,
-            auth=auth,
-            redacted_values=redacted_values,
-            agent_session=agent_session,
-            initial_resume_session_id=initial_resume_session_id,
-        )
+        if attach:
+            process_output = await attach_endpoint_agent(
+                workspace=workspace,
+                redacted_values=redacted_values,
+                agent_session=agent_session,
+            )
+            if process_output.report_data is None and not workspace.final_report_path.exists():
+                raise AgentExitedWithoutReport(process_output.error)
+        else:
+            assert auth is not None
+            process_output = await run_endpoint_agent(
+                prompt=prompt,
+                env=env,
+                workspace=workspace,
+                auth=auth,
+                redacted_values=redacted_values,
+                agent_session=agent_session,
+                initial_resume_session_id=initial_resume_session_id,
+            )
         report = load_endpoint_agent_report(
             output=process_output,
             workspace=workspace,
@@ -290,19 +438,56 @@ def _finish_agent_session(
     console.print(f"Agent log saved to [code]{path / 'agent.log'}[/]")
 
 
-def _suspend_agent_session(session: EndpointAgentSession) -> None:
+def _stop_or_detach_agent_session(
+    session: EndpointAgentSession, api: Optional[Client] = None
+) -> None:
+    """Apply-style interrupt: stop the session, or detach and leave the agent
+    working — it stays visible as a running session in `dstack preset`."""
+    manifest = session.read_manifest()
+    agent_alive = session_process_alive({**manifest, "pid": None})
+    stop = True
+    if agent_alive:
+        try:
+            stop = confirm_ask(f"Stop the preset creation session [code]{session.preset_id}[/]?")
+        except (KeyboardInterrupt, EOFError):
+            stop = True
+    if stop:
+        terminate_agent_process(manifest)
+        runs_stopped = False
+        if api is not None:
+            runs_stopped = _stop_active_session_runs(api, session, assume_yes=False)
+        _suspend_agent_session(session, runs_left_active=not runs_stopped)
+        return
+    session.update_manifest(pid=None)
+    console.print(
+        f"\nDetached. The session keeps running; attach with"
+        f" [code]dstack preset attach {session.preset_id}[/]"
+        f" or stop it with [code]dstack preset stop {session.preset_id}[/]."
+    )
+
+
+def _suspend_agent_session(
+    session: EndpointAgentSession, *, runs_left_active: bool = True
+) -> None:
     try:
         session.finish("interrupted")
     except OSError as e:
         warn(f"Could not record the interrupted session state: {e}")
-    console.print(
-        f"\nSession [code]{session.preset_id}[/] interrupted. "
-        "Its runs may still be active and accruing cost."
-    )
-    console.print(
-        f"Resume with [code]dstack preset create -f <configuration> "
-        f"--resume {session.preset_id}[/], or stop the runs with [code]dstack stop[/]."
-    )
+    if runs_left_active:
+        console.print(
+            f"\nSession [code]{session.preset_id}[/] interrupted. "
+            "Its runs may still be active and accruing cost."
+        )
+        console.print(
+            f"Resume with [code]dstack preset create -f <configuration> "
+            f"--resume {session.preset_id}[/], or stop the runs with [code]dstack stop[/]."
+        )
+    else:
+        console.print(f"\nSession [code]{session.preset_id}[/] interrupted.")
+        console.print(
+            f"Resume with [code]dstack preset create -f <configuration> "
+            f"--resume {session.preset_id}[/]."
+        )
 
 
 def _get_build_name(name: Optional[str], model_name: str, suffix: str) -> str:

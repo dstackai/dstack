@@ -7,11 +7,12 @@ import signal
 import subprocess
 import sys
 import tempfile
-from contextlib import suppress
+import time
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, AsyncIterator, Callable, Optional, Protocol, Sequence
 
 import psutil
 import yaml
@@ -41,7 +42,6 @@ _PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
 _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
-_CLAUDE_STREAM_LIMIT = 16 * 1024 * 1024
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
 _RESUME_PROMPT = (
     "The previous agent process was interrupted. Continue where you left off. "
@@ -119,6 +119,14 @@ class EndpointAgentWorkspace:
     @property
     def final_report_path(self) -> Path:
         return self.path / _FINAL_REPORT_FILENAME
+
+    @property
+    def agent_stdout_path(self) -> Path:
+        return self.path / ".agent-stdout.jsonl"
+
+    @property
+    def agent_stderr_path(self) -> Path:
+        return self.path / ".agent-stderr.log"
 
 
 @dataclass
@@ -337,16 +345,16 @@ def create_endpoint_agent_session(
             "debug": debug,
         }
         _write_private_text(path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
+        data = json.loads(configuration.json(exclude_none=True))
+        if configuration.env:
+            data["env"] = list(configuration.env)
+        else:
+            data.pop("env", None)
+        _write_private_text(
+            path / "preset.dstack.yml",
+            yaml.safe_dump(data, sort_keys=False),
+        )
         if debug:
-            data = json.loads(configuration.json(exclude_none=True))
-            if configuration.env:
-                data["env"] = list(configuration.env)
-            else:
-                data.pop("env", None)
-            _write_private_text(
-                path / "preset.dstack.yml",
-                yaml.safe_dump(data, sort_keys=False),
-            )
             _write_private_text(path / "trace.jsonl", "")
     except OSError as e:
         if path is not None:
@@ -398,18 +406,61 @@ def load_resumable_agent_session(preset_id: str) -> EndpointAgentSession:
         raise CLIError(f"Session {preset_id} completed successfully; nothing to resume")
     if status == "failed":
         raise CLIError(f"Session {preset_id} failed and cannot be resumed")
-    pid = manifest.get("pid")
-    if (
-        status == "running"
-        and isinstance(pid, int)
-        and pid > 0
-        and pid != os.getpid()
-        and psutil.pid_exists(pid)
-    ):
-        raise CLIError(f"Session {preset_id} appears to be running already (pid {pid})")
+    if status == "running" and session_process_alive(manifest):
+        raise CLIError(
+            f"Session {preset_id} appears to be running already;"
+            f" attach with [code]dstack preset attach {preset_id}[/]"
+        )
     if not manifest.get("claude_session_id"):
         raise CLIError(
             f"Session {preset_id} stopped before the agent started; start a new session"
+        )
+    session.debug = bool(manifest.get("debug"))
+    session.timestamp = str(manifest.get("created_at") or "")
+    return session
+
+
+def _pid_alive(pid: Any, started_at: Any = None) -> bool:
+    if not isinstance(pid, int) or pid <= 0 or not psutil.pid_exists(pid):
+        return False
+    if isinstance(started_at, (int, float)):
+        create_time = _process_started_at(pid)
+        # A recycled pid has a different start time.
+        if create_time is not None and abs(create_time - started_at) > 1.0:
+            return False
+    return True
+
+
+def session_process_alive(manifest: dict[str, Any]) -> bool:
+    """Whether the session is still worked on: a live agent (possibly
+    detached) or a live CLI (possibly between agent retries)."""
+    if _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at")):
+        return True
+    pid = manifest.get("pid")
+    return isinstance(pid, int) and pid > 0 and pid != os.getpid() and psutil.pid_exists(pid)
+
+
+def load_attachable_agent_session(preset_id: str) -> EndpointAgentSession:
+    path = get_presets_dir() / preset_id
+    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    manifest = session.read_manifest()
+    if not path.is_dir() or not manifest:
+        raise CLIError(f"Unknown preset creation session: {preset_id}")
+    status = manifest.get("status")
+    if status == "success":
+        raise CLIError(f"Session {preset_id} completed successfully; nothing to attach")
+    if status == "failed":
+        raise CLIError(f"Session {preset_id} failed and cannot be attached")
+    if status == "interrupted":
+        raise CLIError(
+            f"Session {preset_id} is interrupted; resume it with"
+            f" [code]dstack preset create -f <configuration> --resume {preset_id}[/]"
+        )
+    pid = manifest.get("pid")
+    if isinstance(pid, int) and pid > 0 and pid != os.getpid() and psutil.pid_exists(pid):
+        raise CLIError(
+            f"Session {preset_id} is already attached by another CLI (pid {pid});"
+            f" stop or detach it there with Ctrl+C"
         )
     session.debug = bool(manifest.get("debug"))
     session.timestamp = str(manifest.get("created_at") or "")
@@ -452,10 +503,7 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         status = manifest.get("status")
         if status not in ("running", "interrupted", "success"):
             continue
-        pid = manifest.get("pid")
-        if status == "running" and not (
-            isinstance(pid, int) and pid > 0 and psutil.pid_exists(pid)
-        ):
+        if status == "running" and not session_process_alive(manifest):
             status = "interrupted"
         entry = dict(manifest)
         entry["id"] = path.name
@@ -584,33 +632,9 @@ async def run_endpoint_agent(
     agent_session: EndpointAgentSession,
     initial_resume_session_id: Optional[str] = None,
 ) -> EndpointAgentProcessOutput:
-    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
-    progress_tailer = _ProgressTailer(
-        path=workspace.progress_path,
-        redacted_values=redacted_values,
-        agent_session=agent_session,
-        offset_store=offset_store,
-    )
-    record_mirrors = [
-        _RecordMirror(
-            source=workspace.runs_path,
-            target=agent_session.runs_path,
-            redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="runs",
-        ),
-        _RecordMirror(
-            source=workspace.trials_path,
-            target=agent_session.trials_path,
-            redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="trials",
-        ),
-    ]
-    tailer_tasks = [
-        asyncio.create_task(tailer.run()) for tailer in [progress_tailer, *record_mirrors]
-    ]
-    try:
+    async with _session_tailers(
+        workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
+    ):
         resume_session_id: Optional[str] = initial_resume_session_id
         attempt_prompt = prompt if resume_session_id is None else _RESUME_PROMPT
         retry_delays = list(_RESUME_DELAYS_SECONDS)
@@ -653,15 +677,6 @@ async def run_endpoint_agent(
                 agent_session=agent_session,
             )
             await asyncio.sleep(delay)
-    finally:
-        for task in tailer_tasks:
-            task.cancel()
-        for task in tailer_tasks:
-            with suppress(asyncio.CancelledError):
-                await task
-        progress_tailer.flush()
-        for mirror in record_mirrors:
-            mirror.flush()
 
 
 async def _run_claude_process(
@@ -674,62 +689,54 @@ async def _run_claude_process(
     agent_session: EndpointAgentSession,
 ) -> tuple[EndpointAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
-    watchdog: Optional[subprocess.Popen] = None
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *command,
-            cwd=workspace.path,
-            env=env,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            start_new_session=not IS_WINDOWS,
-            limit=_CLAUDE_STREAM_LIMIT,
+        # The agent's streams go to workspace files rather than pipes, so the
+        # agent survives CLI death (detach) and a later attach can continue
+        # parsing from the persisted offsets.
+        with (
+            workspace.agent_stdout_path.open("ab") as stdout_file,
+            workspace.agent_stderr_path.open("ab") as stderr_file,
+        ):
+            proc = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=workspace.path,
+                env=env,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                start_new_session=not IS_WINDOWS,
+            )
+        agent_session.update_manifest(
+            agent_pid=proc.pid, agent_started_at=_process_started_at(proc.pid)
         )
-        watchdog = _start_agent_watchdog(proc.pid)
         assert proc.stdin is not None
-        assert proc.stdout is not None
-        assert proc.stderr is not None
         proc.stdin.write(prompt.encode())
         with suppress(BrokenPipeError, ConnectionResetError):
             await proc.stdin.drain()
         proc.stdin.close()
-        stdout_task = asyncio.create_task(
-            _read_process_stream(
-                stream=proc.stdout,
-                stream_name="stdout",
-                parse_result=True,
-                redacted_values=redacted_values,
+
+        def agent_alive() -> bool:
+            return proc.returncode is None
+
+        collect_task = asyncio.create_task(
+            _collect_agent_output(
+                workspace=workspace,
                 agent_session=agent_session,
+                redacted_values=redacted_values,
+                is_alive=agent_alive,
             )
         )
-        stderr_task = asyncio.create_task(
-            _read_process_stream(
-                stream=proc.stderr,
-                stream_name="stderr",
-                parse_result=False,
-                redacted_values=redacted_values,
-                agent_session=agent_session,
-            )
-        )
-        stdout_output, stderr_output, returncode = await asyncio.gather(
-            stdout_task,
-            stderr_task,
-            proc.wait(),
-        )
+        returncode = await proc.wait()
+        output = await collect_task
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # The stop-or-detach decision belongs to the interrupt handler; the
+        # agent must stay alive here in case the user detaches.
+        raise
     except BaseException:
         if proc is not None and proc.returncode is None:
             await _terminate_process(proc)
         raise
-    finally:
-        if watchdog is not None:
-            await asyncio.to_thread(_stop_agent_watchdog, watchdog)
 
-    output = stdout_output
-    if output.report_data is None:
-        output.report_data = stderr_output.report_data
-    if output.error is None:
-        output.error = stderr_output.error
     return output, returncode
 
 
@@ -992,9 +999,124 @@ def _redact_trace_value(value: Any, redacted_values: Sequence[str]) -> Any:
     return value
 
 
+@asynccontextmanager
+async def _session_tailers(
+    *,
+    workspace: EndpointAgentWorkspace,
+    agent_session: EndpointAgentSession,
+    redacted_values: Sequence[str],
+) -> AsyncIterator[None]:
+    """Mirrors the session's progress and record files while the body runs."""
+    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
+    progress_tailer = _ProgressTailer(
+        path=workspace.progress_path,
+        redacted_values=redacted_values,
+        agent_session=agent_session,
+        offset_store=offset_store,
+    )
+    record_mirrors = [
+        _RecordMirror(
+            source=workspace.runs_path,
+            target=agent_session.runs_path,
+            redacted_values=redacted_values,
+            offset_store=offset_store,
+            offset_key="runs",
+        ),
+        _RecordMirror(
+            source=workspace.trials_path,
+            target=agent_session.trials_path,
+            redacted_values=redacted_values,
+            offset_store=offset_store,
+            offset_key="trials",
+        ),
+    ]
+    tailer_tasks = [
+        asyncio.create_task(tailer.run()) for tailer in [progress_tailer, *record_mirrors]
+    ]
+    try:
+        yield
+    finally:
+        for task in tailer_tasks:
+            task.cancel()
+        for task in tailer_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+        progress_tailer.flush()
+        for mirror in record_mirrors:
+            mirror.flush()
+
+
+async def _collect_agent_output(
+    *,
+    workspace: EndpointAgentWorkspace,
+    agent_session: EndpointAgentSession,
+    redacted_values: Sequence[str],
+    is_alive: Callable[[], bool],
+) -> EndpointAgentProcessOutput:
+    """Parses the agent's stream files until it exits; safe alongside a live
+    process or over the remains of a finished one."""
+    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
+    stdout_output, stderr_output = await asyncio.gather(
+        _read_process_stream(
+            stream=_FileLineReader(
+                workspace.agent_stdout_path,
+                offset_store=offset_store,
+                offset_key="agent_stdout",
+                is_alive=is_alive,
+            ),
+            stream_name="stdout",
+            parse_result=True,
+            redacted_values=redacted_values,
+            agent_session=agent_session,
+        ),
+        _read_process_stream(
+            stream=_FileLineReader(
+                workspace.agent_stderr_path,
+                offset_store=offset_store,
+                offset_key="agent_stderr",
+                is_alive=is_alive,
+            ),
+            stream_name="stderr",
+            parse_result=False,
+            redacted_values=redacted_values,
+            agent_session=agent_session,
+        ),
+    )
+    output = stdout_output
+    if output.report_data is None:
+        output.report_data = stderr_output.report_data
+    if output.error is None:
+        output.error = stderr_output.error
+    return output
+
+
+async def attach_endpoint_agent(
+    *,
+    workspace: EndpointAgentWorkspace,
+    redacted_values: Sequence[str],
+    agent_session: EndpointAgentSession,
+) -> EndpointAgentProcessOutput:
+    """Follows a detached session's agent to completion, like
+    `run_endpoint_agent` without owning the process."""
+    async with _session_tailers(
+        workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
+    ):
+        manifest = agent_session.read_manifest()
+
+        def agent_alive() -> bool:
+            return _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at"))
+
+        return await _collect_agent_output(
+            workspace=workspace,
+            agent_session=agent_session,
+            redacted_values=redacted_values,
+            is_alive=agent_alive,
+        )
+
+
 async def _read_process_stream(
     *,
-    stream: asyncio.StreamReader,
+    stream: "_LineStream",
     stream_name: str,
     parse_result: bool,
     redacted_values: Sequence[str],
@@ -1072,76 +1194,38 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
         await proc.wait()
 
 
-# The watchdog reads its stdin until EOF. The CLI holds the write end and never
-# writes while the agent runs, so EOF means the CLI is gone — any death,
-# including SIGKILL, which the CLI cannot react to itself. A disarm byte is
-# written when the CLI stops the agent on its own, so the watchdog exits
-# without touching anything (and cannot kill a reused pid).
-_AGENT_WATCHDOG_SCRIPT = """
-import os
-import signal
-import sys
-import time
-
-import psutil
-
-agent_pid = int(sys.argv[1])
-if sys.stdin.buffer.read():
-    sys.exit(0)  # disarmed: the CLI stopped the agent itself
-
-
-def _kill(hard):
-    if os.name == "posix":
-        try:
-            os.killpg(agent_pid, signal.SIGKILL if hard else signal.SIGTERM)
-        except OSError:
-            pass
+def terminate_agent_process(manifest: dict[str, Any]) -> None:
+    """Terminates the session's agent process tree, if alive."""
+    agent_pid = manifest.get("agent_pid")
+    if not isinstance(agent_pid, int) or not _pid_alive(
+        agent_pid, manifest.get("agent_started_at")
+    ):
         return
-    try:
-        root = psutil.Process(agent_pid)
-        processes = [*root.children(recursive=True), root]
-    except psutil.NoSuchProcess:
+    if IS_WINDOWS:
+        _terminate_windows_process_tree(agent_pid)
         return
-    for process in processes:
-        try:
-            process.kill() if hard else process.terminate()
-        except psutil.NoSuchProcess:
-            pass
+    with suppress(OSError):
+        os.killpg(agent_pid, signal.SIGTERM)  # pyright: ignore[reportAttributeAccessIssue]
+    for _ in range(30):
+        if not _pid_running(agent_pid):
+            return
+        time.sleep(0.1)
+    with suppress(OSError):
+        os.killpg(agent_pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
 
 
-if psutil.pid_exists(agent_pid):
-    _kill(hard=False)
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline and psutil.pid_exists(agent_pid):
-        time.sleep(0.5)
-    if psutil.pid_exists(agent_pid):
-        _kill(hard=True)
-"""
-
-
-def _start_agent_watchdog(agent_pid: int) -> subprocess.Popen:
-    """Tie the agent's life to this process: if this process dies in a way it
-    cannot react to, the watchdog kills the agent's process tree."""
-    return subprocess.Popen(
-        [sys.executable, "-c", _AGENT_WATCHDOG_SCRIPT, str(agent_pid)],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=not IS_WINDOWS,
-    )
-
-
-def _stop_agent_watchdog(watchdog: subprocess.Popen) -> None:
-    if watchdog.stdin is not None:
-        with suppress(OSError, ValueError):
-            watchdog.stdin.write(b"x")
-            watchdog.stdin.flush()
-        with suppress(OSError, ValueError):
-            watchdog.stdin.close()
+def _pid_running(pid: int) -> bool:
     try:
-        watchdog.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        watchdog.kill()
+        return psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+    except psutil.Error:
+        return False
+
+
+def _process_started_at(pid: int) -> Optional[float]:
+    try:
+        return psutil.Process(pid).create_time()
+    except psutil.Error:
+        return None
 
 
 def _terminate_windows_process_tree(pid: int) -> None:
@@ -1158,6 +1242,64 @@ def _terminate_windows_process_tree(pid: int) -> None:
         with suppress(psutil.NoSuchProcess):
             process.kill()
     psutil.wait_procs(alive, timeout=3)
+
+
+class _LineStream(Protocol):
+    async def readline(self) -> bytes: ...
+
+
+class _FileLineReader:
+    """`readline()` over a growing file, so stream parsing survives CLI
+    restarts: offsets persist, and a later attach continues exactly where the
+    previous reader stopped."""
+
+    _POLL_SECONDS = 0.2
+    _MAX_CHUNK = 1024 * 1024
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        offset_store: "_OffsetStore",
+        offset_key: str,
+        is_alive: Callable[[], bool],
+    ) -> None:
+        self._path = path
+        self._offset_store = offset_store
+        self._offset_key = offset_key
+        self._is_alive = is_alive
+        self._offset = offset_store.get(offset_key)
+        self._buffer = b""
+        self._drained = False
+
+    def _read_chunk(self) -> bytes:
+        try:
+            with self._path.open("rb") as f:
+                f.seek(self._offset)
+                return f.read(self._MAX_CHUNK)
+        except OSError:
+            return b""
+
+    async def readline(self) -> bytes:
+        while True:
+            if b"\n" in self._buffer:
+                line, self._buffer = self._buffer.split(b"\n", 1)
+                return line + b"\n"
+            chunk = self._read_chunk()
+            if chunk:
+                self._buffer += chunk
+                self._offset += len(chunk)
+                self._offset_store.set(self._offset_key, self._offset)
+                continue
+            if not self._is_alive():
+                if self._drained:
+                    # A final partial line without a newline, then EOF.
+                    line, self._buffer = self._buffer, b""
+                    return line
+                # One more read after death to catch the last flush.
+                self._drained = True
+                continue
+            await asyncio.sleep(self._POLL_SECONDS)
 
 
 class _OffsetStore:

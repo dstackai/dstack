@@ -230,8 +230,8 @@ class TestPresetNames:
         assert store.find_by_name("qwen").id == named.id
         assert store.find_by_name("other") is None
 
-        detached = store.detach_name("qwen")
+        released = store.release_name("qwen")
 
-        assert detached.id == named.id
+        assert released.id == named.id
         assert store.find_by_name("qwen") is None
         assert store.get(named.id).name is None
