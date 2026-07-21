@@ -6,8 +6,13 @@ from pydantic import ValidationError
 
 from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.services.endpoints.agent import (
+    EndpointAgentProcessOutput,
+    EndpointAgentWorkspace,
+)
 from dstack._internal.cli.services.endpoints.verify import (
     build_verified_endpoint_preset,
+    load_endpoint_agent_report,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
@@ -80,3 +85,37 @@ class TestBuildVerifiedEndpointPreset:
                 ),
                 report=report,
             )
+
+
+class TestLoadEndpointAgentReport:
+    def _load(self, tmp_path, report_data, redacted_values):
+        return load_endpoint_agent_report(
+            output=EndpointAgentProcessOutput(report_data=report_data),
+            workspace=EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
+            redacted_values=redacted_values,
+        )
+
+    def test_redacts_known_secret_in_benchmark_command_instead_of_failing(self, tmp_path):
+        run = get_running_service_run()
+        data = get_successful_endpoint_report(run).dict()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"]["command"] = (
+            "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
+        )
+
+        report = self._load(tmp_path, data, redacted_values=("sk-live-0123456789abcdef",))
+
+        assert report.benchmark is not None
+        assert report.benchmark.command.endswith("Bearer [redacted]'")
+        assert "sk-live" not in report.benchmark.command
+
+    def test_still_rejects_unknown_bearer_token(self, tmp_path):
+        run = get_running_service_run()
+        data = get_successful_endpoint_report(run).dict()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"]["command"] = (
+            "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
+        )
+
+        with pytest.raises(CLIError, match="bearer token"):
+            self._load(tmp_path, data, redacted_values=("some-other-secret-value",))

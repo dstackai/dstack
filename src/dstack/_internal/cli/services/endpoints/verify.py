@@ -28,6 +28,16 @@ from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 
 
+def _redact_structure(value: Any, redacted_values: Sequence[str]) -> Any:
+    if isinstance(value, str):
+        return redact(value, redacted_values)
+    if isinstance(value, dict):
+        return {key: _redact_structure(item, redacted_values) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_structure(item, redacted_values) for item in value]
+    return value
+
+
 def load_endpoint_agent_report(
     *,
     output: EndpointAgentProcessOutput,
@@ -42,6 +52,10 @@ def load_endpoint_agent_report(
                 redacted_values,
             )
         )
+    # Scrub known secret values before validation: an echoed secret must never
+    # be persisted, but it also must not cost the whole session — the bearer
+    # check below still rejects unknown leaked tokens.
+    report_data = _redact_structure(report_data, redacted_values)
     try:
         report = AgentFinalReport.parse_obj(report_data)
     except ValidationError as e:
