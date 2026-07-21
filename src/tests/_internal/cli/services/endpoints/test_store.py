@@ -1,4 +1,6 @@
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -11,6 +13,7 @@ from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmarkMetrics,
     EndpointBenchmarkWorkload,
 )
+from dstack._internal.cli.services.endpoints import store as store_module
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
@@ -68,7 +71,7 @@ class TestEndpointPresetStore:
 
         path = store.save(preset)
 
-        assert path == (tmp_path / "presets" / "models--Qwen--Qwen3.5-27B" / "8f3a12c4.yaml")
+        assert path == (tmp_path / "presets" / "8f3a12c4" / "preset.yaml")
         data = yaml.safe_load(path.read_text())
         assert data["base"] == preset.base
         assert data["id"] == preset.id
@@ -89,14 +92,37 @@ class TestEndpointPresetStore:
 
         assert store.get(updated.id) == updated
 
-    def test_rejects_duplicate_preset_id(self, tmp_path: Path):
+    def test_same_id_save_overwrites(self, tmp_path: Path):
         store = EndpointPresetStore(tmp_path / "presets")
         preset = get_endpoint_preset()
         store.save(preset)
         store.save(preset.copy(update={"base": "Qwen/Another-Model"}))
 
-        with pytest.raises(CLIError, match="is not unique"):
-            store.get(preset.id)
+        loaded = store.get(preset.id)
+        assert loaded is not None
+        assert loaded.base == "Qwen/Another-Model"
+
+    def test_migrates_legacy_layout_and_archives_on_delete(self, tmp_path: Path):
+        root = tmp_path / "presets"
+        store = EndpointPresetStore(root)
+        preset = get_endpoint_preset()
+        legacy = root / "models--Qwen--Qwen3.5-27B"
+        legacy.mkdir(parents=True)
+        (legacy / f"{preset.id}.yaml").write_text(
+            yaml.safe_dump(
+                yaml.safe_load(EndpointPresetStore(tmp_path / "tmp").save(preset).read_text()),
+                sort_keys=False,
+            )
+        )
+
+        assert store.list() == [preset]
+        assert (root / preset.id / "preset.yaml").is_file()
+        assert not legacy.exists()
+
+        assert store.delete(preset.id) is True
+        assert store.get(preset.id) is None
+        assert (root / ".archive" / preset.id / "preset.yaml").is_file()
+        assert store.list() == []
 
     def test_rejects_preset_without_successful_benchmark(self, tmp_path: Path):
         store = EndpointPresetStore(tmp_path / "presets")
@@ -125,3 +151,35 @@ class TestEndpointPresetStore:
         assert "TOKENIZERS_PARALLELISM=false" in env
         assert "MODEL_LABEL=monkey" in env
         assert "HF_TOKEN" in env
+
+
+class TestParseEndpointConfiguration:
+    @pytest.mark.parametrize("key", ["base", "repo"])
+    def test_warns_on_nested_model_without_name(self, key: str):
+        stream = StringIO(f"type: endpoint\nmodel:\n  {key}: Qwen/Qwen3.5-27B\n")
+
+        with patch.object(store_module, "warn") as warn:
+            configuration = store_module._parse_endpoint_configuration(stream)
+
+        warn.assert_called_once()
+        assert f"model.{key}" in warn.call_args.args[0]
+        assert f"`{key}:`" in warn.call_args.args[0]
+        assert configuration.model is not None
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "base: Qwen/Qwen3.5-27B\n",
+            "repo: Qwen/Qwen3.5-27B\n",
+            "model: Qwen/Qwen3.5-27B\n",
+            "model:\n  repo: community/Qwen3.5-27B-GPTQ-Int4\n  name: Qwen/Qwen3.5-27B\n",
+        ],
+    )
+    def test_does_not_warn_on_preferred_syntax(self, body: str):
+        stream = StringIO(f"type: endpoint\n{body}")
+
+        with patch.object(store_module, "warn") as warn:
+            configuration = store_module._parse_endpoint_configuration(stream)
+
+        warn.assert_not_called()
+        assert configuration.model is not None

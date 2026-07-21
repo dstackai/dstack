@@ -11,7 +11,9 @@ from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentProcessOutput,
     EndpointAgentSession,
     EndpointAgentWorkspace,
+    create_agent_workspace,
     print_endpoint_progress,
+    remove_agent_workspace,
 )
 from dstack._internal.cli.services.endpoints.create import (
     EndpointPresetCreateResult,
@@ -77,7 +79,7 @@ def creation_context(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         "dstack._internal.cli.services.endpoints.create._get_build_name",
-        lambda _: "qwen-build",
+        lambda *_: "qwen-build",
     )
     return SimpleNamespace(
         api=api,
@@ -118,13 +120,16 @@ class TestCreateEndpointPreset:
             store=EndpointPresetStore(tmp_path / "presets"),
         )
 
-        paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
+        paths = [
+            path
+            for path in (tmp_path / ".dstack" / "presets").iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        ]
         assert len(paths) == 1
         assert {path.name for path in paths[0].iterdir()} == {"agent.log", "session.json"}
-        assert json.loads((paths[0] / "session.json").read_text()) == {
-            "status": "success",
-            "preset_id": preset.id,
-        }
+        manifest = json.loads((paths[0] / "session.json").read_text())
+        assert manifest["status"] == "success"
+        assert manifest["id"] == paths[0].name
         assert "testing preset" in (paths[0] / "agent.log").read_text()
         output = capsys.readouterr().out.replace("\n", "")
         assert f"Agent log saved to {paths[0] / 'agent.log'}" in output
@@ -170,7 +175,11 @@ class TestCreateEndpointPreset:
             debug=True,
         )
 
-        paths = list((tmp_path / ".dstack" / "agent" / "qwen").iterdir())
+        paths = [
+            path
+            for path in (tmp_path / ".dstack" / "presets").iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        ]
         assert len(paths) == 1
         assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
@@ -180,10 +189,7 @@ class TestCreateEndpointPreset:
             "session.json",
             "trace.jsonl",
         }
-        assert json.loads((paths[0] / "session.json").read_text()) == {
-            "status": "running",
-            "preset_id": None,
-        }
+        assert json.loads((paths[0] / "session.json").read_text())["status"] == "running"
         assert "hf-secret" not in (paths[0] / "endpoint.dstack.yml").read_text()
         assert "Files remain at" in capsys.readouterr().out
 
@@ -237,7 +243,7 @@ class TestCreateEndpointPreset:
             )
 
     @pytest.mark.asyncio
-    async def test_cleans_up_runs_when_cancelled(self, creation_context, monkeypatch, tmp_path):
+    async def test_skips_cleanup_when_cancelled(self, creation_context, monkeypatch, tmp_path):
         async def run_agent(**_):
             raise asyncio.CancelledError
 
@@ -264,8 +270,7 @@ class TestCreateEndpointPreset:
                 agent_session=_agent_session(tmp_path),
             )
 
-        assert len(cleanup_calls) == 1
-        assert cleanup_calls[0]["build_name"] == "qwen-build"
+        assert cleanup_calls == []
 
     @pytest.mark.parametrize(
         ("keep_service", "stopped_names"),
@@ -302,6 +307,7 @@ class TestCreateEndpointPreset:
             source_configuration=creation_context.source_configuration,
             store=creation_context.store,
             keep_service=keep_service,
+            build_name="qwen-build",
             agent_session=agent_session,
         )
 
@@ -314,16 +320,13 @@ class TestCreateEndpointPreset:
 
 
 class TestBuildName:
-    def test_requires_name_and_keeps_generated_prefix_bounded(self, monkeypatch):
+    def test_requires_name_and_keeps_generated_prefix_bounded(self):
         with pytest.raises(CLIError, match="Endpoint name is required"):
-            _get_build_name(None)
-        monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.secrets.token_hex",
-            lambda _: "a1b2c3",
-        )
+            _get_build_name(None, "a1b2c3d4")
 
-        build_name = _get_build_name("qwen-endpoint-with-a-name-that-is-forty-one")
+        build_name = _get_build_name("qwen-endpoint-with-a-name-that-is-forty-one", "a1b2c3d4")
 
+        assert build_name.endswith("-a1b2c3d4")
         assert len(f"{build_name}-99999") <= 41
 
 
@@ -369,6 +372,7 @@ def _agent_session(tmp_path, *, debug: bool = False) -> EndpointAgentSession:
         path=path,
         timestamp="20260714-120000Z",
         debug=debug,
+        preset_id="ab12cd34",
     )
 
 
@@ -482,3 +486,79 @@ class TestSaveFinalReportCopy:
         )
 
         assert not (session.path / "final_report.json").exists()
+
+
+class TestInterruptAndResume:
+    def test_interrupt_suspends_session(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+        async def create(**kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
+            create,
+        )
+
+        with pytest.raises(KeyboardInterrupt):
+            create_endpoint_preset(
+                api=SimpleNamespace(),
+                configuration=EndpointConfiguration(
+                    name="qwen", model={"base": "Qwen/Qwen3.5-27B"}
+                ),
+                store=EndpointPresetStore(tmp_path / "presets"),
+            )
+
+        sessions = [
+            path
+            for path in (tmp_path / ".dstack" / "presets").iterdir()
+            if path.is_dir() and not path.name.startswith(".")
+        ]
+        assert len(sessions) == 1
+        manifest = json.loads((sessions[0] / "session.json").read_text())
+        assert manifest["status"] == "interrupted"
+        output = capsys.readouterr().out
+        assert "Resume with" in output
+        assert sessions[0].name in output
+
+    @pytest.mark.asyncio
+    async def test_resume_uses_saved_claude_session(self, creation_context, monkeypatch, tmp_path):
+        session_dir = tmp_path / "sessions" / "fe98dc76"
+        session_dir.mkdir(parents=True)
+        (session_dir / "agent.log").touch()
+        agent_session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="fe98dc76"
+        )
+        workspace = create_agent_workspace(agent_session)
+        workspace.constraints_path.write_text(
+            '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
+        )
+        agent_session.update_manifest(claude_session_id="sid-xyz", claude_model="claude-pinned")
+        captured = {}
+
+        async def run_agent(**kwargs):
+            captured.update(kwargs)
+            return EndpointAgentProcessOutput(
+                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            run_agent,
+        )
+
+        result = await _create_endpoint_preset(
+            api=creation_context.api,
+            configuration=creation_context.configuration,
+            source_configuration=creation_context.source_configuration,
+            store=creation_context.store,
+            agent_session=agent_session,
+            resume=True,
+        )
+
+        assert captured["initial_resume_session_id"] == "sid-xyz"
+        assert captured["auth"].model == "claude-pinned"
+        assert result.preset.id == "fe98dc76"
+        assert (session_dir / "workspace").is_dir()
+        remove_agent_workspace(agent_session)

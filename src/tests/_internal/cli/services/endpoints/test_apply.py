@@ -139,8 +139,7 @@ class TestSelectPlan:
             configurator_args=service_args,
             plan_properties={
                 "Model": "Qwen/Qwen3.5-27B ([secondary]base[/])",
-                "Preset": "8f3a12c4 "
-                "([secondary]context=32K, concurrency=1 42.1 tok/s TTFT 108ms[/])",
+                "Preset": "8f3a12c4 ([secondary]context=32K, con=1 42.1 tok/s TTFT 108ms[/])",
             },
         )
 

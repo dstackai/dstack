@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import Field, PositiveInt, validator
+from pydantic import Field, PositiveInt, root_validator, validator
 
 from dstack._internal.core.models.common import (
     CoreModel,
@@ -94,10 +94,24 @@ class EndpointConfiguration(
         Field(
             description=(
                 "The model to serve. Use a string or `repo` for an exact repo/path, "
-                "or `base` to allow compatible model variants."
+                "or `base` to allow compatible model variants. "
+                "Prefer the top-level `base`/`repo` shorthand unless a custom "
+                "client-facing model name is needed"
             )
         ),
     ]
+    base: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The base model repo; compatible variants are allowed. Shorthand for `model.base`"
+            )
+        ),
+    ] = None
+    repo: Annotated[
+        Optional[str],
+        Field(description="The exact model repo/path to serve. Shorthand for `model.repo`"),
+    ] = None
     context_length: Annotated[
         Optional[PositiveInt], Field(description="The minimum required context length")
     ] = None
@@ -143,6 +157,22 @@ class EndpointConfiguration(
     @property
     def effective_concurrency(self) -> int:
         return self.concurrency if self.concurrency is not None else DEFAULT_CONCURRENCY
+
+    @root_validator(pre=True)
+    def apply_model_shorthand(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        base, repo = values.get("base"), values.get("repo")
+        if base and repo:
+            raise ValueError("`base` and `repo` are mutually exclusive")
+        if base or repo:
+            if values.get("model") is not None:
+                raise ValueError("`model` cannot be combined with the `base`/`repo` shorthand")
+            values = dict(values)
+            values.pop("base", None)
+            values.pop("repo", None)
+            values["model"] = {"base": base} if base else {"repo": repo}
+        return values
 
     @validator("model", pre=True)
     def parse_model(cls, value: Any) -> Any:

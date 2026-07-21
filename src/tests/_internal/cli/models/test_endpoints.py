@@ -49,3 +49,36 @@ class TestEndpointConfiguration:
     def test_rejects_ambiguous_model_object(self):
         with pytest.raises(ValidationError):
             EndpointConfiguration(model={"base": "Qwen/base", "repo": "Qwen/repo"})
+
+    def test_parses_top_level_base_shorthand(self):
+        configuration = EndpointConfiguration(base="Qwen/Qwen3.5-27B")
+
+        assert isinstance(configuration.model, EndpointModelBase)
+        assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
+        assert configuration.base is None
+
+    def test_parses_top_level_repo_shorthand(self):
+        configuration = EndpointConfiguration(repo="community/Qwen3.5-27B-GPTQ-Int4")
+
+        assert isinstance(configuration.model, EndpointModelRepo)
+        assert configuration.model.exact_repo == "community/Qwen3.5-27B-GPTQ-Int4"
+        assert configuration.repo is None
+
+    def test_shorthand_round_trips_through_dict(self):
+        configuration = EndpointConfiguration(base="Qwen/Qwen3.5-27B")
+
+        round_tripped = EndpointConfiguration.parse_obj(configuration.dict())
+
+        assert round_tripped.model == configuration.model
+
+    def test_rejects_combined_base_and_repo_shorthand(self):
+        with pytest.raises(ValidationError):
+            EndpointConfiguration(base="Qwen/base", repo="Qwen/repo")
+
+    def test_rejects_shorthand_combined_with_model(self):
+        with pytest.raises(ValidationError):
+            EndpointConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
+
+    def test_requires_model(self):
+        with pytest.raises(ValidationError):
+            EndpointConfiguration()

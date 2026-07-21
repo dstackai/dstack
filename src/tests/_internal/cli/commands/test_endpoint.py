@@ -49,9 +49,9 @@ class TestEndpointPresetLocalCommands:
 
         endpoint_presets_utils.print_endpoint_presets([get_endpoint_preset()])
 
-        assert "concurrency=1" in "".join(output.getvalue().split())
+        assert "con=1" in "".join(output.getvalue().split())
 
-    def test_prints_created_column(self, monkeypatch):
+    def test_prints_submitted_column(self, monkeypatch):
         output = StringIO()
         monkeypatch.setattr(
             endpoint_presets_utils,
@@ -67,7 +67,7 @@ class TestEndpointPresetLocalCommands:
 
         endpoint_presets_utils.print_endpoint_presets([get_endpoint_preset()])
 
-        assert "CREATED" in output.getvalue()
+        assert "SUBMITTED" in output.getvalue()
         assert "2 months ago" in output.getvalue()
 
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
@@ -118,13 +118,15 @@ class TestEndpointPresetLocalCommands:
 
         output = list_output.getvalue()
         assert "Qwen/Qwen3.5-27B" in output
-        assert "preset=8f3a12c4" in output
-        assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in output
-        assert "CONTEXT" in output
+        assert "8f3a12c4" in output
+        # The repo row is shown only in verbose mode.
+        assert "repo=community/Qwen3.5-27B-GPTQ-Int4" not in output
+        # The context column is shown only in verbose mode.
+        assert "CONTEXT" not in output
         assert "BENCHMARK" in output
-        assert "32K" in output
+        assert "32K" not in output
         assert "42.1" in output
-        assert "concurrency=1" in "".join(output.split())
+        assert "con=1" in "".join(output.split())
         assert "tok/s" in output
         assert "TTFT" in output
         assert "108ms" in output
@@ -132,11 +134,12 @@ class TestEndpointPresetLocalCommands:
 
         assert run_dstack_cli(["endpoint", "preset", "list", "-v"], home_dir=tmp_path) == 0
         verbose_output = capsys.readouterr().out
-        assert "hardware=" in verbose_output
-        assert "api=" in verbose_output
-        assert "n=16" in verbose_output
-        assert "concurrency=1" in "".join(verbose_output.split())
-        assert "1K->128" in verbose_output
+        joined_verbose = "".join(verbose_output.split())
+        assert "hardware=" in joined_verbose
+        assert "api=" in joined_verbose
+        assert "n=16" in joined_verbose
+        assert "con=1" in joined_verbose
+        assert "1K->128" in joined_verbose
 
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
@@ -198,7 +201,9 @@ class TestEndpointPresetLocalCommands:
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
-    def test_deletes_preset_without_api_client(self, tmp_path):
+    @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "model")])
+    def test_deletes_presets_by_model_without_api_client(self, tmp_path, flag_attribute):
+        flag, attribute = flag_attribute
         preset = get_endpoint_preset()
         store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
@@ -207,7 +212,7 @@ class TestEndpointPresetLocalCommands:
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
                 run_dstack_cli(
-                    ["endpoint", "preset", "delete", "--model", preset.base, "-y"],
+                    ["endpoint", "preset", "delete", flag, getattr(preset, attribute), "-y"],
                     home_dir=tmp_path,
                 )
                 == 0
@@ -215,6 +220,41 @@ class TestEndpointPresetLocalCommands:
             from_config.assert_not_called()
 
         assert store.list() == []
+
+    def test_delete_by_model_keeps_other_presets(self, tmp_path):
+        preset = get_endpoint_preset()
+        store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
+        store.save(preset)
+        other = preset.copy(
+            update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"}
+        )
+        store.save(other)
+
+        assert (
+            run_dstack_cli(
+                ["endpoint", "preset", "delete", "--base", preset.base, "-y"],
+                home_dir=tmp_path,
+            )
+            == 0
+        )
+
+        assert [remaining.id for remaining in store.list()] == ["01234567"]
+
+    @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "model")])
+    def test_lists_presets_filtered_by_model(self, tmp_path, capsys, flag_attribute):
+        flag, attribute = flag_attribute
+        preset = get_endpoint_preset()
+        store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
+        store.save(preset)
+        store.save(
+            preset.copy(update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+        )
+
+        args = ["endpoint", "preset", "list", "--json", flag, getattr(preset, attribute)]
+        assert run_dstack_cli(args, home_dir=tmp_path) == 0
+
+        output = json.loads(capsys.readouterr().out)
+        assert [entry["id"] for entry in output["presets"]] == [preset.id]
 
     def test_merges_profile_configuration_and_cli_args(self, tmp_path):
         (tmp_path / ".dstack").mkdir()

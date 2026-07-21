@@ -1,16 +1,17 @@
 import asyncio
 import json
 import os
+import secrets
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import psutil
 import yaml
@@ -40,6 +41,12 @@ _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 _CLAUDE_STREAM_LIMIT = 16 * 1024 * 1024
+_RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
+_RESUME_PROMPT = (
+    "The previous agent process was interrupted. Continue where you left off. "
+    "Re-check the states of your runs before relying on them: time may have "
+    "passed, and tasks or instances may have stopped in the meantime."
+)
 _MAX_RUN_NAME_LENGTH = 41
 _MAX_UNIX_SOCKET_PATH_BYTES = 103
 _INHERITED_ENV_NAMES = (
@@ -118,6 +125,7 @@ class EndpointAgentSession:
     path: Path
     timestamp: str
     debug: bool
+    preset_id: str = ""
     _log_enabled: bool = field(default=True, init=False, repr=False)
 
     @property
@@ -172,12 +180,23 @@ class EndpointAgentSession:
             self._log_enabled = False
             console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
 
-    def finish(self, preset_id: Optional[str] = None) -> Path:
-        status = {
-            "status": "success" if preset_id is not None else "failed",
-            "preset_id": preset_id,
-        }
-        _write_private_text(self.path / _SESSION_FILENAME, json.dumps(status, indent=2) + "\n")
+    def read_manifest(self) -> dict[str, Any]:
+        try:
+            manifest = json.loads((self.path / _SESSION_FILENAME).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return manifest if isinstance(manifest, dict) else {}
+
+    def update_manifest(self, **fields: Any) -> None:
+        manifest = self.read_manifest()
+        manifest.update(fields)
+        _write_private_text(self.path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
+
+    def record_claude_session_id(self, session_id: str) -> None:
+        self.update_manifest(claude_session_id=session_id)
+
+    def finish(self, status: str) -> Path:
+        self.update_manifest(status=status)
         return self.path
 
 
@@ -193,16 +212,84 @@ class ClaudeAuth:
 class EndpointAgentProcessOutput:
     report_data: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+    session_id: Optional[str] = None
+    made_progress: bool = False
 
 
-@contextmanager
-def endpoint_agent_workspace() -> Iterator[EndpointAgentWorkspace]:
-    with tempfile.TemporaryDirectory(prefix="dpe-", dir=_get_short_temp_dir()) as directory:
-        root = Path(directory)
-        _validate_control_socket_path(root)
-        workspace = EndpointAgentWorkspace(path=root / "w", dstack_home=root / "h")
+def create_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorkspace:
+    real = session.path / "workspace"
+    try:
+        real.mkdir(mode=0o700)
+        if IS_WINDOWS:
+            # Windows has no Unix-socket path limit and symlinks require
+            # privileges, so the workspace is used directly.
+            alias = real
+        else:
+            alias = _create_workspace_alias(real)
+            _validate_control_socket_path(alias)
+        workspace = EndpointAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
         _prepare_workspace(workspace)
-        yield workspace
+    except OSError as e:
+        raise CLIError(f"Could not create the agent workspace under {real}: {e}") from e
+    session.update_manifest(workspace=str(real), alias=str(alias))
+    return workspace
+
+
+def attach_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorkspace:
+    manifest = session.read_manifest()
+    real_value, alias_value = manifest.get("workspace"), manifest.get("alias")
+    if not real_value or not alias_value:
+        raise CLIError("The session has no workspace to resume")
+    real, alias = Path(real_value), Path(alias_value)
+    if not real.is_dir():
+        raise CLIError(
+            f"The session workspace no longer exists: {real}. "
+            "Stop any leftover runs manually and start a new session."
+        )
+    if alias != real:
+        _ensure_workspace_alias(alias, real)
+    return EndpointAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
+
+
+def remove_agent_workspace(session: EndpointAgentSession) -> None:
+    manifest = session.read_manifest()
+    alias = manifest.get("alias")
+    workspace = manifest.get("workspace")
+    if alias and alias != workspace and Path(alias).is_symlink():
+        with suppress(OSError):
+            os.unlink(alias)
+    if workspace:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def _create_workspace_alias(real: Path) -> Path:
+    base = _get_short_temp_dir() or tempfile.gettempdir()
+    while True:
+        alias = Path(base) / f"dpe-{secrets.token_hex(4)}"
+        try:
+            os.symlink(real, alias)
+        except FileExistsError:
+            continue
+        return alias
+
+
+def _ensure_workspace_alias(alias: Path, real: Path) -> None:
+    if os.path.lexists(alias):
+        if (
+            alias.is_symlink()
+            and os.readlink(alias) == str(real)
+            and (IS_WINDOWS or os.lstat(alias).st_uid == os.getuid())
+        ):
+            return
+        raise CLIError(
+            f"The workspace alias path cannot be used safely: {alias}. "
+            "Remove it manually if it is yours, or start a new session."
+        )
+    os.symlink(real, alias)
+
+
+def get_presets_dir() -> Path:
+    return get_dstack_dir() / "presets"
 
 
 def create_endpoint_agent_session(
@@ -213,16 +300,31 @@ def create_endpoint_agent_session(
     if configuration.name is None:
         raise CLIError("Endpoint name is required to save agent output")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
-    parent = get_dstack_dir() / "agent" / configuration.name
+    parent = get_presets_dir()
     path: Optional[Path] = None
     try:
         parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        path = _create_agent_session_directory(parent, timestamp)
+        while True:
+            preset_id = secrets.token_hex(4)
+            path = parent / preset_id
+            try:
+                path.mkdir(mode=0o700)
+            except FileExistsError:
+                continue
+            break
         _write_private_text(path / "agent.log", "")
-        _write_private_text(
-            path / _SESSION_FILENAME,
-            json.dumps({"status": "running", "preset_id": None}, indent=2) + "\n",
-        )
+        manifest = {
+            "id": preset_id,
+            "status": "running",
+            "pid": os.getpid(),
+            "endpoint": configuration.name,
+            "model": getattr(configuration.model, "base", None)
+            or getattr(configuration.model, "repo", None),
+            "max_trials": configuration.effective_max_trials,
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "debug": debug,
+        }
+        _write_private_text(path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
         if debug:
             data = json.loads(configuration.json(exclude_none=True))
             if configuration.env:
@@ -239,7 +341,7 @@ def create_endpoint_agent_session(
             shutil.rmtree(path, ignore_errors=True)
         raise CLIError(f"Could not create agent output under {parent}: {e}") from e
     assert path is not None
-    return EndpointAgentSession(path=path, timestamp=timestamp, debug=debug)
+    return EndpointAgentSession(path=path, timestamp=timestamp, debug=debug, preset_id=preset_id)
 
 
 def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
@@ -273,17 +375,112 @@ def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
     return {"authMethod": "unknown"}
 
 
-def _create_agent_session_directory(parent: Path, timestamp: str) -> Path:
-    index = 0
-    while True:
-        name = timestamp if index == 0 else f"{timestamp}-{index}"
-        path = parent / name
-        try:
-            path.mkdir(mode=0o700)
-        except FileExistsError:
-            index += 1
+def load_resumable_agent_session(preset_id: str) -> EndpointAgentSession:
+    path = get_presets_dir() / preset_id
+    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    manifest = session.read_manifest()
+    if not path.is_dir() or not manifest:
+        raise CLIError(f"Unknown preset creation session: {preset_id}")
+    status = manifest.get("status")
+    if status == "success":
+        raise CLIError(f"Session {preset_id} completed successfully; nothing to resume")
+    if status == "failed":
+        raise CLIError(f"Session {preset_id} failed and cannot be resumed")
+    pid = manifest.get("pid")
+    if (
+        status == "running"
+        and isinstance(pid, int)
+        and pid > 0
+        and pid != os.getpid()
+        and psutil.pid_exists(pid)
+    ):
+        raise CLIError(f"Session {preset_id} appears to be running already (pid {pid})")
+    if not manifest.get("claude_session_id"):
+        raise CLIError(
+            f"Session {preset_id} stopped before the agent started; start a new session"
+        )
+    session.debug = bool(manifest.get("debug"))
+    session.timestamp = str(manifest.get("created_at") or "")
+    return session
+
+
+def list_agent_sessions() -> list[dict[str, Any]]:
+    root = get_presets_dir()
+    entries = []
+    candidates = sorted(root.iterdir()) if root.is_dir() else []
+    for path in candidates:
+        if not path.is_dir() or path.name.startswith((".", "models--")):
             continue
-        return path
+        session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+        manifest = session.read_manifest()
+        status = manifest.get("status")
+        if status not in ("running", "interrupted"):
+            continue
+        pid = manifest.get("pid")
+        if status == "running" and not (
+            isinstance(pid, int) and pid > 0 and psutil.pid_exists(pid)
+        ):
+            status = "interrupted"
+        entry = dict(manifest)
+        entry["id"] = path.name
+        entry["status"] = status
+        entry["trials"] = _summarize_session_trials(path / _TRIALS_FILENAME)
+        entries.append(entry)
+    return entries
+
+
+def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+    """Best-so-far summary from a session's mirrored trial records."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    count = 0
+    task_names: set[str] = set()
+    best: Optional[dict[str, Any]] = None
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        # A trial may log several benchmark records (e.g. a re-run); records
+        # sharing a task name are one trial.
+        task = record.get("task")
+        task_name = task.get("name") if isinstance(task, dict) else None
+        if isinstance(task_name, str) and task_name:
+            task_names.add(task_name)
+        else:
+            count += 1
+        benchmark = record.get("benchmark")
+        if not isinstance(benchmark, dict):
+            continue
+        metrics = benchmark.get("metrics") or {}
+        workload = benchmark.get("workload") or {}
+        duration = metrics.get("duration_seconds")
+        tokens = metrics.get("total_output_tokens")
+        if not isinstance(duration, (int, float)) or duration <= 0:
+            continue
+        if not isinstance(tokens, (int, float)):
+            continue
+        tok_s = tokens / duration
+        if best is None or tok_s > best["tok_s"]:
+            resources = record.get("resources") or {}
+            gpu = resources.get("gpu") if isinstance(resources, dict) else None
+            gpu_text = None
+            if isinstance(gpu, dict) and gpu.get("name"):
+                gpu_text = str(gpu["name"])
+                if gpu.get("memory"):
+                    gpu_text += f":{gpu['memory']}"
+                if gpu.get("count"):
+                    gpu_text += f":{gpu['count']}"
+            best = {
+                "tok_s": tok_s,
+                "concurrency": workload.get("concurrency"),
+                "gpu": gpu_text,
+            }
+    return {"count": count + len(task_names), "best": best}
 
 
 def get_claude_auth() -> ClaudeAuth:
@@ -354,28 +551,97 @@ async def run_endpoint_agent(
     auth: ClaudeAuth,
     redacted_values: Sequence[str],
     agent_session: EndpointAgentSession,
+    initial_resume_session_id: Optional[str] = None,
 ) -> EndpointAgentProcessOutput:
-    command = _prepare_subprocess_command(_build_claude_command(auth=auth))
+    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
     progress_tailer = _ProgressTailer(
         path=workspace.progress_path,
         redacted_values=redacted_values,
         agent_session=agent_session,
+        offset_store=offset_store,
     )
     record_mirrors = [
         _RecordMirror(
             source=workspace.runs_path,
             target=agent_session.runs_path,
             redacted_values=redacted_values,
+            offset_store=offset_store,
+            offset_key="runs",
         ),
         _RecordMirror(
             source=workspace.trials_path,
             target=agent_session.trials_path,
             redacted_values=redacted_values,
+            offset_store=offset_store,
+            offset_key="trials",
         ),
     ]
     tailer_tasks = [
         asyncio.create_task(tailer.run()) for tailer in [progress_tailer, *record_mirrors]
     ]
+    try:
+        resume_session_id: Optional[str] = initial_resume_session_id
+        attempt_prompt = prompt if resume_session_id is None else _RESUME_PROMPT
+        retry_delays = list(_RESUME_DELAYS_SECONDS)
+        while True:
+            command = _prepare_subprocess_command(
+                _build_claude_command(auth=auth, resume_session_id=resume_session_id)
+            )
+            output, returncode = await _run_claude_process(
+                command=command,
+                prompt=attempt_prompt,
+                env=env,
+                workspace=workspace,
+                redacted_values=redacted_values,
+                agent_session=agent_session,
+            )
+            if output.report_data is None and returncode != 0:
+                output.error = output.error or f"Claude exited with return code {returncode}"
+            # Retry any process death without a submitted report; a terminal
+            # failure report from the agent returns immediately.
+            if output.report_data is not None or output.error is None:
+                return output
+            # A failed attempt that produced agent work is a new outage, not a
+            # continuation of the previous one: restore the full retry budget.
+            # Attempts that fail without any work drain it, so the loop always
+            # terminates when the network stays down.
+            if output.made_progress:
+                retry_delays = list(_RESUME_DELAYS_SECONDS)
+            if not retry_delays:
+                return output
+            delay = retry_delays.pop(0)
+            session_id = output.session_id or resume_session_id
+            if session_id is not None:
+                resume_session_id = session_id
+                attempt_prompt = _RESUME_PROMPT
+                action = "resuming the session"
+            else:
+                action = "retrying"
+            print_endpoint_progress(
+                f"Agent process exited without a report; {action} in {delay}s.",
+                agent_session=agent_session,
+            )
+            await asyncio.sleep(delay)
+    finally:
+        for task in tailer_tasks:
+            task.cancel()
+        for task in tailer_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+        progress_tailer.flush()
+        for mirror in record_mirrors:
+            mirror.flush()
+
+
+async def _run_claude_process(
+    *,
+    command: list[str],
+    prompt: str,
+    env: dict[str, str],
+    workspace: EndpointAgentWorkspace,
+    redacted_values: Sequence[str],
+    agent_session: EndpointAgentSession,
+) -> tuple[EndpointAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -422,24 +688,13 @@ async def run_endpoint_agent(
         if proc is not None and proc.returncode is None:
             await _terminate_process(proc)
         raise
-    finally:
-        for task in tailer_tasks:
-            task.cancel()
-        for task in tailer_tasks:
-            with suppress(asyncio.CancelledError):
-                await task
-        progress_tailer.flush()
-        for mirror in record_mirrors:
-            mirror.flush()
 
     output = stdout_output
     if output.report_data is None:
         output.report_data = stderr_output.report_data
     if output.error is None:
         output.error = stderr_output.error
-    if output.report_data is None and returncode != 0:
-        output.error = output.error or f"Claude exited with return code {returncode}"
-    return output
+    return output, returncode
 
 
 def print_endpoint_progress(message: str, *, agent_session: EndpointAgentSession) -> None:
@@ -615,7 +870,9 @@ def _get_skills_dir() -> Path:
     raise CLIError("Could not find packaged dstack skills")
 
 
-def _build_claude_command(*, auth: ClaudeAuth) -> list[str]:
+def _build_claude_command(
+    *, auth: ClaudeAuth, resume_session_id: Optional[str] = None
+) -> list[str]:
     command = [
         auth.executable,
         "-p",
@@ -641,6 +898,8 @@ def _build_claude_command(*, auth: ClaudeAuth) -> list[str]:
         command[2:2] = ["--bare"]
     if auth.effort is not None:
         command[2:2] = ["--effort", auth.effort]
+    if resume_session_id is not None:
+        command += ["--resume", resume_session_id]
     return command
 
 
@@ -724,7 +983,16 @@ async def _read_process_stream(
             message = json.loads(text)
         except json.JSONDecodeError:
             continue
-        if not isinstance(message, dict) or message.get("type") != "result":
+        if not isinstance(message, dict):
+            continue
+        if output.session_id is None:
+            session_id = message.get("session_id")
+            if isinstance(session_id, str) and session_id:
+                output.session_id = session_id
+                agent_session.record_claude_session_id(session_id)
+        if message.get("type") == "assistant":
+            output.made_progress = True
+        if message.get("type") != "result":
             continue
         if message.get("is_error"):
             error = message.get("result") or "Claude failed"
@@ -784,6 +1052,27 @@ def _terminate_windows_process_tree(pid: int) -> None:
     psutil.wait_procs(alive, timeout=3)
 
 
+class _OffsetStore:
+    """Persists tailer/mirror byte offsets so resumed sessions do not repeat output."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        self._data: dict[str, Any] = data if isinstance(data, dict) else {}
+
+    def get(self, key: str) -> int:
+        value = self._data.get(key, 0)
+        return value if isinstance(value, int) and value >= 0 else 0
+
+    def set(self, key: str, value: int) -> None:
+        self._data[key] = value
+        with suppress(OSError):
+            _write_private_text(self._path, json.dumps(self._data) + "\n")
+
+
 class _ProgressTailer:
     def __init__(
         self,
@@ -791,11 +1080,15 @@ class _ProgressTailer:
         path: Path,
         redacted_values: Sequence[str],
         agent_session: EndpointAgentSession,
+        offset_store: Optional[_OffsetStore] = None,
+        offset_key: str = "progress",
     ) -> None:
         self._path = path
         self._redacted_values = redacted_values
         self._agent_session = agent_session
-        self._offset = 0
+        self._offset_store = offset_store
+        self._offset_key = offset_key
+        self._offset = offset_store.get(offset_key) if offset_store else 0
 
     async def run(self) -> None:
         while True:
@@ -809,6 +1102,8 @@ class _ProgressTailer:
             f.seek(self._offset)
             lines = f.readlines()
             self._offset = f.tell()
+        if lines and self._offset_store is not None:
+            self._offset_store.set(self._offset_key, self._offset)
         for line in lines:
             message = _parse_progress(line)
             if message is not None:
@@ -821,11 +1116,21 @@ class _ProgressTailer:
 class _RecordMirror:
     """Mirrors a workspace record file into the persistent session directory, redacted."""
 
-    def __init__(self, *, source: Path, target: Path, redacted_values: Sequence[str]) -> None:
+    def __init__(
+        self,
+        *,
+        source: Path,
+        target: Path,
+        redacted_values: Sequence[str],
+        offset_store: Optional[_OffsetStore] = None,
+        offset_key: str = "",
+    ) -> None:
         self._source = source
         self._target = target
         self._redacted_values = redacted_values
-        self._offset = 0
+        self._offset_store = offset_store
+        self._offset_key = offset_key
+        self._offset = offset_store.get(offset_key) if offset_store and offset_key else 0
         self._enabled = True
 
     async def run(self) -> None:
@@ -845,6 +1150,8 @@ class _RecordMirror:
             return
         chunk = data[: end + 1].decode("utf-8", errors="replace")
         self._offset += end + 1
+        if self._offset_store is not None and self._offset_key:
+            self._offset_store.set(self._offset_key, self._offset)
         try:
             if not self._target.exists():
                 _write_private_text(self._target, "")

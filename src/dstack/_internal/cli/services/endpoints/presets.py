@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Any
+from typing import Any, Optional
 
 import gpuhunt
 
@@ -26,6 +26,7 @@ def build_endpoint_preset(
     model: str,
     context_length: int,
     benchmark: EndpointBenchmark,
+    preset_id: Optional[str] = None,
 ) -> EndpointPreset:
     service = service.copy(deep=True)
     service.name = None
@@ -39,7 +40,7 @@ def build_endpoint_preset(
     set_service_gpu_vendors_from_validations(service, [validation])
     return EndpointPreset(
         base=base_model,
-        id=make_endpoint_preset_id(service, context_length=context_length),
+        id=preset_id or make_endpoint_preset_id(service, context_length=context_length),
         model=model,
         context_length=context_length,
         created_at=get_current_datetime(),

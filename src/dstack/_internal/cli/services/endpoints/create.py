@@ -1,7 +1,7 @@
 import asyncio
+import dataclasses
 import json
 import os
-import secrets
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -17,15 +17,17 @@ from dstack._internal.cli.models.endpoints import (
 from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
+    attach_agent_workspace,
     build_endpoint_agent_env,
     contains_redacted_value,
+    create_agent_workspace,
     create_endpoint_agent_session,
-    endpoint_agent_workspace,
     get_claude_auth,
     get_redacted_values,
     get_sensitive_inherited_env_values,
     print_endpoint_progress,
     redact,
+    remove_agent_workspace,
     run_endpoint_agent,
 )
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
@@ -60,8 +62,9 @@ def create_endpoint_preset(
     keep_service: bool = False,
     build_name: Optional[str] = None,
     debug: bool = False,
+    resume_session: Optional[EndpointAgentSession] = None,
 ) -> EndpointPresetCreateResult:
-    agent_session = create_endpoint_agent_session(configuration, debug=debug)
+    agent_session = resume_session or create_endpoint_agent_session(configuration, debug=debug)
     try:
         resolved_configuration = _resolve_endpoint_env(configuration)
         result = asyncio.run(
@@ -73,12 +76,18 @@ def create_endpoint_preset(
                 keep_service=keep_service,
                 build_name=build_name,
                 agent_session=agent_session,
+                resume=resume_session is not None,
             )
         )
-    except BaseException:
-        _finish_agent_session(agent_session)
+    except KeyboardInterrupt:
+        _suspend_agent_session(agent_session)
         raise
-    _finish_agent_session(agent_session, result.preset.id)
+    except BaseException:
+        _finish_agent_session(agent_session, "failed")
+        remove_agent_workspace(agent_session)
+        raise
+    _finish_agent_session(agent_session, "success")
+    remove_agent_workspace(agent_session)
     return result
 
 
@@ -91,13 +100,30 @@ async def _create_endpoint_preset(
     keep_service: bool = False,
     build_name: Optional[str] = None,
     agent_session: EndpointAgentSession,
+    resume: bool = False,
 ) -> EndpointPresetCreateResult:
     source_configuration = source_configuration or configuration
-    build_name = build_name or _get_build_name(configuration.name)
-    allowed_fleets = _get_allowed_fleets(api, configuration)
-    if not allowed_fleets:
-        raise CLIError("The project has no active fleets available for preset creation")
-    auth = get_claude_auth()
+    initial_resume_session_id: Optional[str] = None
+    if resume:
+        auth = get_claude_auth()
+        workspace = attach_agent_workspace(agent_session)
+        manifest = agent_session.read_manifest()
+        claude_model = manifest.get("claude_model")
+        if isinstance(claude_model, str) and claude_model:
+            auth = dataclasses.replace(auth, model=claude_model)
+        claude_session_id = manifest.get("claude_session_id")
+        if isinstance(claude_session_id, str) and claude_session_id:
+            initial_resume_session_id = claude_session_id
+        build_name = build_name or _load_build_name(workspace)
+        allowed_fleets: tuple[str, ...] = ()
+    else:
+        allowed_fleets = _get_allowed_fleets(api, configuration)
+        if not allowed_fleets:
+            raise CLIError("The project has no active fleets available for preset creation")
+        auth = get_claude_auth()
+        workspace = create_agent_workspace(agent_session)
+        build_name = build_name or _get_build_name(configuration.name, agent_session.preset_id)
+    agent_session.update_manifest(status="running", pid=os.getpid(), claude_model=auth.model)
 
     endpoint_env = configuration.env.as_dict()
     token = getattr(api.client, "_token", None)
@@ -115,61 +141,68 @@ async def _create_endpoint_preset(
     preset: Optional[EndpointPreset] = None
     preset_path: Optional[Path] = None
     creation_succeeded = False
+    interrupted = False
     cleanup_error: Optional[str] = None
-    with endpoint_agent_workspace() as workspace:
-        env = build_endpoint_agent_env(
-            api=api,
-            endpoint_env=endpoint_env,
-            auth=auth,
-            workspace=workspace,
-            token=token,
-        )
+    env = build_endpoint_agent_env(
+        api=api,
+        endpoint_env=endpoint_env,
+        auth=auth,
+        workspace=workspace,
+        token=token,
+    )
+    prompt = get_endpoint_agent_system_prompt()
+    if not resume:
         constraints_text = _build_constraints(
             configuration=configuration,
             build_name=build_name,
             allowed_fleets=allowed_fleets,
         )
         workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
-        prompt = get_endpoint_agent_system_prompt()
         if agent_session.debug:
             agent_session.write_prompt(prompt)
             agent_session.write_constraints(constraints_text)
             agent_session.write_agent_info(auth)
-        try:
-            process_output = await run_endpoint_agent(
-                prompt=prompt,
-                env=env,
+    try:
+        process_output = await run_endpoint_agent(
+            prompt=prompt,
+            env=env,
+            workspace=workspace,
+            auth=auth,
+            redacted_values=redacted_values,
+            agent_session=agent_session,
+            initial_resume_session_id=initial_resume_session_id,
+        )
+        report = load_endpoint_agent_report(
+            output=process_output,
+            workspace=workspace,
+            redacted_values=redacted_values,
+        )
+        run = api.client.runs.get(api.project, report.run_name)
+        preset = build_verified_endpoint_preset(
+            run=run,
+            endpoint_configuration=source_configuration,
+            report=report,
+            preset_id=agent_session.preset_id or None,
+        )
+        if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
+            raise CLIError("Generated endpoint preset contains a secret value")
+        preset_path = store.save(preset)
+        print_endpoint_progress(
+            f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}.",
+            agent_session=agent_session,
+        )
+        creation_succeeded = True
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        interrupted = True
+        raise
+    finally:
+        if agent_session.debug:
+            _save_final_report_copy(
                 workspace=workspace,
-                auth=auth,
-                redacted_values=redacted_values,
                 agent_session=agent_session,
-            )
-            report = load_endpoint_agent_report(
-                output=process_output,
-                workspace=workspace,
                 redacted_values=redacted_values,
             )
-            run = api.client.runs.get(api.project, report.run_name)
-            preset = build_verified_endpoint_preset(
-                run=run,
-                endpoint_configuration=source_configuration,
-                report=report,
-            )
-            if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
-                raise CLIError("Generated endpoint preset contains a secret value")
-            preset_path = store.save(preset)
-            print_endpoint_progress(
-                f"Saved endpoint preset {preset.id} for {preset.base} at {preset_path}.",
-                agent_session=agent_session,
-            )
-            creation_succeeded = True
-        finally:
-            if agent_session.debug:
-                _save_final_report_copy(
-                    workspace=workspace,
-                    agent_session=agent_session,
-                    redacted_values=redacted_values,
-                )
+        if not interrupted:
             keep_final_service = keep_service and creation_succeeded
             try:
                 await _cleanup_runs(
@@ -221,23 +254,49 @@ def _resolve_endpoint_env(configuration: EndpointConfiguration) -> EndpointConfi
 
 def _finish_agent_session(
     session: EndpointAgentSession,
-    preset_id: Optional[str] = None,
+    status: str,
 ) -> None:
     try:
-        path = session.finish(preset_id)
+        path = session.finish(status)
     except OSError as e:
         path = session.path
         warn(f"Could not finalize agent output. Files remain at {path}: {e}")
     console.print(f"Agent log saved to [code]{path / 'agent.log'}[/]")
 
 
-def _get_build_name(endpoint_name: Optional[str]) -> str:
+def _suspend_agent_session(session: EndpointAgentSession) -> None:
+    try:
+        session.finish("interrupted")
+    except OSError as e:
+        warn(f"Could not record the interrupted session state: {e}")
+    console.print(
+        f"\nSession [code]{session.preset_id}[/] interrupted. "
+        "Its runs may still be active and accruing cost."
+    )
+    console.print(
+        f"Resume with [code]dstack endpoint preset create -f <configuration> "
+        f"--resume {session.preset_id}[/], or stop the runs with [code]dstack stop[/]."
+    )
+
+
+def _get_build_name(endpoint_name: Optional[str], suffix: str) -> str:
     if endpoint_name is None:
         raise CLIError("Endpoint name is required. Set `name` in the configuration or use --name")
-    suffix = secrets.token_hex(3)
-    # Leave room for the numeric submission suffix while retaining a recognizable prefix.
-    prefix = endpoint_name[:28].rstrip("-")
+    # Leave room for the preset id and numeric submission suffix while retaining
+    # a recognizable prefix.
+    prefix = endpoint_name[:26].rstrip("-")
     return f"{prefix}-{suffix}"
+
+
+def _load_build_name(workspace: EndpointAgentWorkspace) -> str:
+    try:
+        data = json.loads(workspace.constraints_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise CLIError(f"The session constraints cannot be read: {e}") from e
+    prefix = data.get("run_name_prefix") if isinstance(data, dict) else None
+    if not isinstance(prefix, str) or not prefix:
+        raise CLIError("The session constraints do not contain a run name prefix")
+    return prefix
 
 
 def _get_allowed_fleets(api: Client, configuration: EndpointConfiguration) -> tuple[str, ...]:

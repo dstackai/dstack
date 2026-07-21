@@ -1,8 +1,10 @@
 import os
+import shutil
 import sys
 import tempfile
+from contextlib import suppress
 from pathlib import Path
-from typing import List, TextIO
+from typing import TextIO
 
 import yaml
 from pydantic import ValidationError
@@ -10,38 +12,48 @@ from pydantic import ValidationError
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.utils.common import get_dstack_dir
 
 
 class EndpointPresetStore:
+    """Presets live at `<root>/<preset id>/` — one directory per preset holding
+    the artifact (`preset.yaml`) next to the creation session internals.
+    Deleted presets are archived under `<root>/.archive/`."""
+
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
 
     def list(self) -> list[EndpointPreset]:
         if not self.root.exists():
             return []
-        presets = [self._load(path) for path in self.root.glob("models--*/*.yaml")]
+        self._migrate_legacy()
+        presets = [self._load(path) for path in self.root.glob("*/preset.yaml")]
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 
     def get(self, preset_id: str) -> EndpointPreset | None:
-        paths = self._find_preset_paths(preset_id)
-        if not paths:
+        _validate_preset_id(preset_id)
+        if not self.root.exists():
             return None
-        if len(paths) > 1:
-            raise CLIError(f"Endpoint preset ID {preset_id!r} is not unique")
-        path = paths[0]
+        self._migrate_legacy()
+        path = self.root / preset_id / "preset.yaml"
+        if not path.is_file():
+            return None
         preset = self._load(path)
         if preset.id != preset_id:
             raise CLIError(f"Endpoint preset file {path} does not match its path")
         return preset
 
     def save(self, preset: EndpointPreset) -> Path:
-        path = self._path(preset.base, preset.id)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        _validate_preset_id(preset.id)
+        self._migrate_legacy()
+        directory = self.root / preset.id
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / "preset.yaml"
         content = yaml.safe_dump(endpoint_preset_to_data(preset), sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
-            dir=path.parent,
+            dir=directory,
             prefix=f".{preset.id}.",
             suffix=".tmp",
         )
@@ -62,27 +74,31 @@ class EndpointPresetStore:
         preset = self.get(preset_id)
         if preset is None:
             return False
-        path = self._path(preset.base, preset.id)
-        path.unlink()
-        try:
-            path.parent.rmdir()
-        except OSError:
-            pass
+        self._archive(self.root / preset_id)
         return True
 
-    def delete_for_base(self, base: str) -> int:
-        directory = self._directory(base)
-        paths = list(directory.glob("*.yaml"))
-        presets = [self._load(path) for path in paths]
-        if any(preset.base != base for preset in presets):
-            raise CLIError(f"Endpoint preset directory {directory} contains another base model")
-        for path in paths:
-            path.unlink()
-        try:
-            directory.rmdir()
-        except OSError:
-            pass
-        return len(presets)
+    def _archive(self, directory: Path) -> None:
+        archive_root = self.root / ".archive"
+        archive_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        target = archive_root / directory.name
+        index = 0
+        while target.exists():
+            index += 1
+            target = archive_root / f"{directory.name}-{index}"
+        shutil.move(str(directory), str(target))
+
+    def _migrate_legacy(self) -> None:
+        for legacy in list(self.root.glob("models--*/*.yaml")):
+            target_dir = self.root / legacy.stem
+            target_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            target = target_dir / "preset.yaml"
+            if target.exists():
+                legacy.unlink()
+            else:
+                legacy.replace(target)
+        for directory in self.root.glob("models--*"):
+            with suppress(OSError):
+                directory.rmdir()
 
     def _load(self, path: Path) -> EndpointPreset:
         try:
@@ -91,23 +107,10 @@ class EndpointPresetStore:
         except (OSError, ValidationError, yaml.YAMLError) as e:
             raise CLIError(f"Invalid endpoint preset file {path}: {e}") from e
 
-    def _path(self, base: str, preset_id: str) -> Path:
-        if not preset_id or any(char in preset_id for char in "/\\"):
-            raise CLIError("Endpoint preset ID must not contain path separators")
-        return self._directory(base) / f"{preset_id}.yaml"
 
-    def _find_preset_paths(self, preset_id: str) -> List[Path]:
-        if not preset_id or any(char in preset_id for char in "/\\"):
-            raise CLIError("Endpoint preset ID must not contain path separators")
-        return [
-            path
-            for directory in self.root.glob("models--*")
-            if (path := directory / f"{preset_id}.yaml").is_file()
-        ]
-
-    def _directory(self, base: str) -> Path:
-        directory = "models--" + base.replace("/", "--").replace("\\", "--")
-        return self.root / directory
+def _validate_preset_id(preset_id: str) -> None:
+    if not preset_id or preset_id.startswith(".") or any(char in preset_id for char in "/\\"):
+        raise CLIError(f"Invalid endpoint preset ID: {preset_id!r}")
 
 
 def load_endpoint_configuration(path: str) -> tuple[str, EndpointConfiguration]:
@@ -129,8 +132,16 @@ def _parse_endpoint_configuration(stream: TextIO) -> EndpointConfiguration:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ConfigurationError("Endpoint configuration must be a YAML object")
-        return EndpointConfiguration.parse_obj(data)
+        configuration = EndpointConfiguration.parse_obj(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
     except yaml.YAMLError as e:
         raise ConfigurationError(f"Invalid endpoint configuration: {e}") from e
+    model = data.get("model")
+    if isinstance(model, dict) and model.get("name") is None:
+        key = "base" if "base" in model else "repo"
+        warn(
+            f"The nested `model.{key}` syntax is deprecated"
+            f" unless `model.name` is set. Use top-level `{key}:` instead"
+        )
+    return configuration

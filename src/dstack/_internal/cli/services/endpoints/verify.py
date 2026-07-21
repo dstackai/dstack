@@ -61,6 +61,7 @@ def build_verified_endpoint_preset(
     run: Run,
     endpoint_configuration: EndpointConfiguration,
     report: AgentFinalReport,
+    preset_id: Optional[str] = None,
 ) -> EndpointPreset:
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
@@ -107,6 +108,7 @@ def build_verified_endpoint_preset(
         model=report.model,
         context_length=report.context_length,
         benchmark=benchmark,
+        preset_id=preset_id,
     )
 
 
