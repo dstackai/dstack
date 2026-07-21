@@ -62,3 +62,46 @@ class TestSessionRow:
         row = _session_row({"id": "ab12cd34", "status": "interrupted", "trials": {"count": 2}})
 
         assert row["STATUS"] == "[bold gold1]interrupted[/] (2)"
+
+
+class TestGroupOrdering:
+    def test_sorts_presets_and_sessions_newest_first(self, monkeypatch):
+        from datetime import timedelta
+        from io import StringIO
+
+        from rich.console import Console
+        from rich.theme import Theme
+
+        from dstack._internal.cli.services.endpoints import output as output_module
+        from tests._internal.cli.endpoint_presets import get_endpoint_preset
+
+        buffer = StringIO()
+        monkeypatch.setattr(
+            output_module,
+            "console",
+            Console(
+                file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
+            ),
+        )
+        old = get_endpoint_preset()
+        new = old.copy(update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)})
+        sessions = [
+            {
+                "id": "aaaaaaaa",
+                "status": "interrupted",
+                "model": old.base,
+                "created_at": "2026-07-01T00:00:00+00:00",
+            },
+            {
+                "id": "bbbbbbbb",
+                "status": "interrupted",
+                "model": old.base,
+                "created_at": "2026-07-02T00:00:00+00:00",
+            },
+        ]
+
+        output_module.print_endpoint_presets([old, new], sessions=sessions)
+
+        text = buffer.getvalue()
+        assert text.index("11aa22bb") < text.index(old.id)
+        assert text.index(old.id) < text.index("bbbbbbbb") < text.index("aaaaaaaa")

@@ -643,6 +643,7 @@ async def _run_claude_process(
     agent_session: EndpointAgentSession,
 ) -> tuple[EndpointAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
+    watchdog: Optional[subprocess.Popen] = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *command,
@@ -654,6 +655,7 @@ async def _run_claude_process(
             start_new_session=not IS_WINDOWS,
             limit=_CLAUDE_STREAM_LIMIT,
         )
+        watchdog = _start_agent_watchdog(proc.pid)
         assert proc.stdin is not None
         assert proc.stdout is not None
         assert proc.stderr is not None
@@ -688,6 +690,9 @@ async def _run_claude_process(
         if proc is not None and proc.returncode is None:
             await _terminate_process(proc)
         raise
+    finally:
+        if watchdog is not None:
+            await asyncio.to_thread(_stop_agent_watchdog, watchdog)
 
     output = stdout_output
     if output.report_data is None:
@@ -1034,6 +1039,78 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
         else:
             proc.kill()
         await proc.wait()
+
+
+# The watchdog reads its stdin until EOF. The CLI holds the write end and never
+# writes while the agent runs, so EOF means the CLI is gone — any death,
+# including SIGKILL, which the CLI cannot react to itself. A disarm byte is
+# written when the CLI stops the agent on its own, so the watchdog exits
+# without touching anything (and cannot kill a reused pid).
+_AGENT_WATCHDOG_SCRIPT = """
+import os
+import signal
+import sys
+import time
+
+import psutil
+
+agent_pid = int(sys.argv[1])
+if sys.stdin.buffer.read():
+    sys.exit(0)  # disarmed: the CLI stopped the agent itself
+
+
+def _kill(hard):
+    if os.name == "posix":
+        try:
+            os.killpg(agent_pid, signal.SIGKILL if hard else signal.SIGTERM)
+        except OSError:
+            pass
+        return
+    try:
+        root = psutil.Process(agent_pid)
+        processes = [*root.children(recursive=True), root]
+    except psutil.NoSuchProcess:
+        return
+    for process in processes:
+        try:
+            process.kill() if hard else process.terminate()
+        except psutil.NoSuchProcess:
+            pass
+
+
+if psutil.pid_exists(agent_pid):
+    _kill(hard=False)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and psutil.pid_exists(agent_pid):
+        time.sleep(0.5)
+    if psutil.pid_exists(agent_pid):
+        _kill(hard=True)
+"""
+
+
+def _start_agent_watchdog(agent_pid: int) -> subprocess.Popen:
+    """Tie the agent's life to this process: if this process dies in a way it
+    cannot react to, the watchdog kills the agent's process tree."""
+    return subprocess.Popen(
+        [sys.executable, "-c", _AGENT_WATCHDOG_SCRIPT, str(agent_pid)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=not IS_WINDOWS,
+    )
+
+
+def _stop_agent_watchdog(watchdog: subprocess.Popen) -> None:
+    if watchdog.stdin is not None:
+        with suppress(OSError, ValueError):
+            watchdog.stdin.write(b"x")
+            watchdog.stdin.flush()
+        with suppress(OSError, ValueError):
+            watchdog.stdin.close()
+    try:
+        watchdog.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        watchdog.kill()
 
 
 def _terminate_windows_process_tree(pid: int) -> None:

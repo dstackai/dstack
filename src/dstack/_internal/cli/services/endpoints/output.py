@@ -50,9 +50,16 @@ def print_endpoint_presets(
 
     for base in sorted({*presets_by_base, *sessions_by_model}, key=str.lower):
         add_row_from_dict(table, {"BASE": f"[bold]{base}[/]"})
-        for preset in presets_by_base.get(base, []):
+        # Newest first within a group, as in `dstack ps`.
+        for preset in sorted(
+            presets_by_base.get(base, []), key=lambda p: p.created_at, reverse=True
+        ):
             _add_preset(table, preset, verbose=verbose)
-        for session in sessions_by_model.get(base, []):
+        for session in sorted(
+            sessions_by_model.get(base, []),
+            key=lambda s: str(s.get("created_at") or ""),
+            reverse=True,
+        ):
             _add_session(table, session)
     console.print(table)
     console.print()

@@ -2,8 +2,10 @@ import asyncio
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,6 +22,8 @@ from dstack._internal.cli.services.endpoints.agent import (
     _prepare_subprocess_command,
     _ProgressTailer,
     _RecordMirror,
+    _start_agent_watchdog,
+    _stop_agent_watchdog,
     _summarize_session_trials,
     _terminate_process,
     attach_agent_workspace,
@@ -405,6 +409,57 @@ class TestProcessCleanup:
 
         assert proc.returncode is not None
         assert not psutil.pid_exists(child_pid)
+
+
+class TestAgentWatchdog:
+    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX signals and sessions")
+    def test_kills_agent_when_cli_dies_hard(self):
+        # A fake CLI spawns a fake agent in its own session, arms the real
+        # watchdog, and hangs. SIGKILL of the CLI must take the agent down.
+        cli_script = (
+            "import subprocess, sys, time\n"
+            "from dstack._internal.cli.services.endpoints.agent import _start_agent_watchdog\n"
+            "agent = subprocess.Popen(\n"
+            "    [sys.executable, '-c', 'import time; time.sleep(300)'], start_new_session=True\n"
+            ")\n"
+            "_start_agent_watchdog(agent.pid)\n"
+            "print(agent.pid, flush=True)\n"
+            "time.sleep(300)\n"
+        )
+        cli = subprocess.Popen(
+            [sys.executable, "-c", cli_script], stdout=subprocess.PIPE, text=True
+        )
+        try:
+            assert cli.stdout is not None
+            agent_pid = int(cli.stdout.readline())
+            assert psutil.pid_exists(agent_pid)
+
+            cli.kill()
+            cli.wait(timeout=10)
+
+            try:
+                psutil.Process(agent_pid).wait(timeout=20)
+            except psutil.NoSuchProcess:
+                pass
+            assert not psutil.pid_exists(agent_pid)
+        finally:
+            with suppress(OSError):
+                cli.kill()
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX signals and sessions")
+    def test_disarmed_watchdog_leaves_agent_untouched(self):
+        agent = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True
+        )
+        try:
+            watchdog = _start_agent_watchdog(agent.pid)
+            _stop_agent_watchdog(watchdog)
+
+            assert watchdog.poll() is not None
+            assert agent.poll() is None
+        finally:
+            with suppress(OSError):
+                os.killpg(agent.pid, signal.SIGKILL)
 
 
 class TestRecordMirror:
