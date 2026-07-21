@@ -1319,8 +1319,17 @@ class _OffsetStore:
 
     def set(self, key: str, value: int) -> None:
         self._data[key] = value
+        # Re-read and update only this key: several stores (stream readers and
+        # record mirrors) share one file with disjoint keys, and writing the
+        # whole in-memory view would clobber the others' offsets.
+        try:
+            on_disk = json.loads(self._path.read_text(encoding="utf-8"))
+            data = on_disk if isinstance(on_disk, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        data[key] = value
         with suppress(OSError):
-            _write_private_text(self._path, json.dumps(self._data) + "\n")
+            _write_private_text(self._path, json.dumps(data) + "\n")
 
 
 class _ProgressTailer:

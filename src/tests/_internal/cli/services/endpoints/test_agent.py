@@ -903,3 +903,24 @@ class TestStopOrDetach:
         finally:
             with suppress(OSError):
                 os.killpg(agent.pid, signal.SIGKILL)
+
+
+class TestOffsetStoreSharing:
+    def test_disjoint_stores_do_not_clobber_each_other(self, tmp_path):
+        from dstack._internal.cli.services.endpoints.agent import _OffsetStore
+
+        state = tmp_path / ".offsets.json"
+        readers = _OffsetStore(state)
+        mirrors = _OffsetStore(state)
+
+        # Two stores with disjoint keys, interleaved writes to the same file.
+        readers.set("agent_stdout", 10)
+        mirrors.set("runs", 20)
+        readers.set("agent_stderr", 30)
+        mirrors.set("trials", 40)
+
+        reloaded = _OffsetStore(state)
+        assert reloaded.get("agent_stdout") == 10
+        assert reloaded.get("agent_stderr") == 30
+        assert reloaded.get("runs") == 20
+        assert reloaded.get("trials") == 40
