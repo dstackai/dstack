@@ -589,7 +589,7 @@ def _reconcile_gateway_replica_count(
     gateway_replicas: list[GatewayComputeModel],
 ) -> _ReplicaScalingResult:
     desired_replica_count = gateway_model.desired_replica_count
-    if desired_replica_count is None:  # pre-0.20.28 gateway
+    if desired_replica_count is None:  # pre-0.20.29 gateway
         if gateway_model.status != GatewayStatus.SUBMITTED:
             return _ReplicaScalingResult()
         desired_replica_count = gateways_services.get_gateway_configuration(gateway_model).replicas
