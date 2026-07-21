@@ -320,11 +320,12 @@ class TestCreateEndpointPreset:
 
 
 class TestBuildName:
-    def test_requires_name_and_keeps_generated_prefix_bounded(self):
-        with pytest.raises(CLIError, match="The service name is required"):
-            _get_build_name(None, "a1b2c3d4")
+    def test_derives_slug_for_nameless_and_keeps_prefix_bounded(self):
+        assert _get_build_name(None, "Qwen/Qwen3.5-27B", "a1b2c3d4") == "qwen3-5-27b-a1b2c3d4"
 
-        build_name = _get_build_name("qwen-endpoint-with-a-name-that-is-forty-one", "a1b2c3d4")
+        build_name = _get_build_name(
+            "qwen-endpoint-with-a-name-that-is-forty-one", "Qwen/Qwen3.5-27B", "a1b2c3d4"
+        )
 
         assert build_name.endswith("-a1b2c3d4")
         assert len(f"{build_name}-99999") <= 41

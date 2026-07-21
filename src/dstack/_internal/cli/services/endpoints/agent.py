@@ -329,6 +329,7 @@ def create_endpoint_agent_session(
             "status": "running",
             "pid": os.getpid(),
             "endpoint": configuration.name,
+            "name": configuration.name,
             "model": getattr(configuration.model, "base", None)
             or getattr(configuration.model, "repo", None),
             "max_trials": configuration.effective_max_trials,
@@ -415,6 +416,30 @@ def load_resumable_agent_session(preset_id: str) -> EndpointAgentSession:
     return session
 
 
+def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
+    """The name this session holds; pre-claim manifests fall back to the endpoint."""
+    if "name" in manifest:
+        value = manifest.get("name")
+        return value if isinstance(value, str) and value else None
+    value = manifest.get("endpoint")
+    return value if isinstance(value, str) and value else None
+
+
+def find_session_name_claims(name: str) -> list[EndpointAgentSession]:
+    """Sessions of any status holding `name`, including failed ones."""
+    root = get_presets_dir()
+    claims = []
+    if not root.is_dir():
+        return claims
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or path.name.startswith((".", "models--")):
+            continue
+        session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+        if claimed_session_name(session.read_manifest()) == name:
+            claims.append(session)
+    return claims
+
+
 def list_agent_sessions() -> list[dict[str, Any]]:
     root = get_presets_dir()
     entries = []
@@ -434,6 +459,7 @@ def list_agent_sessions() -> list[dict[str, Any]]:
             status = "interrupted"
         entry = dict(manifest)
         entry["id"] = path.name
+        entry["name"] = claimed_session_name(manifest)
         entry["status"] = status
         entry["trials"] = _summarize_session_trials(path / _TRIALS_FILENAME)
         entries.append(entry)

@@ -2,11 +2,14 @@ import asyncio
 import dataclasses
 import json
 import os
+import re
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
+
+from rich.table import Table
 
 from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
@@ -19,6 +22,7 @@ from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentWorkspace,
     attach_agent_workspace,
     build_endpoint_agent_env,
+    claimed_session_name,
     contains_redacted_value,
     create_agent_workspace,
     create_endpoint_agent_session,
@@ -38,9 +42,12 @@ from dstack._internal.cli.services.endpoints.verify import (
     load_endpoint_agent_report,
 )
 from dstack._internal.cli.utils.common import console, warn
+from dstack._internal.cli.utils.run import print_offers
 from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
+from dstack._internal.core.models.runs import RunSpec
 from dstack.api import Client
 
 _RUN_STOP_TIMEOUT_SECONDS = 10 * 60
@@ -64,6 +71,7 @@ def create_endpoint_preset(
     debug: bool = False,
     resume_session: Optional[EndpointAgentSession] = None,
     user_prompt: Optional[str] = None,
+    allowed_fleets: Optional[tuple[str, ...]] = None,
 ) -> EndpointPresetCreateResult:
     agent_session = resume_session or create_endpoint_agent_session(configuration, debug=debug)
     try:
@@ -79,6 +87,7 @@ def create_endpoint_preset(
                 agent_session=agent_session,
                 resume=resume_session is not None,
                 user_prompt=user_prompt,
+                allowed_fleets=allowed_fleets,
             )
         )
     except KeyboardInterrupt:
@@ -104,6 +113,7 @@ async def _create_endpoint_preset(
     agent_session: EndpointAgentSession,
     resume: bool = False,
     user_prompt: Optional[str] = None,
+    allowed_fleets: Optional[tuple[str, ...]] = None,
 ) -> EndpointPresetCreateResult:
     source_configuration = source_configuration or configuration
     initial_resume_session_id: Optional[str] = None
@@ -125,14 +135,17 @@ async def _create_endpoint_preset(
         if isinstance(claude_session_id, str) and claude_session_id:
             initial_resume_session_id = claude_session_id
         build_name = build_name or _load_build_name(workspace)
-        allowed_fleets: tuple[str, ...] = ()
+        allowed_fleets = ()
     else:
-        allowed_fleets = _get_allowed_fleets(api, configuration)
+        if allowed_fleets is None:
+            allowed_fleets = _get_allowed_fleets(api, configuration)
         if not allowed_fleets:
             raise CLIError("The project has no active fleets available for preset creation")
         auth = get_claude_auth()
         workspace = create_agent_workspace(agent_session)
-        build_name = build_name or _get_build_name(configuration.name, agent_session.preset_id)
+        build_name = build_name or _get_build_name(
+            configuration.name, configuration.model.api_model_name, agent_session.preset_id
+        )
     agent_session.update_manifest(status="running", pid=os.getpid(), claude_model=auth.model)
 
     endpoint_env = configuration.env.as_dict()
@@ -195,6 +208,7 @@ async def _create_endpoint_preset(
             endpoint_configuration=source_configuration,
             report=report,
             preset_id=agent_session.preset_id or None,
+            name=claimed_session_name(agent_session.read_manifest()),
         )
         if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
             raise CLIError("Generated preset contains a secret value")
@@ -291,15 +305,21 @@ def _suspend_agent_session(session: EndpointAgentSession) -> None:
     )
 
 
-def _get_build_name(endpoint_name: Optional[str], suffix: str) -> str:
-    if endpoint_name is None:
-        raise CLIError(
-            "The service name is required. Set `name` in the configuration or use --name"
-        )
+def _get_build_name(name: Optional[str], model_name: str, suffix: str) -> str:
+    base = name or _model_slug(model_name)
     # Leave room for the preset id and numeric submission suffix while retaining
     # a recognizable prefix.
-    prefix = endpoint_name[:26].rstrip("-")
+    prefix = base[:26].rstrip("-")
     return f"{prefix}-{suffix}"
+
+
+def _model_slug(model_name: str) -> str:
+    """A run-name-safe slug for name-less presets, from the model's basename."""
+    basename = model_name.rsplit("/", 1)[-1]
+    slug = re.sub(r"[^a-z0-9]+", "-", basename.lower()).strip("-")
+    if not slug or not slug[0].isalpha():
+        slug = f"model-{slug}".strip("-")
+    return slug
 
 
 def _load_build_name(workspace: EndpointAgentWorkspace) -> str:
@@ -311,6 +331,38 @@ def _load_build_name(workspace: EndpointAgentWorkspace) -> str:
     if not isinstance(prefix, str) or not prefix:
         raise CLIError("The session constraints do not contain a run name prefix")
     return prefix
+
+
+def plan_endpoint_preset(*, api: Client, configuration: EndpointConfiguration) -> tuple[str, ...]:
+    """Resolves the allowed fleets and shows what the agent will have to work
+    with — Project, User, the effective fleets, and their offers. Agent-free."""
+    allowed_fleets = _get_allowed_fleets(api, configuration)
+    if not allowed_fleets:
+        raise CLIError("The project has no active fleets available for preset creation")
+    _print_fleet_offers(api, allowed_fleets)
+    return allowed_fleets
+
+
+def _print_fleet_offers(api: Client, allowed_fleets: tuple[str, ...]) -> None:
+    try:
+        # Image and user are set so the server neither defaults gpu.vendor to
+        # nvidia nor pulls image config from a registry (as in `dstack offer`).
+        offer_configuration = TaskConfiguration(commands=[":"], image="scratch", user="root")
+        offer_configuration.fleets = list(allowed_fleets)
+        run_spec = RunSpec(configuration=offer_configuration, profile=None)
+        with console.status("Getting offers..."):
+            run_plan = api.client.runs.get_plan(api.project, run_spec, max_offers=10)
+        props = Table(box=None, show_header=False)
+        props.add_column(no_wrap=True)
+        props.add_column()
+        props.add_row("[bold]Project[/bold]", run_plan.project_name)
+        props.add_row("[bold]User[/bold]", run_plan.user)
+        props.add_row("[bold]Fleets[/bold]", ", ".join(allowed_fleets))
+        console.print(props)
+        console.print()
+        print_offers(run_plan.job_plans[0], dim_after_first=False)
+    except Exception as e:  # noqa: BLE001
+        warn(f"Could not list offers for the allowed fleets: {e}")
 
 
 def _get_allowed_fleets(api: Client, configuration: EndpointConfiguration) -> tuple[str, ...]:

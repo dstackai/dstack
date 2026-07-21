@@ -27,6 +27,7 @@ def build_endpoint_preset(
     context_length: int,
     benchmark: EndpointBenchmark,
     preset_id: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> EndpointPreset:
     service = service.copy(deep=True)
     service.name = None
@@ -39,6 +40,7 @@ def build_endpoint_preset(
     )
     set_service_gpu_vendors_from_validations(service, [validation])
     return EndpointPreset(
+        name=name,
         base=base_model,
         id=preset_id or make_endpoint_preset_id(service, context_length=context_length),
         model=model,
@@ -68,6 +70,7 @@ def endpoint_preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
     return {
         "base": preset.base,
         "id": preset.id,
+        **({"name": preset.name} if preset.name else {}),
         "model": preset.model,
         "context_length": preset.context_length,
         "created_at": preset.created_at.isoformat(),

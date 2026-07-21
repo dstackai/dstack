@@ -79,12 +79,16 @@ class TestEndpointPresetLocalCommands:
         with (
             patch("dstack.api.Client.from_config"),
             patch(
+                "dstack._internal.cli.commands.endpoint.plan_endpoint_preset",
+                return_value=("fleet-a",),
+            ),
+            patch(
                 "dstack._internal.cli.commands.endpoint.create_endpoint_preset",
                 side_effect=KeyboardInterrupt,
             ),
         ):
             exit_code = run_dstack_cli(
-                ["preset", "create", "-f", str(configuration_path)],
+                ["preset", "create", "-y", "-f", str(configuration_path)],
                 home_dir=tmp_path,
             )
 
@@ -289,6 +293,10 @@ env:
         with (
             patch("dstack.api.Client.from_config"),
             patch(
+                "dstack._internal.cli.commands.endpoint.plan_endpoint_preset",
+                return_value=("fleet-a",),
+            ),
+            patch(
                 "dstack._internal.cli.commands.endpoint.create_endpoint_preset",
                 return_value=result,
             ) as create,
@@ -297,6 +305,7 @@ env:
                 [
                     "preset",
                     "create",
+                    "-y",
                     "-f",
                     str(configuration_path),
                     "--name",
@@ -366,3 +375,97 @@ env:
         assert apply.call_args.kwargs["profile_name"] == "gpu"
         assert apply.call_args.kwargs["preset_ids"] == expected_ids
         assert apply.call_args.kwargs["configuration"].max_price == 0.5
+
+
+class TestPresetNameClaims:
+    def test_create_detaches_the_name_from_the_old_preset(self, tmp_path, monkeypatch):
+        preset = get_endpoint_preset().copy(update={"name": "qwen"})
+        store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
+        store.save(preset)
+        configuration_path = tmp_path / "preset.dstack.yml"
+        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
+        result = SimpleNamespace(
+            preset=preset, path=tmp_path / "preset.yaml", final_run_name="qwen-1"
+        )
+
+        with (
+            patch("dstack.api.Client.from_config"),
+            patch(
+                "dstack._internal.cli.commands.endpoint.plan_endpoint_preset",
+                return_value=("fleet-a",),
+            ),
+            patch(
+                "dstack._internal.cli.commands.endpoint.create_endpoint_preset",
+                return_value=result,
+            ) as create,
+        ):
+            exit_code = run_dstack_cli(
+                ["preset", "create", "-f", str(configuration_path), "-y"],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 0
+        create.assert_called_once()
+        assert store.get(preset.id).name is None
+
+    def test_create_without_confirmation_exits_before_creating(self, tmp_path, capsys):
+        preset = get_endpoint_preset().copy(update={"name": "qwen"})
+        store = EndpointPresetStore(tmp_path / ".dstack" / "presets")
+        store.save(preset)
+        configuration_path = tmp_path / "preset.dstack.yml"
+        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
+
+        with (
+            patch("dstack.api.Client.from_config"),
+            patch(
+                "dstack._internal.cli.commands.endpoint.plan_endpoint_preset",
+                return_value=("fleet-a",),
+            ),
+            patch("dstack._internal.cli.commands.endpoint.confirm_ask", return_value=False),
+            patch("dstack._internal.cli.commands.endpoint.create_endpoint_preset") as create,
+        ):
+            exit_code = run_dstack_cli(
+                ["preset", "create", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 0
+        create.assert_not_called()
+        assert store.get(preset.id).name == "qwen"
+
+    def test_get_and_delete_resolve_names(self, tmp_path, capsys):
+        preset = get_endpoint_preset().copy(update={"name": "qwen"})
+        EndpointPresetStore(tmp_path / ".dstack" / "presets").save(preset)
+
+        assert run_dstack_cli(["preset", "get", "qwen", "--json"], home_dir=tmp_path) == 0
+        assert json.loads(capsys.readouterr().out)["id"] == preset.id
+
+        assert run_dstack_cli(["preset", "delete", "qwen", "-y"], home_dir=tmp_path) == 0
+        assert EndpointPresetStore(tmp_path / ".dstack" / "presets").list() == []
+
+    def test_create_always_asks_even_without_a_name_conflict(self, tmp_path):
+        configuration_path = tmp_path / "preset.dstack.yml"
+        configuration_path.write_text("type: preset\nbase: Qwen/Qwen3.5-27B\n")
+
+        with (
+            patch("dstack.api.Client.from_config"),
+            patch(
+                "dstack._internal.cli.commands.endpoint.plan_endpoint_preset",
+                return_value=("fleet-a",),
+            ),
+            patch(
+                "dstack._internal.cli.commands.endpoint.confirm_ask", return_value=False
+            ) as confirm,
+            patch("dstack._internal.cli.commands.endpoint.create_endpoint_preset") as create,
+        ):
+            exit_code = run_dstack_cli(
+                ["preset", "create", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 0
+        confirm.assert_called_once_with("Create the preset?")
+        create.assert_not_called()

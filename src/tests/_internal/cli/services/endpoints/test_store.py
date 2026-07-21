@@ -218,3 +218,20 @@ class TestResolveEndpointPrompt:
                 EndpointConfiguration(name="q", base="Q/M", prompt={"path": "empty.md"}),
                 configuration_path,
             )
+
+
+class TestPresetNames:
+    def test_finds_and_detaches_names(self, tmp_path: Path):
+        store = EndpointPresetStore(tmp_path / "presets")
+        named = get_endpoint_preset().copy(update={"name": "qwen"})
+        store.save(named)
+        store.save(get_endpoint_preset().copy(update={"id": "01234567"}))
+
+        assert store.find_by_name("qwen").id == named.id
+        assert store.find_by_name("other") is None
+
+        detached = store.detach_name("qwen")
+
+        assert detached.id == named.id
+        assert store.find_by_name("qwen") is None
+        assert store.get(named.id).name is None

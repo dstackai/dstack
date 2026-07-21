@@ -76,6 +76,7 @@ def build_verified_endpoint_preset(
     endpoint_configuration: EndpointConfiguration,
     report: AgentFinalReport,
     preset_id: Optional[str] = None,
+    name: Optional[str] = None,
 ) -> EndpointPreset:
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
@@ -116,6 +117,7 @@ def build_verified_endpoint_preset(
         if isinstance(value, EnvSentinel) and key in portable_service.env:
             portable_service.env[key] = value
     return build_endpoint_preset(
+        name=name,
         service=portable_service,
         validation_replicas=_get_validation_replicas(run, service),
         base_model=report.base,

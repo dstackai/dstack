@@ -13,11 +13,15 @@ from dstack._internal.cli.models.endpoint_presets import (
 from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.endpoints.agent import (
+    find_session_name_claims,
     list_agent_sessions,
     load_resumable_agent_session,
 )
 from dstack._internal.cli.services.endpoints.apply import apply_endpoint_preset
-from dstack._internal.cli.services.endpoints.create import create_endpoint_preset
+from dstack._internal.cli.services.endpoints.create import (
+    create_endpoint_preset,
+    plan_endpoint_preset,
+)
 from dstack._internal.cli.services.endpoints.output import print_endpoint_presets
 from dstack._internal.cli.services.endpoints.store import (
     EndpointPresetStore,
@@ -61,7 +65,7 @@ class EndpointCommand(BaseCommand):
             help="Get a preset",
             formatter_class=self._parser.formatter_class,
         )
-        get_parser.add_argument("preset", metavar="ID", help="The preset ID")
+        get_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
         get_parser.add_argument(
             "--json",
             action="store_true",
@@ -98,6 +102,9 @@ class EndpointCommand(BaseCommand):
             metavar="ID",
             help="Resume an interrupted preset creation session by its preset ID",
         )
+        create_parser.add_argument(
+            "-y", "--yes", action="store_true", help="Do not ask for confirmation"
+        )
         create_parser.set_defaults(subfunc=self._create)
 
         apply_parser = preset_subparsers.add_parser(
@@ -112,7 +119,7 @@ class EndpointCommand(BaseCommand):
             action="append",
             dest="preset_ids",
             metavar="ID",
-            help="Deploy the best available preset among these IDs. Can be repeated",
+            help="Deploy the best available preset among these IDs or names. Can be repeated",
         )
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -138,7 +145,7 @@ class EndpointCommand(BaseCommand):
             "preset",
             nargs="?",
             metavar="ID",
-            help="The preset ID",
+            help="The preset ID or name",
         )
         delete_target.add_argument(
             "--base",
@@ -193,8 +200,9 @@ class EndpointCommand(BaseCommand):
 
     def _create(self, args: argparse.Namespace) -> None:
         configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
-        configuration = _get_effective_configuration(configuration, args)
+        configuration = _get_effective_configuration(configuration, args, require_name=False)
         user_prompt = resolve_endpoint_prompt(configuration, configuration_path)
+        store = EndpointPresetStore()
         resume_session = None
         if getattr(args, "resume", None):
             resume_session = load_resumable_agent_session(args.resume)
@@ -203,14 +211,22 @@ class EndpointCommand(BaseCommand):
                     "[warning]--max-trials is ignored when resuming: "
                     "session constraints are fixed at creation[/]"
                 )
+        api = Client.from_config(project_name=args.project)
+        allowed_fleets = None
+        if resume_session is None:
+            allowed_fleets = plan_endpoint_preset(api=api, configuration=configuration)
+            if not _confirm_preset_creation(store, configuration.name, assume_yes=args.yes):
+                console.print("\nExiting...")
+                return
         result = create_endpoint_preset(
-            api=Client.from_config(project_name=args.project),
+            api=api,
             configuration=configuration,
-            store=EndpointPresetStore(),
+            store=store,
             keep_service=args.keep_service,
             debug=args.debug,
             resume_session=resume_session,
             user_prompt=user_prompt,
+            allowed_fleets=allowed_fleets,
         )
         console.print(
             f"Preset [code]{result.preset.id}[/] for "
@@ -220,7 +236,8 @@ class EndpointCommand(BaseCommand):
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
     def _get(self, args: argparse.Namespace) -> None:
-        preset = EndpointPresetStore().get(args.preset)
+        store = EndpointPresetStore()
+        preset = store.get(args.preset) or store.find_by_name(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
         print(preset.json())
@@ -241,7 +258,7 @@ class EndpointCommand(BaseCommand):
     def _delete(self, args: argparse.Namespace) -> None:
         store = EndpointPresetStore()
         if args.preset is not None:
-            preset = store.get(args.preset)
+            preset = store.get(args.preset) or store.find_by_name(args.preset)
             if preset is None:
                 raise CLIError(f"Preset {args.preset!r} does not exist")
             presets = [preset]
@@ -343,22 +360,61 @@ def _session_matches_model(
     return model == base or repo_to_base.get(model) == base
 
 
-def _apply_name(configuration: EndpointConfiguration, name: str | None) -> None:
+def _apply_name(configuration: EndpointConfiguration, name: str | None, *, required: bool) -> None:
     if name is not None:
         configuration.name = name
     if configuration.name is None:
-        raise CLIError(
-            "The service name is required. Set `name` in the configuration or use --name"
-        )
+        if required:
+            raise CLIError(
+                "The service name is required. Set `name` in the configuration or use --name"
+            )
+        return
     if not is_valid_dstack_resource_name(configuration.name):
         raise CLIError("The name must match '^[a-z][a-z0-9-]{1,40}$'")
+
+
+def _confirm_preset_creation(
+    store: EndpointPresetStore, name: str | None, *, assume_yes: bool
+) -> bool:
+    """One apply-style confirmation; detaches the name from any holder on yes."""
+    preset_holder = None
+    session_holders = []
+    if name is not None:
+        preset_holder = store.find_by_name(name)
+        session_holders = [
+            session
+            for session in find_session_name_claims(name)
+            if preset_holder is None or session.preset_id != preset_holder.id
+        ]
+    holders = []
+    if preset_holder is not None:
+        holders.append(f"preset [code]{preset_holder.id}[/]")
+    holders.extend(f"session [code]{session.preset_id}[/]" for session in session_holders)
+    if holders:
+        message = (
+            f"The name [code]{name}[/] is already used by {', '.join(holders)}."
+            f" Detach it and create a new preset?"
+        )
+    elif name is not None:
+        message = f"Create the preset [code]{name}[/]?"
+    else:
+        message = "Create the preset?"
+    if not assume_yes and not confirm_ask(message):
+        return False
+    if preset_holder is not None and name is not None:
+        store.detach_name(name)
+    for session in session_holders:
+        session.update_manifest(name=None)
+    return True
 
 
 def _get_effective_configuration(
     configuration: EndpointConfiguration,
     args: argparse.Namespace,
+    *,
+    require_name: bool = True,
 ) -> EndpointConfiguration:
-    _apply_name(configuration, args.name)
+    _apply_name(configuration, args.name, required=require_name)
     if getattr(args, "max_trials", None) is not None:
         configuration.max_trials = args.max_trials
     profile = load_profile(Path.cwd(), args.profile)

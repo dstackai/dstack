@@ -104,6 +104,8 @@ class EndpointPreset(CoreModel):
     base: str
     """Base model used for local preset lookup."""
     id: str
+    name: Optional[str] = None
+    """Mutable human name; at most one preset or in-flight session holds it."""
     model: str
     """Exact repo/path loaded by the service command."""
     context_length: PositiveInt

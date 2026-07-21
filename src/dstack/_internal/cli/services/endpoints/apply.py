@@ -73,14 +73,22 @@ def _get_candidate_presets(
 ) -> list[EndpointPreset]:
     if not preset_ids:
         return presets
-    presets_by_id = {preset.id: preset for preset in presets}
-    missing = [preset_id for preset_id in preset_ids if preset_id not in presets_by_id]
+    presets_by_ref = {preset.id: preset for preset in presets}
+    for preset in presets:
+        if preset.name is not None:
+            presets_by_ref.setdefault(preset.name, preset)
+    missing = [ref for ref in preset_ids if ref not in presets_by_ref]
     if len(missing) == 1:
         raise CLIError(f"Preset {missing[0]} does not exist")
     if missing:
         raise CLIError(f"Presets {', '.join(missing)} do not exist")
-    # Preserve the order given: capacity-aware selection tries ids in turn.
-    return [presets_by_id[preset_id] for preset_id in preset_ids]
+    # Preserve the order given: capacity-aware selection tries candidates in turn.
+    candidates = []
+    for ref in preset_ids:
+        preset = presets_by_ref[ref]
+        if preset not in candidates:
+            candidates.append(preset)
+    return candidates
 
 
 def _get_matching_presets(

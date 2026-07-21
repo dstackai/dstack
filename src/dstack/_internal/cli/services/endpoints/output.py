@@ -58,6 +58,7 @@ def print_endpoint_presets(
     table = Table(box=None)
     table.add_column("BASE", no_wrap=True)
     table.add_column("ID", no_wrap=True)
+    table.add_column("NAME", no_wrap=True)
     table.add_column("RESOURCES" if verbose else "GPU", style="secondary")
     table.add_column("BENCHMARK", min_width=len("con=1"), overflow="fold")
     table.add_column("STATUS", no_wrap=True)
@@ -124,6 +125,7 @@ def _add_session(table: Table, session: dict[str, Any], base_label: Optional[str
         table,
         {
             "ID": str(session.get("id", "")),
+            "NAME": str(session.get("name") or ""),
             "GPU": gpu,
             "RESOURCES": gpu,
             "BENCHMARK": benchmark,
@@ -144,6 +146,7 @@ def _add_preset(
     column = "RESOURCES" if verbose else "GPU"
     row = {
         "ID": preset.id,
+        "NAME": preset.name or "",
         column: _format_resources(groups[0].resources, verbose=verbose),
         "STATUS": _format_status("ready") + _format_trial_progress(creation),
         "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),

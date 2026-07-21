@@ -74,6 +74,21 @@ class EndpointPresetStore:
                 pass
         return path
 
+    def find_by_name(self, name: str) -> EndpointPreset | None:
+        for preset in self.list():
+            if preset.name == name:
+                return preset
+        return None
+
+    def detach_name(self, name: str) -> EndpointPreset | None:
+        """Detaches `name` from the preset holding it, keeping the preset."""
+        preset = self.find_by_name(name)
+        if preset is None:
+            return None
+        detached = preset.copy(update={"name": None})
+        self.save(detached)
+        return detached
+
     def delete(self, preset_id: str) -> bool:
         preset = self.get(preset_id)
         if preset is None:

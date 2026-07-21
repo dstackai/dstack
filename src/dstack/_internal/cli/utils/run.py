@@ -29,6 +29,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     ImagePullProgress,
     Job,
+    JobPlan,
     JobStatus,
     JobSubmission,
     Probe,
@@ -174,6 +175,25 @@ def print_run_plan(
     for key, value in (extra_properties or {}).items():
         props.add_row(th(key), value)
 
+    console.print(props)
+    console.print()
+    print_offers(
+        job_plan,
+        max_offers=max_offers,
+        dim_after_first=include_run_properties,
+        show_offer_fleet_hint=show_offer_fleet_hint,
+        no_fleets=no_fleets,
+    )
+
+
+def print_offers(
+    job_plan: JobPlan,
+    *,
+    max_offers: Optional[int] = None,
+    dim_after_first: bool = True,
+    show_offer_fleet_hint: bool = False,
+    no_fleets: bool = False,
+):
     offers = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     offers.add_column("#")
     offers.add_column("BACKEND", style="grey58", ratio=2)
@@ -197,13 +217,11 @@ def print_run_plan(
             instance,
             f"${offer.price:.4f}".rstrip("0").rstrip("."),
             format_instance_availability(offer.availability),
-            style=None if i == 1 or not include_run_properties else "secondary",
+            style=None if i == 1 or not dim_after_first else "secondary",
         )
     if job_plan.total_offers > len(displayed_offers):
         offers.add_row("", "...", style="secondary")
 
-    console.print(props)
-    console.print()
     if len(displayed_offers) > 0:
         show_offer_fleet_hint_before_table = (
             show_offer_fleet_hint
@@ -429,7 +447,7 @@ def _format_instance_type(
 
 
 def _format_run_name(run: CoreRun, show_deployment_num: bool) -> str:
-    parts: List[str] = [run.run_spec.run_name]
+    parts: List[str] = [run.run_spec.run_name or ""]
     if show_deployment_num:
         parts.append(f" [secondary]deployment={run.deployment_num}[/]")
     return "".join(parts)
