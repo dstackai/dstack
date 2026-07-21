@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -1572,6 +1573,52 @@ class TestGetGatewayPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_get_plan_rejects_failed_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+            wildcard_domain="old.example.com",
+            status=GatewayStatus.FAILED,
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/get_plan",
+            json={
+                "spec": {
+                    "configuration": {
+                        "type": "gateway",
+                        "name": "my-gateway",
+                        "backend": "aws",
+                        "region": "us-east-1",
+                        "domain": "new.example.com",
+                    }
+                }
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 400
+        assert "FAILED status" in response.json()["detail"][0]["msg"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_get_plan_with_region_change_is_create(
         self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
     ):
@@ -2236,3 +2283,66 @@ class TestApplyGatewayPlan:
         )
         assert response.status_code == 400
         assert "being deleted" in response.json()["detail"][0]["msg"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    @pytest.mark.parametrize("force", [False, True])
+    async def test_rejects_apply_on_failed_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        populate_configuration: bool,
+        force: bool,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+            wildcard_domain="old.example.com",
+            status=GatewayStatus.FAILED,
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
+        )
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        assert get_response.status_code == 200
+        current_resource = get_response.json()
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "domain": "new.example.com",
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": force,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 400
+        assert "FAILED status" in response.json()["detail"][0]["msg"]
