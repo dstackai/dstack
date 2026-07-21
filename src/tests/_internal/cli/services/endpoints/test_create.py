@@ -562,3 +562,83 @@ class TestInterruptAndResume:
         assert result.preset.id == "fe98dc76"
         assert (session_dir / "workspace").is_dir()
         remove_agent_workspace(agent_session)
+
+    @pytest.mark.asyncio
+    async def test_pins_user_prompt_on_create(self, creation_context, monkeypatch, tmp_path):
+        session_dir = tmp_path / "ab34ef12"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
+        agent_session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
+        )
+        captured = {}
+
+        async def run_agent(**kwargs):
+            captured.update(kwargs)
+            return EndpointAgentProcessOutput(
+                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            run_agent,
+        )
+
+        await _create_endpoint_preset(
+            api=creation_context.api,
+            configuration=creation_context.configuration,
+            source_configuration=creation_context.source_configuration,
+            store=creation_context.store,
+            build_name="qwen-build",
+            agent_session=agent_session,
+            user_prompt="Optimize for RAG traffic.",
+        )
+
+        assert agent_session.read_user_prompt() == "Optimize for RAG traffic."
+        assert "## Additional instructions" in captured["prompt"]
+        assert "Optimize for RAG traffic." in captured["prompt"]
+
+    @pytest.mark.asyncio
+    async def test_resume_keeps_the_pinned_user_prompt(
+        self, creation_context, monkeypatch, tmp_path, capsys
+    ):
+        session_dir = tmp_path / "ab34ef12"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
+        agent_session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
+        )
+        workspace = create_agent_workspace(agent_session)
+        workspace.constraints_path.write_text(
+            '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
+        )
+        agent_session.update_manifest(claude_session_id="sid-abc")
+        agent_session.write_user_prompt("Optimize for RAG traffic.")
+        captured = {}
+
+        async def run_agent(**kwargs):
+            captured.update(kwargs)
+            return EndpointAgentProcessOutput(
+                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            run_agent,
+        )
+
+        await _create_endpoint_preset(
+            api=creation_context.api,
+            configuration=creation_context.configuration,
+            source_configuration=creation_context.source_configuration,
+            store=creation_context.store,
+            agent_session=agent_session,
+            resume=True,
+            user_prompt="A different prompt.",
+        )
+
+        # The session keeps its original prompt; the new one is ignored with a warning.
+        assert "Optimize for RAG traffic." in captured["prompt"]
+        assert "A different prompt." not in captured["prompt"]
+        assert "keepsitsoriginalprompt" in "".join(capsys.readouterr().out.split())
+        remove_agent_workspace(agent_session)

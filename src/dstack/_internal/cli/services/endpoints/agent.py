@@ -36,6 +36,7 @@ _TRIALS_FILENAME = "trials.jsonl"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
+_USER_PROMPT_FILENAME = "user_prompt.md"
 _PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
 _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
@@ -146,6 +147,16 @@ class EndpointAgentSession:
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
+
+    def write_user_prompt(self, user_prompt: str) -> None:
+        _write_private_text(self.path / _USER_PROMPT_FILENAME, user_prompt + "\n")
+
+    def read_user_prompt(self) -> Optional[str]:
+        try:
+            text = (self.path / _USER_PROMPT_FILENAME).read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        return text or None
 
     def write_constraints(self, constraints_text: str) -> None:
         _write_private_text(self.path / _CONSTRAINTS_FILENAME, constraints_text)

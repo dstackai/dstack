@@ -13,9 +13,10 @@ from dstack._internal.cli.models.endpoint_presets import (
     EndpointBenchmarkMetrics,
     EndpointBenchmarkWorkload,
 )
+from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.endpoints import store as store_module
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
-from dstack._internal.core.errors import CLIError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.envs import EnvSentinel
 from tests._internal.cli.endpoint_presets import (
     get_endpoint_benchmark,
@@ -183,3 +184,37 @@ class TestParseEndpointConfiguration:
 
         warn.assert_not_called()
         assert configuration.model is not None
+
+
+class TestResolveEndpointPrompt:
+    def test_resolves_inline_and_file_relative_to_configuration(self, tmp_path: Path):
+        (tmp_path / "notes.md").write_text("From a file.\n")
+        configuration_path = str(tmp_path / "preset.dstack.yml")
+        inline = EndpointConfiguration(name="q", base="Q/M", prompt="Inline text.")
+        from_file = EndpointConfiguration(name="q", base="Q/M", prompt={"path": "notes.md"})
+
+        assert store_module.resolve_endpoint_prompt(inline, configuration_path) == "Inline text."
+        assert (
+            store_module.resolve_endpoint_prompt(from_file, configuration_path) == "From a file."
+        )
+        assert (
+            store_module.resolve_endpoint_prompt(
+                EndpointConfiguration(name="q", base="Q/M"), configuration_path
+            )
+            is None
+        )
+
+    def test_rejects_missing_and_empty_prompt_files(self, tmp_path: Path):
+        configuration_path = str(tmp_path / "preset.dstack.yml")
+        (tmp_path / "empty.md").write_text("  \n")
+
+        with pytest.raises(ConfigurationError, match="Failed to read"):
+            store_module.resolve_endpoint_prompt(
+                EndpointConfiguration(name="q", base="Q/M", prompt={"path": "missing.md"}),
+                configuration_path,
+            )
+        with pytest.raises(ConfigurationError, match="is empty"):
+            store_module.resolve_endpoint_prompt(
+                EndpointConfiguration(name="q", base="Q/M", prompt={"path": "empty.md"}),
+                configuration_path,
+            )

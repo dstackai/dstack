@@ -22,6 +22,7 @@ from dstack._internal.cli.services.endpoints.output import print_endpoint_preset
 from dstack._internal.cli.services.endpoints.store import (
     EndpointPresetStore,
     load_endpoint_configuration,
+    resolve_endpoint_prompt,
 )
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
@@ -191,8 +192,9 @@ class EndpointCommand(BaseCommand):
             time.sleep(5)
 
     def _create(self, args: argparse.Namespace) -> None:
-        _, configuration = load_endpoint_configuration(args.configuration_file)
+        configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args)
+        user_prompt = resolve_endpoint_prompt(configuration, configuration_path)
         resume_session = None
         if getattr(args, "resume", None):
             resume_session = load_resumable_agent_session(args.resume)
@@ -208,6 +210,7 @@ class EndpointCommand(BaseCommand):
             keep_service=args.keep_service,
             debug=args.debug,
             resume_session=resume_session,
+            user_prompt=user_prompt,
         )
         console.print(
             f"Preset [code]{result.preset.id}[/] for "

@@ -10,7 +10,11 @@ import yaml
 from pydantic import ValidationError
 
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.models.endpoints import (
+    MAX_PROMPT_LENGTH,
+    EndpointConfiguration,
+    EndpointPromptFile,
+)
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
@@ -145,3 +149,25 @@ def _parse_endpoint_configuration(stream: TextIO) -> EndpointConfiguration:
             f" unless `model.name` is set. Use top-level `{key}:` instead"
         )
     return configuration
+
+
+def resolve_endpoint_prompt(
+    configuration: EndpointConfiguration, configuration_path: str
+) -> str | None:
+    """The resolved user prompt text; file paths are relative to the configuration file."""
+    if configuration.prompt is None:
+        return None
+    if isinstance(configuration.prompt, str):
+        return configuration.prompt.strip()
+    assert isinstance(configuration.prompt, EndpointPromptFile)
+    base = Path.cwd() if configuration_path == "-" else Path(configuration_path).parent
+    path = base / configuration.prompt.path
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as e:
+        raise ConfigurationError(f"Failed to read the prompt file {path}: {e}") from e
+    if not text:
+        raise ConfigurationError(f"The prompt file {path} is empty")
+    if len(text) > MAX_PROMPT_LENGTH:
+        raise ConfigurationError(f"The prompt file {path} exceeds {MAX_PROMPT_LENGTH} characters")
+    return text

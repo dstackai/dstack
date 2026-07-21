@@ -63,6 +63,7 @@ def create_endpoint_preset(
     build_name: Optional[str] = None,
     debug: bool = False,
     resume_session: Optional[EndpointAgentSession] = None,
+    user_prompt: Optional[str] = None,
 ) -> EndpointPresetCreateResult:
     agent_session = resume_session or create_endpoint_agent_session(configuration, debug=debug)
     try:
@@ -77,6 +78,7 @@ def create_endpoint_preset(
                 build_name=build_name,
                 agent_session=agent_session,
                 resume=resume_session is not None,
+                user_prompt=user_prompt,
             )
         )
     except KeyboardInterrupt:
@@ -101,10 +103,18 @@ async def _create_endpoint_preset(
     build_name: Optional[str] = None,
     agent_session: EndpointAgentSession,
     resume: bool = False,
+    user_prompt: Optional[str] = None,
 ) -> EndpointPresetCreateResult:
     source_configuration = source_configuration or configuration
     initial_resume_session_id: Optional[str] = None
     if resume:
+        # The prompt is fixed at session creation, like the constraints.
+        pinned_prompt = agent_session.read_user_prompt()
+        if user_prompt is not None and user_prompt != pinned_prompt:
+            warn(
+                "The configuration prompt is ignored when resuming: the session keeps its original prompt"
+            )
+        user_prompt = pinned_prompt
         auth = get_claude_auth()
         workspace = attach_agent_workspace(agent_session)
         manifest = agent_session.read_manifest()
@@ -150,8 +160,10 @@ async def _create_endpoint_preset(
         workspace=workspace,
         token=token,
     )
-    prompt = get_endpoint_agent_system_prompt()
+    prompt = get_endpoint_agent_system_prompt(user_prompt=user_prompt)
     if not resume:
+        if user_prompt:
+            agent_session.write_user_prompt(user_prompt)
         constraints_text = _build_constraints(
             configuration=configuration,
             build_name=build_name,

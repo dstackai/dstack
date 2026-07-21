@@ -13,6 +13,7 @@ from dstack._internal.utils.common import pretty_date, pretty_resources
 _STATUS_DISPLAY = {
     "ready": ("success", "green"),
     "running": ("clauding", "bold deep_sky_blue1"),
+    "verifying": ("verifying", "bold deep_sky_blue1"),
     "interrupted": ("interrupted", "bold gold1"),
     "failed": ("failed", "indian_red1"),
 }
@@ -21,6 +22,17 @@ _STATUS_DISPLAY = {
 def _format_status(status: str) -> str:
     text, style = _STATUS_DISPLAY.get(status, (status, None))
     return f"[{style}]{text}[/]" if style else text
+
+
+def _trials_exhausted(session: dict[str, Any]) -> bool:
+    trials = session.get("trials")
+    max_trials = session.get("max_trials")
+    return (
+        isinstance(trials, dict)
+        and isinstance(max_trials, int)
+        and isinstance(trials.get("count"), int)
+        and trials["count"] >= max_trials
+    )
 
 
 def _format_trial_progress(session: Optional[dict[str, Any]]) -> str:
@@ -92,7 +104,12 @@ def _add_session(table: Table, session: dict[str, Any], base_label: Optional[str
             created = created_at
     benchmark = ""
     gpu = ""
-    status = _format_status(str(session.get("status", ""))) + _format_trial_progress(session)
+    status_key = str(session.get("status", ""))
+    if status_key == "running" and _trials_exhausted(session):
+        # The trial budget is spent, so the agent is deploying and verifying
+        # the final service.
+        status_key = "verifying"
+    status = _format_status(status_key) + _format_trial_progress(session)
     trials = session.get("trials")
     if isinstance(trials, dict):
         best = trials.get("best")

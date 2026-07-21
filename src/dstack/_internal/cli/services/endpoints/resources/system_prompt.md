@@ -35,8 +35,15 @@ pick the hardware (the best available within the allowed `dstack` fleets),
 the model variant (only if `model` has `base`), the serving framework, the
 Docker image and dependencies, the serving framework parameters, and
 anything else within these constraints — except generating custom kernels,
-patching drivers, or patching serving framework source code.
+patching drivers, or patching serving framework source code<!--?prompt:,
+unless `## Additional instructions` explicitly allows it-->.
 
+<!--?prompt:## Additional instructions
+
+```
+{prompt}
+```
+-->
 ## CLI And Skills
 
 All trials and the final verification are done using `dstack`. This includes

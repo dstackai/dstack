@@ -131,3 +131,19 @@ class TestDoneProgress:
         text = buffer.getvalue()
         assert "success (3/4)" in text
         assert text.count(preset.id) == 1
+
+
+class TestVerifyingStatus:
+    def test_running_session_with_exhausted_trials_shows_verifying(self):
+        row = _session_row(
+            {"id": "ab12cd34", "status": "running", "max_trials": 2, "trials": {"count": 2}}
+        )
+
+        assert row["STATUS"] == "[bold deep_sky_blue1]verifying[/] [secondary](2/2)[/]"
+
+    def test_running_session_with_remaining_trials_stays_clauding(self):
+        row = _session_row(
+            {"id": "ab12cd34", "status": "running", "max_trials": 2, "trials": {"count": 1}}
+        )
+
+        assert row["STATUS"].startswith("[bold deep_sky_blue1]clauding[/]")

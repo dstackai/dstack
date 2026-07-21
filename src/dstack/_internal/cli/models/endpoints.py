@@ -69,6 +69,21 @@ class EndpointModelBase(CoreModel):
 
 EndpointModelSpec = Union[EndpointModelRepo, EndpointModelBase]
 
+MAX_PROMPT_LENGTH = 10_000
+
+
+class EndpointPromptFile(CoreModel):
+    path: Annotated[
+        str,
+        Field(description="The path to a prompt file, relative to the configuration file"),
+    ]
+
+    @validator("path")
+    def validate_path(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Prompt path must be a non-empty string")
+        return value
+
 
 class EndpointConfigurationConfig(ProfileParamsConfig):
     @staticmethod
@@ -111,6 +126,14 @@ class EndpointConfiguration(
     repo: Annotated[
         Optional[str],
         Field(description="The exact model repo/path to serve. Shorthand for `model.repo`"),
+    ] = None
+    prompt: Annotated[
+        Optional[Union[str, EndpointPromptFile]],
+        Field(
+            description=(
+                "Additional instructions for the preset creation agent, inline or as a file `path`"
+            )
+        ),
     ] = None
     context_length: Annotated[
         Optional[PositiveInt], Field(description="The minimum required context length")
@@ -175,6 +198,15 @@ class EndpointConfiguration(
     def parse_model(cls, value: Any) -> Any:
         if isinstance(value, str):
             return {"repo": _validate_model(value, field="model")}
+        return value
+
+    @validator("prompt")
+    def validate_prompt(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            if not value.strip():
+                raise ValueError("Prompt must be a non-empty string")
+            if len(value) > MAX_PROMPT_LENGTH:
+                raise ValueError(f"Prompt must be at most {MAX_PROMPT_LENGTH} characters")
         return value
 
 
