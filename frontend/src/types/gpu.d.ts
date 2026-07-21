@@ -27,7 +27,7 @@ declare interface IResourcesSpecRequest {
     memory?: TRange | number | string;
     shm_size?: number | string;
     gpu?: IGPUSpecRequest | number | string;
-    disk?: { size: TRange | number | string } | number | string;
+    disk?: { size: TRange | number | string } | number | string | null;
 }
 
 declare interface ITaskConfigurationQueryParams {
