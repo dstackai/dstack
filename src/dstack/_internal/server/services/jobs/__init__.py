@@ -135,8 +135,25 @@ def emit_job_status_change_event(
             termination_reason_message=termination_reason_message,
         ),
         actor=actor,
-        targets=[events.Target.from_model(job_model)],
+        targets=get_job_and_run_event_targets(job_model),
     )
+
+
+def get_job_and_run_event_targets(job_model: JobModel) -> list[events.Target]:
+    """
+    Returns job and run event targets for events that can be about never-provisioned job submissions.
+    Such submissions can be deleted.
+    Target the run directly so that such events stay discoverable after the job model is deleted.
+    """
+    return [
+        events.Target.from_model(job_model),
+        events.Target(
+            type=events.EventTargetType.RUN,
+            project_id=job_model.project_id,
+            id=job_model.run_id,
+            name=job_model.run_name,
+        ),
+    ]
 
 
 async def get_jobs_from_run_spec(
