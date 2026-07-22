@@ -11,8 +11,8 @@ from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
-    "ready": ("success", "green"),
-    "running": ("clauding", "bold deep_sky_blue1"),
+    "ready": ("verified", "grey"),
+    "running": ("clauding", "bold sea_green3"),
     "verifying": ("verifying", "bold deep_sky_blue1"),
     "interrupted": ("interrupted", "bold gold1"),
     "failed": ("failed", "indian_red1"),
@@ -58,11 +58,11 @@ def print_endpoint_presets(
     table = Table(box=None)
     table.add_column("BASE", no_wrap=True)
     table.add_column("ID", no_wrap=True)
-    table.add_column("NAME", no_wrap=True)
     table.add_column("RESOURCES" if verbose else "GPU", style="secondary")
     table.add_column("BENCHMARK", min_width=len("con=1"), overflow="fold")
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", no_wrap=True, style="secondary")
+    table.add_column("NAME", no_wrap=True, style="secondary")
     presets_by_base: dict[str, list[EndpointPreset]] = defaultdict(list)
     repo_to_base: dict[str, str] = {}
     for preset in presets:

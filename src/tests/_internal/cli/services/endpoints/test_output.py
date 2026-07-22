@@ -48,7 +48,7 @@ class TestSessionRow:
             }
         )
 
-        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] [secondary](2/3)[/]"
+        assert row["STATUS"] == "[bold sea_green3]clauding[/] [secondary](2/3)[/]"
         assert row["BENCHMARK"] == "best trial: con=8 2339 tok/s"
         assert row["GPU"] == "A40:48GB:1"
 
@@ -57,7 +57,7 @@ class TestSessionRow:
             {"id": "ab12cd34", "status": "running", "max_trials": 3, "trials": {"count": 0}}
         )
 
-        assert row["STATUS"] == "[bold deep_sky_blue1]clauding[/] [secondary](0/3)[/]"
+        assert row["STATUS"] == "[bold sea_green3]clauding[/] [secondary](0/3)[/]"
         assert row["BENCHMARK"] == ""
 
     def test_omits_progress_without_trials_data(self):
@@ -129,7 +129,7 @@ class TestDoneProgress:
         output_module.print_endpoint_presets([preset], sessions=sessions)
 
         text = buffer.getvalue()
-        assert "success (3/4)" in text
+        assert "verified (3/4)" in text
         assert text.count(preset.id) == 1
 
 
@@ -146,4 +146,4 @@ class TestVerifyingStatus:
             {"id": "ab12cd34", "status": "running", "max_trials": 2, "trials": {"count": 1}}
         )
 
-        assert row["STATUS"].startswith("[bold deep_sky_blue1]clauding[/]")
+        assert row["STATUS"].startswith("[bold sea_green3]clauding[/]")
