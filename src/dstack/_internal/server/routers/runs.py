@@ -10,6 +10,7 @@ from dstack._internal.server.compatibility.runs import patch_run, patch_run_plan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
+    MAX_JOB_SUBMISSIONS_LIMIT,
     ApplyRunPlanRequest,
     DeleteRunsRequest,
     GetRunPlanRequest,
@@ -61,10 +62,14 @@ async def list_runs(
     `project_name`, `repo_id`, `username`, and `only_active` can be specified as filters.
     Setting `only_active` to `true` excludes finished runs and deleted runs.
     Specifying `repo_id` without `project_name` returns no runs.
+    At most `job_submissions_limit` latest job submissions are returned per job.
 
     The results are paginated. To get the next page, pass `submitted_at` and `id` of
     the last run from the previous page as `prev_submitted_at` and `prev_run_id`.
     """
+    job_submissions_limit = body.job_submissions_limit
+    if job_submissions_limit is None:
+        job_submissions_limit = MAX_JOB_SUBMISSIONS_LIMIT
     run_list = await runs.list_user_runs(
         session=session,
         user=user,
@@ -73,7 +78,7 @@ async def list_runs(
         username=body.username,
         only_active=body.only_active,
         include_jobs=body.include_jobs,
-        job_submissions_limit=body.job_submissions_limit,
+        job_submissions_limit=job_submissions_limit,
         prev_submitted_at=body.prev_submitted_at,
         prev_run_id=body.prev_run_id,
         limit=body.limit,
