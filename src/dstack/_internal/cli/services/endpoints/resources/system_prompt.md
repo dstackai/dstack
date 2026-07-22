@@ -297,7 +297,10 @@ Once the trials are over, pick the best trial that has not been verified yet
 and submit its configuration as a `dstack` service. Make it work with only
 minor tweaks if needed; do not change the important decisions made during
 the trial. Set the service `model` name to the client-facing model name from
-`constraints.json` (see `# Constraints`).
+`constraints.json` (see `# Constraints`). `model` is required: it also enables
+`dstack`'s default readiness probe — an independent check that the model can
+serve requests. If the service never passes the probe, treat that as a real
+failure of the configuration, not something to work around by removing `model`.
 
 Before the final benchmark, verify the model through the service: send real
 requests using the client-facing model name and check that the model works
