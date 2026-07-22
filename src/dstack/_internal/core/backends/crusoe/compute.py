@@ -180,7 +180,9 @@ class CrusoeCompute(
                 result[prog_name] = available
         return result
 
-    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterable[OfferModifier]:
         # Only adjust disk size for types without ephemeral NVMe (disk_gb == 0).
         # Types with ephemeral NVMe already have their disk_size set by gpuhunt.
         base_modifier = get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)

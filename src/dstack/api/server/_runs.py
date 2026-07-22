@@ -72,9 +72,13 @@ class RunsAPIClient(APIClientGroup):
         return parse_obj_as(Run.__response__, resp.json())
 
     def get_plan(
-        self, project_name: str, run_spec: RunSpec, max_offers: Optional[int] = None
+        self,
+        project_name: str,
+        run_spec: RunSpec,
+        max_offers: Optional[int] = None,
+        full_offers: bool = False,
     ) -> RunPlan:
-        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers)
+        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers, full_offers=full_offers)
         body = copy.deepcopy(body)
         patch_run_spec(body.run_spec)
         resp = self._request(

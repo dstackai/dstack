@@ -59,6 +59,11 @@ class OfferCommand(APIBaseCommand):
             type=int,
             default=50,
         )
+        self._parser.add_argument(
+            "--full-offers",
+            action="store_true",
+            help="Show full offers not adjusted by requirements",
+        )
         resources_group = self._parser.add_argument_group("Resources")
         register_resources_args(resources_group)
         # TODO: register only relevant options
@@ -79,6 +84,7 @@ class OfferCommand(APIBaseCommand):
             project_name=self.api.project,
             run_spec=run_spec,
             max_offers=args.max_offers,
+            full_offers=args.full_offers,
         )
         job_plan = run_plan.job_plans[0]
         if args.format == "plain":
@@ -103,6 +109,7 @@ class OfferCommand(APIBaseCommand):
             project_name=self.api.project,
             run_spec=run_spec,
             group_by=[g for g in group_by if g != "gpu"],
+            full_offers=args.full_offers,
         )
         if args.format == "plain":
             print_gpu_table(gpus, run_spec, group_by, self.api.project)

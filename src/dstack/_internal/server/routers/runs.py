@@ -139,6 +139,7 @@ async def get_plan(
         user=user,
         run_spec=body.run_spec,
         max_offers=body.max_offers,
+        full_offers=body.full_offers,
         legacy_repo_dir=legacy_repo_dir,
     )
     patch_run_plan(run_plan, client_version)

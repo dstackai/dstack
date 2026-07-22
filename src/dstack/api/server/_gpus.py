@@ -15,10 +15,12 @@ class GpusAPIClient(APIClientGroup):
         project_name: str,
         run_spec: RunSpec,
         group_by: Optional[List[str]] = None,
+        full_offers: bool = False,
     ) -> List[GpuGroup]:
         body = ListGpusRequest(
             run_spec=run_spec,
             group_by=cast(Optional[List[Literal["backend", "region", "count"]]], group_by),
+            full_offers=full_offers,
         )
         resp = self._request(
             f"/api/project/{project_name}/gpus/list",

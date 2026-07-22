@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, ClassVar, Dict, List, Optional
 
 import git
 import requests
@@ -109,12 +109,23 @@ class Compute(ABC):
     """
 
     @abstractmethod
-    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+    def get_offers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
         If the provider is added to gpuhunt, typically gets offers using
         `base.offers.get_catalog_offers()` and extends them with availability info.
         It is called from async code in executor. It can block on call but not between yields.
+
+        if `full_offers` set to `True`, the method should not adjust offer's resources according to
+        `requirements`. For most backends, this flag has no meaning, as they work with predefined
+        provider offers (even configurable disk size reflects the actual disk created once the
+        instance is provisioned), but some backends such as Kubernetes and Slurm allocates flexible
+        slices of instances (nodes) according to the requested resources; such Computes usually
+        generate synthetic offers from discovered nodes on the fly; these synthetic offers should
+        reflect either resources that would be allocated based on `requirements`
+        (`full_offers=False`) or full allocatable node resources (`full_offers=True`).
         """
         pass
 
@@ -190,11 +201,15 @@ class ComputeWithAllOffersCached(ABC):
         """
         pass
 
-    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterable[OfferModifier]:
         """
         Returns functions that modify offers before they are filtered by requirements.
         A modifier function can return `None` to exclude the offer.
         E.g. can be used to set appropriate disk size based on requirements.
+
+        See `Compute.get_offers()` for the `full_offers` argument description.
         """
         return []
 
@@ -207,12 +222,16 @@ class ComputeWithAllOffersCached(ABC):
         """
         return None
 
-    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+    def get_offers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterator[InstanceOfferWithAvailability]:
         with self._offers_cache_execution_lock:
             # Cache lock does not prevent concurrent execution.
             # We use a separate lock to avoid requesting offers in parallel, re-doing the work and hitting rate limits.
             cached_offers = self._get_all_offers_with_availability_cached()
-        offers = self.__apply_modifiers(cached_offers, self.get_offers_modifiers(requirements))
+        offers = self.__apply_modifiers(
+            cached_offers, self.get_offers_modifiers(requirements, full_offers)
+        )
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
@@ -246,6 +265,12 @@ class ComputeWithFilteredOffersCached(ABC):
     It caches offers using requirements as key.
     """
 
+    full_offers_argument_has_effect: ClassVar[bool] = False
+    """
+    Set to `True` if `get_offers_by_requirements()` produces different results based on
+    the `full_offers` value. Doubles the amount of cached data.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self._offers_cache_lock = threading.Lock()
@@ -253,19 +278,30 @@ class ComputeWithFilteredOffersCached(ABC):
 
     @abstractmethod
     def get_offers_by_requirements(
-        self, requirements: Requirements
+        self,
+        requirements: Requirements,
+        full_offers: bool,
     ) -> List[InstanceOfferWithAvailability]:
         """
         Returns backend offers with availability matching requirements.
+
+        See `Compute.get_offers()` for the `full_offers` argument description.
+        Set the class variable `full_offers_argument_has_effect` to `True` if the `full_offers`
+        value has an effect on the offers produced by this method.
         """
         pass
 
-    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
-        return iter(self._get_offers_cached(requirements))
+    def get_offers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterator[InstanceOfferWithAvailability]:
+        return iter(self._get_offers_cached(requirements, full_offers))
 
-    def _get_offers_cached_key(self, requirements: Requirements) -> int:
+    def _get_offers_cached_key(self, requirements: Requirements, full_offers: bool) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
-        return hash(requirements.json())
+        hashable_requirements = requirements.json()
+        if self.full_offers_argument_has_effect:
+            return hash((hashable_requirements, full_offers))
+        return hash(hashable_requirements)
 
     @cachedmethod(
         cache=lambda self: self._offers_cache,
@@ -273,9 +309,9 @@ class ComputeWithFilteredOffersCached(ABC):
         lock=lambda self: self._offers_cache_lock,
     )
     def _get_offers_cached(
-        self, requirements: Requirements
+        self, requirements: Requirements, full_offers: bool
     ) -> List[InstanceOfferWithAvailability]:
-        return self.get_offers_by_requirements(requirements)
+        return self.get_offers_by_requirements(requirements, full_offers)
 
 
 class ComputeWithCreateInstanceSupport(ABC):

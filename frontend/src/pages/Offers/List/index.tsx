@@ -67,6 +67,7 @@ const getRequestParams = ({
             profile: { name: 'default', default: false },
             ssh_key_pub: '(dummy)',
         },
+        full_offers: true,
     };
 };
 

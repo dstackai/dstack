@@ -161,8 +161,12 @@ def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
         return_value=[_cpu_offer(disk_size_mib=100 * 1024)]
     )
 
-    offers_250gb = list(compute.get_offers(Requirements(resources=ResourcesSpec(disk="250GB"))))
-    offers_300gb = list(compute.get_offers(Requirements(resources=ResourcesSpec(disk="300GB"))))
+    offers_250gb = list(
+        compute.get_offers(Requirements(resources=ResourcesSpec(disk="250GB")), False)
+    )
+    offers_300gb = list(
+        compute.get_offers(Requirements(resources=ResourcesSpec(disk="300GB")), False)
+    )
 
     assert len(offers_250gb) == 1
     assert offers_250gb[0].instance.resources.disk.size_mib == 250 * 1024

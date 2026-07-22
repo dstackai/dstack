@@ -169,7 +169,11 @@ class KubernetesCompute(
                 offers.extend(cluster_offers)
         return offers
 
-    def get_offers_modifiers(self, requirements: Requirements) -> list[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> list[OfferModifier]:
+        if full_offers:
+            return []
         resource_requests = ResourceRequests.from_resources_spec(requirements.resources)
         return [partial(_offer_modifier, resource_requests)]
 
