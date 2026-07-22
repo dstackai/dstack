@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import PositiveInt, root_validator
 
-from dstack._internal.cli.models.endpoint_presets import EndpointBenchmark
+from dstack._internal.cli.models.presets import PresetBenchmark
 from dstack._internal.core.models.common import CoreModel
 
 _LATENCY_JSON_SCHEMA = {
@@ -97,7 +97,7 @@ class AgentFinalReport(CoreModel):
     base: Optional[str] = None
     model: Optional[str] = None
     context_length: Optional[PositiveInt] = None
-    benchmark: Optional[EndpointBenchmark] = None
+    benchmark: Optional[PresetBenchmark] = None
     failure_summary: Optional[str] = None
 
     @root_validator
@@ -120,7 +120,7 @@ class AgentFinalReport(CoreModel):
         return values
 
 
-class EndpointAgentInfo(CoreModel):
+class PresetAgentInfo(CoreModel):
     """Base information about the agent runtime that ran a preset creation
     session, saved in the debug session directory."""
 
@@ -133,7 +133,7 @@ class ClaudeModelParams(CoreModel):
     effort: str
 
 
-class ClaudeAgentInfo(EndpointAgentInfo):
+class ClaudeAgentInfo(PresetAgentInfo):
     """Claude agent runtime information, saved as `agent.json`."""
 
     model: ClaudeModelParams

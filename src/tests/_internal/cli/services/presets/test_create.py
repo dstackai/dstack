@@ -6,44 +6,44 @@ from types import SimpleNamespace
 
 import pytest
 
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.endpoints.agent import (
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
-    EndpointAgentProcessOutput,
-    EndpointAgentSession,
-    EndpointAgentWorkspace,
+    PresetAgentProcessOutput,
+    PresetAgentSession,
+    PresetAgentWorkspace,
     create_agent_workspace,
     load_agent_session,
     mark_session_owner,
-    print_endpoint_progress,
+    print_preset_progress,
     print_session_log,
     release_session_claim,
     remove_agent_workspace,
     session_process_alive,
     try_claim_session,
 )
-from dstack._internal.cli.services.endpoints.create import (
-    EndpointPresetCreateResult,
+from dstack._internal.cli.services.presets.create import (
+    PresetCreateResult,
     SessionBusyError,
     _build_constraints,
     _cleanup_runs,
-    _create_endpoint_preset,
+    _create_preset,
     _get_build_name,
     _print_fleet_offers,
     _save_final_report_copy,
     _stop_active_session_runs,
-    create_endpoint_preset,
-    follow_endpoint_preset,
+    create_preset,
+    follow_preset,
     reconcile_detached_sessions,
 )
-from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
+from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
-from tests._internal.cli.endpoint_presets import (
-    get_endpoint_preset,
+from tests._internal.cli.preset_factories import (
+    get_preset,
     get_running_service_run,
-    get_successful_endpoint_report,
+    get_successful_preset_report,
 )
 
 pytestmark = pytest.mark.windows
@@ -71,26 +71,28 @@ def creation_context(tmp_path, monkeypatch):
             runs=run_apis,
         ),
     )
-    configuration = EndpointConfiguration(
+    configuration = PresetConfiguration(
         name="qwen-build",
         model={"base": "Qwen/Qwen3.5-27B"},
         context_length=8192,
+        max_trials=1,
         fleets=["gpu-fleet"],
         env={"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
     )
-    source_configuration = EndpointConfiguration(
+    source_configuration = PresetConfiguration(
         name="qwen-build",
         model={"base": "Qwen/Qwen3.5-27B"},
         context_length=8192,
+        max_trials=1,
         fleets=["gpu-fleet"],
         env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
     )
     monkeypatch.setattr(
-        "dstack._internal.cli.services.endpoints.create.get_claude_auth",
+        "dstack._internal.cli.services.presets.create.get_claude_auth",
         _claude_auth,
     )
     monkeypatch.setattr(
-        "dstack._internal.cli.services.endpoints.create._get_build_name",
+        "dstack._internal.cli.services.presets.create._get_build_name",
         lambda *_: "qwen-build",
     )
     return SimpleNamespace(
@@ -99,19 +101,19 @@ def creation_context(tmp_path, monkeypatch):
         source_configuration=source_configuration,
         run=run,
         run_apis=run_apis,
-        store=EndpointPresetStore(tmp_path / "presets"),
+        store=PresetStore(tmp_path / "presets"),
     )
 
 
-class TestCreateEndpointPreset:
+class TestCreatePreset:
     def test_saves_agent_log_without_debug(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
-        preset = get_endpoint_preset()
+        preset = get_preset()
 
         async def create(**kwargs):
-            print_endpoint_progress("testing preset", agent_session=kwargs["agent_session"])
-            return EndpointPresetCreateResult(
+            print_preset_progress("testing preset", agent_session=kwargs["agent_session"])
+            return PresetCreateResult(
                 preset=preset,
                 path=tmp_path / "preset.yaml",
                 final_run_id=uuid.uuid4(),
@@ -119,17 +121,17 @@ class TestCreateEndpointPreset:
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
+            "dstack._internal.cli.services.presets.create._create_preset",
             create,
         )
 
-        create_endpoint_preset(
+        create_preset(
             api=SimpleNamespace(),
-            configuration=EndpointConfiguration(
+            configuration=PresetConfiguration(
                 name="qwen",
                 model={"base": "Qwen/Qwen3.5-27B"},
             ),
-            store=EndpointPresetStore(tmp_path / "presets"),
+            store=PresetStore(tmp_path / "presets"),
         )
 
         paths = [
@@ -152,7 +154,7 @@ class TestCreateEndpointPreset:
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         monkeypatch.setenv("HF_TOKEN", "hf-secret")
-        preset = get_endpoint_preset()
+        preset = get_preset()
 
         async def create(**kwargs):
             assert kwargs["configuration"].env.as_dict() == {
@@ -162,7 +164,7 @@ class TestCreateEndpointPreset:
             assert isinstance(kwargs["source_configuration"].env["HF_TOKEN"], EnvSentinel)
             assert kwargs["source_configuration"].env["TOKENIZERS_PARALLELISM"] == "false"
             kwargs["agent_session"].write_prompt("test prompt")
-            return EndpointPresetCreateResult(
+            return PresetCreateResult(
                 preset=preset,
                 path=tmp_path / "preset.yaml",
                 final_run_id=uuid.uuid4(),
@@ -173,19 +175,19 @@ class TestCreateEndpointPreset:
             raise OSError("rename failed")
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
+            "dstack._internal.cli.services.presets.create._create_preset",
             create,
         )
-        monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
+        monkeypatch.setattr(PresetAgentSession, "finish", fail_finish)
 
-        result = create_endpoint_preset(
+        result = create_preset(
             api=SimpleNamespace(),
-            configuration=EndpointConfiguration(
+            configuration=PresetConfiguration(
                 name="qwen",
                 model={"base": "Qwen/Qwen3.5-27B"},
                 env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
             ),
-            store=EndpointPresetStore(tmp_path / "presets"),
+            store=PresetStore(tmp_path / "presets"),
             debug=True,
         )
 
@@ -218,19 +220,19 @@ class TestCreateEndpointPreset:
             raise OSError("rename failed")
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
+            "dstack._internal.cli.services.presets.create._create_preset",
             create,
         )
-        monkeypatch.setattr(EndpointAgentSession, "finish", fail_finish)
+        monkeypatch.setattr(PresetAgentSession, "finish", fail_finish)
 
         with pytest.raises(RuntimeError, match="creation failed"):
-            create_endpoint_preset(
+            create_preset(
                 api=SimpleNamespace(),
-                configuration=EndpointConfiguration(
+                configuration=PresetConfiguration(
                     name="qwen",
                     model={"base": "Qwen/Qwen3.5-27B"},
                 ),
-                store=EndpointPresetStore(tmp_path / "presets"),
+                store=PresetStore(tmp_path / "presets"),
                 debug=True,
             )
 
@@ -241,18 +243,18 @@ class TestCreateEndpointPreset:
             client=SimpleNamespace(fleets=SimpleNamespace(list=lambda *args, **kwargs: [])),
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.get_claude_auth",
+            "dstack._internal.cli.services.presets.create.get_claude_auth",
             lambda: pytest.fail("Claude auth must not be checked without an active fleet"),
         )
 
         with pytest.raises(CLIError, match="no fleets"):
-            await _create_endpoint_preset(
+            await _create_preset(
                 api=api,
-                configuration=EndpointConfiguration(
+                configuration=PresetConfiguration(
                     name="qwen-build",
                     model={"base": "Qwen/Qwen3.5-27B"},
                 ),
-                store=EndpointPresetStore(tmp_path / "presets"),
+                store=PresetStore(tmp_path / "presets"),
                 agent_session=_agent_session(tmp_path),
             )
 
@@ -267,16 +269,16 @@ class TestCreateEndpointPreset:
             cleanup_calls.append(kwargs)
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
             run_agent,
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create._cleanup_runs",
+            "dstack._internal.cli.services.presets.create._cleanup_runs",
             cleanup_runs,
         )
 
         with pytest.raises(asyncio.CancelledError):
-            await _create_endpoint_preset(
+            await _create_preset(
                 api=creation_context.api,
                 configuration=creation_context.configuration,
                 source_configuration=creation_context.source_configuration,
@@ -298,7 +300,7 @@ class TestCreateEndpointPreset:
         session_path.mkdir()
         (session_path / "agent.log").touch()
         (session_path / "trace.jsonl").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_path,
             timestamp="20260714-120000Z",
             debug=True,
@@ -307,15 +309,15 @@ class TestCreateEndpointPreset:
         async def run_agent(**kwargs):
             assert kwargs["agent_session"] is agent_session
             assert (session_path / "prompt.md").is_file()
-            return EndpointAgentProcessOutput(
-                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            return PresetAgentProcessOutput(
+                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
             run_agent,
         )
-        result = await _create_endpoint_preset(
+        result = await _create_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
             source_configuration=creation_context.source_configuration,
@@ -338,7 +340,7 @@ class TestBuildName:
         assert _get_build_name(None, "Qwen/Qwen3.5-27B", "a1b2c3d4") == "qwen3-5-27b-a1b2c3d4"
 
         build_name = _get_build_name(
-            "qwen-endpoint-with-a-name-that-is-forty-one", "Qwen/Qwen3.5-27B", "a1b2c3d4"
+            "qwen-preset-with-a-name-that-is-forty-one", "Qwen/Qwen3.5-27B", "a1b2c3d4"
         )
 
         assert build_name.endswith("-a1b2c3d4")
@@ -365,7 +367,7 @@ class TestCleanupRuns:
         await _cleanup_runs(
             api=api,
             build_name="qwen-build",
-            workspace=EndpointAgentWorkspace(
+            workspace=PresetAgentWorkspace(
                 path=tmp_path,
                 dstack_home=tmp_path / "home",
             ),
@@ -377,13 +379,13 @@ class TestCleanupRuns:
         assert runs.stopped_names == ["qwen-build-1"]
 
 
-def _agent_session(tmp_path, *, debug: bool = False) -> EndpointAgentSession:
+def _agent_session(tmp_path, *, debug: bool = False) -> PresetAgentSession:
     path = tmp_path / "agent-running"
     path.mkdir()
     (path / "agent.log").touch()
     if debug:
         (path / "trace.jsonl").touch()
-    return EndpointAgentSession(
+    return PresetAgentSession(
         path=path,
         timestamp="20260714-120000Z",
         debug=debug,
@@ -423,9 +425,10 @@ class _FakeRunAPIs:
 
 class TestBuildConstraints:
     def test_renders_all_fields_with_explicit_nulls_and_defaults(self):
-        configuration = EndpointConfiguration(
+        configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3-32B"},
+            max_trials=3,
             env=["HF_TOKEN"],
         )
 
@@ -447,7 +450,7 @@ class TestBuildConstraints:
         }
 
     def test_renders_configured_values(self):
-        configuration = EndpointConfiguration(
+        configuration = PresetConfiguration(
             name="qwen",
             model={"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"},
             context_length=32768,
@@ -472,7 +475,7 @@ class TestBuildConstraints:
 
 class TestSaveFinalReportCopy:
     def test_copies_report_redacted(self, tmp_path):
-        workspace = EndpointAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
+        workspace = PresetAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
         workspace.path.mkdir()
         workspace.final_report_path.write_text(
             '{"success": true, "note": "token dstack-secret"}', encoding="utf-8"
@@ -490,7 +493,7 @@ class TestSaveFinalReportCopy:
         assert "[redacted]" in copied
 
     def test_missing_report_is_no_op(self, tmp_path):
-        workspace = EndpointAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
+        workspace = PresetAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
         workspace.path.mkdir()
         session = _agent_session(tmp_path, debug=True)
 
@@ -512,17 +515,15 @@ class TestInterruptAndResume:
             raise KeyboardInterrupt
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create._create_endpoint_preset",
+            "dstack._internal.cli.services.presets.create._create_preset",
             create,
         )
 
         with pytest.raises(KeyboardInterrupt):
-            create_endpoint_preset(
+            create_preset(
                 api=SimpleNamespace(),
-                configuration=EndpointConfiguration(
-                    name="qwen", model={"base": "Qwen/Qwen3.5-27B"}
-                ),
-                store=EndpointPresetStore(tmp_path / "presets"),
+                configuration=PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
+                store=PresetStore(tmp_path / "presets"),
             )
 
         sessions = [
@@ -542,7 +543,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "sessions" / "fe98dc76"
         session_dir.mkdir(parents=True)
         (session_dir / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="fe98dc76"
         )
         workspace = create_agent_workspace(agent_session)
@@ -554,16 +555,16 @@ class TestInterruptAndResume:
 
         async def run_agent(**kwargs):
             captured.update(kwargs)
-            return EndpointAgentProcessOutput(
-                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            return PresetAgentProcessOutput(
+                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
             run_agent,
         )
 
-        result = await _create_endpoint_preset(
+        result = await _create_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
             source_configuration=creation_context.source_configuration,
@@ -583,23 +584,23 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
         )
         captured = {}
 
         async def run_agent(**kwargs):
             captured.update(kwargs)
-            return EndpointAgentProcessOutput(
-                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            return PresetAgentProcessOutput(
+                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
             run_agent,
         )
 
-        await _create_endpoint_preset(
+        await _create_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
             source_configuration=creation_context.source_configuration,
@@ -620,7 +621,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
         )
         workspace = create_agent_workspace(agent_session)
@@ -633,16 +634,16 @@ class TestInterruptAndResume:
 
         async def run_agent(**kwargs):
             captured.update(kwargs)
-            return EndpointAgentProcessOutput(
-                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            return PresetAgentProcessOutput(
+                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.run_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
             run_agent,
         )
 
-        await _create_endpoint_preset(
+        await _create_preset(
             api=creation_context.api,
             configuration=creation_context.configuration,
             source_configuration=creation_context.source_configuration,
@@ -679,11 +680,11 @@ class TestFleetOffersPreview:
 
 
 class TestSessionLog:
-    def _session(self, tmp_path, preset_id: str, status: str, log: str) -> EndpointAgentSession:
+    def _session(self, tmp_path, preset_id: str, status: str, log: str) -> PresetAgentSession:
         session_dir = tmp_path / preset_id
         session_dir.mkdir()
         (session_dir / "agent.log").write_text(log)
-        session = EndpointAgentSession(
+        session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id=preset_id
         )
         session.update_manifest(status=status)
@@ -692,7 +693,7 @@ class TestSessionLog:
     def test_load_agent_session_reads_any_status(self, tmp_path, monkeypatch):
         self._session(tmp_path, "dead0000", "failed", "[t] boom\n")
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.agent.get_presets_dir",
             lambda: tmp_path,
         )
         # A failed session is off-limits to follow/resume, but its log is readable.
@@ -716,13 +717,13 @@ class TestSessionLog:
         assert "No log output yet" in capsys.readouterr().out
 
 
-class TestFollowEndpointPreset:
-    def _detached_session(self, tmp_path, configuration_yaml: str) -> EndpointAgentSession:
+class TestFollowPreset:
+    def _detached_session(self, tmp_path, configuration_yaml: str) -> PresetAgentSession:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
         (session_dir / "preset.dstack.yml").write_text(configuration_yaml)
-        session = EndpointAgentSession(
+        session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
         )
         workspace = create_agent_workspace(session)
@@ -735,25 +736,25 @@ class TestFollowEndpointPreset:
             tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.agent.get_presets_dir",
             lambda: tmp_path,
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            "dstack._internal.cli.services.presets.create.load_attachable_agent_session",
             lambda preset_id: session,
         )
 
         async def fake_attach(**kwargs):
-            return EndpointAgentProcessOutput(
-                report_data=json.loads(get_successful_endpoint_report(creation_context.run).json())
+            return PresetAgentProcessOutput(
+                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
             )
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.attach_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.attach_preset_agent",
             fake_attach,
         )
 
-        result = follow_endpoint_preset(
+        result = follow_preset(
             api=creation_context.api,
             store=creation_context.store,
             preset_id="ab12cd34",
@@ -770,20 +771,20 @@ class TestFollowEndpointPreset:
             tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            "dstack._internal.cli.services.presets.create.load_attachable_agent_session",
             lambda preset_id: session,
         )
 
         async def fake_attach(**kwargs):
-            return EndpointAgentProcessOutput(error="agent died")
+            return PresetAgentProcessOutput(error="agent died")
 
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.attach_endpoint_agent",
+            "dstack._internal.cli.services.presets.create.attach_preset_agent",
             fake_attach,
         )
 
         with pytest.raises(CLIError, match="agent died"):
-            follow_endpoint_preset(
+            follow_preset(
                 api=creation_context.api,
                 store=creation_context.store,
                 preset_id="ab12cd34",
@@ -799,12 +800,12 @@ class TestFollowEndpointPreset:
         held = try_claim_session(session)
         assert held is not None
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            "dstack._internal.cli.services.presets.create.load_attachable_agent_session",
             lambda preset_id: session,
         )
         # claim=True must refuse rather than double-finalize; the session is untouched.
         with pytest.raises(SessionBusyError):
-            follow_endpoint_preset(
+            follow_preset(
                 api=creation_context.api,
                 store=creation_context.store,
                 preset_id="ab12cd34",
@@ -815,13 +816,13 @@ class TestFollowEndpointPreset:
 
 
 class TestStopActiveSessionRuns:
-    def _session(self, tmp_path) -> EndpointAgentSession:
+    def _session(self, tmp_path) -> PresetAgentSession:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "runs.jsonl").write_text(
             '{"name":"qwen-build-1","id":"a"}\n{"name":"qwen-build-2","id":"b"}\n'
         )
-        return EndpointAgentSession(
+        return PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
         )
 
@@ -895,15 +896,15 @@ class TestReconcileDetachedSessions:
     def _patch(self, monkeypatch, tmp_path, follow):
         # reconcile iterates via agent.iter_agent_sessions -> agent.get_presets_dir.
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.agent.get_presets_dir",
             lambda: tmp_path,
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.Client",
+            "dstack._internal.cli.services.presets.create.Client",
             SimpleNamespace(from_config=lambda project_name=None: SimpleNamespace()),
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.create.follow_endpoint_preset",
+            "dstack._internal.cli.services.presets.create.follow_preset",
             follow,
         )
 
@@ -920,7 +921,7 @@ class TestReconcileDetachedSessions:
         self._session_dir(tmp_path, keep_service=True)
         calls: list = []
         self._patch(monkeypatch, tmp_path, self._recording_follow(calls))
-        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+        reconcile_detached_sessions(PresetStore(tmp_path / "store"))
         assert len(calls) == 1
         assert calls[0]["preset_id"] == "dead0001"
         # Honors persisted keep-service; non-interactive, non-blocking, silent,
@@ -947,7 +948,7 @@ class TestReconcileDetachedSessions:
         self._session_dir(tmp_path, **kwargs)
         calls: list = []
         self._patch(monkeypatch, tmp_path, self._recording_follow(calls))
-        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+        reconcile_detached_sessions(PresetStore(tmp_path / "store"))
         assert calls == []
 
     def test_never_raises_when_finalize_fails(self, tmp_path, monkeypatch):
@@ -958,13 +959,13 @@ class TestReconcileDetachedSessions:
 
         self._patch(monkeypatch, tmp_path, boom)
         # A read command must never fail because reconcile did.
-        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+        reconcile_detached_sessions(PresetStore(tmp_path / "store"))
 
 
 class TestSessionClaim:
     def _session(self, tmp_path):
         (tmp_path / "sess").mkdir()
-        return EndpointAgentSession(
+        return PresetAgentSession(
             path=tmp_path / "sess", timestamp="", debug=False, preset_id="sess"
         )
 
@@ -1001,9 +1002,7 @@ class TestSessionProcessAlive:
 class TestMarkSessionOwner:
     def test_persists_finalize_context(self, tmp_path):
         (tmp_path / "s").mkdir()
-        session = EndpointAgentSession(
-            path=tmp_path / "s", timestamp="", debug=False, preset_id="s"
-        )
+        session = PresetAgentSession(path=tmp_path / "s", timestamp="", debug=False, preset_id="s")
         session.update_manifest(status="running")
         mark_session_owner(session, project="main", keep_service=True)
         manifest = session.read_manifest()

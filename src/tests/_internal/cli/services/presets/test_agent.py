@@ -13,11 +13,11 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.endpoints.agent import (
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
-    EndpointAgentSession,
-    EndpointAgentWorkspace,
+    PresetAgentSession,
+    PresetAgentWorkspace,
     _build_claude_command,
     _prepare_subprocess_command,
     _ProgressTailer,
@@ -25,16 +25,16 @@ from dstack._internal.cli.services.endpoints.agent import (
     _summarize_session_trials,
     _terminate_process,
     attach_agent_workspace,
-    build_endpoint_agent_env,
+    build_preset_agent_env,
     contains_redacted_value,
     create_agent_workspace,
-    create_endpoint_agent_session,
+    create_preset_agent_session,
     get_claude_auth,
     load_resumable_agent_session,
-    print_endpoint_progress,
+    print_preset_progress,
     redact,
     remove_agent_workspace,
-    run_endpoint_agent,
+    run_preset_agent,
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
@@ -103,11 +103,11 @@ class TestAgentIsolation:
             client=SimpleNamespace(base_url="http://127.0.0.1:3000"),
         )
 
-        env = build_endpoint_agent_env(
+        env = build_preset_agent_env(
             api=api,
-            endpoint_env={"HF_TOKEN": "hf-secret"},
+            preset_env={"HF_TOKEN": "hf-secret"},
             auth=_claude_auth(),
-            workspace=EndpointAgentWorkspace(
+            workspace=PresetAgentWorkspace(
                 path=tmp_path,
                 dstack_home=tmp_path / "home",
             ),
@@ -163,7 +163,7 @@ class TestAgentIsolation:
 def _session_workspace(tmp_path):
     session_dir = tmp_path / "session-under-test"
     session_dir.mkdir()
-    session = EndpointAgentSession(
+    session = PresetAgentSession(
         path=session_dir, timestamp="t", debug=False, preset_id="abcd1234"
     )
     return create_agent_workspace(session)
@@ -173,14 +173,14 @@ class TestAgentSession:
     def test_saves_log_and_debug_files(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
-        configuration = EndpointConfiguration(
+        configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
             max_price=0.5,
             env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
         )
 
-        session = create_endpoint_agent_session(configuration)
+        session = create_preset_agent_session(configuration)
 
         assert session.path.parent == tmp_path / ".dstack" / "presets"
         assert session.path.name == session.preset_id
@@ -193,17 +193,17 @@ class TestAgentSession:
         manifest = json.loads((session.path / "session.json").read_text())
         assert manifest["id"] == session.preset_id
         assert manifest["status"] == "running"
-        assert manifest["endpoint"] == "qwen"
+        assert manifest["name"] == "qwen"
         assert manifest["model"] == "Qwen/Qwen3.5-27B"
         assert manifest["pid"] == os.getpid()
-        print_endpoint_progress("creating preset", agent_session=session)
+        print_preset_progress("creating preset", agent_session=session)
         assert "creating preset" in session.log_path.read_text()
         assert "creating preset" in capsys.readouterr().out
         if not IS_WINDOWS:
             assert session.path.stat().st_mode & 0o777 == 0o700
             assert session.log_path.stat().st_mode & 0o777 == 0o600
 
-        debug_session = create_endpoint_agent_session(configuration, debug=True)
+        debug_session = create_preset_agent_session(configuration, debug=True)
         data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
 
         assert {path.name for path in debug_session.path.iterdir()} == {
@@ -219,7 +219,7 @@ class TestAgentSession:
         assert success_path == debug_session.path
         assert json.loads((debug_session.path / "session.json").read_text())["status"] == "success"
 
-        failed_session = create_endpoint_agent_session(configuration)
+        failed_session = create_preset_agent_session(configuration)
         failed_path = failed_session.finish("failed")
         assert failed_path == failed_session.path
         assert json.loads((failed_session.path / "session.json").read_text())["status"] == "failed"
@@ -228,7 +228,7 @@ class TestAgentSession:
         session_dir = tmp_path / "20260714-120000-000000Z"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = EndpointAgentSession(
+        session = PresetAgentSession(
             path=session_dir,
             timestamp="20260714-120000-000000Z",
             debug=False,
@@ -246,15 +246,15 @@ class TestAgentSession:
         (tmp_path / ".dstack" / "presets").write_text("not a directory")
 
         with pytest.raises(CLIError, match="Could not create agent output"):
-            create_endpoint_agent_session(
-                EndpointConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"})
+            create_preset_agent_session(
+                PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"})
             )
 
     def test_log_write_failure_warns_once(self, tmp_path, capsys):
         path = tmp_path / "agent-running"
         path.mkdir()
         (path / "agent.log").touch()
-        session = EndpointAgentSession(
+        session = PresetAgentSession(
             path=path,
             timestamp="20260714-120000-000000Z",
             debug=False,
@@ -294,22 +294,22 @@ print(json.dumps({
         )
         (tmp_path / "progress.jsonl").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
             lambda **_: [sys.executable, str(script)],
         )
 
-        workspace = EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
         session_path = tmp_path / "debug-running"
         session_path.mkdir()
         (session_path / "agent.log").touch()
         (session_path / "trace.jsonl").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_path,
             timestamp="20260714-120000Z",
             debug=True,
         )
-        output = await run_endpoint_agent(
-            prompt="full endpoint prompt",
+        output = await run_preset_agent(
+            prompt="full preset prompt",
             env=os.environ.copy(),
             workspace=workspace,
             auth=_claude_auth(),
@@ -317,7 +317,7 @@ print(json.dumps({
             agent_session=agent_session,
         )
 
-        assert output.report_data == {"prompt": "full endpoint prompt"}
+        assert output.report_data == {"prompt": "full preset prompt"}
         assert output.error == "bad [redacted]"
         trace = [json.loads(line) for line in agent_session.trace_path.read_text().splitlines()]
         assert len(trace) == 1
@@ -344,17 +344,17 @@ print(json.dumps({
         session_path.mkdir()
         (session_path / "agent.log").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
             lambda **_: [sys.executable, str(script)],
         )
 
-        output = await run_endpoint_agent(
+        output = await run_preset_agent(
             prompt="prompt",
             env=os.environ.copy(),
-            workspace=EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
+            workspace=PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
             auth=_claude_auth(),
             redacted_values=(),
-            agent_session=EndpointAgentSession(
+            agent_session=PresetAgentSession(
                 path=session_path,
                 timestamp="20260714-120000Z",
                 debug=False,
@@ -370,7 +370,7 @@ print(json.dumps({
         session_path = tmp_path / "agent-running"
         session_path.mkdir()
         (session_path / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_path,
             timestamp="20260714-120000Z",
             debug=False,
@@ -451,16 +451,16 @@ class TestRecordMirror:
 class TestWriteAgentInfo:
     def test_writes_model_params_and_auth(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._get_claude_version",
+            "dstack._internal.cli.services.presets.agent._get_claude_version",
             lambda auth: "2.1.0 (Claude Code)",
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._get_claude_auth_status",
+            "dstack._internal.cli.services.presets.agent._get_claude_auth_status",
             lambda auth: {"authMethod": "claude.ai", "loggedIn": True},
         )
         session_dir = tmp_path / "session"
         session_dir.mkdir()
-        session = EndpointAgentSession(path=session_dir, timestamp="t", debug=True)
+        session = PresetAgentSession(path=session_dir, timestamp="t", debug=True)
 
         session.write_agent_info(
             ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
@@ -505,11 +505,11 @@ else:
 
     def _agent_setup(self, tmp_path):
         (tmp_path / "progress.jsonl").touch()
-        workspace = EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
         session_path = tmp_path / "session"
         session_path.mkdir()
         (session_path / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_path,
             timestamp="20260714-120000Z",
             debug=False,
@@ -520,10 +520,10 @@ else:
     async def test_resumes_after_connection_error(self, tmp_path, monkeypatch, capsys):
         script = self._write_flaky_claude(tmp_path)
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._RESUME_DELAYS_SECONDS", (0,)
+            "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
             lambda **kwargs: [sys.executable, str(script)]
             + (
                 ["--resume", kwargs["resume_session_id"]]
@@ -533,7 +533,7 @@ else:
         )
         workspace, agent_session = self._agent_setup(tmp_path)
 
-        output = await run_endpoint_agent(
+        output = await run_preset_agent(
             prompt="system prompt",
             env={},
             workspace=workspace,
@@ -570,10 +570,10 @@ else:
 """
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._RESUME_DELAYS_SECONDS", (0,)
+            "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
             lambda **kwargs: [sys.executable, str(script)]
             + (
                 ["--resume", kwargs["resume_session_id"]]
@@ -583,7 +583,7 @@ else:
         )
         workspace, agent_session = self._agent_setup(tmp_path)
 
-        output = await run_endpoint_agent(
+        output = await run_preset_agent(
             prompt="system prompt",
             env={},
             workspace=workspace,
@@ -617,22 +617,22 @@ sys.exit(1)
 """
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._RESUME_DELAYS_SECONDS", (0, 0)
+            "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0, 0)
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent._build_claude_command",
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
             lambda **kwargs: [sys.executable, str(script)],
         )
         (tmp_path / "progress.jsonl").touch()
-        workspace = EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
         session_path = tmp_path / "session"
         session_path.mkdir()
         (session_path / "agent.log").touch()
-        agent_session = EndpointAgentSession(
+        agent_session = PresetAgentSession(
             path=session_path, timestamp="20260714-120000Z", debug=False
         )
 
-        output = await run_endpoint_agent(
+        output = await run_preset_agent(
             prompt="system prompt",
             env={},
             workspace=workspace,
@@ -651,7 +651,7 @@ class TestWorkspaceLifecycle:
     def _session(self, tmp_path):
         session_dir = tmp_path / "sessions" / "ab12cd34"
         session_dir.mkdir(parents=True)
-        return EndpointAgentSession(
+        return PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
         )
 
@@ -699,7 +699,7 @@ class TestWorkspaceLifecycle:
 
 class TestOffsetPersistence:
     def test_mirror_does_not_duplicate_after_restart(self, tmp_path):
-        from dstack._internal.cli.services.endpoints.agent import _OffsetStore
+        from dstack._internal.cli.services.presets.agent import _OffsetStore
 
         source = tmp_path / "runs.jsonl"
         target = tmp_path / "mirror.jsonl"
@@ -768,7 +768,7 @@ class TestLoadResumableSession:
             },
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent.psutil.pid_exists",
+            "dstack._internal.cli.services.presets.agent.psutil.pid_exists",
             lambda pid: False,
         )
 
@@ -799,7 +799,7 @@ class TestLoadResumableSession:
             },
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.agent.psutil.pid_exists",
+            "dstack._internal.cli.services.presets.agent.psutil.pid_exists",
             lambda pid: True,
         )
         with pytest.raises(CLIError, match="still being created"):
@@ -841,7 +841,7 @@ class TestSummarizeSessionTrials:
 class TestFileLineReader:
     @pytest.mark.asyncio
     async def test_reads_lines_and_continues_from_persisted_offset(self, tmp_path):
-        from dstack._internal.cli.services.endpoints.agent import _FileLineReader, _OffsetStore
+        from dstack._internal.cli.services.presets.agent import _FileLineReader, _OffsetStore
 
         stream = tmp_path / "stdout.jsonl"
         state = tmp_path / ".offsets.json"
@@ -875,13 +875,13 @@ class TestFileLineReader:
 class TestStopOrDetach:
     @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX process groups")
     def test_detach_keeps_the_agent_and_stop_terminates_it(self, tmp_path, monkeypatch, capsys):
-        from dstack._internal.cli.services.endpoints import create as create_module
-        from dstack._internal.cli.services.endpoints.create import _stop_or_detach_agent_session
+        from dstack._internal.cli.services.presets import create as create_module
+        from dstack._internal.cli.services.presets.create import _stop_or_detach_agent_session
 
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = EndpointAgentSession(
+        session = PresetAgentSession(
             path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
         )
         agent = subprocess.Popen(
@@ -907,7 +907,7 @@ class TestStopOrDetach:
 
 class TestOffsetStoreSharing:
     def test_disjoint_stores_do_not_clobber_each_other(self, tmp_path):
-        from dstack._internal.cli.services.endpoints.agent import _OffsetStore
+        from dstack._internal.cli.services.presets.agent import _OffsetStore
 
         state = tmp_path / ".offsets.json"
         readers = _OffsetStore(state)

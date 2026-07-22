@@ -4,13 +4,13 @@ from typing import Optional, Sequence
 
 from rich.markup import escape
 
-from dstack._internal.cli.models.endpoint_presets import EndpointPreset
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.presets import Preset
 from dstack._internal.cli.services.configurators.run import ServiceConfigurator
-from dstack._internal.cli.services.endpoints.output import (
-    format_endpoint_benchmark,
+from dstack._internal.cli.services.presets.output import (
+    format_preset_benchmark,
 )
-from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
+from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
@@ -21,20 +21,20 @@ from dstack.api import Client
 
 @dataclass(frozen=True)
 class _PresetPlan:
-    preset: EndpointPreset
+    preset: Preset
     run_plan: RunPlan
     repo: Repo
 
 
-def apply_endpoint_preset(
+def apply_preset(
     *,
     api: Client,
-    configuration: EndpointConfiguration,
+    configuration: PresetConfiguration,
     configuration_path: str,
     preset_ids: Optional[Sequence[str]],
     profile_name: Optional[str],
     command_args: argparse.Namespace,
-    store: EndpointPresetStore,
+    store: PresetStore,
 ) -> None:
     candidates = _get_candidate_presets(store.list(), preset_ids=preset_ids)
     presets = _get_matching_presets(candidates, configuration=configuration)
@@ -67,10 +67,10 @@ def apply_endpoint_preset(
 
 
 def _get_candidate_presets(
-    presets: list[EndpointPreset],
+    presets: list[Preset],
     *,
     preset_ids: Optional[Sequence[str]],
-) -> list[EndpointPreset]:
+) -> list[Preset]:
     if not preset_ids:
         return presets
     presets_by_ref = {preset.id: preset for preset in presets}
@@ -92,10 +92,10 @@ def _get_candidate_presets(
 
 
 def _get_matching_presets(
-    presets: list[EndpointPreset],
+    presets: list[Preset],
     *,
-    configuration: EndpointConfiguration,
-) -> list[EndpointPreset]:
+    configuration: PresetConfiguration,
+) -> list[Preset]:
     model_name = configuration.model.api_model_name
     matches = []
     for preset in presets:
@@ -116,9 +116,9 @@ def _get_matching_presets(
 
 def _select_plan(
     *,
-    configuration: EndpointConfiguration,
+    configuration: PresetConfiguration,
     configuration_path: str,
-    presets: list[EndpointPreset],
+    presets: list[Preset],
     configurator: ServiceConfigurator,
     service_args: argparse.Namespace,
 ) -> _PresetPlan:
@@ -140,8 +140,8 @@ def _select_plan(
 
 
 def _build_service(
-    configuration: EndpointConfiguration,
-    preset: EndpointPreset,
+    configuration: PresetConfiguration,
+    preset: Preset,
 ) -> ServiceConfiguration:
     service = preset.service.copy(deep=True)
     service.name = configuration.name
@@ -161,13 +161,13 @@ def _has_available_offers(plan: RunPlan) -> bool:
     )
 
 
-def _format_requested_model(configuration: EndpointConfiguration) -> str:
+def _format_requested_model(configuration: PresetConfiguration) -> str:
     model = escape(configuration.model.api_model_name)
     if configuration.model.allows_variant_selection:
         return f"{model} ([secondary]base[/])"
     return model
 
 
-def _format_selected_preset(preset: EndpointPreset) -> str:
-    details = format_endpoint_benchmark(preset, verbose=True)
+def _format_selected_preset(preset: Preset) -> str:
+    details = format_preset_benchmark(preset, verbose=True)
     return f"{escape(preset.id)} ([secondary]{details}[/])"

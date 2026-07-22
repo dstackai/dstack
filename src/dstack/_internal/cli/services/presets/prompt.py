@@ -14,7 +14,7 @@ _DIRECTIVE_PATTERN = re.compile(r"<!--\?(\w+):(.*?)-->", re.DOTALL)
 
 # TODO: reintroduce a `# Resume` section in system_prompt.md once session resume
 # (seeded from `runs.jsonl` and `trials.jsonl`) is designed.
-def get_endpoint_agent_system_prompt(user_prompt: Optional[str] = None) -> str:
+def get_preset_agent_system_prompt(user_prompt: Optional[str] = None) -> str:
     text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
     variables = {"prompt": user_prompt.strip() if user_prompt else None}
     applied = 0

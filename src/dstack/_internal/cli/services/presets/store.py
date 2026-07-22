@@ -9,19 +9,19 @@ from typing import TextIO
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.endpoint_presets import EndpointPreset
-from dstack._internal.cli.models.endpoints import (
+from dstack._internal.cli.models.configurations import (
     MAX_PROMPT_LENGTH,
-    EndpointConfiguration,
-    EndpointPromptFile,
+    PresetConfiguration,
+    PresetPromptFile,
 )
-from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
+from dstack._internal.cli.models.presets import Preset
+from dstack._internal.cli.services.presets.presets import preset_to_data
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.utils.common import get_dstack_dir
 
 
-class EndpointPresetStore:
+class PresetStore:
     """Presets live at `<root>/<preset id>/` — one directory per preset holding
     the artifact (`preset.yaml`) next to the creation session internals.
     Deleted presets are archived under `<root>/.archive/`."""
@@ -29,14 +29,14 @@ class EndpointPresetStore:
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
 
-    def list(self) -> list[EndpointPreset]:
+    def list(self) -> list[Preset]:
         if not self.root.exists():
             return []
         self._migrate_legacy()
         presets = [self._load(path) for path in self.root.glob("*/preset.yaml")]
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 
-    def get(self, preset_id: str) -> EndpointPreset | None:
+    def get(self, preset_id: str) -> Preset | None:
         _validate_preset_id(preset_id)
         if not self.root.exists():
             return None
@@ -49,13 +49,13 @@ class EndpointPresetStore:
             raise CLIError(f"Preset file {path} does not match its path")
         return preset
 
-    def save(self, preset: EndpointPreset) -> Path:
+    def save(self, preset: Preset) -> Path:
         _validate_preset_id(preset.id)
         self._migrate_legacy()
         directory = self.root / preset.id
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "preset.yaml"
-        content = yaml.safe_dump(endpoint_preset_to_data(preset), sort_keys=False)
+        content = yaml.safe_dump(preset_to_data(preset), sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
             dir=directory,
             prefix=f".{preset.id}.",
@@ -74,13 +74,13 @@ class EndpointPresetStore:
                 pass
         return path
 
-    def find_by_name(self, name: str) -> EndpointPreset | None:
+    def find_by_name(self, name: str) -> Preset | None:
         for preset in self.list():
             if preset.name == name:
                 return preset
         return None
 
-    def release_name(self, name: str) -> EndpointPreset | None:
+    def release_name(self, name: str) -> Preset | None:
         """Releases `name` from the preset holding it, keeping the preset."""
         preset = self.find_by_name(name)
         if preset is None:
@@ -119,10 +119,10 @@ class EndpointPresetStore:
             with suppress(OSError):
                 directory.rmdir()
 
-    def _load(self, path: Path) -> EndpointPreset:
+    def _load(self, path: Path) -> Preset:
         try:
             with path.open(encoding="utf-8") as f:
-                return EndpointPreset.parse_obj(yaml.safe_load(f))
+                return Preset.parse_obj(yaml.safe_load(f))
         except (OSError, ValidationError, yaml.YAMLError) as e:
             raise CLIError(f"Invalid preset file {path}: {e}") from e
 
@@ -132,26 +132,26 @@ def _validate_preset_id(preset_id: str) -> None:
         raise CLIError(f"Invalid preset ID: {preset_id!r}")
 
 
-def load_endpoint_configuration(path: str) -> tuple[str, EndpointConfiguration]:
+def load_preset_configuration(path: str) -> tuple[str, PresetConfiguration]:
     if path == "-":
-        return "-", _parse_endpoint_configuration(sys.stdin)
+        return "-", _parse_preset_configuration(sys.stdin)
     configuration_path = Path(path)
     if not configuration_path.is_file():
         raise ConfigurationError(f"Configuration file {path} does not exist")
     try:
         with configuration_path.open(encoding="utf-8") as f:
-            configuration = _parse_endpoint_configuration(f)
+            configuration = _parse_preset_configuration(f)
     except OSError as e:
         raise ConfigurationError(f"Failed to load configuration from {path}") from e
     return str(configuration_path.resolve()), configuration
 
 
-def _parse_endpoint_configuration(stream: TextIO) -> EndpointConfiguration:
+def _parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
     try:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ConfigurationError("Preset configuration must be a YAML object")
-        configuration = EndpointConfiguration.parse_obj(data)
+        configuration = PresetConfiguration.parse_obj(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
     except yaml.YAMLError as e:
@@ -166,15 +166,15 @@ def _parse_endpoint_configuration(stream: TextIO) -> EndpointConfiguration:
     return configuration
 
 
-def resolve_endpoint_prompt(
-    configuration: EndpointConfiguration, configuration_path: str
+def resolve_preset_prompt(
+    configuration: PresetConfiguration, configuration_path: str
 ) -> str | None:
     """The resolved user prompt text; file paths are relative to the configuration file."""
     if configuration.prompt is None:
         return None
     if isinstance(configuration.prompt, str):
         return configuration.prompt.strip()
-    assert isinstance(configuration.prompt, EndpointPromptFile)
+    assert isinstance(configuration.prompt, PresetPromptFile)
     base = Path.cwd() if configuration_path == "-" else Path(configuration_path).parent
     path = base / configuration.prompt.path
     try:

@@ -3,17 +3,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.endpoints.apply import (
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.services.presets.apply import (
     _build_service,
     _get_candidate_presets,
     _get_matching_presets,
     _select_plan,
-    apply_endpoint_preset,
+    apply_preset,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.instances import InstanceAvailability
-from tests._internal.cli.endpoint_presets import get_endpoint_preset
+from tests._internal.cli.preset_factories import get_preset
 
 pytestmark = pytest.mark.windows
 
@@ -21,10 +21,10 @@ pytestmark = pytest.mark.windows
 class TestGetMatchingPresets:
     def test_matches_base_model_context_and_preset(self):
         presets = [
-            get_endpoint_preset(preset_id="small", context_length=4096),
-            get_endpoint_preset(preset_id="large", context_length=32768),
+            get_preset(preset_id="small", context_length=4096),
+            get_preset(preset_id="large", context_length=32768),
         ]
-        configuration = EndpointConfiguration(
+        configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
             context_length=8192,
@@ -40,8 +40,8 @@ class TestGetMatchingPresets:
 
     def test_candidates_preserve_id_order_and_reject_unknown_ids(self):
         presets = [
-            get_endpoint_preset(preset_id="aa11bb22"),
-            get_endpoint_preset(preset_id="cc33dd44"),
+            get_preset(preset_id="aa11bb22"),
+            get_preset(preset_id="cc33dd44"),
         ]
 
         ordered = _get_candidate_presets(presets, preset_ids=["cc33dd44", "aa11bb22"])
@@ -51,8 +51,8 @@ class TestGetMatchingPresets:
             _get_candidate_presets(presets, preset_ids=["aa11bb22", "ee55ff66"])
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
-        matching = get_endpoint_preset(preset_id="matching")
-        configuration = EndpointConfiguration(
+        matching = get_preset(preset_id="matching")
+        configuration = PresetConfiguration(
             name="qwen",
             model={
                 "repo": "community/Qwen3.5-27B-GPTQ-Int4",
@@ -68,8 +68,8 @@ class TestGetMatchingPresets:
 
 
 class TestBuildService:
-    def test_applies_endpoint_name_env_gateway_and_constraints(self):
-        configuration = EndpointConfiguration(
+    def test_applies_preset_name_env_gateway_and_constraints(self):
+        configuration = PresetConfiguration(
             name="qwen-production",
             model={"base": "Qwen/Qwen3.5-27B"},
             gateway="inference",
@@ -78,7 +78,7 @@ class TestBuildService:
             max_price=1,
         )
 
-        service = _build_service(configuration, get_endpoint_preset())
+        service = _build_service(configuration, get_preset())
 
         assert service.name == "qwen-production"
         assert service.gateway == "inference"
@@ -90,9 +90,9 @@ class TestBuildService:
 class TestSelectPlan:
     def test_selects_first_preset_with_available_offer(self):
         presets = [
-            get_endpoint_preset(preset_id="unavailable"),
-            get_endpoint_preset(preset_id="available"),
-            get_endpoint_preset(preset_id="never-probed"),
+            get_preset(preset_id="unavailable"),
+            get_preset(preset_id="available"),
+            get_preset(preset_id="never-probed"),
         ]
         configurator = Mock()
         plans = [
@@ -103,8 +103,8 @@ class TestSelectPlan:
         service_args = SimpleNamespace(profile=None)
 
         selected = _select_plan(
-            configuration=EndpointConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
-            configuration_path="endpoint.dstack.yml",
+            configuration=PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
+            configuration_path="preset.dstack.yml",
             presets=presets,
             configurator=configurator,
             service_args=service_args,
@@ -116,7 +116,7 @@ class TestSelectPlan:
         assert configurator.get_plan.call_count == 2
 
     def test_applies_the_selected_plan(self, monkeypatch):
-        preset = get_endpoint_preset()
+        preset = get_preset()
         run_plan = _plan(InstanceAvailability.AVAILABLE)
         repo = Mock()
         service_args = SimpleNamespace(profile="gpu")
@@ -124,14 +124,14 @@ class TestSelectPlan:
         configurator.get_parser.return_value.parse_args.return_value = service_args
         configurator.get_plan.return_value = (run_plan, repo)
         monkeypatch.setattr(
-            "dstack._internal.cli.services.endpoints.apply.ServiceConfigurator",
+            "dstack._internal.cli.services.presets.apply.ServiceConfigurator",
             lambda api_client: configurator,
         )
         command_args = SimpleNamespace()
 
-        apply_endpoint_preset(
+        apply_preset(
             api=Mock(),
-            configuration=EndpointConfiguration(
+            configuration=PresetConfiguration(
                 name="qwen",
                 model={"base": "Qwen/Qwen3.5-27B"},
             ),

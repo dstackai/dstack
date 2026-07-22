@@ -4,8 +4,8 @@ from typing import Any, Optional
 
 from rich.table import Table
 
-from dstack._internal.cli.models.endpoint_presets import (
-    EndpointPreset,
+from dstack._internal.cli.models.presets import (
+    Preset,
 )
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
@@ -50,8 +50,8 @@ def _format_trial_progress(session: Optional[dict[str, Any]]) -> str:
     return f" [secondary]({progress})[/]"
 
 
-def print_endpoint_presets(
-    presets: list[EndpointPreset],
+def print_presets(
+    presets: list[Preset],
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
 ) -> None:
@@ -63,7 +63,7 @@ def print_endpoint_presets(
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", no_wrap=True, style="secondary")
     table.add_column("NAME", no_wrap=True, style="secondary")
-    presets_by_base: dict[str, list[EndpointPreset]] = defaultdict(list)
+    presets_by_base: dict[str, list[Preset]] = defaultdict(list)
     repo_to_base: dict[str, str] = {}
     for preset in presets:
         presets_by_base[preset.base].append(preset)
@@ -137,7 +137,7 @@ def _add_session(table: Table, session: dict[str, Any], base_label: Optional[str
 
 def _add_preset(
     table: Table,
-    preset: EndpointPreset,
+    preset: Preset,
     *,
     verbose: bool,
     creation: Optional[dict[str, Any]] = None,
@@ -149,7 +149,7 @@ def _add_preset(
         "NAME": preset.name or "",
         column: _format_resources(groups[0].resources, verbose=verbose),
         "STATUS": _format_status("ready") + _format_trial_progress(creation),
-        "BENCHMARK": format_endpoint_benchmark(preset, verbose=verbose),
+        "BENCHMARK": format_preset_benchmark(preset, verbose=verbose),
         "SUBMITTED": pretty_date(preset.created_at),
     }
     if verbose and preset.model != preset.base:
@@ -167,7 +167,7 @@ def _add_preset(
             )
 
 
-def format_endpoint_benchmark(preset: EndpointPreset, *, verbose: bool = False) -> str:
+def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
     benchmark = preset.validations[0].benchmark
     workload = benchmark.workload
     metrics = benchmark.metrics

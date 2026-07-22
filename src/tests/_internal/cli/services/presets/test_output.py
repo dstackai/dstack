@@ -6,9 +6,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.theme import Theme
 
-from dstack._internal.cli.services.endpoints import output as output_module
-from dstack._internal.cli.services.endpoints.output import _add_session, _format_number
-from tests._internal.cli.endpoint_presets import get_endpoint_preset
+from dstack._internal.cli.services.presets import output as output_module
+from dstack._internal.cli.services.presets.output import _add_session, _format_number
+from tests._internal.cli.preset_factories import get_preset
 
 pytestmark = pytest.mark.windows
 
@@ -81,7 +81,7 @@ class TestGroupOrdering:
                 file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
             ),
         )
-        old = get_endpoint_preset()
+        old = get_preset()
         new = old.copy(update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)})
         sessions = [
             {
@@ -98,7 +98,7 @@ class TestGroupOrdering:
             },
         ]
 
-        output_module.print_endpoint_presets([old, new], sessions=sessions)
+        output_module.print_presets([old, new], sessions=sessions)
 
         text = buffer.getvalue()
         assert text.index("11aa22bb") < text.index(old.id)
@@ -115,7 +115,7 @@ class TestDoneProgress:
                 file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
             ),
         )
-        preset = get_endpoint_preset()
+        preset = get_preset()
         sessions = [
             {
                 "id": preset.id,
@@ -126,7 +126,7 @@ class TestDoneProgress:
             }
         ]
 
-        output_module.print_endpoint_presets([preset], sessions=sessions)
+        output_module.print_presets([preset], sessions=sessions)
 
         text = buffer.getvalue()
         assert "verified (3/4)" in text

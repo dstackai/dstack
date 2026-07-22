@@ -18,11 +18,11 @@ import psutil
 import yaml
 from rich.text import Text
 
-from dstack._internal.cli.models.endpoint_agent import (
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.preset_agent import (
     AGENT_FINAL_REPORT_JSON_SCHEMA,
     ClaudeAgentInfo,
 )
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
@@ -38,7 +38,7 @@ _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
 _USER_PROMPT_FILENAME = "user_prompt.md"
-_PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
+_PROGRESS_ENV = "DSTACK_PRESET_PROGRESS_LOG"
 _REDACTION = "[redacted]"
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
@@ -93,7 +93,7 @@ class SessionBusyError(CLIError):
 
 
 @dataclass(frozen=True)
-class EndpointAgentWorkspace:
+class PresetAgentWorkspace:
     path: Path
     dstack_home: Path
 
@@ -135,7 +135,7 @@ class EndpointAgentWorkspace:
 
 
 @dataclass
-class EndpointAgentSession:
+class PresetAgentSession:
     path: Path
     timestamp: str
     debug: bool
@@ -238,14 +238,14 @@ class ClaudeAuth:
 
 
 @dataclass
-class EndpointAgentProcessOutput:
+class PresetAgentProcessOutput:
     report_data: Optional[dict[str, Any]] = None
     error: Optional[str] = None
     session_id: Optional[str] = None
     made_progress: bool = False
 
 
-def create_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorkspace:
+def create_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
     real = session.path / "workspace"
     try:
         real.mkdir(mode=0o700)
@@ -256,7 +256,7 @@ def create_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorksp
         else:
             alias = _create_workspace_alias(real)
             _validate_control_socket_path(alias)
-        workspace = EndpointAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
+        workspace = PresetAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
         _prepare_workspace(workspace)
     except OSError as e:
         raise CLIError(f"Could not create the agent workspace under {real}: {e}") from e
@@ -264,7 +264,7 @@ def create_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorksp
     return workspace
 
 
-def attach_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorkspace:
+def attach_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
     manifest = session.read_manifest()
     real_value, alias_value = manifest.get("workspace"), manifest.get("alias")
     if not real_value or not alias_value:
@@ -277,10 +277,10 @@ def attach_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorksp
         )
     if alias != real:
         _ensure_workspace_alias(alias, real)
-    return EndpointAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
+    return PresetAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
 
 
-def remove_agent_workspace(session: EndpointAgentSession) -> None:
+def remove_agent_workspace(session: PresetAgentSession) -> None:
     manifest = session.read_manifest()
     alias = manifest.get("alias")
     workspace = manifest.get("workspace")
@@ -321,11 +321,11 @@ def get_presets_dir() -> Path:
     return get_dstack_dir() / "presets"
 
 
-def create_endpoint_agent_session(
-    configuration: EndpointConfiguration,
+def create_preset_agent_session(
+    configuration: PresetConfiguration,
     *,
     debug: bool = False,
-) -> EndpointAgentSession:
+) -> PresetAgentSession:
     if configuration.name is None:
         raise CLIError("The service name is required to save agent output")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
@@ -347,11 +347,10 @@ def create_endpoint_agent_session(
             "status": "running",
             "pid": os.getpid(),
             "pid_started_at": _process_started_at(os.getpid()),
-            "endpoint": configuration.name,
             "name": configuration.name,
             "model": getattr(configuration.model, "base", None)
             or getattr(configuration.model, "repo", None),
-            "max_trials": configuration.effective_max_trials,
+            "max_trials": configuration.max_trials,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "debug": debug,
         }
@@ -372,7 +371,7 @@ def create_endpoint_agent_session(
             shutil.rmtree(path, ignore_errors=True)
         raise CLIError(f"Could not create agent output under {parent}: {e}") from e
     assert path is not None
-    return EndpointAgentSession(path=path, timestamp=timestamp, debug=debug, preset_id=preset_id)
+    return PresetAgentSession(path=path, timestamp=timestamp, debug=debug, preset_id=preset_id)
 
 
 def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
@@ -406,9 +405,9 @@ def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
     return {"authMethod": "unknown"}
 
 
-def load_resumable_agent_session(preset_id: str) -> EndpointAgentSession:
+def load_resumable_agent_session(preset_id: str) -> PresetAgentSession:
     path = get_presets_dir() / preset_id
-    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -454,9 +453,9 @@ def session_process_alive(manifest: dict[str, Any]) -> bool:
     return _pid_alive(pid, manifest.get("pid_started_at"))
 
 
-def load_attachable_agent_session(preset_id: str) -> EndpointAgentSession:
+def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
     path = get_presets_dir() / preset_id
-    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -486,16 +485,16 @@ def load_attachable_agent_session(preset_id: str) -> EndpointAgentSession:
     return session
 
 
-def load_agent_session(preset_id: str) -> EndpointAgentSession:
+def load_agent_session(preset_id: str) -> PresetAgentSession:
     """Loads a session of any status for read-only inspection (its log)."""
     path = get_presets_dir() / preset_id
-    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
     if not path.is_dir() or not session.read_manifest():
         raise CLIError(f"Unknown preset: {preset_id}")
     return session
 
 
-def print_session_log(session: EndpointAgentSession) -> None:
+def print_session_log(session: PresetAgentSession) -> None:
     """Prints the session's redacted progress log verbatim (no markup)."""
     try:
         content = session.log_path.read_text(encoding="utf-8")
@@ -508,7 +507,7 @@ def print_session_log(session: EndpointAgentSession) -> None:
 
 
 def mark_session_owner(
-    session: EndpointAgentSession,
+    session: PresetAgentSession,
     *,
     project: Optional[str] = None,
     keep_service: Optional[bool] = None,
@@ -540,7 +539,7 @@ def session_report_exists(manifest: dict[str, Any]) -> bool:
     return (Path(workspace) / "w" / _FINAL_REPORT_FILENAME).is_file()
 
 
-def try_claim_session(session: EndpointAgentSession) -> Optional[int]:
+def try_claim_session(session: PresetAgentSession) -> Optional[int]:
     """Takes an exclusive, kernel-held lock for the duration of a session's
     finalization, so concurrent readers can't both finalize it. Returns an open
     file descriptor to release via `release_session_claim`, or None if another
@@ -590,25 +589,22 @@ def _try_lock_fd(fd: int) -> bool:
 
 
 def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
-    """The name this session holds; pre-claim manifests fall back to the endpoint."""
-    if "name" in manifest:
-        value = manifest.get("name")
-        return value if isinstance(value, str) and value else None
-    value = manifest.get("endpoint")
+    """The name this session holds."""
+    value = manifest.get("name")
     return value if isinstance(value, str) and value else None
 
 
-def iter_agent_sessions() -> Iterator[EndpointAgentSession]:
+def iter_agent_sessions() -> Iterator[PresetAgentSession]:
     """Yields a handle for every session directory under the presets dir."""
     root = get_presets_dir()
     if not root.is_dir():
         return
     for path in sorted(root.iterdir()):
         if path.is_dir() and not path.name.startswith((".", "models--")):
-            yield EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+            yield PresetAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
 
 
-def find_session_name_claims(name: str) -> list[EndpointAgentSession]:
+def find_session_name_claims(name: str) -> list[PresetAgentSession]:
     """Sessions of any status holding `name`, including failed ones."""
     return [
         session
@@ -703,12 +699,12 @@ def get_claude_auth() -> ClaudeAuth:
     )
 
 
-def build_endpoint_agent_env(
+def build_preset_agent_env(
     *,
     api: Client,
-    endpoint_env: dict[str, str],
+    preset_env: dict[str, str],
     auth: ClaudeAuth,
-    workspace: EndpointAgentWorkspace,
+    workspace: PresetAgentWorkspace,
     token: str,
 ) -> dict[str, str]:
     config_manager = ConfigManager(workspace.dstack_home / ".dstack")
@@ -720,7 +716,7 @@ def build_endpoint_agent_env(
     )
     config_manager.save()
     env = {name: value for name in _INHERITED_ENV_NAMES if (value := os.getenv(name))}
-    env.update(endpoint_env)
+    env.update(preset_env)
     if IS_WINDOWS:
         env.update(
             {name: value for name in _WINDOWS_INHERITED_ENV_NAMES if (value := os.getenv(name))}
@@ -744,16 +740,16 @@ def build_endpoint_agent_env(
     return env
 
 
-async def run_endpoint_agent(
+async def run_preset_agent(
     *,
     prompt: str,
     env: dict[str, str],
-    workspace: EndpointAgentWorkspace,
+    workspace: PresetAgentWorkspace,
     auth: ClaudeAuth,
     redacted_values: Sequence[str],
-    agent_session: EndpointAgentSession,
+    agent_session: PresetAgentSession,
     initial_resume_session_id: Optional[str] = None,
-) -> EndpointAgentProcessOutput:
+) -> PresetAgentProcessOutput:
     async with _session_tailers(
         workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
     ):
@@ -794,7 +790,7 @@ async def run_endpoint_agent(
                 action = "resuming"
             else:
                 action = "retrying"
-            print_endpoint_progress(
+            print_preset_progress(
                 f"Agent process exited without a report; {action} in {delay}s.",
                 agent_session=agent_session,
             )
@@ -806,10 +802,10 @@ async def _run_claude_process(
     command: list[str],
     prompt: str,
     env: dict[str, str],
-    workspace: EndpointAgentWorkspace,
+    workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
-    agent_session: EndpointAgentSession,
-) -> tuple[EndpointAgentProcessOutput, int]:
+    agent_session: PresetAgentSession,
+) -> tuple[PresetAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
     try:
         # The agent's streams go to workspace files rather than pipes, so the
@@ -862,7 +858,7 @@ async def _run_claude_process(
     return output, returncode
 
 
-def print_endpoint_progress(message: str, *, agent_session: EndpointAgentSession) -> None:
+def print_preset_progress(message: str, *, agent_session: PresetAgentSession) -> None:
     timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
     message = message.rstrip("\r\n")
     agent_session.append_log(f"[{timestamp}] {message}")
@@ -914,7 +910,7 @@ def _validate_control_socket_path(build_root: Path) -> None:
         raise CLIError(f"Temporary path is too long for an SSH control socket: {build_root}")
 
 
-def _prepare_workspace(workspace: EndpointAgentWorkspace) -> None:
+def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
     workspace.path.mkdir(mode=0o700, parents=True, exist_ok=False)
     workspace.dstack_home.mkdir(mode=0o700)
     workspace.temp_path.mkdir(mode=0o700)
@@ -1086,7 +1082,7 @@ def _write_private_text(path: Path, content: str) -> None:
 
 
 def _write_debug_trace(
-    session: EndpointAgentSession,
+    session: PresetAgentSession,
     *,
     stream_name: str,
     text: str,
@@ -1126,8 +1122,8 @@ def _redact_trace_value(value: Any, redacted_values: Sequence[str]) -> Any:
 @asynccontextmanager
 async def _session_tailers(
     *,
-    workspace: EndpointAgentWorkspace,
-    agent_session: EndpointAgentSession,
+    workspace: PresetAgentWorkspace,
+    agent_session: PresetAgentSession,
     redacted_values: Sequence[str],
 ) -> AsyncIterator[None]:
     """Mirrors the session's progress and record files while the body runs."""
@@ -1174,11 +1170,11 @@ async def _session_tailers(
 
 async def _collect_agent_output(
     *,
-    workspace: EndpointAgentWorkspace,
-    agent_session: EndpointAgentSession,
+    workspace: PresetAgentWorkspace,
+    agent_session: PresetAgentSession,
     redacted_values: Sequence[str],
     is_alive: Callable[[], bool],
-) -> EndpointAgentProcessOutput:
+) -> PresetAgentProcessOutput:
     """Parses the agent's stream files until it exits; safe alongside a live
     process or over the remains of a finished one."""
     offset_store = _OffsetStore(agent_session.path / ".offsets.json")
@@ -1216,14 +1212,14 @@ async def _collect_agent_output(
     return output
 
 
-async def attach_endpoint_agent(
+async def attach_preset_agent(
     *,
-    workspace: EndpointAgentWorkspace,
+    workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
-    agent_session: EndpointAgentSession,
-) -> EndpointAgentProcessOutput:
+    agent_session: PresetAgentSession,
+) -> PresetAgentProcessOutput:
     """Follows a detached session's agent to completion, like
-    `run_endpoint_agent` without owning the process."""
+    `run_preset_agent` without owning the process."""
     async with _session_tailers(
         workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
     ):
@@ -1246,9 +1242,9 @@ async def _read_process_stream(
     stream_name: str,
     parse_result: bool,
     redacted_values: Sequence[str],
-    agent_session: EndpointAgentSession,
-) -> EndpointAgentProcessOutput:
-    output = EndpointAgentProcessOutput()
+    agent_session: PresetAgentSession,
+) -> PresetAgentProcessOutput:
+    output = PresetAgentProcessOutput()
     while True:
         line = await stream.readline()
         if not line:
@@ -1464,7 +1460,7 @@ class _ProgressTailer:
         *,
         path: Path,
         redacted_values: Sequence[str],
-        agent_session: EndpointAgentSession,
+        agent_session: PresetAgentSession,
         offset_store: Optional[_OffsetStore] = None,
         offset_key: str = "progress",
     ) -> None:
@@ -1492,7 +1488,7 @@ class _ProgressTailer:
         for line in lines:
             message = _parse_progress(line)
             if message is not None:
-                print_endpoint_progress(
+                print_preset_progress(
                     redact(message, self._redacted_values),
                     agent_session=self._agent_session,
                 )

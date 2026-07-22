@@ -17,7 +17,7 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
 
 
-class EndpointBenchmarkWorkload(CoreModel):
+class PresetBenchmarkWorkload(CoreModel):
     api: Literal["chat_completions", "completions"]
     num_requests: PositiveInt
     input_tokens: PositiveInt
@@ -25,38 +25,38 @@ class EndpointBenchmarkWorkload(CoreModel):
     concurrency: PositiveInt
 
 
-class EndpointBenchmarkLatency(CoreModel):
+class PresetBenchmarkLatency(CoreModel):
     mean: Annotated[float, Field(ge=0)]
     p50: Annotated[float, Field(ge=0)]
     p99: Annotated[float, Field(ge=0)]
 
 
-class EndpointBenchmarkMetrics(CoreModel):
+class PresetBenchmarkMetrics(CoreModel):
     successful_requests: Annotated[int, Field(ge=0)]
     failed_requests: Annotated[int, Field(ge=0)]
     duration_seconds: PositiveFloat
     total_input_tokens: Annotated[int, Field(ge=0)]
     total_output_tokens: Annotated[int, Field(ge=0)]
-    ttft_ms: EndpointBenchmarkLatency
-    tpot_ms: EndpointBenchmarkLatency
+    ttft_ms: PresetBenchmarkLatency
+    tpot_ms: PresetBenchmarkLatency
 
 
-class EndpointBenchmarkTarget(CoreModel):
+class PresetBenchmarkTarget(CoreModel):
     type: Literal["gateway", "server-proxy"]
 
 
-class EndpointBenchmarkClient(CoreModel):
+class PresetBenchmarkClient(CoreModel):
     type: Literal["local"]
 
 
-class EndpointBenchmark(CoreModel):
+class PresetBenchmark(CoreModel):
     tool: str
     tool_version: str
     command: str
-    workload: EndpointBenchmarkWorkload
-    metrics: EndpointBenchmarkMetrics
-    target: Optional[EndpointBenchmarkTarget] = None
-    client: Optional[EndpointBenchmarkClient] = None
+    workload: PresetBenchmarkWorkload
+    metrics: PresetBenchmarkMetrics
+    target: Optional[PresetBenchmarkTarget] = None
+    client: Optional[PresetBenchmarkClient] = None
 
     @validator("tool", "tool_version", "command")
     def validate_non_empty(cls, value: str) -> str:
@@ -89,18 +89,18 @@ class EndpointBenchmark(CoreModel):
         return values
 
 
-class EndpointPresetValidationReplica(CoreModel):
+class PresetValidationReplica(CoreModel):
     resources: list[ResourcesSpec]
     """Exact resources for each running replica in this service replica group."""
 
 
-class EndpointPresetValidation(CoreModel):
-    replicas: list[EndpointPresetValidationReplica]
+class PresetValidation(CoreModel):
+    replicas: list[PresetValidationReplica]
     """Ordered to match `ServiceConfiguration.replica_groups`."""
-    benchmark: EndpointBenchmark
+    benchmark: PresetBenchmark
 
 
-class EndpointPreset(CoreModel):
+class Preset(CoreModel):
     base: str
     """Base model used for local preset lookup."""
     id: str
@@ -112,7 +112,7 @@ class EndpointPreset(CoreModel):
     """Token context length this preset was verified to support."""
     created_at: datetime
     service: ServiceConfiguration
-    validations: list[EndpointPresetValidation]
+    validations: list[PresetValidation]
 
     @validator("base", "id", "model")
     def validate_non_empty(cls, value: str) -> str:
@@ -151,8 +151,8 @@ class EndpointPreset(CoreModel):
         return values
 
 
-class EndpointPresetListOutput(CoreModel):
-    presets: list[EndpointPreset]
+class PresetListOutput(CoreModel):
+    presets: list[Preset]
 
 
 def _validate_exact_resources(resources: ResourcesSpec) -> None:

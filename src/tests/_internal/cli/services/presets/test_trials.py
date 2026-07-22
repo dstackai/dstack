@@ -1,6 +1,6 @@
 import pytest
 
-from dstack._internal.cli.models.endpoint_trials import EndpointPresetTrial
+from dstack._internal.cli.models.preset_trials import PresetTrial
 
 pytestmark = pytest.mark.windows
 
@@ -9,7 +9,7 @@ def get_trial_record(benchmark=True) -> dict:
     record = {
         "task": {
             "type": "task",
-            "name": "qwen-endpoint-1",
+            "name": "qwen-preset-1",
             "image": "vllm/vllm-openai:v0.11.0",
             "commands": [
                 "vllm serve Qwen/Qwen3-32B-AWQ --reasoning-parser qwen3 --port 8000",
@@ -48,17 +48,17 @@ def get_trial_record(benchmark=True) -> dict:
     return record
 
 
-class TestEndpointPresetTrial:
+class TestPresetTrial:
     def test_parses_measured_trial(self):
-        trial = EndpointPresetTrial.parse_obj(get_trial_record())
+        trial = PresetTrial.parse_obj(get_trial_record())
 
-        assert trial.task.name == "qwen-endpoint-1"
+        assert trial.task.name == "qwen-preset-1"
         assert trial.task.commands[0].startswith("vllm serve")
         assert trial.benchmark is not None
         assert trial.benchmark.workload.concurrency == 8
         assert trial.benchmark.metrics.tpot_ms.mean == 17.57
 
     def test_failed_trial_allows_null_benchmark(self):
-        trial = EndpointPresetTrial.parse_obj(get_trial_record(benchmark=False))
+        trial = PresetTrial.parse_obj(get_trial_record(benchmark=False))
 
         assert trial.benchmark is None

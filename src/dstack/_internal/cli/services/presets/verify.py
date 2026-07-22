@@ -5,21 +5,21 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
-from dstack._internal.cli.models.endpoint_presets import (
-    EndpointBenchmarkClient,
-    EndpointBenchmarkTarget,
-    EndpointPreset,
-    EndpointPresetValidationReplica,
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.preset_agent import AgentFinalReport
+from dstack._internal.cli.models.presets import (
+    Preset,
+    PresetBenchmarkClient,
+    PresetBenchmarkTarget,
+    PresetValidationReplica,
 )
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.endpoints.agent import (
-    EndpointAgentProcessOutput,
-    EndpointAgentWorkspace,
+from dstack._internal.cli.services.presets.agent import (
+    PresetAgentProcessOutput,
+    PresetAgentWorkspace,
     redact,
 )
-from dstack._internal.cli.services.endpoints.presets import (
-    build_endpoint_preset,
+from dstack._internal.cli.services.presets.presets import (
+    build_preset,
     resources_spec_from_instance_resources,
 )
 from dstack._internal.core.errors import CLIError
@@ -38,10 +38,10 @@ def _redact_structure(value: Any, redacted_values: Sequence[str]) -> Any:
     return value
 
 
-def load_endpoint_agent_report(
+def load_preset_agent_report(
     *,
-    output: EndpointAgentProcessOutput,
-    workspace: EndpointAgentWorkspace,
+    output: PresetAgentProcessOutput,
+    workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
 ) -> AgentFinalReport:
     report_data = output.report_data or _load_json_object(workspace.final_report_path)
@@ -70,14 +70,14 @@ def load_endpoint_agent_report(
     return report
 
 
-def build_verified_endpoint_preset(
+def build_verified_preset(
     *,
     run: Run,
-    endpoint_configuration: EndpointConfiguration,
+    preset_configuration: PresetConfiguration,
     report: AgentFinalReport,
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
-) -> EndpointPreset:
+) -> Preset:
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
     if run.status != RunStatus.RUNNING or run.service is None:
@@ -85,20 +85,20 @@ def build_verified_endpoint_preset(
     service = run.run_spec.configuration
     if not isinstance(service, ServiceConfiguration) or service.model is None:
         raise CLIError("Claude final run is not a model service")
-    if service.model.name != endpoint_configuration.model.api_model_name:
+    if service.model.name != preset_configuration.model.api_model_name:
         raise CLIError("Claude final service model name does not match the requested model")
     assert report.base is not None
     assert report.model is not None
     assert report.context_length is not None
     assert report.benchmark is not None
-    if endpoint_configuration.model.allows_variant_selection:
-        if report.base != endpoint_configuration.model.api_model_name:
+    if preset_configuration.model.allows_variant_selection:
+        if report.base != preset_configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the requested model")
-    elif report.model != endpoint_configuration.model.exact_repo:
+    elif report.model != preset_configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
     if (
-        endpoint_configuration.context_length is not None
-        and report.context_length < endpoint_configuration.context_length
+        preset_configuration.context_length is not None
+        and report.context_length < preset_configuration.context_length
     ):
         raise CLIError("Claude final service does not meet the requested context length")
 
@@ -107,16 +107,16 @@ def build_verified_endpoint_preset(
     )
     benchmark = report.benchmark.copy(
         update={
-            "target": EndpointBenchmarkTarget(type=target_type),
-            "client": EndpointBenchmarkClient(type="local"),
+            "target": PresetBenchmarkTarget(type=target_type),
+            "client": PresetBenchmarkClient(type="local"),
         }
     )
     portable_service = service.copy(deep=True)
-    # The CLI resolved endpoint env references before submission; presets retain the references.
-    for key, value in endpoint_configuration.env.items():
+    # The CLI resolved preset env references before submission; presets retain the references.
+    for key, value in preset_configuration.env.items():
         if isinstance(value, EnvSentinel) and key in portable_service.env:
             portable_service.env[key] = value
-    return build_endpoint_preset(
+    return build_preset(
         name=name,
         service=portable_service,
         validation_replicas=_get_validation_replicas(run, service),
@@ -131,8 +131,8 @@ def build_verified_endpoint_preset(
 def _get_validation_replicas(
     run: Run,
     service: ServiceConfiguration,
-) -> list[EndpointPresetValidationReplica]:
-    replicas: list[EndpointPresetValidationReplica] = []
+) -> list[PresetValidationReplica]:
+    replicas: list[PresetValidationReplica] = []
     for group in service.replica_groups:
         resources = []
         for job in sorted(run.jobs, key=lambda job: job.job_spec.replica_num):
@@ -154,7 +154,7 @@ def _get_validation_replicas(
             )
         if not resources:
             raise CLIError(f"Final service replica group {group.name!r} has no running replicas")
-        replicas.append(EndpointPresetValidationReplica(resources=resources))
+        replicas.append(PresetValidationReplica(resources=resources))
     return replicas
 
 

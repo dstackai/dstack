@@ -7,31 +7,31 @@ from pathlib import Path
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.models.endpoint_presets import (
-    EndpointPreset,
-    EndpointPresetListOutput,
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.presets import (
+    Preset,
+    PresetListOutput,
 )
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
 from dstack._internal.cli.services.completion import ProjectNameCompleter
-from dstack._internal.cli.services.endpoints.agent import (
+from dstack._internal.cli.services.presets.agent import (
     find_session_name_claims,
     get_presets_dir,
     list_agent_sessions,
     load_resumable_agent_session,
 )
-from dstack._internal.cli.services.endpoints.apply import apply_endpoint_preset
-from dstack._internal.cli.services.endpoints.create import (
-    create_endpoint_preset,
-    plan_endpoint_preset,
+from dstack._internal.cli.services.presets.apply import apply_preset
+from dstack._internal.cli.services.presets.create import (
+    create_preset,
+    plan_preset,
     reconcile_detached_sessions,
-    show_endpoint_session_logs,
-    stop_endpoint_session,
+    show_preset_session_logs,
+    stop_preset_session,
 )
-from dstack._internal.cli.services.endpoints.output import print_endpoint_presets
-from dstack._internal.cli.services.endpoints.store import (
-    EndpointPresetStore,
-    load_endpoint_configuration,
-    resolve_endpoint_prompt,
+from dstack._internal.cli.services.presets.output import print_presets
+from dstack._internal.cli.services.presets.store import (
+    PresetStore,
+    load_preset_configuration,
+    resolve_preset_prompt,
 )
 from dstack._internal.cli.services.profile import (
     apply_profile_args,
@@ -39,13 +39,13 @@ from dstack._internal.cli.services.profile import (
     register_profile_args,
 )
 from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.core.errors import CLIError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack.api import Client
 
 
-class EndpointCommand(BaseCommand):
+class PresetCommand(BaseCommand):
     NAME = "preset"
     DESCRIPTION = "Manage model serving presets"
 
@@ -213,20 +213,20 @@ class EndpointCommand(BaseCommand):
         so a saved preset never depends on a foreground CLI surviving. Fully
         best-effort — it must never make a read command fail."""
         with suppress(Exception):
-            reconcile_detached_sessions(EndpointPresetStore())
+            reconcile_detached_sessions(PresetStore())
 
     def _list(self, args: argparse.Namespace) -> None:
         base = getattr(args, "base", None)
         repo = getattr(args, "repo", None)
         if getattr(args, "json", False):
             self._reconcile()
-            presets = _filter_presets(EndpointPresetStore().list(), base=base, repo=repo)
-            print(EndpointPresetListOutput(presets=presets).json())
+            presets = _filter_presets(PresetStore().list(), base=base, repo=repo)
+            print(PresetListOutput(presets=presets).json())
             return
         verbose = getattr(args, "verbose", False)
         while True:
             self._reconcile()
-            presets = EndpointPresetStore().list()
+            presets = PresetStore().list()
             sessions = list_agent_sessions()
             if base or repo:
                 repo_to_base = {preset.model: preset.base for preset in presets}
@@ -240,16 +240,16 @@ class EndpointCommand(BaseCommand):
                 ]
             if getattr(args, "watch", False):
                 console.clear()
-            print_endpoint_presets(presets, sessions=sessions, verbose=verbose)
+            print_presets(presets, sessions=sessions, verbose=verbose)
             if not getattr(args, "watch", False):
                 return
             time.sleep(5)
 
     def _create(self, args: argparse.Namespace) -> None:
-        configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
+        configuration_path, configuration = load_preset_configuration(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args, require_name=False)
-        user_prompt = resolve_endpoint_prompt(configuration, configuration_path)
-        store = EndpointPresetStore()
+        user_prompt = resolve_preset_prompt(configuration, configuration_path)
+        store = PresetStore()
         resume_session = None
         if getattr(args, "resume", None):
             resume_session = load_resumable_agent_session(args.resume)
@@ -261,12 +261,16 @@ class EndpointCommand(BaseCommand):
         api = Client.from_config(project_name=args.project)
         allowed_fleets = None
         if resume_session is None:
-            allowed_fleets = plan_endpoint_preset(api=api, configuration=configuration)
+            if configuration.max_trials is None:
+                raise ConfigurationError(
+                    "max_trials is required. Set it in the configuration or pass --max-trials"
+                )
+            allowed_fleets = plan_preset(api=api, configuration=configuration)
             if not _confirm_preset_creation(store, configuration.name, assume_yes=args.yes):
                 console.print("\nExiting...")
                 return
         try:
-            result = create_endpoint_preset(
+            result = create_preset(
                 api=api,
                 configuration=configuration,
                 store=store,
@@ -278,18 +282,15 @@ class EndpointCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
-        console.print(
-            f"Preset [code]{result.preset.id}[/] for "
-            f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
-        )
+        console.print(f"Preset [code]{result.preset.id}[/] saved")
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
     def _logs(self, args: argparse.Namespace) -> None:
         try:
-            result = show_endpoint_session_logs(
+            result = show_preset_session_logs(
                 project=args.project,
-                store=EndpointPresetStore(),
+                store=PresetStore(),
                 preset_id=_resolve_session_ref(args.preset),
                 follow=args.follow,
                 keep_service=args.keep_service,
@@ -297,10 +298,7 @@ class EndpointCommand(BaseCommand):
         except KeyboardInterrupt:
             return  # a log viewer: Ctrl+C just stops watching, quietly
         if result is not None:
-            console.print(
-                f"Preset [code]{result.preset.id}[/] for "
-                f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
-            )
+            console.print(f"Preset [code]{result.preset.id}[/] saved")
             if args.keep_service:
                 console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
@@ -309,11 +307,11 @@ class EndpointCommand(BaseCommand):
         if not args.yes and not confirm_ask(f"Stop creating preset [code]{preset_id}[/]?"):
             console.print("\nExiting...")
             return
-        stop_endpoint_session(Client.from_config(project_name=args.project), preset_id)
+        stop_preset_session(Client.from_config(project_name=args.project), preset_id)
 
     def _get(self, args: argparse.Namespace) -> None:
         self._reconcile()
-        store = EndpointPresetStore()
+        store = PresetStore()
         preset = store.get(args.preset) or store.find_by_name(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
@@ -321,20 +319,20 @@ class EndpointCommand(BaseCommand):
 
     def _apply(self, args: argparse.Namespace) -> None:
         self._reconcile()
-        configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
+        configuration_path, configuration = load_preset_configuration(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args)
-        apply_endpoint_preset(
+        apply_preset(
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             configuration_path=configuration_path,
             preset_ids=args.preset_ids,
             profile_name=args.profile,
             command_args=args,
-            store=EndpointPresetStore(),
+            store=PresetStore(),
         )
 
     def _delete(self, args: argparse.Namespace) -> None:
-        store = EndpointPresetStore()
+        store = PresetStore()
         if args.preset is not None:
             preset = store.get(args.preset) or store.find_by_name(args.preset)
             if preset is None:
@@ -411,11 +409,11 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _filter_presets(
-    presets: list[EndpointPreset],
+    presets: list[Preset],
     *,
     base: str | None,
     repo: str | None,
-) -> list[EndpointPreset]:
+) -> list[Preset]:
     return [
         preset
         for preset in presets
@@ -438,7 +436,7 @@ def _session_matches_model(
     return model == base or repo_to_base.get(model) == base
 
 
-def _apply_name(configuration: EndpointConfiguration, name: str | None, *, required: bool) -> None:
+def _apply_name(configuration: PresetConfiguration, name: str | None, *, required: bool) -> None:
     if name is not None:
         configuration.name = name
     if configuration.name is None:
@@ -461,9 +459,7 @@ def _resolve_session_ref(ref: str) -> str:
     return ref
 
 
-def _confirm_preset_creation(
-    store: EndpointPresetStore, name: str | None, *, assume_yes: bool
-) -> bool:
+def _confirm_preset_creation(store: PresetStore, name: str | None, *, assume_yes: bool) -> bool:
     """One apply-style confirmation; reassigns the name from any holder on yes."""
     preset_holder = None
     session_holders = []
@@ -497,11 +493,11 @@ def _confirm_preset_creation(
 
 
 def _get_effective_configuration(
-    configuration: EndpointConfiguration,
+    configuration: PresetConfiguration,
     args: argparse.Namespace,
     *,
     require_name: bool = True,
-) -> EndpointConfiguration:
+) -> PresetConfiguration:
     _apply_name(configuration, args.name, required=require_name)
     if getattr(args, "max_trials", None) is not None:
         configuration.max_trials = args.max_trials
@@ -510,4 +506,4 @@ def _get_effective_configuration(
         if getattr(configuration, field) is None:
             setattr(configuration, field, getattr(profile, field))
     apply_profile_args(args, configuration)
-    return EndpointConfiguration.parse_obj(configuration.dict())
+    return PresetConfiguration.parse_obj(configuration.dict())

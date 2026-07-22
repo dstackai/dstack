@@ -11,11 +11,10 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import ProfileParams, ProfileParamsConfig
 from dstack._internal.utils.json_schema import add_extra_schema_types
 
-DEFAULT_MAX_TRIALS = 3
 DEFAULT_CONCURRENCY = 8
 
 
-class EndpointModelRepo(CoreModel):
+class PresetModelRepo(CoreModel):
     repo: Annotated[str, Field(description="The exact model repo or path to deploy")]
     name: Annotated[
         Optional[str], Field(description="The client-facing model name. Defaults to `repo`")
@@ -44,7 +43,7 @@ class EndpointModelRepo(CoreModel):
         return _validate_model(value, field="name")
 
 
-class EndpointModelBase(CoreModel):
+class PresetModelBase(CoreModel):
     base: Annotated[
         str,
         Field(description="The base model for which the agent may select a compatible variant"),
@@ -67,12 +66,12 @@ class EndpointModelBase(CoreModel):
         return _validate_model(value, field="base")
 
 
-EndpointModelSpec = Union[EndpointModelRepo, EndpointModelBase]
+PresetModelSpec = Union[PresetModelRepo, PresetModelBase]
 
 MAX_PROMPT_LENGTH = 10_000
 
 
-class EndpointPromptFile(CoreModel):
+class PresetPromptFile(CoreModel):
     path: Annotated[
         str,
         Field(description="The path to a prompt file, relative to the configuration file"),
@@ -85,7 +84,7 @@ class EndpointPromptFile(CoreModel):
         return value
 
 
-class EndpointConfigurationConfig(ProfileParamsConfig):
+class PresetConfigurationConfig(ProfileParamsConfig):
     @staticmethod
     def schema_extra(schema: dict[str, Any]):
         ProfileParamsConfig.schema_extra(schema)
@@ -95,9 +94,9 @@ class EndpointConfigurationConfig(ProfileParamsConfig):
         )
 
 
-class EndpointConfiguration(
+class PresetConfiguration(
     ProfileParams,
-    generate_dual_core_model(EndpointConfigurationConfig),
+    generate_dual_core_model(PresetConfigurationConfig),
 ):
     type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
     name: Annotated[
@@ -105,7 +104,7 @@ class EndpointConfiguration(
         Field(description="The service name. Required unless passed with `--name`"),
     ] = None
     model: Annotated[
-        EndpointModelSpec,
+        PresetModelSpec,
         Field(
             description=(
                 "The model to serve. Use a string or `repo` for an exact repo/path, "
@@ -128,7 +127,7 @@ class EndpointConfiguration(
         Field(description="The exact model repo/path to serve. Shorthand for `model.repo`"),
     ] = None
     prompt: Annotated[
-        Optional[Union[str, EndpointPromptFile]],
+        Optional[Union[str, PresetPromptFile]],
         Field(
             description=(
                 "Additional instructions for the preset creation agent, inline or as a file `path`"
@@ -143,7 +142,7 @@ class EndpointConfiguration(
         Field(
             description=(
                 "The maximum number of benchmarked trials during preset creation"
-                f" before the best one is promoted. Defaults to `{DEFAULT_MAX_TRIALS}`"
+                " before the best one is promoted"
             )
         ),
     ] = None
@@ -169,10 +168,6 @@ class EndpointConfiguration(
     env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (
         Env()
     )
-
-    @property
-    def effective_max_trials(self) -> int:
-        return self.max_trials if self.max_trials is not None else DEFAULT_MAX_TRIALS
 
     @property
     def effective_concurrency(self) -> int:
@@ -210,12 +205,12 @@ class EndpointConfiguration(
         return value
 
 
-class EndpointPresetConstraints(CoreModel):
-    """The effective constraints for endpoint preset creation, saved as `constraints.json`
+class PresetConstraints(CoreModel):
+    """The effective constraints for preset creation, saved as `constraints.json`
     in the agent workspace. Field semantics are documented in the agent system prompt."""
 
     run_name_prefix: str
-    model: EndpointModelSpec
+    model: PresetModelSpec
     context_length: Optional[PositiveInt] = None
     max_trials: PositiveInt
     concurrency: PositiveInt
@@ -225,5 +220,5 @@ class EndpointPresetConstraints(CoreModel):
 
 def _validate_model(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"Endpoint model {field} must be a non-empty string")
+        raise ValueError(f"Preset model {field} must be a non-empty string")
     return value

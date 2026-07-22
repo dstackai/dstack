@@ -4,31 +4,31 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
-from dstack._internal.cli.models.endpoints import EndpointConfiguration
-from dstack._internal.cli.services.endpoints.agent import (
-    EndpointAgentProcessOutput,
-    EndpointAgentWorkspace,
+from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.preset_agent import AgentFinalReport
+from dstack._internal.cli.services.presets.agent import (
+    PresetAgentProcessOutput,
+    PresetAgentWorkspace,
 )
-from dstack._internal.cli.services.endpoints.verify import (
-    build_verified_endpoint_preset,
-    load_endpoint_agent_report,
+from dstack._internal.cli.services.presets.verify import (
+    build_verified_preset,
+    load_preset_agent_report,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
-from tests._internal.cli.endpoint_presets import (
+from tests._internal.cli.preset_factories import (
     get_running_service_run,
-    get_successful_endpoint_report,
+    get_successful_preset_report,
 )
 
 pytestmark = pytest.mark.windows
 
 
-class TestBuildVerifiedEndpointPreset:
+class TestBuildVerifiedPreset:
     def test_successful_report_requires_benchmark(self):
         run = get_running_service_run()
-        data = get_successful_endpoint_report(run).dict()
+        data = get_successful_preset_report(run).dict()
         data.pop("benchmark")
 
         with pytest.raises(ValidationError, match="benchmark"):
@@ -39,19 +39,19 @@ class TestBuildVerifiedEndpointPreset:
         created_at = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
 
         with patch(
-            "dstack._internal.cli.services.endpoints.presets.get_current_datetime",
+            "dstack._internal.cli.services.presets.presets.get_current_datetime",
             return_value=created_at,
         ):
-            preset = build_verified_endpoint_preset(
+            preset = build_verified_preset(
                 run=run,
-                endpoint_configuration=EndpointConfiguration(
+                preset_configuration=PresetConfiguration(
                     name="qwen-build",
                     model={"base": "Qwen/Qwen3.5-27B"},
                     context_length=8192,
                     gateway="benchmark-gateway",
                     env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
                 ),
-                report=get_successful_endpoint_report(run),
+                report=get_successful_preset_report(run),
             )
 
         assert preset.base == "Qwen/Qwen3.5-27B"
@@ -71,12 +71,12 @@ class TestBuildVerifiedEndpointPreset:
 
     def test_rejects_variant_for_exact_model_request(self):
         run = get_running_service_run()
-        report = get_successful_endpoint_report(run).copy(update={"model": "other/model"})
+        report = get_successful_preset_report(run).copy(update={"model": "other/model"})
 
         with pytest.raises(CLIError, match="changed an exact model request"):
-            build_verified_endpoint_preset(
+            build_verified_preset(
                 run=run,
-                endpoint_configuration=EndpointConfiguration(
+                preset_configuration=PresetConfiguration(
                     name="qwen-build",
                     model={
                         "repo": "community/Qwen3.5-27B-GPTQ-Int4",
@@ -87,17 +87,17 @@ class TestBuildVerifiedEndpointPreset:
             )
 
 
-class TestLoadEndpointAgentReport:
+class TestLoadPresetAgentReport:
     def _load(self, tmp_path, report_data, redacted_values):
-        return load_endpoint_agent_report(
-            output=EndpointAgentProcessOutput(report_data=report_data),
-            workspace=EndpointAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
+        return load_preset_agent_report(
+            output=PresetAgentProcessOutput(report_data=report_data),
+            workspace=PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
             redacted_values=redacted_values,
         )
 
     def test_redacts_known_secret_in_benchmark_command_instead_of_failing(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_endpoint_report(run).dict()
+        data = get_successful_preset_report(run).dict()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
@@ -111,7 +111,7 @@ class TestLoadEndpointAgentReport:
 
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_endpoint_report(run).dict()
+        data = get_successful_preset_report(run).dict()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
@@ -124,7 +124,7 @@ class TestLoadEndpointAgentReport:
         # Regression: "(auth via DSTACK_TOKEN bearer header from env)" failed
         # two live sessions — the word after "bearer" is prose, not a token.
         run = get_running_service_run()
-        data = get_successful_endpoint_report(run).dict()
+        data = get_successful_preset_report(run).dict()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"
