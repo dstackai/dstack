@@ -3,14 +3,16 @@ import dataclasses
 import json
 import os
 import re
+import time
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import yaml
 from rich.table import Table
+from rich.text import Text
 
 from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
 from dstack._internal.cli.models.endpoint_presets import EndpointPreset
@@ -21,6 +23,7 @@ from dstack._internal.cli.models.endpoints import (
 from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
+    SessionBusyError,
     attach_agent_workspace,
     attach_endpoint_agent,
     build_endpoint_agent_env,
@@ -31,13 +34,20 @@ from dstack._internal.cli.services.endpoints.agent import (
     get_claude_auth,
     get_redacted_values,
     get_sensitive_inherited_env_values,
+    iter_agent_sessions,
+    load_agent_session,
     load_attachable_agent_session,
+    mark_session_owner,
     print_endpoint_progress,
+    print_session_log,
     redact,
+    release_session_claim,
     remove_agent_workspace,
     run_endpoint_agent,
     session_process_alive,
+    session_report_exists,
     terminate_agent_process,
+    try_claim_session,
 )
 from dstack._internal.cli.services.endpoints.presets import endpoint_preset_to_data
 from dstack._internal.cli.services.endpoints.prompt import get_endpoint_agent_system_prompt
@@ -75,72 +85,217 @@ class AgentExitedWithoutReport(Exception):
         self.error = error
 
 
-def attach_endpoint_preset(
+def follow_endpoint_preset(
     *,
     api: Client,
     store: EndpointPresetStore,
     preset_id: str,
     keep_service: bool = False,
+    wait_for_run_stop: bool = True,
+    echo: bool = True,
+    claim: bool = False,
 ) -> EndpointPresetCreateResult:
+    """Re-owns a detached session: follows its agent to completion, then
+    verifies and saves the preset (the finalize role, which must run CLI-side
+    for secret-scrubbing and server-verified preset building).
+
+    `claim=True` takes the exclusive finalize lock so a concurrent `logs -f` and
+    reconcile can't both finalize the same session. `wait_for_run_stop=False`
+    and `echo=False` make it non-blocking and silent for reconcile."""
     agent_session = load_attachable_agent_session(preset_id)
+    agent_session.echo = echo
+    lock = try_claim_session(agent_session) if claim else None
+    if claim and lock is None:
+        raise SessionBusyError(f"Preset {preset_id} is being finalized by another process")
+    try:
+        configuration = _load_session_configuration(agent_session)
+        try:
+            result = asyncio.run(
+                _create_endpoint_preset(
+                    api=api,
+                    configuration=_resolve_endpoint_env_best_effort(configuration),
+                    source_configuration=configuration,
+                    store=store,
+                    keep_service=keep_service,
+                    agent_session=agent_session,
+                    attach=True,
+                    wait_for_run_stop=wait_for_run_stop,
+                )
+            )
+        except KeyboardInterrupt:
+            # `logs -f` is a viewer: Ctrl+C detaches and leaves the agent
+            # running (reconcile finalizes it later), never stops it.
+            _detach_agent_session(agent_session)
+            raise
+        except AgentExitedWithoutReport as e:
+            _stop_active_session_runs(api, agent_session)
+            _suspend_agent_session(agent_session)
+            raise CLIError(str(e)) from e
+        except CLIError:
+            # Definitive: a failure/invalid report, an unverifiable service, or a
+            # leaked secret — the preset genuinely cannot be built, so fail it.
+            _finish_agent_session(agent_session, "failed")
+            remove_agent_workspace(agent_session)
+            raise
+        # A transient error (network / OS) propagates untouched: the completed
+        # session and its report stay intact for a later follow or reconcile.
+        _finish_agent_session(agent_session, "success")
+        remove_agent_workspace(agent_session)
+        return result
+    finally:
+        release_session_claim(lock)
+
+
+def _load_session_configuration(agent_session: EndpointAgentSession) -> EndpointConfiguration:
     configuration_path = agent_session.path / "preset.dstack.yml"
     if not configuration_path.is_file():
         raise CLIError(
-            f"Session {preset_id} has no configuration copy and cannot be attached;"
-            f" resume it with [code]--resume {preset_id}[/] instead"
+            f"Preset {agent_session.preset_id} has no saved configuration and cannot be"
+            f" followed; resume it with [code]--resume {agent_session.preset_id}[/] instead"
         )
     # The session copy is canonical output, not user input: parse it without
     # the user-facing deprecation warnings.
     try:
-        configuration = EndpointConfiguration.parse_obj(
+        return EndpointConfiguration.parse_obj(
             yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
         )
     except (OSError, ValueError) as e:
-        raise CLIError(f"Could not read the session configuration: {e}") from e
-    try:
-        result = asyncio.run(
-            _create_endpoint_preset(
-                api=api,
-                configuration=_resolve_endpoint_env_best_effort(configuration),
-                source_configuration=configuration,
-                store=store,
-                keep_service=keep_service,
-                agent_session=agent_session,
-                attach=True,
+        raise CLIError(f"Could not read the preset configuration: {e}") from e
+
+
+def show_endpoint_session_logs(
+    *,
+    project: Optional[str],
+    store: EndpointPresetStore,
+    preset_id: str,
+    follow: bool,
+    keep_service: bool,
+) -> Optional[EndpointPresetCreateResult]:
+    """`logs`: dump a session's log (any status). With `follow`, a still-live
+    session is re-owned, followed to completion, and its preset saved; a
+    finished session just prints its log. Returns the saved preset, if any."""
+    session = load_agent_session(preset_id)
+    status = session.read_manifest().get("status")
+    if not follow or status in ("success", "failed", "interrupted"):
+        print_session_log(session)
+        if follow and status == "interrupted":
+            console.print(
+                f"\nPreset [code]{preset_id}[/] creation was interrupted; resume it with"
+                f" [code]dstack preset create -f <config> --resume {preset_id}[/]."
             )
+        return None
+    # Following a live session: print the log so far, then stream new progress
+    # (a future --since could bound this). The client is built only here, so a
+    # read-only dump never needs a server or authentication.
+    print_session_log(session)
+    try:
+        return follow_endpoint_preset(
+            api=Client.from_config(project_name=project),
+            store=store,
+            preset_id=preset_id,
+            keep_service=keep_service,
+            claim=True,
         )
-    except KeyboardInterrupt:
-        _stop_or_detach_agent_session(agent_session, api)
-        raise
-    except AgentExitedWithoutReport as e:
-        runs_stopped = _stop_active_session_runs(api, agent_session, assume_yes=False)
-        _suspend_agent_session(agent_session, runs_left_active=not runs_stopped)
-        raise CLIError(str(e)) from e
-    except BaseException:
-        _finish_agent_session(agent_session, "failed")
-        remove_agent_workspace(agent_session)
-        raise
-    _finish_agent_session(agent_session, "success")
-    remove_agent_workspace(agent_session)
-    return result
+    except SessionBusyError:
+        # Another CLI already owns the finalize; follow read-only instead of
+        # refusing, so any number of viewers can watch the same preset at once.
+        _follow_session_log_readonly(session)
+        return None
 
 
-def stop_endpoint_session(api: Client, preset_id: str, *, assume_yes: bool = False) -> None:
+def _follow_session_log_readonly(session: EndpointAgentSession) -> None:
+    """Read-only follow: another CLI owns the finalize, so just stream the log it
+    writes until the preset reaches a terminal state."""
+    try:
+        offset = session.log_path.stat().st_size
+    except OSError:
+        offset = 0
+    while True:
+        try:
+            with session.log_path.open("r", encoding="utf-8", errors="replace") as f:
+                f.seek(offset)
+                chunk = f.read()
+                offset = f.tell()
+        except OSError:
+            chunk = ""
+        if chunk:
+            console.print(Text(chunk.rstrip("\n")), soft_wrap=True)
+        if session.read_manifest().get("status") in ("success", "failed", "interrupted"):
+            return
+        time.sleep(1)
+
+
+def reconcile_detached_sessions(store: EndpointPresetStore) -> None:
+    """Finalizes sessions whose agent completed while no CLI was attached
+    (graceful detach, or an ungraceful CLI death). This is what makes the saved
+    preset independent of a foreground process: any read command runs it, and
+    the work materializes from the on-disk report.
+
+    Best-effort and parallel-safe — finalize takes an exclusive claim, and every
+    error is swallowed so the calling read command never fails.
+    """
+    for session in iter_agent_sessions():
+        if _is_reconcilable(session.read_manifest()):
+            _reconcile_session(session, store)
+
+
+def _is_reconcilable(manifest: dict[str, Any]) -> bool:
+    # An orphaned session (no live owner) whose agent left a completion report.
+    # A session interrupted mid-work has no report and stays resumable; one
+    # stopped *after* the agent finished is finalized by `stop` itself, not here.
+    # Sessions created before finalize context was persisted lack `project` and
+    # are skipped — they finalize interactively via `logs -f`.
+    return (
+        manifest.get("status") == "running"
+        and bool(manifest.get("project"))
+        and session_report_exists(manifest)
+        and not session_process_alive(manifest)
+    )
+
+
+def _reconcile_session(session: EndpointAgentSession, store: EndpointPresetStore) -> None:
+    manifest = session.read_manifest()
+    try:
+        api = Client.from_config(project_name=str(manifest.get("project") or ""))
+    except Exception:  # noqa: BLE001 — offline/misconfigured must not break the read command
+        return
+    # follow_endpoint_preset takes the finalize claim (so a concurrent `logs -f`
+    # or reconcile can't double-finalize), records the terminal status itself,
+    # and leaves the session intact on a transient error. Every outcome is silent
+    # here — the result shows in the list that follows.
+    with suppress(Exception):
+        follow_endpoint_preset(
+            api=api,
+            store=store,
+            preset_id=session.preset_id,
+            keep_service=bool(manifest.get("keep_service")),
+            wait_for_run_stop=False,
+            echo=False,
+            claim=True,
+        )
+
+
+def stop_endpoint_session(api: Client, preset_id: str) -> None:
     session = load_attachable_agent_session(preset_id)
-    terminate_agent_process(session.read_manifest())
-    runs_stopped = _stop_active_session_runs(api, session, assume_yes=assume_yes)
-    _suspend_agent_session(session, runs_left_active=not runs_stopped)
+    manifest = session.read_manifest()
+    # If the agent already finished, there is nothing to stop. Leave the session
+    # for a read to save (reconcile-on-read) rather than discarding it as
+    # interrupted — but `stop` itself never saves; it only stops.
+    if session_report_exists(manifest) and not session_process_alive(manifest):
+        console.print(f"Preset [code]{preset_id}[/] has already finished.")
+        return
+    terminate_agent_process(manifest)
+    _stop_active_session_runs(api, session)
+    _suspend_agent_session(session)
 
 
-def _stop_active_session_runs(
-    api: Client, session: EndpointAgentSession, *, assume_yes: bool
-) -> bool:
-    """Offers to stop the session's non-terminal runs; returns whether none
-    are left active."""
+def _stop_active_session_runs(api: Client, session: EndpointAgentSession) -> None:
+    """Stops the session's non-terminal runs (with a spinner), like `dstack
+    stop`. Keeping a trial instance warm for resume is the detach path, not this."""
     try:
         lines = session.runs_path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return False
+        return
     names = []
     for line in lines:
         try:
@@ -158,15 +313,9 @@ def _stop_active_session_runs(
         if not run.status.is_finished():
             active.append(name)
     if not active:
-        return True
-    plural = "s" if len(active) != 1 else ""
-    if not assume_yes and not confirm_ask(
-        f"Stop {len(active)} active preset creation run{plural} ([code]{', '.join(active)}[/])?"
-    ):
-        return False
+        return
     with console.status("Stopping runs..."):
         api.client.runs.stop(api.project, active, abort=False)
-    return True
 
 
 def _resolve_endpoint_env_best_effort(
@@ -239,6 +388,7 @@ async def _create_endpoint_preset(
     agent_session: EndpointAgentSession,
     resume: bool = False,
     attach: bool = False,
+    wait_for_run_stop: bool = True,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
 ) -> EndpointPresetCreateResult:
@@ -254,7 +404,7 @@ async def _create_endpoint_preset(
         pinned_prompt = agent_session.read_user_prompt()
         if user_prompt is not None and user_prompt != pinned_prompt:
             warn(
-                "The configuration prompt is ignored when resuming: the session keeps its original prompt"
+                "The configuration prompt is ignored when resuming: the preset keeps its original prompt"
             )
         user_prompt = pinned_prompt
         auth = get_claude_auth()
@@ -272,16 +422,20 @@ async def _create_endpoint_preset(
         if allowed_fleets is None:
             allowed_fleets = _get_allowed_fleets(api, configuration)
         if not allowed_fleets:
-            raise CLIError("The project has no active fleets available for preset creation")
+            raise CLIError("The project has no fleets. Create one before creating a preset")
         auth = get_claude_auth()
         workspace = create_agent_workspace(agent_session)
         build_name = build_name or _get_build_name(
             configuration.name, configuration.model.api_model_name, agent_session.preset_id
         )
-    if auth is not None:
-        agent_session.update_manifest(status="running", pid=os.getpid(), claude_model=auth.model)
-    else:
-        agent_session.update_manifest(status="running", pid=os.getpid())
+    # Record ownership + the finalize context (project, keep-service) so a later
+    # detached reconcile can complete this session from disk alone.
+    mark_session_owner(
+        agent_session,
+        project=api.project,
+        keep_service=keep_service,
+        claude_model=auth.model if auth is not None else None,
+    )
 
     endpoint_env = configuration.env.as_dict()
     token = getattr(api.client, "_token", None)
@@ -361,10 +515,6 @@ async def _create_endpoint_preset(
         if contains_redacted_value(endpoint_preset_to_data(preset), redacted_values):
             raise CLIError("Generated preset contains a secret value")
         preset_path = store.save(preset)
-        print_endpoint_progress(
-            f"Saved preset {preset.id} for {preset.base} at {preset_path}.",
-            agent_session=agent_session,
-        )
         creation_succeeded = True
     except (KeyboardInterrupt, asyncio.CancelledError):
         interrupted = True
@@ -386,6 +536,7 @@ async def _create_endpoint_preset(
                     final_run_name=report.run_name if report is not None else None,
                     keep_final_service=keep_final_service,
                     agent_session=agent_session,
+                    wait_for_stop=wait_for_run_stop,
                 )
             except Exception as e:
                 cleanup_error = str(e)
@@ -397,10 +548,15 @@ async def _create_endpoint_preset(
                             workspace=workspace,
                             final_run_name=report.run_name if report is not None else None,
                             agent_session=agent_session,
+                            wait_for_stop=wait_for_run_stop,
                         )
 
     if cleanup_error is not None:
-        raise CLIError(f"Failed to clean up preset creation runs: {cleanup_error}")
+        # The preset is already saved by this point; a failed cleanup only means
+        # trial runs may still be running. Warn rather than fail the (successful)
+        # session — otherwise a transient blip would discard completed work.
+        if agent_session.echo:
+            warn(f"Failed to stop preset creation runs: {cleanup_error}")
     assert preset is not None
     assert preset_path is not None
     assert report is not None
@@ -431,63 +587,54 @@ def _finish_agent_session(
     status: str,
 ) -> None:
     try:
-        path = session.finish(status)
+        session.finish(status)
     except OSError as e:
-        path = session.path
-        warn(f"Could not finalize agent output. Files remain at {path}: {e}")
-    console.print(f"Agent log saved to [code]{path / 'agent.log'}[/]")
+        if session.echo:
+            warn(f"Could not finalize agent output. Files remain at {session.path}: {e}")
+
+
+def _detach_agent_session(session: EndpointAgentSession) -> None:
+    """Releases ownership but leaves the agent running — it stays visible and
+    reconcilable in `dstack preset`. Silent: `logs -f` calls this on Ctrl+C, and
+    a viewer that just stops watching shouldn't announce anything."""
+    session.update_manifest(pid=None)
 
 
 def _stop_or_detach_agent_session(
     session: EndpointAgentSession, api: Optional[Client] = None
 ) -> None:
-    """Apply-style interrupt: stop the session, or detach and leave the agent
+    """`create` interrupt: stop the session, or detach and leave the agent
     working — it stays visible as a running session in `dstack preset`."""
     manifest = session.read_manifest()
     agent_alive = session_process_alive({**manifest, "pid": None})
     stop = True
     if agent_alive:
         try:
-            stop = confirm_ask(f"Stop the preset creation session [code]{session.preset_id}[/]?")
+            stop = confirm_ask(f"Stop creating preset [code]{session.preset_id}[/]?")
         except (KeyboardInterrupt, EOFError):
             stop = True
-    if stop:
-        terminate_agent_process(manifest)
-        runs_stopped = False
-        if api is not None:
-            runs_stopped = _stop_active_session_runs(api, session, assume_yes=False)
-        _suspend_agent_session(session, runs_left_active=not runs_stopped)
+    if not stop:
+        _detach_agent_session(session)
+        console.print(
+            f"\nDetached. Follow with [code]dstack preset logs -f {session.preset_id}[/]"
+            f" or stop with [code]dstack preset stop {session.preset_id}[/]."
+        )
         return
-    session.update_manifest(pid=None)
-    console.print(
-        f"\nDetached. The session keeps running; attach with"
-        f" [code]dstack preset attach {session.preset_id}[/]"
-        f" or stop it with [code]dstack preset stop {session.preset_id}[/]."
-    )
+    terminate_agent_process(manifest)
+    if api is not None:
+        _stop_active_session_runs(api, session)
+    _suspend_agent_session(session)
 
 
-def _suspend_agent_session(
-    session: EndpointAgentSession, *, runs_left_active: bool = True
-) -> None:
+def _suspend_agent_session(session: EndpointAgentSession) -> None:
     try:
         session.finish("interrupted")
     except OSError as e:
-        warn(f"Could not record the interrupted session state: {e}")
-    if runs_left_active:
-        console.print(
-            f"\nSession [code]{session.preset_id}[/] interrupted. "
-            "Its runs may still be active and accruing cost."
-        )
-        console.print(
-            f"Resume with [code]dstack preset create -f <configuration> "
-            f"--resume {session.preset_id}[/], or stop the runs with [code]dstack stop[/]."
-        )
-    else:
-        console.print(f"\nSession [code]{session.preset_id}[/] interrupted.")
-        console.print(
-            f"Resume with [code]dstack preset create -f <configuration> "
-            f"--resume {session.preset_id}[/]."
-        )
+        warn(f"Could not record the interrupted preset state: {e}")
+    console.print(f"\nPreset [code]{session.preset_id}[/] creation interrupted.")
+    console.print(
+        f"Resume it with [code]dstack preset create -f <config> --resume {session.preset_id}[/]."
+    )
 
 
 def _get_build_name(name: Optional[str], model_name: str, suffix: str) -> str:
@@ -511,10 +658,10 @@ def _load_build_name(workspace: EndpointAgentWorkspace) -> str:
     try:
         data = json.loads(workspace.constraints_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        raise CLIError(f"The session constraints cannot be read: {e}") from e
+        raise CLIError(f"The preset creation constraints cannot be read: {e}") from e
     prefix = data.get("run_name_prefix") if isinstance(data, dict) else None
     if not isinstance(prefix, str) or not prefix:
-        raise CLIError("The session constraints do not contain a run name prefix")
+        raise CLIError("The preset creation constraints do not contain a run name prefix")
     return prefix
 
 
@@ -523,7 +670,7 @@ def plan_endpoint_preset(*, api: Client, configuration: EndpointConfiguration) -
     with — Project, User, the effective fleets, and their offers. Agent-free."""
     allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
-        raise CLIError("The project has no active fleets available for preset creation")
+        raise CLIError("The project has no fleets. Create one before creating a preset")
     _print_fleet_offers(api, allowed_fleets)
     return allowed_fleets
 
@@ -617,6 +764,7 @@ async def _cleanup_runs(
     final_run_name: Optional[str],
     agent_session: EndpointAgentSession,
     keep_final_service: bool = False,
+    wait_for_stop: bool = True,
 ) -> None:
     run_names = _load_submitted_run_names(workspace.runs_path)
     if final_run_name is not None:
@@ -634,6 +782,10 @@ async def _cleanup_runs(
     if not active_names:
         return
     api.client.runs.stop(api.project, active_names, abort=False)
+    if not wait_for_stop:
+        # Background reconcile issues the stop but must not block the read
+        # command it runs inside; the runs terminate on the server regardless.
+        return
     deadline = asyncio.get_running_loop().time() + _RUN_STOP_TIMEOUT_SECONDS
     pending = set(active_names)
     while pending:

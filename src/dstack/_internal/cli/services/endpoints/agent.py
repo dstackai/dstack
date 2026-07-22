@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Optional, Protocol, Sequence
+from typing import Any, AsyncIterator, Callable, Iterator, Optional, Protocol, Sequence
 
 import psutil
 import yaml
@@ -87,6 +87,11 @@ _SENSITIVE_INHERITED_ENV_NAMES = (
 )
 
 
+class SessionBusyError(CLIError):
+    """Another live process owns the session — it is following or finalizing it.
+    Callers that only want to view can fall back to a read-only follow."""
+
+
 @dataclass(frozen=True)
 class EndpointAgentWorkspace:
     path: Path
@@ -135,6 +140,10 @@ class EndpointAgentSession:
     timestamp: str
     debug: bool
     preset_id: str = ""
+    # Whether progress lines echo to this process's console (a live attach), on
+    # top of always being recorded to agent.log. Background reconcile sets it
+    # False so finalizing a detached session stays silent on the read command.
+    echo: bool = field(default=True, repr=False)
     _log_enabled: bool = field(default=True, init=False, repr=False)
 
     @property
@@ -197,7 +206,8 @@ class EndpointAgentSession:
                 f.flush()
         except OSError as e:
             self._log_enabled = False
-            console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
+            if self.echo:
+                console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
 
     def read_manifest(self) -> dict[str, Any]:
         try:
@@ -258,12 +268,12 @@ def attach_agent_workspace(session: EndpointAgentSession) -> EndpointAgentWorksp
     manifest = session.read_manifest()
     real_value, alias_value = manifest.get("workspace"), manifest.get("alias")
     if not real_value or not alias_value:
-        raise CLIError("The session has no workspace to resume")
+        raise CLIError("The preset creation has no workspace to resume")
     real, alias = Path(real_value), Path(alias_value)
     if not real.is_dir():
         raise CLIError(
-            f"The session workspace no longer exists: {real}. "
-            "Stop any leftover runs manually and start a new session."
+            f"The preset creation workspace no longer exists: {real}. "
+            "Stop any leftover runs manually and create a new preset."
         )
     if alias != real:
         _ensure_workspace_alias(alias, real)
@@ -336,6 +346,7 @@ def create_endpoint_agent_session(
             "id": preset_id,
             "status": "running",
             "pid": os.getpid(),
+            "pid_started_at": _process_started_at(os.getpid()),
             "endpoint": configuration.name,
             "name": configuration.name,
             "model": getattr(configuration.model, "base", None)
@@ -400,21 +411,19 @@ def load_resumable_agent_session(preset_id: str) -> EndpointAgentSession:
     session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
-        raise CLIError(f"Unknown preset creation session: {preset_id}")
+        raise CLIError(f"Unknown preset: {preset_id}")
     status = manifest.get("status")
     if status == "success":
-        raise CLIError(f"Session {preset_id} completed successfully; nothing to resume")
+        raise CLIError(f"Preset {preset_id} is already created; nothing to resume")
     if status == "failed":
-        raise CLIError(f"Session {preset_id} failed and cannot be resumed")
+        raise CLIError(f"Preset {preset_id} creation failed and cannot be resumed")
     if status == "running" and session_process_alive(manifest):
         raise CLIError(
-            f"Session {preset_id} appears to be running already;"
-            f" attach with [code]dstack preset attach {preset_id}[/]"
+            f"Preset {preset_id} is still being created;"
+            f" follow it with [code]dstack preset logs -f {preset_id}[/]"
         )
     if not manifest.get("claude_session_id"):
-        raise CLIError(
-            f"Session {preset_id} stopped before the agent started; start a new session"
-        )
+        raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
     session.debug = bool(manifest.get("debug"))
     session.timestamp = str(manifest.get("created_at") or "")
     return session
@@ -437,7 +446,12 @@ def session_process_alive(manifest: dict[str, Any]) -> bool:
     if _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at")):
         return True
     pid = manifest.get("pid")
-    return isinstance(pid, int) and pid > 0 and pid != os.getpid() and psutil.pid_exists(pid)
+    if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
+        return False
+    # Guard the CLI pid with its start time too: after an ungraceful CLI death
+    # the OS can recycle the pid, and a bare pid_exists() would read a dead
+    # session as still owned (falsely blocking reconcile / follow).
+    return _pid_alive(pid, manifest.get("pid_started_at"))
 
 
 def load_attachable_agent_session(preset_id: str) -> EndpointAgentSession:
@@ -445,26 +459,134 @@ def load_attachable_agent_session(preset_id: str) -> EndpointAgentSession:
     session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
-        raise CLIError(f"Unknown preset creation session: {preset_id}")
+        raise CLIError(f"Unknown preset: {preset_id}")
     status = manifest.get("status")
     if status == "success":
-        raise CLIError(f"Session {preset_id} completed successfully; nothing to attach")
+        raise CLIError(f"Preset {preset_id} is already created")
     if status == "failed":
-        raise CLIError(f"Session {preset_id} failed and cannot be attached")
+        raise CLIError(f"Preset {preset_id} creation failed")
     if status == "interrupted":
         raise CLIError(
-            f"Session {preset_id} is interrupted; resume it with"
-            f" [code]dstack preset create -f <configuration> --resume {preset_id}[/]"
+            f"Preset {preset_id} creation was interrupted; resume it with"
+            f" [code]dstack preset create -f <config> --resume {preset_id}[/]"
         )
     pid = manifest.get("pid")
-    if isinstance(pid, int) and pid > 0 and pid != os.getpid() and psutil.pid_exists(pid):
-        raise CLIError(
-            f"Session {preset_id} is already attached by another CLI (pid {pid});"
+    if (
+        isinstance(pid, int)
+        and pid > 0
+        and pid != os.getpid()
+        and _pid_alive(pid, manifest.get("pid_started_at"))
+    ):
+        raise SessionBusyError(
+            f"Preset {preset_id} is already being followed by another CLI (pid {pid});"
             f" stop or detach it there with Ctrl+C"
         )
     session.debug = bool(manifest.get("debug"))
     session.timestamp = str(manifest.get("created_at") or "")
     return session
+
+
+def load_agent_session(preset_id: str) -> EndpointAgentSession:
+    """Loads a session of any status for read-only inspection (its log)."""
+    path = get_presets_dir() / preset_id
+    session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    if not path.is_dir() or not session.read_manifest():
+        raise CLIError(f"Unknown preset: {preset_id}")
+    return session
+
+
+def print_session_log(session: EndpointAgentSession) -> None:
+    """Prints the session's redacted progress log verbatim (no markup)."""
+    try:
+        content = session.log_path.read_text(encoding="utf-8")
+    except OSError:
+        content = ""
+    if content.strip():
+        console.print(Text(content.rstrip("\n")), soft_wrap=True)
+    else:
+        console.print(f"No log output yet for session [code]{session.preset_id}[/].")
+
+
+def mark_session_owner(
+    session: EndpointAgentSession,
+    *,
+    project: Optional[str] = None,
+    keep_service: Optional[bool] = None,
+    claude_model: Optional[str] = None,
+) -> None:
+    """Records this process as the session's owner (pid + start time) and, when
+    given, the finalize context a later detached reconcile needs (project and
+    keep-service intent). `None` fields are left untouched."""
+    fields: dict[str, Any] = {
+        "status": "running",
+        "pid": os.getpid(),
+        "pid_started_at": _process_started_at(os.getpid()),
+    }
+    if project is not None:
+        fields["project"] = project
+    if keep_service is not None:
+        fields["keep_service"] = keep_service
+    if claude_model is not None:
+        fields["claude_model"] = claude_model
+    session.update_manifest(**fields)
+
+
+def session_report_exists(manifest: dict[str, Any]) -> bool:
+    """Whether the agent left a final report on disk — the durable completion
+    signal a detached session is finalized from."""
+    workspace = manifest.get("workspace")
+    if not isinstance(workspace, str) or not workspace:
+        return False
+    return (Path(workspace) / "w" / _FINAL_REPORT_FILENAME).is_file()
+
+
+def try_claim_session(session: EndpointAgentSession) -> Optional[int]:
+    """Takes an exclusive, kernel-held lock for the duration of a session's
+    finalization, so concurrent readers can't both finalize it. Returns an open
+    file descriptor to release via `release_session_claim`, or None if another
+    process holds it. The kernel drops the lock if the holder dies, so there are
+    no stale locks to reason about."""
+    try:
+        fd = os.open(session.path / ".reconcile.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    except OSError:
+        return None
+    if _try_lock_fd(fd):
+        return fd
+    with suppress(OSError):
+        os.close(fd)
+    return None
+
+
+def release_session_claim(fd: Optional[int]) -> None:
+    if fd is not None:
+        # Closing the descriptor releases the kernel lock.
+        with suppress(OSError):
+            os.close(fd)
+
+
+def _try_lock_fd(fd: int) -> bool:
+    """Non-blocking exclusive lock on an open fd; True if acquired, False if
+    another process holds it."""
+    if IS_WINDOWS:
+        import msvcrt
+
+        try:
+            # A 1-byte range lock at offset 0 (allowed past EOF on Windows).
+            msvcrt.locking(  # pyright: ignore[reportAttributeAccessIssue]
+                fd,
+                msvcrt.LK_NBLCK,  # pyright: ignore[reportAttributeAccessIssue]
+                1,
+            )
+            return True
+        except OSError:
+            return False
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
 
 
 def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
@@ -476,29 +598,29 @@ def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
     return value if isinstance(value, str) and value else None
 
 
+def iter_agent_sessions() -> Iterator[EndpointAgentSession]:
+    """Yields a handle for every session directory under the presets dir."""
+    root = get_presets_dir()
+    if not root.is_dir():
+        return
+    for path in sorted(root.iterdir()):
+        if path.is_dir() and not path.name.startswith((".", "models--")):
+            yield EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+
+
 def find_session_name_claims(name: str) -> list[EndpointAgentSession]:
     """Sessions of any status holding `name`, including failed ones."""
-    root = get_presets_dir()
-    claims = []
-    if not root.is_dir():
-        return claims
-    for path in sorted(root.iterdir()):
-        if not path.is_dir() or path.name.startswith((".", "models--")):
-            continue
-        session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
-        if claimed_session_name(session.read_manifest()) == name:
-            claims.append(session)
-    return claims
+    return [
+        session
+        for session in iter_agent_sessions()
+        if claimed_session_name(session.read_manifest()) == name
+    ]
 
 
 def list_agent_sessions() -> list[dict[str, Any]]:
-    root = get_presets_dir()
     entries = []
-    candidates = sorted(root.iterdir()) if root.is_dir() else []
-    for path in candidates:
-        if not path.is_dir() or path.name.startswith((".", "models--")):
-            continue
-        session = EndpointAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+    for session in iter_agent_sessions():
+        path = session.path
         manifest = session.read_manifest()
         status = manifest.get("status")
         if status not in ("running", "interrupted", "success"):
@@ -669,7 +791,7 @@ async def run_endpoint_agent(
             if session_id is not None:
                 resume_session_id = session_id
                 attempt_prompt = _RESUME_PROMPT
-                action = "resuming the session"
+                action = "resuming"
             else:
                 action = "retrying"
             print_endpoint_progress(
@@ -744,6 +866,8 @@ def print_endpoint_progress(message: str, *, agent_session: EndpointAgentSession
     timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
     message = message.rstrip("\r\n")
     agent_session.append_log(f"[{timestamp}] {message}")
+    if not agent_session.echo:
+        return
     console.print(
         Text(f"[{timestamp}]", style="log.time"),
         Text(message, style="log.message"),
@@ -1021,6 +1145,7 @@ async def _session_tailers(
             redacted_values=redacted_values,
             offset_store=offset_store,
             offset_key="runs",
+            echo=agent_session.echo,
         ),
         _RecordMirror(
             source=workspace.trials_path,
@@ -1028,6 +1153,7 @@ async def _session_tailers(
             redacted_values=redacted_values,
             offset_store=offset_store,
             offset_key="trials",
+            echo=agent_session.echo,
         ),
     ]
     tailer_tasks = [
@@ -1383,6 +1509,7 @@ class _RecordMirror:
         redacted_values: Sequence[str],
         offset_store: Optional[_OffsetStore] = None,
         offset_key: str = "",
+        echo: bool = True,
     ) -> None:
         self._source = source
         self._target = target
@@ -1391,6 +1518,7 @@ class _RecordMirror:
         self._offset_key = offset_key
         self._offset = offset_store.get(offset_key) if offset_store and offset_key else 0
         self._enabled = True
+        self._echo = echo
 
     async def run(self) -> None:
         while True:
@@ -1419,7 +1547,8 @@ class _RecordMirror:
                 f.flush()
         except OSError as e:
             self._enabled = False
-            console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
+            if self._echo:
+                console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
 
 
 def _parse_progress(line: str) -> Optional[str]:

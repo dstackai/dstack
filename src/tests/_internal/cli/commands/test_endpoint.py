@@ -93,7 +93,9 @@ class TestEndpointPresetLocalCommands:
             )
 
         assert exit_code == 0
-        assert "Operation interrupted by user" in capsys.readouterr().out
+        # create reports its own Ctrl+C outcome (Detached / interrupted) via the
+        # interrupt handler, so the command layer stays silent — no generic line.
+        assert "Operation interrupted by user" not in capsys.readouterr().out
 
     def test_lists_and_deletes_preset_without_api_client(self, tmp_path, capsys):
         preset = get_endpoint_preset()

@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+from contextlib import suppress
 from pathlib import Path
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
@@ -20,9 +21,10 @@ from dstack._internal.cli.services.endpoints.agent import (
 )
 from dstack._internal.cli.services.endpoints.apply import apply_endpoint_preset
 from dstack._internal.cli.services.endpoints.create import (
-    attach_endpoint_preset,
     create_endpoint_preset,
     plan_endpoint_preset,
+    reconcile_detached_sessions,
+    show_endpoint_session_logs,
     stop_endpoint_session,
 )
 from dstack._internal.cli.services.endpoints.output import print_endpoint_presets
@@ -106,29 +108,35 @@ class EndpointCommand(BaseCommand):
         create_parser.add_argument(
             "--resume",
             metavar="ID",
-            help="Resume an interrupted preset creation session by its preset ID",
+            help="Resume an interrupted preset creation by its preset ID",
         )
         create_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
         )
         create_parser.set_defaults(subfunc=self._create)
 
-        attach_parser = preset_subparsers.add_parser(
-            "attach",
-            help="Attach to a detached preset creation session",
+        logs_parser = preset_subparsers.add_parser(
+            "logs",
+            help="Show a preset's creation log",
             formatter_class=self._parser.formatter_class,
         )
-        attach_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
-        attach_parser.add_argument(
+        logs_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
+        logs_parser.add_argument(
+            "-f",
+            "--follow",
+            action="store_true",
+            help="Follow to completion and save the preset",
+        )
+        logs_parser.add_argument(
             "--keep-service",
             action="store_true",
-            help="Leave the verified service running",
+            help="Leave the verified service running (with -f)",
         )
-        attach_parser.set_defaults(subfunc=self._attach)
+        logs_parser.set_defaults(subfunc=self._logs)
 
         stop_parser = preset_subparsers.add_parser(
             "stop",
-            help="Stop a running preset creation session",
+            help="Stop a running preset creation",
             formatter_class=self._parser.formatter_class,
         )
         stop_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
@@ -200,15 +208,24 @@ class EndpointCommand(BaseCommand):
             console.print("\nOperation interrupted by user. Exiting...")
             exit(0)
 
+    def _reconcile(self) -> None:
+        """Finalize any detached/orphaned session whose agent already completed,
+        so a saved preset never depends on a foreground CLI surviving. Fully
+        best-effort — it must never make a read command fail."""
+        with suppress(Exception):
+            reconcile_detached_sessions(EndpointPresetStore())
+
     def _list(self, args: argparse.Namespace) -> None:
         base = getattr(args, "base", None)
         repo = getattr(args, "repo", None)
         if getattr(args, "json", False):
+            self._reconcile()
             presets = _filter_presets(EndpointPresetStore().list(), base=base, repo=repo)
             print(EndpointPresetListOutput(presets=presets).json())
             return
         verbose = getattr(args, "verbose", False)
         while True:
+            self._reconcile()
             presets = EndpointPresetStore().list()
             sessions = list_agent_sessions()
             if base or repo:
@@ -239,7 +256,7 @@ class EndpointCommand(BaseCommand):
             if getattr(args, "max_trials", None) is not None:
                 console.print(
                     "[warning]--max-trials is ignored when resuming: "
-                    "session constraints are fixed at creation[/]"
+                    "the constraints are fixed at creation[/]"
                 )
         api = Client.from_config(project_name=args.project)
         allowed_fleets = None
@@ -248,16 +265,19 @@ class EndpointCommand(BaseCommand):
             if not _confirm_preset_creation(store, configuration.name, assume_yes=args.yes):
                 console.print("\nExiting...")
                 return
-        result = create_endpoint_preset(
-            api=api,
-            configuration=configuration,
-            store=store,
-            keep_service=args.keep_service,
-            debug=args.debug,
-            resume_session=resume_session,
-            user_prompt=user_prompt,
-            allowed_fleets=allowed_fleets,
-        )
+        try:
+            result = create_endpoint_preset(
+                api=api,
+                configuration=configuration,
+                store=store,
+                keep_service=args.keep_service,
+                debug=args.debug,
+                resume_session=resume_session,
+                user_prompt=user_prompt,
+                allowed_fleets=allowed_fleets,
+            )
+        except KeyboardInterrupt:
+            return  # the interrupt handler already reported detach / stop
         console.print(
             f"Preset [code]{result.preset.id}[/] for "
             f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
@@ -265,32 +285,34 @@ class EndpointCommand(BaseCommand):
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
-    def _attach(self, args: argparse.Namespace) -> None:
-        result = attach_endpoint_preset(
-            api=Client.from_config(project_name=args.project),
-            store=EndpointPresetStore(),
-            preset_id=_resolve_session_ref(args.preset),
-            keep_service=args.keep_service,
-        )
-        console.print(
-            f"Preset [code]{result.preset.id}[/] for "
-            f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
-        )
-        if args.keep_service:
-            console.print(f"Final service [code]{result.final_run_name}[/] kept running")
+    def _logs(self, args: argparse.Namespace) -> None:
+        try:
+            result = show_endpoint_session_logs(
+                project=args.project,
+                store=EndpointPresetStore(),
+                preset_id=_resolve_session_ref(args.preset),
+                follow=args.follow,
+                keep_service=args.keep_service,
+            )
+        except KeyboardInterrupt:
+            return  # a log viewer: Ctrl+C just stops watching, quietly
+        if result is not None:
+            console.print(
+                f"Preset [code]{result.preset.id}[/] for "
+                f"[code]{result.preset.base}[/] saved to [code]{result.path}[/]"
+            )
+            if args.keep_service:
+                console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
     def _stop(self, args: argparse.Namespace) -> None:
         preset_id = _resolve_session_ref(args.preset)
-        if not args.yes and not confirm_ask(
-            f"Stop the preset creation session [code]{preset_id}[/]?"
-        ):
+        if not args.yes and not confirm_ask(f"Stop creating preset [code]{preset_id}[/]?"):
             console.print("\nExiting...")
             return
-        stop_endpoint_session(
-            Client.from_config(project_name=args.project), preset_id, assume_yes=args.yes
-        )
+        stop_endpoint_session(Client.from_config(project_name=args.project), preset_id)
 
     def _get(self, args: argparse.Namespace) -> None:
+        self._reconcile()
         store = EndpointPresetStore()
         preset = store.get(args.preset) or store.find_by_name(args.preset)
         if preset is None:
@@ -298,6 +320,7 @@ class EndpointCommand(BaseCommand):
         print(preset.json())
 
     def _apply(self, args: argparse.Namespace) -> None:
+        self._reconcile()
         configuration_path, configuration = load_endpoint_configuration(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args)
         apply_endpoint_preset(
@@ -367,7 +390,7 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
         "-w",
         "--watch",
         action="store_true",
-        help="Watch presets and sessions in realtime",
+        help="Watch presets in realtime",
     )
     parser.add_argument(
         "--json",
@@ -454,7 +477,7 @@ def _confirm_preset_creation(
     holders = []
     if preset_holder is not None:
         holders.append(f"preset [code]{preset_holder.id}[/]")
-    holders.extend(f"session [code]{session.preset_id}[/]" for session in session_holders)
+    holders.extend(f"preset [code]{session.preset_id}[/]" for session in session_holders)
     if holders:
         message = (
             f"The name [code]{name}[/] is already used by {', '.join(holders)}."

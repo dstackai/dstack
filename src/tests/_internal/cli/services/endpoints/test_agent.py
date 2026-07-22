@@ -549,7 +549,7 @@ else:
         assert calls[0]["prompt"] == "system prompt"
         assert calls[1]["args"] == ["--resume", "sid-123"]
         assert "The previous agent process was interrupted" in calls[1]["prompt"]
-        assert "resuming the session" in capsys.readouterr().out
+        assert "resuming" in capsys.readouterr().out
 
     @pytest.mark.asyncio
     async def test_resumes_on_any_unreported_death(self, tmp_path, monkeypatch):
@@ -775,7 +775,7 @@ class TestLoadResumableSession:
         assert load_resumable_agent_session("ab12cd34").preset_id == "ab12cd34"
 
     def test_refusals(self, tmp_path, monkeypatch):
-        with pytest.raises(CLIError, match="Unknown preset creation session"):
+        with pytest.raises(CLIError, match="Unknown preset"):
             monkeypatch.setenv("HOME", str(tmp_path))
             monkeypatch.setenv("USERPROFILE", str(tmp_path))
             load_resumable_agent_session("00000000")
@@ -802,11 +802,11 @@ class TestLoadResumableSession:
             "dstack._internal.cli.services.endpoints.agent.psutil.pid_exists",
             lambda pid: True,
         )
-        with pytest.raises(CLIError, match="running already"):
+        with pytest.raises(CLIError, match="still being created"):
             load_resumable_agent_session("aa000003")
 
         self._write_session(tmp_path, monkeypatch, {"id": "aa000004", "status": "interrupted"})
-        with pytest.raises(CLIError, match="stopped before the agent started"):
+        with pytest.raises(CLIError, match="stopped before it started"):
             load_resumable_agent_session("aa000004")
 
 

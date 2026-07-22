@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import uuid
 from types import SimpleNamespace
 
@@ -12,11 +13,18 @@ from dstack._internal.cli.services.endpoints.agent import (
     EndpointAgentSession,
     EndpointAgentWorkspace,
     create_agent_workspace,
+    load_agent_session,
+    mark_session_owner,
     print_endpoint_progress,
+    print_session_log,
+    release_session_claim,
     remove_agent_workspace,
+    session_process_alive,
+    try_claim_session,
 )
 from dstack._internal.cli.services.endpoints.create import (
     EndpointPresetCreateResult,
+    SessionBusyError,
     _build_constraints,
     _cleanup_runs,
     _create_endpoint_preset,
@@ -24,8 +32,9 @@ from dstack._internal.cli.services.endpoints.create import (
     _print_fleet_offers,
     _save_final_report_copy,
     _stop_active_session_runs,
-    attach_endpoint_preset,
     create_endpoint_preset,
+    follow_endpoint_preset,
+    reconcile_detached_sessions,
 )
 from dstack._internal.cli.services.endpoints.store import EndpointPresetStore
 from dstack._internal.core.errors import CLIError
@@ -138,8 +147,6 @@ class TestCreateEndpointPreset:
         assert manifest["status"] == "success"
         assert manifest["id"] == paths[0].name
         assert "testing preset" in (paths[0] / "agent.log").read_text()
-        output = capsys.readouterr().out.replace("\n", "")
-        assert f"Agent log saved to {paths[0] / 'agent.log'}" in output
 
     def test_debug_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -238,7 +245,7 @@ class TestCreateEndpointPreset:
             lambda: pytest.fail("Claude auth must not be checked without an active fleet"),
         )
 
-        with pytest.raises(CLIError, match="no active fleets"):
+        with pytest.raises(CLIError, match="no fleets"):
             await _create_endpoint_preset(
                 api=api,
                 configuration=EndpointConfiguration(
@@ -527,7 +534,7 @@ class TestInterruptAndResume:
         manifest = json.loads((sessions[0] / "session.json").read_text())
         assert manifest["status"] == "interrupted"
         output = capsys.readouterr().out
-        assert "Resume with" in output
+        assert "--resume" in output
         assert sessions[0].name in output
 
     @pytest.mark.asyncio
@@ -671,7 +678,45 @@ class TestFleetOffersPreview:
         assert "No matching instance offers available" in out
 
 
-class TestAttachEndpointPreset:
+class TestSessionLog:
+    def _session(self, tmp_path, preset_id: str, status: str, log: str) -> EndpointAgentSession:
+        session_dir = tmp_path / preset_id
+        session_dir.mkdir()
+        (session_dir / "agent.log").write_text(log)
+        session = EndpointAgentSession(
+            path=session_dir, timestamp="t", debug=False, preset_id=preset_id
+        )
+        session.update_manifest(status=status)
+        return session
+
+    def test_load_agent_session_reads_any_status(self, tmp_path, monkeypatch):
+        self._session(tmp_path, "dead0000", "failed", "[t] boom\n")
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            lambda: tmp_path,
+        )
+        # A failed session is off-limits to follow/resume, but its log is readable.
+        session = load_agent_session("dead0000")
+        assert session.preset_id == "dead0000"
+        with pytest.raises(CLIError, match="Unknown preset"):
+            load_agent_session("nope0000")
+
+    def test_print_session_log_dumps_log_verbatim(self, tmp_path, monkeypatch, capsys):
+        session = self._session(
+            tmp_path, "abcd0000", "success", "[t] trial 1 done\n[t] saved preset\n"
+        )
+        print_session_log(session)
+        out = capsys.readouterr().out
+        assert "trial 1 done" in out
+        assert "saved preset" in out
+
+    def test_print_session_log_notes_empty_log(self, tmp_path, capsys):
+        session = self._session(tmp_path, "empty000", "running", "")
+        print_session_log(session)
+        assert "No log output yet" in capsys.readouterr().out
+
+
+class TestFollowEndpointPreset:
     def _detached_session(self, tmp_path, configuration_yaml: str) -> EndpointAgentSession:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
@@ -708,7 +753,7 @@ class TestAttachEndpointPreset:
             fake_attach,
         )
 
-        result = attach_endpoint_preset(
+        result = follow_endpoint_preset(
             api=creation_context.api,
             store=creation_context.store,
             preset_id="ab12cd34",
@@ -738,13 +783,35 @@ class TestAttachEndpointPreset:
         )
 
         with pytest.raises(CLIError, match="agent died"):
-            attach_endpoint_preset(
+            follow_endpoint_preset(
                 api=creation_context.api,
                 store=creation_context.store,
                 preset_id="ab12cd34",
             )
 
         assert session.read_manifest()["status"] == "interrupted"
+
+    def test_backs_off_when_claim_is_held(self, creation_context, monkeypatch, tmp_path):
+        session = self._detached_session(
+            tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+        )
+        # Another live holder owns the finalize lock (reconcile or logs -f).
+        held = try_claim_session(session)
+        assert held is not None
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.load_attachable_agent_session",
+            lambda preset_id: session,
+        )
+        # claim=True must refuse rather than double-finalize; the session is untouched.
+        with pytest.raises(SessionBusyError):
+            follow_endpoint_preset(
+                api=creation_context.api,
+                store=creation_context.store,
+                preset_id="ab12cd34",
+                claim=True,
+            )
+        assert session.read_manifest()["status"] == "running"
+        release_session_claim(held)
 
 
 class TestStopActiveSessionRuns:
@@ -778,18 +845,169 @@ class TestStopActiveSessionRuns:
             {"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.RUNNING}, stopped
         )
 
-        assert _stop_active_session_runs(api, self._session(tmp_path), assume_yes=True) is True
+        # No per-run prompt: active runs are stopped automatically (like dstack stop).
+        _stop_active_session_runs(api, self._session(tmp_path))
         assert stopped == ["qwen-build-2"]
 
-    def test_declined_confirmation_leaves_runs_active(self, tmp_path, monkeypatch):
-        from dstack._internal.cli.services.endpoints import create as create_module
+    def test_stops_nothing_when_all_terminal(self, tmp_path):
         from dstack._internal.core.models.runs import RunStatus
 
-        monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)
         stopped: list = []
-        api = self._api(
-            {"qwen-build-1": RunStatus.RUNNING, "qwen-build-2": RunStatus.DONE}, stopped
+        api = self._api({"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.DONE}, stopped)
+
+        _stop_active_session_runs(api, self._session(tmp_path))
+        assert stopped == []
+
+
+class TestReconcileDetachedSessions:
+    def _session_dir(
+        self,
+        tmp_path,
+        preset_id="dead0001",
+        *,
+        status="running",
+        project="main",
+        with_report=True,
+        keep_service=False,
+        owner_alive=False,
+    ):
+        session_dir = tmp_path / preset_id
+        (session_dir / "workspace" / "w").mkdir(parents=True)
+        manifest = {
+            "id": preset_id,
+            "status": status,
+            "keep_service": keep_service,
+            # A dead pid unless a live owner is requested below.
+            "pid": 987654321,
+            "pid_started_at": 0.0,
+            "workspace": str(session_dir / "workspace"),
+        }
+        if project is not None:
+            manifest["project"] = project
+        if owner_alive:
+            # A live pid with no recorded start time reads as an active owner.
+            manifest["agent_pid"] = os.getpid()
+        (session_dir / "session.json").write_text(json.dumps(manifest))
+        if with_report:
+            (session_dir / "workspace" / "w" / "final_report.json").write_text("{}")
+        return session_dir
+
+    def _patch(self, monkeypatch, tmp_path, follow):
+        # reconcile iterates via agent.iter_agent_sessions -> agent.get_presets_dir.
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.agent.get_presets_dir",
+            lambda: tmp_path,
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.Client",
+            SimpleNamespace(from_config=lambda project_name=None: SimpleNamespace()),
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.endpoints.create.follow_endpoint_preset",
+            follow,
         )
 
-        assert _stop_active_session_runs(api, self._session(tmp_path), assume_yes=False) is False
-        assert stopped == []
+    def _recording_follow(self, calls):
+        def follow(**kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                preset=SimpleNamespace(id=kwargs["preset_id"], base="Qwen/Qwen3.5-27B")
+            )
+
+        return follow
+
+    def test_finalizes_eligible_detached_session(self, tmp_path, monkeypatch):
+        self._session_dir(tmp_path, keep_service=True)
+        calls: list = []
+        self._patch(monkeypatch, tmp_path, self._recording_follow(calls))
+        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+        assert len(calls) == 1
+        assert calls[0]["preset_id"] == "dead0001"
+        # Honors persisted keep-service; non-interactive, non-blocking, silent,
+        # and under the finalize claim (parallel-safe).
+        assert calls[0]["keep_service"] is True
+        assert calls[0]["wait_for_run_stop"] is False
+        assert calls[0]["echo"] is False
+        assert calls[0]["claim"] is True
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"status": "success"},
+            {"status": "failed"},
+            {"with_report": False},
+            {"project": None},
+            {"owner_alive": True},
+            # `interrupted` is `stop`'s job now, not reconcile's — with or without a report.
+            {"status": "interrupted"},
+            {"status": "interrupted", "with_report": False},
+        ],
+    )
+    def test_skips_ineligible(self, tmp_path, monkeypatch, kwargs):
+        self._session_dir(tmp_path, **kwargs)
+        calls: list = []
+        self._patch(monkeypatch, tmp_path, self._recording_follow(calls))
+        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+        assert calls == []
+
+    def test_never_raises_when_finalize_fails(self, tmp_path, monkeypatch):
+        self._session_dir(tmp_path)
+
+        def boom(**kwargs):
+            raise RuntimeError("finalize blew up")
+
+        self._patch(monkeypatch, tmp_path, boom)
+        # A read command must never fail because reconcile did.
+        reconcile_detached_sessions(EndpointPresetStore(tmp_path / "store"))
+
+
+class TestSessionClaim:
+    def _session(self, tmp_path):
+        (tmp_path / "sess").mkdir()
+        return EndpointAgentSession(
+            path=tmp_path / "sess", timestamp="", debug=False, preset_id="sess"
+        )
+
+    def test_claim_is_exclusive_and_releasable(self, tmp_path):
+        session = self._session(tmp_path)
+        first = try_claim_session(session)
+        assert first is not None
+        assert try_claim_session(session) is None  # the kernel lock is held
+        release_session_claim(first)
+        again = try_claim_session(session)
+        assert again is not None
+        release_session_claim(again)
+
+    def test_claim_acquires_when_lock_file_is_unheld(self, tmp_path):
+        session = self._session(tmp_path)
+        # A leftover lock file from a crashed run holds no kernel lock: the file's
+        # presence must not block a new claim (no stale-lock reasoning needed).
+        (session.path / ".reconcile.lock").write_text("stale")
+        fd = try_claim_session(session)
+        assert fd is not None
+        release_session_claim(fd)
+
+
+class TestSessionProcessAlive:
+    def test_recycled_pid_with_stale_start_time_is_not_alive(self):
+        # A live pid whose recorded start time does not match — the pid was recycled.
+        assert session_process_alive({"agent_pid": os.getpid(), "agent_started_at": 0.0}) is False
+
+    def test_dead_pids_are_not_alive(self):
+        assert session_process_alive({"pid": 987654321, "pid_started_at": 0.0}) is False
+        assert session_process_alive({}) is False
+
+
+class TestMarkSessionOwner:
+    def test_persists_finalize_context(self, tmp_path):
+        (tmp_path / "s").mkdir()
+        session = EndpointAgentSession(
+            path=tmp_path / "s", timestamp="", debug=False, preset_id="s"
+        )
+        session.update_manifest(status="running")
+        mark_session_owner(session, project="main", keep_service=True)
+        manifest = session.read_manifest()
+        assert manifest["project"] == "main"
+        assert manifest["keep_service"] is True
+        assert manifest["pid"] == os.getpid()
+        assert "pid_started_at" in manifest
