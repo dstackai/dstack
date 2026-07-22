@@ -32,10 +32,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import get_combined_gateway_stats
-from dstack._internal.server.services.jobs import (
-    emit_job_status_change_event,
-    get_job_and_run_event_targets,
-)
+from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
@@ -419,7 +416,7 @@ async def _apply_pending_result(
                 session,
                 f"Job created on new submission. Status: {job_model.status.upper()}",
                 actor=events.SystemActor(),
-                targets=get_job_and_run_event_targets(job_model),
+                targets=[events.Target.from_model(job_model)],
             )
         await delete_superseded_no_capacity_job_submissions(
             session=session,
@@ -603,7 +600,7 @@ async def _apply_active_result(
                 session,
                 f"Job created on retry. Status: {job_model.status.upper()}",
                 actor=events.SystemActor(),
-                targets=get_job_and_run_event_targets(job_model),
+                targets=[events.Target.from_model(job_model)],
             )
         await delete_superseded_no_capacity_job_submissions(
             session=session,

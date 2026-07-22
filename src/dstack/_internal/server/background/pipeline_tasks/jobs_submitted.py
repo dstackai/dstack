@@ -103,7 +103,6 @@ from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     find_job,
     find_jobs,
-    get_job_and_run_event_targets,
     get_job_configured_volume_models,
     get_job_configured_volumes,
     get_job_runtime_data,
@@ -651,7 +650,7 @@ async def _apply_assignment_result(
                     actor=events.SystemActor(),
                     targets=[
                         events.Target.from_model(instance_model),
-                        *get_job_and_run_event_targets(job_model),
+                        events.Target.from_model(job_model),
                     ],
                 )
                 job_model.fleet_id = assignment.fleet_id

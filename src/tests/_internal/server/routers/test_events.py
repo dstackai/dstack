@@ -6,13 +6,10 @@ import pytest
 import pytest_asyncio
 from freezegun import freeze_time
 from httpx import AsyncClient
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import JobModel
 from dstack._internal.server.services import events
-from dstack._internal.server.services.jobs import get_job_and_run_event_targets
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_export,
@@ -931,33 +928,6 @@ class TestListEventsFilters:
         )
         resp.raise_for_status()
         assert len(resp.json()) == 3
-
-    async def test_within_runs_finds_events_of_deleted_jobs(
-        self, session: AsyncSession, client: AsyncClient
-    ) -> None:
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
-        repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run)
-        events.emit(
-            session,
-            "Job created on new submission",
-            actor=events.SystemActor(),
-            targets=get_job_and_run_event_targets(job),
-        )
-        await session.commit()
-        # Superseded no-capacity submissions are deleted on resubmission
-        await session.execute(delete(JobModel).where(JobModel.id == job.id))
-        await session.commit()
-
-        resp = await client.post(
-            "/api/events/list",
-            headers=get_auth_headers(user.token),
-            json={"within_runs": [str(run.id)]},
-        )
-        resp.raise_for_status()
-        assert len(resp.json()) == 1
 
     async def test_include_target_types(self, session: AsyncSession, client: AsyncClient) -> None:
         user = await create_user(session=session)

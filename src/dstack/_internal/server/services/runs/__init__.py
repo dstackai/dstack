@@ -57,7 +57,6 @@ from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
-    get_job_and_run_event_targets,
     get_job_configured_volumes,
     get_job_connection_info,
     get_job_spec,
@@ -788,7 +787,9 @@ async def submit_run(
                             session,
                             f"Job created on run submission. Status: {job_model.status.upper()}",
                             actor=events.SystemActor(),
-                            targets=get_job_and_run_event_targets(job_model),
+                            targets=[
+                                events.Target.from_model(job_model),
+                            ],
                         )
                     global_replica_num += 1
             await ensure_service_router_worker_sync_row(session, run_model, run_spec)
@@ -814,7 +815,9 @@ async def submit_run(
                         # created by the user, while the job is created by the system to satisfy the
                         # run spec.
                         actor=events.SystemActor(),
-                        targets=get_job_and_run_event_targets(job_model),
+                        targets=[
+                            events.Target.from_model(job_model),
+                        ],
                     )
         await session.commit()
         if pipeline_hinter is not None:
