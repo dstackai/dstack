@@ -1538,7 +1538,10 @@ class _RecordMirror:
         try:
             if not self._target.exists():
                 _write_private_text(self._target, "")
-            with self._target.open("a", encoding="utf-8") as f:
+            # newline="" writes the binary-read chunk verbatim. Without it, text mode
+            # re-translates "\n" to "\r\n" on Windows, doubling the "\r\n" a text-written
+            # source already carries ("\r\r\n"), which reads back as a blank extra line.
+            with self._target.open("a", encoding="utf-8", newline="") as f:
                 f.write(redact(chunk, self._redacted_values))
                 f.flush()
         except OSError as e:
