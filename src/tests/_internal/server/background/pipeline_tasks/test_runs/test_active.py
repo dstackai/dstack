@@ -296,6 +296,86 @@ class TestRunActiveWorker:
         assert retried_job.status == JobStatus.SUBMITTED
         assert len(jobs) == 3
 
+    async def test_replica_retry_deletes_superseded_no_capacity_submissions(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                name="default",
+                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+            ),
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=2, max=2),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        superseded_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=0,
+            submission_num=0,
+        )
+        interrupted_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=0,
+            submission_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        lock_run(run)
+        await session.commit()
+
+        now = run.submitted_at + timedelta(minutes=3)
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.runs.active.get_current_datetime",
+            return_value=now,
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        jobs = list(
+            (
+                await session.execute(
+                    select(JobModel)
+                    .where(JobModel.run_id == run.id, JobModel.replica_num == 0)
+                    .order_by(JobModel.submission_num)
+                )
+            ).scalars()
+        )
+        assert [j.submission_num for j in jobs] == [1, 2]
+        assert superseded_job.id not in [j.id for j in jobs]
+        assert interrupted_job.id in [j.id for j in jobs]
+        assert jobs[-1].status == JobStatus.SUBMITTED
+
     async def test_retries_scheduled_run_no_capacity_from_trigger_time(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:

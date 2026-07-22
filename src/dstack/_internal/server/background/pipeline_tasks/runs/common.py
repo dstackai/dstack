@@ -1,12 +1,16 @@
 import json
+import uuid
 from datetime import datetime
 from typing import Optional
+
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.runs import JobStatus, RunSpec
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import get_job_spec, get_jobs_from_run_spec
@@ -86,8 +90,8 @@ async def build_scale_up_job_models(
                 run_model=run_model,
                 job=new_job,
                 status=JobStatus.SUBMITTED,
+                submission_num=old_job_model.submission_num + 1,
             )
-            job_model.submission_num = old_job_model.submission_num + 1
             new_job_models.append(job_model)
         scheduled_replicas += 1
 
@@ -115,3 +119,32 @@ async def build_scale_up_job_models(
                 new_job_models.append(job_model)
 
     return new_job_models
+
+
+async def delete_superseded_no_capacity_job_submissions(
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    new_job_models: list[JobModel],
+) -> None:
+    """
+    Delete previous job submissions that failed to start due to no capacity without
+    ever provisioning. Such submissions are created each time a run is retrying
+    on no capacity and carry no information beyond the events.
+    The direct predecessor of each new submission is kept so that the run's
+    `status_message` can still show `retrying` while the new submission is in flight.
+    """
+    for job_model in new_job_models:
+        if job_model.submission_num < 2:
+            continue
+        await session.execute(
+            delete(JobModel).where(
+                JobModel.run_id == run_id,
+                JobModel.replica_num == job_model.replica_num,
+                JobModel.job_num == job_model.job_num,
+                JobModel.submission_num < job_model.submission_num - 1,
+                JobModel.status.in_(JobStatus.finished_statuses()),
+                JobModel.termination_reason
+                == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                JobModel.job_provisioning_data.is_(None),
+            )
+        )

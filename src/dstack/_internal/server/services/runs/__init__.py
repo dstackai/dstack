@@ -833,6 +833,7 @@ def create_job_model_for_new_submission(
     run_model: RunModel,
     job: Job,
     status: JobStatus,
+    submission_num: int = 0,
 ) -> JobModel:
     """
     Create a new job.
@@ -849,7 +850,7 @@ def create_job_model_for_new_submission(
         job_name=f"{job.job_spec.job_name}",
         replica_num=job.job_spec.replica_num,
         deployment_num=run_model.deployment_num,
-        submission_num=len(job.job_submissions),
+        submission_num=submission_num,
         submitted_at=now,
         last_processed_at=now,
         status=status,

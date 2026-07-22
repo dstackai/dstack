@@ -332,6 +332,7 @@ class _UnregisterReplicaResult:
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
     instance_update_map: Optional[_InstanceUpdateMap] = None
+    delete_instance: bool = False
     volume_update_rows: list[_VolumeUpdateRow] = field(default_factory=list)
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     unassign_event_message: Optional[str] = None
@@ -476,7 +477,11 @@ async def _apply_process_result(
 ) -> None:
     set_processed_update_map_fields(result.job_update_map)
     set_unlock_update_map_fields(result.job_update_map)
-    if instance_model is not None and result.instance_update_map is None:
+    if (
+        instance_model is not None
+        and result.instance_update_map is None
+        and not result.delete_instance
+    ):
         result.instance_update_map = _InstanceUpdateMap()
     if result.instance_update_map is not None:
         set_processed_update_map_fields(result.instance_update_map)
@@ -514,7 +519,24 @@ async def _apply_process_result(
                 )
             return
 
-        if instance_model is not None and instance_update_map is not None:
+        if instance_model is not None and result.delete_instance:
+            res = await session.execute(
+                delete(InstanceModel)
+                .where(
+                    InstanceModel.id == instance_model.id,
+                    InstanceModel.lock_token == item.lock_token,
+                    InstanceModel.lock_owner == related_instance_lock_owner,
+                )
+                .returning(InstanceModel.id)
+            )
+            deleted_ids = list(res.scalars().all())
+            if len(deleted_ids) == 0:
+                logger.error(
+                    "Failed to delete placeholder instance %s for terminating job %s.",
+                    instance_model.id,
+                    item.id,
+                )
+        elif instance_model is not None and instance_update_map is not None:
             res = await session.execute(
                 update(InstanceModel)
                 .where(
@@ -647,13 +669,11 @@ async def _process_terminating_job(
         return result
 
     if is_placeholder_instance(instance_model):
-        # Placeholder has no VM and no provisioning data. Skip graceful stop,
-        # container stop, and volume detach.
-        instance_update_map = get_or_error(result.instance_update_map)
-        if instance_model.status != InstanceStatus.TERMINATING:
-            instance_update_map["status"] = InstanceStatus.TERMINATING
-            instance_update_map["skip_min_processing_interval"] = True
-        instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
+        # Placeholder has no VM and no provisioning data, so there is nothing to terminate.
+        # Skip graceful stop, container stop, and volume detach. Delete the instance right away
+        # to avoid placeholders accumulating for runs retrying on no capacity.
+        result.instance_update_map = None
+        result.delete_instance = True
         result.job_update_map["instance_id"] = None
         await _unregister_replica_and_update_result(result=result, job_model=job_model)
         result.job_update_map["status"] = _get_job_termination_status(job_model)

@@ -844,10 +844,14 @@ class TestJobTerminatingWorker:
         await worker.process(_job_to_pipeline_item(job))
 
         await session.refresh(job)
-        await session.refresh(placeholder)
         assert job.status == JobStatus.TERMINATED
         assert job.instance_id is None
-        assert placeholder.status == InstanceStatus.TERMINATING
+        assert job.used_instance_id == placeholder.id
+        # The placeholder never provisioned anything, so it is deleted, not terminated
+        res = await session.execute(
+            select(InstanceModel.id).where(InstanceModel.id == placeholder.id)
+        )
+        assert res.scalar_one_or_none() is None
 
     async def test_retries_detaching_when_used_instance_is_missing(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
