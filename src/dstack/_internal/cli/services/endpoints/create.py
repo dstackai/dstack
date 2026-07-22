@@ -46,8 +46,8 @@ from dstack._internal.cli.services.endpoints.verify import (
     build_verified_endpoint_preset,
     load_endpoint_agent_report,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console, warn
-from dstack._internal.cli.utils.run import print_offers
+from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, confirm_ask, console, warn
+from dstack._internal.cli.utils.offers import print_offers_table
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.envs import Env, EnvSentinel
@@ -545,7 +545,16 @@ def _print_fleet_offers(api: Client, allowed_fleets: tuple[str, ...]) -> None:
         props.add_row("[bold]Fleets[/bold]", ", ".join(allowed_fleets))
         console.print(props)
         console.print()
-        print_offers(run_plan.job_plans[0], dim_after_first=False)
+        job_plan = run_plan.job_plans[0]
+        if job_plan.offers:
+            print_offers_table(
+                offers=job_plan.offers,
+                total_offers=job_plan.total_offers,
+                max_price=job_plan.max_price or 0.0,
+                mute_tail_rows=False,
+            )
+        else:
+            console.print(NO_OFFERS_WARNING)
     except Exception as e:  # noqa: BLE001
         warn(f"Could not list offers for the allowed fleets: {e}")
 

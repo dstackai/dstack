@@ -444,11 +444,20 @@ $ DSTACK_OTEL_TRACES_ENABLED=1 \
     - `DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE` – The head sampling rate for background task traces.
 
 ??? info "Metrics exporters"
-    By default, if the [Prometheus `/metrics` endpoint](../concepts/metrics.md) is enabled via
-    `DSTACK_ENABLE_PROMETHEUS_METRICS`, OpenTelemetry metrics are exposed there alongside the built-in
-    `dstack` metrics; otherwise they are pushed via OTLP. Set `DSTACK_OTEL_METRICS_EXPORTERS`
-    to a comma-separated list of `prometheus` and/or `otlp` to override, e.g. force OTLP push
-    even when `/metrics` is enabled.
+    By default, metrics are pushed via OTLP like traces and logs. Set
+    `DSTACK_OTEL_METRICS_EXPORTERS=prometheus` to instead expose them on the
+    [Prometheus `/metrics` endpoint](../concepts/metrics.md) alongside the built-in `dstack`
+    metrics (a comma-separated list enables both exporters at once).
+
+    If you run multiple server replicas, only use the `prometheus` exporter if Prometheus
+    scrapes each replica directly. Scraping through a load balancer interleaves the
+    replicas' counters into the same series and silently corrupts all rates.
+
+    When pushed metrics end up in Prometheus (e.g. via an OTel Collector), the sample
+    cadence is set by `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds; defaults to `60000`).
+    If it's much larger than Prometheus' configured `timeInterval` (defaults to 15s),
+    `rate()` queries may be empty. Set e.g. `OTEL_METRIC_EXPORT_INTERVAL=30000`,
+    and make sure the datasource's `timeInterval` reflects the cadence you choose.
 
 ## Encryption
 

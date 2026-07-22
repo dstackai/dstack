@@ -1,5 +1,5 @@
 import copy
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,8 +27,8 @@ from dstack._internal.server.services.runs.plan import (
     _freeze_offer_identity_value,
     _get_backend_offer_identity,
     _get_backend_offers_in_fleet,
-    _get_job_plan,
     get_backend_offers_in_run_candidate_fleets,
+    get_job_plans,
     get_targeted_instance_offers,
 )
 from dstack._internal.server.testing.common import (
@@ -86,31 +86,98 @@ class TestFreezeOfferIdentityValue:
         assert _get_backend_offer_identity(offer) != _get_backend_offer_identity(different_offer)
 
 
-class TestGetJobPlan:
-    @pytest.mark.asyncio
-    async def test_excludes_backend_offers_when_instances_specified(self) -> None:
-        run_spec = get_run_spec(
-            repo_id="test-repo",
-            configuration=TaskConfiguration(image="debian", commands=["echo"]),
-        )
-        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
-        instance_offer = get_instance_offer_with_availability()
-        backend_offer = get_instance_offer_with_availability()
+class TestGetJobPlansBackendOffers:
+    """
+    Backend offers are requested only for `creation_policy: reuse-or-create` runs without
+    an explicit `instances` selector. `get_job_plans` decides this once via `skip_backend_offers`
+    and forwards it to the offer collectors.
+    """
 
-        job_plan = _get_job_plan(
-            instance_offers=[(None, instance_offer)],  # type: ignore[list-item]
-            backend_offers=[(None, backend_offer)],  # type: ignore[list-item]
-            profile=Profile(
-                name="default",
-                creation_policy=CreationPolicy.REUSE_OR_CREATE,
-                instances=[InstanceNameSelector(name="my-fleet-0")],
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("creation_policy", "expected_skip_backend_offers"),
+        [
+            (CreationPolicy.REUSE, True),
+            (CreationPolicy.REUSE_OR_CREATE, False),
+        ],
+    )
+    async def test_skips_backend_offers_by_creation_policy(
+        self,
+        test_db,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+        creation_policy: CreationPolicy,
+        expected_skip_backend_offers: bool,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian", commands=["echo"], creation_policy=creation_policy
             ),
-            job=jobs[0],
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+            AsyncMock(return_value=[Mock()]),
+        )
+        find_optimal_fleet_with_offers_mock = AsyncMock(return_value=(Mock(), [], []))
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+            find_optimal_fleet_with_offers_mock,
+        )
+
+        await get_job_plans(
+            session=session,
+            project=project,
+            run_spec=run_spec,
             max_offers=None,
         )
 
-        assert job_plan.total_offers == 1
-        assert job_plan.offers == [instance_offer]
+        find_optimal_fleet_with_offers_mock.assert_awaited_once()
+        await_args = find_optimal_fleet_with_offers_mock.await_args
+        assert await_args is not None
+        assert await_args.kwargs["skip_backend_offers"] is expected_skip_backend_offers
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_excludes_backend_offers_when_instances_specified(
+        self,
+        test_db,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                instances=[InstanceNameSelector(name="my-fleet-0")],
+            ),
+        )
+        instance_offer = get_instance_offer_with_availability(price=1.0)
+        get_targeted_instance_offers_mock = AsyncMock(return_value=[(Mock(), instance_offer)])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.get_targeted_instance_offers",
+            get_targeted_instance_offers_mock,
+        )
+
+        job_plans = await get_job_plans(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            max_offers=None,
+        )
+
+        get_targeted_instance_offers_mock.assert_awaited_once()
+        assert len(job_plans) == 1
+        assert job_plans[0].total_offers == 1
+        assert job_plans[0].offers == [instance_offer]
 
 
 class TestGetPlan:

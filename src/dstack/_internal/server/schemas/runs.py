@@ -7,6 +7,8 @@ from pydantic import Field
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.runs import ApplyRunPlanInput, RunSpec
 
+MAX_JOB_SUBMISSIONS_LIMIT = 10
+
 
 class ListRunsRequest(CoreModel):
     project_name: Optional[str] = None
@@ -20,9 +22,11 @@ class ListRunsRequest(CoreModel):
     job_submissions_limit: Optional[int] = Field(
         None,
         ge=0,
+        le=MAX_JOB_SUBMISSIONS_LIMIT,
         description=(
             "Limit number of job submissions returned per job to avoid large responses."
-            "Drops older job submissions. No effect with `include_jobs: false`"
+            " Drops older job submissions. No effect with `include_jobs: false`."
+            f" Defaults to the maximum allowed value of {MAX_JOB_SUBMISSIONS_LIMIT}"
         ),
     )
     prev_submitted_at: Optional[datetime] = None

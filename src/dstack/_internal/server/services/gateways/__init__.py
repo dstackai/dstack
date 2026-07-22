@@ -952,6 +952,11 @@ async def get_plan(
                 raise ServerClientError(
                     f"Gateway {effective_spec.configuration.name!r} is being deleted. Try again later."
                 )
+            if current_gateway_model.status == GatewayStatus.FAILED:
+                raise ServerClientError(
+                    f"Gateway {effective_spec.configuration.name!r} is in FAILED status and"
+                    " cannot be updated in-place. Delete it and re-apply."
+                )
             current_gateway = gateway_model_to_gateway(
                 current_gateway_model, default_gateway_id=project.default_gateway_id
             )
@@ -1011,6 +1016,11 @@ async def apply_plan(
         if gateway_model.to_be_deleted:
             raise ServerClientError(
                 f"Gateway {new_configuration.name!r} is being deleted. Try again later."
+            )
+        if gateway_model.status == GatewayStatus.FAILED:
+            raise ServerClientError(
+                f"Gateway {new_configuration.name!r} is in FAILED status and cannot be updated"
+                " in-place. Delete it and re-apply."
             )
         current_configuration = gateway_model_to_gateway(
             gateway_model,

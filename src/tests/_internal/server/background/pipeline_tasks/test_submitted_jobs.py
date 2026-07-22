@@ -18,6 +18,7 @@ from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPla
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import (
+    CreationPolicy,
     FleetInstanceSelector,
     InstanceHostnameSelector,
     InstanceNameSelector,
@@ -1792,6 +1793,77 @@ class TestJobSubmittedWorker:
         assert placeholder.fleet_id == fleet.id
         assert placeholder.offer is None
         assert placeholder.instance_num == 0
+
+    async def test_assigns_job_to_instance_with_reuse_creation_policy(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(creation_policy=CreationPolicy.REUSE),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance.id
+        assert job.fleet_id == fleet.id
+
+    async def test_terminates_job_when_no_reusable_instances_with_reuse_creation_policy(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(creation_policy=CreationPolicy.REUSE),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(session=session, run=run)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        # Backend offers must not be requested with the reuse policy.
+        m.assert_not_called()
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message == "Could not reuse any instance for this job"
+        assert not job.instance_assigned
+        # No placeholder must be created when reuse fails.
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 1
 
     @pytest.mark.parametrize("fleet_type", ["cloud", "ssh"])
     async def test_job_fails_when_fleet_is_full(

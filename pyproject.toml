@@ -282,6 +282,7 @@ otel = [
     "opentelemetry-instrumentation-httpx>=0.51b0",
     "opentelemetry-instrumentation-requests>=0.51b0",
     "opentelemetry-instrumentation-system-metrics>=0.51b0",
+    "opentelemetry-instrumentation-logging>=0.61b0",
     "dstack[server]",
 ]
 crusoe = [
