@@ -76,6 +76,7 @@ class Target:
     project_id: Optional[uuid.UUID]
     id: uuid.UUID
     name: str
+    run_id: Optional[uuid.UUID] = None
 
     def __post_init__(self):
         if self.type == EventTargetType.USER and self.project_id is not None:
@@ -84,6 +85,10 @@ class Target:
             raise ValueError(f"{self.type} target must have project_id")
         if self.type == EventTargetType.PROJECT and self.id != self.project_id:
             raise ValueError("Project target id must be equal to project_id")
+        if self.type in [EventTargetType.RUN, EventTargetType.JOB] and self.run_id is None:
+            raise ValueError(f"{self.type} target must have run_id")
+        if self.type == EventTargetType.RUN and self.id != self.run_id:
+            raise ValueError("Run target id must be equal to run_id")
 
     @staticmethod
     def from_model(
@@ -126,6 +131,7 @@ class Target:
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.job_name,
+                run_id=model.run_id,
             )
         if isinstance(model, ProjectModel):
             return Target(
@@ -140,6 +146,7 @@ class Target:
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.run_name,
+                run_id=model.id,
             )
         if isinstance(model, SecretModel):
             return Target(
@@ -225,6 +232,7 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Tar
                 entity_project_id=target.project_id,
                 entity_id=target.id,
                 entity_name=target.name,
+                entity_run_id=target.run_id,
             )
         )
     session.add(event)
@@ -354,23 +362,7 @@ async def list_events(
             )
         )
     if within_runs is not None:
-        query = select(JobModel.id).where(JobModel.run_id.in_(within_runs))
-        res = await session.execute(query)
-        # In Postgres, fetching job IDs separately is orders of magnitude faster
-        # than using a subquery.
-        job_ids = list(res.unique().scalars().all())
-        target_filters.append(
-            or_(
-                and_(
-                    EventTargetModel.entity_type == EventTargetType.RUN,
-                    EventTargetModel.entity_id.in_(within_runs),
-                ),
-                and_(
-                    EventTargetModel.entity_type == EventTargetType.JOB,
-                    EventTargetModel.entity_id.in_(job_ids),
-                ),
-            )
-        )
+        target_filters.append(EventTargetModel.entity_run_id.in_(within_runs))
     if include_target_types is not None:
         target_filters.append(EventTargetModel.entity_type.in_(include_target_types))
 
