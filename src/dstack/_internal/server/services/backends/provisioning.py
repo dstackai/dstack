@@ -19,6 +19,7 @@ _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
     r"^p5en\.(48xlarge)$",
     r"^p4d\.(24xlarge)$",
     r"^p4de\.(24xlarge)$",
+    r"^g7\.(8xlarge|12xlarge|24xlarge|48xlarge)$",
     r"^g7e\.(8xlarge|12xlarge|24xlarge|48xlarge)$",
     r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
     r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
