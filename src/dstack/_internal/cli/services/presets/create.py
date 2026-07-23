@@ -158,7 +158,7 @@ def _load_session_configuration(agent_session: PresetAgentSession) -> PresetConf
     if not configuration_path.is_file():
         raise CLIError(
             f"Preset {agent_session.preset_id} has no saved configuration and cannot be"
-            f" followed; resume it with [code]--resume {agent_session.preset_id}[/] instead"
+            f" followed; resume it with --resume {agent_session.preset_id} instead"
         )
     # The session copy is canonical output, not user input: parse it without
     # the user-facing deprecation warnings.
@@ -185,11 +185,6 @@ def show_preset_session_logs(
     status = session.read_manifest().get("status")
     if not follow or status in ("success", "failed", "interrupted"):
         print_session_log(session)
-        if follow and status == "interrupted":
-            console.print(
-                f"\nPreset [code]{preset_id}[/] creation was interrupted; resume it with"
-                f" [code]dstack preset create -f <config> --resume {preset_id}[/]."
-            )
         return None
     # Following a live session: print the log so far, then stream new progress
     # (a future --since could bound this). The client is built only here, so a

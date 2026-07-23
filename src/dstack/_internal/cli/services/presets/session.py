@@ -210,7 +210,7 @@ def load_resumable_agent_session(preset_id: str) -> PresetAgentSession:
     if status == "running" and session_process_alive(manifest):
         raise CLIError(
             f"Preset {preset_id} is still being created;"
-            f" follow it with [code]dstack preset logs -f {preset_id}[/]"
+            f" follow it with dstack preset logs -f {preset_id}"
         )
     if not manifest.get("claude_session_id"):
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
@@ -257,7 +257,7 @@ def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
     if status == "interrupted":
         raise CLIError(
             f"Preset {preset_id} creation was interrupted; resume it with"
-            f" [code]dstack preset create -f <config> --resume {preset_id}[/]"
+            f" dstack preset create -f <config> --resume {preset_id}"
         )
     pid = manifest.get("pid")
     if (
