@@ -77,6 +77,7 @@ class Target:
     id: uuid.UUID
     name: str
     run_id: Optional[uuid.UUID] = None
+    fleet_id: Optional[uuid.UUID] = None
 
     def __post_init__(self):
         if self.type == EventTargetType.USER and self.project_id is not None:
@@ -89,6 +90,8 @@ class Target:
             raise ValueError(f"{self.type} target must have run_id")
         if self.type == EventTargetType.RUN and self.id != self.run_id:
             raise ValueError("Run target id must be equal to run_id")
+        if self.type == EventTargetType.FLEET and self.id != self.fleet_id:
+            raise ValueError("Fleet target id must be equal to fleet_id")
 
     @staticmethod
     def from_model(
@@ -110,6 +113,7 @@ class Target:
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,
+                fleet_id=model.id,
             )
         if isinstance(model, GatewayModel):
             return Target(
@@ -119,11 +123,18 @@ class Target:
                 name=model.name,
             )
         if isinstance(model, InstanceModel):
+            fleet_id = model.fleet_id
+            if fleet_id is None:
+                # Not-yet-flushed models may only have the fleet relationship set.
+                fleet = model.__dict__.get("fleet")
+                if fleet is not None:
+                    fleet_id = fleet.id
             return Target(
                 type=EventTargetType.INSTANCE,
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,
+                fleet_id=fleet_id,
             )
         if isinstance(model, JobModel):
             return Target(
@@ -233,6 +244,7 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Tar
                 entity_id=target.id,
                 entity_name=target.name,
                 entity_run_id=target.run_id,
+                entity_fleet_id=target.fleet_id,
             )
         )
     session.add(event)
@@ -344,23 +356,7 @@ async def list_events(
     if within_projects is not None:
         target_filters.append(EventTargetModel.entity_project_id.in_(within_projects))
     if within_fleets is not None:
-        query = select(InstanceModel.id).where(InstanceModel.fleet_id.in_(within_fleets))
-        res = await session.execute(query)
-        # In Postgres, fetching instance IDs separately is orders of magnitude faster
-        # than using a subquery.
-        instance_ids = list(res.unique().scalars().all())
-        target_filters.append(
-            or_(
-                and_(
-                    EventTargetModel.entity_type == EventTargetType.FLEET,
-                    EventTargetModel.entity_id.in_(within_fleets),
-                ),
-                and_(
-                    EventTargetModel.entity_type == EventTargetType.INSTANCE,
-                    EventTargetModel.entity_id.in_(instance_ids),
-                ),
-            )
-        )
+        target_filters.append(EventTargetModel.entity_fleet_id.in_(within_fleets))
     if within_runs is not None:
         target_filters.append(EventTargetModel.entity_run_id.in_(within_runs))
     if include_target_types is not None:

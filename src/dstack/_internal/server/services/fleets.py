@@ -1074,6 +1074,7 @@ async def _create_fleet(
                     instance_num=i,
                     host=host,
                 )
+                fleet_model.instances.append(instance_model)
                 events.emit(
                     session,
                     (
@@ -1083,7 +1084,6 @@ async def _create_fleet(
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(instance_model)],
                 )
-                fleet_model.instances.append(instance_model)
         else:
             for i in range(_get_fleet_nodes_to_provision(spec)):
                 instance_model = create_fleet_instance_model(
@@ -1093,6 +1093,7 @@ async def _create_fleet(
                     spec=spec,
                     instance_num=i,
                 )
+                fleet_model.instances.append(instance_model)
                 events.emit(
                     session,
                     (
@@ -1106,7 +1107,6 @@ async def _create_fleet(
                     actor=events.SystemActor(),
                     targets=[events.Target.from_model(instance_model)],
                 )
-                fleet_model.instances.append(instance_model)
         await session.commit()
         if spec.configuration.ssh_config is None:
             pipeline_hinter.hint_fetch(FleetModel.__name__)
@@ -1186,13 +1186,13 @@ async def _update_fleet(
                     instance_num=instance_num,
                     host=host,
                 )
+                fleet_model.instances.append(instance_model)
                 events.emit(
                     session,
                     f"Instance created on fleet update. Status: {instance_model.status.upper()}",
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(instance_model)],
                 )
-                fleet_model.instances.append(instance_model)
                 active_instance_nums.add(instance_num)
         if removed_instance_nums:
             _terminate_fleet_instances(session, fleet_model, removed_instance_nums, actor=user)
