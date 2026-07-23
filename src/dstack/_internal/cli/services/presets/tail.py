@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
@@ -52,11 +53,13 @@ class _FileLineReader:
             if b"\n" in self._buffer:
                 line, self._buffer = self._buffer.split(b"\n", 1)
                 return line + b"\n"
-            chunk = self._read_chunk()
+            # File IO runs off the event loop so a hung filesystem cannot
+            # freeze the CLI.
+            chunk = await asyncio.to_thread(self._read_chunk)
             if chunk:
                 self._buffer += chunk
                 self._offset += len(chunk)
-                self._offset_store.set(self._offset_key, self._offset)
+                await asyncio.to_thread(self._offset_store.set, self._offset_key, self._offset)
                 continue
             if not self._is_alive():
                 if self._drained:
@@ -70,10 +73,15 @@ class _FileLineReader:
 
 
 class _OffsetStore:
-    """Persists tailer/mirror byte offsets so resumed sessions do not repeat output."""
+    """Persists tailer/mirror byte offsets so resumed sessions do not repeat
+    output. One instance serves the whole session — every reader and mirror
+    shares it with disjoint keys, and the exclusive session claim guarantees no
+    other process writes the file."""
 
     def __init__(self, path: Path) -> None:
         self._path = path
+        # Consumers flush from worker threads; serialize the update + write.
+        self._lock = threading.Lock()
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -85,18 +93,15 @@ class _OffsetStore:
         return value if isinstance(value, int) and value >= 0 else 0
 
     def set(self, key: str, value: int) -> None:
-        self._data[key] = value
-        # Re-read and update only this key: several stores (stream readers and
-        # record mirrors) share one file with disjoint keys, and writing the
-        # whole in-memory view would clobber the others' offsets.
-        try:
-            on_disk = json.loads(self._path.read_text(encoding="utf-8"))
-            data = on_disk if isinstance(on_disk, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            data = {}
-        data[key] = value
-        with suppress(OSError):
-            _write_private_text(self._path, json.dumps(data) + "\n")
+        with self._lock:
+            self._data[key] = value
+            with suppress(OSError):
+                _write_private_text(self._path, json.dumps(self._data) + "\n")
+
+
+def open_session_offsets(session: PresetAgentSession) -> _OffsetStore:
+    """The session's single offset store, shared by all its tailers."""
+    return _OffsetStore(session.path / ".offsets.json")
 
 
 class _ProgressTailer:
@@ -118,7 +123,8 @@ class _ProgressTailer:
 
     async def run(self) -> None:
         while True:
-            self.flush()
+            # File IO runs off the event loop; see _FileLineReader.readline.
+            await asyncio.to_thread(self.flush)
             await asyncio.sleep(1)
 
     def flush(self) -> None:
@@ -163,7 +169,8 @@ class _RecordMirror:
 
     async def run(self) -> None:
         while True:
-            self.flush()
+            # File IO runs off the event loop; see _FileLineReader.readline.
+            await asyncio.to_thread(self.flush)
             await asyncio.sleep(1)
 
     def flush(self) -> None:

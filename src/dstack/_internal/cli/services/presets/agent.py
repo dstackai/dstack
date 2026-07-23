@@ -27,6 +27,7 @@ from dstack._internal.cli.services.presets.tail import (
     _OffsetStore,
     _ProgressTailer,
     _RecordMirror,
+    open_session_offsets,
 )
 from dstack._internal.cli.services.presets.workspace import (
     _PROGRESS_ENV,
@@ -40,6 +41,7 @@ from dstack.api import Client
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
+_TERMINATE_GRACE_SECONDS = 3
 _RESUME_PROMPT = (
     "The previous agent process was interrupted. Continue where you left off. "
     "Re-check the states of your runs before relying on them: time may have "
@@ -191,8 +193,12 @@ async def run_preset_agent(
     agent_session: PresetAgentSession,
     initial_resume_session_id: Optional[str] = None,
 ) -> PresetAgentProcessOutput:
+    offset_store = open_session_offsets(agent_session)
     async with _session_tailers(
-        workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
+        workspace=workspace,
+        agent_session=agent_session,
+        redacted_values=redacted_values,
+        offset_store=offset_store,
     ):
         resume_session_id: Optional[str] = initial_resume_session_id
         attempt_prompt = prompt if resume_session_id is None else _RESUME_PROMPT
@@ -208,6 +214,7 @@ async def run_preset_agent(
                 workspace=workspace,
                 redacted_values=redacted_values,
                 agent_session=agent_session,
+                offset_store=offset_store,
             )
             if output.report_data is None and returncode != 0:
                 output.error = output.error or f"Claude exited with return code {returncode}"
@@ -246,6 +253,7 @@ async def _run_claude_process(
     workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
     agent_session: PresetAgentSession,
+    offset_store: _OffsetStore,
 ) -> tuple[PresetAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
     try:
@@ -287,10 +295,19 @@ async def _run_claude_process(
                 agent_session=agent_session,
                 redacted_values=redacted_values,
                 is_alive=agent_alive,
+                offset_store=offset_store,
             )
         )
-        returncode = await proc.wait()
-        output = await collect_task
+        try:
+            returncode = await proc.wait()
+            output = await collect_task
+        finally:
+            # Never leave the collector orphaned when an await above raises
+            # (cancellation, interrupt, or a wait failure).
+            if not collect_task.done():
+                collect_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await collect_task
     except (KeyboardInterrupt, asyncio.CancelledError):
         # The stop-or-detach decision belongs to the interrupt handler; the
         # agent must stay alive here in case the user detaches.
@@ -376,9 +393,9 @@ async def _session_tailers(
     workspace: PresetAgentWorkspace,
     agent_session: PresetAgentSession,
     redacted_values: Sequence[str],
+    offset_store: _OffsetStore,
 ) -> AsyncIterator[None]:
     """Mirrors the session's progress and record files while the body runs."""
-    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
     progress_tailer = _ProgressTailer(
         path=workspace.progress_path,
         redacted_values=redacted_values,
@@ -425,10 +442,10 @@ async def _collect_agent_output(
     agent_session: PresetAgentSession,
     redacted_values: Sequence[str],
     is_alive: Callable[[], bool],
+    offset_store: _OffsetStore,
 ) -> PresetAgentProcessOutput:
     """Parses the agent's stream files until it exits; safe alongside a live
     process or over the remains of a finished one."""
-    offset_store = _OffsetStore(agent_session.path / ".offsets.json")
     stdout_output, _ = await asyncio.gather(
         _read_process_stream(
             stream=_FileLineReader(
@@ -468,8 +485,12 @@ async def attach_preset_agent(
 ) -> PresetAgentProcessOutput:
     """Follows a detached session's agent to completion, like
     `run_preset_agent` without owning the process."""
+    offset_store = open_session_offsets(agent_session)
     async with _session_tailers(
-        workspace=workspace, agent_session=agent_session, redacted_values=redacted_values
+        workspace=workspace,
+        agent_session=agent_session,
+        redacted_values=redacted_values,
+        offset_store=offset_store,
     ):
         manifest = agent_session.read_manifest()
 
@@ -481,6 +502,7 @@ async def attach_preset_agent(
             agent_session=agent_session,
             redacted_values=redacted_values,
             is_alive=agent_alive,
+            offset_store=offset_store,
         )
 
 
@@ -540,6 +562,8 @@ async def _read_process_stream(
 
 
 async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
+    """SIGTERM, a grace period, then SIGKILL — the same ladder as
+    `terminate_agent_process`, driven through the owned process handle."""
     if IS_WINDOWS:
         await asyncio.to_thread(_terminate_windows_process_tree, proc.pid)
         await proc.wait()
@@ -551,7 +575,7 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
     else:
         proc.terminate()
     try:
-        await asyncio.wait_for(proc.wait(), timeout=3)
+        await asyncio.wait_for(proc.wait(), timeout=_TERMINATE_GRACE_SECONDS)
     except asyncio.TimeoutError:
         if hasattr(os, "killpg"):
             with suppress(ProcessLookupError):
@@ -565,7 +589,9 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
 
 
 def terminate_agent_process(manifest: dict[str, Any]) -> None:
-    """Terminates the session's agent process tree, if alive."""
+    """Terminates the session's agent process tree, if alive. The same
+    SIGTERM-grace-SIGKILL ladder as `_terminate_process`, driven by pid because
+    the caller (`preset stop`) never owned the process."""
     agent_pid = manifest.get("agent_pid")
     if not isinstance(agent_pid, int) or not _pid_alive(
         agent_pid, manifest.get("agent_started_at")
@@ -576,7 +602,7 @@ def terminate_agent_process(manifest: dict[str, Any]) -> None:
         return
     with suppress(OSError):
         os.killpg(agent_pid, signal.SIGTERM)  # pyright: ignore[reportAttributeAccessIssue]
-    for _ in range(30):
+    for _ in range(_TERMINATE_GRACE_SECONDS * 10):
         if not _pid_running(agent_pid):
             return
         time.sleep(0.1)

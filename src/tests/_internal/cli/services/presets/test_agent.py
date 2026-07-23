@@ -168,17 +168,22 @@ def _session_workspace(tmp_path):
 
 
 class TestAgentSession:
-    def test_saves_log_and_debug_files(self, tmp_path, monkeypatch, capsys):
-        monkeypatch.setenv("HOME", str(tmp_path))
-        monkeypatch.setenv("USERPROFILE", str(tmp_path))
-        configuration = PresetConfiguration(
+    def _configuration(self) -> PresetConfiguration:
+        return PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
             max_price=0.5,
             env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
         )
 
-        session = create_preset_agent_session(configuration)
+    def _home(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+
+    def test_creates_private_session_with_log_and_manifest(self, tmp_path, monkeypatch, capsys):
+        self._home(tmp_path, monkeypatch)
+
+        session = create_preset_agent_session(self._configuration())
 
         assert session.path.parent == tmp_path / ".dstack" / "presets"
         assert session.path.name == session.preset_id
@@ -201,9 +206,12 @@ class TestAgentSession:
             assert session.path.stat().st_mode & 0o777 == 0o700
             assert session.log_path.stat().st_mode & 0o777 == 0o600
 
-        debug_session = create_preset_agent_session(configuration, debug=True)
-        data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
+    def test_debug_session_saves_scrubbed_configuration_and_trace(self, tmp_path, monkeypatch):
+        self._home(tmp_path, monkeypatch)
 
+        debug_session = create_preset_agent_session(self._configuration(), debug=True)
+
+        data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
         assert {path.name for path in debug_session.path.iterdir()} == {
             "agent.log",
             "preset.dstack.yml",
@@ -213,14 +221,16 @@ class TestAgentSession:
         assert data["max_price"] == 0.5
         assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
         assert "false" not in (debug_session.path / "preset.dstack.yml").read_text()
-        success_path = debug_session.finish("success")
-        assert success_path == debug_session.path
-        assert json.loads((debug_session.path / "session.json").read_text())["status"] == "success"
 
-        failed_session = create_preset_agent_session(configuration)
-        failed_path = failed_session.finish("failed")
-        assert failed_path == failed_session.path
-        assert json.loads((failed_session.path / "session.json").read_text())["status"] == "failed"
+    @pytest.mark.parametrize("status", ["success", "failed"])
+    def test_finish_records_terminal_status(self, tmp_path, monkeypatch, status):
+        self._home(tmp_path, monkeypatch)
+        session = create_preset_agent_session(self._configuration())
+
+        finished_path = session.finish(status)
+
+        assert finished_path == session.path
+        assert json.loads((session.path / "session.json").read_text())["status"] == status
 
     def test_finish_writes_status_in_place(self, tmp_path):
         session_dir = tmp_path / "20260714-120000-000000Z"
@@ -891,21 +901,29 @@ class TestStopOrDetach:
 
 
 class TestOffsetStoreSharing:
-    def test_disjoint_stores_do_not_clobber_each_other(self, tmp_path):
+    def test_shared_store_keeps_every_writers_keys(self, tmp_path):
+        import threading
+
         from dstack._internal.cli.services.presets.tail import _OffsetStore
 
         state = tmp_path / ".offsets.json"
-        readers = _OffsetStore(state)
-        mirrors = _OffsetStore(state)
+        store = _OffsetStore(state)
 
-        # Two stores with disjoint keys, interleaved writes to the same file.
-        readers.set("agent_stdout", 10)
-        mirrors.set("runs", 20)
-        readers.set("agent_stderr", 30)
-        mirrors.set("trials", 40)
+        # One store serves the whole session; readers and mirrors write
+        # disjoint keys from worker threads.
+        def advance(key: str) -> None:
+            for offset in range(1, 51):
+                store.set(key, offset)
+
+        threads = [
+            threading.Thread(target=advance, args=(key,))
+            for key in ("agent_stdout", "agent_stderr", "runs", "trials")
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
         reloaded = _OffsetStore(state)
-        assert reloaded.get("agent_stdout") == 10
-        assert reloaded.get("agent_stderr") == 30
-        assert reloaded.get("runs") == 20
-        assert reloaded.get("trials") == 40
+        for key in ("agent_stdout", "agent_stderr", "runs", "trials"):
+            assert reloaded.get(key) == 50

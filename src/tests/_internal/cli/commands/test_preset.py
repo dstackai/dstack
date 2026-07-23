@@ -69,22 +69,23 @@ class TestPresetLocalCommands:
         assert "max_trials is required" in captured.out + captured.err
         create.assert_not_called()
 
-    def test_lists_and_deletes_preset_without_api_client(self, tmp_path):
-        preset = get_preset()
-        PresetStore(tmp_path / ".dstack" / "presets").save(preset)
-        list_output = StringIO()
-
+    def _list_output(self, tmp_path, args, *, created_at):
+        output = StringIO()
         with (
             patch("dstack.api.Client.from_config") as from_config,
-            patch.object(presets_utils, "console", plain_console(list_output)),
+            patch.object(presets_utils, "console", plain_console(output)),
             patch.object(presets_utils, "pretty_date", return_value="2 months ago") as pretty_date,
         ):
-            assert run_dstack_cli(["preset", "list"], home_dir=tmp_path) == 0
+            assert run_dstack_cli(args, home_dir=tmp_path) == 0
             from_config.assert_not_called()
-            pretty_date.assert_called_once_with(preset.created_at)
-            output = list_output.getvalue()
-            assert run_dstack_cli(["preset", "list", "-v"], home_dir=tmp_path) == 0
-            verbose_output = list_output.getvalue()[len(output) :]
+            pretty_date.assert_called_once_with(created_at)
+        return output.getvalue()
+
+    def test_lists_presets_without_api_client(self, tmp_path):
+        preset = get_preset()
+        PresetStore(tmp_path / ".dstack" / "presets").save(preset)
+
+        output = self._list_output(tmp_path, ["preset", "list"], created_at=preset.created_at)
 
         assert "Qwen/Qwen3.5-27B" in output
         assert "8f3a12c4" in output
@@ -101,26 +102,28 @@ class TestPresetLocalCommands:
         assert "108ms" in output
         assert "A6000:48GB:1" not in output
 
-        joined_verbose = "".join(verbose_output.split())
+    def test_verbose_list_adds_repo_and_context(self, tmp_path):
+        preset = get_preset()
+        PresetStore(tmp_path / ".dstack" / "presets").save(preset)
+
+        joined_verbose = "".join(
+            self._list_output(
+                tmp_path, ["preset", "list", "-v"], created_at=preset.created_at
+            ).split()
+        )
+
         # Verbose adds only the repo and the ctx= benchmark prefix.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in joined_verbose
         assert "ctx=32K" in joined_verbose
         assert "con=1" in joined_verbose
         assert "hardware=" not in joined_verbose
 
+    def test_deletes_preset_without_api_client(self, tmp_path):
+        preset = get_preset()
+        PresetStore(tmp_path / ".dstack" / "presets").save(preset)
+
         with patch("dstack.api.Client.from_config") as from_config:
-            assert (
-                run_dstack_cli(
-                    [
-                        "preset",
-                        "delete",
-                        preset.id,
-                        "-y",
-                    ],
-                    home_dir=tmp_path,
-                )
-                == 0
-            )
+            assert run_dstack_cli(["preset", "delete", preset.id, "-y"], home_dir=tmp_path) == 0
             from_config.assert_not_called()
 
         assert PresetStore(tmp_path / ".dstack" / "presets").list() == []
