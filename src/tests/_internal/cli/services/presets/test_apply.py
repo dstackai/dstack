@@ -8,6 +8,7 @@ from dstack._internal.cli.services.presets.apply import (
     _build_service,
     _get_candidate_presets,
     _get_matching_presets,
+    _order_by_benchmark,
     _select_plan,
     apply_preset,
 )
@@ -59,6 +60,16 @@ class TestGetMatchingPresets:
             [matching.copy(update={"model": "other/repo"})],
             configuration=configuration,
         )
+
+
+class TestOrderByBenchmark:
+    def test_orders_fastest_first_regardless_of_input_order(self):
+        slow = get_preset(preset_id="aa11slow")
+        fast = get_preset(preset_id="bb22fast")
+        fast.validations[0].benchmark.metrics.total_output_tokens *= 2
+
+        assert _order_by_benchmark([slow, fast]) == [fast, slow]
+        assert _order_by_benchmark([fast, slow]) == [fast, slow]
 
 
 class TestBuildService:

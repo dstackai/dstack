@@ -43,6 +43,7 @@ def apply_preset(
         if preset_ids:
             qualifier = f" among {', '.join(preset_ids)}"
         raise CLIError(f"No matching preset{qualifier} for {configuration.model.api_model_name}")
+    presets = _order_by_benchmark(presets)
 
     configurator = ServiceConfigurator(api_client=api)
     service_args = configurator.get_parser().parse_args([])
@@ -66,6 +67,17 @@ def apply_preset(
     )
 
 
+def _benchmark_rate(preset: Preset) -> float:
+    """The preset's canonical output rate — the same tok/s the list shows."""
+    metrics = preset.validations[0].benchmark.metrics
+    return metrics.total_output_tokens / metrics.duration_seconds
+
+
+def _order_by_benchmark(presets: list[Preset]) -> list[Preset]:
+    """Fastest first; capacity still gates the final choice in _select_plan."""
+    return sorted(presets, key=_benchmark_rate, reverse=True)
+
+
 def _get_candidate_presets(
     presets: list[Preset],
     *,
@@ -82,7 +94,8 @@ def _get_candidate_presets(
         raise CLIError(f"Preset {missing[0]} does not exist")
     if missing:
         raise CLIError(f"Presets {', '.join(missing)} do not exist")
-    # Preserve the order given: capacity-aware selection tries candidates in turn.
+    # Dedupe refs, preserving the given order; the final ordering is
+    # benchmark-driven in apply_preset.
     candidates = []
     for ref in preset_ids:
         preset = presets_by_ref[ref]

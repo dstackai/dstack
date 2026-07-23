@@ -156,7 +156,7 @@ Submit the run qwen35-27b? [y/n]: y
 
 </div>
 
-If you don't pass `--id`, `dstack` automatically selects a matching preset based on the available fleet offers, then deploys it as a service. Pass `--id` to choose among specific presets by ID or name; it can be repeated, and `dstack` deploys the best available one.
+If you don't pass `--id`, `dstack` selects the fastest matching preset with available fleet offers, then deploys it as a service. Pass `--id` to choose among specific presets by ID or name; it can be repeated, and `dstack` deploys the fastest available one.
 
 ## Manage presets
 
