@@ -474,6 +474,14 @@ class TestWriteAgentInfo:
         }
 
 
+def _subprocess_env() -> dict[str, str]:
+    # A minimal realistic agent env: build_preset_agent_env never produces an
+    # empty dict, and env={} crashes CreateProcess on Windows 3.10, which lacks
+    # the cpython gh-105436 fix.
+    names = ("PATH", "SYSTEMROOT", "SYSTEMDRIVE", "COMSPEC", "TEMP", "TMP")
+    return {name: value for name in names if (value := os.environ.get(name))}
+
+
 class TestConnectionResume:
     def _write_flaky_claude(self, tmp_path):
         script = tmp_path / "fake_claude.py"
@@ -535,7 +543,7 @@ else:
 
         output = await run_preset_agent(
             prompt="system prompt",
-            env={},
+            env=_subprocess_env(),
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
@@ -585,7 +593,7 @@ else:
 
         output = await run_preset_agent(
             prompt="system prompt",
-            env={},
+            env=_subprocess_env(),
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
@@ -634,7 +642,7 @@ sys.exit(1)
 
         output = await run_preset_agent(
             prompt="system prompt",
-            env={},
+            env=_subprocess_env(),
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
