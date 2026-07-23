@@ -2,14 +2,14 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
-from dstack._internal.cli.models.endpoint_agent import AgentFinalReport
-from dstack._internal.cli.models.endpoint_presets import (
-    EndpointBenchmark,
-    EndpointBenchmarkClient,
-    EndpointBenchmarkTarget,
-    EndpointPreset,
-    EndpointPresetValidation,
-    EndpointPresetValidationReplica,
+from dstack._internal.cli.models.preset_agent import AgentFinalReport
+from dstack._internal.cli.models.presets import (
+    Preset,
+    PresetBenchmark,
+    PresetBenchmarkClient,
+    PresetBenchmarkTarget,
+    PresetValidation,
+    PresetValidationReplica,
 )
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
@@ -17,8 +17,8 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
 
 
-def get_endpoint_benchmark(*, verified: bool = True) -> EndpointBenchmark:
-    benchmark = EndpointBenchmark(
+def get_preset_benchmark(*, verified: bool = True) -> PresetBenchmark:
+    benchmark = PresetBenchmark(
         tool="vllm bench serve",
         tool_version="0.11.0",
         command="vllm bench serve --base-url $SERVICE_URL",
@@ -43,17 +43,17 @@ def get_endpoint_benchmark(*, verified: bool = True) -> EndpointBenchmark:
         return benchmark
     return benchmark.copy(
         update={
-            "target": EndpointBenchmarkTarget(type="server-proxy"),
-            "client": EndpointBenchmarkClient(type="local"),
+            "target": PresetBenchmarkTarget(type="server-proxy"),
+            "client": PresetBenchmarkClient(type="local"),
         }
     )
 
 
-def get_endpoint_preset(
+def get_preset(
     *,
     preset_id: str = "8f3a12c4",
     context_length: int = 32768,
-) -> EndpointPreset:
+) -> Preset:
     resources = ResourcesSpec.parse_obj(
         {
             "cpu": "16",
@@ -62,7 +62,7 @@ def get_endpoint_preset(
             "gpu": {"name": "A6000", "memory": "48GB", "count": 1},
         }
     )
-    return EndpointPreset(
+    return Preset(
         base="Qwen/Qwen3.5-27B",
         id=preset_id,
         model="community/Qwen3.5-27B-GPTQ-Int4",
@@ -79,9 +79,9 @@ def get_endpoint_preset(
             }
         ),
         validations=[
-            EndpointPresetValidation(
-                replicas=[EndpointPresetValidationReplica(resources=[resources])],
-                benchmark=get_endpoint_benchmark(),
+            PresetValidation(
+                replicas=[PresetValidationReplica(resources=[resources])],
+                benchmark=get_preset_benchmark(),
             )
         ],
     )
@@ -136,7 +136,7 @@ def get_running_service_run() -> Run:
     )
 
 
-def get_successful_endpoint_report(run: Run) -> AgentFinalReport:
+def get_successful_preset_report(run: Run) -> AgentFinalReport:
     return AgentFinalReport(
         success=True,
         run_id=run.id,
@@ -145,5 +145,5 @@ def get_successful_endpoint_report(run: Run) -> AgentFinalReport:
         base="Qwen/Qwen3.5-27B",
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=32768,
-        benchmark=get_endpoint_benchmark(verified=False),
+        benchmark=get_preset_benchmark(verified=False),
     )

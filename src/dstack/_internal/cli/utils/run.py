@@ -353,7 +353,7 @@ def _format_instance_type(
 
 
 def _format_run_name(run: CoreRun, show_deployment_num: bool) -> str:
-    parts: List[str] = [run.run_spec.run_name]
+    parts: List[str] = [run.run_spec.run_name or ""]
     if show_deployment_num:
         parts.append(f" [secondary]deployment={run.deployment_num}[/]")
     return "".join(parts)

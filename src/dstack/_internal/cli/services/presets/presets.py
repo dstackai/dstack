@@ -1,14 +1,14 @@
 import hashlib
 import json
-from typing import Any
+from typing import Any, Optional
 
 import gpuhunt
 
-from dstack._internal.cli.models.endpoint_presets import (
-    EndpointBenchmark,
-    EndpointPreset,
-    EndpointPresetValidation,
-    EndpointPresetValidationReplica,
+from dstack._internal.cli.models.presets import (
+    Preset,
+    PresetBenchmark,
+    PresetValidation,
+    PresetValidationReplica,
 )
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
@@ -18,28 +18,31 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import format_mib_as_gb, get_current_datetime
 
 
-def build_endpoint_preset(
+def build_preset(
     *,
     service: ServiceConfiguration,
-    validation_replicas: list[EndpointPresetValidationReplica],
+    validation_replicas: list[PresetValidationReplica],
     base_model: str,
     model: str,
     context_length: int,
-    benchmark: EndpointBenchmark,
-) -> EndpointPreset:
+    benchmark: PresetBenchmark,
+    preset_id: Optional[str] = None,
+    name: Optional[str] = None,
+) -> Preset:
     service = service.copy(deep=True)
     service.name = None
     service.gateway = None
     for field in ProfileParams.__fields__:
         setattr(service, field, None)
-    validation = EndpointPresetValidation(
+    validation = PresetValidation(
         replicas=validation_replicas,
         benchmark=benchmark,
     )
     set_service_gpu_vendors_from_validations(service, [validation])
-    return EndpointPreset(
+    return Preset(
+        name=name,
         base=base_model,
-        id=make_endpoint_preset_id(service, context_length=context_length),
+        id=preset_id or make_preset_id(service, context_length=context_length),
         model=model,
         context_length=context_length,
         created_at=get_current_datetime(),
@@ -48,7 +51,7 @@ def build_endpoint_preset(
     )
 
 
-def make_endpoint_preset_id(
+def make_preset_id(
     service: ServiceConfiguration,
     context_length: int,
 ) -> str:
@@ -63,10 +66,11 @@ def make_endpoint_preset_id(
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
 
 
-def endpoint_preset_to_data(preset: EndpointPreset) -> dict[str, Any]:
+def preset_to_data(preset: Preset) -> dict[str, Any]:
     return {
         "base": preset.base,
         "id": preset.id,
+        **({"name": preset.name} if preset.name else {}),
         "model": preset.model,
         "context_length": preset.context_length,
         "created_at": preset.created_at.isoformat(),
@@ -115,7 +119,7 @@ def resources_spec_from_instance_resources(resources: Resources) -> ResourcesSpe
             or gpu.vendor != first_gpu.vendor
             for gpu in resources.gpus
         ):
-            raise ValueError("endpoint preset cannot be built from mixed-GPU instances")
+            raise ValueError("preset cannot be built from mixed-GPU instances")
         data["gpu"] = {
             "name": first_gpu.name,
             "memory": format_mib_as_gb(first_gpu.memory_mib),
@@ -130,7 +134,7 @@ def resources_spec_from_instance_resources(resources: Resources) -> ResourcesSpe
 
 def set_service_gpu_vendors_from_validations(
     service: ServiceConfiguration,
-    validations: list[EndpointPresetValidation],
+    validations: list[PresetValidation],
 ) -> None:
     for group_num, group in enumerate(service.replica_groups):
         resources = group.resources
@@ -153,7 +157,7 @@ def _env_item_to_preset_data(key: str, value: str | EnvSentinel) -> str:
 
 
 def _get_validation_group_gpu_vendor(
-    validations: list[EndpointPresetValidation],
+    validations: list[PresetValidation],
     group_num: int,
 ) -> gpuhunt.AcceleratorVendor | None:
     vendors = {

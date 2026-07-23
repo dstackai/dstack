@@ -29,6 +29,12 @@ console = Console(
     force_terminal=settings.CLI_RICH_FORCE_TERMINAL,
 )
 
+error_console = Console(
+    theme=Theme(_colors),
+    force_terminal=settings.CLI_RICH_FORCE_TERMINAL,
+    stderr=True,
+)
+
 
 LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
 LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
@@ -119,11 +125,12 @@ def add_row_from_dict(table: Table, data: dict[str, Any], **kwargs):
     table.add_row(*row, **kwargs)
 
 
-def warn(message: str):
+def warn(message: str, stderr: bool = False):
+    """`stderr=True` keeps the warning off stdout, so `--json` output stays parseable."""
     if not message.endswith("\n"):
         # Additional blank line for better visibility if there are more than one warning
         message = f"{message}\n"
-    console.print(f"[warning][bold]{message}[/]")
+    (error_console if stderr else console).print(f"[warning][bold]{message}[/]")
 
 
 def get_start_time(since: Optional[str]) -> Optional[datetime]:

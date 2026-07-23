@@ -1,11 +1,11 @@
-# `endpoint`
+# `preset`
 
-The `endpoint` configuration type describes a model request and the constraints
-used to create or apply an [endpoint preset](../../concepts/endpoints.md).
+The `preset` configuration type describes a model request and the constraints
+used to create or apply a [preset](../../concepts/presets.md).
 
 ## Root reference
 
-#SCHEMA# dstack._internal.cli.models.endpoints.EndpointConfiguration
+#SCHEMA# dstack._internal.cli.models.configurations.PresetConfiguration
     overrides:
       show_root_heading: false
       type:
@@ -17,7 +17,7 @@ used to create or apply an [endpoint preset](../../concepts/endpoints.md).
 
     Allows the creation agent to select a compatible model variant.
 
-    #SCHEMA# dstack._internal.cli.models.endpoints.EndpointModelBase
+    #SCHEMA# dstack._internal.cli.models.configurations.PresetModelBase
         overrides:
           show_root_heading: false
 
@@ -26,9 +26,17 @@ used to create or apply an [endpoint preset](../../concepts/endpoints.md).
     Requires an exact model repo or path and optionally sets another
     client-facing model name.
 
-    #SCHEMA# dstack._internal.cli.models.endpoints.EndpointModelRepo
+    #SCHEMA# dstack._internal.cli.models.configurations.PresetModelRepo
         overrides:
           show_root_heading: false
+
+### `prompt`
+
+Custom agent instructions. Set to an inline string, or to a file:
+
+#SCHEMA# dstack._internal.cli.models.configurations.PresetPromptFile
+    overrides:
+      show_root_heading: false
 
 ### `retry`
 
