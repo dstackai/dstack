@@ -28,12 +28,14 @@ def _patched_create_preset(**create_kwargs):
         yield create
 
 
-class TestPresetLocalCommands:
-    @pytest.fixture(autouse=True)
-    def mock_ssh_client_info(self):
-        with patch("dstack._internal.cli.main.get_ssh_client_info"):
-            yield
+@pytest.fixture(autouse=True)
+def mock_ssh_client_info():
+    # Keeps every CLI invocation in this module off the real ssh binary.
+    with patch("dstack._internal.cli.main.get_ssh_client_info"):
+        yield
 
+
+class TestPresetLocalCommands:
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
