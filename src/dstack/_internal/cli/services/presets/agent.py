@@ -823,6 +823,10 @@ async def _run_claude_process(
                 stdout=stdout_file,
                 stderr=stderr_file,
                 start_new_session=not IS_WINDOWS,
+                # Inherit only the redirected std handles, not the CLI's other fds.
+                # Without this the untrusted agent inherits our open descriptors, and
+                # on Windows the broad inheritance flakes CreateProcess (WinError 87).
+                close_fds=True,
             )
         agent_session.update_manifest(
             agent_pid=proc.pid, agent_started_at=_process_started_at(proc.pid)
