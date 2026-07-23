@@ -21,6 +21,7 @@ from dstack._internal.cli.models.configurations import (
 from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.models.presets import Preset
 from dstack._internal.cli.services.presets.agent import (
+    ClaudeAuth,
     attach_preset_agent,
     build_preset_agent_env,
     get_claude_auth,
@@ -379,6 +380,97 @@ def create_preset(
     return result
 
 
+@dataclass(frozen=True)
+class _CreationSetup:
+    """Per-mode inputs to the shared creation path, built by one of
+    `_fresh_setup`, `_resume_setup`, or `_attach_setup`."""
+
+    auth: Optional[ClaudeAuth]
+    workspace: PresetAgentWorkspace
+    build_name: str
+    allowed_fleets: tuple[str, ...]
+    user_prompt: Optional[str]
+    initial_resume_session_id: Optional[str]
+    write_constraints: bool  # True only for fresh creations
+
+
+def _fresh_setup(
+    api: Client,
+    configuration: PresetConfiguration,
+    agent_session: PresetAgentSession,
+    build_name: Optional[str],
+    allowed_fleets: Optional[tuple[str, ...]],
+    user_prompt: Optional[str],
+) -> _CreationSetup:
+    if allowed_fleets is None:
+        allowed_fleets = _get_allowed_fleets(api, configuration)
+    if not allowed_fleets:
+        raise CLIError(_NO_FLEETS_ERROR)
+    auth = get_claude_auth()
+    workspace = create_agent_workspace(agent_session)
+    build_name = build_name or _get_build_name(
+        configuration.name, configuration.model.api_model_name, agent_session.preset_id
+    )
+    return _CreationSetup(
+        auth=auth,
+        workspace=workspace,
+        build_name=build_name,
+        allowed_fleets=allowed_fleets,
+        user_prompt=user_prompt,
+        initial_resume_session_id=None,
+        write_constraints=True,
+    )
+
+
+def _resume_setup(
+    agent_session: PresetAgentSession,
+    build_name: Optional[str],
+    user_prompt: Optional[str],
+) -> _CreationSetup:
+    # The prompt is fixed at session creation, like the constraints.
+    pinned_prompt = agent_session.read_user_prompt()
+    if user_prompt is not None and user_prompt != pinned_prompt:
+        warn(
+            "The configuration prompt is ignored when resuming: the preset keeps its original prompt"
+        )
+    user_prompt = pinned_prompt
+    auth = get_claude_auth()
+    workspace = attach_agent_workspace(agent_session)
+    manifest = agent_session.read_manifest()
+    claude_model = manifest.get("claude_model")
+    if isinstance(claude_model, str) and claude_model:
+        auth = dataclasses.replace(auth, model=claude_model)
+    initial_resume_session_id: Optional[str] = None
+    claude_session_id = manifest.get("claude_session_id")
+    if isinstance(claude_session_id, str) and claude_session_id:
+        initial_resume_session_id = claude_session_id
+    return _CreationSetup(
+        auth=auth,
+        workspace=workspace,
+        build_name=build_name or _load_build_name(workspace),
+        allowed_fleets=(),
+        user_prompt=user_prompt,
+        initial_resume_session_id=initial_resume_session_id,
+        write_constraints=False,
+    )
+
+
+def _attach_setup(
+    agent_session: PresetAgentSession,
+    build_name: Optional[str],
+) -> _CreationSetup:
+    workspace = attach_agent_workspace(agent_session)
+    return _CreationSetup(
+        auth=None,
+        workspace=workspace,
+        build_name=build_name or _load_build_name(workspace),
+        allowed_fleets=(),
+        user_prompt=None,
+        initial_resume_session_id=None,
+        write_constraints=False,
+    )
+
+
 async def _create_preset(
     *,
     api: Client,
@@ -395,40 +487,13 @@ async def _create_preset(
     allowed_fleets: Optional[tuple[str, ...]] = None,
 ) -> PresetCreateResult:
     source_configuration = source_configuration or configuration
-    initial_resume_session_id: Optional[str] = None
     if attach:
-        auth = None
-        workspace = attach_agent_workspace(agent_session)
-        build_name = build_name or _load_build_name(workspace)
-        allowed_fleets = ()
+        setup = _attach_setup(agent_session, build_name)
     elif resume:
-        # The prompt is fixed at session creation, like the constraints.
-        pinned_prompt = agent_session.read_user_prompt()
-        if user_prompt is not None and user_prompt != pinned_prompt:
-            warn(
-                "The configuration prompt is ignored when resuming: the preset keeps its original prompt"
-            )
-        user_prompt = pinned_prompt
-        auth = get_claude_auth()
-        workspace = attach_agent_workspace(agent_session)
-        manifest = agent_session.read_manifest()
-        claude_model = manifest.get("claude_model")
-        if isinstance(claude_model, str) and claude_model:
-            auth = dataclasses.replace(auth, model=claude_model)
-        claude_session_id = manifest.get("claude_session_id")
-        if isinstance(claude_session_id, str) and claude_session_id:
-            initial_resume_session_id = claude_session_id
-        build_name = build_name or _load_build_name(workspace)
-        allowed_fleets = ()
+        setup = _resume_setup(agent_session, build_name, user_prompt)
     else:
-        if allowed_fleets is None:
-            allowed_fleets = _get_allowed_fleets(api, configuration)
-        if not allowed_fleets:
-            raise CLIError(_NO_FLEETS_ERROR)
-        auth = get_claude_auth()
-        workspace = create_agent_workspace(agent_session)
-        build_name = build_name or _get_build_name(
-            configuration.name, configuration.model.api_model_name, agent_session.preset_id
+        setup = _fresh_setup(
+            api, configuration, agent_session, build_name, allowed_fleets, user_prompt
         )
     # Record ownership + the finalize context (project, keep-service) so a later
     # detached reconcile can complete this session from disk alone.
@@ -436,7 +501,7 @@ async def _create_preset(
         agent_session,
         project=api.project,
         keep_service=keep_service,
-        claude_model=auth.model if auth is not None else None,
+        claude_model=setup.auth.model if setup.auth is not None else None,
     )
 
     preset_env = configuration.env.as_dict()
@@ -446,7 +511,7 @@ async def _create_preset(
     redacted_values = get_redacted_values(
         [
             token,
-            (auth.api_key if auth is not None else None) or "",
+            (setup.auth.api_key if setup.auth is not None else None) or "",
             *preset_env.values(),
             *get_sensitive_inherited_env_values(),
         ]
@@ -458,52 +523,55 @@ async def _create_preset(
     creation_succeeded = False
     interrupted = False
     cleanup_error: Optional[str] = None
-    if auth is not None:
+    if setup.auth is not None:
         env = build_preset_agent_env(
             api=api,
             preset_env=preset_env,
-            auth=auth,
-            workspace=workspace,
+            auth=setup.auth,
+            workspace=setup.workspace,
             token=token,
         )
-    prompt = get_preset_agent_system_prompt(user_prompt=user_prompt)
-    if not resume and not attach:
-        if user_prompt:
-            agent_session.write_user_prompt(user_prompt)
+    prompt = get_preset_agent_system_prompt(user_prompt=setup.user_prompt)
+    if setup.write_constraints:
+        if setup.user_prompt:
+            agent_session.write_user_prompt(setup.user_prompt)
         constraints_text = _build_constraints(
             configuration=configuration,
-            build_name=build_name,
-            allowed_fleets=allowed_fleets,
+            build_name=setup.build_name,
+            allowed_fleets=setup.allowed_fleets,
         )
-        workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
+        setup.workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
         if agent_session.debug:
             agent_session.write_prompt(prompt)
             agent_session.write_constraints(constraints_text)
-            if auth is not None:
-                agent_session.write_agent_info(auth)
+            if setup.auth is not None:
+                agent_session.write_agent_info(setup.auth)
     try:
         if attach:
             process_output = await attach_preset_agent(
-                workspace=workspace,
+                workspace=setup.workspace,
                 redacted_values=redacted_values,
                 agent_session=agent_session,
             )
-            if process_output.report_data is None and not workspace.final_report_path.exists():
+            if (
+                process_output.report_data is None
+                and not setup.workspace.final_report_path.exists()
+            ):
                 raise AgentExitedWithoutReport(process_output.error)
         else:
-            assert auth is not None
+            assert setup.auth is not None
             process_output = await run_preset_agent(
                 prompt=prompt,
                 env=env,
-                workspace=workspace,
-                auth=auth,
+                workspace=setup.workspace,
+                auth=setup.auth,
                 redacted_values=redacted_values,
                 agent_session=agent_session,
-                initial_resume_session_id=initial_resume_session_id,
+                initial_resume_session_id=setup.initial_resume_session_id,
             )
         report = load_preset_agent_report(
             output=process_output,
-            workspace=workspace,
+            workspace=setup.workspace,
             redacted_values=redacted_values,
         )
         run = api.client.runs.get(api.project, report.run_name)
@@ -524,7 +592,7 @@ async def _create_preset(
     finally:
         if agent_session.debug:
             _save_final_report_copy(
-                workspace=workspace,
+                workspace=setup.workspace,
                 agent_session=agent_session,
                 redacted_values=redacted_values,
             )
@@ -533,8 +601,8 @@ async def _create_preset(
             try:
                 await _cleanup_runs(
                     api=api,
-                    build_name=build_name,
-                    workspace=workspace,
+                    build_name=setup.build_name,
+                    workspace=setup.workspace,
                     final_run_name=report.run_name if report is not None else None,
                     keep_final_service=keep_final_service,
                     agent_session=agent_session,
