@@ -32,6 +32,7 @@ from dstack._internal.cli.services.presets.create import (
     _print_fleet_offers,
     _save_final_report_copy,
     _stop_active_session_runs,
+    _suspend_agent_session,
     create_preset,
     follow_preset,
     reconcile_detached_sessions,
@@ -531,6 +532,26 @@ class TestInterruptAndResume:
         output = capsys.readouterr().out
         assert "--resume" in output
         assert sessions[0].name in output
+
+    def test_suspend_scrubs_workspace_token(self, tmp_path, capsys):
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        (session_dir / "agent.log").touch()
+        session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        workspace_root = tmp_path / "workspace"
+        config_dir = workspace_root / "h" / ".dstack"
+        config_dir.mkdir(parents=True)
+        (config_dir / "config.yml").write_text("projects: []\n")
+        (workspace_root / "w").mkdir()
+        (workspace_root / "w" / "constraints.json").write_text("{}")
+        session.update_manifest(workspace=str(workspace_root))
+
+        _suspend_agent_session(session)
+
+        # The live credential is gone; the rest of the workspace stays resumable.
+        assert not (config_dir / "config.yml").exists()
+        assert (workspace_root / "w" / "constraints.json").exists()
+        assert session.read_manifest()["status"] == "interrupted"
 
     @pytest.mark.asyncio
     async def test_resume_uses_saved_claude_session(self, creation_context, monkeypatch, tmp_path):

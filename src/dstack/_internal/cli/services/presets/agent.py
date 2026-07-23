@@ -292,6 +292,17 @@ def remove_agent_workspace(session: PresetAgentSession) -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
+def scrub_workspace_token(session: PresetAgentSession) -> None:
+    """Removes the agent's dstack config (a live token) from a workspace kept
+    for resume, so an interrupted session leaves no credential on disk. Resume
+    re-mints it via `build_preset_agent_env`."""
+    workspace = session.read_manifest().get("workspace")
+    if not workspace:
+        return
+    with suppress(OSError):
+        (Path(workspace) / "h" / ".dstack" / "config.yml").unlink()
+
+
 def _create_workspace_alias(real: Path) -> Path:
     base = _get_short_temp_dir() or tempfile.gettempdir()
     while True:

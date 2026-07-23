@@ -44,6 +44,7 @@ from dstack._internal.cli.services.presets.agent import (
     release_session_claim,
     remove_agent_workspace,
     run_preset_agent,
+    scrub_workspace_token,
     session_process_alive,
     session_report_exists,
     terminate_agent_process,
@@ -610,6 +611,8 @@ def _suspend_agent_session(session: PresetAgentSession) -> None:
         session.finish("interrupted")
     except OSError as e:
         warn(f"Could not record the interrupted preset state: {e}")
+    # The kept workspace must not retain a live credential while suspended.
+    scrub_workspace_token(session)
     console.print(f"\nPreset [code]{session.preset_id}[/] creation interrupted.")
     console.print(
         f"Resume it with [code]dstack preset create -f <config> --resume {session.preset_id}[/]."
