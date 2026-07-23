@@ -121,7 +121,7 @@ class Compute(ABC):
         if `full_offers` set to `True`, the method should not adjust offer's resources according to
         `requirements`. For most backends, this flag has no meaning, as they work with predefined
         provider offers (even configurable disk size reflects the actual disk created once the
-        instance is provisioned), but some backends such as Kubernetes and Slurm allocates flexible
+        instance is provisioned), but some backends such as Kubernetes and Slurm allocate flexible
         slices of instances (nodes) according to the requested resources; such Computes usually
         generate synthetic offers from discovered nodes on the fly; these synthetic offers should
         reflect either resources that would be allocated based on `requirements`
