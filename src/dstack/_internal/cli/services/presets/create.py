@@ -5,7 +5,7 @@ import os
 import re
 import time
 import uuid
-from contextlib import suppress
+from contextlib import nullcontext, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -907,15 +907,19 @@ async def _cleanup_runs(
         return
     deadline = asyncio.get_running_loop().time() + _RUN_STOP_TIMEOUT_SECONDS
     pending = set(active_names)
-    while pending:
-        if asyncio.get_running_loop().time() >= deadline:
-            raise CLIError(f"Timed out waiting for runs to stop: {', '.join(sorted(pending))}")
-        for name in list(pending):
-            run = api.runs.get(name)
-            if run is None or run.status.is_finished():
-                pending.remove(name)
-        if pending:
-            await asyncio.sleep(2)
+    # The same spinner the stop command shows: without it the CLI looks hung
+    # for however long the runs take to terminate.
+    spinner = console.status("Stopping runs...") if agent_session.echo else nullcontext()
+    with spinner:
+        while pending:
+            if asyncio.get_running_loop().time() >= deadline:
+                raise CLIError(f"Timed out waiting for runs to stop: {', '.join(sorted(pending))}")
+            for name in list(pending):
+                run = api.runs.get(name)
+                if run is None or run.status.is_finished():
+                    pending.remove(name)
+            if pending:
+                await asyncio.sleep(2)
     if agent_session.debug:
         print_preset_progress("All preset creation runs stopped.", agent_session=agent_session)
 
