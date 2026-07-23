@@ -66,6 +66,8 @@ $ dstack preset create -f preset.dstack.yml --resume a1b2c3d4
 
 </div>
 
+To stop a creation and its runs, use `dstack preset stop`.
+
 !!! info "Claude configuration"
     By default, preset creation uses the existing `claude` login. To use an Anthropic API key instead, set:
 
@@ -132,12 +134,12 @@ prompt: |
 
 ## Apply a preset
 
-To deploy a preset as a service, pass the preset configuration and the preset ID or name to the `dstack preset apply` command:
+To deploy a preset as a service, pass the preset configuration and the preset ID to the `dstack preset apply` command:
 
 <div class="termy">
 
 ```shell
-$ dstack preset apply -f preset.dstack.yml --id qwen35-27b
+$ dstack preset apply -f preset.dstack.yml --id 532f3f4b
  Project        main
  User           admin
  Type           service
