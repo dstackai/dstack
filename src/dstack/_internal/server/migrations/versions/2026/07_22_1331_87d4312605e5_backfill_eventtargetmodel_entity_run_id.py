@@ -27,7 +27,7 @@ def upgrade() -> None:
     op.execute(
         """
         UPDATE event_targets SET entity_run_id = entity_id
-        WHERE entity_type = 'run' AND entity_run_id IS NULL
+        WHERE entity_type = 'RUN' AND entity_run_id IS NULL
         """
     )
     op.execute(
@@ -35,7 +35,7 @@ def upgrade() -> None:
         UPDATE event_targets SET entity_run_id = jobs.run_id
         FROM jobs
         WHERE jobs.id = event_targets.entity_id
-            AND event_targets.entity_type = 'job'
+            AND event_targets.entity_type = 'JOB'
             AND event_targets.entity_run_id IS NULL
         """
     )
