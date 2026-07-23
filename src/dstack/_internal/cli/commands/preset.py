@@ -5,6 +5,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
+from rich.live import Live
 
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.models.configurations import PresetConfiguration
@@ -16,17 +17,18 @@ from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.presets.apply import apply_preset
 from dstack._internal.cli.services.presets.create import (
     create_preset,
+    find_preset_name_holders,
     plan_preset,
+    reassign_preset_name,
     reconcile_detached_sessions,
     show_preset_session_logs,
     stop_preset_session,
 )
-from dstack._internal.cli.services.presets.output import print_presets
+from dstack._internal.cli.services.presets.output import get_presets_table, print_presets
 from dstack._internal.cli.services.presets.session import (
-    find_session_name_claims,
-    get_presets_dir,
     list_agent_sessions,
     load_resumable_agent_session,
+    resolve_session_ref,
 )
 from dstack._internal.cli.services.presets.store import (
     PresetStore,
@@ -38,10 +40,16 @@ from dstack._internal.cli.services.profile import (
     load_profile_from_args,
     register_profile_args,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console, warn
-from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.cli.utils.common import (
+    LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    LIVE_TABLE_REFRESH_RATE_PER_SEC,
+    confirm_ask,
+    console,
+    warn,
+)
+from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.services import is_valid_dstack_resource_name
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack.api import Client
 
 
@@ -224,26 +232,31 @@ class PresetCommand(BaseCommand):
             print(PresetListOutput(presets=presets).json())
             return
         verbose = args.verbose
-        while True:
-            self._reconcile()
-            presets = PresetStore().list()
-            sessions = list_agent_sessions()
-            if base or repo:
-                repo_to_base = {preset.model: preset.base for preset in presets}
-                presets = _filter_presets(presets, base=base, repo=repo)
-                sessions = [
-                    session
-                    for session in sessions
-                    if _session_matches_model(
-                        session, base=base, repo=repo, repo_to_base=repo_to_base
-                    )
-                ]
-            if getattr(args, "watch", False):
-                console.clear()
+        if not getattr(args, "watch", False):
+            presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
             print_presets(presets, sessions=sessions, verbose=verbose)
-            if not getattr(args, "watch", False):
-                return
-            time.sleep(5)
+            return
+        with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
+            while True:
+                presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
+                live.update(get_presets_table(presets, sessions=sessions, verbose=verbose))
+                time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+
+    def _list_presets_and_sessions(
+        self, *, base: str | None, repo: str | None
+    ) -> tuple[list[Preset], list[dict]]:
+        self._reconcile()
+        presets = PresetStore().list()
+        sessions = list_agent_sessions()
+        if base or repo:
+            repo_to_base = {preset.model: preset.base for preset in presets}
+            presets = _filter_presets(presets, base=base, repo=repo)
+            sessions = [
+                session
+                for session in sessions
+                if _session_matches_model(session, base=base, repo=repo, repo_to_base=repo_to_base)
+            ]
+        return presets, sessions
 
     def _create(self, args: argparse.Namespace) -> None:
         configuration_path, configuration = load_preset_configuration(args.configuration_file)
@@ -291,7 +304,7 @@ class PresetCommand(BaseCommand):
             result = show_preset_session_logs(
                 project=args.project,
                 store=PresetStore(),
-                preset_id=_resolve_session_ref(args.preset),
+                preset_id=resolve_session_ref(args.preset),
                 follow=args.follow,
                 keep_service=args.keep_service,
             )
@@ -303,7 +316,7 @@ class PresetCommand(BaseCommand):
                 console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
     def _stop(self, args: argparse.Namespace) -> None:
-        preset_id = _resolve_session_ref(args.preset)
+        preset_id = resolve_session_ref(args.preset)
         if not args.yes and not confirm_ask(f"Stop creating preset [code]{preset_id}[/]?"):
             console.print("\nExiting...")
             return
@@ -311,8 +324,7 @@ class PresetCommand(BaseCommand):
 
     def _get(self, args: argparse.Namespace) -> None:
         self._reconcile()
-        store = PresetStore()
-        preset = store.get(args.preset) or store.find_by_name(args.preset)
+        preset = PresetStore().find_by_id_or_name(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
         print(preset.json())
@@ -335,7 +347,7 @@ class PresetCommand(BaseCommand):
         store = PresetStore()
         if args.preset is not None:
             try:
-                preset = store.get(args.preset) or store.find_by_name(args.preset)
+                preset = store.find_by_id_or_name(args.preset)
             except CLIError as e:
                 # A corrupt preset file must still be removable by ID.
                 warn(str(e), stderr=True)
@@ -443,39 +455,19 @@ def _apply_name(configuration: PresetConfiguration, name: str | None, *, require
                 "The service name is required. Set `name` in the configuration or use --name"
             )
         return
-    if not is_valid_dstack_resource_name(configuration.name):
-        raise CLIError("The name must match '^[a-z][a-z0-9-]{1,40}$'")
-
-
-def _resolve_session_ref(ref: str) -> str:
-    """A session reference may be a preset id or a claimed name."""
-    if (get_presets_dir() / ref).is_dir():
-        return ref
-    claims = find_session_name_claims(ref)
-    if len(claims) == 1:
-        return claims[0].preset_id
-    return ref
+    try:
+        validate_dstack_resource_name(configuration.name)
+    except ServerClientError as e:
+        raise CLIError(str(e)) from e
 
 
 def _confirm_preset_creation(store: PresetStore, name: str | None, *, assume_yes: bool) -> bool:
     """One apply-style confirmation; reassigns the name from any holder on yes."""
-    preset_holder = None
-    session_holders = []
-    if name is not None:
-        preset_holder = store.find_by_name(name)
-        session_holders = [
-            session
-            for session in find_session_name_claims(name)
-            if preset_holder is None or session.preset_id != preset_holder.id
-        ]
-    holders = []
-    if preset_holder is not None:
-        holders.append(f"preset [code]{preset_holder.id}[/]")
-    holders.extend(f"preset [code]{session.preset_id}[/]" for session in session_holders)
-    if holders:
+    holders = find_preset_name_holders(store, name) if name is not None else None
+    if holders is not None and holders.preset_ids:
+        used_by = ", ".join(f"preset [code]{preset_id}[/]" for preset_id in holders.preset_ids)
         message = (
-            f"The name [code]{name}[/] is already used by {', '.join(holders)}."
-            f" Reassign it to a new preset?"
+            f"The name [code]{name}[/] is already used by {used_by}. Reassign it to a new preset?"
         )
     elif name is not None:
         message = f"Create the preset [code]{name}[/]?"
@@ -483,10 +475,8 @@ def _confirm_preset_creation(store: PresetStore, name: str | None, *, assume_yes
         message = "Create the preset?"
     if not assume_yes and not confirm_ask(message):
         return False
-    if preset_holder is not None and name is not None:
-        store.release_name(name)
-    for session in session_holders:
-        session.update_manifest(name=None)
+    if holders is not None:
+        reassign_preset_name(store, holders)
     return True
 
 

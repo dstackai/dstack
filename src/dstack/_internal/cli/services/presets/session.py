@@ -402,6 +402,16 @@ def find_session_name_claims(name: str) -> list[PresetAgentSession]:
     ]
 
 
+def resolve_session_ref(ref: str) -> str:
+    """A session reference may be a preset id or a claimed name."""
+    if (get_presets_dir() / ref).is_dir():
+        return ref
+    claims = find_session_name_claims(ref)
+    if len(claims) == 1:
+        return claims[0].preset_id
+    return ref
+
+
 def list_agent_sessions() -> list[dict[str, Any]]:
     entries = []
     for session in iter_agent_sessions():

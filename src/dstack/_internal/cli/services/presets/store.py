@@ -87,6 +87,10 @@ class PresetStore:
                 return preset
         return None
 
+    def find_by_id_or_name(self, ref: str) -> Preset | None:
+        """Resolves a preset reference that may be an ID or a claimed name."""
+        return self.get(ref) or self.find_by_name(ref)
+
     def release_name(self, name: str) -> Preset | None:
         """Releases `name` from the preset holding it, keeping the preset."""
         preset = self.find_by_name(name)

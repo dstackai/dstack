@@ -55,6 +55,15 @@ def print_presets(
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
 ) -> None:
+    console.print(get_presets_table(presets, sessions=sessions, verbose=verbose))
+    console.print()
+
+
+def get_presets_table(
+    presets: list[Preset],
+    sessions: Optional[list[dict[str, Any]]] = None,
+    verbose: bool = False,
+) -> Table:
     table = Table(box=None)
     table.add_column("BASE", no_wrap=True)
     table.add_column("ID", no_wrap=True)
@@ -91,8 +100,7 @@ def print_presets(
             reverse=True,
         ):
             _add_session(table, session)
-    console.print(table)
-    console.print()
+    return table
 
 
 def _add_session(table: Table, session: dict[str, Any]) -> None:

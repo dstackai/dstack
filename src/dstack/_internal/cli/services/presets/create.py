@@ -41,6 +41,7 @@ from dstack._internal.cli.services.presets.session import (
     SessionBusyError,
     claimed_session_name,
     create_preset_agent_session,
+    find_session_name_claims,
     iter_agent_sessions,
     load_agent_session,
     load_attachable_agent_session,
@@ -719,6 +720,40 @@ def _load_build_name(workspace: PresetAgentWorkspace) -> str:
     if not isinstance(prefix, str) or not prefix:
         raise CLIError("The preset creation constraints do not contain a run name prefix")
     return prefix
+
+
+@dataclass(frozen=True)
+class PresetNameHolders:
+    """Current claims on a preset name: at most one saved preset, plus any
+    creation sessions claiming it (excluding the holder preset's own session)."""
+
+    name: str
+    preset: Optional[Preset]
+    sessions: list[PresetAgentSession]
+
+    @property
+    def preset_ids(self) -> list[str]:
+        ids = [self.preset.id] if self.preset is not None else []
+        ids.extend(session.preset_id for session in self.sessions)
+        return ids
+
+
+def find_preset_name_holders(store: PresetStore, name: str) -> PresetNameHolders:
+    preset = store.find_by_name(name)
+    sessions = [
+        session
+        for session in find_session_name_claims(name)
+        if preset is None or session.preset_id != preset.id
+    ]
+    return PresetNameHolders(name=name, preset=preset, sessions=sessions)
+
+
+def reassign_preset_name(store: PresetStore, holders: PresetNameHolders) -> None:
+    """Releases the name from every holder so a new preset can claim it."""
+    if holders.preset is not None:
+        store.release_name(holders.name)
+    for session in holders.sessions:
+        session.update_manifest(name=None)
 
 
 def plan_preset(*, api: Client, configuration: PresetConfiguration) -> tuple[str, ...]:
