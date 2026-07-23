@@ -295,7 +295,7 @@ class PresetCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
-        console.print(f"Preset [code]{result.preset.id}[/] saved")
+        # The log already told the story; like a finished run, success is silent.
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
@@ -310,10 +310,8 @@ class PresetCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             return  # a log viewer: Ctrl+C just stops watching, quietly
-        if result is not None:
-            console.print(f"Preset [code]{result.preset.id}[/] saved")
-            if args.keep_service:
-                console.print(f"Final service [code]{result.final_run_name}[/] kept running")
+        if result is not None and args.keep_service:
+            console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
     def _stop(self, args: argparse.Namespace) -> None:
         preset_id = resolve_session_ref(args.preset)

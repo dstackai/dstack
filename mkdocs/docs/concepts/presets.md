@@ -50,7 +50,6 @@ Create the preset qwen25-7b? [y/n]: y
 [2026-07-15 11:41:06] Prototype task qwen25-7b-a1b2c3-2 verified vLLM on an L4:24GB.
 [2026-07-15 11:52:06] Final service qwen25-7b-a1b2c3-3 verified with context length 32768.
 [2026-07-15 11:52:18] Benchmark via guidellm 0.7.1: 32/32 requests succeeded.
-[2026-07-15 11:52:18] Saved preset 8f3a12c4 for Qwen/Qwen2.5-7B-Instruct.
 ```
 
 </div>
