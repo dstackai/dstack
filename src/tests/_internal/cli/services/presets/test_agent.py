@@ -641,6 +641,46 @@ sys.exit(1)
         # Initial attempt + one retry per configured delay, then give up.
         assert len((tmp_path / "calls.jsonl").read_text().splitlines()) == 3
 
+    @pytest.mark.asyncio
+    async def test_does_not_resurrect_an_externally_stopped_agent(self, tmp_path, monkeypatch):
+        script = _write_fake_claude(
+            tmp_path,
+            """import json
+import sys
+from pathlib import Path
+
+with Path("calls.jsonl").open("a") as f:
+    f.write("call\\n")
+print(json.dumps({"type": "system", "subtype": "init", "session_id": "sid-123"}))
+print(json.dumps({
+    "type": "result",
+    "is_error": True,
+    "result": "API Error: Unable to connect to API (ENOTFOUND)",
+}))
+sys.exit(1)
+""",
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0, 0)
+        )
+        _patch_claude_command(monkeypatch, script)
+        workspace, agent_session = _agent_setup(tmp_path)
+        # Another CLI recorded a stop: the death must read as a decision, not an
+        # outage to retry.
+        agent_session.update_manifest(status="interrupted")
+
+        output = await run_preset_agent(
+            prompt="system prompt",
+            env=_subprocess_env(),
+            workspace=workspace,
+            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            redacted_values=(),
+            agent_session=agent_session,
+        )
+
+        assert output.report_data is None
+        assert len((tmp_path / "calls.jsonl").read_text().splitlines()) == 1
+
 
 class TestWorkspaceLifecycle:
     def _session(self, tmp_path):

@@ -26,7 +26,7 @@ def apply_preset(
     command_args: argparse.Namespace,
     store: PresetStore,
 ) -> None:
-    preset = store.find_by_id_or_name(preset_id)
+    preset = store.get(preset_id)
     if preset is None:
         raise CLIError(f"Preset {preset_id} does not exist")
     _validate_preset_matches(preset, configuration=configuration)

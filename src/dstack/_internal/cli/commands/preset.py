@@ -16,6 +16,7 @@ from dstack._internal.cli.models.presets import (
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.presets.apply import apply_preset
 from dstack._internal.cli.services.presets.create import (
+    CreationStopped,
     create_preset,
     find_preset_name_holders,
     plan_preset,
@@ -165,7 +166,7 @@ class PresetCommand(BaseCommand):
             dest="preset_id",
             metavar="ID",
             required=True,
-            help="The preset ID or name to deploy",
+            help="The preset ID to deploy",
         )
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -295,6 +296,8 @@ class PresetCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
+        except CreationStopped:
+            return  # stopped from another CLI, which reported the interruption
         # The log already told the story; like a finished run, success is silent.
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
@@ -310,6 +313,8 @@ class PresetCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             return  # a log viewer: Ctrl+C just stops watching, quietly
+        except CreationStopped:
+            return  # stopped from another CLI, which reported the interruption
         if result is not None and args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 

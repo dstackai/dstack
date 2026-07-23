@@ -22,6 +22,7 @@ from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.models.presets import Preset
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
+    PresetAgentProcessOutput,
     attach_preset_agent,
     build_preset_agent_env,
     get_claude_auth,
@@ -84,6 +85,10 @@ class PresetCreateResult:
     path: Path
     final_run_id: uuid.UUID
     final_run_name: str
+
+
+class CreationStopped(Exception):
+    """Another CLI stopped this creation; it already recorded the interruption."""
 
 
 class AgentExitedWithoutReport(Exception):
@@ -285,14 +290,33 @@ def _reconcile_session(session: PresetAgentSession, store: PresetStore) -> None:
 
 
 def stop_preset_session(api: Client, preset_id: str) -> None:
-    session = load_attachable_agent_session(preset_id)
+    session = load_agent_session(preset_id)
     manifest = session.read_manifest()
-    # If the agent already finished, there is nothing to stop. Leave the session
-    # for a read to save (reconcile-on-read) rather than discarding it as
-    # interrupted — but `stop` itself never saves; it only stops.
-    if session_report_exists(manifest) and not session_process_alive(manifest):
-        console.print(f"Preset [code]{preset_id}[/] has already finished.")
+    status = manifest.get("status")
+    if status == "success":
+        console.print(f"Preset [code]{preset_id}[/] is already created")
         return
+    if status == "failed":
+        console.print(f"Preset [code]{preset_id}[/] creation failed")
+        return
+    if status == "interrupted":
+        console.print(f"Preset [code]{preset_id}[/] creation was interrupted.")
+        return
+    if session_report_exists(manifest) and not session_process_alive(manifest):
+        # The agent already finished; finalize like reconcile would instead of
+        # leaving a not-yet-saved intermediate state behind.
+        follow_preset(
+            api=api,
+            store=PresetStore(),
+            preset_id=preset_id,
+            keep_service=bool(manifest.get("keep_service")),
+            echo=False,
+        )
+        console.print(f"Preset [code]{preset_id}[/] is already created")
+        return
+    # Stop wins, like `dstack stop`: record the intent first so a live owner's
+    # retry loop exits instead of resurrecting the agent, then terminate.
+    _finish_agent_session(session, "interrupted")
     terminate_agent_process(manifest)
     _stop_active_session_runs(api, session)
     _suspend_agent_session(session)
@@ -368,6 +392,9 @@ def create_preset(
         )
     except KeyboardInterrupt:
         _stop_or_detach_agent_session(agent_session, api)
+        raise
+    except CreationStopped:
+        # The stopping CLI already suspended the session.
         raise
     except BaseException:
         _close_agent_session(agent_session, "failed")
@@ -549,6 +576,7 @@ async def _create_preset(
                 redacted_values=redacted_values,
                 agent_session=agent_session,
             )
+            _raise_if_externally_stopped(agent_session, process_output)
             if (
                 process_output.report_data is None
                 and not setup.workspace.final_report_path.exists()
@@ -565,6 +593,7 @@ async def _create_preset(
                 agent_session=agent_session,
                 initial_resume_session_id=setup.initial_resume_session_id,
             )
+            _raise_if_externally_stopped(agent_session, process_output)
         report = load_preset_agent_report(
             output=process_output,
             workspace=setup.workspace,
@@ -624,6 +653,13 @@ async def _create_preset(
         final_run_id=report.run_id,
         final_run_name=report.run_name,
     )
+
+
+def _raise_if_externally_stopped(
+    session: PresetAgentSession, output: "PresetAgentProcessOutput"
+) -> None:
+    if output.report_data is None and session.read_manifest().get("status") == "interrupted":
+        raise CreationStopped
 
 
 def _finish_agent_session(

@@ -228,6 +228,10 @@ async def run_preset_agent(
             # terminates when the network stays down.
             if output.made_progress:
                 retry_delays = list(_RESUME_DELAYS_SECONDS)
+            # An externally recorded stop is a decision, not an outage: never
+            # resurrect an agent another CLI just terminated.
+            if agent_session.read_manifest().get("status") == "interrupted":
+                return output
             if not retry_delays:
                 return output
             delay = retry_delays.pop(0)

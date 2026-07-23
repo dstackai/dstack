@@ -86,7 +86,7 @@ class TestApplyPreset:
                 preset_id="ee55ff66",
                 profile_name=None,
                 command_args=SimpleNamespace(),
-                store=Mock(find_by_id_or_name=Mock(return_value=None)),
+                store=Mock(get=Mock(return_value=None)),
             )
 
     def test_applies_the_referenced_preset(self, monkeypatch):
@@ -113,7 +113,7 @@ class TestApplyPreset:
             preset_id="8f3a12c4",
             profile_name="gpu",
             command_args=command_args,
-            store=Mock(find_by_id_or_name=Mock(return_value=preset)),
+            store=Mock(get=Mock(return_value=preset)),
         )
 
         assert service_args.profile == "gpu"

@@ -53,6 +53,24 @@ class TestPresetLocalCommands:
         # interrupt handler, so the command layer stays silent — no generic line.
         assert "Operation interrupted by user" not in capsys.readouterr().out
 
+    def test_create_ends_quietly_when_stopped_from_another_cli(self, tmp_path, capsys):
+        from dstack._internal.cli.services.presets.create import CreationStopped
+
+        configuration_path = tmp_path / "preset.dstack.yml"
+        configuration_path.write_text(
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+        )
+
+        with _patched_create_preset(side_effect=CreationStopped):
+            exit_code = run_dstack_cli(
+                ["preset", "create", "-y", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+            )
+
+        # The stopping CLI reported the interruption; the owner just ends.
+        assert exit_code == 0
+        assert "Traceback" not in capsys.readouterr().err
+
     def test_create_requires_max_trials(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")

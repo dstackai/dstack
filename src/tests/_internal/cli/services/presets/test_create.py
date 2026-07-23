@@ -25,6 +25,7 @@ from dstack._internal.cli.services.presets.create import (
     create_preset,
     follow_preset,
     reconcile_detached_sessions,
+    stop_preset_session,
 )
 from dstack._internal.cli.services.presets.session import (
     PresetAgentSession,
@@ -821,6 +822,114 @@ class TestFollowPreset:
             )
         assert session.read_manifest()["status"] == "running"
         release_session_claim(held)
+
+
+class TestStopPresetSession:
+    def _session_dir(self, tmp_path, manifest: dict):
+        session_dir = tmp_path / ".dstack" / "presets" / manifest["id"]
+        session_dir.mkdir(parents=True)
+        (session_dir / "agent.log").touch()
+        (session_dir / "session.json").write_text(json.dumps(manifest))
+        return session_dir
+
+    def _patch_root(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
+            lambda: tmp_path / ".dstack" / "presets",
+        )
+
+    @pytest.mark.parametrize(
+        ("status", "message"),
+        [
+            ("success", "is already created"),
+            ("failed", "creation failed"),
+            ("interrupted", "creation was interrupted"),
+        ],
+    )
+    def test_reports_terminal_states_without_stopping(
+        self, tmp_path, monkeypatch, capsys, status, message
+    ):
+        self._patch_root(monkeypatch, tmp_path)
+        self._session_dir(tmp_path, {"id": "ab12cd34", "status": status})
+
+        stop_preset_session(SimpleNamespace(), "ab12cd34")
+
+        assert message in capsys.readouterr().out
+
+    def test_finalizes_completed_session_and_reports_created(self, tmp_path, monkeypatch, capsys):
+        self._patch_root(monkeypatch, tmp_path)
+        workspace = tmp_path / "workspace"
+        (workspace / "w").mkdir(parents=True)
+        (workspace / "w" / "final_report.json").write_text("{}")
+        self._session_dir(
+            tmp_path,
+            {
+                "id": "ab12cd34",
+                "status": "running",
+                "workspace": str(workspace),
+                "keep_service": True,
+            },
+        )
+        calls = []
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.follow_preset",
+            lambda **kwargs: calls.append(kwargs),
+        )
+
+        stop_preset_session(SimpleNamespace(), "ab12cd34")
+
+        # Finalized silently like reconcile, honoring the persisted keep-service.
+        assert len(calls) == 1
+        assert calls[0]["preset_id"] == "ab12cd34"
+        assert calls[0]["keep_service"] is True
+        assert calls[0]["echo"] is False
+        assert "is already created" in capsys.readouterr().out
+
+    def test_stop_wins_over_a_live_owner(self, tmp_path, monkeypatch, capsys):
+        self._patch_root(monkeypatch, tmp_path)
+        session_dir = self._session_dir(
+            tmp_path,
+            {
+                "id": "ab12cd34",
+                "status": "running",
+                # A live owner: this very process.
+                "agent_pid": os.getpid(),
+                "agent_started_at": None,
+            },
+        )
+        order = []
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.session._pid_alive",
+            lambda pid, started_at=None: True,
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.terminate_agent_process",
+            lambda manifest: order.append("terminate"),
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._stop_active_session_runs",
+            lambda api, session: order.append("stop_runs"),
+        )
+
+        def record_finish(session, status):
+            order.append(f"finish:{status}")
+            session.finish(status)
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._finish_agent_session",
+            record_finish,
+        )
+
+        stop_preset_session(SimpleNamespace(), "ab12cd34")
+
+        # The intent is recorded before the agent dies, so a live owner's retry
+        # loop can never resurrect it.
+        assert order[0] == "finish:interrupted"
+        assert "terminate" in order and "stop_runs" in order
+        manifest = json.loads((session_dir / "session.json").read_text())
+        assert manifest["status"] == "interrupted"
+        out = capsys.readouterr().out
+        assert "creation interrupted" in out
 
 
 class TestStopActiveSessionRuns:
