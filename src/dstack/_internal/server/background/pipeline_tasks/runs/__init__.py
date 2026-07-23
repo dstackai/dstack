@@ -25,6 +25,9 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
 )
+from dstack._internal.server.background.pipeline_tasks.runs.common import (
+    delete_superseded_no_capacity_job_submissions,
+)
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
@@ -415,14 +418,17 @@ async def _apply_pending_result(
                 actor=events.SystemActor(),
                 targets=[events.Target.from_model(job_model)],
             )
-
+        await delete_superseded_no_capacity_job_submissions(
+            session=session,
+            run_id=item.id,
+            new_job_models=result.new_job_models,
+        )
         emit_run_status_change_event(
             session=session,
             run_model=context.run_model,
             old_status=context.run_model.status,
             new_status=result.run_update_map.get("status", context.run_model.status),
         )
-
         await _unlock_related_jobs(
             session=session,
             item=item,
@@ -596,6 +602,11 @@ async def _apply_active_result(
                 actor=events.SystemActor(),
                 targets=[events.Target.from_model(job_model)],
             )
+        await delete_superseded_no_capacity_job_submissions(
+            session=session,
+            run_id=item.id,
+            new_job_models=result.new_job_models,
+        )
 
         old_status = run_model.status
         new_status = result.run_update_map.get("status", old_status)

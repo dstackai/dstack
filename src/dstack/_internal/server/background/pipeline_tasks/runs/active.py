@@ -475,8 +475,8 @@ async def _build_retry_job_models(
                 run_model=context.run_model,
                 job=new_job,
                 status=JobStatus.SUBMITTED,
+                submission_num=old_job_model.submission_num + 1,
             )
-            job_model.submission_num = old_job_model.submission_num + 1
             new_job_models.append(job_model)
     return new_job_models
 
