@@ -31,12 +31,6 @@ class TestGetMatchingPresets:
         )
 
         assert _get_matching_presets(presets, configuration=configuration) == [presets[1]]
-        assert _get_matching_presets(
-            _get_candidate_presets(presets, preset_ids=["large"]), configuration=configuration
-        ) == [presets[1]]
-        assert not _get_matching_presets(
-            _get_candidate_presets(presets, preset_ids=["small"]), configuration=configuration
-        )
 
     def test_candidates_preserve_id_order_and_reject_unknown_ids(self):
         presets = [

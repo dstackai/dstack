@@ -66,6 +66,7 @@ from dstack._internal.core.models.runs import RunSpec
 from dstack.api import Client
 
 _RUN_STOP_TIMEOUT_SECONDS = 10 * 60
+_NO_FLEETS_ERROR = "The project has no fleets. Create one before creating a preset"
 
 
 @dataclass(frozen=True)
@@ -93,19 +94,18 @@ def follow_preset(
     keep_service: bool = False,
     wait_for_run_stop: bool = True,
     echo: bool = True,
-    claim: bool = False,
 ) -> PresetCreateResult:
     """Re-owns a detached session: follows its agent to completion, then
     verifies and saves the preset (the finalize role, which must run CLI-side
     for secret-scrubbing and server-verified preset building).
 
-    `claim=True` takes the exclusive finalize lock so a concurrent `logs -f` and
+    Always takes the exclusive finalize lock so a concurrent `logs -f` and
     reconcile can't both finalize the same session. `wait_for_run_stop=False`
     and `echo=False` make it non-blocking and silent for reconcile."""
     agent_session = load_attachable_agent_session(preset_id)
     agent_session.echo = echo
-    lock = try_claim_session(agent_session) if claim else None
-    if claim and lock is None:
+    lock = try_claim_session(agent_session)
+    if lock is None:
         raise SessionBusyError(f"Preset {preset_id} is being finalized by another process")
     try:
         configuration = _load_session_configuration(agent_session)
@@ -113,7 +113,7 @@ def follow_preset(
             result = asyncio.run(
                 _create_preset(
                     api=api,
-                    configuration=_resolve_preset_env_best_effort(configuration),
+                    configuration=_resolve_preset_env(configuration, strict=False),
                     source_configuration=configuration,
                     store=store,
                     keep_service=keep_service,
@@ -134,13 +134,11 @@ def follow_preset(
         except CLIError:
             # Definitive: a failure/invalid report, an unverifiable service, or a
             # leaked secret — the preset genuinely cannot be built, so fail it.
-            _finish_agent_session(agent_session, "failed")
-            remove_agent_workspace(agent_session)
+            _close_agent_session(agent_session, "failed")
             raise
         # A transient error (network / OS) propagates untouched: the completed
         # session and its report stay intact for a later follow or reconcile.
-        _finish_agent_session(agent_session, "success")
-        remove_agent_workspace(agent_session)
+        _close_agent_session(agent_session, "success")
         return result
     finally:
         release_session_claim(lock)
@@ -194,7 +192,6 @@ def show_preset_session_logs(
             store=store,
             preset_id=preset_id,
             keep_service=keep_service,
-            claim=True,
         )
     except SessionBusyError:
         # Another CLI already owns the finalize; follow read-only instead of
@@ -220,7 +217,16 @@ def _follow_session_log_readonly(session: PresetAgentSession) -> None:
             chunk = ""
         if chunk:
             console.print(Text(chunk.rstrip("\n")), soft_wrap=True)
-        if session.read_manifest().get("status") in ("success", "failed", "interrupted"):
+        manifest = session.read_manifest()
+        if manifest.get("status") in ("success", "failed", "interrupted"):
+            return
+        if not chunk and not session_process_alive(manifest):
+            # The owner died without recording a terminal status; stop tailing
+            # rather than poll forever.
+            console.print(
+                f"The process creating preset [code]{session.preset_id}[/] exited;"
+                f" follow it again with [code]dstack preset logs -f {session.preset_id}[/]"
+            )
             return
         time.sleep(1)
 
@@ -271,7 +277,6 @@ def _reconcile_session(session: PresetAgentSession, store: PresetStore) -> None:
             keep_service=bool(manifest.get("keep_service")),
             wait_for_run_stop=False,
             echo=False,
-            claim=True,
         )
 
 
@@ -292,18 +297,7 @@ def stop_preset_session(api: Client, preset_id: str) -> None:
 def _stop_active_session_runs(api: Client, session: PresetAgentSession) -> None:
     """Stops the session's non-terminal runs (with a spinner), like `dstack
     stop`. Keeping a trial instance warm for resume is the detach path, not this."""
-    try:
-        lines = session.runs_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return
-    names = []
-    for line in lines:
-        try:
-            name = json.loads(line).get("name")
-        except json.JSONDecodeError:
-            continue
-        if isinstance(name, str) and name:
-            names.append(name)
+    names = _load_submitted_run_names(session.runs_path)
     active = []
     for name in names:
         try:
@@ -318,21 +312,24 @@ def _stop_active_session_runs(api: Client, session: PresetAgentSession) -> None:
         api.client.runs.stop(api.project, active, abort=False)
 
 
-def _resolve_preset_env_best_effort(
-    configuration: PresetConfiguration,
+def _resolve_preset_env(
+    configuration: PresetConfiguration, *, strict: bool = True
 ) -> PresetConfiguration:
-    """For attach: env values only feed redaction, and the agent already runs,
-    so missing variables are tolerable."""
+    """Resolves `EnvSentinel` entries from the process environment. Non-strict
+    drops unresolvable entries instead of raising — for attach, where env values
+    only feed redaction and the agent already runs."""
     configuration = configuration.copy(deep=True)
-    kept: dict[str, str] = {}
+    resolved: dict[str, str] = {}
     for key, value in configuration.env.items():
         if isinstance(value, EnvSentinel):
-            resolved = os.environ.get(key)
-            if resolved:
-                kept[key] = resolved
+            try:
+                resolved[key] = value.from_env(os.environ)
+            except ValueError as e:
+                if strict:
+                    raise ConfigurationError(str(e)) from e
         else:
-            kept[key] = value
-    configuration.env = Env.parse_obj(kept)
+            resolved[key] = value
+    configuration.env = Env.parse_obj(resolved)
     return configuration
 
 
@@ -369,11 +366,9 @@ def create_preset(
         _stop_or_detach_agent_session(agent_session, api)
         raise
     except BaseException:
-        _finish_agent_session(agent_session, "failed")
-        remove_agent_workspace(agent_session)
+        _close_agent_session(agent_session, "failed")
         raise
-    _finish_agent_session(agent_session, "success")
-    remove_agent_workspace(agent_session)
+    _close_agent_session(agent_session, "success")
     return result
 
 
@@ -422,7 +417,7 @@ async def _create_preset(
         if allowed_fleets is None:
             allowed_fleets = _get_allowed_fleets(api, configuration)
         if not allowed_fleets:
-            raise CLIError("The project has no fleets. Create one before creating a preset")
+            raise CLIError(_NO_FLEETS_ERROR)
         auth = get_claude_auth()
         workspace = create_agent_workspace(agent_session)
         build_name = build_name or _get_build_name(
@@ -540,16 +535,6 @@ async def _create_preset(
                 )
             except Exception as e:
                 cleanup_error = str(e)
-                if keep_final_service:
-                    with suppress(Exception):
-                        await _cleanup_runs(
-                            api=api,
-                            build_name=build_name,
-                            workspace=workspace,
-                            final_run_name=report.run_name if report is not None else None,
-                            agent_session=agent_session,
-                            wait_for_stop=wait_for_run_stop,
-                        )
 
     if cleanup_error is not None:
         # The preset is already saved by this point; a failed cleanup only means
@@ -570,18 +555,6 @@ async def _create_preset(
     )
 
 
-def _resolve_preset_env(configuration: PresetConfiguration) -> PresetConfiguration:
-    configuration = configuration.copy(deep=True)
-    for key, value in configuration.env.items():
-        if not isinstance(value, EnvSentinel):
-            continue
-        try:
-            configuration.env[key] = value.from_env(os.environ)
-        except ValueError as e:
-            raise ConfigurationError(str(e)) from e
-    return configuration
-
-
 def _finish_agent_session(
     session: PresetAgentSession,
     status: str,
@@ -591,6 +564,12 @@ def _finish_agent_session(
     except OSError as e:
         if session.echo:
             warn(f"Could not finalize agent output. Files remain at {session.path}: {e}")
+
+
+def _close_agent_session(session: PresetAgentSession, status: str) -> None:
+    """Records the terminal status and removes the workspace alias."""
+    _finish_agent_session(session, status)
+    remove_agent_workspace(session)
 
 
 def _detach_agent_session(session: PresetAgentSession) -> None:
@@ -670,7 +649,7 @@ def plan_preset(*, api: Client, configuration: PresetConfiguration) -> tuple[str
     with — Project, User, the effective fleets, and their offers. Agent-free."""
     allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
-        raise CLIError("The project has no fleets. Create one before creating a preset")
+        raise CLIError(_NO_FLEETS_ERROR)
     _print_fleet_offers(api, allowed_fleets)
     return allowed_fleets
 
@@ -708,10 +687,7 @@ def _print_fleet_offers(api: Client, allowed_fleets: tuple[str, ...]) -> None:
 
 def _get_allowed_fleets(api: Client, configuration: PresetConfiguration) -> tuple[str, ...]:
     if configuration.fleets is not None:
-        return tuple(
-            fleet.format() if hasattr(fleet, "format") else str(fleet)
-            for fleet in configuration.fleets
-        )
+        return tuple(fleet.format() for fleet in configuration.fleets)
     fleets = api.client.fleets.list(api.project, include_imported=True)
     return tuple(
         fleet.name if fleet.project_name == api.project else f"{fleet.project_name}/{fleet.name}"
@@ -802,10 +778,12 @@ async def _cleanup_runs(
 
 
 def _load_submitted_run_names(path: Path) -> list[str]:
-    if not path.exists():
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
         return []
     names = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in lines:
         try:
             value = json.loads(line)
         except json.JSONDecodeError:

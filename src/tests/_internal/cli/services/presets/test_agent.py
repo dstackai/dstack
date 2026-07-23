@@ -53,21 +53,17 @@ def _claude_auth(*, api_key: str | None = "anthropic-secret", effort=None) -> Cl
 
 
 class TestClaudeAuth:
-    def test_uses_api_key_when_set(self, monkeypatch):
-        monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_API_KEY", "key")
+    @pytest.mark.parametrize("api_key_env", ["key", None])
+    def test_uses_api_key_only_when_env_is_set(self, monkeypatch, api_key_env):
+        if api_key_env is None:
+            monkeypatch.delenv("DSTACK_AGENT_ANTHROPIC_API_KEY", raising=False)
+        else:
+            monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_API_KEY", api_key_env)
         monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
 
         auth = get_claude_auth()
 
-        assert auth.api_key == "key"
-
-    def test_uses_existing_auth_when_api_key_is_unset(self, monkeypatch):
-        monkeypatch.delenv("DSTACK_AGENT_ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
-
-        auth = get_claude_auth()
-
-        assert auth.api_key is None
+        assert auth.api_key == api_key_env
 
     @pytest.mark.parametrize("api_key", ["key", None])
     def test_builds_command_for_selected_auth_mode(self, api_key):
@@ -129,29 +125,25 @@ class TestAgentIsolation:
 
     def test_creates_private_cli_home_and_dstack_wrapper(self, tmp_path):
         workspace = _session_workspace(tmp_path)
-        if True:
-            if not IS_WINDOWS:
-                assert (workspace.dstack_home / ".ssh").stat().st_mode & 0o777 == 0o700
-            assert not (workspace.dstack_home / ".dstack" / "config.yml").exists()
-            dstack_command = shutil.which("dstack", path=str(workspace.bin_path))
-            assert dstack_command is not None
-            result = subprocess.run(
-                [dstack_command, "--help"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            assert result.returncode == 0
-            assert "Usage: dstack" in result.stdout
+        if not IS_WINDOWS:
+            assert (workspace.dstack_home / ".ssh").stat().st_mode & 0o777 == 0o700
+        assert not (workspace.dstack_home / ".dstack" / "config.yml").exists()
+        dstack_command = shutil.which("dstack", path=str(workspace.bin_path))
+        assert dstack_command is not None
+        result = subprocess.run(
+            [dstack_command, "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "Usage: dstack" in result.stdout
 
     def test_keeps_control_socket_path_bounded(self, tmp_path):
         workspace = _session_workspace(tmp_path)
-        if True:
-            if not IS_WINDOWS:
-                socket_path = (
-                    workspace.dstack_home / ".dstack" / "ssh" / f"{'x' * 41}.control.sock"
-                )
-                assert len(os.fsencode(socket_path)) <= 103
+        if not IS_WINDOWS:
+            socket_path = workspace.dstack_home / ".dstack" / "ssh" / f"{'x' * 41}.control.sock"
+            assert len(os.fsencode(socket_path)) <= 103
 
     def test_detects_known_secret_in_generated_artifact(self):
         assert contains_redacted_value(
@@ -163,9 +155,7 @@ class TestAgentIsolation:
 def _session_workspace(tmp_path):
     session_dir = tmp_path / "session-under-test"
     session_dir.mkdir()
-    session = PresetAgentSession(
-        path=session_dir, timestamp="t", debug=False, preset_id="abcd1234"
-    )
+    session = PresetAgentSession(path=session_dir, debug=False, preset_id="abcd1234")
     return create_agent_workspace(session)
 
 
@@ -230,7 +220,6 @@ class TestAgentSession:
         (session_dir / "agent.log").touch()
         session = PresetAgentSession(
             path=session_dir,
-            timestamp="20260714-120000-000000Z",
             debug=False,
         )
 
@@ -256,7 +245,6 @@ class TestAgentSession:
         (path / "agent.log").touch()
         session = PresetAgentSession(
             path=path,
-            timestamp="20260714-120000-000000Z",
             debug=False,
         )
         shutil.rmtree(path)
@@ -305,7 +293,6 @@ print(json.dumps({
         (session_path / "trace.jsonl").touch()
         agent_session = PresetAgentSession(
             path=session_path,
-            timestamp="20260714-120000Z",
             debug=True,
         )
         output = await run_preset_agent(
@@ -356,7 +343,6 @@ print(json.dumps({
             redacted_values=(),
             agent_session=PresetAgentSession(
                 path=session_path,
-                timestamp="20260714-120000Z",
                 debug=False,
             ),
         )
@@ -372,7 +358,6 @@ print(json.dumps({
         (session_path / "agent.log").touch()
         agent_session = PresetAgentSession(
             path=session_path,
-            timestamp="20260714-120000Z",
             debug=False,
         )
 
@@ -460,7 +445,7 @@ class TestWriteAgentInfo:
         )
         session_dir = tmp_path / "session"
         session_dir.mkdir()
-        session = PresetAgentSession(path=session_dir, timestamp="t", debug=True)
+        session = PresetAgentSession(path=session_dir, debug=True)
 
         session.write_agent_info(
             ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
@@ -482,10 +467,38 @@ def _subprocess_env() -> dict[str, str]:
     return {name: value for name in names if (value := os.environ.get(name))}
 
 
+def _write_fake_claude(tmp_path, script_body: str) -> Path:
+    script = tmp_path / "fake_claude.py"
+    script.write_text(script_body)
+    return script
+
+
+def _agent_setup(tmp_path):
+    (tmp_path / "progress.jsonl").touch()
+    workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+    session_path = tmp_path / "session"
+    session_path.mkdir()
+    (session_path / "agent.log").touch()
+    agent_session = PresetAgentSession(
+        path=session_path,
+        debug=False,
+    )
+    return workspace, agent_session
+
+
+def _patch_claude_command(monkeypatch, script):
+    monkeypatch.setattr(
+        "dstack._internal.cli.services.presets.agent._build_claude_command",
+        lambda **kwargs: [sys.executable, str(script)]
+        + (["--resume", kwargs["resume_session_id"]] if kwargs.get("resume_session_id") else []),
+    )
+
+
 class TestConnectionResume:
-    def _write_flaky_claude(self, tmp_path):
-        script = tmp_path / "fake_claude.py"
-        script.write_text(
+    @pytest.mark.asyncio
+    async def test_resumes_after_connection_error(self, tmp_path, monkeypatch, capsys):
+        script = _write_fake_claude(
+            tmp_path,
             """import json
 import sys
 from pathlib import Path
@@ -507,39 +520,13 @@ else:
         "result": "API Error: Unable to connect to API (ENOTFOUND)",
     }))
     sys.exit(1)
-"""
+""",
         )
-        return script
-
-    def _agent_setup(self, tmp_path):
-        (tmp_path / "progress.jsonl").touch()
-        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
-        session_path = tmp_path / "session"
-        session_path.mkdir()
-        (session_path / "agent.log").touch()
-        agent_session = PresetAgentSession(
-            path=session_path,
-            timestamp="20260714-120000Z",
-            debug=False,
-        )
-        return workspace, agent_session
-
-    @pytest.mark.asyncio
-    async def test_resumes_after_connection_error(self, tmp_path, monkeypatch, capsys):
-        script = self._write_flaky_claude(tmp_path)
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
-        monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **kwargs: [sys.executable, str(script)]
-            + (
-                ["--resume", kwargs["resume_session_id"]]
-                if kwargs.get("resume_session_id")
-                else []
-            ),
-        )
-        workspace, agent_session = self._agent_setup(tmp_path)
+        _patch_claude_command(monkeypatch, script)
+        workspace, agent_session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -561,8 +548,8 @@ else:
 
     @pytest.mark.asyncio
     async def test_resumes_on_any_unreported_death(self, tmp_path, monkeypatch):
-        script = tmp_path / "fake_claude.py"
-        script.write_text(
+        script = _write_fake_claude(
+            tmp_path,
             """import json
 import sys
 from pathlib import Path
@@ -575,21 +562,13 @@ else:
     print(json.dumps({"type": "system", "subtype": "init", "session_id": "sid-123"}))
     print(json.dumps({"type": "result", "is_error": True, "result": "model refused"}))
     sys.exit(1)
-"""
+""",
         )
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
-        monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **kwargs: [sys.executable, str(script)]
-            + (
-                ["--resume", kwargs["resume_session_id"]]
-                if kwargs.get("resume_session_id")
-                else []
-            ),
-        )
-        workspace, agent_session = self._agent_setup(tmp_path)
+        _patch_claude_command(monkeypatch, script)
+        workspace, agent_session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -607,8 +586,8 @@ else:
 class TestConnectionRetryExhaustion:
     @pytest.mark.asyncio
     async def test_gives_up_after_repeated_no_progress_failures(self, tmp_path, monkeypatch):
-        script = tmp_path / "fake_claude.py"
-        script.write_text(
+        script = _write_fake_claude(
+            tmp_path,
             """import json
 import sys
 from pathlib import Path
@@ -622,23 +601,13 @@ print(json.dumps({
     "result": "API Error: Unable to connect to API (ENOTFOUND)",
 }))
 sys.exit(1)
-"""
+""",
         )
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0, 0)
         )
-        monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **kwargs: [sys.executable, str(script)],
-        )
-        (tmp_path / "progress.jsonl").touch()
-        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
-        session_path = tmp_path / "session"
-        session_path.mkdir()
-        (session_path / "agent.log").touch()
-        agent_session = PresetAgentSession(
-            path=session_path, timestamp="20260714-120000Z", debug=False
-        )
+        _patch_claude_command(monkeypatch, script)
+        workspace, agent_session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -659,9 +628,7 @@ class TestWorkspaceLifecycle:
     def _session(self, tmp_path):
         session_dir = tmp_path / "sessions" / "ab12cd34"
         session_dir.mkdir(parents=True)
-        return PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
-        )
+        return PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
 
     @pytest.mark.skipif(IS_WINDOWS, reason="workspace alias symlinks are POSIX-only")
     def test_create_attach_and_remove(self, tmp_path):
@@ -782,40 +749,44 @@ class TestLoadResumableSession:
 
         assert load_resumable_agent_session("ab12cd34").preset_id == "ab12cd34"
 
-    def test_refusals(self, tmp_path, monkeypatch):
-        with pytest.raises(CLIError, match="Unknown preset"):
-            monkeypatch.setenv("HOME", str(tmp_path))
-            monkeypatch.setenv("USERPROFILE", str(tmp_path))
-            load_resumable_agent_session("00000000")
-
-        self._write_session(tmp_path, monkeypatch, {"id": "aa000001", "status": "success"})
-        with pytest.raises(CLIError, match="nothing to resume"):
-            load_resumable_agent_session("aa000001")
-
-        self._write_session(tmp_path, monkeypatch, {"id": "aa000002", "status": "failed"})
-        with pytest.raises(CLIError, match="cannot be resumed"):
-            load_resumable_agent_session("aa000002")
-
-        self._write_session(
-            tmp_path,
-            monkeypatch,
-            {
-                "id": "aa000003",
-                "status": "running",
-                "pid": 4242,
-                "claude_session_id": "sid-1",
-            },
-        )
+    @pytest.mark.parametrize(
+        ("manifest", "match"),
+        [
+            pytest.param(None, "Unknown preset", id="unknown-preset"),
+            pytest.param(
+                {"id": "aa000001", "status": "success"}, "nothing to resume", id="success"
+            ),
+            pytest.param({"id": "aa000002", "status": "failed"}, "cannot be resumed", id="failed"),
+            pytest.param(
+                {
+                    "id": "aa000003",
+                    "status": "running",
+                    "pid": 4242,
+                    "claude_session_id": "sid-1",
+                },
+                "still being created",
+                id="still-running",
+            ),
+            pytest.param(
+                {"id": "aa000004", "status": "interrupted"},
+                "stopped before it started",
+                id="interrupted-before-start",
+            ),
+        ],
+    )
+    def test_refusals(self, tmp_path, monkeypatch, manifest, match):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        if manifest is not None:
+            self._write_session(tmp_path, monkeypatch, manifest)
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent.psutil.pid_exists",
             lambda pid: True,
         )
-        with pytest.raises(CLIError, match="still being created"):
-            load_resumable_agent_session("aa000003")
+        preset_id = manifest["id"] if manifest is not None else "00000000"
 
-        self._write_session(tmp_path, monkeypatch, {"id": "aa000004", "status": "interrupted"})
-        with pytest.raises(CLIError, match="stopped before it started"):
-            load_resumable_agent_session("aa000004")
+        with pytest.raises(CLIError, match=match):
+            load_resumable_agent_session(preset_id)
 
 
 class TestSummarizeSessionTrials:
@@ -889,9 +860,7 @@ class TestStopOrDetach:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
-        )
+        session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
         agent = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True
         )

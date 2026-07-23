@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Iterator, Optional, Protocol, Sequence
+from typing import Any, AsyncIterator, Callable, Iterator, Optional, Sequence
 
 import psutil
 import yaml
@@ -40,6 +40,8 @@ _SESSION_FILENAME = "session.json"
 _USER_PROMPT_FILENAME = "user_prompt.md"
 _PROGRESS_ENV = "DSTACK_PRESET_PROGRESS_LOG"
 _REDACTION = "[redacted]"
+# Replacing shorter values such as "1" or "false" corrupts unrelated diagnostics.
+_MIN_REDACTED_SUBSTRING_LENGTH = 8
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 _CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
@@ -137,7 +139,6 @@ class PresetAgentWorkspace:
 @dataclass
 class PresetAgentSession:
     path: Path
-    timestamp: str
     debug: bool
     preset_id: str = ""
     # Whether progress lines echo to this process's console (a live attach), on
@@ -328,7 +329,6 @@ def create_preset_agent_session(
 ) -> PresetAgentSession:
     if configuration.name is None:
         raise CLIError("The service name is required to save agent output")
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%fZ")
     parent = get_presets_dir()
     path: Optional[Path] = None
     try:
@@ -371,7 +371,7 @@ def create_preset_agent_session(
             shutil.rmtree(path, ignore_errors=True)
         raise CLIError(f"Could not create agent output under {parent}: {e}") from e
     assert path is not None
-    return PresetAgentSession(path=path, timestamp=timestamp, debug=debug, preset_id=preset_id)
+    return PresetAgentSession(path=path, debug=debug, preset_id=preset_id)
 
 
 def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
@@ -407,7 +407,7 @@ def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
 
 def load_resumable_agent_session(preset_id: str) -> PresetAgentSession:
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -424,7 +424,6 @@ def load_resumable_agent_session(preset_id: str) -> PresetAgentSession:
     if not manifest.get("claude_session_id"):
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
     session.debug = bool(manifest.get("debug"))
-    session.timestamp = str(manifest.get("created_at") or "")
     return session
 
 
@@ -455,7 +454,7 @@ def session_process_alive(manifest: dict[str, Any]) -> bool:
 
 def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
     manifest = session.read_manifest()
     if not path.is_dir() or not manifest:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -481,14 +480,13 @@ def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
             f" stop or detach it there with Ctrl+C"
         )
     session.debug = bool(manifest.get("debug"))
-    session.timestamp = str(manifest.get("created_at") or "")
     return session
 
 
 def load_agent_session(preset_id: str) -> PresetAgentSession:
     """Loads a session of any status for read-only inspection (its log)."""
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, timestamp="", debug=False, preset_id=preset_id)
+    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
     if not path.is_dir() or not session.read_manifest():
         raise CLIError(f"Unknown preset: {preset_id}")
     return session
@@ -601,7 +599,7 @@ def iter_agent_sessions() -> Iterator[PresetAgentSession]:
         return
     for path in sorted(root.iterdir()):
         if path.is_dir() and not path.name.startswith((".", "models--")):
-            yield PresetAgentSession(path=path, timestamp="", debug=False, preset_id=path.name)
+            yield PresetAgentSession(path=path, debug=False, preset_id=path.name)
 
 
 def find_session_name_claims(name: str) -> list[PresetAgentSession]:
@@ -882,7 +880,8 @@ def get_redacted_values(values: Sequence[str]) -> tuple[str, ...]:
 def contains_redacted_value(value: Any, redacted_values: Sequence[str]) -> bool:
     if isinstance(value, str):
         return any(
-            value == redacted or (len(redacted) >= 8 and redacted in value)
+            value == redacted
+            or (len(redacted) >= _MIN_REDACTED_SUBSTRING_LENGTH and redacted in value)
             for redacted in redacted_values
         )
     if isinstance(value, dict):
@@ -900,9 +899,22 @@ def redact(value: str, redacted_values: Sequence[str]) -> str:
     for redacted_value in redacted_values:
         if value == redacted_value:
             return _REDACTION
-        # Replacing short values such as "1" or "false" corrupts unrelated diagnostics.
-        if len(redacted_value) >= 8:
+        if len(redacted_value) >= _MIN_REDACTED_SUBSTRING_LENGTH:
             value = value.replace(redacted_value, _REDACTION)
+    return value
+
+
+def redact_structure(value: Any, redacted_values: Sequence[str]) -> Any:
+    """Recursively redacts every string (including dict keys) in a JSON-like value."""
+    if isinstance(value, str):
+        return redact(value, redacted_values)
+    if isinstance(value, list):
+        return [redact_structure(item, redacted_values) for item in value]
+    if isinstance(value, dict):
+        return {
+            redact(key, redacted_values): redact_structure(item, redacted_values)
+            for key, item in value.items()
+        }
     return value
 
 
@@ -1080,9 +1092,31 @@ def _prepare_subprocess_command(command: list[str]) -> list[str]:
 
 
 def _write_private_text(path: Path, content: str) -> None:
-    path.write_text(content, encoding="utf-8")
-    if not IS_WINDOWS:
-        path.chmod(0o600)
+    # Atomic tmp + fsync + replace (mkstemp already creates the file 0600), so
+    # a crash mid-write cannot leave a truncated manifest or offsets file.
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            os.replace(temporary, path)
+        except PermissionError:
+            if not IS_WINDOWS:
+                raise
+            # A concurrent reader (a viewer polling the manifest) can hold the
+            # destination open without FILE_SHARE_DELETE; retry briefly, then
+            # prefer an in-place write over crashing the owner.
+            for _ in range(3):
+                time.sleep(0.01)
+                with suppress(PermissionError):
+                    os.replace(temporary, path)
+                    return
+            path.write_text(content, encoding="utf-8")
+    finally:
+        with suppress(FileNotFoundError):
+            os.unlink(temporary)
 
 
 def _write_debug_trace(
@@ -1096,7 +1130,7 @@ def _write_debug_trace(
         datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
     )
     try:
-        event = _redact_trace_value(json.loads(text), redacted_values)
+        event = redact_structure(json.loads(text), redacted_values)
         record = {"timestamp": timestamp, "stream": stream_name, "event": event}
     except json.JSONDecodeError:
         record = {
@@ -1108,19 +1142,6 @@ def _write_debug_trace(
     with session.trace_path.open("a", encoding="utf-8") as f:
         f.write(line + "\n")
         f.flush()
-
-
-def _redact_trace_value(value: Any, redacted_values: Sequence[str]) -> Any:
-    if isinstance(value, str):
-        return redact(value, redacted_values)
-    if isinstance(value, list):
-        return [_redact_trace_value(item, redacted_values) for item in value]
-    if isinstance(value, dict):
-        return {
-            redact(key, redacted_values): _redact_trace_value(item, redacted_values)
-            for key, item in value.items()
-        }
-    return value
 
 
 @asynccontextmanager
@@ -1182,7 +1203,7 @@ async def _collect_agent_output(
     """Parses the agent's stream files until it exits; safe alongside a live
     process or over the remains of a finished one."""
     offset_store = _OffsetStore(agent_session.path / ".offsets.json")
-    stdout_output, stderr_output = await asyncio.gather(
+    stdout_output, _ = await asyncio.gather(
         _read_process_stream(
             stream=_FileLineReader(
                 workspace.agent_stdout_path,
@@ -1208,12 +1229,9 @@ async def _collect_agent_output(
             agent_session=agent_session,
         ),
     )
-    output = stdout_output
-    if output.report_data is None:
-        output.report_data = stderr_output.report_data
-    if output.error is None:
-        output.error = stderr_output.error
-    return output
+    # stderr is tailed with parse_result=False — it feeds the debug trace and
+    # advances the persisted offset, but can never contribute report data.
+    return stdout_output
 
 
 async def attach_preset_agent(
@@ -1242,7 +1260,7 @@ async def attach_preset_agent(
 
 async def _read_process_stream(
     *,
-    stream: "_LineStream",
+    stream: "_FileLineReader",
     stream_name: str,
     parse_result: bool,
     redacted_values: Sequence[str],
@@ -1368,10 +1386,6 @@ def _terminate_windows_process_tree(pid: int) -> None:
         with suppress(psutil.NoSuchProcess):
             process.kill()
     psutil.wait_procs(alive, timeout=3)
-
-
-class _LineStream(Protocol):
-    async def readline(self) -> bytes: ...
 
 
 class _FileLineReader:

@@ -3,7 +3,7 @@
 Your goal is to find a model serving configuration with the best
 performance through sequential experimental trials. Once the best-performing
 candidate is found, it is deployed as a `dstack` service for the final
-benchmark and saved as a reusable endpoint preset.
+benchmark and saved as a reusable preset.
 
 # Constraints
 
@@ -98,7 +98,7 @@ details in workspace files and progress.
 id with `dstack run get <run name> --json` and append one JSON line:
 
 ```json
-{"name":"qwen-endpoint-1","id":"<run id>"}
+{"name":"qwen-preset-1","id":"<run id>"}
 ```
 
 Never edit or delete existing lines. Stop runs you no longer need unless they

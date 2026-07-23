@@ -1,18 +1,31 @@
 import json
+from contextlib import contextmanager
 from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from rich.console import Console
-from rich.theme import Theme
 
 from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
-from tests._internal.cli.common import run_dstack_cli
+from tests._internal.cli.common import plain_console, run_dstack_cli
 from tests._internal.cli.preset_factories import get_preset
 
 pytestmark = pytest.mark.windows
+
+
+@contextmanager
+def _patched_create_preset(**create_kwargs):
+    """Patch the create pipeline; yields the create_preset mock."""
+    with (
+        patch("dstack.api.Client.from_config"),
+        patch(
+            "dstack._internal.cli.commands.preset.plan_preset",
+            return_value=("fleet-a",),
+        ),
+        patch("dstack._internal.cli.commands.preset.create_preset", **create_kwargs) as create,
+    ):
+        yield create
 
 
 class TestPresetLocalCommands:
@@ -21,72 +34,13 @@ class TestPresetLocalCommands:
         with patch("dstack._internal.cli.main.get_ssh_client_info"):
             yield
 
-    def test_formats_second_scale_ttft_without_scientific_notation(self):
-        preset = get_preset()
-        ttft = preset.validations[0].benchmark.metrics.ttft_ms
-        ttft.mean = 8148.3
-        ttft.p50 = 8151.4
-        ttft.p99 = 8334.2
-
-        output = presets_utils.format_preset_benchmark(preset, verbose=True)
-
-        assert output.startswith("ctx=32K ")
-        assert "TTFT 8.15s" in output
-        assert "e+03" not in output
-
-    def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
-        output = StringIO()
-        monkeypatch.setattr(
-            presets_utils,
-            "console",
-            Console(
-                file=output,
-                width=79,
-                color_system=None,
-                theme=Theme({"secondary": "grey58"}),
-            ),
-        )
-
-        presets_utils.print_presets([get_preset()])
-
-        assert "con=1" in "".join(output.getvalue().split())
-
-    def test_prints_submitted_column(self, monkeypatch):
-        output = StringIO()
-        monkeypatch.setattr(
-            presets_utils,
-            "console",
-            Console(
-                file=output,
-                width=160,
-                color_system=None,
-                theme=Theme({"secondary": "grey58"}),
-            ),
-        )
-        monkeypatch.setattr(presets_utils, "pretty_date", lambda _: "2 months ago")
-
-        presets_utils.print_presets([get_preset()])
-
-        assert "SUBMITTED" in output.getvalue()
-        assert "2 months ago" in output.getvalue()
-
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
             "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
         )
 
-        with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
-            patch(
-                "dstack._internal.cli.commands.preset.create_preset",
-                side_effect=KeyboardInterrupt,
-            ),
-        ):
+        with _patched_create_preset(side_effect=KeyboardInterrupt):
             exit_code = run_dstack_cli(
                 ["preset", "create", "-y", "-f", str(configuration_path)],
                 home_dir=tmp_path,
@@ -101,14 +55,7 @@ class TestPresetLocalCommands:
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
 
-        with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
-            patch("dstack._internal.cli.commands.preset.create_preset") as create,
-        ):
+        with _patched_create_preset() as create:
             exit_code = run_dstack_cli(
                 ["preset", "create", "-y", "-f", str(configuration_path)],
                 home_dir=tmp_path,
@@ -120,23 +67,14 @@ class TestPresetLocalCommands:
         assert "max_trials is required" in captured.out + captured.err
         create.assert_not_called()
 
-    def test_lists_and_deletes_preset_without_api_client(self, tmp_path, capsys):
+    def test_lists_and_deletes_preset_without_api_client(self, tmp_path):
         preset = get_preset()
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
         list_output = StringIO()
 
         with (
             patch("dstack.api.Client.from_config") as from_config,
-            patch.object(
-                presets_utils,
-                "console",
-                Console(
-                    file=list_output,
-                    width=250,
-                    color_system=None,
-                    theme=Theme({"secondary": "grey58"}),
-                ),
-            ),
+            patch.object(presets_utils, "console", plain_console(list_output)),
             patch.object(presets_utils, "pretty_date", return_value="2 months ago") as pretty_date,
         ):
             assert run_dstack_cli(["preset", "list"], home_dir=tmp_path) == 0
@@ -184,7 +122,6 @@ class TestPresetLocalCommands:
             from_config.assert_not_called()
 
         assert PresetStore(tmp_path / ".dstack" / "presets").list() == []
-        assert not (tmp_path / ".dstack" / "presets" / "models--Qwen--Qwen3.5-27B").exists()
 
     def test_gets_complete_preset_as_json_without_api_client(self, tmp_path, capsys):
         preset = get_preset()
@@ -228,12 +165,18 @@ class TestPresetLocalCommands:
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "model")])
-    def test_deletes_presets_by_model_without_api_client(self, tmp_path, flag_attribute):
+    def test_deletes_all_presets_of_model_keeping_others_without_api_client(
+        self, tmp_path, flag_attribute
+    ):
         flag, attribute = flag_attribute
         preset = get_preset()
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         store.save(preset.copy(update={"id": "01234567"}))
+        # A preset of a different model must survive the delete.
+        store.save(
+            preset.copy(update={"id": "89abcdef", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+        )
 
         with patch("dstack.api.Client.from_config") as from_config:
             assert (
@@ -245,26 +188,7 @@ class TestPresetLocalCommands:
             )
             from_config.assert_not_called()
 
-        assert store.list() == []
-
-    def test_delete_by_model_keeps_other_presets(self, tmp_path):
-        preset = get_preset()
-        store = PresetStore(tmp_path / ".dstack" / "presets")
-        store.save(preset)
-        other = preset.copy(
-            update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"}
-        )
-        store.save(other)
-
-        assert (
-            run_dstack_cli(
-                ["preset", "delete", "--base", preset.base, "-y"],
-                home_dir=tmp_path,
-            )
-            == 0
-        )
-
-        assert [remaining.id for remaining in store.list()] == ["01234567"]
+        assert [remaining.id for remaining in store.list()] == ["89abcdef"]
 
     @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "model")])
     def test_lists_presets_filtered_by_model(self, tmp_path, capsys, flag_attribute):
@@ -281,6 +205,26 @@ class TestPresetLocalCommands:
 
         output = json.loads(capsys.readouterr().out)
         assert [entry["id"] for entry in output["presets"]] == [preset.id]
+
+    def test_corrupt_preset_stays_deletable_and_keeps_json_parseable(self, tmp_path, capsys):
+        preset = get_preset()
+        store = PresetStore(tmp_path / ".dstack" / "presets")
+        store.save(preset)
+        corrupt_dir = tmp_path / ".dstack" / "presets" / "deadbeef"
+        corrupt_dir.mkdir(parents=True)
+        (corrupt_dir / "preset.yaml").write_text("{not valid yaml")
+
+        # The corrupt-file warning goes to stderr, so --json stdout stays parseable.
+        assert run_dstack_cli(["preset", "list", "--json"], home_dir=tmp_path) == 0
+        captured = capsys.readouterr()
+        output = json.loads(captured.out)
+        assert [entry["id"] for entry in output["presets"]] == [preset.id]
+        assert "Invalid preset file" in captured.err
+
+        # And the corrupt preset is still removable through the CLI.
+        assert run_dstack_cli(["preset", "delete", "deadbeef", "-y"], home_dir=tmp_path) == 0
+        assert not corrupt_dir.exists()
+        assert [remaining.id for remaining in store.list()] == [preset.id]
 
     def test_merges_profile_configuration_and_cli_args(self, tmp_path):
         (tmp_path / ".dstack").mkdir()
@@ -314,17 +258,7 @@ env:
             final_run_name="qwen-build-2",
         )
 
-        with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
-            patch(
-                "dstack._internal.cli.commands.preset.create_preset",
-                return_value=result,
-            ) as create,
-        ):
+        with _patched_create_preset(return_value=result) as create:
             exit_code = run_dstack_cli(
                 [
                     "preset",
@@ -402,7 +336,7 @@ env:
 
 
 class TestPresetNameClaims:
-    def test_create_detaches_the_name_from_the_old_preset(self, tmp_path, monkeypatch):
+    def test_create_detaches_the_name_from_the_old_preset(self, tmp_path):
         preset = get_preset().copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
@@ -414,17 +348,7 @@ class TestPresetNameClaims:
             preset=preset, path=tmp_path / "preset.yaml", final_run_name="qwen-1"
         )
 
-        with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
-            patch(
-                "dstack._internal.cli.commands.preset.create_preset",
-                return_value=result,
-            ) as create,
-        ):
+        with _patched_create_preset(return_value=result) as create:
             exit_code = run_dstack_cli(
                 ["preset", "create", "-f", str(configuration_path), "-y"],
                 home_dir=tmp_path,
@@ -435,7 +359,7 @@ class TestPresetNameClaims:
         create.assert_called_once()
         assert store.get(preset.id).name is None
 
-    def test_create_without_confirmation_exits_before_creating(self, tmp_path, capsys):
+    def test_create_without_confirmation_exits_before_creating(self, tmp_path):
         preset = get_preset().copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
@@ -445,13 +369,8 @@ class TestPresetNameClaims:
         )
 
         with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
+            _patched_create_preset() as create,
             patch("dstack._internal.cli.commands.preset.confirm_ask", return_value=False),
-            patch("dstack._internal.cli.commands.preset.create_preset") as create,
         ):
             exit_code = run_dstack_cli(
                 ["preset", "create", "-f", str(configuration_path)],
@@ -478,15 +397,10 @@ class TestPresetNameClaims:
         configuration_path.write_text("type: preset\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n")
 
         with (
-            patch("dstack.api.Client.from_config"),
-            patch(
-                "dstack._internal.cli.commands.preset.plan_preset",
-                return_value=("fleet-a",),
-            ),
+            _patched_create_preset() as create,
             patch(
                 "dstack._internal.cli.commands.preset.confirm_ask", return_value=False
             ) as confirm,
-            patch("dstack._internal.cli.commands.preset.create_preset") as create,
         ):
             exit_code = run_dstack_cli(
                 ["preset", "create", "-f", str(configuration_path)],

@@ -2,12 +2,11 @@ from datetime import timedelta
 from io import StringIO
 
 import pytest
-from rich.console import Console
 from rich.table import Table
-from rich.theme import Theme
 
 from dstack._internal.cli.services.presets import output as output_module
 from dstack._internal.cli.services.presets.output import _add_session, _format_number
+from tests._internal.cli.common import plain_console
 from tests._internal.cli.preset_factories import get_preset
 
 pytestmark = pytest.mark.windows
@@ -22,6 +21,41 @@ class TestFormatNumber:
         assert _format_number(384.8) == "385"
         assert _format_number(15.92) == "15.9"
         assert _format_number(0.99) == "0.99"
+
+
+class TestFormatPresetBenchmark:
+    def test_formats_second_scale_ttft_without_scientific_notation(self):
+        preset = get_preset()
+        ttft = preset.validations[0].benchmark.metrics.ttft_ms
+        ttft.mean = 8148.3
+        ttft.p50 = 8151.4
+        ttft.p99 = 8334.2
+
+        output = output_module.format_preset_benchmark(preset, verbose=True)
+
+        assert output.startswith("ctx=32K ")
+        assert "TTFT 8.15s" in output
+        assert "e+03" not in output
+
+
+class TestPrintPresets:
+    def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
+        output = StringIO()
+        monkeypatch.setattr(output_module, "console", plain_console(output, width=79))
+
+        output_module.print_presets([get_preset()])
+
+        assert "con=1" in "".join(output.getvalue().split())
+
+    def test_prints_submitted_column(self, monkeypatch):
+        output = StringIO()
+        monkeypatch.setattr(output_module, "console", plain_console(output, width=160))
+        monkeypatch.setattr(output_module, "pretty_date", lambda _: "2 months ago")
+
+        output_module.print_presets([get_preset()])
+
+        assert "SUBMITTED" in output.getvalue()
+        assert "2 months ago" in output.getvalue()
 
 
 def _session_row(session: dict) -> dict:
@@ -74,13 +108,7 @@ class TestSessionRow:
 class TestGroupOrdering:
     def test_sorts_presets_and_sessions_newest_first(self, monkeypatch):
         buffer = StringIO()
-        monkeypatch.setattr(
-            output_module,
-            "console",
-            Console(
-                file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
-            ),
-        )
+        monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         old = get_preset()
         new = old.copy(update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)})
         sessions = [
@@ -108,13 +136,7 @@ class TestGroupOrdering:
 class TestDoneProgress:
     def test_completed_creation_decorates_preset_row_without_extra_session_row(self, monkeypatch):
         buffer = StringIO()
-        monkeypatch.setattr(
-            output_module,
-            "console",
-            Console(
-                file=buffer, width=200, color_system=None, theme=Theme({"secondary": "grey58"})
-            ),
-        )
+        monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         preset = get_preset()
         sessions = [
             {

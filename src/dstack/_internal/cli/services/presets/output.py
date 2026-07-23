@@ -95,7 +95,7 @@ def print_presets(
     console.print()
 
 
-def _add_session(table: Table, session: dict[str, Any], base_label: Optional[str] = None) -> None:
+def _add_session(table: Table, session: dict[str, Any]) -> None:
     created = ""
     created_at = session.get("created_at")
     if isinstance(created_at, str):

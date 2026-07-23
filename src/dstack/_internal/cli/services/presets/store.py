@@ -33,7 +33,14 @@ class PresetStore:
         if not self.root.exists():
             return []
         self._migrate_legacy()
-        presets = [self._load(path) for path in self.root.glob("*/preset.yaml")]
+        presets = []
+        for path in self.root.glob("*/preset.yaml"):
+            try:
+                presets.append(self._load(path))
+            except CLIError as e:
+                # One corrupt file must not take down every read; the preset
+                # stays deletable by ID. stderr keeps `--json` output parseable.
+                warn(str(e), stderr=True)
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 
     def get(self, preset_id: str) -> Preset | None:
@@ -90,10 +97,15 @@ class PresetStore:
         return detached
 
     def delete(self, preset_id: str) -> bool:
-        preset = self.get(preset_id)
-        if preset is None:
+        # Deletes by path so a corrupt preset file is still removable.
+        _validate_preset_id(preset_id)
+        if not self.root.exists():
             return False
-        self._archive(self.root / preset_id)
+        self._migrate_legacy()
+        directory = self.root / preset_id
+        if not (directory / "preset.yaml").is_file():
+            return False
+        self._archive(directory)
         return True
 
     def _archive(self, directory: Path) -> None:

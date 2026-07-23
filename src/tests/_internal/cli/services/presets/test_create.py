@@ -58,6 +58,14 @@ def _claude_auth() -> ClaudeAuth:
     )
 
 
+def _session_dirs(tmp_path):
+    return [
+        path
+        for path in (tmp_path / ".dstack" / "presets").iterdir()
+        if path.is_dir() and not path.name.startswith(".")
+    ]
+
+
 @pytest.fixture
 def creation_context(tmp_path, monkeypatch):
     run = get_running_service_run()
@@ -106,7 +114,7 @@ def creation_context(tmp_path, monkeypatch):
 
 
 class TestCreatePreset:
-    def test_saves_agent_log_without_debug(self, tmp_path, monkeypatch, capsys):
+    def test_saves_agent_log_without_debug(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         preset = get_preset()
@@ -134,11 +142,7 @@ class TestCreatePreset:
             store=PresetStore(tmp_path / "presets"),
         )
 
-        paths = [
-            path
-            for path in (tmp_path / ".dstack" / "presets").iterdir()
-            if path.is_dir() and not path.name.startswith(".")
-        ]
+        paths = _session_dirs(tmp_path)
         assert len(paths) == 1
         assert {path.name for path in paths[0].iterdir()} == {
             "agent.log",
@@ -191,11 +195,7 @@ class TestCreatePreset:
             debug=True,
         )
 
-        paths = [
-            path
-            for path in (tmp_path / ".dstack" / "presets").iterdir()
-            if path.is_dir() and not path.name.startswith(".")
-        ]
+        paths = _session_dirs(tmp_path)
         assert len(paths) == 1
         assert result.preset == preset
         assert {path.name for path in paths[0].iterdir()} == {
@@ -302,7 +302,6 @@ class TestCreatePreset:
         (session_path / "trace.jsonl").touch()
         agent_session = PresetAgentSession(
             path=session_path,
-            timestamp="20260714-120000Z",
             debug=True,
         )
 
@@ -387,7 +386,6 @@ def _agent_session(tmp_path, *, debug: bool = False) -> PresetAgentSession:
         (path / "trace.jsonl").touch()
     return PresetAgentSession(
         path=path,
-        timestamp="20260714-120000Z",
         debug=debug,
         preset_id="ab12cd34",
     )
@@ -526,11 +524,7 @@ class TestInterruptAndResume:
                 store=PresetStore(tmp_path / "presets"),
             )
 
-        sessions = [
-            path
-            for path in (tmp_path / ".dstack" / "presets").iterdir()
-            if path.is_dir() and not path.name.startswith(".")
-        ]
+        sessions = _session_dirs(tmp_path)
         assert len(sessions) == 1
         manifest = json.loads((sessions[0] / "session.json").read_text())
         assert manifest["status"] == "interrupted"
@@ -543,9 +537,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "sessions" / "fe98dc76"
         session_dir.mkdir(parents=True)
         (session_dir / "agent.log").touch()
-        agent_session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="fe98dc76"
-        )
+        agent_session = PresetAgentSession(path=session_dir, debug=False, preset_id="fe98dc76")
         workspace = create_agent_workspace(agent_session)
         workspace.constraints_path.write_text(
             '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
@@ -584,9 +576,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        agent_session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
-        )
+        agent_session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab34ef12")
         captured = {}
 
         async def run_agent(**kwargs):
@@ -621,9 +611,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        agent_session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab34ef12"
-        )
+        agent_session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab34ef12")
         workspace = create_agent_workspace(agent_session)
         workspace.constraints_path.write_text(
             '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
@@ -684,9 +672,7 @@ class TestSessionLog:
         session_dir = tmp_path / preset_id
         session_dir.mkdir()
         (session_dir / "agent.log").write_text(log)
-        session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id=preset_id
-        )
+        session = PresetAgentSession(path=session_dir, debug=False, preset_id=preset_id)
         session.update_manifest(status=status)
         return session
 
@@ -723,9 +709,7 @@ class TestFollowPreset:
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
         (session_dir / "preset.dstack.yml").write_text(configuration_yaml)
-        session = PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
-        )
+        session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
         workspace = create_agent_workspace(session)
         workspace.constraints_path.write_text('{"run_name_prefix": "qwen-build"}')
         session.update_manifest(status="running", agent_pid=987654321)
@@ -803,13 +787,12 @@ class TestFollowPreset:
             "dstack._internal.cli.services.presets.create.load_attachable_agent_session",
             lambda preset_id: session,
         )
-        # claim=True must refuse rather than double-finalize; the session is untouched.
+        # follow must refuse rather than double-finalize; the session is untouched.
         with pytest.raises(SessionBusyError):
             follow_preset(
                 api=creation_context.api,
                 store=creation_context.store,
                 preset_id="ab12cd34",
-                claim=True,
             )
         assert session.read_manifest()["status"] == "running"
         release_session_claim(held)
@@ -822,9 +805,7 @@ class TestStopActiveSessionRuns:
         (session_dir / "runs.jsonl").write_text(
             '{"name":"qwen-build-1","id":"a"}\n{"name":"qwen-build-2","id":"b"}\n'
         )
-        return PresetAgentSession(
-            path=session_dir, timestamp="t", debug=False, preset_id="ab12cd34"
-        )
+        return PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
 
     def _api(self, statuses: dict, stopped: list) -> SimpleNamespace:
         def get(project, name):
@@ -838,26 +819,28 @@ class TestStopActiveSessionRuns:
             client=SimpleNamespace(runs=SimpleNamespace(get=get, stop=stop)),
         )
 
-    def test_stops_only_non_terminal_runs(self, tmp_path):
-        from dstack._internal.core.models.runs import RunStatus
-
+    @pytest.mark.parametrize(
+        ("statuses", "expected_stopped"),
+        [
+            pytest.param(
+                {"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.RUNNING},
+                ["qwen-build-2"],
+                id="stops-only-non-terminal",
+            ),
+            pytest.param(
+                {"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.DONE},
+                [],
+                id="all-terminal",
+            ),
+        ],
+    )
+    def test_stops_only_non_terminal_runs(self, tmp_path, statuses, expected_stopped):
         stopped: list = []
-        api = self._api(
-            {"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.RUNNING}, stopped
-        )
+        api = self._api(statuses, stopped)
 
         # No per-run prompt: active runs are stopped automatically (like dstack stop).
         _stop_active_session_runs(api, self._session(tmp_path))
-        assert stopped == ["qwen-build-2"]
-
-    def test_stops_nothing_when_all_terminal(self, tmp_path):
-        from dstack._internal.core.models.runs import RunStatus
-
-        stopped: list = []
-        api = self._api({"qwen-build-1": RunStatus.DONE, "qwen-build-2": RunStatus.DONE}, stopped)
-
-        _stop_active_session_runs(api, self._session(tmp_path))
-        assert stopped == []
+        assert stopped == expected_stopped
 
 
 class TestReconcileDetachedSessions:
@@ -924,12 +907,11 @@ class TestReconcileDetachedSessions:
         reconcile_detached_sessions(PresetStore(tmp_path / "store"))
         assert len(calls) == 1
         assert calls[0]["preset_id"] == "dead0001"
-        # Honors persisted keep-service; non-interactive, non-blocking, silent,
-        # and under the finalize claim (parallel-safe).
+        # Honors persisted keep-service; non-interactive, non-blocking, and
+        # silent (follow_preset itself takes the finalize claim).
         assert calls[0]["keep_service"] is True
         assert calls[0]["wait_for_run_stop"] is False
         assert calls[0]["echo"] is False
-        assert calls[0]["claim"] is True
 
     @pytest.mark.parametrize(
         "kwargs",
@@ -965,9 +947,7 @@ class TestReconcileDetachedSessions:
 class TestSessionClaim:
     def _session(self, tmp_path):
         (tmp_path / "sess").mkdir()
-        return PresetAgentSession(
-            path=tmp_path / "sess", timestamp="", debug=False, preset_id="sess"
-        )
+        return PresetAgentSession(path=tmp_path / "sess", debug=False, preset_id="sess")
 
     def test_claim_is_exclusive_and_releasable(self, tmp_path):
         session = self._session(tmp_path)
@@ -1002,7 +982,7 @@ class TestSessionProcessAlive:
 class TestMarkSessionOwner:
     def test_persists_finalize_context(self, tmp_path):
         (tmp_path / "s").mkdir()
-        session = PresetAgentSession(path=tmp_path / "s", timestamp="", debug=False, preset_id="s")
+        session = PresetAgentSession(path=tmp_path / "s", debug=False, preset_id="s")
         session.update_manifest(status="running")
         mark_session_owner(session, project="main", keep_service=True)
         manifest = session.read_manifest()

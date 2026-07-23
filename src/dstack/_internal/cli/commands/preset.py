@@ -38,7 +38,7 @@ from dstack._internal.cli.services.profile import (
     load_profile_from_args,
     register_profile_args,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask, console, warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import is_valid_dstack_resource_name
@@ -216,14 +216,14 @@ class PresetCommand(BaseCommand):
             reconcile_detached_sessions(PresetStore())
 
     def _list(self, args: argparse.Namespace) -> None:
-        base = getattr(args, "base", None)
-        repo = getattr(args, "repo", None)
-        if getattr(args, "json", False):
+        base = args.base
+        repo = args.repo
+        if args.json:
             self._reconcile()
             presets = _filter_presets(PresetStore().list(), base=base, repo=repo)
             print(PresetListOutput(presets=presets).json())
             return
-        verbose = getattr(args, "verbose", False)
+        verbose = args.verbose
         while True:
             self._reconcile()
             presets = PresetStore().list()
@@ -334,35 +334,33 @@ class PresetCommand(BaseCommand):
     def _delete(self, args: argparse.Namespace) -> None:
         store = PresetStore()
         if args.preset is not None:
-            preset = store.get(args.preset) or store.find_by_name(args.preset)
-            if preset is None:
-                raise CLIError(f"Preset {args.preset!r} does not exist")
-            presets = [preset]
-            message = f"Delete preset [code]{preset.id}[/] for [code]{preset.base}[/]?"
+            try:
+                preset = store.get(args.preset) or store.find_by_name(args.preset)
+            except CLIError as e:
+                # A corrupt preset file must still be removable by ID.
+                warn(str(e), stderr=True)
+                preset_ids = [args.preset]
+                description = f"preset [code]{args.preset}[/]"
+            else:
+                if preset is None:
+                    raise CLIError(f"Preset {args.preset!r} does not exist")
+                preset_ids = [preset.id]
+                description = f"preset [code]{preset.id}[/] for [code]{preset.base}[/]"
         else:
             target = args.base or args.repo
             presets = _filter_presets(store.list(), base=args.base, repo=args.repo)
             if not presets:
                 kind = "base model" if args.base else "model repo"
                 raise CLIError(f"No presets found for {kind} {target!r}")
-            message = (
-                f"Delete {len(presets)} preset"
-                f"{'s' if len(presets) != 1 else ''} for [code]{target}[/]?"
-            )
-        if not args.yes and not confirm_ask(message):
+            preset_ids = [preset.id for preset in presets]
+            count = f"{len(presets)} preset{'s' if len(presets) != 1 else ''}"
+            description = f"{count} for [code]{target}[/]"
+        if not args.yes and not confirm_ask(f"Delete {description}?"):
             console.print("\nExiting...")
             return
-        for preset in presets:
-            store.delete(preset.id)
-        if args.preset is not None:
-            console.print(
-                f"Preset [code]{presets[0].id}[/] for [code]{presets[0].base}[/] deleted"
-            )
-        else:
-            console.print(
-                f"Deleted {len(presets)} preset{'s' if len(presets) != 1 else ''} "
-                f"for [code]{args.base or args.repo}[/]"
-            )
+        for preset_id in preset_ids:
+            store.delete(preset_id)
+        console.print(f"Deleted {description}")
 
 
 def _add_configuration_args(parser: argparse.ArgumentParser) -> None:

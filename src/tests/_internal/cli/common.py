@@ -1,10 +1,23 @@
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import IO, List, Optional
 from unittest.mock import patch
+
+from rich.console import Console
+from rich.theme import Theme
 
 from dstack._internal.cli.main import main
 from dstack._internal.compat import IS_WINDOWS
+
+
+def plain_console(file: IO[str], *, width: int = 250) -> Console:
+    """A plain-text console for asserting on CLI table output."""
+    return Console(
+        file=file,
+        width=width,
+        color_system=None,
+        theme=Theme({"secondary": "grey58"}),
+    )
 
 
 def run_dstack_cli(
