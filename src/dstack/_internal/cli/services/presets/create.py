@@ -21,41 +21,47 @@ from dstack._internal.cli.models.configurations import (
 from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.models.presets import Preset
 from dstack._internal.cli.services.presets.agent import (
-    PresetAgentSession,
-    PresetAgentWorkspace,
-    SessionBusyError,
-    attach_agent_workspace,
     attach_preset_agent,
     build_preset_agent_env,
-    claimed_session_name,
-    contains_redacted_value,
-    create_agent_workspace,
-    create_preset_agent_session,
     get_claude_auth,
+    run_preset_agent,
+    terminate_agent_process,
+)
+from dstack._internal.cli.services.presets.presets import preset_to_data
+from dstack._internal.cli.services.presets.prompt import get_preset_agent_system_prompt
+from dstack._internal.cli.services.presets.redaction import (
+    contains_redacted_value,
     get_redacted_values,
     get_sensitive_inherited_env_values,
+    redact,
+)
+from dstack._internal.cli.services.presets.session import (
+    PresetAgentSession,
+    SessionBusyError,
+    claimed_session_name,
+    create_preset_agent_session,
     iter_agent_sessions,
     load_agent_session,
     load_attachable_agent_session,
     mark_session_owner,
     print_preset_progress,
     print_session_log,
-    redact,
     release_session_claim,
-    remove_agent_workspace,
-    run_preset_agent,
-    scrub_workspace_token,
     session_process_alive,
     session_report_exists,
-    terminate_agent_process,
     try_claim_session,
 )
-from dstack._internal.cli.services.presets.presets import preset_to_data
-from dstack._internal.cli.services.presets.prompt import get_preset_agent_system_prompt
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.cli.services.presets.verify import (
     build_verified_preset,
     load_preset_agent_report,
+)
+from dstack._internal.cli.services.presets.workspace import (
+    PresetAgentWorkspace,
+    attach_agent_workspace,
+    create_agent_workspace,
+    remove_agent_workspace,
+    scrub_workspace_token,
 )
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, confirm_ask, console, warn
 from dstack._internal.cli.utils.offers import print_offers_table

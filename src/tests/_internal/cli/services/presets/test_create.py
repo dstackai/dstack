@@ -10,17 +10,6 @@ from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     PresetAgentProcessOutput,
-    PresetAgentSession,
-    PresetAgentWorkspace,
-    create_agent_workspace,
-    load_agent_session,
-    mark_session_owner,
-    print_preset_progress,
-    print_session_log,
-    release_session_claim,
-    remove_agent_workspace,
-    session_process_alive,
-    try_claim_session,
 )
 from dstack._internal.cli.services.presets.create import (
     PresetCreateResult,
@@ -37,7 +26,22 @@ from dstack._internal.cli.services.presets.create import (
     follow_preset,
     reconcile_detached_sessions,
 )
+from dstack._internal.cli.services.presets.session import (
+    PresetAgentSession,
+    load_agent_session,
+    mark_session_owner,
+    print_preset_progress,
+    print_session_log,
+    release_session_claim,
+    session_process_alive,
+    try_claim_session,
+)
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.cli.services.presets.workspace import (
+    PresetAgentWorkspace,
+    create_agent_workspace,
+    remove_agent_workspace,
+)
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
@@ -700,7 +704,7 @@ class TestSessionLog:
     def test_load_agent_session_reads_any_status(self, tmp_path, monkeypatch):
         self._session(tmp_path, "dead0000", "failed", "[t] boom\n")
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
             lambda: tmp_path,
         )
         # A failed session is off-limits to follow/resume, but its log is readable.
@@ -741,7 +745,7 @@ class TestFollowPreset:
             tmp_path, "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
             lambda: tmp_path,
         )
         monkeypatch.setattr(
@@ -898,9 +902,9 @@ class TestReconcileDetachedSessions:
         return session_dir
 
     def _patch(self, monkeypatch, tmp_path, follow):
-        # reconcile iterates via agent.iter_agent_sessions -> agent.get_presets_dir.
+        # reconcile iterates via session.iter_agent_sessions -> session.get_presets_dir.
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent.get_presets_dir",
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
             lambda: tmp_path,
         )
         monkeypatch.setattr(

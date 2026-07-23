@@ -16,25 +16,33 @@ import yaml
 from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
-    PresetAgentSession,
-    PresetAgentWorkspace,
     _build_claude_command,
     _prepare_subprocess_command,
-    _ProgressTailer,
-    _RecordMirror,
-    _summarize_session_trials,
     _terminate_process,
-    attach_agent_workspace,
     build_preset_agent_env,
-    contains_redacted_value,
-    create_agent_workspace,
-    create_preset_agent_session,
     get_claude_auth,
+    run_preset_agent,
+)
+from dstack._internal.cli.services.presets.redaction import (
+    contains_redacted_value,
+    redact,
+)
+from dstack._internal.cli.services.presets.session import (
+    PresetAgentSession,
+    _summarize_session_trials,
+    create_preset_agent_session,
     load_resumable_agent_session,
     print_preset_progress,
-    redact,
+)
+from dstack._internal.cli.services.presets.tail import (
+    _ProgressTailer,
+    _RecordMirror,
+)
+from dstack._internal.cli.services.presets.workspace import (
+    PresetAgentWorkspace,
+    attach_agent_workspace,
+    create_agent_workspace,
     remove_agent_workspace,
-    run_preset_agent,
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
@@ -674,7 +682,7 @@ class TestWorkspaceLifecycle:
 
 class TestOffsetPersistence:
     def test_mirror_does_not_duplicate_after_restart(self, tmp_path):
-        from dstack._internal.cli.services.presets.agent import _OffsetStore
+        from dstack._internal.cli.services.presets.tail import _OffsetStore
 
         source = tmp_path / "runs.jsonl"
         target = tmp_path / "mirror.jsonl"
@@ -743,7 +751,7 @@ class TestLoadResumableSession:
             },
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent.psutil.pid_exists",
+            "dstack._internal.cli.services.presets.session.psutil.pid_exists",
             lambda pid: False,
         )
 
@@ -780,7 +788,7 @@ class TestLoadResumableSession:
         if manifest is not None:
             self._write_session(tmp_path, monkeypatch, manifest)
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent.psutil.pid_exists",
+            "dstack._internal.cli.services.presets.session.psutil.pid_exists",
             lambda pid: True,
         )
         preset_id = manifest["id"] if manifest is not None else "00000000"
@@ -820,7 +828,7 @@ class TestSummarizeSessionTrials:
 class TestFileLineReader:
     @pytest.mark.asyncio
     async def test_reads_lines_and_continues_from_persisted_offset(self, tmp_path):
-        from dstack._internal.cli.services.presets.agent import _FileLineReader, _OffsetStore
+        from dstack._internal.cli.services.presets.tail import _FileLineReader, _OffsetStore
 
         stream = tmp_path / "stdout.jsonl"
         state = tmp_path / ".offsets.json"
@@ -884,7 +892,7 @@ class TestStopOrDetach:
 
 class TestOffsetStoreSharing:
     def test_disjoint_stores_do_not_clobber_each_other(self, tmp_path):
-        from dstack._internal.cli.services.presets.agent import _OffsetStore
+        from dstack._internal.cli.services.presets.tail import _OffsetStore
 
         state = tmp_path / ".offsets.json"
         readers = _OffsetStore(state)

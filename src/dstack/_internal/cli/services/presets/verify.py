@@ -15,13 +15,17 @@ from dstack._internal.cli.models.presets import (
 )
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
-    PresetAgentWorkspace,
-    redact,
-    redact_structure,
 )
 from dstack._internal.cli.services.presets.presets import (
     build_preset,
     resources_spec_from_instance_resources,
+)
+from dstack._internal.cli.services.presets.redaction import (
+    redact,
+    redact_structure,
+)
+from dstack._internal.cli.services.presets.workspace import (
+    PresetAgentWorkspace,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration

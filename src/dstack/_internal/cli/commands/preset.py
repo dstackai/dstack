@@ -13,12 +13,6 @@ from dstack._internal.cli.models.presets import (
     PresetListOutput,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
-from dstack._internal.cli.services.presets.agent import (
-    find_session_name_claims,
-    get_presets_dir,
-    list_agent_sessions,
-    load_resumable_agent_session,
-)
 from dstack._internal.cli.services.presets.apply import apply_preset
 from dstack._internal.cli.services.presets.create import (
     create_preset,
@@ -28,6 +22,12 @@ from dstack._internal.cli.services.presets.create import (
     stop_preset_session,
 )
 from dstack._internal.cli.services.presets.output import print_presets
+from dstack._internal.cli.services.presets.session import (
+    find_session_name_claims,
+    get_presets_dir,
+    list_agent_sessions,
+    load_resumable_agent_session,
+)
 from dstack._internal.cli.services.presets.store import (
     PresetStore,
     load_preset_configuration,

@@ -8,11 +8,13 @@ from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
-    PresetAgentWorkspace,
 )
 from dstack._internal.cli.services.presets.verify import (
     build_verified_preset,
     load_preset_agent_report,
+)
+from dstack._internal.cli.services.presets.workspace import (
+    PresetAgentWorkspace,
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
