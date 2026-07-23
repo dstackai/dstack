@@ -6,10 +6,7 @@ import pytest
 from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.services.presets.apply import (
     _build_service,
-    _get_candidate_presets,
-    _get_matching_presets,
-    _order_by_benchmark,
-    _select_plan,
+    _validate_preset_matches,
     apply_preset,
 )
 from dstack._internal.core.errors import CLIError
@@ -19,31 +16,27 @@ from tests._internal.cli.preset_factories import get_preset
 pytestmark = pytest.mark.windows
 
 
-class TestGetMatchingPresets:
-    def test_matches_base_model_context_and_preset(self):
-        presets = [
-            get_preset(preset_id="small", context_length=4096),
-            get_preset(preset_id="large", context_length=32768),
-        ]
+class TestValidatePresetMatches:
+    def test_accepts_matching_base_model_and_context(self):
+        preset = get_preset(preset_id="large", context_length=32768)
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
             context_length=8192,
         )
 
-        assert _get_matching_presets(presets, configuration=configuration) == [presets[1]]
+        _validate_preset_matches(preset, configuration=configuration)
 
-    def test_candidates_preserve_id_order_and_reject_unknown_ids(self):
-        presets = [
-            get_preset(preset_id="aa11bb22"),
-            get_preset(preset_id="cc33dd44"),
-        ]
+    def test_rejects_insufficient_context(self):
+        preset = get_preset(preset_id="small", context_length=4096)
+        configuration = PresetConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3.5-27B"},
+            context_length=8192,
+        )
 
-        ordered = _get_candidate_presets(presets, preset_ids=["cc33dd44", "aa11bb22"])
-        assert [preset.id for preset in ordered] == ["cc33dd44", "aa11bb22"]
-        assert _get_candidate_presets(presets, preset_ids=None) == presets
-        with pytest.raises(CLIError, match="does not exist"):
-            _get_candidate_presets(presets, preset_ids=["aa11bb22", "ee55ff66"])
+        with pytest.raises(CLIError, match="context length"):
+            _validate_preset_matches(preset, configuration=configuration)
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
         matching = get_preset(preset_id="matching")
@@ -55,21 +48,12 @@ class TestGetMatchingPresets:
             },
         )
 
-        assert _get_matching_presets([matching], configuration=configuration) == [matching]
-        assert not _get_matching_presets(
-            [matching.copy(update={"model": "other/repo"})],
-            configuration=configuration,
-        )
-
-
-class TestOrderByBenchmark:
-    def test_orders_fastest_first_regardless_of_input_order(self):
-        slow = get_preset(preset_id="aa11slow")
-        fast = get_preset(preset_id="bb22fast")
-        fast.validations[0].benchmark.metrics.total_output_tokens *= 2
-
-        assert _order_by_benchmark([slow, fast]) == [fast, slow]
-        assert _order_by_benchmark([fast, slow]) == [fast, slow]
+        _validate_preset_matches(matching, configuration=configuration)
+        with pytest.raises(CLIError, match="does not serve repo"):
+            _validate_preset_matches(
+                matching.copy(update={"model": "other/repo"}),
+                configuration=configuration,
+            )
 
 
 class TestBuildService:
@@ -92,35 +76,20 @@ class TestBuildService:
         assert service.max_price == 1
 
 
-class TestSelectPlan:
-    def test_selects_first_preset_with_available_offer(self):
-        presets = [
-            get_preset(preset_id="unavailable"),
-            get_preset(preset_id="available"),
-            get_preset(preset_id="never-probed"),
-        ]
-        configurator = Mock()
-        plans = [
-            (_plan(InstanceAvailability.NOT_AVAILABLE), Mock()),
-            (_plan(InstanceAvailability.AVAILABLE), Mock()),
-        ]
-        configurator.get_plan.side_effect = plans
-        service_args = SimpleNamespace(profile=None)
+class TestApplyPreset:
+    def test_rejects_unknown_preset(self):
+        with pytest.raises(CLIError, match="does not exist"):
+            apply_preset(
+                api=Mock(),
+                configuration=PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
+                configuration_path="preset.dstack.yml",
+                preset_id="ee55ff66",
+                profile_name=None,
+                command_args=SimpleNamespace(),
+                store=Mock(find_by_id_or_name=Mock(return_value=None)),
+            )
 
-        selected = _select_plan(
-            configuration=PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
-            configuration_path="preset.dstack.yml",
-            presets=presets,
-            configurator=configurator,
-            service_args=service_args,
-        )
-
-        assert selected.preset.id == "available"
-        assert selected.run_plan is plans[1][0]
-        assert selected.repo is plans[1][1]
-        assert configurator.get_plan.call_count == 2
-
-    def test_applies_the_selected_plan(self, monkeypatch):
+    def test_applies_the_referenced_preset(self, monkeypatch):
         preset = get_preset()
         run_plan = _plan(InstanceAvailability.AVAILABLE)
         repo = Mock()
@@ -141,10 +110,10 @@ class TestSelectPlan:
                 model={"base": "Qwen/Qwen3.5-27B"},
             ),
             configuration_path="preset.dstack.yml",
-            preset_ids=None,
+            preset_id="8f3a12c4",
             profile_name="gpu",
             command_args=command_args,
-            store=Mock(list=Mock(return_value=[preset])),
+            store=Mock(find_by_id_or_name=Mock(return_value=preset)),
         )
 
         assert service_args.profile == "gpu"

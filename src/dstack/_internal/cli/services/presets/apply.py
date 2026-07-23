@@ -1,6 +1,5 @@
 import argparse
-from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Optional
 
 from rich.markup import escape
 
@@ -14,16 +13,7 @@ from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.runs import RunPlan
 from dstack.api import Client
-
-
-@dataclass(frozen=True)
-class _PresetPlan:
-    preset: Preset
-    run_plan: RunPlan
-    repo: Repo
 
 
 def apply_preset(
@@ -31,125 +21,54 @@ def apply_preset(
     api: Client,
     configuration: PresetConfiguration,
     configuration_path: str,
-    preset_ids: Optional[Sequence[str]],
+    preset_id: str,
     profile_name: Optional[str],
     command_args: argparse.Namespace,
     store: PresetStore,
 ) -> None:
-    candidates = _get_candidate_presets(store.list(), preset_ids=preset_ids)
-    presets = _get_matching_presets(candidates, configuration=configuration)
-    if not presets:
-        qualifier = ""
-        if preset_ids:
-            qualifier = f" among {', '.join(preset_ids)}"
-        raise CLIError(f"No matching preset{qualifier} for {configuration.model.api_model_name}")
-    presets = _order_by_benchmark(presets)
+    preset = store.find_by_id_or_name(preset_id)
+    if preset is None:
+        raise CLIError(f"Preset {preset_id} does not exist")
+    _validate_preset_matches(preset, configuration=configuration)
 
     configurator = ServiceConfigurator(api_client=api)
     service_args = configurator.get_parser().parse_args([])
     service_args.profile = profile_name
-    selected = _select_plan(
-        configuration=configuration,
+    service = _build_service(configuration, preset)
+    run_plan, repo = configurator.get_plan(
+        conf=service,
         configuration_path=configuration_path,
-        presets=presets,
-        configurator=configurator,
-        service_args=service_args,
+        configurator_args=service_args,
     )
     configurator.apply_plan(
-        run_plan=selected.run_plan,
-        repo=selected.repo,
+        run_plan=run_plan,
+        repo=repo,
         command_args=command_args,
         configurator_args=service_args,
         plan_properties={
             "Model": _format_requested_model(configuration),
-            "Preset": _format_selected_preset(selected.preset),
+            "Preset": _format_selected_preset(preset),
         },
     )
 
 
-def _benchmark_rate(preset: Preset) -> float:
-    """The preset's canonical output rate — the same tok/s the list shows."""
-    metrics = preset.validations[0].benchmark.metrics
-    return metrics.total_output_tokens / metrics.duration_seconds
-
-
-def _order_by_benchmark(presets: list[Preset]) -> list[Preset]:
-    """Fastest first; capacity still gates the final choice in _select_plan."""
-    return sorted(presets, key=_benchmark_rate, reverse=True)
-
-
-def _get_candidate_presets(
-    presets: list[Preset],
-    *,
-    preset_ids: Optional[Sequence[str]],
-) -> list[Preset]:
-    if not preset_ids:
-        return presets
-    presets_by_ref = {preset.id: preset for preset in presets}
-    for preset in presets:
-        if preset.name is not None:
-            presets_by_ref.setdefault(preset.name, preset)
-    missing = [ref for ref in preset_ids if ref not in presets_by_ref]
-    if len(missing) == 1:
-        raise CLIError(f"Preset {missing[0]} does not exist")
-    if missing:
-        raise CLIError(f"Presets {', '.join(missing)} do not exist")
-    # Dedupe refs, preserving the given order; the final ordering is
-    # benchmark-driven in apply_preset.
-    candidates = []
-    for ref in preset_ids:
-        preset = presets_by_ref[ref]
-        if preset not in candidates:
-            candidates.append(preset)
-    return candidates
-
-
-def _get_matching_presets(
-    presets: list[Preset],
-    *,
-    configuration: PresetConfiguration,
-) -> list[Preset]:
+def _validate_preset_matches(preset: Preset, *, configuration: PresetConfiguration) -> None:
+    """The referenced preset must serve what the configuration asks for."""
     model_name = configuration.model.api_model_name
-    matches = []
-    for preset in presets:
-        service_model = preset.service.model
-        if service_model is None or service_model.name.lower() != model_name.lower():
-            continue
-        if configuration.context_length is not None:
-            if preset.context_length < configuration.context_length:
-                continue
-        if configuration.model.allows_variant_selection:
-            if preset.base.lower() != model_name.lower():
-                continue
-        elif preset.model != configuration.model.exact_repo:
-            continue
-        matches.append(preset)
-    return matches
-
-
-def _select_plan(
-    *,
-    configuration: PresetConfiguration,
-    configuration_path: str,
-    presets: list[Preset],
-    configurator: ServiceConfigurator,
-    service_args: argparse.Namespace,
-) -> _PresetPlan:
-    first_plan: Optional[_PresetPlan] = None
-    for preset in presets:
-        service = _build_service(configuration, preset)
-        run_plan, repo = configurator.get_plan(
-            conf=service,
-            configuration_path=configuration_path,
-            configurator_args=service_args,
-        )
-        plan = _PresetPlan(preset=preset, run_plan=run_plan, repo=repo)
-        if first_plan is None:
-            first_plan = plan
-        if _has_available_offers(run_plan):
-            return plan
-    assert first_plan is not None
-    return first_plan
+    service_model = preset.service.model
+    if service_model is None or service_model.name.lower() != model_name.lower():
+        raise CLIError(f"Preset {preset.id} does not serve {model_name}")
+    if configuration.context_length is not None:
+        if preset.context_length < configuration.context_length:
+            raise CLIError(
+                f"Preset {preset.id} does not support context length"
+                f" {configuration.context_length}"
+            )
+    if configuration.model.allows_variant_selection:
+        if preset.base.lower() != model_name.lower():
+            raise CLIError(f"Preset {preset.id} does not serve base model {model_name}")
+    elif preset.model != configuration.model.exact_repo:
+        raise CLIError(f"Preset {preset.id} does not serve repo {configuration.model.exact_repo}")
 
 
 def _build_service(
@@ -165,13 +84,6 @@ def _build_service(
         if value is not None:
             setattr(service, field, value)
     return service
-
-
-def _has_available_offers(plan: RunPlan) -> bool:
-    return bool(plan.job_plans) and all(
-        any(offer.availability.is_available() for offer in job_plan.offers)
-        for job_plan in plan.job_plans
-    )
 
 
 def _format_requested_model(configuration: PresetConfiguration) -> str:

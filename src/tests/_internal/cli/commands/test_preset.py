@@ -295,17 +295,8 @@ env:
         assert [fleet.format() for fleet in configuration.fleets] == ["cli-fleet"]
         assert create.call_args.kwargs["debug"] is True
 
-    @pytest.mark.parametrize(
-        ("extra_args", "expected_ids"),
-        [
-            ([], None),
-            (["--id", "cli-preset"], ["cli-preset"]),
-            (["--id", "a1", "--id", "b2"], ["a1", "b2"]),
-        ],
-    )
-    def test_apply_passes_selected_profile_and_preset_ids(
-        self, tmp_path, extra_args, expected_ids
-    ):
+    def test_apply_passes_selected_profile_and_preset_id(self, tmp_path):
+        extra_args = ["--id", "cli-preset"]
         (tmp_path / ".dstack").mkdir()
         (tmp_path / ".dstack" / "profiles.yml").write_text(
             "profiles:\n  - name: gpu\n    max_price: 0.5\n"
@@ -336,8 +327,25 @@ env:
 
         assert exit_code == 0
         assert apply.call_args.kwargs["profile_name"] == "gpu"
-        assert apply.call_args.kwargs["preset_ids"] == expected_ids
+        assert apply.call_args.kwargs["preset_id"] == "cli-preset"
         assert apply.call_args.kwargs["configuration"].max_price == 0.5
+
+    def test_apply_requires_preset_id(self, tmp_path, capsys):
+        configuration_path = tmp_path / "preset.dstack.yml"
+        configuration_path.write_text(
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
+        )
+
+        with patch("dstack._internal.cli.commands.preset.apply_preset") as apply:
+            exit_code = run_dstack_cli(
+                ["preset", "apply", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 2
+        assert "--id" in capsys.readouterr().err
+        apply.assert_not_called()
 
 
 class TestPresetNameClaims:

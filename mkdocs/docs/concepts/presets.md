@@ -133,12 +133,12 @@ prompt: |
 
 ## Apply a preset
 
-To deploy a preset as a service, pass the preset configuration to the `dstack preset apply` command:
+To deploy a preset as a service, pass the preset configuration and the preset ID or name to the `dstack preset apply` command:
 
 <div class="termy">
 
 ```shell
-$ dstack preset apply -f preset.dstack.yml
+$ dstack preset apply -f preset.dstack.yml --id qwen35-27b
  Project        main
  User           admin
  Type           service
@@ -155,8 +155,6 @@ Submit the run qwen35-27b? [y/n]: y
 ```
 
 </div>
-
-If you don't pass `--id`, `dstack` selects the fastest matching preset with available fleet offers, then deploys it as a service. Pass `--id` to choose among specific presets by ID or name; it can be repeated, and `dstack` deploys the fastest available one.
 
 ## Manage presets
 

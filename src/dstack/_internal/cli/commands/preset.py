@@ -162,10 +162,10 @@ class PresetCommand(BaseCommand):
         register_profile_args(apply_parser)
         apply_parser.add_argument(
             "--id",
-            action="append",
-            dest="preset_ids",
+            dest="preset_id",
             metavar="ID",
-            help="Deploy the best available preset among these IDs or names. Can be repeated",
+            required=True,
+            help="The preset ID or name to deploy",
         )
         apply_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
@@ -337,7 +337,7 @@ class PresetCommand(BaseCommand):
             api=Client.from_config(project_name=args.project),
             configuration=configuration,
             configuration_path=configuration_path,
-            preset_ids=args.preset_ids,
+            preset_id=args.preset_id,
             profile_name=args.profile,
             command_args=args,
             store=PresetStore(),
