@@ -49,7 +49,7 @@ class {{ backend_name }}Compute(
         self.config = config
 
     def get_offers(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> Iterator[InstanceOfferWithAvailability]:
         # If the provider is added to gpuhunt, you'd typically get offers
         # using `get_catalog_offers()` and extend them with availability info.

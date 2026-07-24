@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, ClassVar, Dict, List, Optional
+from typing import Callable, ClassVar, Dict, List, Optional, Union
 
 import git
 import requests
@@ -110,7 +110,7 @@ class Compute(ABC):
 
     @abstractmethod
     def get_offers(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
@@ -126,6 +126,13 @@ class Compute(ABC):
         generate synthetic offers from discovered nodes on the fly; these synthetic offers should
         reflect either resources that would be allocated based on `requirements`
         (`full_offers=False`) or full allocatable node resources (`full_offers=True`).
+
+        if `unallocated_resources` set to `True`, the method should exclude (subtract) already
+        allocated resources from offer's resources. As with `full_offers`, this flag has no meaning
+        for most backends and is intended for backends such as Kubernetes and Slurm where many jobs
+        can coexist on a single node. With such backends, the method should return full allocatable
+        node resources if `unallocated_resources=False` and only unallocated (available) resources
+        if `unallocated_resources=True`.
         """
         pass
 
@@ -188,16 +195,29 @@ class ComputeWithAllOffersCached(ABC):
     It caches all offers with availability and post-filters by requirements.
     """
 
+    unallocated_resources_argument_has_effect: ClassVar[bool] = False
+    """
+    Set to `True` if `get_all_offers_with_availability()` produces different results based on
+    the `unallocated_resources` value. Doubles the amount of cached data.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self._offers_cache_lock = threading.Lock()
         self._offers_cache_execution_lock = threading.Lock()
-        self._offers_cache = TTLCache(maxsize=1, ttl=180)
+        self._offers_cache = TTLCache(
+            maxsize=(2 if self.unallocated_resources_argument_has_effect else 1),
+            ttl=180,
+        )
 
     @abstractmethod
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         """
         Returns all backend offers with availability.
+
+        See `Compute.get_offers()` for the `unallocated_resources` argument description.
         """
         pass
 
@@ -223,12 +243,12 @@ class ComputeWithAllOffersCached(ABC):
         return None
 
     def get_offers(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> Iterator[InstanceOfferWithAvailability]:
         with self._offers_cache_execution_lock:
             # Cache lock does not prevent concurrent execution.
             # We use a separate lock to avoid requesting offers in parallel, re-doing the work and hitting rate limits.
-            cached_offers = self._get_all_offers_with_availability_cached()
+            cached_offers = self._get_all_offers_with_availability_cached(unallocated_resources)
         offers = self.__apply_modifiers(
             cached_offers, self.get_offers_modifiers(requirements, full_offers)
         )
@@ -238,12 +258,20 @@ class ComputeWithAllOffersCached(ABC):
             offers = (o for o in offers if post_filter(o))
         return offers
 
+    def _get_all_offers_with_availability_cached_key(self, unallocated_resources: bool) -> int:
+        if self.unallocated_resources_argument_has_effect:
+            return hash(unallocated_resources)
+        return hash(None)
+
     @cachedmethod(
         cache=lambda self: self._offers_cache,
+        key=_get_all_offers_with_availability_cached_key,
         lock=lambda self: self._offers_cache_lock,
     )
-    def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
-        return self.get_all_offers_with_availability()
+    def _get_all_offers_with_availability_cached(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
+        return self.get_all_offers_with_availability(unallocated_resources)
 
     @staticmethod
     def __apply_modifiers(
@@ -271,6 +299,12 @@ class ComputeWithFilteredOffersCached(ABC):
     the `full_offers` value. Doubles the amount of cached data.
     """
 
+    unallocated_resources_argument_has_effect: ClassVar[bool] = False
+    """
+    Set to `True` if `get_offers_by_requirements()` produces different results based on
+    the `unallocated_resources` value. Doubles the amount of cached data.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self._offers_cache_lock = threading.Lock()
@@ -281,6 +315,7 @@ class ComputeWithFilteredOffersCached(ABC):
         self,
         requirements: Requirements,
         full_offers: bool,
+        unallocated_resources: bool,
     ) -> List[InstanceOfferWithAvailability]:
         """
         Returns backend offers with availability matching requirements.
@@ -288,20 +323,29 @@ class ComputeWithFilteredOffersCached(ABC):
         See `Compute.get_offers()` for the `full_offers` argument description.
         Set the class variable `full_offers_argument_has_effect` to `True` if the `full_offers`
         value has an effect on the offers produced by this method.
+
+        See `Compute.get_offers()` for the `unallocated_resources` argument description.
+        Set the class variable `unallocated_resources_argument_has_effect` to `True` if
+        the `unallocated_resources` value has an effect on the offers produced by this method.
         """
         pass
 
     def get_offers(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> Iterator[InstanceOfferWithAvailability]:
-        return iter(self._get_offers_cached(requirements, full_offers))
+        return iter(self._get_offers_cached(requirements, full_offers, unallocated_resources))
 
-    def _get_offers_cached_key(self, requirements: Requirements, full_offers: bool) -> int:
+    def _get_offers_cached_key(
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
+    ) -> int:
+        hash_items: list[Union[str, bool]] = []
         # Requirements is not hashable, so we use a hack to get arguments hash
-        hashable_requirements = requirements.json()
+        hash_items.append(requirements.json())
         if self.full_offers_argument_has_effect:
-            return hash((hashable_requirements, full_offers))
-        return hash(hashable_requirements)
+            hash_items.append(full_offers)
+        if self.unallocated_resources_argument_has_effect:
+            hash_items.append(unallocated_resources)
+        return hash(tuple(hash_items))
 
     @cachedmethod(
         cache=lambda self: self._offers_cache,
@@ -309,9 +353,9 @@ class ComputeWithFilteredOffersCached(ABC):
         lock=lambda self: self._offers_cache_lock,
     )
     def _get_offers_cached(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> List[InstanceOfferWithAvailability]:
-        return self.get_offers_by_requirements(requirements, full_offers)
+        return self.get_offers_by_requirements(requirements, full_offers, unallocated_resources)
 
 
 class ComputeWithCreateInstanceSupport(ABC):

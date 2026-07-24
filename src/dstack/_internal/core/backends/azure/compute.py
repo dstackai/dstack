@@ -102,7 +102,9 @@ class AzureCompute(
             credential=credential, subscription_id=config.subscription_id
         )
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AZURE,
             locations=self.config.regions,

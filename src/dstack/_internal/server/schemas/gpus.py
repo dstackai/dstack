@@ -19,6 +19,10 @@ class ListGpusRequest(CoreModel):
     full_offers: Annotated[
         bool, Field(description="Don't adjust backend offers by requirements")
     ] = False
+    unallocated_resources: Annotated[
+        bool,
+        Field(description="Subtract allocated resources to return only unallocated resources"),
+    ] = False
 
 
 class ListGpusResponse(CoreModel):

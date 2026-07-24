@@ -48,6 +48,10 @@ class GetRunPlanRequest(CoreModel):
     full_offers: Annotated[
         bool, Field(description="Return full offers not adjusted by requirements")
     ] = False
+    unallocated_resources: Annotated[
+        bool,
+        Field(description="Subtract allocated resources to return only unallocated resources"),
+    ] = False
 
 
 class SubmitRunRequest(CoreModel):

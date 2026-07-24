@@ -41,6 +41,7 @@ async def get_offers_by_requirements(
     blocks: Union[int, Literal["auto"]] = 1,
     max_offers: Optional[int] = None,
     full_offers: bool = False,
+    unallocated_resources: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -93,6 +94,7 @@ async def get_offers_by_requirements(
         backends=backends,
         requirements=requirements,
         full_offers=full_offers,
+        unallocated_resources=unallocated_resources,
         exclude_not_available=exclude_not_available,
     )
 

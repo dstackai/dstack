@@ -385,8 +385,12 @@ def is_taint_tolerated(taint: V1Taint) -> bool:
     return taint.key in (NVIDIA_GPU_NODE_TAINT, AMD_GPU_NODE_TAINT)
 
 
-def get_instance_offers(api: CoreV1Api, region: str) -> list[InstanceOfferWithAvailability]:
-    nodes_allocated_resources = _get_nodes_allocated_resources(api)
+def get_instance_offers(
+    api: CoreV1Api, region: str, unallocated_resources: bool
+) -> list[InstanceOfferWithAvailability]:
+    nodes_allocated_resources: Optional[dict[str, KubernetesResources]] = None
+    if unallocated_resources:
+        nodes_allocated_resources = _get_nodes_allocated_resources(api)
     offers: list[InstanceOfferWithAvailability] = []
     for node in api.list_node().items:
         if (node_name := get_node_name(node)) is None:
@@ -394,7 +398,11 @@ def get_instance_offers(api: CoreV1Api, region: str) -> list[InstanceOfferWithAv
         offer = _get_instance_offer_from_node(
             node=node,
             node_name=node_name,
-            node_allocated_resources=nodes_allocated_resources.get(node_name),
+            node_allocated_resources=(
+                None
+                if nodes_allocated_resources is None
+                else nodes_allocated_resources.get(node_name)
+            ),
             region=region,
         )
         if offer is not None:

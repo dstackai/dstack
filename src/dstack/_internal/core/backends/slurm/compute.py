@@ -80,6 +80,9 @@ class SlurmCompute(
     ComputeWithGroupProvisioningSupport,
     Compute,
 ):
+    # TODO: support allocated resource accounting and change to True
+    unallocated_resources_argument_has_effect = False
+
     def __init__(self, config: SlurmConfig):
         super().__init__()
         self._region_to_cluster_map = {
@@ -91,7 +94,9 @@ class SlurmCompute(
         # configuration -> the same zones)
         self._skip_offer_cache = RegionalSkipOfferCache(ttl=60)
 
-    def get_all_offers_with_availability(self) -> list[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> list[InstanceOfferWithAvailability]:
         offers: list[InstanceOfferWithAvailability] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_to_cluster_map: dict[

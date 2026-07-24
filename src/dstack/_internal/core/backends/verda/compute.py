@@ -64,7 +64,9 @@ class VerdaCompute(
         )
         self.backend_type = backend_type
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=self.backend_type,
             locations=self.config.regions,

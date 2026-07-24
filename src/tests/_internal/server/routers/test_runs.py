@@ -1629,6 +1629,61 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("body_unallocated_resources", "expected_unallocated_resources"),
+        [
+            pytest.param(None, False, id="omitted-defaults-to-false"),
+            pytest.param(True, True, id="true"),
+            pytest.param(False, False, id="false"),
+        ],
+    )
+    async def test_forwards_unallocated_resources_to_compute_get_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        body_unallocated_resources: Optional[bool],
+        expected_unallocated_resources: bool,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=DevEnvironmentConfiguration(ide="vscode"),
+        )
+        body: dict = {"run_spec": json.loads(run_spec.json())}
+        if body_unallocated_resources is not None:
+            body["unallocated_resources"] = body_unallocated_resources
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            get_offers_mock = backend_mock.compute.return_value.get_offers
+            get_offers_mock.return_value = []
+            m.return_value = [backend_mock]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        get_offers_mock.assert_called()
+        # get_offers is called as get_offers(requirements, full_offers, unallocated_resources)
+        assert all(
+            call_args.args[2] is expected_unallocated_resources
+            for call_args in get_offers_mock.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_privileged_true(
         self,
         test_db,
@@ -1800,7 +1855,9 @@ class TestGetRunPlan:
         )
         body = {"run_spec": json.loads(run_spec.json())}
 
-        def offers_by_requirements(requirements: Requirements, full_offers: bool):
+        def offers_by_requirements(
+            requirements: Requirements, full_offers: bool, unallocated_resources: bool
+        ):
             if (
                 requirements.resources.gpu is not None
                 and requirements.resources.gpu.count.min is not None
