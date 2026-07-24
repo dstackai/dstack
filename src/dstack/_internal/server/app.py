@@ -11,7 +11,6 @@ import sentry_sdk
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from packaging.version import Version
 
 from dstack._internal import settings as core_settings
@@ -73,6 +72,7 @@ from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
+    CustomStaticFiles,
     check_client_server_compatibility,
     error_detail,
     get_client_version,
@@ -366,7 +366,7 @@ def register_routes(app: FastAPI, ui: bool = True):
 
     if ui and Path(__file__).parent.joinpath("statics").exists():
         app.mount(
-            "/", StaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
+            "/", CustomStaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
         )
 
         @app.exception_handler(404)
