@@ -94,6 +94,7 @@ from dstack._internal.utils.common import (
     EntityName,
     EntityNameOrID,
     get_current_datetime,
+    get_lowest_unused_nums,
 )
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
@@ -964,16 +965,7 @@ def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
 
 
 def get_next_instance_num(taken_instance_nums: set[int]) -> int:
-    if not taken_instance_nums:
-        return 0
-    min_instance_num = min(taken_instance_nums)
-    if min_instance_num > 0:
-        return 0
-    instance_num = min_instance_num + 1
-    while True:
-        if instance_num not in taken_instance_nums:
-            return instance_num
-        instance_num += 1
+    return next(get_lowest_unused_nums(used_nums=taken_instance_nums))
 
 
 def get_fleet_master_instance_provisioning_data(

@@ -1,24 +1,27 @@
 import asyncio
+import itertools
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Sequence
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
-from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     GatewayReplicaStatus,
     GatewayStatus,
 )
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
+    UpdateMapDateTime,
     Worker,
     log_lock_token_changed_after_processing,
     log_lock_token_mismatch,
@@ -33,7 +36,6 @@ from dstack._internal.server.models import (
     GatewayModel,
     ProjectModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
@@ -44,7 +46,7 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import tracing
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, get_lowest_unused_nums
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -139,12 +141,35 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
         async with gateway_lock:
             async with get_session_ctx() as session:
                 now = get_current_datetime()
+                active_replica_count_subquery = (
+                    select(func.count(GatewayComputeModel.id))
+                    .where(
+                        or_(
+                            GatewayComputeModel.gateway_id == GatewayModel.id,
+                            GatewayComputeModel.id == GatewayModel.gateway_compute_id,
+                        ),
+                        *_get_active_replica_filters(),
+                    )
+                    .correlate(GatewayModel)
+                    .scalar_subquery()
+                )
                 res = await session.execute(
                     select(GatewayModel)
                     .where(
                         or_(
                             GatewayModel.status.in_(
                                 [GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]
+                            ),
+                            and_(
+                                GatewayModel.status == GatewayStatus.RUNNING,
+                                GatewayModel.desired_replica_count.is_not(None),
+                                or_(
+                                    # fetch to reconcile replica count
+                                    GatewayModel.desired_replica_count
+                                    != active_replica_count_subquery,
+                                    # fetch to potentially reset attempts
+                                    GatewayModel.replica_scale_attempt > 0,
+                                ),
                             ),
                             GatewayModel.to_be_deleted == True,
                         ),
@@ -219,6 +244,24 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
             await _process_submitted_item(item)
         elif item.status == GatewayStatus.PROVISIONING:
             await _process_provisioning_item(item)
+        elif item.status == GatewayStatus.RUNNING:
+            await _process_running_item(item)
+
+
+class _GatewayUpdateMap(ItemUpdateMap, total=False):
+    status: GatewayStatus
+    status_message: str
+    replica_scale_attempt: int
+    last_replica_scale_attempt_at: UpdateMapDateTime
+
+
+@dataclass
+class _ReplicaScalingResult:
+    needs_more_replicas: bool = False
+    new_gateway_compute_models: list[GatewayComputeModel] = field(default_factory=list)
+    scale_in_replica_ids: list[uuid.UUID] = field(default_factory=list)
+    gateway_update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
+    limit_reached: bool = False
 
 
 async def _process_submitted_item(item: GatewayPipelineItem):
@@ -229,7 +272,7 @@ async def _process_submitted_item(item: GatewayPipelineItem):
                 GatewayModel.id == item.id,
                 GatewayModel.lock_token == item.lock_token,
             )
-            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
             .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
         )
         gateway_model = res.unique().scalar_one_or_none()
@@ -243,8 +286,6 @@ async def _process_submitted_item(item: GatewayPipelineItem):
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
-        for gateway_compute_model in result.gateway_compute_models:
-            session.add(gateway_compute_model)
         now = get_current_datetime()
         resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
@@ -267,58 +308,24 @@ async def _process_submitted_item(item: GatewayPipelineItem):
             new_status=update_map.get("status", gateway_model.status),
             status_message=update_map.get("status_message", gateway_model.status_message),
         )
-
-
-class _GatewayUpdateMap(ItemUpdateMap, total=False):
-    status: GatewayStatus
-    status_message: str
+        await _apply_replica_scaling(session, gateway_model, result.scale_result)
 
 
 @dataclass
 class _SubmittedResult:
     update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
-    gateway_compute_models: list[GatewayComputeModel] = field(default_factory=list)
+    scale_result: _ReplicaScalingResult = field(default_factory=_ReplicaScalingResult)
 
 
 async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedResult:
-    configuration = gateways_services.get_gateway_configuration(gateway_model)
-    try:
-        (
-            backend_model,
-            _,
-        ) = await backends_services.get_project_backend_with_model_by_type_or_error(
-            project=gateway_model.project, backend_type=configuration.backend
-        )
-    except BackendNotAvailable:
-        return _SubmittedResult(
-            update_map={
-                "status": GatewayStatus.FAILED,
-                "status_message": "Backend not available",
-            }
-        )
     # NOTE: On a later stage of #3959, the SUBMITTED status may also be responsible for
     # setting up the load balancer (e.g., AWS ALB) before replicas are created.
-    replicas = (
-        configuration.replicas if configuration.replicas is not None else GATEWAY_REPLICAS_DEFAULT
-    )
-    gateway_compute_models = []
-    for replica_num in range(replicas):
-        gateway_compute_model = gateways_services.create_gateway_compute_model(
-            project_name=gateway_model.project.name,
-            configuration=configuration,
-            replica_num=replica_num,
-            gateway_id=gateway_model.id,
-            backend_id=backend_model.id,
-        )
-        gateway_compute_models.append(gateway_compute_model)
-    logger.info(
-        "%s: created %d replica record(s) in submitted state",
-        fmt(gateway_model),
-        len(gateway_compute_models),
-    )
+    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas=[])
+    update_map = _GatewayUpdateMap(status=GatewayStatus.PROVISIONING)
+    update_map.update(scale_result.gateway_update_map)
     return _SubmittedResult(
-        update_map={"status": GatewayStatus.PROVISIONING},
-        gateway_compute_models=gateway_compute_models,
+        update_map=update_map,
+        scale_result=scale_result,
     )
 
 
@@ -330,10 +337,16 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
                 GatewayModel.id == item.id,
                 GatewayModel.lock_token == item.lock_token,
             )
+            .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
             .options(joinedload(GatewayModel.gateway_compute))
             .options(
                 selectinload(GatewayModel.gateway_computes).load_only(
-                    GatewayComputeModel.id, GatewayComputeModel.status
+                    GatewayComputeModel.id,
+                    GatewayComputeModel.status,
+                    GatewayComputeModel.replica_num,
+                    GatewayComputeModel.created_at,
+                    GatewayComputeModel.scale_in,
                 )
             )
         )
@@ -370,11 +383,13 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             new_status=gateway_update_map.get("status", gateway_model.status),
             status_message=gateway_update_map.get("status_message", gateway_model.status_message),
         )
+        await _apply_replica_scaling(session, gateway_model, result.scale_result)
 
 
 @dataclass
 class _ProvisioningResult:
     gateway_update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
+    scale_result: _ReplicaScalingResult = field(default_factory=_ReplicaScalingResult)
 
 
 def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
@@ -382,7 +397,12 @@ def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningR
     # Provisioning gateways must have compute.
     assert len(gateway_computes) > 0
 
-    statuses = {gc.status for gc in gateway_computes}
+    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_computes)
+    statuses = {
+        gc.status
+        for gc in gateway_computes
+        if not gc.scale_in and gc.id not in scale_result.scale_in_replica_ids
+    }
 
     if statuses & {GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED}:
         return _ProvisioningResult(
@@ -390,15 +410,76 @@ def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningR
                 "status": GatewayStatus.FAILED,
                 "status_message": "Failed to provision gateway replica",
             },
+            scale_result=_ReplicaScalingResult(),  # do not scale, gateway failed
         )
 
-    if statuses == {GatewayReplicaStatus.RUNNING}:
+    update_map = _GatewayUpdateMap()
+    update_map.update(scale_result.gateway_update_map)
+
+    if statuses == {GatewayReplicaStatus.RUNNING} and not scale_result.needs_more_replicas:
+        update_map["status"] = GatewayStatus.RUNNING
         return _ProvisioningResult(
-            gateway_update_map={"status": GatewayStatus.RUNNING},
+            gateway_update_map=update_map,
+            scale_result=scale_result,
         )
 
     # Replicas are still being provisioned
-    return _ProvisioningResult()
+    return _ProvisioningResult(
+        gateway_update_map=update_map,
+        scale_result=scale_result,
+    )
+
+
+async def _process_running_item(item: GatewayPipelineItem):
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(GatewayModel)
+            .where(
+                GatewayModel.id == item.id,
+                GatewayModel.lock_token == item.lock_token,
+            )
+            .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+            .options(joinedload(GatewayModel.gateway_compute))
+            .options(
+                selectinload(GatewayModel.gateway_computes).load_only(
+                    GatewayComputeModel.id,
+                    GatewayComputeModel.status,
+                    GatewayComputeModel.replica_num,
+                    GatewayComputeModel.created_at,
+                    GatewayComputeModel.scale_in,
+                )
+            )
+        )
+        gateway_model = res.unique().scalar_one_or_none()
+        if gateway_model is None:
+            log_lock_token_mismatch(logger, item)
+            return
+
+    gateway_computes = get_gateway_compute_models(gateway_model)
+    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_computes)
+
+    update_map = _GatewayUpdateMap()
+    update_map.update(scale_result.gateway_update_map)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(update_map, now=now)
+        res = await session.execute(
+            update(GatewayModel)
+            .where(
+                GatewayModel.id == gateway_model.id,
+                GatewayModel.lock_token == gateway_model.lock_token,
+            )
+            .values(**update_map)
+            .returning(GatewayModel.id)
+        )
+        updated_ids = list(res.scalars().all())
+        if len(updated_ids) == 0:
+            log_lock_token_changed_after_processing(logger, item)
+            return
+        await _apply_replica_scaling(session, gateway_model, scale_result)
 
 
 async def _process_to_be_deleted_item(item: GatewayPipelineItem):
@@ -476,3 +557,182 @@ def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeD
     gateway_computes = get_gateway_compute_models(gateway_model)
     all_terminated = all(gc.status == GatewayReplicaStatus.TERMINATED for gc in gateway_computes)
     return _ProcessToBeDeletedResult(delete_gateway=all_terminated)
+
+
+REPLICA_SCALE_IN_PRIORITY: dict[GatewayReplicaStatus, int] = {
+    GatewayReplicaStatus.SUBMITTED: 0,
+    GatewayReplicaStatus.PROVISIONING: 1,
+    GatewayReplicaStatus.RUNNING: 2,
+}
+
+
+def _is_replica_active(replica: GatewayComputeModel) -> bool:
+    # should match _get_active_replica_filters
+    return not replica.scale_in and replica.status not in (
+        GatewayReplicaStatus.TERMINATING,
+        GatewayReplicaStatus.TERMINATED,
+    )
+
+
+def _get_active_replica_filters() -> list[ColumnElement[bool]]:
+    # should match _is_replica_active
+    return [
+        GatewayComputeModel.scale_in == False,
+        GatewayComputeModel.status.not_in(
+            [GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED]
+        ),
+    ]
+
+
+def _reconcile_gateway_replica_count(
+    gateway_model: GatewayModel,
+    gateway_replicas: list[GatewayComputeModel],
+) -> _ReplicaScalingResult:
+    desired_replica_count = gateway_model.desired_replica_count
+    if desired_replica_count is None:  # pre-0.20.29 gateway
+        if gateway_model.status != GatewayStatus.SUBMITTED:
+            return _ReplicaScalingResult()
+        desired_replica_count = gateways_services.get_gateway_configuration(gateway_model).replicas
+        if desired_replica_count is None:
+            desired_replica_count = GATEWAY_REPLICAS_DEFAULT
+
+    reset_replica_scale_attempt = gateway_model.replica_scale_attempt > 0 and (
+        _was_gateway_updated_since_last_scale_attempt(gateway_model)
+    )
+
+    active_replicas = [r for r in gateway_replicas if _is_replica_active(r)]
+    diff = desired_replica_count - len(active_replicas)
+    if diff == 0:
+        result = _ReplicaScalingResult()
+        if reset_replica_scale_attempt or (
+            gateway_model.replica_scale_attempt > 0
+            and all(r.status == GatewayReplicaStatus.RUNNING for r in active_replicas)
+        ):
+            result.gateway_update_map["replica_scale_attempt"] = 0
+        return result
+
+    if diff > 0:
+        if not reset_replica_scale_attempt and not _is_gateway_ready_for_replica_scale_out(
+            gateway_model
+        ):
+            return _ReplicaScalingResult(needs_more_replicas=True)
+        configuration = gateways_services.get_gateway_configuration(gateway_model)
+        used_nums = {
+            r.replica_num for r in gateway_replicas if r.status != GatewayReplicaStatus.TERMINATED
+        }
+        new_nums = itertools.islice(get_lowest_unused_nums(used_nums), diff)
+        new_gateway_compute_models = [
+            gateways_services.create_gateway_compute_model(
+                project_name=gateway_model.project.name,
+                configuration=configuration,
+                replica_num=replica_num,
+                gateway_id=gateway_model.id,
+                backend_id=gateway_model.backend_id,
+            )
+            for replica_num in new_nums
+        ]
+        logger.info(
+            "%s: scaling out, adding %d replica(s)",
+            fmt(gateway_model),
+            diff,
+        )
+        new_attempt = (
+            0 if reset_replica_scale_attempt else gateway_model.replica_scale_attempt
+        ) + 1
+        return _ReplicaScalingResult(
+            new_gateway_compute_models=new_gateway_compute_models,
+            gateway_update_map={
+                "replica_scale_attempt": new_attempt,
+                "last_replica_scale_attempt_at": NOW_PLACEHOLDER,
+            },
+            limit_reached=new_attempt >= _MAX_REPLICA_SCALE_ATTEMPTS,
+            needs_more_replicas=True,
+        )
+
+    replicas_redundant = -diff
+    active_replicas.sort(
+        key=lambda r: (
+            # Stop replicas with lower priority statuses first.
+            REPLICA_SCALE_IN_PRIORITY.get(r.status, max(REPLICA_SCALE_IN_PRIORITY.values()) + 1),
+            # Stop older replicas first. This allows to migrate off old instances
+            # (e.g., to update the gateway to a new OS image).
+            r.created_at,
+        )
+    )
+    scale_in_replica_ids = [r.id for r in active_replicas[:replicas_redundant]]
+    logger.info(
+        "%s: scaling in, marking %d replica(s) for scale-in",
+        fmt(gateway_model),
+        len(scale_in_replica_ids),
+    )
+    result = _ReplicaScalingResult(scale_in_replica_ids=scale_in_replica_ids)
+    if reset_replica_scale_attempt:
+        result.gateway_update_map["replica_scale_attempt"] = 0
+    return result
+
+
+def _was_gateway_updated_since_last_scale_attempt(gateway_model: GatewayModel) -> bool:
+    if gateway_model.last_update_at is None:
+        return False
+    if gateway_model.last_replica_scale_attempt_at is None:
+        return True
+    return gateway_model.last_update_at > gateway_model.last_replica_scale_attempt_at
+
+
+_MAX_REPLICA_SCALE_ATTEMPTS = 15
+
+# We use exponentially increasing retry delays so that a gateway with replicas
+# that repeatedly fail to provision (e.g. due to no cloud capacity) does not
+# retry constantly, recreating replicas forever.
+_REPLICA_SCALE_RETRY_DELAYS = [
+    timedelta(minutes=1),
+    timedelta(minutes=2),
+    timedelta(minutes=5),
+    timedelta(minutes=10),
+    timedelta(minutes=30),
+]
+
+
+def _get_replica_scale_retry_delay(replica_scale_attempt: int) -> timedelta:
+    index = replica_scale_attempt - 1
+    if index < len(_REPLICA_SCALE_RETRY_DELAYS):
+        return _REPLICA_SCALE_RETRY_DELAYS[index]
+    return _REPLICA_SCALE_RETRY_DELAYS[-1]
+
+
+def _is_gateway_ready_for_replica_scale_out(gateway_model: GatewayModel) -> bool:
+    if gateway_model.replica_scale_attempt >= _MAX_REPLICA_SCALE_ATTEMPTS:
+        return False
+    if gateway_model.replica_scale_attempt == 0:
+        return True
+    retry_delay = _get_replica_scale_retry_delay(gateway_model.replica_scale_attempt)
+    last_scale_attempt_at = gateway_model.last_replica_scale_attempt_at or gateway_model.created_at
+    return get_current_datetime() - last_scale_attempt_at >= retry_delay
+
+
+async def _apply_replica_scaling(
+    session: AsyncSession,
+    gateway_model: GatewayModel,
+    scale_result: _ReplicaScalingResult,
+) -> None:
+    for gateway_compute_model in scale_result.new_gateway_compute_models:
+        session.add(gateway_compute_model)
+    if scale_result.scale_in_replica_ids:
+        # The gateway pipeline does not need to lock gateway replicas — it only mutates `scale_in`,
+        # which can only ever be flipped from False to True, so no races are expected.
+        await session.execute(
+            update(GatewayComputeModel)
+            .where(GatewayComputeModel.id.in_(scale_result.scale_in_replica_ids))
+            .values(scale_in=True)
+        )
+    if scale_result.limit_reached:
+        events.emit(
+            session,
+            (
+                f"Gateway made its {_MAX_REPLICA_SCALE_ATTEMPTS}th and final replica scale-out"
+                " attempt. If it doesn't succeed, no further attempts will be made until the"
+                " gateway is updated."
+            ),
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(gateway_model)],
+        )

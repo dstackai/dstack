@@ -1918,6 +1918,8 @@ class TestApplyGatewayPlan:
         assert data["configuration"]["domain"] == "new.example.com"
         events = await list_events(session)
         assert any("Gateway updated." in e.message and "domain" in e.message for e in events)
+        await session.refresh(gateway)
+        assert gateway.last_update_at is not None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -1972,6 +1974,8 @@ class TestApplyGatewayPlan:
         assert data["configuration"]["domain"] == "new.example.com"
         events = await list_events(session)
         assert any("Gateway updated." in e.message and "domain" in e.message for e in events)
+        await session.refresh(gateway)
+        assert gateway.last_update_at is not None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

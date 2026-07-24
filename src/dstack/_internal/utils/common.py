@@ -4,7 +4,7 @@ import enum
 import itertools
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -311,6 +311,12 @@ def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
         raise ValueError(f"n should be a positive integer, not {n}")
     it = iter(seq)
     return iter(lambda: list(itertools.islice(it, n)), [])
+
+
+def get_lowest_unused_nums(used_nums: set[int]) -> Iterator[int]:
+    for num in itertools.count():
+        if num not in used_nums:
+            yield num
 
 
 StrT = TypeVar("StrT", str, bytes)
