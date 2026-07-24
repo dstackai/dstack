@@ -10,7 +10,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import InstanceModel, JobModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -858,6 +858,32 @@ class TestListEventsFilters:
         )
         resp.raise_for_status()
         assert len(resp.json()) == 3
+
+    async def test_within_fleets_finds_events_of_deleted_instances(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(session=session, project=project, fleet=fleet)
+        events.emit(
+            session,
+            "Instance created for job",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance)],
+        )
+        await session.commit()
+        # Placeholder instances that never provisioned are deleted on job termination
+        await session.execute(delete(InstanceModel).where(InstanceModel.id == instance.id))
+        await session.commit()
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"within_fleets": [str(fleet.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 1
 
     async def test_within_runs(self, session: AsyncSession, client: AsyncClient) -> None:
         user = await create_user(session=session)
