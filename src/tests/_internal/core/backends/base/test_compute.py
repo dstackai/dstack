@@ -1,10 +1,12 @@
 import re
 from typing import Optional
+from unittest.mock import MagicMock
 
 import gpuhunt
 import pytest
 
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithCreateInstanceSupport,
     GoArchType,
     generate_unique_backend_name,
     generate_unique_gateway_instance_name,
@@ -12,11 +14,99 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_volume_name,
     normalize_arch,
 )
+from dstack._internal.core.models.instances import InstanceConfiguration
+from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
+from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.testing.common import (
     get_gateway_compute_configuration,
     get_instance_configuration,
     get_volume,
 )
+
+
+class _FakeCreateInstanceCompute(ComputeWithCreateInstanceSupport):
+    """Minimal Compute stub that just records the `InstanceConfiguration` it was given."""
+
+    last_instance_config: Optional[InstanceConfiguration] = None
+
+    def create_instance(self, instance_offer, instance_config, placement_group):
+        self.last_instance_config = instance_config
+        # `run_job()`'s return value isn't exercised by this test - it's returned
+        # as-is by `create_instance`, with no validation in `run_job()` itself.
+        return MagicMock()
+
+
+class TestRunJobSourcesFromEffectiveRequirements:
+    """
+    `run_job()` is called with an already fleet+run-combined `Requirements` object
+    (see `_get_effective_profile_and_requirements` /
+    `get_run_profile_and_requirements_in_fleet` in
+    `server/background/pipeline_tasks/jobs_submitted.py`). It must build the
+    `InstanceConfiguration` from that `requirements` parameter, not from
+    `job.job_spec.requirements`, which only ever reflects the run's own
+    requirements as computed at submission time and is never updated to include
+    a fleet's `reservation`/`security_group` when a run provisions new capacity
+    into an existing fleet.
+    """
+
+    def _resources(self) -> ResourcesSpec:
+        return ResourcesSpec(cpu=CPUSpec.parse("1"))
+
+    def _run_job(self, effective_requirements: Requirements):
+        compute = _FakeCreateInstanceCompute()
+        run = MagicMock()
+        run.project_name = "test-project"
+        run.user = "test-user"
+        run.run_spec.merged_profile.tags = None
+        job = MagicMock()
+        job.job_spec.job_name = "test-run-0-0"
+        # The job's own (run-only) requirements deliberately differ from the
+        # effective (fleet+run-combined) ones passed as the `requirements` arg,
+        # to prove which one `run_job` actually uses.
+        job.job_spec.requirements = Requirements(
+            resources=self._resources(),
+            reservation="job-spec-reservation",
+            security_group="job-spec-security-group",
+        )
+        instance_offer = MagicMock()
+        instance_offer.region = "us-east-1"
+        instance_offer.price = 1.0
+        instance_offer.copy.return_value = instance_offer
+        compute.run_job(
+            run=run,
+            job=job,
+            instance_offer=instance_offer,
+            project_ssh_public_key="ssh-rsa AAAA",
+            project_ssh_private_key="private-key",
+            volumes=[],
+            placement_group=None,
+            requirements=effective_requirements,
+        )
+        assert compute.last_instance_config is not None
+        return compute.last_instance_config
+
+    def test_uses_effective_reservation_not_job_spec_reservation(self):
+        effective_requirements = Requirements(
+            resources=self._resources(), reservation="fleet-reservation"
+        )
+        instance_config = self._run_job(effective_requirements)
+        assert instance_config.reservation == "fleet-reservation"
+
+    def test_uses_effective_security_group_not_job_spec_security_group(self):
+        effective_requirements = Requirements(
+            resources=self._resources(), security_group="fleet-security-group"
+        )
+        instance_config = self._run_job(effective_requirements)
+        assert instance_config.security_group == "fleet-security-group"
+
+    def test_none_in_effective_requirements_is_respected(self):
+        # Even though job.job_spec.requirements sets both fields, an effective
+        # Requirements with neither set must result in neither being used -
+        # confirming `run_job` isn't merging the two, just using `requirements`.
+        effective_requirements = Requirements(resources=self._resources())
+        instance_config = self._run_job(effective_requirements)
+        assert instance_config.reservation is None
+        assert instance_config.security_group is None
 
 
 class TestGenerateUniqueInstanceName:

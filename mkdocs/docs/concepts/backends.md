@@ -242,6 +242,49 @@ There are two ways to configure AWS: using an access key or using the default cr
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by NAT Gateway, Transit Gateway, or other mechanism.
 
+??? info "Custom security group"
+    By default, `dstack` creates and manages its own security group per project that allows: SSH
+    ingress (TCP port 22) from `0.0.0.0/0`, unrestricted egress, and all traffic within the group so
+    that multi-node clusters work out of the box.
+    To use a security group you manage yourself instead, set `security_group_name` if you create a
+    security group with the same name in every configured region's VPC:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            security_group_name: my-security-group
+    ```
+
+    If your security groups have different names (or IDs are more convenient) per region, use
+    `security_group_ids` instead:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            security_group_ids:
+              us-east-1: sg-0a1b2c3d4e5f6g7h8
+              us-west-2: sg-1b2c3d4e5f6g7h8i9
+    ```
+
+    Regions not covered by `security_group_ids` fall back to `security_group_name` if set, or to
+    dstack's auto-created security group otherwise. Either way, `dstack` attaches the security group
+    to instances as-is and never adds, removes, or modifies its rules. You're responsible for its
+    rules, including SSH ingress (from wherever the `dstack` server and users connect), egress
+    (e.g. outbound access to pull Docker images), and, for multi-node clusters, traffic between
+    instances in the group.
+
+    You can also override this per fleet or run using the `security_group` profile property.
+
 ??? info "OS images"
     By default, `dstack` uses its own [AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
     optimized for `dstack`.
@@ -443,6 +486,37 @@ There are two ways to configure Azure: using a client secret or using the defaul
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by [NAT Gateway or other mechanism](https://learn.microsoft.com/en-us/azure/nat-gateway/nat-overview).
+
+??? info "Custom network security group"
+    By default, `dstack` creates and manages its own network security group per project that allows:
+    SSH ingress (TCP port 22) from the internet, unrestricted egress, and all traffic within the
+    virtual network so that multi-node clusters work out of the box.
+    Azure NSG names must be unique within a resource group regardless of region, so a custom NSG is
+    configured per location via `network_security_group_names`. The values are plain NSG names
+    within the configured `resource_group` (not full Azure resource IDs), so NSGs in a different
+    resource group cannot be referenced:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+            regions: [westeurope, eastus]
+            network_security_group_names:
+              westeurope: my-network-security-group-we
+              eastus: my-network-security-group-eus
+    ```
+
+    Locations not covered by `network_security_group_names` fall back to dstack's auto-created network
+    security group. Either way, `dstack` attaches the network security group to instances as-is and
+    never adds, removes, or modifies its rules. You're responsible for its ingress rules, in
+    particular allowing SSH from wherever you connect — Azure's own default NSG rules already permit
+    egress and traffic within the virtual network (including between instances in a multi-node
+    cluster), unless your NSG's rules override those defaults.
+
+    You can also override this per fleet or run using the `security_group` profile property.
 
 ### GCP
 
@@ -661,6 +735,33 @@ gcloud projects list --format="json(projectId)"
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
+
+??? info "Custom firewall rules"
+    By default, `dstack` creates a VPC firewall rule per network that allows SSH ingress (TCP port 22)
+    from `0.0.0.0/0`, scoped to the `dstack-runner-instance` target tag.
+    Unlike AWS/Azure/OCI, GCP firewall rules apply to the whole VPC rather than to a single attachable resource,
+    so there's no per-fleet override — if you manage your own firewall rules and don't want `dstack` creating
+    a rule that opens port 22 to `0.0.0.0/0`, disable this at the project level with `create_firewall_rules: false`:
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+
+          create_firewall_rules: false
+    ```
+
+    You're then responsible for ensuring your VPC's own firewall rules allow whatever SSH and cluster traffic
+    `dstack` needs. `create_firewall_rules: false` only affects the instance SSH rule — the separate
+    firewall rule `dstack` creates for gateways (allowing TCP ports 22, 80, and 443 from the internet,
+    scoped to the `dstack-gateway-instance` target tag) is always auto-managed when it's created at
+    all, since gateways are meant to be internet-reachable. Note that when a shared VPC
+    (`vpc_project_id`) is used, `dstack` never creates either firewall rule, regardless of
+    `create_firewall_rules` — you must have your own firewall rules in place either way.
 
 ### Lambda
 
@@ -1067,6 +1168,45 @@ There are two ways to configure OCI: using client credentials or using the defau
           type: default
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
+
+??? info "Custom network security group"
+    By default, `dstack` creates and manages its own network security group (NSG) per project that
+    allows: SSH ingress (TCP port 22) from `0.0.0.0/0`, unrestricted egress, and all traffic within
+    the group so that multi-node clusters work out of the box. These rules live on the NSG itself
+    (rather than an OCI security list) because `dstack` places every instance in a shared subnet that
+    has **no** security list attached, making the NSG the sole security boundary.
+
+    OCI network security groups are region-scoped, so a custom NSG is configured per region via
+    `network_security_group_ids`:
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+        network_security_group_ids:
+          eu-frankfurt-1: ocid1.networksecuritygroup.oc1..aaaaaaaa
+          us-ashburn-1: ocid1.networksecuritygroup.oc1..bbbbbbbb
+    ```
+
+    Regions not covered by `network_security_group_ids` fall back to dstack's auto-created network
+    security group.
+
+    OCI requires a network security group to belong to the same VCN as the instances it's attached
+    to. Since `dstack` provisions instances into its own default VCN per project
+    (`dstack-<project>-default-vcn`), your custom NSG must be created in that VCN.
+
+    When a custom NSG is used, `dstack` attaches it to instances as-is and never adds, removes, or
+    modifies its rules. Because the shared subnet has no security list, the NSG is the sole security
+    boundary for these instances — there is no implicit SSH-from-anywhere or implicit outbound-all
+    falling back from a security list. You're responsible for its rules, including SSH ingress (from
+    wherever you connect), egress (e.g. outbound access to pull Docker images — without an egress
+    rule, instances will have no outbound connectivity and will fail to start runs), and, for
+    multi-node clusters, traffic between instances in the group.
+
+    You can also override this per fleet or run using the `security_group` profile property.
 
 SSH fleets support the same features as [VM-based](#vm-based) backends.
 

@@ -96,6 +96,37 @@ class AWSBackendConfig(CoreModel):
             )
         ),
     ] = None
+    security_group_name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of an existing security group to use for instances instead of the one"
+                " `dstack` creates and manages automatically (`dstack_security_group_<project>`)."
+                " The security group must exist in every VPC `dstack` provisions into."
+                " If your custom security groups don't have names or have different names in"
+                " different regions, use `security_group_ids` instead."
+                " When set, `dstack` does not add, remove, or modify any rules on this security group"
+                " — you are responsible for SSH reachability and, for multi-node clusters,"
+                " for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
+    security_group_ids: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from AWS regions to the IDs of existing security groups to use for"
+                " instances instead of the one `dstack` creates and manages automatically."
+                " Use this instead of `security_group_name` when your security groups don't have"
+                " names or have different names in different regions."
+                " Regions not present in this mapping fall back to `security_group_name` if set,"
+                " or to dstack's auto-created security group otherwise."
+                " When set, `dstack` does not add, remove, or modify any rules on these security"
+                " groups — you are responsible for SSH reachability and, for multi-node clusters,"
+                " for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),

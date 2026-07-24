@@ -45,6 +45,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithSecurityGroupSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     get_gateway_user_data,
@@ -89,6 +90,7 @@ class AzureCompute(
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGatewaySupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(self, config: AzureConfig, credential: TokenCredential):
@@ -146,10 +148,14 @@ class AzureCompute(
             location=location,
             allocate_public_ip=allocate_public_ip,
         )
-        network_security_group = azure_utils.get_default_network_security_group_name(
-            resource_group=self.config.resource_group,
-            location=location,
-        )
+        network_security_group = instance_config.security_group
+        if network_security_group is None and self.config.network_security_group_names is not None:
+            network_security_group = self.config.network_security_group_names.get(location)
+        if network_security_group is None:
+            network_security_group = azure_utils.get_default_network_security_group_name(
+                resource_group=self.config.resource_group,
+                location=location,
+            )
 
         managed_identity_resource_group, managed_identity_name = parse_vm_managed_identity(
             self.config.vm_managed_identity
@@ -256,7 +262,12 @@ class AzureCompute(
             location=configuration.region,
             allocate_public_ip=True,
         )
-        network_security_group = azure_utils.get_default_network_security_group_name(
+        # Gateways always use the dedicated gateway NSG (created unconditionally in
+        # `_create_network_resources`, regardless of `network_security_group_names`),
+        # never the per-location default/custom instance NSG. This keeps gateway
+        # provisioning working even for locations where the default instance NSG is
+        # skipped because a custom one is configured for instances.
+        network_security_group = azure_utils.get_gateway_network_security_group_name(
             resource_group=self.config.resource_group,
             location=configuration.region,
         )

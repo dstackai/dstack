@@ -12,6 +12,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_PRIVILEGED_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
+    BACKENDS_WITH_SECURITY_GROUP_SUPPORT,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -72,6 +73,11 @@ async def get_offers_by_requirements(
         if backend_types is None:
             backend_types = BACKENDS_WITH_RESERVATION_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_RESERVATION_SUPPORT]
+
+    if requirements.security_group is not None:
+        if backend_types is None:
+            backend_types = BACKENDS_WITH_SECURITY_GROUP_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_SECURITY_GROUP_SUPPORT]
 
     # For multi-node, restrict backend and region.
     # The default behavior is to provision all nodes in the same backend and region.

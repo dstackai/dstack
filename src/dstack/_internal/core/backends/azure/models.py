@@ -81,6 +81,23 @@ class AzureBackendConfig(CoreModel):
             )
         ),
     ] = None
+    network_security_group_names: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from Azure locations to the names of existing network security groups"
+                " to use for instances instead of the one `dstack` creates and manages automatically."
+                " The values are plain NSG names (not full Azure resource IDs) and must refer to"
+                " network security groups within the configured `resource_group` — NSGs in a different"
+                " resource group cannot be referenced."
+                " Locations not present in this mapping fall back to dstack's auto-created"
+                " network security group."
+                " When set, `dstack` does not add, remove, or modify any rules on these network"
+                " security groups — you are responsible for SSH reachability and, for multi-node"
+                " clusters, for allowing traffic between instances in the group"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),

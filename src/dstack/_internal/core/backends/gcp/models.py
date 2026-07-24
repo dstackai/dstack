@@ -80,6 +80,19 @@ class GCPBackendConfig(CoreModel):
             )
         ),
     ] = None
+    create_firewall_rules: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable `dstack` creating a VPC firewall rule that allows SSH"
+                " traffic from the internet to instances."
+                " Set to `false` if you manage your own firewall rules and don't want `dstack`"
+                " creating a rule that opens port 22 to `0.0.0.0/0`. Defaults to `true`."
+                " This does not affect the separate firewall rule `dstack` creates for gateways,"
+                " which are meant to be internet-reachable and are always auto-managed"
+            )
+        ),
+    ] = None
     vm_service_account: Annotated[
         Optional[str], Field(description="The service account to associate with provisioned VMs")
     ] = None

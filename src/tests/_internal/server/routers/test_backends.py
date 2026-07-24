@@ -828,6 +828,8 @@ class TestGetConfigInfo:
             "iam_instance_profile": None,
             "tags": None,
             "os_images": None,
+            "security_group_name": None,
+            "security_group_ids": None,
             "creds": json.loads(backend.auth.get_plaintext_or_error()),
         }
 

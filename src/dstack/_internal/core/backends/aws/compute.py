@@ -31,6 +31,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithSecurityGroupSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -124,6 +125,7 @@ class AWSCompute(
     ComputeWithGatewaySupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(
@@ -329,12 +331,27 @@ class AWSCompute(
                 instance_type=instance_offer.instance.name,
                 image_config=self.config.os_images,
             )
-            security_group_id = self._create_security_group(
-                ec2_client=ec2_client,
-                region=instance_offer.region,
-                project_id=project_name,
-                vpc_id=vpc_id,
-            )
+            security_group_id = instance_config.security_group
+            if security_group_id is None and self.config.security_group_ids is not None:
+                security_group_id = self.config.security_group_ids.get(instance_offer.region)
+            if security_group_id is None and self.config.security_group_name is not None:
+                security_group_id = aws_resources.get_security_group_id_by_name(
+                    ec2_client=ec2_client,
+                    name=self.config.security_group_name,
+                    vpc_id=vpc_id,
+                )
+                if security_group_id is None:
+                    raise ComputeError(
+                        f"Security group '{self.config.security_group_name}' not found in"
+                        f" VPC {vpc_id} (region {instance_offer.region})"
+                    )
+            if security_group_id is None:
+                security_group_id = self._create_security_group(
+                    ec2_client=ec2_client,
+                    region=instance_offer.region,
+                    project_id=project_name,
+                    vpc_id=vpc_id,
+                )
             try:
                 response = ec2_resource.create_instances(  # pyright: ignore[reportAttributeAccessIssue]
                     **aws_resources.create_instances_struct(
@@ -363,9 +380,18 @@ class AWSCompute(
                 )
             except botocore.exceptions.ClientError as e:
                 logger.warning("Got botocore.exceptions.ClientError: %s", e)
-                if e.response["Error"]["Code"] == "InvalidParameterValue":
+                error_code = e.response["Error"]["Code"]
+                if error_code == "InvalidParameterValue":
                     msg = e.response["Error"].get("Message", "")
                     raise ComputeError(f"Invalid AWS request: {msg}")
+                if error_code == "InvalidGroup.NotFound":
+                    # A misconfigured security group (e.g. wrong VPC/region) is not a
+                    # capacity issue, so surface it clearly instead of retrying other AZs.
+                    msg = e.response["Error"].get("Message", "")
+                    raise ComputeError(
+                        f"Security group not found for instance in region"
+                        f" {instance_offer.region}: {msg}"
+                    )
                 continue
             instance = response[0]
             # wait_until_running() is only needed so that instance is immediately ready for volume attach.

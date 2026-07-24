@@ -136,6 +136,21 @@ def create_security_group(
     return security_group_id
 
 
+def get_security_group_id_by_name(
+    ec2_client: botocore.client.BaseClient,
+    name: str,
+    vpc_id: Optional[str],
+) -> Optional[str]:
+    filters = [{"Name": "group-name", "Values": [name]}]
+    if vpc_id is not None:
+        filters.append({"Name": "vpc-id", "Values": [vpc_id]})
+    response = ec2_client.describe_security_groups(Filters=filters)
+    groups = response.get("SecurityGroups")
+    if not groups:
+        return None
+    return groups[0]["GroupId"]
+
+
 def create_instances_struct(
     disk_size: int,
     image_id: str,

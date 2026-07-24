@@ -12,6 +12,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithSecurityGroupSupport,
     generate_unique_instance_name,
     get_user_data,
 )
@@ -58,6 +59,7 @@ class OCICompute(
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithSecurityGroupSupport,
     Compute,
 ):
     def __init__(self, config: OCIConfig):
@@ -133,18 +135,30 @@ class OCICompute(
             listing, self.config.compartment_id, region.marketplace_client
         )
 
+        # All instances - whether using dstack's auto-managed NSG or a custom
+        # one - share the same subnet. This is required because OCI NSGs are
+        # VCN-scoped: an NSG can only be attached to a VNIC whose subnet
+        # belongs to the same VCN the NSG lives in, and dstack only manages
+        # one VCN per project. The subnet has no security list attached (see
+        # `get_or_create_subnet`), so the NSG attached to each instance is its
+        # sole security boundary.
         subnet: oci.core.models.Subnet = region.virtual_network_client.get_subnet(
             self.config.subnet_ids_per_region[instance_offer.region]
         ).data
-        security_group = resources.get_or_create_security_group(
-            f"dstack-{instance_config.project_name}-default-security-group",
-            subnet.vcn_id,
-            self.config.compartment_id,
-            region.virtual_network_client,
-        )
-        resources.update_security_group_rules_for_runner_instances(
-            security_group.id, region.virtual_network_client
-        )
+        security_group_id = instance_config.security_group
+        if security_group_id is None and self.config.network_security_group_ids is not None:
+            security_group_id = self.config.network_security_group_ids.get(instance_offer.region)
+        if security_group_id is None:
+            security_group = resources.get_or_create_security_group(
+                f"dstack-{instance_config.project_name}-default-security-group",
+                subnet.vcn_id,
+                self.config.compartment_id,
+                region.virtual_network_client,
+            )
+            resources.update_security_group_rules_for_runner_instances(
+                security_group.id, region.virtual_network_client
+            )
+            security_group_id = security_group.id
 
         cloud_init_user_data = get_user_data(
             authorized_keys=instance_config.get_public_keys(),
@@ -158,7 +172,7 @@ class OCICompute(
                 availability_domain=availability_domain,
                 compartment_id=self.config.compartment_id,
                 subnet_id=subnet.id,
-                security_group_id=security_group.id,
+                security_group_id=security_group_id,
                 display_name=display_name,
                 cloud_init_user_data=cloud_init_user_data,
                 shape=instance_offer.instance.name,

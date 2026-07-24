@@ -683,6 +683,7 @@ def create_fleet_instance_model(
         instance_num=instance_num,
         instance_id=instance_id,
         reservation=spec.merged_profile.reservation,
+        security_group=spec.merged_profile.security_group,
         blocks=spec.configuration.blocks,
         tags=spec.configuration.tags,
     )
@@ -957,6 +958,7 @@ def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
         reservation=fleet_spec.configuration.reservation,
+        security_group=fleet_spec.configuration.security_group,
         multinode=fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER,
         backend_options=profile.backend_options,
     )
@@ -1263,6 +1265,7 @@ def _check_can_update_fleet_configuration(current: FleetConfiguration, new: Flee
             (
                 "nodes",
                 "reservation",
+                "security_group",
                 "tags",
                 "resources",
                 "backends",

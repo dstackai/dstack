@@ -60,6 +60,7 @@ class OCIConfigurator(
             get_subscribed_regions(config.creds).names
         except any_oci_exception as e:
             raise_invalid_credentials_error(fields=[["creds"]], details=e)
+        _check_config_network_security_groups(config)
 
     def create_backend(
         self, project_name: str, config: OCIBackendConfigWithCreds
@@ -103,6 +104,22 @@ class OCIConfigurator(
         return OCIConfig.__response__(
             **json.loads(record.config),
             creds=OCICreds.parse_raw(record.auth).__root__,
+        )
+
+
+def _check_config_network_security_groups(config: OCIBackendConfigWithCreds) -> None:
+    if config.network_security_group_ids is None or config.regions is None:
+        return
+    regions = set(config.regions)
+    unknown_regions = [r for r in config.network_security_group_ids if r not in regions]
+    if unknown_regions:
+        raise ServerClientError(
+            msg=(
+                f"`network_security_group_ids` specifies regions not in `regions`:"
+                f" {unknown_regions}. This is likely a typo — remove the extra keys or add"
+                " them to `regions`"
+            ),
+            fields=[["network_security_group_ids"]],
         )
 
 

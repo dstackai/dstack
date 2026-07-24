@@ -9,7 +9,9 @@ from dstack._internal.core.backends.aws.resources import (
     _is_valid_tag_key,
     _is_valid_tag_value,
     create_instances_struct,
+    create_security_group,
     get_image_id_and_username,
+    get_security_group_id_by_name,
     validate_tags,
 )
 from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError
@@ -274,6 +276,132 @@ class TestCreateInstancesStruct:
         )
         assert struct["Placement"]["GroupName"] == "pg-1"
         assert struct["Placement"]["Tenancy"] == "dedicated"
+
+
+class TestCreateSecurityGroup:
+    @pytest.fixture
+    def ec2_client_mock(self) -> Mock:
+        mock = Mock(
+            spec_set=[
+                "describe_security_groups",
+                "create_security_group",
+                "authorize_security_group_ingress",
+                "authorize_security_group_egress",
+            ]
+        )
+        # No existing group -> a new one is created and all rules are added.
+        mock.describe_security_groups.return_value = {"SecurityGroups": []}
+        mock.create_security_group.return_value = {"GroupId": "sg-new"}
+        return mock
+
+    def test_creates_and_manages_group_when_missing(self, ec2_client_mock: Mock):
+        security_group_id = create_security_group(
+            ec2_client=ec2_client_mock,
+            project_id="my-project",
+            vpc_id="vpc-1",
+        )
+        assert security_group_id == "sg-new"
+        ec2_client_mock.create_security_group.assert_called_once()
+        create_kwargs = ec2_client_mock.create_security_group.call_args.kwargs
+        assert create_kwargs["GroupName"] == "dstack_security_group_my_project"
+        assert create_kwargs["VpcId"] == "vpc-1"
+        # dstack manages the group: SSH (22) ingress + intra-group ingress are authorized,
+        # plus egress rules.
+        assert ec2_client_mock.authorize_security_group_ingress.call_count == 2
+        assert ec2_client_mock.authorize_security_group_egress.call_count == 2
+        ingress_rules = [
+            call.kwargs["IpPermissions"][0]
+            for call in ec2_client_mock.authorize_security_group_ingress.call_args_list
+        ]
+        assert {
+            "FromPort": 22,
+            "ToPort": 22,
+            "IpProtocol": "tcp",
+            "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+        } in ingress_rules
+
+    def test_reuses_existing_group_without_recreating(self, ec2_client_mock: Mock):
+        # An existing group with all managed rules already present -> no create/authorize calls.
+        ec2_client_mock.describe_security_groups.return_value = {
+            "SecurityGroups": [
+                {
+                    "GroupId": "sg-existing",
+                    "IpPermissions": [
+                        {
+                            "FromPort": 22,
+                            "ToPort": 22,
+                            "IpProtocol": "tcp",
+                            "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+                        },
+                        {
+                            "IpProtocol": "-1",
+                            "UserIdGroupPairs": [{"GroupId": "sg-existing"}],
+                        },
+                    ],
+                    "IpPermissionsEgress": [
+                        {"IpProtocol": "-1"},
+                        {
+                            "IpProtocol": "-1",
+                            "UserIdGroupPairs": [{"GroupId": "sg-existing"}],
+                        },
+                    ],
+                }
+            ]
+        }
+        security_group_id = create_security_group(
+            ec2_client=ec2_client_mock,
+            project_id="my-project",
+            vpc_id="vpc-1",
+        )
+        assert security_group_id == "sg-existing"
+        ec2_client_mock.create_security_group.assert_not_called()
+        ec2_client_mock.authorize_security_group_ingress.assert_not_called()
+        ec2_client_mock.authorize_security_group_egress.assert_not_called()
+
+
+class TestGetSecurityGroupIdByName:
+    def test_returns_id_when_found(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {
+            "SecurityGroups": [{"GroupId": "sg-found"}]
+        }
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id="vpc-1",
+        )
+        assert result == "sg-found"
+        ec2_client_mock.describe_security_groups.assert_called_once_with(
+            Filters=[
+                {"Name": "group-name", "Values": ["my-sg"]},
+                {"Name": "vpc-id", "Values": ["vpc-1"]},
+            ]
+        )
+
+    def test_omits_vpc_filter_when_vpc_id_none(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {
+            "SecurityGroups": [{"GroupId": "sg-found"}]
+        }
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id=None,
+        )
+        assert result == "sg-found"
+        ec2_client_mock.describe_security_groups.assert_called_once_with(
+            Filters=[{"Name": "group-name", "Values": ["my-sg"]}]
+        )
+
+    def test_returns_none_when_not_found(self):
+        ec2_client_mock = Mock(spec_set=["describe_security_groups"])
+        ec2_client_mock.describe_security_groups.return_value = {"SecurityGroups": []}
+        result = get_security_group_id_by_name(
+            ec2_client=ec2_client_mock,
+            name="my-sg",
+            vpc_id="vpc-1",
+        )
+        assert result is None
 
 
 class TestCreateNetworkInterfacesStruct:

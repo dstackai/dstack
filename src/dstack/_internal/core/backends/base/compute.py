@@ -320,7 +320,8 @@ class ComputeWithCreateInstanceSupport(ABC):
             user=run.user,
             ssh_keys=[SSHKey(public=project_ssh_public_key.strip())],
             volumes=volumes,
-            reservation=job.job_spec.requirements.reservation,
+            reservation=requirements.reservation,
+            security_group=requirements.security_group,
             tags=run.run_spec.merged_profile.tags,
         )
         instance_offer = instance_offer.copy()
@@ -408,6 +409,24 @@ class ComputeWithReservationSupport:
       `availability_zones` if necessary.
     - `create_instance` respects `InstanceConfig.reservation` if set, and
       provisions the instance in the configured reservation.
+    """
+
+    pass
+
+
+class ComputeWithSecurityGroupSupport:
+    """
+    Must be subclassed to support provisioning instances into a custom, user-managed
+    security group (or the backend's equivalent: Azure network security group,
+    OCI network security group).
+
+    The following is expected from a backend that supports this:
+
+    - `create_instance` respects `InstanceConfiguration.security_group` if set, and
+      attaches the given security group to the instance instead of creating and
+      managing dstack's own.
+    - The backend must not add, remove, or modify any rules on a user-supplied
+      security group. It is fully user-owned.
     """
 
     pass

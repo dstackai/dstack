@@ -556,10 +556,47 @@ def get_or_create_vcn(
 def get_or_create_subnet(
     name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.Subnet:
+    """
+    The subnet is created with an empty list of security lists
+    (`security_list_ids=[]`) instead of letting OCI attach the VCN's permissive
+    default security list. All instances - whether they use dstack's
+    auto-managed network security group (NSG) or a user-supplied custom one -
+    live in this single shared subnet, so the NSG attached to each instance's
+    VNIC is the sole security boundary; there is no separate security-list
+    layer to reason about.
+
+    A single shared subnet (rather than a second, NSG-only subnet) is required
+    because OCI NSGs are scoped to a single VCN: an NSG can only be attached to
+    a VNIC whose subnet belongs to the *same* VCN the NSG was created in. Since
+    dstack only manages one VCN, a user's custom NSG must live in - and a
+    custom-NSG instance must therefore be placed in a subnet within - that same
+    VCN.
+
+    For instances using dstack's auto-managed NSG, the rules normally
+    contributed by the security list (SSH ingress, unrestricted egress) are
+    added directly to that NSG instead; see
+    `update_security_group_rules_for_runner_instances`. Instances using a
+    user-supplied NSG get no such compensating rules - per dstack's "fully
+    hands-off" contract, it never adds, removes, or otherwise modifies rules on
+    a user-supplied security group, so the user is fully responsible for
+    allowing the traffic their instances need (including SSH).
+    """
     query_results = chain_paginated_responses(
         client.list_subnets, compartment_id=compartment_id, display_name=name
     )
     if subnet := next(query_results, None):
+        if subnet.security_list_ids:
+            # A subnet created before this fix still has the VCN's default
+            # security list attached. Since dstack owns this subnet
+            # (it is not user-supplied), it's safe to update it in place -
+            # detaching the security list so the NSG becomes the sole
+            # security boundary for every instance in it, matching newly
+            # created subnets. This is unrelated to dstack's "fully
+            # hands-off" contract for user-supplied *security groups*, which
+            # this does not touch.
+            subnet = client.update_subnet(
+                subnet.id, oci.core.models.UpdateSubnetDetails(security_list_ids=[])
+            ).data
         return subnet
 
     return client.create_subnet(
@@ -568,6 +605,7 @@ def get_or_create_subnet(
             compartment_id=compartment_id,
             display_name=name,
             vcn_id=vcn_id,
+            security_list_ids=[],
         )
     ).data
 
@@ -628,14 +666,34 @@ def get_or_create_security_group(
 def update_security_group_rules_for_runner_instances(
     security_group_id: str, client: oci.core.VirtualNetworkClient
 ) -> None:
-    # These rules are combined with subnet's default Security List that allows
-    # ingress TCP on port 22 from anywhere
+    # The subnet these instances live in has no security list attached (see
+    # `get_or_create_subnet`), so this NSG must grant everything a runner
+    # instance needs on its own: SSH ingress from anywhere and unrestricted
+    # egress, in addition to allowing all traffic between instances that share
+    # this NSG.
     rules = [
         SecurityRule(
             description="Allow all traffic within this security group",
             direction=oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS,
             source_type=oci.core.models.AddSecurityRuleDetails.SOURCE_TYPE_NETWORK_SECURITY_GROUP,
             source=security_group_id,
+            protocol="all",
+        ),
+        SecurityRule(
+            description="Allow SSH ingress from anywhere",
+            direction=oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS,
+            source_type=oci.core.models.AddSecurityRuleDetails.SOURCE_TYPE_CIDR_BLOCK,
+            source="0.0.0.0/0",
+            protocol="6",  # TCP
+            tcp_options=oci.core.models.TcpOptions(
+                destination_port_range=oci.core.models.PortRange(min=22, max=22)
+            ),
+        ),
+        SecurityRule(
+            description="Allow all egress traffic",
+            direction=oci.core.models.AddSecurityRuleDetails.DIRECTION_EGRESS,
+            destination_type=oci.core.models.AddSecurityRuleDetails.DESTINATION_TYPE_CIDR_BLOCK,
+            destination="0.0.0.0/0",
             protocol="all",
         ),
     ]

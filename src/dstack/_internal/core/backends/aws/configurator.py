@@ -77,6 +77,7 @@ class AWSConfigurator(
                 raise_invalid_credentials_error(fields=[["creds"]])
         self._check_config_tags(config)
         self._check_config_iam_instance_profile(session, config)
+        self._check_config_security_group(config)
         self._check_config_vpc(session, config)
 
     def create_backend(
@@ -144,6 +145,19 @@ class AWSConfigurator(
             logger.exception("Got exception when checking iam_instance_profile")
             raise ServerClientError(
                 f"Failed to check IAM instance profile {config.iam_instance_profile}"
+            )
+
+    def _check_config_security_group(self, config: AWSBackendConfigWithCreds):
+        if config.security_group_ids is None:
+            return
+        regions = config.regions if config.regions is not None else DEFAULT_REGIONS
+        unknown_regions = [r for r in config.security_group_ids if r not in regions]
+        if unknown_regions:
+            raise ServerClientError(
+                msg=(
+                    f"`security_group_ids` specifies regions not in `regions`: {unknown_regions}."
+                    " This is likely a typo — remove the extra keys or add them to `regions`"
+                )
             )
 
     def _check_config_vpc(self, session: Session, config: AWSBackendConfigWithCreds):

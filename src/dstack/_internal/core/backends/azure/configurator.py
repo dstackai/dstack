@@ -1,6 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import azure.core.exceptions
 from azure.core.credentials import TokenCredential
@@ -104,6 +104,7 @@ class AzureConfigurator(
         self._check_config_resource_group(config=config, credential=credential)
         self._check_config_vm_managed_identity(config=config, credential=credential)
         self._check_config_vpc(config=config, credential=credential)
+        self._check_config_network_security_groups(config)
 
     def create_backend(
         self, project_name: str, config: AzureBackendConfigWithCreds
@@ -126,6 +127,7 @@ class AzureConfigurator(
             resource_group=config.resource_group,
             locations=config.regions,
             create_default_network=config.vpc_ids is None and config.subnet_ids is None,
+            network_security_group_names=config.network_security_group_names,
         )
         return BackendRecord(
             config=AzureStoredConfig(
@@ -282,6 +284,27 @@ class AzureConfigurator(
                     except BackendError as e:
                         raise ServerClientError(e.args[0])
 
+    def _check_config_network_security_groups(self, config: AzureBackendConfigWithCreds):
+        if not config.network_security_group_names:
+            return
+        # When `regions` is None, all regions are used and there is no feasible way to validate
+        # location keys against the full list of Azure regions here, so the check is skipped.
+        if config.regions is None:
+            return
+        configured_regions = set(config.regions)
+        unknown_locations = sorted(
+            location
+            for location in config.network_security_group_names
+            if location not in configured_regions
+        )
+        if unknown_locations:
+            raise ServerClientError(
+                f"Locations {unknown_locations} in `network_security_group_names` are not in"
+                " `regions`. Otherwise, these network security groups would be silently ignored"
+                " and instances in those locations would fall back to dstack's auto-created"
+                " network security group."
+            )
+
     def _check_config_vm_managed_identity(
         self, config: AzureBackendConfigWithCreds, credential: auth.AzureCredential
     ):
@@ -340,6 +363,7 @@ class AzureConfigurator(
         resource_group: str,
         locations: List[str],
         create_default_network: bool,
+        network_security_group_names: Optional[Dict[str, str]] = None,
     ):
         def func(location: str):
             network_manager = NetworkManager(
@@ -352,11 +376,17 @@ class AzureConfigurator(
                     name=azure_utils.get_default_network_name(resource_group, location),
                     subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
                 )
-            network_manager.create_network_security_group(
-                resource_group=resource_group,
-                location=location,
-                name=azure_utils.get_default_network_security_group_name(resource_group, location),
-            )
+            if location not in (network_security_group_names or {}):
+                # Skipped when the user supplies their own network security group for this
+                # location via `network_security_group_names` - dstack does not create or manage
+                # it in that case.
+                network_manager.create_network_security_group(
+                    resource_group=resource_group,
+                    location=location,
+                    name=azure_utils.get_default_network_security_group_name(
+                        resource_group, location
+                    ),
+                )
             network_manager.create_gateway_network_security_group(
                 resource_group=resource_group,
                 location=location,
