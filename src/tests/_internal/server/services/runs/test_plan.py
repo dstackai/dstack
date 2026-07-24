@@ -134,6 +134,7 @@ class TestGetJobPlansBackendOffers:
             project=project,
             run_spec=run_spec,
             max_offers=None,
+            full_offers=False,
         )
 
         find_optimal_fleet_with_offers_mock.assert_awaited_once()
@@ -172,6 +173,7 @@ class TestGetJobPlansBackendOffers:
             project=project,
             run_spec=run_spec,
             max_offers=None,
+            full_offers=False,
         )
 
         get_targeted_instance_offers_mock.assert_awaited_once()
@@ -211,6 +213,7 @@ class TestGetPlan:
             user=user,
             run_spec=run_spec,
             max_offers=None,
+            full_offers=False,
         )
 
         select_instances_mock.assert_not_awaited()

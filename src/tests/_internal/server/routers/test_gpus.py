@@ -138,11 +138,14 @@ async def call_gpus_api(
     run_spec: RunSpec,
     group_by: Optional[List[str]] = None,
     client_version: Optional[str] = None,
+    full_offers: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
     json_data = {"run_spec": run_spec.dict()}
     if group_by is not None:
         json_data["group_by"] = group_by
+    if full_offers is not None:
+        json_data["full_offers"] = full_offers
     headers = get_auth_headers(user_token)
     if client_version is not None:
         headers["X-API-Version"] = client_version
@@ -189,6 +192,43 @@ class TestListGpus:
         assert "gpus" in response_data
         assert isinstance(response_data["gpus"], list)
         assert len(response_data["gpus"]) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("body_full_offers", "expected_full_offers"),
+        [
+            pytest.param(None, False, id="omitted-defaults-to-false"),
+            pytest.param(True, True, id="true"),
+            pytest.param(False, False, id="false"),
+        ],
+    )
+    async def test_forwards_full_offers_to_compute_get_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        body_full_offers: Optional[bool],
+        expected_full_offers: bool,
+    ):
+        user, project, repo, run_spec = await gpu_test_setup(session)
+        offer = create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)
+        mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            response = await call_gpus_api(
+                client, project.name, user.token, run_spec, full_offers=body_full_offers
+            )
+
+        assert response.status_code == 200, response.json()
+        get_offers_mock = mocked_backends[0].compute.return_value.get_offers
+        get_offers_mock.assert_called()
+        # get_offers is called as get_offers(requirements, full_offers)
+        assert all(
+            call_args.args[1] is expected_full_offers
+            for call_args in get_offers_mock.call_args_list
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

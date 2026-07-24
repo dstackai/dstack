@@ -87,6 +87,7 @@ async def get_job_plans(
     project: ProjectModel,
     run_spec: RunSpec,
     max_offers: Optional[int],
+    full_offers: bool,
 ) -> list[JobPlan]:
     """
     Returns job plans for the given run spec.
@@ -145,6 +146,7 @@ async def get_job_plans(
             replica_group_name=replica_group_name,
         )
         if candidate_fleet_models is not None:
+            # Regular job planning
             fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
                 project=project,
                 fleet_models=candidate_fleet_models,
@@ -155,8 +157,10 @@ async def get_job_plans(
                 volumes=volumes,
                 exclude_not_available=False,
                 skip_backend_offers=skip_backend_offers,
+                full_offers=full_offers,
             )
         elif run_spec.merged_profile.instances is not None:
+            # Regular job planning or offer collection
             instance_offers = await get_targeted_instance_offers(
                 session=session,
                 project=project,
@@ -166,6 +170,7 @@ async def get_job_plans(
             )
             backend_offers = []
         elif run_spec.merged_profile.fleets is not None:
+            # Offer collection
             instance_offers, backend_offers = await get_offers_in_run_candidate_fleets(
                 session=session,
                 project=project,
@@ -173,8 +178,10 @@ async def get_job_plans(
                 job=jobs[0],
                 volumes=volumes,
                 skip_backend_offers=skip_backend_offers,
+                full_offers=full_offers,
             )
         else:
+            # Offer collection
             instance_offers, backend_offers = await get_non_fleet_offers(
                 session=session,
                 project=project,
@@ -182,6 +189,7 @@ async def get_job_plans(
                 job=jobs[0],
                 volumes=volumes,
                 skip_backend_offers=skip_backend_offers,
+                full_offers=full_offers,
             )
 
         for job in jobs:
@@ -324,6 +332,7 @@ async def find_optimal_fleet_with_offers(
     exclude_not_available: bool,
     skip_backend_offers: bool = False,
     skip_backend_offers_on_pool_capacity: bool = False,
+    full_offers: bool = False,
 ) -> tuple[
     Optional[FleetModel],
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
@@ -427,6 +436,7 @@ async def find_optimal_fleet_with_offers(
                 job=job,
                 volumes=volumes,
                 max_offers=_PER_FLEET_MAX_OFFERS,
+                full_offers=full_offers,
             )
         available_backend_offers = _exclude_non_available_backend_offers(backend_offers)
         candidates_with_backend_offers.append(
@@ -459,6 +469,7 @@ async def find_optimal_fleet_with_offers(
             job=job,
             volumes=volumes,
             max_offers=None,
+            full_offers=full_offers,
         )
         if exclude_not_available:
             backend_offers = _exclude_non_available_backend_offers(backend_offers)
@@ -715,6 +726,7 @@ async def _get_backend_offers_in_fleet(
     volumes: Optional[list[list[Volume]]],
     fleet_spec: Optional[FleetSpec] = None,
     max_offers: Optional[int] = None,
+    full_offers: bool = False,
 ) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
     if fleet_spec is None:
         fleet_spec = get_fleet_spec(fleet_model)
@@ -746,6 +758,7 @@ async def _get_backend_offers_in_fleet(
             privileged=job.job_spec.privileged,
             instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
             max_offers=max_offers,
+            full_offers=full_offers,
         )
     return backend_offers
 
@@ -793,6 +806,7 @@ async def get_non_fleet_offers(
     job: Job,
     volumes: Optional[list[list[Volume]]] = None,
     skip_backend_offers: bool = False,
+    full_offers: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     list[tuple[Backend, InstanceOfferWithAvailability]],
@@ -821,6 +835,7 @@ async def get_non_fleet_offers(
             volumes=volumes,
             privileged=job.job_spec.privileged,
             instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+            full_offers=full_offers,
         )
     return instance_offers, backend_offers
 
@@ -832,6 +847,7 @@ async def get_backend_offers_in_run_candidate_fleets(
     job: Job,
     volumes: Optional[list[list[Volume]]],
     max_offers_per_fleet: Optional[int] = None,
+    full_offers: bool = False,
 ) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Returns backend offers across the run's selected candidate fleets.
@@ -860,6 +876,7 @@ async def get_backend_offers_in_run_candidate_fleets(
             job=job,
             volumes=volumes,
             max_offers=max_offers_per_fleet,
+            full_offers=full_offers,
         ):
             offer_identity = _get_backend_offer_identity(offer)
             if offer_identity not in seen_offer_identities:
@@ -876,6 +893,7 @@ async def get_offers_in_run_candidate_fleets(
     job: Job,
     volumes: Optional[list[list[Volume]]] = None,
     skip_backend_offers: bool = False,
+    full_offers: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     list[tuple[Backend, InstanceOfferWithAvailability]],
@@ -923,6 +941,7 @@ async def get_offers_in_run_candidate_fleets(
             job=job,
             volumes=volumes,
             max_offers_per_fleet=None,
+            full_offers=full_offers,
         )
     return instance_offers, backend_offers
 

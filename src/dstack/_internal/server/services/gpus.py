@@ -26,9 +26,12 @@ async def list_gpus_grouped(
     project: ProjectModel,
     run_spec: RunSpec,
     group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
+    full_offers: bool = False,
 ) -> ListGpusResponse:
     """Retrieves available GPU specifications based on a run spec, with optional grouping."""
-    offers = await _get_gpu_offers(session=session, project=project, run_spec=run_spec)
+    offers = await _get_gpu_offers(
+        session=session, project=project, run_spec=run_spec, full_offers=full_offers
+    )
     backend_gpus = _process_offers_into_backend_gpus(offers)
     group_by_set = set(group_by) if group_by else set()
     if "region" in group_by_set and "backend" not in group_by_set:
@@ -58,6 +61,7 @@ async def _get_gpu_offers(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
+    full_offers: bool,
 ) -> list[InstanceOfferWithAvailability]:
     """Fetches all available instance offers that match the run spec's GPU requirements."""
     # NOTE: Basically, this is a simplified version of get_job_plans(); keep them in sync
@@ -85,6 +89,7 @@ async def _get_gpu_offers(
             run_spec=run_spec,
             job=job,
             skip_backend_offers=skip_backend_offers,
+            full_offers=full_offers,
         )
     else:
         instance_offers, backend_offers = await get_non_fleet_offers(
@@ -93,6 +98,7 @@ async def _get_gpu_offers(
             run_spec=run_spec,
             job=job,
             skip_backend_offers=skip_backend_offers,
+            full_offers=full_offers,
         )
     return [offer for _, offer in instance_offers] + [offer for _, offer in backend_offers]
 

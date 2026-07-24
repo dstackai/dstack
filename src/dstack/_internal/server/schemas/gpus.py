@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional
 
 from pydantic import Field
 
@@ -16,6 +16,9 @@ class ListGpusRequest(CoreModel):
         description="List of fields to group by. Valid values: 'backend', 'region', 'count'. "
         "Note: 'region' can only be used together with 'backend'.",
     )
+    full_offers: Annotated[
+        bool, Field(description="Don't adjust backend offers by requirements")
+    ] = False
 
 
 class ListGpusResponse(CoreModel):

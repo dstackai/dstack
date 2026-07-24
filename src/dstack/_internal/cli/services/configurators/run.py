@@ -143,6 +143,8 @@ class BaseRunConfigurator(
                 configuration_path=configuration_path,
                 profile=profile,
                 ssh_identity_file=configurator_args.ssh_identity_file,
+                max_offers=configurator_args.max_offers,
+                full_offers=configurator_args.full_offers,
             )
         return run_plan, repo
 
@@ -386,6 +388,11 @@ class BaseRunConfigurator(
             help="Number of offers to show in the run plan",
             type=int,
             default=3,
+        )
+        configuration_group.add_argument(
+            "--full-offers",
+            action="store_true",
+            help="Show full offers not adjusted by requirements",
         )
         cls.register_env_args(configuration_group)
         register_resources_args(configuration_group)

@@ -88,6 +88,7 @@ declare type TGpusListQueryParams = {
         profile?: { name: string; default?: boolean };
         ssh_key_pub: string;
     };
+    full_offers: boolean;
 };
 
 declare type TGpusListQueryResponse = {
