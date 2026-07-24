@@ -42,7 +42,9 @@ class LambdaCompute(
         self.config = config
         self.api_client = LambdaAPIClient(config.creds.api_key)
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.LAMBDA,
             locations=self.config.regions or None,

@@ -9,6 +9,8 @@ def get_list_gpus_excludes(request: ListGpusRequest) -> Optional[IncludeExcludeD
     list_gpus_excludes: IncludeExcludeDictType = {}
     if not request.full_offers:
         list_gpus_excludes["full_offers"] = True
+    if not request.unallocated_resources:
+        list_gpus_excludes["unallocated_resources"] = True
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
     if run_spec_excludes is not None:
         list_gpus_excludes["run_spec"] = run_spec_excludes

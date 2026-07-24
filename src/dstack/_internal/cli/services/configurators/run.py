@@ -145,6 +145,7 @@ class BaseRunConfigurator(
                 ssh_identity_file=configurator_args.ssh_identity_file,
                 max_offers=configurator_args.max_offers,
                 full_offers=configurator_args.full_offers,
+                unallocated_resources=configurator_args.unallocated,
             )
         return run_plan, repo
 
@@ -393,6 +394,11 @@ class BaseRunConfigurator(
             "--full-offers",
             action="store_true",
             help="Show full offers not adjusted by requirements",
+        )
+        configuration_group.add_argument(
+            "--unallocated",
+            action="store_true",
+            help="Subtract allocated resources to show only unallocated resources",
         )
         cls.register_env_args(configuration_group)
         register_resources_args(configuration_group)

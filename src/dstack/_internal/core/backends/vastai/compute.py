@@ -90,7 +90,7 @@ class VastAICompute(
         return catalog
 
     def get_offers_by_requirements(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> List[InstanceOfferWithAvailability]:
         vastai_options = (
             get_backend_profile_options(requirements.backend_options, VastAIProfileOptions)

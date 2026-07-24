@@ -83,7 +83,7 @@ def test_vastai_compute_enables_community_cloud_by_default():
     ):
         catalog_instance = catalog_cls.return_value
         compute = VastAICompute(_config())
-        list(compute.get_offers(_requirements(), False))
+        list(compute.get_offers(_requirements(), full_offers=False, unallocated_resources=False))
         vast_provider_cls.assert_called_once()
         assert vast_provider_cls.call_args.kwargs["community_cloud"] is True
         catalog_instance.add_provider.assert_called_once()
@@ -97,7 +97,7 @@ def test_vastai_compute_can_enable_community_cloud():
     ):
         catalog_instance = catalog_cls.return_value
         compute = VastAICompute(_config(community_cloud=True))
-        list(compute.get_offers(_requirements(), False))
+        list(compute.get_offers(_requirements(), full_offers=False, unallocated_resources=False))
         vast_provider_cls.assert_called_once()
         assert vast_provider_cls.call_args.kwargs["community_cloud"] is True
         catalog_instance.add_provider.assert_called_once()
@@ -111,7 +111,7 @@ def test_vastai_compute_can_disable_community_cloud():
     ):
         catalog_instance = catalog_cls.return_value
         compute = VastAICompute(_config(community_cloud=False))
-        list(compute.get_offers(_requirements(), False))
+        list(compute.get_offers(_requirements(), full_offers=False, unallocated_resources=False))
         vast_provider_cls.assert_called_once()
         assert vast_provider_cls.call_args.kwargs["community_cloud"] is False
         catalog_instance.add_provider.assert_called_once()
