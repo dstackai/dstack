@@ -33,7 +33,7 @@ def _node_offer() -> InstanceOfferWithAvailability:
                 memory_mib=128 * 1024,
                 gpus=[Gpu(name="H100", memory_mib=80 * 1024) for _ in range(8)],
                 spot=False,
-                disk=Disk(size_mib=500 * 1024),
+                disk=Disk(size_mib=0),
             ),
         ),
         region="cluster1",
@@ -66,7 +66,7 @@ def test_get_offers_with_full_offers_keeps_full_node_resources():
     assert full_resources.cpus == 16
     assert full_resources.memory_mib == 128 * 1024
     assert len(full_resources.gpus) == 8
-    assert full_resources.disk.size_mib == 500 * 1024
+    assert full_resources.disk.size_mib == 0
 
 
 def test_get_offers_without_full_offers_adjusts_to_requested_slice():
@@ -89,5 +89,5 @@ def test_get_offers_without_full_offers_adjusts_to_requested_slice():
     assert adjusted_resources.cpus == 2
     assert adjusted_resources.memory_mib == 8 * 1024
     assert len(adjusted_resources.gpus) == 1
-    assert adjusted_resources.disk.size_mib == 100 * 1024
+    assert adjusted_resources.disk.size_mib == 0
     assert adjusted_offers[0].availability_zones == ["partition1"]

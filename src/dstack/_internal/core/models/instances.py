@@ -48,6 +48,7 @@ class Gpu(CoreModel):
 
 class Disk(CoreModel):
     size_mib: int
+    """`size_mib=0` has a special meaning -- size is unknown"""
 
 
 class Resources(CoreModel):
