@@ -98,6 +98,7 @@ class TestListBackendTypes:
             "oci",
             "runpod",
             "slurm",
+            "seeweb",
             "vastai",
             "verda",
             "vultr",

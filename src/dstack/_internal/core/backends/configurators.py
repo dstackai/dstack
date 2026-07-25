@@ -136,6 +136,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.seeweb.configurator import SeewebConfigurator
+
+    _CONFIGURATOR_CLASSES.append(SeewebConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator
 
     _CONFIGURATOR_CLASSES.append(VastAIConfigurator)
