@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Generator
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from opentelemetry.util.types import AttributeValue
     from sqlalchemy.ext.asyncio import AsyncEngine
 
 try:
@@ -54,3 +55,13 @@ def record_task_run(name: str, *, error: bool) -> None:
     if _task_runs_counter is None:
         return
     _task_runs_counter.add(1, {"task": name, "status": "error" if error else "success"})
+
+
+def set_current_span_attribute(key: str, value: "AttributeValue") -> None:
+    """
+    Sets an attribute on the currently active span.
+    No-op if OpenTelemetry is not installed or tracing is not configured.
+    """
+    if otel_trace is None:
+        return
+    otel_trace.get_current_span().set_attribute(key, value)

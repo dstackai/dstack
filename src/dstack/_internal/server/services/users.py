@@ -32,6 +32,7 @@ from dstack._internal.server.models import DecryptedString, MemberModel, UserMod
 from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.permissions import get_default_permissions
+from dstack._internal.server.utils import otel
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
@@ -397,6 +398,7 @@ async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserM
         return None
     if user.token.get_plaintext_or_error() != token:
         return None
+    otel.set_current_span_attribute("dstack.user.name", user.name)
     return user
 
 
