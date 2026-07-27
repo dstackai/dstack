@@ -15,17 +15,20 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import CreationPolicy, Profile
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.models import FleetModel, ProjectModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
+    create_instance,
     create_project,
     create_repo,
     create_user,
     get_auth_headers,
     get_fleet_spec,
+    get_instance_offer_with_availability,
     get_run_spec,
 )
 
@@ -79,6 +82,40 @@ def create_gpu_offer(
     )
 
 
+async def create_gpu_pool_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet: FleetModel,
+    name: str,
+    gpu_name: str = "A100",
+    gpu_memory_gib: float = 80,
+    price: float = 5.0,
+    backend: BackendType = BackendType.AWS,
+    region: str = "us-west-2",
+):
+    """Helper to create an idle pool instance backed by a GPU offer."""
+    offer = get_instance_offer_with_availability(
+        backend=backend,
+        region=region,
+        gpu_count=1,
+        gpu_name=gpu_name,
+        gpu_memory_gib=gpu_memory_gib,
+        cpu_count=8,
+        memory_gib=64,
+        price=price,
+    )
+    return await create_instance(
+        session=session,
+        project=project,
+        fleet=fleet,
+        name=name,
+        backend=backend,
+        region=region,
+        offer=offer,
+        price=price,
+    )
+
+
 def create_mock_backends_with_offers(
     offers_by_backend: Dict[BackendType, List[InstanceOfferWithAvailability]],
 ) -> List[Mock]:
@@ -101,11 +138,14 @@ async def call_gpus_api(
     run_spec: RunSpec,
     group_by: Optional[List[str]] = None,
     client_version: Optional[str] = None,
+    full_offers: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
     json_data = {"run_spec": run_spec.dict()}
     if group_by is not None:
         json_data["group_by"] = group_by
+    if full_offers is not None:
+        json_data["full_offers"] = full_offers
     headers = get_auth_headers(user_token)
     if client_version is not None:
         headers["X-API-Version"] = client_version
@@ -152,6 +192,43 @@ class TestListGpus:
         assert "gpus" in response_data
         assert isinstance(response_data["gpus"], list)
         assert len(response_data["gpus"]) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("body_full_offers", "expected_full_offers"),
+        [
+            pytest.param(None, False, id="omitted-defaults-to-false"),
+            pytest.param(True, True, id="true"),
+            pytest.param(False, False, id="false"),
+        ],
+    )
+    async def test_forwards_full_offers_to_compute_get_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        body_full_offers: Optional[bool],
+        expected_full_offers: bool,
+    ):
+        user, project, repo, run_spec = await gpu_test_setup(session)
+        offer = create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)
+        mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            response = await call_gpus_api(
+                client, project.name, user.token, run_spec, full_offers=body_full_offers
+            )
+
+        assert response.status_code == 200, response.json()
+        get_offers_mock = mocked_backends[0].compute.return_value.get_offers
+        get_offers_mock.assert_called()
+        # get_offers is called as get_offers(requirements, full_offers)
+        assert all(
+            call_args.args[1] is expected_full_offers
+            for call_args in get_offers_mock.call_args_list
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -216,6 +293,85 @@ class TestListGpus:
         assert response.status_code == 200
         response_data = response.json()
         assert {gpu["backend"] for gpu in response_data["gpus"]} == {"aws", "runpod"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_includes_backend_offers_when_creation_policy_reuse_or_create(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user, project, repo, _ = await gpu_test_setup(session)
+        fleet = await create_fleet(session=session, project=project, name="pool-fleet")
+        await create_gpu_pool_instance(session, project, fleet, name="pool-instance")
+
+        offers_by_backend = {
+            BackendType.AWS: [create_gpu_offer(BackendType.AWS, "L4", 24576, 1.0)]
+        }
+        mocked_backends = create_mock_backends_with_offers(offers_by_backend)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+            response = await call_gpus_api(client, project.name, user.token, run_spec)
+
+        assert response.status_code == 200
+        assert {gpu["name"] for gpu in response.json()["gpus"]} == {"A100", "L4"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_skips_backend_offers_when_creation_policy_reuse(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user, project, repo, _ = await gpu_test_setup(session)
+        fleet = await create_fleet(session=session, project=project, name="pool-fleet")
+        await create_gpu_pool_instance(session, project, fleet, name="pool-instance")
+
+        offers_by_backend = {
+            BackendType.AWS: [create_gpu_offer(BackendType.AWS, "L4", 24576, 1.0)]
+        }
+        mocked_backends = create_mock_backends_with_offers(offers_by_backend)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            # reuse skips backend offers, keeping only the existing instance.
+            run_spec = get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                profile=Profile(name="default", creation_policy=CreationPolicy.REUSE),
+            )
+            response = await call_gpus_api(client, project.name, user.token, run_spec)
+
+        assert response.status_code == 200
+        assert {gpu["name"] for gpu in response.json()["gpus"]} == {"A100"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_uses_targeted_instance_offers_when_instances_specified(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user, project, repo, _ = await gpu_test_setup(session)
+        fleet = await create_fleet(session=session, project=project, name="pool-fleet")
+        await create_gpu_pool_instance(session, project, fleet, name="targeted-instance")
+        await create_gpu_pool_instance(
+            session, project, fleet, name="other-instance", gpu_name="H100"
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            profile=Profile(name="default", instances=["targeted-instance"]),
+        )
+
+        offers_by_backend = {
+            BackendType.AWS: [create_gpu_offer(BackendType.AWS, "L4", 24576, 1.0)]
+        }
+        mocked_backends = create_mock_backends_with_offers(offers_by_backend)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            response = await call_gpus_api(client, project.name, user.token, run_spec)
+
+        assert response.status_code == 200
+        # Only the selected instance's GPU is listed: not the other instance, not backend offers.
+        assert {gpu["name"] for gpu in response.json()["gpus"]} == {"A100"}
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

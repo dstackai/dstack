@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import ScalingSpec, ServiceConf
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobStatus,
+    JobTerminationReason,
     RunStatus,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
@@ -21,6 +22,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_job_provisioning_data,
     get_run_spec,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -146,6 +148,77 @@ class TestRunPendingWorker:
         assert new_job.status == JobStatus.SUBMITTED
         assert new_job.replica_num == old_job.replica_num
         assert new_job.submission_num == old_job.submission_num + 1
+
+    async def test_resubmission_deletes_superseded_no_capacity_submissions(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """
+        On resubmission, older submissions that failed to start due to no capacity
+        without provisioning are deleted. The direct predecessor, provisioned
+        submissions, and submissions failed for other reasons are kept.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.PENDING,
+            resubmission_attempt=4,
+        )
+        old_time = get_current_datetime() - timedelta(minutes=10)
+        superseded_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=old_time,
+            submission_num=0,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        )
+        provisioned_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=old_time,
+            submission_num=1,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        other_reason_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=old_time,
+            submission_num=2,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+        )
+        predecessor_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=old_time,
+            submission_num=3,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.SUBMITTED
+        res = await session.execute(
+            select(JobModel).where(JobModel.run_id == run.id).order_by(JobModel.submission_num)
+        )
+        jobs = list(res.scalars().all())
+        assert [j.submission_num for j in jobs] == [1, 2, 3, 4]
+        assert superseded_job.id not in [j.id for j in jobs]
+        assert provisioned_job.id in [j.id for j in jobs]
+        assert other_reason_job.id in [j.id for j in jobs]
+        assert predecessor_job.id in [j.id for j in jobs]
+        assert jobs[-1].status == JobStatus.SUBMITTED
 
     async def test_noops_when_run_lock_changes_after_processing(
         self, test_db, session: AsyncSession, worker: RunWorker

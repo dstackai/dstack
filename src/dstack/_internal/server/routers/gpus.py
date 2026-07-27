@@ -37,6 +37,7 @@ async def list_gpus(
         project=project,
         run_spec=body.run_spec,
         group_by=body.group_by,
+        full_offers=body.full_offers,
     )
     patch_list_gpus_response(resp, client_version)
     return resp

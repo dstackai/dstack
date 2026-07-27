@@ -71,6 +71,7 @@ class TestResolveProvisioningImageName:
             "p4de.24xlarge",
             "g6.8xlarge",
             "g6e.8xlarge",
+            "g7.8xlarge",
             "g7e.8xlarge",
         ],
     )

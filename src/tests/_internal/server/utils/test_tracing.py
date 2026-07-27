@@ -148,19 +148,17 @@ class TestBuildLogHandler:
 
 class TestGetMetricsExporters:
     @pytest.mark.parametrize(
-        ("exporters", "prometheus_enabled", "expected"),
+        ("exporters", "expected"),
         [
-            (None, True, ["prometheus"]),
-            (None, False, ["otlp"]),
-            ("otlp", True, ["otlp"]),
-            ("prometheus, otlp", False, ["prometheus", "otlp"]),
+            (None, ["otlp"]),
+            ("prometheus", ["prometheus"]),
+            ("prometheus, otlp", ["prometheus", "otlp"]),
         ],
     )
-    def test_returns_expected(self, monkeypatch, exporters, prometheus_enabled, expected):
+    def test_returns_expected(self, monkeypatch, exporters, expected):
         from dstack._internal.server import settings
 
         monkeypatch.setattr(settings, "OTEL_METRICS_EXPORTERS", exporters)
-        monkeypatch.setattr(settings, "ENABLE_PROMETHEUS_METRICS", prometheus_enabled)
         assert _get_metrics_exporters() == expected
 
 

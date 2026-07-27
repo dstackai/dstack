@@ -48,7 +48,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
 from dstack._internal.server.models import JobModel, RunModel
-from dstack._internal.server.schemas.runs import ApplyRunPlanRequest
+from dstack._internal.server.schemas.runs import MAX_JOB_SUBMISSIONS_LIMIT, ApplyRunPlanRequest
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.services.resources import (
     set_gpu_vendor_default,
@@ -984,6 +984,47 @@ class TestListRuns:
         ]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_limits_job_submissions_by_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        submissions_num = MAX_JOB_SUBMISSIONS_LIMIT + 2
+        for submission_num in range(submissions_num):
+            await create_job(
+                session=session,
+                run=run,
+                submission_num=submission_num,
+            )
+        response = await client.post(
+            "/api/runs/list",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 200, response.json()
+        runs = response.json()
+        assert len(runs) == 1
+        job_submissions = runs[0]["jobs"][0]["job_submissions"]
+        assert len(job_submissions) == MAX_JOB_SUBMISSIONS_LIMIT
+        assert [js["submission_num"] for js in job_submissions] == list(
+            range(submissions_num - MAX_JOB_SUBMISSIONS_LIMIT, submissions_num)
+        )
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "client_version,expected_probes",
         [
@@ -1533,6 +1574,61 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("body_full_offers", "expected_full_offers"),
+        [
+            pytest.param(None, False, id="omitted-defaults-to-false"),
+            pytest.param(True, True, id="true"),
+            pytest.param(False, False, id="false"),
+        ],
+    )
+    async def test_forwards_full_offers_to_compute_get_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        body_full_offers: Optional[bool],
+        expected_full_offers: bool,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=DevEnvironmentConfiguration(ide="vscode"),
+        )
+        body: dict = {"run_spec": json.loads(run_spec.json())}
+        if body_full_offers is not None:
+            body["full_offers"] = body_full_offers
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            get_offers_mock = backend_mock.compute.return_value.get_offers
+            get_offers_mock.return_value = []
+            m.return_value = [backend_mock]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        get_offers_mock.assert_called()
+        # get_offers is called as get_offers(requirements, full_offers)
+        assert all(
+            call_args.args[1] is expected_full_offers
+            for call_args in get_offers_mock.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_privileged_true(
         self,
         test_db,
@@ -1704,7 +1800,7 @@ class TestGetRunPlan:
         )
         body = {"run_spec": json.loads(run_spec.json())}
 
-        def offers_by_requirements(requirements: Requirements):
+        def offers_by_requirements(requirements: Requirements, full_offers: bool):
             if (
                 requirements.resources.gpu is not None
                 and requirements.resources.gpu.count.min is not None
@@ -2628,14 +2724,14 @@ class TestGetRunPlan:
         global_offer = get_instance_offer_with_availability(price=1.0)
         with (
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(return_value=([(Mock(), global_offer)], [])),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(
                     side_effect=AssertionError(
-                        "_get_offers_in_run_candidate_fleets should not be called"
+                        "get_offers_in_run_candidate_fleets should not be called"
                     )
                 ),
             ) as get_offers_in_run_candidate_fleets_mock,
@@ -2693,13 +2789,13 @@ class TestGetRunPlan:
         fleet_offer = get_instance_offer_with_availability(price=2.0)
         with (
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(
-                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                    side_effect=AssertionError("get_non_fleet_offers should not be called")
                 ),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(return_value=([(Mock(), fleet_offer)], [])),
             ) as get_offers_in_run_candidate_fleets_mock,
             patch(
@@ -2761,16 +2857,16 @@ class TestGetRunPlan:
                 new=AsyncMock(return_value=(Mock(), [(Mock(), chosen_fleet_offer)], [])),
             ) as find_optimal_fleet_with_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
                 new=AsyncMock(
-                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                    side_effect=AssertionError("get_non_fleet_offers should not be called")
                 ),
             ) as get_non_fleet_offers_mock,
             patch(
-                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                "dstack._internal.server.services.runs.plan.get_offers_in_run_candidate_fleets",
                 new=AsyncMock(
                     side_effect=AssertionError(
-                        "_get_offers_in_run_candidate_fleets should not be called"
+                        "get_offers_in_run_candidate_fleets should not be called"
                     )
                 ),
             ) as get_offers_in_run_candidate_fleets_mock,

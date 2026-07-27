@@ -1192,6 +1192,16 @@ class EventTargetModel(BaseModel):
     )
     entity_project: Mapped[Optional["ProjectModel"]] = relationship()
 
+    entity_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    entity_run: Mapped[Optional["RunModel"]] = relationship()
+
+    entity_fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("fleets.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    entity_fleet: Mapped[Optional["FleetModel"]] = relationship()
+
     entity_type: Mapped[EventTargetType] = mapped_column(
         EnumAsString(EventTargetType, 100), index=True
     )

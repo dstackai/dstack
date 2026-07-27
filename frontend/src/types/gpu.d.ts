@@ -27,7 +27,7 @@ declare interface IResourcesSpecRequest {
     memory?: TRange | number | string;
     shm_size?: number | string;
     gpu?: IGPUSpecRequest | number | string;
-    disk?: { size: TRange | number | string } | number | string;
+    disk?: { size: TRange | number | string } | number | string | null;
 }
 
 declare interface ITaskConfigurationQueryParams {
@@ -88,6 +88,7 @@ declare type TGpusListQueryParams = {
         profile?: { name: string; default?: boolean };
         ssh_key_pub: string;
     };
+    full_offers: boolean;
 };
 
 declare type TGpusListQueryResponse = {

@@ -91,7 +91,7 @@ from dstack._internal.server.testing.common import (
 )
 from dstack._internal.utils.common import get_current_datetime
 
-pytestmark = pytest.mark.usefixtures("image_config_mock")
+pytestmark = pytest.mark.usefixtures("image_config_mock", "test_log_storage")
 
 
 @dataclass

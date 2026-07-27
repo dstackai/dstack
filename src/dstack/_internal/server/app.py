@@ -11,9 +11,7 @@ import sentry_sdk
 from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from packaging.version import Version
-from prometheus_client import Counter, Histogram
 
 from dstack._internal import settings as core_settings
 from dstack._internal.cli.utils.common import console
@@ -51,11 +49,13 @@ from dstack._internal.server.routers import (
     users,
     volumes,
 )
+from dstack._internal.server.services import prometheus as prometheus_service
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
+from dstack._internal.server.services.prometheus.client_metrics import http_metrics
 from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
 from dstack._internal.server.services.proxy.routers import service_proxy
 from dstack._internal.server.services.runner.pool import instance_connection_pool
@@ -72,6 +72,7 @@ from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
+    CustomStaticFiles,
     check_client_server_compatibility,
     error_detail,
     get_client_version,
@@ -83,20 +84,9 @@ from dstack._internal.utils.ssh import check_required_ssh_version
 
 logger = get_logger(__name__)
 
-# Server HTTP metrics
-REQUESTS_TOTAL = Counter(
-    "dstack_server_requests_total",
-    "Total number of HTTP requests",
-    ["method", "endpoint", "http_status", "project_name"],
-)
-REQUEST_DURATION = Histogram(
-    "dstack_server_request_duration_seconds",
-    "HTTP request duration in seconds",
-    ["method", "endpoint", "http_status", "project_name"],
-)
-
 
 def create_app() -> FastAPI:
+    prometheus_service.unregister_default_collectors()
     app = FastAPI(
         docs_url="/api/docs",
         lifespan=lifespan,
@@ -361,19 +351,13 @@ def register_routes(app: FastAPI, ui: bool = True):
         response: Response = await call_next(request)
         endpoint_label = _extract_endpoint_label(request, response)
 
-        REQUEST_DURATION.labels(
+        http_metrics.log_request(
             method=request.method,
             endpoint=endpoint_label,
             http_status=response.status_code,
             project_name=project_name,
-        ).observe(request.state.process_time)
-
-        REQUESTS_TOTAL.labels(
-            method=request.method,
-            endpoint=endpoint_label,
-            http_status=response.status_code,
-            project_name=project_name,
-        ).inc()
+            duration_seconds=request.state.process_time,
+        )
         return response
 
     @app.get("/healthcheck")
@@ -382,7 +366,7 @@ def register_routes(app: FastAPI, ui: bool = True):
 
     if ui and Path(__file__).parent.joinpath("statics").exists():
         app.mount(
-            "/", StaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
+            "/", CustomStaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
         )
 
         @app.exception_handler(404)

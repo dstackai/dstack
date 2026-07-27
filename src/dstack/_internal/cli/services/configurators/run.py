@@ -17,7 +17,11 @@ from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
 )
-from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
+from dstack._internal.cli.services.profile import (
+    apply_profile_args,
+    load_profile_from_args,
+    register_profile_args,
+)
 from dstack._internal.cli.services.repos import (
     get_repo_from_dir,
     get_repo_from_url,
@@ -68,7 +72,6 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.runs import Run
-from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
 _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
@@ -132,7 +135,7 @@ class BaseRunConfigurator(
         repo = self.get_repo(conf, configuration_path, configurator_args)
         if repo is None:
             repo = init_default_virtual_repo(api=self.api)
-        profile = load_profile(Path.cwd(), configurator_args.profile)
+        profile = load_profile_from_args(args=configurator_args, repo_dir=Path.cwd())
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
                 configuration=conf,
@@ -140,6 +143,8 @@ class BaseRunConfigurator(
                 configuration_path=configuration_path,
                 profile=profile,
                 ssh_identity_file=configurator_args.ssh_identity_file,
+                max_offers=configurator_args.max_offers,
+                full_offers=configurator_args.full_offers,
             )
         return run_plan, repo
 
@@ -383,6 +388,11 @@ class BaseRunConfigurator(
             help="Number of offers to show in the run plan",
             type=int,
             default=3,
+        )
+        configuration_group.add_argument(
+            "--full-offers",
+            action="store_true",
+            help="Show full offers not adjusted by requirements",
         )
         cls.register_env_args(configuration_group)
         register_resources_args(configuration_group)

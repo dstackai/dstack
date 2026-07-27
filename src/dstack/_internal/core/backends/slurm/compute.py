@@ -114,7 +114,11 @@ class SlurmCompute(
                 offers.extend(cluster_offers)
         return offers
 
-    def get_offers_modifiers(self, requirements: Requirements) -> list[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> list[OfferModifier]:
+        if full_offers:
+            return []
         requested_resources = get_requested_resources_from_resources_spec(requirements.resources)
         return [partial(self._offer_modifier, requested_resources)]
 

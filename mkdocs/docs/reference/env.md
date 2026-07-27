@@ -130,7 +130,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_OTEL_TRACES_BACKGROUND_SAMPLE_RATE } – The head sampling rate for background task traces. Defaults to `1.0`.
 - `DSTACK_OTEL_LOGS_ENABLED`{ #DSTACK_OTEL_LOGS_ENABLED } – Enables server log export via OTLP if set to any value. Requires the `otel` extra.
 - `DSTACK_OTEL_METRICS_ENABLED`{ #DSTACK_OTEL_METRICS_ENABLED } – Enables OpenTelemetry metrics if set to any value. Requires the `otel` extra.
-- `DSTACK_OTEL_METRICS_EXPORTERS`{ #DSTACK_OTEL_METRICS_EXPORTERS } – A comma-separated list of OpenTelemetry metrics exporters: `prometheus` (expose on the `/metrics` endpoint) and/or `otlp` (push via OTLP). Defaults to `prometheus` if `DSTACK_ENABLE_PROMETHEUS_METRICS` is set, otherwise `otlp`.
+- `DSTACK_OTEL_METRICS_EXPORTERS`{ #DSTACK_OTEL_METRICS_EXPORTERS } – A comma-separated list of OpenTelemetry metrics exporters: `otlp` (push via OTLP) and/or `prometheus` (expose on the `/metrics` endpoint). Defaults to `otlp`.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – Timeout in seconds for HTTP requests sent from the in-server proxy and gateways to service replicas. Defaults to 60.
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
@@ -216,7 +216,7 @@ $ find ~/.dstack/logs/cli/
 </div>
 
 - `DSTACK_PROJECT`{ #DSTACK_PROJECT } – Has the same effect as `--project`. Defaults to `None`.
-- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the endpoint preset agent. If unset, the existing `claude` login is used.
-- `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the endpoint preset agent. Defaults to `claude` from `PATH`.
-- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the endpoint preset agent. Defaults to `claude-opus-4-8`.
-- `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the endpoint preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.
+- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the preset agent. If unset, the existing `claude` login is used.
+- `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the preset agent. Defaults to `claude` from `PATH`.
+- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. Defaults to `claude-opus-4-8`.
+- `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.

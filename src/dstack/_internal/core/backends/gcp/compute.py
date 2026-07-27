@@ -168,7 +168,9 @@ class GCPCompute(
             offer_with_availability.region = region
         return offers_with_availability
 
-    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterable[OfferModifier]:
         modifiers = []
 
         if requirements.reservation:

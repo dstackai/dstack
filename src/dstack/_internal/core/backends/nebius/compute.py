@@ -133,7 +133,9 @@ class NebiusCompute(
             offer.with_availability(availability=InstanceAvailability.UNKNOWN) for offer in offers
         ]
 
-    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+    def get_offers_modifiers(
+        self, requirements: Requirements, full_offers: bool
+    ) -> Iterable[OfferModifier]:
         return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(

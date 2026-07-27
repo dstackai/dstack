@@ -47,9 +47,10 @@ const getRequestParams = ({
                 home_dir: '/root',
                 env: {},
                 resources: {
-                    // cpu: { min: 2 },
-                    // memory: { min: 8.0 },
-                    // disk: { size: { min: 100.0 } },
+                    // cpu/memory/disk should match ResourcesSpec.unconstrained() used by `dstack offer` CLI command
+                    cpu: { min: 1 },
+                    memory: { min: 0.0 },
+                    disk: null,
                     gpu: {
                         ...(gpu_name?.length ? { name: gpu_name } : {}),
                         ...(gpuCountMinMax ? { count: gpuCountMinMax as unknown as TRange } : {}),
@@ -66,6 +67,7 @@ const getRequestParams = ({
             profile: { name: 'default', default: false },
             ssh_key_pub: '(dummy)',
         },
+        full_offers: true,
     };
 };
 

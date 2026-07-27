@@ -3,11 +3,28 @@ from typing import Any, Dict, List, Optional
 import orjson
 import packaging.version
 from fastapi import HTTPException, Request, Response, status
+from fastapi.staticfiles import StaticFiles
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
 from dstack._internal.utils.version import parse_version
+
+
+class CustomStaticFiles(StaticFiles):
+    """
+    StaticFiles raises AssertionError on "websocket" scope type,
+    but starlette's Mount() matches both "http" and "websocket".
+    So a custom ASGI app is needed to reject WebSocket requests gracefully.
+
+    See: https://github.com/dstackai/dstack/issues/4061
+    """
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "websocket":
+            await send({"type": "websocket.close"})  # Reject the handshake
+            return
+        await super().__call__(scope, receive, send)
 
 
 class CustomORJSONResponse(Response):
