@@ -1,7 +1,7 @@
 """Add gateway scaling fields
 
 Revision ID: d35995d56249
-Revises: e9c5e7e26c78
+Revises: 4d3cbb932bb2
 Create Date: 2026-07-27 05:52:29.664340+00:00
 
 """
@@ -13,7 +13,7 @@ import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
 revision = "d35995d56249"
-down_revision = "e9c5e7e26c78"
+down_revision = "4d3cbb932bb2"
 branch_labels = None
 depends_on = None
 
