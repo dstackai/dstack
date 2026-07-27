@@ -52,7 +52,9 @@ class HotAisleCompute(
             HotAisleProvider(api_key=config.creds.api_key, team_handle=config.team_handle)
         )
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.HOTAISLE,
             locations=self.config.regions or None,

@@ -63,7 +63,9 @@ def test_get_offers_with_full_offers_keeps_full_node_resources():
         resources=ResourcesSpec(cpu="2..", memory="8GB..", gpu="1..", disk="100GB..")
     )
 
-    full_offers = list(compute.get_offers(requirements, full_offers=True))
+    full_offers = list(
+        compute.get_offers(requirements, full_offers=True, unallocated_resources=False)
+    )
 
     assert len(full_offers) == 1
     full_resources = full_offers[0].instance.resources
@@ -80,7 +82,9 @@ def test_get_offers_without_full_offers_adjusts_to_requested_slice():
         resources=ResourcesSpec(cpu="2..", memory="8GB..", gpu="1..", disk="100GB..")
     )
 
-    adjusted_offers = list(compute.get_offers(requirements, full_offers=False))
+    adjusted_offers = list(
+        compute.get_offers(requirements, full_offers=False, unallocated_resources=False)
+    )
 
     assert len(adjusted_offers) == 1
     adjusted_resources = adjusted_offers[0].instance.resources

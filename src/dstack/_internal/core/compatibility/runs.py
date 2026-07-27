@@ -72,6 +72,8 @@ def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExclude
     get_plan_excludes: IncludeExcludeDictType = {}
     if not request.full_offers:
         get_plan_excludes["full_offers"] = True
+    if not request.unallocated_resources:
+        get_plan_excludes["unallocated_resources"] = True
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
     if run_spec_excludes is not None:
         get_plan_excludes["run_spec"] = run_spec_excludes

@@ -143,7 +143,7 @@ def test_get_all_offers_uses_configurable_disk_size():
         "dstack._internal.core.backends.jarvislabs.compute.get_catalog_offers",
         return_value=[_cpu_catalog_offer()],
     ) as m:
-        offers = compute.get_all_offers_with_availability()
+        offers = compute.get_all_offers_with_availability(False)
 
     assert len(offers) == 1
     assert offers[0].availability == InstanceAvailability.AVAILABLE
@@ -162,10 +162,18 @@ def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
     )
 
     offers_250gb = list(
-        compute.get_offers(Requirements(resources=ResourcesSpec(disk="250GB")), False)
+        compute.get_offers(
+            Requirements(resources=ResourcesSpec(disk="250GB")),
+            full_offers=False,
+            unallocated_resources=False,
+        )
     )
     offers_300gb = list(
-        compute.get_offers(Requirements(resources=ResourcesSpec(disk="300GB")), False)
+        compute.get_offers(
+            Requirements(resources=ResourcesSpec(disk="300GB")),
+            full_offers=False,
+            unallocated_resources=False,
+        )
     )
 
     assert len(offers_250gb) == 1

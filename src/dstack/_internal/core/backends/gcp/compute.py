@@ -134,7 +134,9 @@ class GCPCompute(
         # Smaller TTL since we check the reservation's in_use_count, which can change often
         self._reservation_cache = ComputeTTLCache(cache=TTLCache(maxsize=8, ttl=20))
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
         zones_by_key: Dict[Tuple, List[str]] = {}
         catalog_item_filter = _make_catalog_item_filter(regions, zones_by_key)

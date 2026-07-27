@@ -477,6 +477,7 @@ class RunCollection:
         ssh_identity_file: Optional[PathLike] = None,
         max_offers: Optional[int] = None,
         full_offers: bool = False,
+        unallocated_resources: bool = False,
     ) -> RunPlan:
         """
         Get a run plan.
@@ -495,6 +496,8 @@ class RunCollection:
                 If ssh_identity_file is not specified, the user key is used.
             max_offers: Maximum number of offers returned in the run plan.
             full_offers: Return full offers not adjusted by requirements.
+            unallocated_resources: Subtract allocated resources to return only unallocated
+                resources.
 
         Returns:
             Run plan.
@@ -550,6 +553,7 @@ class RunCollection:
             run_spec=run_spec,
             max_offers=max_offers,
             full_offers=full_offers,
+            unallocated_resources=unallocated_resources,
         )
         return run_plan
 

@@ -139,6 +139,7 @@ async def call_gpus_api(
     group_by: Optional[List[str]] = None,
     client_version: Optional[str] = None,
     full_offers: Optional[bool] = None,
+    unallocated_resources: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
     json_data = {"run_spec": run_spec.dict()}
@@ -146,6 +147,8 @@ async def call_gpus_api(
         json_data["group_by"] = group_by
     if full_offers is not None:
         json_data["full_offers"] = full_offers
+    if unallocated_resources is not None:
+        json_data["unallocated_resources"] = unallocated_resources
     headers = get_auth_headers(user_token)
     if client_version is not None:
         headers["X-API-Version"] = client_version
@@ -227,6 +230,47 @@ class TestListGpus:
         # get_offers is called as get_offers(requirements, full_offers)
         assert all(
             call_args.args[1] is expected_full_offers
+            for call_args in get_offers_mock.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("body_unallocated_resources", "expected_unallocated_resources"),
+        [
+            pytest.param(None, False, id="omitted-defaults-to-false"),
+            pytest.param(True, True, id="true"),
+            pytest.param(False, False, id="false"),
+        ],
+    )
+    async def test_forwards_unallocated_resources_to_compute_get_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        body_unallocated_resources: Optional[bool],
+        expected_unallocated_resources: bool,
+    ):
+        user, project, repo, run_spec = await gpu_test_setup(session)
+        offer = create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)
+        mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            response = await call_gpus_api(
+                client,
+                project.name,
+                user.token,
+                run_spec,
+                unallocated_resources=body_unallocated_resources,
+            )
+
+        assert response.status_code == 200, response.json()
+        get_offers_mock = mocked_backends[0].compute.return_value.get_offers
+        get_offers_mock.assert_called()
+        # get_offers is called as get_offers(requirements, full_offers, unallocated_resources)
+        assert all(
+            call_args.args[2] is expected_unallocated_resources
             for call_args in get_offers_mock.call_args_list
         )
 

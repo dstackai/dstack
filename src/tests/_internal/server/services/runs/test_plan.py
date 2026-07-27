@@ -135,6 +135,7 @@ class TestGetJobPlansBackendOffers:
             run_spec=run_spec,
             max_offers=None,
             full_offers=False,
+            unallocated_resources=False,
         )
 
         find_optimal_fleet_with_offers_mock.assert_awaited_once()
@@ -174,6 +175,7 @@ class TestGetJobPlansBackendOffers:
             run_spec=run_spec,
             max_offers=None,
             full_offers=False,
+            unallocated_resources=False,
         )
 
         get_targeted_instance_offers_mock.assert_awaited_once()
@@ -214,6 +216,7 @@ class TestGetPlan:
             run_spec=run_spec,
             max_offers=None,
             full_offers=False,
+            unallocated_resources=False,
         )
 
         select_instances_mock.assert_not_awaited()

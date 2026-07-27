@@ -77,8 +77,14 @@ class RunsAPIClient(APIClientGroup):
         run_spec: RunSpec,
         max_offers: Optional[int] = None,
         full_offers: bool = False,
+        unallocated_resources: bool = False,
     ) -> RunPlan:
-        body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers, full_offers=full_offers)
+        body = GetRunPlanRequest(
+            run_spec=run_spec,
+            max_offers=max_offers,
+            full_offers=full_offers,
+            unallocated_resources=unallocated_resources,
+        )
         body = copy.deepcopy(body)
         patch_run_spec(body.run_spec)
         resp = self._request(

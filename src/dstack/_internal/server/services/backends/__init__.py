@@ -476,6 +476,7 @@ async def get_backend_offers(
     backends: List[Backend],
     requirements: Requirements,
     full_offers: bool,
+    unallocated_resources: bool,
     exclude_not_available: bool = False,
 ) -> Iterable[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
@@ -492,7 +493,8 @@ async def get_backend_offers(
 
     logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [
-        run_async(get_offers_tracked, backend, requirements, full_offers) for backend in backends
+        run_async(get_offers_tracked, backend, requirements, full_offers, unallocated_resources)
+        for backend in backends
     ]
     offers_by_backend: list[Iterable[tuple[Backend, InstanceOfferWithAvailability]]] = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
@@ -524,10 +526,10 @@ def check_backend_type_available(backend_type: BackendType):
 
 
 def get_offers_tracked(
-    backend: Backend, requirements: Requirements, full_offers: bool
+    backend: Backend, requirements: Requirements, full_offers: bool, unallocated_resources: bool
 ) -> Iterator[InstanceOfferWithAvailability]:
     start = time.time()
-    res = backend.compute().get_offers(requirements, full_offers)
+    res = backend.compute().get_offers(requirements, full_offers, unallocated_resources)
     duration = time.time() - start
     logger.debug("Got offers from %s in %.6fs", backend.TYPE.value, duration)
     return res

@@ -140,12 +140,16 @@ class KubernetesCompute(
     ComputeWithMultinodeSupport,
     Compute,
 ):
+    unallocated_resources_argument_has_effect = True
+
     def __init__(self, config: KubernetesConfig):
         super().__init__()
         self.region_cluster_map = {c.region: c for c in get_clusters_from_backend_config(config)}
         self.skip_offer_cache = RegionalSkipOfferCache(ttl=60)
 
-    def get_all_offers_with_availability(self) -> list[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> list[InstanceOfferWithAvailability]:
         offers: list[InstanceOfferWithAvailability] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             future_cluster_map: dict[
@@ -153,7 +157,7 @@ class KubernetesCompute(
             ] = {}
             for region, cluster in self.region_cluster_map.items():
                 api = client.CoreV1Api(cluster.api_client)
-                future = executor.submit(get_instance_offers, api, region)
+                future = executor.submit(get_instance_offers, api, region, unallocated_resources)
                 future_cluster_map[future] = cluster
             for future in concurrent.futures.as_completed(future_cluster_map):
                 try:

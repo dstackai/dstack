@@ -157,7 +157,9 @@ class AWSCompute(
         self._security_group_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
         self._image_id_and_username_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
 
-    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(
+        self, unallocated_resources: bool
+    ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
@@ -186,17 +188,21 @@ class AWSCompute(
     ) -> Iterable[OfferModifier]:
         return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
-    def _get_offers_cached_key(self, requirements: Requirements) -> int:
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        return self._get_offers_post_filter_cached(requirements)
+
+    def _get_offers_post_filter_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
         return hash(requirements.json())
 
-    # For `pyright: ignore` directive, see: https://github.com/tkem/cachetools/issues/394
     @cachedmethod(
         cache=lambda self: self._offers_post_filter_cache.cache,
-        key=_get_offers_cached_key,
+        key=_get_offers_post_filter_cached_key,
         lock=lambda self: self._offers_post_filter_cache.lock,
     )
-    def get_offers_post_filter(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _get_offers_post_filter_cached(
         self, requirements: Requirements
     ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
         if requirements.reservation:

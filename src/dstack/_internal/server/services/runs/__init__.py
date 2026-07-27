@@ -533,6 +533,7 @@ async def get_plan(
     run_spec: RunSpec,
     max_offers: Optional[int],
     full_offers: bool,
+    unallocated_resources: bool,
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
@@ -572,6 +573,7 @@ async def get_plan(
         run_spec=effective_run_spec,
         max_offers=max_offers,
         full_offers=full_offers,
+        unallocated_resources=unallocated_resources,
     )
     run_plan = RunPlan(
         project_name=project.name,
