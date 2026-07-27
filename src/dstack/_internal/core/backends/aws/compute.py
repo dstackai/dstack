@@ -25,6 +25,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeTTLCache,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
@@ -57,6 +58,8 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
+    GatewayLoadBalancerConfiguration,
+    GatewayLoadBalancerData,
     GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
@@ -123,6 +126,7 @@ class AWSCompute(
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
     Compute,
@@ -584,17 +588,51 @@ class AWSCompute(
         instance = response[0]
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address
-        if configuration.certificate is None or configuration.certificate.type != "acm":
-            ip_address = _get_instance_ip(instance, configuration.public_ip)
-            return GatewayProvisioningData(
-                instance_id=instance.instance_id,
-                region=configuration.region,
-                availability_zone=availability_zone,
-                ip_address=ip_address,
-            )
+        ip_address = _get_instance_ip(instance, configuration.public_ip)
+        return GatewayProvisioningData(
+            instance_id=instance.instance_id,
+            region=configuration.region,
+            availability_zone=availability_zone,
+            ip_address=ip_address,
+        )
 
+    def create_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+    ) -> GatewayLoadBalancerData:
+        """Creates an ALB, target group, and listeners for a gateway with an ACM certificate."""
+        assert configuration.certificate is not None
+        assert configuration.certificate.type == "acm"
+
+        ec2_client = self.session.client("ec2", region_name=configuration.region)
         elb_client = self.session.client("elbv2", region_name=configuration.region)
 
+        base_tags = {
+            "owner": "dstack",
+            "dstack_project": configuration.project_name,
+            "dstack_name": configuration.gateway_name,
+        }
+        if settings.DSTACK_VERSION is not None:
+            base_tags["dstack_version"] = settings.DSTACK_VERSION
+        tags = merge_tags(
+            base_tags=base_tags,
+            backend_tags=self.config.tags,
+            resource_tags=configuration.tags,
+        )
+        tags = aws_resources.filter_invalid_tags(tags)
+        tags = aws_resources.make_tags(tags)
+
+        vpc_id, subnets_ids = self._get_vpc_id_subnets_ids_or_error(
+            ec2_client=ec2_client,
+            config=self.config,
+            region=configuration.region,
+            allocate_public_ip=configuration.public_ip,
+        )
+        security_group_id = aws_resources.create_gateway_security_group(
+            ec2_client=ec2_client,
+            project_id=configuration.project_name,
+            vpc_id=vpc_id,
+        )
         lb_subnets_ids = self._get_gateway_lb_subnets_ids(
             ec2_client=ec2_client, region=configuration.region, subnets_ids=subnets_ids
         )
@@ -606,7 +644,7 @@ class AWSCompute(
         # Using short names as LB and target groups have length limit of 32.
         resources_name_prefix = generate_unique_short_backend_name()
 
-        logger.debug("Creating ALB for gateway %s...", configuration.instance_name)
+        logger.debug("Creating ALB for gateway %s...", configuration.gateway_name)
         response = elb_client.create_load_balancer(
             Name=f"{resources_name_prefix}-lb",
             Subnets=lb_subnets_ids,
@@ -619,9 +657,9 @@ class AWSCompute(
         lb = response["LoadBalancers"][0]
         lb_arn = lb["LoadBalancerArn"]
         lb_dns_name = lb["DNSName"]
-        logger.debug("Created ALB for gateway %s.", configuration.instance_name)
+        logger.debug("Created ALB for gateway %s.", configuration.gateway_name)
 
-        logger.debug("Creating Target Group for gateway %s...", configuration.instance_name)
+        logger.debug("Creating Target Group for gateway %s...", configuration.gateway_name)
         response = elb_client.create_target_group(
             Name=f"{resources_name_prefix}-tg",
             Protocol="HTTP",
@@ -630,18 +668,9 @@ class AWSCompute(
             TargetType="instance",
         )
         tg_arn = response["TargetGroups"][0]["TargetGroupArn"]
-        logger.debug("Created Target Group for gateway %s", configuration.instance_name)
+        logger.debug("Created Target Group for gateway %s", configuration.gateway_name)
 
-        logger.debug("Registering ALB target for gateway %s...", configuration.instance_name)
-        elb_client.register_targets(
-            TargetGroupArn=tg_arn,
-            Targets=[
-                {"Id": instance.instance_id, "Port": 80},
-            ],
-        )
-        logger.debug("Registered ALB target for gateway %s", configuration.instance_name)
-
-        logger.debug("Creating HTTPS ALB listener for gateway %s...", configuration.instance_name)
+        logger.debug("Creating HTTPS ALB listener for gateway %s...", configuration.gateway_name)
         response = elb_client.create_listener(
             LoadBalancerArn=lb_arn,
             Protocol="HTTPS",
@@ -658,9 +687,9 @@ class AWSCompute(
             ],
         )
         listener_arn = response["Listeners"][0]["ListenerArn"]
-        logger.debug("Created HTTPS ALB listener for gateway %s", configuration.instance_name)
+        logger.debug("Created HTTPS ALB listener for gateway %s", configuration.gateway_name)
 
-        logger.debug("Creating HTTP ALB listener for gateway %s...", configuration.instance_name)
+        logger.debug("Creating HTTP ALB listener for gateway %s...", configuration.gateway_name)
         response = elb_client.create_listener(
             LoadBalancerArn=lb_arn,
             Protocol="HTTP",
@@ -677,13 +706,9 @@ class AWSCompute(
             ],
         )
         http_listener_arn = response["Listeners"][0]["ListenerArn"]
-        logger.debug("Created HTTP ALB listener for gateway %s", configuration.instance_name)
+        logger.debug("Created HTTP ALB listener for gateway %s", configuration.gateway_name)
 
-        ip_address = _get_instance_ip(instance, configuration.public_ip)
-        return GatewayProvisioningData(
-            instance_id=instance.instance_id,
-            region=configuration.region,
-            ip_address=ip_address,
+        return GatewayLoadBalancerData(
             hostname=lb_dns_name,
             backend_data=AWSGatewayBackendData(
                 lb_arn=lb_arn,
@@ -704,34 +729,112 @@ class AWSCompute(
             region=configuration.region,
             backend_data=None,
         )
-        if configuration.certificate is None or configuration.certificate.type != "acm":
-            return
 
+    def terminate_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+        backend_data: Optional[str],
+    ) -> None:
         if backend_data is None:
             logger.error(
-                "Failed to terminate all gateway %s resources. backend_data is None.",
-                configuration.instance_name,
+                "Failed to terminate load balancer for gateway %s: backend_data is None.",
+                configuration.gateway_name,
             )
             return
-
         try:
-            backend_data_parsed = AWSGatewayBackendData.parse_raw(backend_data)
+            backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(backend_data)
         except ValidationError:
             logger.exception(
-                "Failed to terminate all gateway %s resources. backend_data parsing error.",
-                configuration.instance_name,
+                "Failed to terminate load balancer for gateway %s: backend_data parsing error.",
+                configuration.gateway_name,
             )
             return
 
         elb_client = self.session.client("elbv2", region_name=configuration.region)
 
-        logger.debug("Deleting ALB resources for gateway %s...", configuration.instance_name)
+        logger.debug("Deleting ALB resources for gateway %s...", configuration.gateway_name)
         if backend_data_parsed.http_listener_arn is not None:
             elb_client.delete_listener(ListenerArn=backend_data_parsed.http_listener_arn)
         elb_client.delete_listener(ListenerArn=backend_data_parsed.listener_arn)
         elb_client.delete_target_group(TargetGroupArn=backend_data_parsed.tg_arn)
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
-        logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
+        logger.debug("Deleted ALB resources for gateway %s.", configuration.gateway_name)
+
+    def register_gateway_replica_with_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        if gateway_backend_data is None:
+            raise ComputeError(
+                f"Cannot register gateway {configuration.gateway_name} replica with load balancer:"
+                " gateway_backend_data is None"
+            )
+        try:
+            gateway_backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(
+                gateway_backend_data
+            )
+        except ValidationError as e:
+            raise ComputeError(
+                f"Cannot register gateway {configuration.gateway_name} replica with load balancer:"
+                " gateway_backend_data parsing error"
+            ) from e
+
+        elb_client = self.session.client("elbv2", region_name=configuration.region)
+        logger.debug(
+            "Registering gateway %s replica %s with ALB target group %s...",
+            configuration.gateway_name,
+            instance_id,
+            gateway_backend_data_parsed.tg_arn,
+        )
+        elb_client.register_targets(
+            TargetGroupArn=gateway_backend_data_parsed.tg_arn,
+            Targets=[{"Id": instance_id, "Port": 80}],
+        )
+        logger.debug(
+            "Registered gateway %s replica %s with ALB target group.",
+            configuration.gateway_name,
+            instance_id,
+        )
+
+    def deregister_gateway_replica_from_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        if gateway_backend_data is None:
+            raise ComputeError(
+                f"Cannot deregister gateway {configuration.gateway_name} replica from load balancer:"
+                " gateway_backend_data is None"
+            )
+        try:
+            gateway_backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(
+                gateway_backend_data
+            )
+        except ValidationError as e:
+            raise ComputeError(
+                f"Cannot deregister gateway {configuration.gateway_name} replica from load balancer:"
+                " gateway_backend_data parsing error",
+            ) from e
+
+        elb_client = self.session.client("elbv2", region_name=configuration.region)
+        logger.debug(
+            "Deregistering gateway %s replica %s from ALB target group %s...",
+            configuration.gateway_name,
+            instance_id,
+            gateway_backend_data_parsed.tg_arn,
+        )
+        elb_client.deregister_targets(
+            TargetGroupArn=gateway_backend_data_parsed.tg_arn,
+            Targets=[{"Id": instance_id, "Port": 80}],
+        )
+        logger.debug(
+            "Deregistered gateway %s replica %s from ALB target group.",
+            configuration.gateway_name,
+            instance_id,
+        )
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, AWSVolumeConfiguration)

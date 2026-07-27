@@ -214,6 +214,20 @@ class GatewayProvisioningData(CoreModel):
     ip_address: str
     region: str
     availability_zone: Optional[str] = None
-    hostname: Optional[str] = None
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
+
+
+class GatewayLoadBalancerConfiguration(CoreModel):
+    project_name: str
+    gateway_name: str
+    region: str
+    public_ip: bool
+    certificate: Optional[AnyGatewayCertificate] = None
+    tags: Optional[Dict[str, str]] = None
+
+
+class GatewayLoadBalancerData(CoreModel):
+    hostname: str
+    backend_data: str
+    """Backend-specific JSON"""

@@ -3,12 +3,14 @@ import itertools
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy import ColumnElement, and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
+from dstack._internal.core.backends.base.compute import ComputeWithGatewayLoadBalancerSupport
+from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     GatewayReplicaStatus,
@@ -36,17 +38,19 @@ from dstack._internal.server.models import (
     GatewayModel,
     ProjectModel,
 )
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
     emit_gateway_status_change_event,
     get_gateway_compute_models,
+    get_gateway_lb_configuration,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import tracing
-from dstack._internal.utils.common import get_current_datetime, get_lowest_unused_nums
+from dstack._internal.utils.common import get_current_datetime, get_lowest_unused_nums, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -153,6 +157,18 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                     .correlate(GatewayModel)
                     .scalar_subquery()
                 )
+                unmigrated_hostname_exists_subquery = (
+                    select(GatewayComputeModel.id)
+                    .where(
+                        or_(
+                            GatewayComputeModel.gateway_id == GatewayModel.id,
+                            GatewayComputeModel.id == GatewayModel.gateway_compute_id,
+                        ),
+                        GatewayComputeModel.hostname_deprecated_readonly.is_not(None),
+                    )
+                    .correlate(GatewayModel)
+                    .exists()
+                )
                 res = await session.execute(
                     select(GatewayModel)
                     .where(
@@ -162,13 +178,23 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                             ),
                             and_(
                                 GatewayModel.status == GatewayStatus.RUNNING,
-                                GatewayModel.desired_replica_count.is_not(None),
                                 or_(
-                                    # fetch to reconcile replica count
-                                    GatewayModel.desired_replica_count
-                                    != active_replica_count_subquery,
-                                    # fetch to potentially reset attempts
-                                    GatewayModel.replica_scale_attempt > 0,
+                                    and_(
+                                        GatewayModel.desired_replica_count.is_not(None),
+                                        or_(
+                                            # fetch to reconcile replica count
+                                            GatewayModel.desired_replica_count
+                                            != active_replica_count_subquery,
+                                            # fetch to potentially reset attempts
+                                            GatewayModel.replica_scale_attempt > 0,
+                                        ),
+                                    ),
+                                    # fetch pre-0.20.30 AWS ACM gateways to migrate their hostname
+                                    # and backend_data onto GatewayModel
+                                    and_(
+                                        GatewayModel.hostname.is_(None),
+                                        unmigrated_hostname_exists_subquery,
+                                    ),
                                 ),
                             ),
                             GatewayModel.to_be_deleted == True,
@@ -250,9 +276,11 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
 
 class _GatewayUpdateMap(ItemUpdateMap, total=False):
     status: GatewayStatus
-    status_message: str
+    status_message: Optional[str]
     replica_scale_attempt: int
     last_replica_scale_attempt_at: UpdateMapDateTime
+    hostname: Optional[str]
+    backend_data: Optional[str]
 
 
 @dataclass
@@ -273,6 +301,7 @@ async def _process_submitted_item(item: GatewayPipelineItem):
                 GatewayModel.lock_token == item.lock_token,
             )
             .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
+            .options(joinedload(GatewayModel.project).selectinload(ProjectModel.backends))
             .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
         )
         gateway_model = res.unique().scalar_one_or_none()
@@ -318,10 +347,69 @@ class _SubmittedResult:
 
 
 async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedResult:
-    # NOTE: On a later stage of #3959, the SUBMITTED status may also be responsible for
-    # setting up the load balancer (e.g., AWS ALB) before replicas are created.
+    configuration = gateways_services.get_gateway_configuration(gateway_model)
+    update_map: _GatewayUpdateMap = {}
+    if configuration.certificate is not None and configuration.certificate.type == "acm":
+        try:
+            (
+                _,
+                backend,
+            ) = await backends_services.get_project_backend_with_model_by_type_or_error(
+                project=gateway_model.project, backend_type=configuration.backend
+            )
+        except BackendNotAvailable:
+            return _SubmittedResult(
+                update_map={
+                    "status": GatewayStatus.FAILED,
+                    "status_message": "Backend not available",
+                }
+            )
+        compute = backend.compute()
+        if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+            logger.error(
+                "%s: backend does not support load balancer operations", fmt(gateway_model)
+            )
+            return _SubmittedResult(
+                update_map={
+                    "status": GatewayStatus.FAILED,
+                    "status_message": "Backend does not support load balancer operations",
+                }
+            )
+        lb_configuration = get_gateway_lb_configuration(gateway_model)
+        logger.info("%s: creating gateway load balancer...", fmt(gateway_model))
+        try:
+            backend_data = await run_async(compute.create_gateway_load_balancer, lb_configuration)
+        except BackendError as e:
+            status_message = f"Backend error: {repr(e)}"
+            if len(e.args) > 0:
+                status_message = str(e.args[0])
+            logger.warning(
+                "%s: failed to create gateway load balancer: %s",
+                fmt(gateway_model),
+                status_message,
+            )
+            return _SubmittedResult(
+                update_map={
+                    "status": GatewayStatus.FAILED,
+                    "status_message": status_message,
+                }
+            )
+        except Exception:
+            logger.exception(
+                "%s: unexpected error when creating gateway load balancer", fmt(gateway_model)
+            )
+            return _SubmittedResult(
+                update_map={
+                    "status": GatewayStatus.FAILED,
+                    "status_message": "Unexpected error when creating load balancer",
+                }
+            )
+        logger.info("%s: gateway load balancer created.", fmt(gateway_model))
+        update_map["hostname"] = backend_data.hostname
+        update_map["backend_data"] = backend_data.backend_data
+
     scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas=[])
-    update_map = _GatewayUpdateMap(status=GatewayStatus.PROVISIONING)
+    update_map["status"] = GatewayStatus.PROVISIONING
     update_map.update(scale_result.gateway_update_map)
     return _SubmittedResult(
         update_map=update_map,
@@ -347,6 +435,8 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
                     GatewayComputeModel.replica_num,
                     GatewayComputeModel.created_at,
                     GatewayComputeModel.scale_in,
+                    GatewayComputeModel.hostname_deprecated_readonly,
+                    GatewayComputeModel.backend_data,
                 )
             )
         )
@@ -403,17 +493,22 @@ def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningR
         for gc in gateway_computes
         if not gc.scale_in and gc.id not in scale_result.scale_in_replica_ids
     }
+    update_map = _migrate_hostname_and_backend_data_from_legacy_replica(
+        gateway_model, gateway_computes
+    )
 
     if statuses & {GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED}:
-        return _ProvisioningResult(
-            gateway_update_map={
+        update_map.update(
+            {
                 "status": GatewayStatus.FAILED,
                 "status_message": "Failed to provision gateway replica",
-            },
+            }
+        )
+        return _ProvisioningResult(
+            gateway_update_map=update_map,
             scale_result=_ReplicaScalingResult(),  # do not scale, gateway failed
         )
 
-    update_map = _GatewayUpdateMap()
     update_map.update(scale_result.gateway_update_map)
 
     if statuses == {GatewayReplicaStatus.RUNNING} and not scale_result.needs_more_replicas:
@@ -448,6 +543,8 @@ async def _process_running_item(item: GatewayPipelineItem):
                     GatewayComputeModel.replica_num,
                     GatewayComputeModel.created_at,
                     GatewayComputeModel.scale_in,
+                    GatewayComputeModel.hostname_deprecated_readonly,
+                    GatewayComputeModel.backend_data,
                 )
             )
         )
@@ -460,6 +557,9 @@ async def _process_running_item(item: GatewayPipelineItem):
     scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_computes)
 
     update_map = _GatewayUpdateMap()
+    update_map.update(
+        _migrate_hostname_and_backend_data_from_legacy_replica(gateway_model, gateway_computes)
+    )
     update_map.update(scale_result.gateway_update_map)
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
@@ -490,10 +590,15 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                 GatewayModel.id == item.id,
                 GatewayModel.lock_token == item.lock_token,
             )
+            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
             .options(joinedload(GatewayModel.gateway_compute))
             .options(
                 selectinload(GatewayModel.gateway_computes).load_only(
-                    GatewayComputeModel.id, GatewayComputeModel.status
+                    GatewayComputeModel.id,
+                    GatewayComputeModel.status,
+                    GatewayComputeModel.hostname_deprecated_readonly,
+                    GatewayComputeModel.backend_data,
                 )
             )
         )
@@ -502,7 +607,8 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
             log_lock_token_mismatch(logger, item)
             return
 
-    result = _process_to_be_deleted_gateway(gateway_model)
+    result = await _process_to_be_deleted_gateway(gateway_model)
+
     async with get_session_ctx() as session:
         if result.delete_gateway:
             res = await session.execute(
@@ -529,7 +635,7 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                 targets=[events.Target.from_model(gateway_model)],
             )
         else:
-            update_map = _GatewayUpdateMap()
+            update_map = result.update_map
             set_processed_update_map_fields(update_map)
             set_unlock_update_map_fields(update_map)
             resolve_now_placeholders(update_map, now=get_current_datetime())
@@ -551,12 +657,54 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
 @dataclass
 class _ProcessToBeDeletedResult:
     delete_gateway: bool
+    update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
 
 
-def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
+async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
     gateway_computes = get_gateway_compute_models(gateway_model)
-    all_terminated = all(gc.status == GatewayReplicaStatus.TERMINATED for gc in gateway_computes)
-    return _ProcessToBeDeletedResult(delete_gateway=all_terminated)
+    if update_map := _migrate_hostname_and_backend_data_from_legacy_replica(
+        gateway_model, gateway_computes
+    ):
+        return _ProcessToBeDeletedResult(
+            delete_gateway=False,
+            update_map=update_map,
+        )
+    all_replicas_terminated = all(
+        gc.status == GatewayReplicaStatus.TERMINATED for gc in gateway_computes
+    )
+    lb_terminated = True
+    if all_replicas_terminated and gateway_model.hostname is not None:
+        lb_terminated = await _terminate_gateway_load_balancer(gateway_model)
+    return _ProcessToBeDeletedResult(delete_gateway=all_replicas_terminated and lb_terminated)
+
+
+async def _terminate_gateway_load_balancer(gateway_model: GatewayModel) -> bool:
+    """Terminates the gateway's load balancer. Returns True on success, False on failure."""
+    configuration = gateways_services.get_gateway_configuration(gateway_model)
+    try:
+        (_, backend) = await backends_services.get_project_backend_with_model_by_type_or_error(
+            project=gateway_model.project, backend_type=configuration.backend
+        )
+    except BackendNotAvailable:
+        logger.error(
+            "%s: backend not available, cannot terminate load balancer", fmt(gateway_model)
+        )
+        return False
+    compute = backend.compute()
+    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+        logger.error("%s: backend does not support load balancer operations", fmt(gateway_model))
+        return False
+    lb_configuration = get_gateway_lb_configuration(gateway_model)
+    logger.info("%s: terminating gateway load balancer...", fmt(gateway_model))
+    try:
+        await run_async(
+            compute.terminate_gateway_load_balancer, lb_configuration, gateway_model.backend_data
+        )
+    except Exception:
+        logger.exception("%s: error when terminating gateway load balancer", fmt(gateway_model))
+        return False
+    logger.info("%s: gateway load balancer terminated.", fmt(gateway_model))
+    return True
 
 
 REPLICA_SCALE_IN_PRIORITY: dict[GatewayReplicaStatus, int] = {
@@ -736,3 +884,31 @@ async def _apply_replica_scaling(
             actor=events.SystemActor(),
             targets=[events.Target.from_model(gateway_model)],
         )
+
+
+def _migrate_hostname_and_backend_data_from_legacy_replica(
+    gateway_model: GatewayModel,
+    gateway_computes: list[GatewayComputeModel],
+) -> _GatewayUpdateMap:
+    """
+    Move `hostname` and `backend_data` from pre-0.20.30 GatewayComputeModel onto GatewayModel.
+
+    Alembic migration ecc9e8a0bfac does the same thing. This function is a fallback in case any
+    gateways are created by an older server replica after the migration passes.
+    """
+    if gateway_model.hostname is not None:
+        return {}
+    for gateway_compute in gateway_computes:
+        if gateway_compute.hostname_deprecated_readonly is not None:
+            update_map: _GatewayUpdateMap = {
+                "hostname": gateway_compute.hostname_deprecated_readonly,
+                # Pre-0.20.30 AWS ACM gateways used GatewayComputeModel.backend_data exclusively
+                # for load-balancer related fields, and not for gateway replica instance fields.
+                # So GatewayComputeModel.backend_data is copied entirely.
+                "backend_data": gateway_compute.backend_data,
+            }
+            logger.info(
+                "%s: migrating hostname and backend_data onto GatewayModel", fmt(gateway_model)
+            )
+            return update_map
+    return {}

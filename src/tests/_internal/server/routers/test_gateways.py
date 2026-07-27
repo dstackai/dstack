@@ -736,27 +736,14 @@ class TestCreateGateway:
                     "name": "test",
                     "backend": "aws",
                     "region": "us",
-                    "certificate": {
-                        "type": "acm",
-                        "arn": "arn:aws:acm:us-east-1:123456789:certificate/abc",
-                    },
-                    "replicas": 2,
-                },
-                "Replicated gateways do not support certificates."
-                " Set either `certificate: null` or `replicas: 1` in the gateway configuration",
-                id="multi-replica-with-acm-cert",
-            ),
-            pytest.param(
-                {
-                    "type": "gateway",
-                    "name": "test",
-                    "backend": "aws",
-                    "region": "us",
                     "certificate": {"type": "lets-encrypt"},
                     "replicas": 2,
                 },
-                "Replicated gateways do not support certificates."
-                " Set either `certificate: null` or `replicas: 1` in the gateway configuration",
+                "The `lets-encrypt` certificate type is not supported for gateways with `replicas`"
+                " greater than `1`. To create a replicated gateway, set the `certificate`"
+                " configuration property to one of the supported values, such as"
+                " `certificate: null` (no HTTPS)"
+                " or `certificate: { type: acm, arn: <arn> }` (AWS ACM)",
                 id="multi-replica-with-letsencrypt-cert",
             ),
             pytest.param(

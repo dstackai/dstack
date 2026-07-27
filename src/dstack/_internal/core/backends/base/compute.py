@@ -30,6 +30,8 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
+    GatewayLoadBalancerConfiguration,
+    GatewayLoadBalancerData,
     GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
@@ -574,6 +576,55 @@ class ComputeWithGatewaySupport(ABC):
         """
         Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
         but may perform additional work such as deleting a load balancer when a gateway has one.
+        """
+        pass
+
+
+class ComputeWithGatewayLoadBalancerSupport(ABC):
+    """
+    Must be subclassed and implemented to support gateways with a load balancer that fronts
+    all replica instances.
+
+    Backends implementing this mixin must also implement `ComputeWithGatewaySupport`.
+    """
+
+    @abstractmethod
+    def create_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+    ) -> GatewayLoadBalancerData:
+        """Creates the load balancer for a gateway."""
+        pass
+
+    @abstractmethod
+    def terminate_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+        backend_data: Optional[str],
+    ) -> None:
+        """Deletes the load balancer."""
+        pass
+
+    @abstractmethod
+    def register_gateway_replica_with_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        """Registers a gateway replica instance as a target of the load balancer."""
+        pass
+
+    @abstractmethod
+    def deregister_gateway_replica_from_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        """Deregisters a gateway replica instance from the load balancer.
+
+        If the replica is not registered, it should not raise errors but return silently.
         """
         pass
 
