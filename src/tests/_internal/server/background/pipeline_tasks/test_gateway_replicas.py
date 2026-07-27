@@ -80,6 +80,7 @@ class TestGatewayReplicaFetcher:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
+            replicas=7,
         )
         now = get_current_datetime()
         stale = now - timedelta(minutes=1)
@@ -278,6 +279,36 @@ class TestGatewayReplicaFetcher:
         items = await fetcher.fetch(limit=10)
 
         assert len(items) == 0
+
+    async def test_fetch_includes_running_replica_marked_for_scale_in(
+        self,
+        test_db,
+        session: AsyncSession,
+        fetcher: GatewayReplicaFetcher,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        stale = get_current_datetime() - timedelta(minutes=1)
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            last_processed_at=stale,
+        )
+        compute.scale_in = True
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert len(items) == 1
+        assert items[0].id == compute.id
+        assert items[0].status == GatewayReplicaStatus.RUNNING
 
 
 @pytest.mark.asyncio
@@ -510,6 +541,43 @@ class TestGatewayReplicaWorkerSubmitted:
         assert compute.active is False
         assert compute.deleted is True
 
+    async def test_submitted_to_terminated_when_scaled_in(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            ip_address=None,
+            instance_id=None,
+            region=None,
+            status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
+        )
+        compute.scale_in = True
+        _lock_compute(compute)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as m:
+            await worker.process(_compute_to_pipeline_item(compute))
+            m.assert_not_called()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATED
+        assert compute.active is False
+        assert compute.deleted is True
+        assert compute.status_message == "Scaled in"
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -567,6 +635,34 @@ class TestGatewayReplicaWorkerRunning:
         await session.refresh(compute)
         assert compute.status == GatewayReplicaStatus.TERMINATING
         assert compute.active is False
+
+    async def test_running_to_terminating_when_scaled_in(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            active=True,
+        )
+        compute.scale_in = True
+        _lock_compute(compute)
+        await session.commit()
+
+        await worker.process(_compute_to_pipeline_item(compute))
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATING
+        assert compute.active is False
+        assert compute.status_message == "Scaled in"
 
 
 @pytest.mark.asyncio

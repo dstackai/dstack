@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import itertools
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -77,6 +78,7 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -87,6 +89,8 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 _CONF_UPDATABLE_FIELDS = frozenset({"domain"})
+if FeatureFlags.GATEWAY_SCALING:
+    _CONF_UPDATABLE_FIELDS |= {"replicas"}
 
 
 def switch_gateway_status(
@@ -267,6 +271,11 @@ async def create_gateway(
             wildcard_domain=configuration.domain,
             configuration=configuration.json(),
             status=GatewayStatus.SUBMITTED,
+            desired_replica_count=(
+                configuration.replicas
+                if configuration.replicas is not None
+                else GATEWAY_REPLICAS_DEFAULT
+            ),
             created_at=now,
             last_processed_at=now,
         )
@@ -837,11 +846,10 @@ async def configure_gateway(
 
 
 def get_gateway_compute_models(gateway_model: GatewayModel) -> List[GatewayComputeModel]:
-    if gateway_model.gateway_computes:  # 0.20.25+ gateway
-        return list(gateway_model.gateway_computes)
+    computes = list(gateway_model.gateway_computes)
     if gateway_model.gateway_compute is not None:  # pre-0.20.25 gateway
-        return [gateway_model.gateway_compute]
-    return []
+        computes.append(gateway_model.gateway_compute)
+    return computes
 
 
 def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
@@ -889,10 +897,17 @@ def gateway_model_to_gateway(
     configuration = get_gateway_configuration(gateway_model)
     configuration.default = is_default
 
-    compute_models = sorted(get_gateway_compute_models(gateway_model), key=lambda c: c.replica_num)
+    all_compute_models = sorted(
+        get_gateway_compute_models(gateway_model), key=lambda c: c.replica_num
+    )
+    relevant_compute_models = []
+    for replica_num, compute_models_for_num in itertools.groupby(
+        all_compute_models, key=lambda c: c.replica_num
+    ):
+        relevant_compute_models.append(max(compute_models_for_num, key=lambda c: c.created_at))
     gateway_hostname = None
     replicas = []
-    for compute in compute_models:
+    for compute in relevant_compute_models:
         replicas.append(
             GatewayReplica(
                 hostname=compute.ip_address,
@@ -1045,7 +1060,14 @@ async def apply_plan(
             )
 
         gateway_model.wildcard_domain = new_configuration.domain
+        if new_configuration.replicas != current_configuration.replicas:
+            gateway_model.desired_replica_count = (
+                new_configuration.replicas
+                if new_configuration.replicas is not None
+                else GATEWAY_REPLICAS_DEFAULT
+            )
         gateway_model.configuration = new_configuration.json()
+        gateway_model.last_update_at = get_current_datetime()
         events.emit(
             session,
             f"Gateway updated. Changed fields: {format_diff_fields_for_event(diff)}",
