@@ -139,6 +139,11 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
         gpu_vendor = gpu.vendor
         gpu_name = gpu.name
         gpu_memory = gpu.memory_mib / 1024
+    # Resources.disk.size_mib = 0 -> gpuhunt.CatalogItem.disk_size = None -> gpuhunt.matches()
+    # doesn't check disk size (gpuhunt.QueryFilter.{min_disk_size,max_disk_size} are ignored)
+    disk_size: Optional[float] = None
+    if (disk_size_mib := offer.instance.resources.disk.size_mib) != 0:
+        disk_size = disk_size_mib / 1024
     return gpuhunt.CatalogItem(
         provider=offer.backend.value,
         instance_name=offer.instance.name,
@@ -152,7 +157,7 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
         spot=offer.instance.resources.spot,
-        disk_size=offer.instance.resources.disk.size_mib / 1024,
+        disk_size=disk_size,
     )
 
 

@@ -1,9 +1,20 @@
 import gpuhunt
 import pytest
 
-from dstack._internal.core.backends.base.offers import gpu_matches_gpu_spec
-from dstack._internal.core.models.instances import Gpu
-from dstack._internal.core.models.resources import GPUSpec
+from dstack._internal.core.backends.base.offers import (
+    filter_offers_by_requirements,
+    gpu_matches_gpu_spec,
+)
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import (
+    Disk,
+    Gpu,
+    InstanceOffer,
+    InstanceType,
+    Resources,
+)
+from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
+from dstack._internal.core.models.runs import Requirements
 
 NVIDIA = gpuhunt.AcceleratorVendor.NVIDIA
 AMD = gpuhunt.AcceleratorVendor.AMD
@@ -92,3 +103,52 @@ class TestGpuMatchesGpuSpec:
         # Everything matches except memory, which is below the minimum.
         spec = GPUSpec(vendor="nvidia", name="A100", memory="40GB..80GB")
         assert not gpu_matches_gpu_spec(make_gpu(name="A100", memory_gib=24), spec)
+
+
+class TestFilterOffersByRequirementsDiskSize:
+    """
+    An offer with `disk.size_mib == 0` has an unknown disk size and must not be
+    filtered out by the disk size requirement. This exercises both the
+    `offer_to_catalog_item` mapping (`size_mib=0` -> `disk_size=None`) and
+    `gpuhunt.matches` (ignores disk bounds when `disk_size is None`).
+    """
+
+    def make_offer(self, disk_size_mib: int) -> InstanceOffer:
+        # cpus/memory are chosen to satisfy the default requirements so that only the
+        # disk size decides whether the offer is filtered out.
+        return InstanceOffer(
+            backend=BackendType.SLURM,
+            instance=InstanceType(
+                name="test-instance",
+                resources=Resources(
+                    cpus=8,
+                    memory_mib=64 * 1024,
+                    gpus=[],
+                    spot=False,
+                    disk=Disk(size_mib=disk_size_mib),
+                ),
+            ),
+            region="test-region",
+            price=1.0,
+        )
+
+    def test_unknown_disk_size_ignores_disk_requirement(self):
+        # An offer with a real 0 GB disk would satisfy neither the min nor the max
+        # bound, so a match here proves the disk requirement is ignored entirely.
+        offer = self.make_offer(disk_size_mib=0)
+        requirements = Requirements(resources=ResourcesSpec(disk="100GB..200GB"))
+
+        assert list(filter_offers_by_requirements([offer], requirements)) == [offer]
+
+    def test_known_disk_size_below_min_is_filtered_out(self):
+        # A non-zero disk size is still checked, so the requirement stays effective.
+        offer = self.make_offer(disk_size_mib=50 * 1024)
+        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+
+        assert list(filter_offers_by_requirements([offer], requirements)) == []
+
+    def test_known_disk_size_within_range_matches(self):
+        offer = self.make_offer(disk_size_mib=150 * 1024)
+        requirements = Requirements(resources=ResourcesSpec(disk="100GB..200GB"))
+
+        assert list(filter_offers_by_requirements([offer], requirements)) == [offer]

@@ -449,7 +449,6 @@ def _adjust_resources(resources: Resources, requested_resources: RequestedResour
     resources.cpus = requested_resources.cpu_count
     resources.memory_mib = requested_resources.memory_mib
     resources.gpus = resources.gpus[: requested_resources.gpu_count]
-    resources.disk = Disk(size_mib=requested_resources.disk_mib)
 
 
 def _build_image_uri(image_name: str) -> str:
