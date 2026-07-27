@@ -1,7 +1,8 @@
 import threading
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
@@ -141,6 +142,10 @@ class AWSCompute(
             )
         else:  # default creds
             self.session = boto3.Session()
+        self._supported_instances = partial(
+            _supported_instances,
+            experimental_instance_types=set(self.config.experimental_instance_types or []),
+        )
         # Caches to avoid redundant API calls when provisioning many instances
         # get_offers is already cached but we still cache its sub-functions
         # with more aggressive/longer caches.
@@ -161,7 +166,7 @@ class AWSCompute(
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
-            extra_filter=_supported_instances,
+            extra_filter=self._supported_instances,
         )
         regions = list(set(i.region for i in offers))
         regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
@@ -1235,7 +1240,11 @@ def _get_regions_to_zones(session: boto3.Session, regions: List[str]) -> Dict[st
     return regions_to_zones
 
 
-def _supported_instances(offer: InstanceOffer) -> bool:
+def _supported_instances(
+    offer: InstanceOffer, experimental_instance_types: Container[str]
+) -> bool:
+    if offer.instance.name in experimental_instance_types:
+        return True
     for family in [
         "m7i.",
         "c7i.",
