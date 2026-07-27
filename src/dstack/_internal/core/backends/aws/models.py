@@ -106,6 +106,16 @@ class AWSBackendConfig(CoreModel):
             description="The mapping of instance categories (CPU, NVIDIA GPU) to AMI configurations"
         ),
     ] = None
+    experimental_instance_types: Annotated[
+        Optional[List[str]],
+        Field(
+            description=(
+                "The list of instance type names to allow provisioning in addition to"
+                " the standard supported instance families. Only works for instance types"
+                " included in `dstack`'s pricing catalog (`gpuhunt`)"
+            )
+        ),
+    ] = None
 
 
 class AWSBackendConfigWithCreds(AWSBackendConfig):
