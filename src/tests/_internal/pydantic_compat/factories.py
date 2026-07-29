@@ -11,13 +11,16 @@ from datetime import datetime, timezone
 
 from dstack._internal.core.backends.aws.models import AWSCreds
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.fleets import Fleet, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import Fleet, FleetPlan, FleetSpec, FleetStatus
 from dstack._internal.core.models.gateways import (
+    Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayStatus,
 )
 from dstack._internal.core.models.instances import (
     Disk,
@@ -39,6 +42,12 @@ from dstack._internal.core.models.profiles import (
     RetryEvent,
     SpotPolicy,
 )
+from dstack._internal.core.models.projects import (
+    Member,
+    MemberPermissions,
+    Project,
+    ProjectRole,
+)
 from dstack._internal.core.models.resources import (
     ComputeCapability,
     GPUSpec,
@@ -48,14 +57,26 @@ from dstack._internal.core.models.resources import (
 )
 from dstack._internal.core.models.runs import (
     ImagePullProgress,
+    JobPlan,
     JobProvisioningData,
     JobRuntimeData,
     JobSpec,
     Requirements,
+    RunPlan,
     RunSpec,
     ServiceSpec,
 )
+from dstack._internal.core.models.secrets import Secret
+from dstack._internal.core.models.server import ServerInfo
+from dstack._internal.core.models.users import (
+    GlobalRole,
+    User,
+    UserPermissions,
+    UserTokenCreds,
+    UserWithCreds,
+)
 from dstack._internal.core.models.volumes import (
+    Volume,
     VolumeAttachmentData,
     VolumeConfiguration,
     VolumeProvisioningData,
@@ -77,11 +98,13 @@ from dstack._internal.server.testing.common import (
     get_placement_group_provisioning_data,
     get_remote_connection_info,
     get_run_spec,
+    get_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
 )
 
-_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+# Version-4 shaped: several models annotate their id as `UUID4`, which validates the version.
+_ID = uuid.UUID("11111111-1111-4111-8111-111111111111")
 _CREATED_AT = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
 
@@ -281,6 +304,124 @@ def fleet() -> Fleet:
             )
         ],
     )
+
+
+def run_plan() -> RunPlan:
+    """
+    The single richest response tree — 67 of the 129 model classes reachable from any response
+    model are reachable only through here.
+    """
+    return RunPlan(
+        project_name="test-project",
+        user="test-user",
+        run_spec=run_spec(),
+        job_plans=[
+            JobPlan(
+                job_spec=job_spec(),
+                offers=[get_instance_offer_with_availability()],
+                total_offers=1,
+                max_price=10.5,
+            )
+        ],
+        current_resource=None,
+        action=ApplyAction.CREATE,
+    )
+
+
+def fleet_plan() -> FleetPlan:
+    return FleetPlan(
+        project_name="test-project",
+        user="test-user",
+        spec=get_fleet_spec(),
+        effective_spec=None,
+        current_resource=None,
+        offers=[get_instance_offer_with_availability()],
+        total_offers=1,
+        max_offer_price=10.5,
+        action=ApplyAction.CREATE,
+    )
+
+
+def project() -> Project:
+    return Project(
+        project_id=_ID,
+        project_name="test-project",
+        owner=user(),
+        backends=[],
+        members=[
+            Member(
+                user=user(),
+                project_role=ProjectRole.ADMIN,
+                permissions=MemberPermissions(can_manage_ssh_fleets=True),
+            )
+        ],
+        is_public=False,
+    )
+
+
+def user() -> User:
+    return User(
+        id=_ID,
+        username="test-user",
+        created_at=_CREATED_AT,
+        global_role=GlobalRole.USER,
+        email=None,
+        active=True,
+        permissions=UserPermissions(can_create_projects=True),
+    )
+
+
+def user_with_creds() -> UserWithCreds:
+    """
+    The `SerializeAsAny` case. v2 drops `creds`/`ssh_private_key` from any `User`-typed field, and
+    that drop is desired — so this fixture pins that the *top-level* response still carries them.
+    """
+    return UserWithCreds(
+        id=_ID,
+        username="test-user",
+        created_at=_CREATED_AT,
+        global_role=GlobalRole.USER,
+        email=None,
+        active=True,
+        permissions=UserPermissions(can_create_projects=True),
+        creds=UserTokenCreds(token="test-token"),
+    )
+
+
+def volume() -> Volume:
+    return get_volume(
+        id_=_ID,
+        name="test-volume",
+        project_name="test-project",
+        created_at=_CREATED_AT,
+        last_processed_at=_CREATED_AT,
+    )
+
+
+def gateway() -> Gateway:
+    return Gateway(
+        id=_ID,
+        name="test-gateway",
+        project_name="test-project",
+        backend=BackendType.AWS,
+        region="us-east-1",
+        created_at=_CREATED_AT,
+        status=GatewayStatus.RUNNING,
+        status_message=None,
+        hostname="gateway.example.com",
+        wildcard_domain=None,
+        default=True,
+        replicas=[],
+        configuration=gateway_configuration(),
+    )
+
+
+def secret() -> Secret:
+    return Secret(id=_ID, name="test-secret", value=None)
+
+
+def server_info() -> ServerInfo:
+    return ServerInfo(server_version="0.20.0")
 
 
 # --- API request bodies --------------------------------------------------------------

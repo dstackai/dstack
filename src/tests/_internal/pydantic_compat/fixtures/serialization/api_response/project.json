@@ -1,0 +1,41 @@
+{
+  "backends": [],
+  "created_at": null,
+  "is_public": false,
+  "members": [
+    {
+      "permissions": {
+        "can_manage_secrets": false,
+        "can_manage_ssh_fleets": true
+      },
+      "project_role": "admin",
+      "user": {
+        "active": true,
+        "created_at": "2024-01-02T03:04:05+00:00",
+        "email": null,
+        "global_role": "user",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "permissions": {
+          "can_create_projects": true
+        },
+        "ssh_public_key": null,
+        "username": "test-user"
+      }
+    }
+  ],
+  "owner": {
+    "active": true,
+    "created_at": "2024-01-02T03:04:05+00:00",
+    "email": null,
+    "global_role": "user",
+    "id": "11111111-1111-4111-8111-111111111111",
+    "permissions": {
+      "can_create_projects": true
+    },
+    "ssh_public_key": null,
+    "username": "test-user"
+  },
+  "project_id": "11111111-1111-4111-8111-111111111111",
+  "project_name": "test-project",
+  "templates_repo": null
+}

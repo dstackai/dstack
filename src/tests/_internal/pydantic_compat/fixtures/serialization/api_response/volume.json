@@ -1,0 +1,29 @@
+{
+  "attachment_data": null,
+  "attachments": [],
+  "configuration": {
+    "auto_cleanup_duration": null,
+    "availability_zone": null,
+    "backend": "aws",
+    "name": "test-volume",
+    "region": "eu-west-1",
+    "size": 100.0,
+    "tags": null,
+    "type": "volume",
+    "volume_id": null
+  },
+  "cost": 0,
+  "created_at": "2024-01-02T03:04:05+00:00",
+  "deleted": false,
+  "deleted_at": null,
+  "external": false,
+  "id": "11111111-1111-4111-8111-111111111111",
+  "last_processed_at": "2024-01-02T03:04:05+00:00",
+  "name": "test-volume",
+  "project_name": "test-project",
+  "provisioning_data": null,
+  "status": "active",
+  "status_message": null,
+  "user": "test_user",
+  "volume_id": null
+}

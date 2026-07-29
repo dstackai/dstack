@@ -1,0 +1,234 @@
+{
+  "action": "create",
+  "current_resource": null,
+  "effective_run_spec": null,
+  "job_plans": [
+    {
+      "job_spec": {
+        "app_specs": null,
+        "commands": [
+          "/bin/bash",
+          "-i",
+          "-c",
+          "echo hi"
+        ],
+        "env": {
+          "A": "1"
+        },
+        "file_archives": [],
+        "home_dir": null,
+        "image_name": "dstackai/base:latest",
+        "job_name": "test-run-0-0",
+        "job_num": 0,
+        "jobs_per_replica": 1,
+        "max_duration": 7200,
+        "privileged": false,
+        "probes": [],
+        "registry_auth": null,
+        "replica_group": "0",
+        "replica_num": 0,
+        "repo_code_hash": null,
+        "repo_data": null,
+        "repo_dir": "/workflow",
+        "repo_exists_action": null,
+        "requirements": {
+          "backend_options": null,
+          "max_price": 10.5,
+          "multinode": null,
+          "reservation": "test-reservation",
+          "resources": {
+            "cpu": {
+              "max": 8,
+              "min": 2
+            },
+            "disk": {
+              "size": {
+                "max": null,
+                "min": 100.0
+              }
+            },
+            "gpu": {
+              "compute_capability": [
+                8,
+                0
+              ],
+              "count": {
+                "max": 1,
+                "min": 1
+              },
+              "memory": {
+                "max": null,
+                "min": 40.0
+              },
+              "name": [
+                "A100"
+              ],
+              "total_memory": null,
+              "vendor": null
+            },
+            "memory": {
+              "max": null,
+              "min": 16.0
+            },
+            "shm_size": null
+          },
+          "spot": false
+        },
+        "retry": null,
+        "service_port": null,
+        "single_branch": null,
+        "ssh_key": null,
+        "stop_duration": null,
+        "user": null,
+        "utilization_policy": null,
+        "volumes": null,
+        "working_dir": "/workflow"
+      },
+      "max_price": 10.5,
+      "offers": [
+        {
+          "availability": "available",
+          "availability_zones": null,
+          "backend": "aws",
+          "backend_data": {},
+          "blocks": 1,
+          "instance": {
+            "name": "instance",
+            "resources": {
+              "cpu_arch": null,
+              "cpus": 2,
+              "description": "",
+              "disk": {
+                "size_mib": 102400
+              },
+              "gpus": [],
+              "memory_mib": 12288,
+              "spot": false
+            }
+          },
+          "instance_runtime": "shim",
+          "price": 1.0,
+          "region": "eu-west",
+          "total_blocks": 1
+        }
+      ],
+      "total_offers": 1
+    }
+  ],
+  "project_name": "test-project",
+  "run_spec": {
+    "configuration": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "creation_policy": null,
+      "docker": null,
+      "dstack": false,
+      "entrypoint": null,
+      "env": {},
+      "files": [],
+      "fleets": null,
+      "home_dir": "/root",
+      "ide": "vscode",
+      "idle_duration": null,
+      "image": null,
+      "inactivity_duration": null,
+      "init": [],
+      "instance_types": null,
+      "instances": null,
+      "max_duration": null,
+      "max_price": null,
+      "name": null,
+      "nvcc": null,
+      "ports": [],
+      "priority": null,
+      "privileged": false,
+      "python": null,
+      "regions": null,
+      "registry_auth": null,
+      "repos": [],
+      "reservation": null,
+      "resources": {
+        "cpu": {
+          "max": 8,
+          "min": 2
+        },
+        "disk": {
+          "size": {
+            "max": null,
+            "min": 100.0
+          }
+        },
+        "gpu": {
+          "compute_capability": null,
+          "count": {
+            "max": null,
+            "min": 0
+          },
+          "memory": null,
+          "name": null,
+          "total_memory": null,
+          "vendor": null
+        },
+        "memory": {
+          "max": null,
+          "min": 16.0
+        },
+        "shm_size": null
+      },
+      "retry": null,
+      "schedule": null,
+      "setup": [],
+      "shell": null,
+      "single_branch": null,
+      "spot_policy": null,
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "type": "dev-environment",
+      "user": null,
+      "utilization_policy": null,
+      "version": null,
+      "volumes": [],
+      "working_dir": null
+    },
+    "configuration_path": "dstack.yaml",
+    "file_archives": [],
+    "profile": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "creation_policy": null,
+      "default": false,
+      "fleets": null,
+      "idle_duration": 300,
+      "instance_types": null,
+      "instances": null,
+      "max_duration": 7200,
+      "max_price": null,
+      "name": "default",
+      "regions": null,
+      "reservation": null,
+      "retry": null,
+      "schedule": null,
+      "spot_policy": null,
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "utilization_policy": null
+    },
+    "repo_code_hash": null,
+    "repo_data": {
+      "repo_dir": "/",
+      "repo_type": "local"
+    },
+    "repo_dir": null,
+    "repo_id": "test-repo",
+    "run_name": "test-run",
+    "ssh_key_pub": "user_ssh_key",
+    "working_dir": null
+  },
+  "user": "test-user"
+}

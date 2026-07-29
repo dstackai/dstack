@@ -52,6 +52,14 @@ DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
 # Returned from a router via `CustomORJSONResponse`.
 API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "fleet": factories.fleet,
+    "fleet_plan": factories.fleet_plan,
+    "gateway": factories.gateway,
+    "project": factories.project,
+    "run_plan": factories.run_plan,
+    "secret": factories.secret,
+    "server_info": factories.server_info,
+    "user_with_creds": factories.user_with_creds,
+    "volume": factories.volume,
 }
 
 # Sent by the API client as a request body — `body=X.json()`, 40 call sites in `api/server/`.
