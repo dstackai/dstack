@@ -6,8 +6,10 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.gateways import (
+    ACMGatewayCertificate,
     GatewayProvisioningData,
     GatewayReplicaStatus,
     GatewayStatus,
@@ -716,6 +718,223 @@ class TestGatewayReplicaWorkerProvisioning:
         assert compute.status == GatewayReplicaStatus.RUNNING
         assert compute.active is True
 
+    async def test_provisioning_to_running_registers_with_load_balancer(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.PROVISIONING,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+            ) as pool_add,
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+        ):
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            register_mock = (
+                backend_mock.compute.return_value.register_gateway_replica_with_load_balancer
+            )
+            register_mock.assert_called_once()
+            call_args = register_mock.call_args.args
+            assert call_args[0] == compute.instance_id
+            assert call_args[1].gateway_name == gateway.name
+            assert call_args[2] == "lb-backend-data"
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.RUNNING
+        assert compute.active is True
+
+    async def test_provisioning_skips_load_balancer_registration_without_hostname(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.PROVISIONING,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+            ) as pool_add,
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+        ):
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            get_backends_mock.assert_not_called()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.RUNNING
+        assert compute.active is True
+
+    async def test_provisioning_to_terminating_when_load_balancer_registration_fails(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.PROVISIONING,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+            ) as pool_add,
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+        ):
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.register_gateway_replica_with_load_balancer.side_effect = Exception(
+                "boom"
+            )
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATING
+        assert compute.active is False
+        assert compute.status_message == "Error registering with load balancer"
+
+    async def test_provisioning_to_terminating_when_backend_does_not_support_load_balancer(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.PROVISIONING,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+            ) as pool_add,
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+        ):
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATING
+        assert compute.active is False
+        assert compute.status_message == "Backend does not support load balancer operations"
+
+    async def test_provisioning_waits_for_pending_acm_gateway_migration(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # migration not yet performed
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.PROVISIONING,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+        )
+        _lock_compute(compute)
+        original_last_processed_at = compute.last_processed_at
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+        ) as pool_add:
+            await worker.process(_compute_to_pipeline_item(compute))
+            pool_add.assert_not_called()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.PROVISIONING
+        assert compute.last_processed_at > original_last_processed_at
+        assert compute.lock_token is None
+
     @pytest.mark.parametrize("legacy_compute", [False, True])
     async def test_provisioning_to_terminating_if_connect_fails(
         self, test_db, session: AsyncSession, worker: GatewayReplicaWorker, legacy_compute: bool
@@ -916,6 +1135,196 @@ class TestGatewayReplicaWorkerTerminating:
         assert compute.status == GatewayReplicaStatus.TERMINATED
         assert compute.active is False
         assert compute.deleted is True
+
+    async def test_terminating_deregisters_from_load_balancer_before_terminating(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.TERMINATING,
+            active=False,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
+            ),
+        ):
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            deregister_mock = (
+                backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer
+            )
+            deregister_mock.assert_called_once()
+            call_args = deregister_mock.call_args.args
+            assert call_args[0] == compute.instance_id
+            assert call_args[1].gateway_name == gateway.name
+            assert call_args[2] == "lb-backend-data"
+            backend_mock.compute.return_value.terminate_gateway.assert_called_once()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATED
+        assert compute.active is False
+        assert compute.deleted is True
+
+    async def test_terminating_proceeds_when_load_balancer_deregistration_raises(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.TERMINATING,
+            active=False,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
+            ),
+        ):
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer.side_effect = Exception(
+                "boom"
+            )
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            backend_mock.compute.return_value.terminate_gateway.assert_called_once()
+            deregister_mock = (
+                backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer
+            )
+            deregister_mock.assert_called_once()
+
+        await session.refresh(compute)
+        # Deregistration failures do not block termination: the load balancer is expected
+        # to eventually deregister the (now-terminated) target automatically.
+        assert compute.status == GatewayReplicaStatus.TERMINATED
+        assert compute.active is False
+        assert compute.deleted is True
+
+    async def test_terminating_skips_deregistration_when_gateway_has_no_hostname(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.TERMINATING,
+            active=False,
+        )
+        _lock_compute(compute)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.services.backends.get_project_backends_with_models"
+            ) as get_backends_mock,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
+            ),
+        ):
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer.assert_not_called()
+            backend_mock.compute.return_value.terminate_gateway.assert_called_once()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATED
+
+    async def test_terminating_waits_for_pending_acm_gateway_migration(
+        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # migration not yet performed by the gateway pipeline
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.TERMINATING,
+            active=False,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+        )
+        _lock_compute(compute)
+        original_last_processed_at = compute.last_processed_at
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_compute_to_pipeline_item(compute))
+
+            backend_mock.compute.return_value.terminate_gateway.assert_not_called()
+            backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer.assert_not_called()
+
+        await session.refresh(compute)
+        assert compute.status == GatewayReplicaStatus.TERMINATING
+        assert compute.last_processed_at > original_last_processed_at
+        assert compute.lock_token is None
 
     @pytest.mark.parametrize("legacy_compute", [False, True])
     async def test_terminating_to_terminated_if_backend_not_available(
