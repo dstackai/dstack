@@ -1,0 +1,18 @@
+{
+  "choices": [
+    {
+      "delta": {
+        "content": "hi",
+        "role": "assistant"
+      },
+      "finish_reason": null,
+      "index": 0,
+      "logprobs": {}
+    }
+  ],
+  "created": null,
+  "id": null,
+  "model": "llama",
+  "object": "chat.completion.chunk",
+  "system_fingerprint": ""
+}

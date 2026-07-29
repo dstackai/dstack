@@ -1,5 +1,5 @@
 """
-Parse equality for stored blobs, request bodies, and client-side response parsing.
+Parse equality across every boundary that reads somebody else's payload.
 
 Each case is a frozen input plus two expectations: the values parsing produced, and the concrete
 classes it chose. Both are needed — `Duration(7200)` and `7200` are the same JSON, so the value
@@ -12,6 +12,9 @@ absent field that now defaults, or a sugared value.
 
 Inputs are hand-written and must never be regenerated. `--regen-fixtures` rewrites
 `*.values.json` and `*.types.json` only.
+
+Registries and test classes below follow the same surface order as `test_serialization.py`:
+db, api_request, api_response, config, runner, gateway, proxy.
 """
 
 import json
@@ -28,6 +31,11 @@ from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterReplicaRequest,
     RegisterServiceRequest,
+)
+from dstack._internal.proxy.lib.schemas.model_proxy import (
+    ChatCompletionsChunk,
+    ChatCompletionsRequest,
+    ChatCompletionsResponse,
 )
 from dstack._internal.server.schemas.runner import HealthcheckResponse, MetricsResponse
 from dstack._internal.server.schemas.volumes import CreateVolumeRequest
@@ -48,18 +56,18 @@ DB_BLOBS: dict[str, Any] = {
 }
 
 # Validated from a request body with extra="forbid": an unknown field is a user-facing error.
-REQUEST_BODIES: dict[str, Any] = {
+API_REQUESTS: dict[str, Any] = {
     "create_volume_request": CreateVolumeRequest,
 }
 
 # Parsed by the API client from a server response with extra="ignore", so an older CLI works.
-CLIENT_RESPONSES: dict[str, Any] = {
+API_RESPONSES: dict[str, Any] = {
     "fleet": Fleet,
 }
 
 # Parsed from user-authored YAML with extra="forbid". The only surface whose inputs are `.yml`,
-# because the sugar pinned here is a YAML phenomenon: `python: 3.10` is a float that only survives via
-# number->str coercion, and `16GB..` / `2..8` / an env list are shorthands people type by hand.
+# because the sugar pinned here is a YAML phenomenon: `python: 3.10` is a float that survives only
+# via number->str coercion, and `16GB..` / `2..8` / an env list are shorthands people type by hand.
 # `DstackConfiguration` dispatches every `.dstack.yml` type through its `__root__` union, so one
 # entry point covers task, service, dev-environment, fleet, volume, and gateway.
 CONFIGS: dict[str, Any] = {
@@ -70,15 +78,6 @@ CONFIGS: dict[str, Any] = {
     "volume": DstackConfiguration,
 }
 
-
-class TestDbBlobParsing:
-    @pytest.mark.parametrize("name", sorted(DB_BLOBS))
-    def test_parses_to_expected_values_and_types(self, name, regen):
-        _assert_parses(
-            "db", name, parse_ignore_extra(DB_BLOBS[name], _load_input("db", name)), regen
-        )
-
-
 # Responses the server reads back from the runner (shim), permissively: a newer runner may add
 # fields, and the server has no say over which runner version an instance is running.
 RUNNER_RESPONSES: dict[str, Any] = {
@@ -87,12 +86,81 @@ RUNNER_RESPONSES: dict[str, Any] = {
 }
 
 # Request payloads the gateway parses from the server. These schemas are plain `BaseModel`, so
-# `parse_obj` already ignores unknown fields in both pydantic versions — no shim, and nothing to
-# assert about strictness.
+# `parse_obj` already ignores unknown fields in both pydantic versions — no shim needed, and
+# nothing to assert about strictness.
 GATEWAY_REQUESTS: dict[str, Any] = {
     "register_replica_request": RegisterReplicaRequest,
     "register_service_request": RegisterServiceRequest,
 }
+
+# The model proxy. The request comes from a caller and the response from an upstream model server,
+# so both are somebody else's payload and both are read permissively. `stop` and `tool_choice` are
+# two of the unions with no common Literal to discriminate on, which makes them the clearest
+# smart-union cases in the codebase.
+PROXY_PAYLOADS: dict[str, Any] = {
+    "chat_completions_chunk": ChatCompletionsChunk,
+    "chat_completions_request": ChatCompletionsRequest,
+    "chat_completions_response": ChatCompletionsResponse,
+}
+
+
+class TestDbBlobParsing:
+    @pytest.mark.parametrize("name", sorted(DB_BLOBS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(DB_BLOBS[name], _load_input("db", name))
+        _assert_parses("db", name, model, regen)
+
+
+class TestDbBlobExtraFieldTolerance:
+    """
+    Every stored model must survive a row extended by a newer writer.
+
+    This needs no hand-written input: the serialization fixture already *is* a valid row, so
+    injecting one unknown key into it produces the exact situation an older reader faces. Covers
+    all of `serialization/db` rather than only the models with an interesting input above, because
+    failing to read a `VolumeProvisioningData` row is a distinct bug from failing to read a
+    `RunSpec` row.
+    """
+
+    @pytest.mark.parametrize("name", sorted(SERIALIZED_DB_BLOBS))
+    def test_unknown_field_is_dropped(self, name):
+        committed = (FIXTURES_DIR / "serialization" / "db" / f"{name}.json").read_text()
+        perturbed = {**json.loads(committed), "unknown_from_a_newer_writer": {"x": [1]}}
+        parsed = parse_ignore_extra(type(SERIALIZED_DB_BLOBS[name]()), perturbed)
+        assert canonicalize(parsed.json()) == canonicalize(committed)
+
+
+class TestApiRequestParsing:
+    @pytest.mark.parametrize("name", sorted(API_REQUESTS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_forbid_extra(API_REQUESTS[name], _load_input("api_request", name))
+        _assert_parses("api_request", name, model, regen)
+
+    @pytest.mark.parametrize("name", sorted(API_REQUESTS))
+    def test_unknown_field_is_still_rejected(self, name):
+        """
+        Forbidding extra fields is the feature here: it is what makes `dstack apply` report a
+        typo'd key instead of silently ignoring it. The v2 `CoreModel` forbids them by default
+        with a per-call `extra="ignore"` override, so the regression to guard against is that
+        override leaking onto a request path.
+        """
+        body = {**_load_input("api_request", name), "definitely_not_a_field": 1}
+        with pytest.raises(Exception, match="(?i)extra"):
+            parse_forbid_extra(API_REQUESTS[name], body)
+
+
+class TestApiResponseParsing:
+    @pytest.mark.parametrize("name", sorted(API_RESPONSES))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(API_RESPONSES[name], _load_input("api_response", name))
+        _assert_parses("api_response", name, model, regen)
+
+
+class TestConfigParsing:
+    @pytest.mark.parametrize("name", sorted(CONFIGS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_forbid_extra(CONFIGS[name], _load_yaml_input("config", name))
+        _assert_parses("config", name, model, regen)
 
 
 class TestRunnerResponseParsing:
@@ -109,51 +177,11 @@ class TestGatewayRequestParsing:
         _assert_parses("gateway", name, model, regen)
 
 
-class TestDbBlobExtraFieldTolerance:
-    """
-    Every stored model must survive a row extended by a newer writer.
-    """
-
-    @pytest.mark.parametrize("name", sorted(SERIALIZED_DB_BLOBS))
-    def test_unknown_field_is_dropped(self, name):
-        committed = (FIXTURES_DIR / "serialization" / "db" / f"{name}.json").read_text()
-        perturbed = {**json.loads(committed), "unknown_from_a_newer_writer": {"x": [1]}}
-        model = type(SERIALIZED_DB_BLOBS[name]())
-        parsed = parse_ignore_extra(model, perturbed)
-        assert canonicalize(parsed.json()) == canonicalize(committed)
-
-
-class TestRequestBodyParsing:
-    @pytest.mark.parametrize("name", sorted(REQUEST_BODIES))
+class TestProxyPayloadParsing:
+    @pytest.mark.parametrize("name", sorted(PROXY_PAYLOADS))
     def test_parses_to_expected_values_and_types(self, name, regen):
-        model = parse_forbid_extra(REQUEST_BODIES[name], _load_input("api_request", name))
-        _assert_parses("api_request", name, model, regen)
-
-    @pytest.mark.parametrize("name", sorted(REQUEST_BODIES))
-    def test_unknown_field_is_still_rejected(self, name):
-        """
-        Forbidding extra fields is the feature here: it is what makes `dstack apply` report a
-        typo'd key instead of silently ignoring it. The v2 `CoreModel` forbids them by default
-        with a per-call `extra="ignore"` override, so the regression to guard against is that
-        override leaking onto a request path.
-        """
-        body = {**_load_input("api_request", name), "definitely_not_a_field": 1}
-        with pytest.raises(Exception, match="(?i)extra"):
-            parse_forbid_extra(REQUEST_BODIES[name], body)
-
-
-class TestClientResponseParsing:
-    @pytest.mark.parametrize("name", sorted(CLIENT_RESPONSES))
-    def test_parses_to_expected_values_and_types(self, name, regen):
-        model = parse_ignore_extra(CLIENT_RESPONSES[name], _load_input("api_response", name))
-        _assert_parses("api_response", name, model, regen)
-
-
-class TestConfigParsing:
-    @pytest.mark.parametrize("name", sorted(CONFIGS))
-    def test_parses_to_expected_values_and_types(self, name, regen):
-        model = parse_forbid_extra(CONFIGS[name], _load_yaml_input("config", name))
-        _assert_parses("config", name, model, regen)
+        model = parse_ignore_extra(PROXY_PAYLOADS[name], _load_input("proxy", name))
+        _assert_parses("proxy", name, model, regen)
 
 
 def _assert_parses(surface: str, name: str, model, regen: bool) -> None:

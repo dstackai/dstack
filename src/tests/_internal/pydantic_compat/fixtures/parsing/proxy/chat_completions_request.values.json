@@ -1,0 +1,23 @@
+{
+  "frequency_penalty": 0.0,
+  "logit_bias": {},
+  "max_tokens": null,
+  "messages": [
+    {
+      "content": "hi",
+      "role": "user"
+    }
+  ],
+  "model": "llama",
+  "n": 1,
+  "presence_penalty": 0.0,
+  "response_format": null,
+  "seed": null,
+  "stop": "\n",
+  "stream": false,
+  "temperature": 1.0,
+  "tool_choice": "auto",
+  "tools": [],
+  "top_p": 1.0,
+  "user": null
+}

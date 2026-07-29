@@ -1,18 +1,21 @@
 """
-Serialization stability for DB blobs and API responses.
+Serialization stability across every boundary that writes a payload somebody else reads.
 
-Each model is serialized through the *production* path — `.json()` for anything written to a
-`Text` column, `CustomORJSONResponse` for anything returned from a router — and compared against a
-fixture generated under pydantic v1. On v1 these are regression tests; on the v2 branch they are
-the compat assertion.
+Each model is serialized through the *production* path — there are four distinct ones, noted on
+each registry below — and compared against a fixture generated under pydantic v1. On v1 these are
+regression tests; on the v2 branch they are the compat assertion.
 
 Nothing here may reference the duality API (`__request__` / `__response__`): these tests have to
 run unchanged on both versions, and duality is gone in v2.
 
 Disposable: this package is deleted once the v2 release is verified in prod, except for a curated
 subset of the `db/` fixtures, which outlive it because stored rows do.
+
+Registries and test classes follow the same surface order as `test_parsing.py`:
+db, api_request, api_response, runner, gateway, proxy.
 """
 
+import json
 from typing import Callable
 
 import pytest
@@ -50,7 +53,19 @@ DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
     "volume_provisioning_data": factories.volume_provisioning_data,
 }
 
-# Returned from a router via `CustomORJSONResponse`.
+# Sent by the API client as a request body — `body=X.json()`, 40 call sites in `api/server/`.
+# This is the new-CLI-against-old-server direction.
+API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "apply_fleet_plan_request": factories.apply_fleet_plan_request,
+    "apply_gateway_plan_request": factories.apply_gateway_plan_request,
+    "apply_run_plan_request": factories.apply_run_plan_request,
+    "create_volume_request": factories.create_volume_request,
+    "delete_fleets_request": factories.delete_fleets_request,
+    "save_repo_creds_request": factories.save_repo_creds_request,
+}
+
+# Returned from a router via `CustomORJSONResponse` — orjson with a `default=` hook rather than
+# `.json()`, so this path can drift away from the one above.
 API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "fleet": factories.fleet,
     "fleet_plan": factories.fleet_plan,
@@ -63,15 +78,23 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "volume": factories.volume,
 }
 
-# Sent by the API client as a request body — `body=X.json()`, 40 call sites in `api/server/`.
-# This is the new-CLI-against-old-server direction, which nothing else in the suite covers.
-API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
-    "delete_fleets_request": factories.delete_fleets_request,
-    "save_repo_creds_request": factories.save_repo_creds_request,
-    "apply_fleet_plan_request": factories.apply_fleet_plan_request,
-    "apply_gateway_plan_request": factories.apply_gateway_plan_request,
-    "apply_run_plan_request": factories.apply_run_plan_request,
-    "create_volume_request": factories.create_volume_request,
+# Sent by the server to the runner (shim) as a request body, via `.json()`.
+RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "submit_body": factories.submit_body,
+}
+
+# Returned by the gateway to the server. The request direction is not model-driven — the server
+# hand-builds those payloads — so it is covered on the parsing side instead.
+GATEWAY_RESPONSES: dict[str, Callable[[], BaseModel]] = {
+    "service_stats": factories.service_stats,
+}
+
+# Forwarded upstream by the model proxy. Dumped with `exclude_unset=True`, matching
+# `proxy/lib/services/model_proxy/clients/openai.py`, and encoded with stdlib json the way httpx
+# does for a `json=` body — the fourth distinct dump path, and the only one where
+# `__fields_set__` decides what goes on the wire.
+PROXY_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "chat_completions_request": factories.chat_completions_request,
 }
 
 
@@ -82,15 +105,6 @@ class TestDbBlobSerialization:
         assert_matches_fixture("serialization/db", name, payload, regen=regen)
 
 
-class TestApiResponseSerialization:
-    @pytest.mark.parametrize("name", sorted(API_RESPONSES))
-    def test_matches_fixture(self, name, regen):
-        # Response bodies go through orjson with a `default=` hook, not through `.json()`, so the
-        # two paths can drift apart. Serialize the way the router does.
-        payload = bytes(CustomORJSONResponse(API_RESPONSES[name]()).body)
-        assert_matches_fixture("serialization/api_response", name, payload, regen=regen)
-
-
 class TestApiRequestSerialization:
     @pytest.mark.parametrize("name", sorted(API_REQUESTS))
     def test_matches_fixture(self, name, regen):
@@ -98,16 +112,11 @@ class TestApiRequestSerialization:
         assert_matches_fixture("serialization/api_request", name, payload, regen=regen)
 
 
-# Sent by the server to the runner (shim) as a request body.
-RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
-    "submit_body": factories.submit_body,
-}
-
-# Returned by the gateway to the server. The request direction is not model-driven — the server
-# hand-builds those payloads — so it is covered on the parsing side instead.
-GATEWAY_RESPONSES: dict[str, Callable[[], BaseModel]] = {
-    "service_stats": factories.service_stats,
-}
+class TestApiResponseSerialization:
+    @pytest.mark.parametrize("name", sorted(API_RESPONSES))
+    def test_matches_fixture(self, name, regen):
+        payload = bytes(CustomORJSONResponse(API_RESPONSES[name]()).body)
+        assert_matches_fixture("serialization/api_response", name, payload, regen=regen)
 
 
 class TestRunnerRequestSerialization:
@@ -122,6 +131,13 @@ class TestGatewayResponseSerialization:
     def test_matches_fixture(self, name, regen):
         payload = GATEWAY_RESPONSES[name]().json()
         assert_matches_fixture("serialization/gateway", name, payload, regen=regen)
+
+
+class TestProxyRequestSerialization:
+    @pytest.mark.parametrize("name", sorted(PROXY_REQUESTS))
+    def test_matches_fixture(self, name, regen):
+        payload = json.dumps(PROXY_REQUESTS[name]().dict(exclude_unset=True))
+        assert_matches_fixture("serialization/proxy", name, payload, regen=regen)
 
 
 class TestFleetNodesTargetCompatHack:

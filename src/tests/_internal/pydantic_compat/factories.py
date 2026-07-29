@@ -89,6 +89,10 @@ from dstack._internal.core.models.volumes import (
     VolumeProvisioningData,
 )
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats, Stat
+from dstack._internal.proxy.lib.schemas.model_proxy import (
+    ChatCompletionsRequest,
+    ChatMessage,
+)
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanInput,
     ApplyFleetPlanRequest,
@@ -570,4 +574,24 @@ def service_stats() -> ServiceStats:
         project_name="test-project",
         run_name="test-run",
         stats={60: Stat(requests=10, request_time=0.125)},
+    )
+
+
+# --- Model proxy ---------------------------------------------------------------------------
+# The OpenAI-compatible proxy. Both directions are model-driven: a request is parsed from the
+# caller and then forwarded upstream, and the upstream's reply is parsed back.
+#
+# The forward leg is the only place in the codebase that dumps with `exclude_unset=True`
+# (`proxy/lib/services/model_proxy/clients/openai.py`), which makes `__fields_set__` load-bearing
+# here and nowhere else: if a field the caller never set starts counting as set, the proxy begins
+# sending keys the caller did not ask for, and the upstream model behaves differently.
+
+
+def chat_completions_request() -> ChatCompletionsRequest:
+    """Only some fields set on purpose — `exclude_unset` is the point."""
+    return ChatCompletionsRequest(
+        model="llama",
+        messages=[ChatMessage(role="user", content="hi")],
+        temperature=0.7,
+        stop=["\n"],
     )
