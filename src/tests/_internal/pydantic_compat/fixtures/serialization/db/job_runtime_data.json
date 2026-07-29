@@ -1,0 +1,14 @@
+{
+  "cpu": null,
+  "gpu": null,
+  "memory": null,
+  "network_mode": "host",
+  "offer": null,
+  "ports": {
+    "8080": 30080,
+    "8081": 30081
+  },
+  "username": null,
+  "volume_names": null,
+  "working_dir": null
+}

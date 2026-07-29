@@ -1,0 +1,10 @@
+{
+  "instance_id": null,
+  "instance_name": "test-instance",
+  "project_name": "test-project",
+  "reservation": null,
+  "ssh_keys": [],
+  "tags": null,
+  "user": "dstack-user",
+  "volumes": null
+}

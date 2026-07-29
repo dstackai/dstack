@@ -20,20 +20,25 @@ from typing import Any
 import pytest
 import yaml
 
+from dstack._internal.core.backends.aws.models import AWSCreds
 from dstack._internal.core.models.configurations import DstackConfiguration
 from dstack._internal.core.models.fleets import Fleet
 from dstack._internal.core.models.profiles import ProfilesConfig
-from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.volumes import CreateVolumeRequest
 from tests._internal.pydantic_compat.compare import (
     FIXTURES_DIR,
     assert_matches_fixture,
+    canonicalize,
     type_map,
 )
 from tests._internal.pydantic_compat.compat import parse_forbid_extra, parse_ignore_extra
+from tests._internal.pydantic_compat.test_serialization import DB_BLOBS as SERIALIZED_DB_BLOBS
 
 # Read from a `Text` column with extra="ignore", so a row written by a newer server loads.
 DB_BLOBS: dict[str, Any] = {
+    "aws_creds": AWSCreds,
+    "job_spec": JobSpec,
     "run_spec": RunSpec,
 }
 
@@ -53,9 +58,11 @@ CLIENT_RESPONSES: dict[str, Any] = {
 # `DstackConfiguration` dispatches every `.dstack.yml` type through its `__root__` union, so one
 # entry point covers task, service, dev-environment, fleet, volume, and gateway.
 CONFIGS: dict[str, Any] = {
-    "task_sugared": DstackConfiguration,
-    "fleet_nodes_range": DstackConfiguration,
-    "profiles_durations": ProfilesConfig,
+    "fleet": DstackConfiguration,
+    "profiles": ProfilesConfig,
+    "service": DstackConfiguration,
+    "task": DstackConfiguration,
+    "volume": DstackConfiguration,
 }
 
 
@@ -65,6 +72,20 @@ class TestDbBlobParsing:
         _assert_parses(
             "db", name, parse_ignore_extra(DB_BLOBS[name], _load_input("db", name)), regen
         )
+
+
+class TestDbBlobExtraFieldTolerance:
+    """
+    Every stored model must survive a row extended by a newer writer.
+    """
+
+    @pytest.mark.parametrize("name", sorted(SERIALIZED_DB_BLOBS))
+    def test_unknown_field_is_dropped(self, name):
+        committed = (FIXTURES_DIR / "serialization" / "db" / f"{name}.json").read_text()
+        perturbed = {**json.loads(committed), "unknown_from_a_newer_writer": {"x": [1]}}
+        model = type(SERIALIZED_DB_BLOBS[name]())
+        parsed = parse_ignore_extra(model, perturbed)
+        assert canonicalize(parsed.json()) == canonicalize(committed)
 
 
 class TestRequestBodyParsing:

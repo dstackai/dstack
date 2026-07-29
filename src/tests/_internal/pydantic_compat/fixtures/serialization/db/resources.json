@@ -1,0 +1,17 @@
+{
+  "cpu_arch": null,
+  "cpus": 8,
+  "description": "8xCPU, 16GB, 1xA100",
+  "disk": {
+    "size_mib": 102400
+  },
+  "gpus": [
+    {
+      "memory_mib": 40960,
+      "name": "A100",
+      "vendor": "nvidia"
+    }
+  ],
+  "memory_mib": 16384,
+  "spot": false
+}

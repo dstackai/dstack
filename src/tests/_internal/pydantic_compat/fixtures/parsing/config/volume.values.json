@@ -1,0 +1,11 @@
+{
+  "auto_cleanup_duration": null,
+  "availability_zone": null,
+  "backend": "aws",
+  "name": "my-volume",
+  "region": "us-east-1",
+  "size": 100.0,
+  "tags": null,
+  "type": "volume",
+  "volume_id": null
+}

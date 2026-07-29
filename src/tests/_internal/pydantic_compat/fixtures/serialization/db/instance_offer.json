@@ -1,0 +1,25 @@
+{
+  "availability": "available",
+  "availability_zones": null,
+  "backend": "aws",
+  "backend_data": {},
+  "blocks": 1,
+  "instance": {
+    "name": "instance",
+    "resources": {
+      "cpu_arch": null,
+      "cpus": 2,
+      "description": "",
+      "disk": {
+        "size_mib": 102400
+      },
+      "gpus": [],
+      "memory_mib": 12288,
+      "spot": false
+    }
+  },
+  "instance_runtime": "shim",
+  "price": 1.0,
+  "region": "eu-west",
+  "total_blocks": 1
+}

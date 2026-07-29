@@ -25,8 +25,28 @@ from tests._internal.pydantic_compat.compare import assert_matches_fixture
 
 # Written to a `Text` column via `.json()`.
 DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
+    "aws_creds": factories.aws_creds,
+    "compute_group_provisioning_data": factories.compute_group_provisioning_data,
+    "fleet_spec": factories.fleet_spec,
+    "gateway_compute_configuration": factories.gateway_compute_configuration,
+    "gateway_configuration": factories.gateway_configuration,
+    "image_pull_progress": factories.image_pull_progress,
+    "instance_configuration": factories.instance_configuration,
+    "instance_offer": factories.instance_offer,
     "job_provisioning_data": factories.job_provisioning_data,
+    "job_runtime_data": factories.job_runtime_data,
+    "job_spec": factories.job_spec,
+    "placement_group_configuration": factories.placement_group_configuration,
+    "placement_group_provisioning_data": factories.placement_group_provisioning_data,
+    "profile": factories.profile,
+    "remote_connection_info": factories.remote_connection_info,
+    "requirements": factories.requirements,
+    "resources": factories.resources,
     "run_spec": factories.run_spec,
+    "service_spec": factories.service_spec,
+    "volume_attachment_data": factories.volume_attachment_data,
+    "volume_configuration": factories.volume_configuration,
+    "volume_provisioning_data": factories.volume_provisioning_data,
 }
 
 # Returned from a router via `CustomORJSONResponse`.

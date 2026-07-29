@@ -1,0 +1,14 @@
+{
+  "/": "JobSpec",
+  "/requirements": "Requirements",
+  "/requirements/resources": "ResourcesSpec",
+  "/requirements/resources/cpu": "CPUSpec",
+  "/requirements/resources/cpu/count": "Range[int]",
+  "/requirements/resources/disk": "DiskSpec",
+  "/requirements/resources/disk/size": "Range[Memory]",
+  "/requirements/resources/disk/size/min": "Memory",
+  "/requirements/resources/gpu": "GPUSpec",
+  "/requirements/resources/gpu/count": "Range[int]",
+  "/requirements/resources/memory": "Range[Memory]",
+  "/requirements/resources/memory/min": "Memory"
+}

@@ -1,0 +1,17 @@
+{
+  "/": "DstackConfiguration",
+  "/__root__": "ServiceConfiguration",
+  "/__root__/env": "Env",
+  "/__root__/model": "OpenAIChatModel",
+  "/__root__/port": "PortMapping",
+  "/__root__/resources": "ResourcesSpec",
+  "/__root__/resources/cpu": "CPUSpec",
+  "/__root__/resources/cpu/count": "Range[int]",
+  "/__root__/resources/disk": "DiskSpec",
+  "/__root__/resources/disk/size": "Range[Memory]",
+  "/__root__/resources/disk/size/min": "Memory",
+  "/__root__/resources/gpu": "GPUSpec",
+  "/__root__/resources/gpu/count": "Range[int]",
+  "/__root__/resources/memory": "Range[Memory]",
+  "/__root__/resources/memory/min": "Memory"
+}

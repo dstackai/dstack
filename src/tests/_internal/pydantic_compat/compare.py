@@ -4,6 +4,16 @@ Fixture comparison for the pydantic v1 → v2 migration.
 Fixtures are generated under pydantic v1 and committed. The same tests then run under v2, so a
 mismatch means the two versions disagree about the wire format. Regenerating a fixture IS the act
 of accepting a wire change — every accepted diff shows up in review as a fixture diff.
+
+Layout is `fixtures/<direction>/<surface>/<model>[.<variant>].<role>`:
+
+- direction: `serialization` or `parsing`
+- surface: `db`, `api_request`, `api_response`, `config`
+- variant: omitted while a model has only one case; added to *every* case for that model as soon
+  as a second one exists, so `volume.input.yml` becomes `volume.size.input.yml` and
+  `volume.kubernetes.input.yml` together
+- role: `input` for hand-written parse inputs, `values` / `types` for generated expectations, and
+  a bare `.json` for serialization fixtures, which need no input
 """
 
 import difflib
