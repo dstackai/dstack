@@ -1,0 +1,18 @@
+{
+  "/": "DstackConfiguration",
+  "/__root__": "TaskConfiguration",
+  "/__root__/env": "Env",
+  "/__root__/env/__root__/B": "EnvSentinel",
+  "/__root__/max_duration": "Duration",
+  "/__root__/python": "PythonVersion",
+  "/__root__/resources": "ResourcesSpec",
+  "/__root__/resources/cpu": "CPUSpec",
+  "/__root__/resources/cpu/count": "Range[int]",
+  "/__root__/resources/disk": "DiskSpec",
+  "/__root__/resources/disk/size": "Range[Memory]",
+  "/__root__/resources/disk/size/min": "Memory",
+  "/__root__/resources/gpu": "GPUSpec",
+  "/__root__/resources/gpu/count": "Range[int]",
+  "/__root__/resources/memory": "Range[Memory]",
+  "/__root__/resources/memory/min": "Memory"
+}

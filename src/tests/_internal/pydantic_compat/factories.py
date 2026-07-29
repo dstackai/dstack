@@ -16,6 +16,11 @@ from dstack._internal.core.models.instances import Instance, InstanceStatus
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, RunSpec
+from dstack._internal.server.schemas.fleets import (
+    ApplyFleetPlanInput,
+    ApplyFleetPlanRequest,
+    DeleteFleetsRequest,
+)
 from dstack._internal.server.testing.common import (
     get_fleet_spec,
     get_job_provisioning_data,
@@ -27,7 +32,6 @@ _CREATED_AT = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
 
 def job_provisioning_data() -> JobProvisioningData:
-    """Stored in `JobModel.job_provisioning_data` and `InstanceModel.job_provisioning_data`."""
     return get_job_provisioning_data(
         dockerized=True,
         availability_zone="us-east-1a",
@@ -37,15 +41,9 @@ def job_provisioning_data() -> JobProvisioningData:
 
 def run_spec() -> RunSpec:
     """
-    Stored in `RunModel.run_spec` — the largest blob, and the one carrying the type zoo.
-
-    `max_duration`/`idle_duration` are `Duration` (an `int` subclass) and `resources` carries
-    `Memory` and `Range[T]`, so this fixture pins how the custom types render. Those are the types
-    whose `__get_validators__` → `__get_pydantic_core_schema__` port is riskiest.
-
     Values are given in their already-parsed form rather than as YAML shorthand (`"2h"`,
     `"16GB.."`): shorthand only type-checks because a `pre=True` validator widens the input, and
-    pinning the *parse* side is the job of the parse fixtures, not these.
+    pinning the *parse* side is the job of the parsing fixtures, not these.
     """
     return get_run_spec(
         repo_id="test-repo",
@@ -62,11 +60,9 @@ def run_spec() -> RunSpec:
 
 def fleet() -> Fleet:
     """
-    Returned by `/api/project/{name}/fleets/list` through `CustomORJSONResponse`.
-
     The default `FleetNodesSpec` has `target == min`, which is what makes `FleetNodesSpec.dict()`
     drop `target` — the old-client compat hack from #3066. That override becomes a
-    `@model_serializer` in v2, so this fixture is the thing that proves the hack survived.
+    `@model_serializer` in v2, so this fixture is what proves the hack survived.
     """
     return Fleet(
         id=_ID,
@@ -87,4 +83,19 @@ def fleet() -> Fleet:
                 region="us-east-1",
             )
         ],
+    )
+
+
+def delete_fleets_request() -> DeleteFleetsRequest:
+    return DeleteFleetsRequest(names=["fleet-a", "fleet-b"])
+
+
+def apply_fleet_plan_request() -> ApplyFleetPlanRequest:
+    """
+    Chosen over a simpler request body because it carries a whole `FleetSpec`, so it covers the
+    client side of the #3066 `target`-dropping hack too.
+    """
+    return ApplyFleetPlanRequest(
+        plan=ApplyFleetPlanInput(spec=get_fleet_spec(), current_resource=None),
+        force=False,
     )

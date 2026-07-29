@@ -34,6 +34,13 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "fleet": factories.fleet,
 }
 
+# Sent by the API client as a request body — `body=X.json()`, 40 call sites in `api/server/`.
+# This is the new-CLI-against-old-server direction, which nothing else in the suite covers.
+API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "delete_fleets_request": factories.delete_fleets_request,
+    "apply_fleet_plan_request": factories.apply_fleet_plan_request,
+}
+
 
 class TestDbBlobSerialization:
     @pytest.mark.parametrize("name", sorted(DB_BLOBS))
@@ -49,6 +56,13 @@ class TestApiResponseSerialization:
         # two paths can drift apart. Serialize the way the router does.
         payload = bytes(CustomORJSONResponse(API_RESPONSES[name]()).body)
         assert_matches_fixture("serialization/api_response", name, payload, regen=regen)
+
+
+class TestApiRequestSerialization:
+    @pytest.mark.parametrize("name", sorted(API_REQUESTS))
+    def test_matches_fixture(self, name, regen):
+        payload = API_REQUESTS[name]().json()
+        assert_matches_fixture("serialization/api_request", name, payload, regen=regen)
 
 
 class TestFleetNodesTargetCompatHack:

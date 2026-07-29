@@ -1,0 +1,6 @@
+profiles:
+  - name: default
+    max_duration: 2h
+    stop_duration: off
+    idle_duration: 300
+    spot_policy: auto

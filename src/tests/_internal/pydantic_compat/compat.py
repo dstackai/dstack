@@ -2,8 +2,13 @@
 The only place in this package allowed to branch on pydantic version.
 
 Every test here has to run unchanged on v1 and v2, which rules out touching the duality API
-directly. Strict parsing needs no help — `parse_obj` is strict in both versions. Permissive
-parsing does: v1 spells it `X.__response__`, and v2 will spell it `validate_extra_ignore`.
+directly. Forbidding extra fields needs no help — `parse_obj` forbids them in both versions.
+Ignoring them does: v1 spells it `X.__response__`, and v2 will spell it `validate_extra_ignore`.
+
+Both helpers are named for the `extra` setting they apply, deliberately avoiding the word
+"strict": pydantic's `strict` is an unrelated axis that turns off type coercion, and a migration
+that may well want real strict mode later should not have the term already spent on something
+else.
 """
 
 from typing import Any
@@ -14,17 +19,22 @@ from pydantic import BaseModel
 PYDANTIC_V1 = pydantic.VERSION.startswith("1.")
 
 
-def parse_strict(model: Any, data: Any) -> BaseModel:
-    """Parse the way the server validates a request body: unknown fields are an error."""
+def parse_forbid_extra(model: Any, data: Any) -> BaseModel:
+    """
+    Parse with `extra="forbid"` — the way the server validates a request body or a user's YAML.
+
+    An unknown field is an error, which is what makes `dstack apply` report a typo'd key instead
+    of silently ignoring it.
+    """
     return model.parse_obj(data)
 
 
-def parse_permissive(model: Any, data: Any) -> BaseModel:
+def parse_ignore_extra(model: Any, data: Any) -> BaseModel:
     """
-    Parse the way a stored blob or a peer's response is read: unknown fields are ignored.
+    Parse with `extra="ignore"` — the way a stored blob or a peer's response is read.
 
-    This is what lets an older reader survive a newer writer, so it is the behaviour the whole
-    migration has to preserve.
+    Unknown fields are dropped, which is what lets an older reader survive a newer writer, so it
+    is the behaviour the whole migration has to preserve.
     """
     if PYDANTIC_V1:
         return model.__response__.parse_obj(data)

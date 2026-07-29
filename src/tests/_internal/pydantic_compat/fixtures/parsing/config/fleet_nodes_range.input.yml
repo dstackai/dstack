@@ -1,0 +1,6 @@
+type: fleet
+name: test-fleet
+nodes: 1..2
+idle_duration: 2h
+resources:
+  gpu: 24GB..
