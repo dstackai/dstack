@@ -1,0 +1,25 @@
+{
+  "force": false,
+  "plan": {
+    "current_resource": null,
+    "spec": {
+      "configuration": {
+        "backend": "aws",
+        "certificate": {
+          "type": "lets-encrypt"
+        },
+        "default": false,
+        "domain": "example.com",
+        "instance_type": null,
+        "name": "test-gateway",
+        "public_ip": true,
+        "region": "us-east-1",
+        "replicas": null,
+        "router": null,
+        "tags": null,
+        "type": "gateway"
+      },
+      "configuration_path": "gateway.dstack.yml"
+    }
+  }
+}

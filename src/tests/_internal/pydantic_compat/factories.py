@@ -20,6 +20,7 @@ from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewaySpec,
     GatewayStatus,
 )
 from dstack._internal.core.models.instances import (
@@ -48,6 +49,7 @@ from dstack._internal.core.models.projects import (
     Project,
     ProjectRole,
 )
+from dstack._internal.core.models.repos.remote import RemoteRepoCreds, RemoteRepoInfo
 from dstack._internal.core.models.resources import (
     ComputeCapability,
     GPUSpec,
@@ -86,6 +88,16 @@ from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
     DeleteFleetsRequest,
 )
+from dstack._internal.server.schemas.gateways import (
+    ApplyGatewayPlanInput,
+    ApplyGatewayPlanRequest,
+)
+from dstack._internal.server.schemas.repos import SaveRepoCredsRequest
+from dstack._internal.server.schemas.runs import (
+    ApplyRunPlanInput,
+    ApplyRunPlanRequest,
+)
+from dstack._internal.server.schemas.volumes import CreateVolumeRequest
 from dstack._internal.server.testing.common import (
     get_compute_group_provisioning_data,
     get_fleet_spec,
@@ -109,9 +121,7 @@ _CREATED_AT = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
 
 # --- DB blobs ------------------------------------------------------------------------
-# Written to a `Text` column with `.json()`. Rows outlive any release, so each stored model
-# is an independent liability and gets its own fixture rather than standing in for a shared
-# shape — unlike the API surfaces below, which are covered by feature instead.
+# Written to a `Text` column with `.json()`.
 
 
 def aws_creds() -> AWSCreds:
@@ -275,7 +285,10 @@ def volume_provisioning_data() -> VolumeProvisioningData:
 
 
 # --- API responses -------------------------------------------------------------------
-# Returned from a router through `CustomORJSONResponse`.
+# Returned from a router through `CustomORJSONResponse`. Chosen by greedy set cover so that
+# between them they reach every model class reachable from any response model — 129 of 129.
+# `run` and `instance` are absent on purpose: `run_plan` and `fleet` already reach everything
+# they would add.
 
 
 def fleet() -> Fleet:
@@ -425,7 +438,11 @@ def server_info() -> ServerInfo:
 
 
 # --- API request bodies --------------------------------------------------------------
-# Serialized by the API client as `body=X.json()`.
+# Serialized by the API client as `body=X.json()`. Picked by the same greedy cover as the
+# responses, over the 75 client->server schemas: these six reach 98 of the 171 nested model
+# classes. Coverage plateaus there because most of the remainder are wrappers like
+# `{names: list[str]}` whose only contribution is their own class, which a fixture pins no
+# better than the annotation does.
 
 
 def apply_fleet_plan_request() -> ApplyFleetPlanRequest:
@@ -436,6 +453,42 @@ def apply_fleet_plan_request() -> ApplyFleetPlanRequest:
     return ApplyFleetPlanRequest(
         plan=ApplyFleetPlanInput(spec=get_fleet_spec(), current_resource=None),
         force=False,
+    )
+
+
+def apply_run_plan_request() -> ApplyRunPlanRequest:
+    """The largest client-sent body: it carries a whole `RunSpec`."""
+    return ApplyRunPlanRequest(
+        plan=ApplyRunPlanInput(run_spec=run_spec(), current_resource=None),
+        force=False,
+    )
+
+
+def apply_gateway_plan_request() -> ApplyGatewayPlanRequest:
+    return ApplyGatewayPlanRequest(
+        plan=ApplyGatewayPlanInput(
+            spec=GatewaySpec(
+                configuration=gateway_configuration(),
+                configuration_path="gateway.dstack.yml",
+            ),
+            current_resource=None,
+        ),
+        force=False,
+    )
+
+
+def create_volume_request() -> CreateVolumeRequest:
+    return CreateVolumeRequest(configuration=get_volume_configuration())
+
+
+def save_repo_creds_request() -> SaveRepoCredsRequest:
+    return SaveRepoCredsRequest(
+        repo_id="test-repo",
+        repo_info=RemoteRepoInfo(repo_name="dstack"),
+        repo_creds=RemoteRepoCreds(
+            clone_url="https://github.com/dstackai/dstack.git",
+            oauth_token="test-token",
+        ),
     )
 
 

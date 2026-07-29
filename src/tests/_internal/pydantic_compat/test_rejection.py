@@ -51,8 +51,8 @@ REJECTED_INPUTS: dict[str, tuple[Callable, Any]] = {
     ),
     # Custom-type parsing: `Duration.parse` rejects unknown units and non-numeric input.
     "duration_bad_unit": (DstackConfiguration.parse_obj, _task("max_duration: 5 years\n")),
-    # An unknown discriminator tag. After Phase 0 item 2 these unions are discriminated, so the
-    # error should name the tag rather than accumulate one failure per arm.
+    # An unknown discriminator tag. `AnyDstackConfiguration` declares `discriminator="type"`, so
+    # the error names the tag instead of accumulating one failure per arm.
     "unknown_config_type": (DstackConfiguration.parse_obj, {"type": "not-a-real-type"}),
 }
 

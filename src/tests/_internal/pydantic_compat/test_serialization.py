@@ -66,7 +66,11 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
 # This is the new-CLI-against-old-server direction, which nothing else in the suite covers.
 API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
     "delete_fleets_request": factories.delete_fleets_request,
+    "save_repo_creds_request": factories.save_repo_creds_request,
     "apply_fleet_plan_request": factories.apply_fleet_plan_request,
+    "apply_gateway_plan_request": factories.apply_gateway_plan_request,
+    "apply_run_plan_request": factories.apply_run_plan_request,
+    "create_volume_request": factories.create_volume_request,
 }
 
 
