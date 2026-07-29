@@ -1,0 +1,114 @@
+{
+  "configuration": {
+    "availability_zones": null,
+    "backend_options": null,
+    "backends": null,
+    "creation_policy": null,
+    "docker": null,
+    "dstack": false,
+    "entrypoint": null,
+    "env": {},
+    "files": [],
+    "fleets": null,
+    "home_dir": "/root",
+    "ide": "vscode",
+    "idle_duration": null,
+    "image": null,
+    "inactivity_duration": null,
+    "init": [],
+    "instance_types": null,
+    "instances": null,
+    "max_duration": null,
+    "max_price": null,
+    "name": null,
+    "nvcc": null,
+    "ports": [],
+    "priority": null,
+    "privileged": false,
+    "python": null,
+    "regions": null,
+    "registry_auth": null,
+    "repos": [],
+    "reservation": null,
+    "resources": {
+      "cpu": {
+        "max": 8,
+        "min": 2
+      },
+      "disk": {
+        "size": {
+          "max": null,
+          "min": 100.0
+        }
+      },
+      "gpu": {
+        "compute_capability": null,
+        "count": {
+          "max": null,
+          "min": 0
+        },
+        "memory": null,
+        "name": null,
+        "total_memory": null,
+        "vendor": null
+      },
+      "memory": {
+        "max": null,
+        "min": 16.0
+      },
+      "shm_size": null
+    },
+    "retry": null,
+    "schedule": null,
+    "setup": [],
+    "shell": null,
+    "single_branch": null,
+    "spot_policy": null,
+    "startup_order": null,
+    "stop_criteria": null,
+    "stop_duration": null,
+    "tags": null,
+    "type": "dev-environment",
+    "user": null,
+    "utilization_policy": null,
+    "version": null,
+    "volumes": [],
+    "working_dir": null
+  },
+  "configuration_path": "dstack.yaml",
+  "file_archives": [],
+  "profile": {
+    "availability_zones": null,
+    "backend_options": null,
+    "backends": null,
+    "creation_policy": null,
+    "default": false,
+    "fleets": null,
+    "idle_duration": 300,
+    "instance_types": null,
+    "instances": null,
+    "max_duration": 7200,
+    "max_price": null,
+    "name": "default",
+    "regions": null,
+    "reservation": null,
+    "retry": null,
+    "schedule": null,
+    "spot_policy": null,
+    "startup_order": null,
+    "stop_criteria": null,
+    "stop_duration": null,
+    "tags": null,
+    "utilization_policy": null
+  },
+  "repo_code_hash": null,
+  "repo_data": {
+    "repo_dir": "/",
+    "repo_type": "local"
+  },
+  "repo_dir": null,
+  "repo_id": "test-repo",
+  "run_name": "test-run",
+  "ssh_key_pub": "user_ssh_key",
+  "working_dir": null
+}
