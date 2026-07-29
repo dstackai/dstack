@@ -1,4 +1,4 @@
-"""Gateways hostname and backend_data
+"""Add GatewayModel.hostname and backend_data
 
 Revision ID: ecc9e8a0bfac
 Revises: dd83c131e78f
