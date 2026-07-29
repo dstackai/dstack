@@ -102,7 +102,7 @@ class OCIConfigurator(
     def _get_config(self, record: BackendRecord) -> OCIConfig:
         return OCIConfig.__response__(
             **json.loads(record.config),
-            creds=OCICreds.parse_raw(record.auth).__root__,
+            creds=OCICreds.__response__.parse_raw(record.auth).__root__,
         )
 
 

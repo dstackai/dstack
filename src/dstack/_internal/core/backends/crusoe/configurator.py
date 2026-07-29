@@ -74,5 +74,5 @@ class CrusoeConfigurator(
     def _get_config(self, record: BackendRecord) -> CrusoeConfig:
         return CrusoeConfig.__response__(
             **json.loads(record.config),
-            creds=CrusoeCreds.parse_raw(record.auth),
+            creds=CrusoeCreds.__response__.parse_raw(record.auth),
         )

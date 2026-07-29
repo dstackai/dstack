@@ -715,7 +715,7 @@ class AWSCompute(
             return
 
         try:
-            backend_data_parsed = AWSGatewayBackendData.parse_raw(backend_data)
+            backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(backend_data)
         except ValidationError:
             logger.exception(
                 "Failed to terminate all gateway %s resources. backend_data parsing error.",
@@ -1321,7 +1321,7 @@ def _parse_instance_backend_data(backend_data: Optional[str]) -> "AWSInstanceBac
     if backend_data is None:
         return AWSInstanceBackendData()
     try:
-        return AWSInstanceBackendData.parse_raw(backend_data)
+        return AWSInstanceBackendData.__response__.parse_raw(backend_data)
     except ValidationError:
         logger.exception("Failed to parse AWS instance backend_data; treating as empty")
         return AWSInstanceBackendData()

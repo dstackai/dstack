@@ -155,7 +155,7 @@ class AzureConfigurator(
         return AzureConfig.__response__(
             **config_dict,
             regions=regions,
-            creds=AzureCreds.parse_raw(record.auth).__root__,
+            creds=AzureCreds.__response__.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tenant_id(

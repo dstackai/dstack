@@ -58,7 +58,7 @@ class VerdaConfigurator(
     def _get_config(self, record: BackendRecord) -> VerdaConfig:
         return VerdaConfig.__response__(
             **json.loads(record.config),
-            creds=VerdaCreds.parse_raw(record.auth),
+            creds=VerdaCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_creds(self, creds: VerdaCreds):

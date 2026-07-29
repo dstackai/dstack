@@ -82,7 +82,7 @@ class ProjectsAPIClient(APIClientGroup):
         resp_json = resp.json()
         if isinstance(resp_json, list):
             return parse_obj_as(List[Project.__response__], resp_json)
-        return parse_obj_as(ProjectsInfoList, resp_json)
+        return parse_obj_as(ProjectsInfoList.__response__, resp_json)
 
     def create(self, project_name: str, is_public: bool = False) -> Project:
         body = CreateProjectRequest(project_name=project_name, is_public=is_public)

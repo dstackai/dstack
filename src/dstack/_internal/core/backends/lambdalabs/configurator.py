@@ -56,7 +56,7 @@ class LambdaConfigurator(
     def _get_config(self, record: BackendRecord) -> LambdaConfig:
         return LambdaConfig.__response__(
             **json.loads(record.config),
-            creds=LambdaCreds.parse_raw(record.auth),
+            creds=LambdaCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_lambda_api_key(self, api_key: str):

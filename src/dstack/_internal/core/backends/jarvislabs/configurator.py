@@ -62,7 +62,7 @@ class JarvisLabsConfigurator(
     def _get_config(self, record: BackendRecord) -> JarvisLabsConfig:
         return JarvisLabsConfig.__response__(
             **json.loads(record.config),
-            creds=JarvisLabsCreds.parse_raw(record.auth),
+            creds=JarvisLabsCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_api_key(self, api_key: str):

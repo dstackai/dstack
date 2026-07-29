@@ -62,7 +62,7 @@ class VultrConfigurator(
     def _get_config(self, record: BackendRecord) -> VultrConfig:
         return VultrConfig.__response__(
             **json.loads(record.config),
-            creds=VultrCreds.parse_raw(record.auth),
+            creds=VultrCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_vultr_api_key(self, api_key: str):

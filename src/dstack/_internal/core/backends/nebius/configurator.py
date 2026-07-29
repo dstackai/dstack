@@ -94,5 +94,5 @@ class NebiusConfigurator(
     def _get_config(self, record: BackendRecord) -> NebiusConfig:
         return NebiusConfig.__response__(
             **json.loads(record.config),
-            creds=NebiusCreds.parse_raw(record.auth),
+            creds=NebiusCreds.__response__.parse_raw(record.auth),
         )
