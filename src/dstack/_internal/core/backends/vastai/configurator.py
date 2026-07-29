@@ -60,7 +60,7 @@ class VastAIConfigurator(
     def _get_config(self, record: BackendRecord) -> VastAIConfig:
         return VastAIConfig.__response__(
             **json.loads(record.config),
-            creds=VastAICreds.parse_raw(record.auth),
+            creds=VastAICreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_vastai_creds(self, api_key: str):

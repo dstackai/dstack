@@ -101,9 +101,9 @@ class SubmitBody(CoreModel):
             }
         ),
     ]
-    cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)]
-    secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
-    repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
+    cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)] = None
+    secrets: Annotated[Optional[Dict[str, str]], Field(include=True)] = None
+    repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)] = None
     log_quota_hour: Annotated[Optional[int], Field(include=True)] = None
     """Maximum bytes of log output per hour. None means unlimited."""
     # TODO: remove `run_spec` once instances deployed with 0.19.8 or earlier are no longer supported.
@@ -282,4 +282,4 @@ class JobResult(CoreModel):
 
 class LegacyPullResponse(CoreModel):
     state: str
-    result: Optional[JobResult]
+    result: Optional[JobResult] = None

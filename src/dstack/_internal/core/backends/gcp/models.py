@@ -141,7 +141,7 @@ class GCPStoredConfig(GCPBackendConfig):
 
 
 class GCPConfig(GCPStoredConfig):
-    creds: AnyGCPCreds
+    creds: Annotated[AnyGCPCreds, Field(discriminator="type")]
 
     @property
     def allocate_public_ips(self) -> bool:

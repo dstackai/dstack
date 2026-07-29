@@ -50,7 +50,7 @@ class BaseDigitalOceanConfigurator(Configurator):
     def _get_config(self, record: BackendRecord) -> BaseDigitalOceanConfig:
         return BaseDigitalOceanConfig.__response__(
             **json.loads(record.config),
-            creds=BaseDigitalOceanCreds.parse_raw(record.auth),
+            creds=BaseDigitalOceanCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_creds(self, creds: AnyBaseDigitalOceanCreds, project_name: Optional[str] = None):

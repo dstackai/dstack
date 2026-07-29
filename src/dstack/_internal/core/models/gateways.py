@@ -97,8 +97,9 @@ class GatewayConfiguration(CoreModel):
     certificate: Annotated[
         Optional[AnyGatewayCertificate],
         Field(
+            discriminator="type",
             description="The SSL certificate configuration."
-            " Set to `null` to disable. Defaults to `type: lets-encrypt`"
+            " Set to `null` to disable. Defaults to `type: lets-encrypt`",
         ),
     ] = LetsEncryptGatewayCertificate()
     replicas: Annotated[
@@ -148,13 +149,13 @@ class Gateway(CoreModel):
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus
-    status_message: Optional[str]
-    hostname: Optional[str]
+    status_message: Optional[str] = None
+    hostname: Optional[str] = None
     """Hostname of the load balancer.
     Unset if there is no load balancer, in which case users are expected to point the gateway's
     wildcard domain name to `replicas[i].hostname`.
     """
-    wildcard_domain: Optional[str]
+    wildcard_domain: Optional[str] = None
     default: bool
     replicas: list[GatewayReplica] = []
     backend: Optional[BackendType] = None
@@ -203,7 +204,7 @@ class GatewayComputeConfiguration(CoreModel):
     instance_type: Optional[str] = None
     public_ip: bool
     ssh_key_pub: str
-    certificate: Optional[AnyGatewayCertificate] = None
+    certificate: Annotated[Optional[AnyGatewayCertificate], Field(discriminator="type")] = None
     tags: Optional[Dict[str, str]] = None
     router: Optional[AnyGatewayRouterConfig] = None
 

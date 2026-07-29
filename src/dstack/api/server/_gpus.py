@@ -28,4 +28,4 @@ class GpusAPIClient(APIClientGroup):
             f"/api/project/{project_name}/gpus/list",
             body=body.json(exclude=get_list_gpus_excludes(body)),
         )
-        return parse_obj_as(ListGpusResponse, resp.json()).gpus
+        return parse_obj_as(ListGpusResponse.__response__, resp.json()).gpus

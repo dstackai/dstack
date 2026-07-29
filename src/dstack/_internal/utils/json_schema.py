@@ -3,6 +3,11 @@ def add_extra_schema_types(schema_property: dict, extra_types: list[dict]):
         refs = [schema_property.pop("allOf")[0]]
     elif "anyOf" in schema_property:
         refs = schema_property.pop("anyOf")
+    elif "oneOf" in schema_property:
+        nested = {"oneOf": schema_property.pop("oneOf")}
+        if "discriminator" in schema_property:
+            nested["discriminator"] = schema_property.pop("discriminator")
+        refs = [nested]
     elif "type" in schema_property:
         refs = [{"type": schema_property.pop("type")}]
     else:

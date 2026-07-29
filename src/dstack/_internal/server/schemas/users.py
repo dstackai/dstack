@@ -57,7 +57,7 @@ class GetUserRequest(CoreModel):
 class CreateUserRequest(CoreModel):
     username: str
     global_role: GlobalRole
-    email: Optional[str]
+    email: Optional[str] = None
     active: bool = True
 
 

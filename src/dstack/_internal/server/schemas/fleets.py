@@ -25,7 +25,7 @@ class ListProjectFleetsRequest(CoreModel):
 
 
 class GetFleetRequest(CoreModel):
-    name: Optional[str]
+    name: Optional[str] = None
     id: Optional[UUID] = None
 
     def get_name_or_id(self) -> EntityNameOrID:

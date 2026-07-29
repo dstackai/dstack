@@ -14,16 +14,16 @@ class OCIClientCreds(CoreModel):
         Field(
             description="Path to the user's private PEM key. Either this or `key_content` should be set"
         ),
-    ]
+    ] = None
     key_content: Annotated[
         Optional[str],
         Field(
             description="Content of the user's private PEM key. Either this or `key_file` should be set"
         ),
-    ]
+    ] = None
     pass_phrase: Annotated[
         Optional[str], Field(description="Passphrase for the private PEM key if it is encrypted")
-    ]
+    ] = None
     fingerprint: Annotated[str, Field(description="User's public key fingerprint")]
     region: Annotated[
         str, Field(description="Name or key of any region the tenancy is subscribed to")
@@ -84,4 +84,4 @@ class OCIStoredConfig(OCIBackendConfig):
 
 
 class OCIConfig(OCIStoredConfig):
-    creds: AnyOCICreds
+    creds: Annotated[AnyOCICreds, Field(discriminator="type")]

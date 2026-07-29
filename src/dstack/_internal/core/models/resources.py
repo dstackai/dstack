@@ -19,8 +19,8 @@ T = TypeVar("T", bound=Union[int, float])
 
 
 class Range(GenericModel, Generic[T]):
-    min: Optional[T]
-    max: Optional[T]
+    min: Optional[T] = None
+    max: Optional[T] = None
 
     class Config:
         extra = "forbid"

@@ -58,7 +58,7 @@ class HotAisleConfigurator(
     def _get_config(self, record: BackendRecord) -> HotAisleConfig:
         return HotAisleConfig.__response__(
             **json.loads(record.config),
-            creds=HotAisleCreds.parse_raw(record.auth),
+            creds=HotAisleCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_creds(self, creds: AnyHotAisleCreds, team_handle: str):

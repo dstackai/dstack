@@ -36,7 +36,7 @@ class ChatCompletionsChoice(CoreModel):
 class ChatCompletionsChunkChoice(CoreModel):
     delta: object
     logprobs: object = {}
-    finish_reason: Optional[str]
+    finish_reason: Optional[str] = None
     index: int
 
 

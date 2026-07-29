@@ -153,7 +153,7 @@ class EntityReference(CoreModel):
     project: Annotated[
         Optional[str],
         Field(description="The project name. If unspecified, refers to the current project"),
-    ]
+    ] = None
     name: Annotated[str, Field(description="The entity name")]
 
     @classmethod

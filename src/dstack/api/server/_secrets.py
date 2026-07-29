@@ -19,7 +19,7 @@ class SecretsAPIClient(APIClientGroup):
     def get(self, project_name: str, name: str) -> Secret:
         body = GetSecretRequest(name=name)
         resp = self._request(f"/api/project/{project_name}/secrets/get", body=body.json())
-        return parse_obj_as(Secret, resp.json())
+        return parse_obj_as(Secret.__response__, resp.json())
 
     def create_or_update(self, project_name: str, name: str, value: str) -> Secret:
         body = CreateOrUpdateSecretRequest(

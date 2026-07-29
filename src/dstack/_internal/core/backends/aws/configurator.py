@@ -106,7 +106,7 @@ class AWSConfigurator(
     def _get_config(self, record: BackendRecord) -> AWSConfig:
         return AWSConfig.__response__(
             **json.loads(record.config),
-            creds=AWSCreds.parse_raw(record.auth).__root__,
+            creds=AWSCreds.__response__.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tags(self, config: AWSBackendConfigWithCreds):

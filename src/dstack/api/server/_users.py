@@ -55,7 +55,7 @@ class UsersAPIClient(APIClientGroup):
         resp_json = resp.json()
         if isinstance(resp_json, list):
             return parse_obj_as(List[User.__response__], resp_json)
-        return parse_obj_as(UsersInfoList, resp_json)
+        return parse_obj_as(UsersInfoList.__response__, resp_json)
 
     def get_my_user(self) -> UserWithCreds:
         resp = self._request("/api/users/get_my_user")

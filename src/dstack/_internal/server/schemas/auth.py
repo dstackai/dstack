@@ -80,4 +80,4 @@ class OAuthGetNextRedirectResponse(CoreModel):
                 " If `null`, there is no next redirect."
             )
         ),
-    ]
+    ] = None

@@ -53,7 +53,7 @@ from dstack._internal.utils.common import format_pretty_duration
 
 class AppSpec(CoreModel):
     port: int
-    map_to_port: Optional[int]
+    map_to_port: Optional[int] = None
     app_name: str
     url_path: Optional[str] = None
     url_query_params: Optional[Dict[str, str]] = None
@@ -263,24 +263,24 @@ class JobSpec(CoreModel):
     jobs_per_replica: int = 1
     """`jobs_per_replica` uses a default value for backward compatibility."""
     replica_group: str = DEFAULT_REPLICA_GROUP_NAME
-    app_specs: Optional[List[AppSpec]]
+    app_specs: Optional[List[AppSpec]] = None
     user: Optional[UnixUser] = None
     """`user` uses a default value for backward compatibility."""
     commands: List[str]
     env: Dict[str, str]
-    home_dir: Optional[str]
+    home_dir: Optional[str] = None
     image_name: str
     privileged: bool = False
     single_branch: Optional[bool] = None
-    max_duration: Optional[int]
+    max_duration: Optional[int] = None
     stop_duration: Optional[int] = None
     utilization_policy: Optional[UtilizationPolicy] = None
-    registry_auth: Optional[RegistryAuth]
+    registry_auth: Optional[RegistryAuth] = None
     requirements: Requirements
-    retry: Optional[Retry]
+    retry: Optional[Retry] = None
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
-    working_dir: Optional[str]
+    working_dir: Optional[str] = None
     repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
     """`repo_data` is optional for client compatibility with pre-0.19.17 servers and for jobs
     submitted before 0.19.17. All new jobs are expected to have non-`None` `repo_data`.
@@ -443,7 +443,7 @@ class JobSubmission(CoreModel):
 class JobConnectionInfo(CoreModel):
     ide_name: Annotated[
         Optional[str], Field(description="Dev environment IDE name for UI, human-readable.")
-    ]
+    ] = None
     attached_ide_url: Annotated[
         Optional[str],
         Field(
@@ -453,7 +453,7 @@ class JobConnectionInfo(CoreModel):
                 " Only works if the user is attached to the run via CLI or Python API."
             )
         ),
-    ]
+    ] = None
     proxied_ide_url: Annotated[
         Optional[str],
         Field(
@@ -462,7 +462,7 @@ class JobConnectionInfo(CoreModel):
                 " Not set if the job has hot started yet or sshproxy is not configured."
             )
         ),
-    ]
+    ] = None
     attached_ssh_command: Annotated[
         Optional[list[str]],
         Field(
@@ -471,7 +471,7 @@ class JobConnectionInfo(CoreModel):
                 " Only works if the user is attached to the run via CLI or Python API."
             )
         ),
-    ]
+    ] = None
     proxied_ssh_command: Annotated[
         Optional[list[str]],
         Field(
@@ -480,7 +480,7 @@ class JobConnectionInfo(CoreModel):
                 " Not set if sshproxy is not configured."
             )
         ),
-    ]
+    ] = None
     sshproxy_hostname: Annotated[
         Optional[str],
         Field(description="sshproxy hostname. Not set if sshproxy is not configured."),
@@ -709,7 +709,7 @@ class JobPlan(CoreModel):
     job_spec: JobSpec
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
-    max_price: Optional[float]
+    max_price: Optional[float] = None
 
 
 class RunPlan(CoreModel):

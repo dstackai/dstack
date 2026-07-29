@@ -62,7 +62,7 @@ class LimitReqConfig(BaseModel):
 
 class LocationConfig(BaseModel):
     prefix: str
-    limit_req: Optional[LimitReqConfig]
+    limit_req: Optional[LimitReqConfig] = None
 
 
 class ServiceConfig(SiteConfig):

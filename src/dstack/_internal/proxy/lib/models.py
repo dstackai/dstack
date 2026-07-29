@@ -23,7 +23,7 @@ class Replica(ImmutableModel):
     app_port: int
     ssh_destination: str
     ssh_port: int
-    ssh_proxy: Optional[SSHConnectionParams]
+    ssh_proxy: Optional[SSHConnectionParams] = None
     ssh_proxy_private_key: Optional[str] = None
     "`None` means same as service project's key"
     # Optional outer proxy, a head node/bastion
@@ -54,8 +54,8 @@ class RateLimit(ImmutableModel):
 class Service(ImmutableModel):
     project_name: str
     run_name: str
-    domain: Optional[str]  # only used on gateways
-    https: Optional[bool]  # only used on gateways
+    domain: Optional[str] = None  # only used on gateways
+    https: Optional[bool] = None  # only used on gateways
     rate_limits: tuple[RateLimit, ...] = ()  # only used on gateways
     auth: bool
     client_max_body_size: int  # only enforced on gateways

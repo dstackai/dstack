@@ -166,7 +166,7 @@ class GCPConfigurator(
     def _get_config(self, record: BackendRecord) -> GCPConfig:
         return GCPConfig.__response__(
             **json.loads(record.config),
-            creds=GCPCreds.parse_raw(record.auth).__root__,
+            creds=GCPCreds.__response__.parse_raw(record.auth).__root__,
         )
 
     def _check_config_tags(self, config: GCPBackendConfigWithCreds):

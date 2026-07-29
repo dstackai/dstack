@@ -61,7 +61,7 @@ class CloudRiftConfigurator(
     def _get_config(self, record: BackendRecord) -> CloudRiftConfig:
         return CloudRiftConfig.__response__(
             **json.loads(record.config),
-            creds=CloudRiftCreds.parse_raw(record.auth),
+            creds=CloudRiftCreds.__response__.parse_raw(record.auth),
         )
 
     def _validate_creds(self, creds: AnyCloudRiftCreds):
