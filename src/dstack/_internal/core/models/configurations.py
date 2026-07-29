@@ -1015,15 +1015,20 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = STRIP_PREFIX_DEFAULT
+    # A discriminator cannot read `format` off the documented `model: <name>` shorthand, so it
+    # would reject it. This works only because the `convert_model` pre-validator below expands a
+    # bare string into an `OpenAIChatModel` first — leaving the union something that carries
+    # `format` either way: an attribute on the expanded model, or a key in a user-supplied mapping.
     model: Annotated[
         Optional[AnyModel],
         Field(
+            discriminator="format",
             description=(
                 "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
                 " Can be a full model format definition or just a model name."
                 " If it's a name, the service is expected to expose an OpenAI-compatible"
                 " API at the `/v1` path"
-            )
+            ),
         ),
     ] = None
     https: Annotated[

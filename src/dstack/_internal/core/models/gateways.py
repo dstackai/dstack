@@ -97,8 +97,9 @@ class GatewayConfiguration(CoreModel):
     certificate: Annotated[
         Optional[AnyGatewayCertificate],
         Field(
+            discriminator="type",
             description="The SSL certificate configuration."
-            " Set to `null` to disable. Defaults to `type: lets-encrypt`"
+            " Set to `null` to disable. Defaults to `type: lets-encrypt`",
         ),
     ] = LetsEncryptGatewayCertificate()
     replicas: Annotated[
@@ -203,7 +204,7 @@ class GatewayComputeConfiguration(CoreModel):
     instance_type: Optional[str] = None
     public_ip: bool
     ssh_key_pub: str
-    certificate: Optional[AnyGatewayCertificate] = None
+    certificate: Annotated[Optional[AnyGatewayCertificate], Field(discriminator="type")] = None
     tags: Optional[Dict[str, str]] = None
     router: Optional[AnyGatewayRouterConfig] = None
 

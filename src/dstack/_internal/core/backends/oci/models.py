@@ -84,4 +84,4 @@ class OCIStoredConfig(OCIBackendConfig):
 
 
 class OCIConfig(OCIStoredConfig):
-    creds: AnyOCICreds
+    creds: Annotated[AnyOCICreds, Field(discriminator="type")]

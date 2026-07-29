@@ -130,7 +130,7 @@ class AWSStoredConfig(AWSBackendConfig):
 
 
 class AWSConfig(AWSStoredConfig):
-    creds: AnyAWSCreds
+    creds: Annotated[AnyAWSCreds, Field(discriminator="type")]
 
     @property
     def allocate_public_ips(self) -> bool:

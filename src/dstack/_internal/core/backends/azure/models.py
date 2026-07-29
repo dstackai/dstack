@@ -99,7 +99,7 @@ class AzureStoredConfig(AzureBackendConfig):
 
 
 class AzureConfig(AzureStoredConfig):
-    creds: AnyAzureCreds
+    creds: Annotated[AnyAzureCreds, Field(discriminator="type")]
 
     @property
     def allocate_public_ips(self) -> bool:

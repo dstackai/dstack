@@ -13,7 +13,7 @@ class GetRepoRequest(RepoRequest):
 
 
 class SaveRepoCredsRequest(RepoRequest):
-    repo_info: AnyRepoInfo
+    repo_info: Annotated[AnyRepoInfo, Field(discriminator="repo_type")]
     repo_creds: Annotated[
         Optional[RemoteRepoCreds],
         Field(description="The repo creds for accessing private remote repo"),
