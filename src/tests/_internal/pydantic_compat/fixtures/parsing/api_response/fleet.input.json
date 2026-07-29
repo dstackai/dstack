@@ -1,0 +1,14 @@
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "test-fleet",
+  "project_name": "test-project",
+  "spec": {
+    "configuration": {"type": "fleet", "name": "test-fleet", "nodes": {"min": 1, "max": 1}},
+    "configuration_path": "fleet.dstack.yml",
+    "profile": {"name": "default"}
+  },
+  "created_at": "2024-01-02T03:04:05+00:00",
+  "status": "active",
+  "instances": [],
+  "field_added_by_a_newer_server": "ignored"
+}

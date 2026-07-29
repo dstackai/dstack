@@ -9,15 +9,21 @@ of accepting a wire change — every accepted diff shows up in review as a fixtu
 import difflib
 import json
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import pytest
+from pydantic import BaseModel
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+# Types JSON represents faithfully. Anything else — a `Duration` (int subclass), a `Memory`
+# (float subclass), an enum, or a model standing in for a union arm — renders identically to its
+# base type, so the value dump cannot show which one parsing produced.
+_JSON_NATIVE = (str, int, float, bool, type(None))
+
 _REGEN_HINT = (
     "Fix the regression, or if the change is intended, accept it with"
-    " `pytest src/tests/_internal/pydantic_compat --regen-wire-fixtures`."
+    " `pytest src/tests/_internal/pydantic_compat --regen-fixtures`."
 )
 
 
@@ -60,3 +66,38 @@ def assert_matches_fixture(kind: str, name: str, payload: Union[bytes, str], reg
             )
         )
         pytest.fail(f"{kind}/{name} serialization changed:\n{diff}\n{_REGEN_HINT}")
+
+
+def type_map(value: Any, path: str = "", out: Union[dict, None] = None) -> dict:
+    """
+    Map JSON pointer -> the concrete class parsing produced, wherever JSON erases it.
+
+    `Duration(7200)` and `7200` serialize identically, as do `Memory(16.0)` and `16.0`, and
+    `PythonVersion.PY310` and `"3.10"`. Losing the subclass is therefore invisible in the value
+    dump while still being a real regression — `Memory.__str__` is `"16GB"`, and that string
+    reaches the CLI. Models are recorded as well as recursed into, so a union that resolves to a
+    different arm shows up here even when both arms happen to serialize the same.
+    """
+    out = {} if out is None else out
+    if isinstance(value, BaseModel):
+        out[path or "/"] = _class_name(value)
+        for name, attr in value.__dict__.items():
+            type_map(attr, f"{path}/{name}", out)
+    elif isinstance(value, dict):
+        for key, attr in value.items():
+            type_map(attr, f"{path}/{key}", out)
+    elif isinstance(value, (list, tuple)):
+        for i, attr in enumerate(value):
+            type_map(attr, f"{path}/{i}", out)
+    elif type(value) not in _JSON_NATIVE:
+        out[path] = _class_name(value)
+    return out
+
+
+def _class_name(value: Any) -> str:
+    # pydantic-duality names the concrete classes `XRequest` / `XResponse`. Those suffixes vanish
+    # in v2, so strip them or every line of every type map diffs on the migration branch.
+    name = type(value).__name__
+    for suffix in ("Request", "Response"):
+        name = name.removesuffix(suffix)
+    return name

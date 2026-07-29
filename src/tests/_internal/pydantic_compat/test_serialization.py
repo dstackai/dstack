@@ -39,7 +39,7 @@ class TestDbBlobSerialization:
     @pytest.mark.parametrize("name", sorted(DB_BLOBS))
     def test_matches_fixture(self, name, regen):
         payload = DB_BLOBS[name]().json()
-        assert_matches_fixture("db", name, payload, regen=regen)
+        assert_matches_fixture("serialization/db", name, payload, regen=regen)
 
 
 class TestApiResponseSerialization:
@@ -48,7 +48,7 @@ class TestApiResponseSerialization:
         # Response bodies go through orjson with a `default=` hook, not through `.json()`, so the
         # two paths can drift apart. Serialize the way the router does.
         payload = bytes(CustomORJSONResponse(API_RESPONSES[name]()).body)
-        assert_matches_fixture("api", name, payload, regen=regen)
+        assert_matches_fixture("serialization/api_response", name, payload, regen=regen)
 
 
 class TestFleetNodesTargetCompatHack:
