@@ -52,7 +52,7 @@ class RunpodConfigurator(
         return RunpodBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> RunpodConfig:
-        return RunpodConfig(
+        return RunpodConfig.__response__(
             **json.loads(record.config),
             creds=RunpodCreds.__response__.parse_raw(record.auth),
         )

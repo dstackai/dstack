@@ -14,7 +14,13 @@ from dstack.api.server._group import APIClientGroup
 class BackendsAPIClient(APIClientGroup):
     def list_backend_types(self) -> List[BackendType]:
         resp = self._request("/api/backends/list_types")
-        return parse_obj_as(List[BackendType], resp.json())
+        backend_types = []
+        for value in parse_obj_as(List[str], resp.json()):
+            try:
+                backend_types.append(BackendType(value))
+            except ValueError:
+                continue
+        return backend_types
 
     def create(
         self, project_name: str, config: AnyBackendConfigWithCreds
