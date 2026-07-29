@@ -25,6 +25,11 @@ from dstack._internal.core.models.configurations import DstackConfiguration
 from dstack._internal.core.models.fleets import Fleet
 from dstack._internal.core.models.profiles import ProfilesConfig
 from dstack._internal.core.models.runs import JobSpec, RunSpec
+from dstack._internal.proxy.gateway.schemas.registry import (
+    RegisterReplicaRequest,
+    RegisterServiceRequest,
+)
+from dstack._internal.server.schemas.runner import HealthcheckResponse, MetricsResponse
 from dstack._internal.server.schemas.volumes import CreateVolumeRequest
 from tests._internal.pydantic_compat.compare import (
     FIXTURES_DIR,
@@ -72,6 +77,36 @@ class TestDbBlobParsing:
         _assert_parses(
             "db", name, parse_ignore_extra(DB_BLOBS[name], _load_input("db", name)), regen
         )
+
+
+# Responses the server reads back from the runner (shim), permissively: a newer runner may add
+# fields, and the server has no say over which runner version an instance is running.
+RUNNER_RESPONSES: dict[str, Any] = {
+    "healthcheck_response": HealthcheckResponse,
+    "metrics_response": MetricsResponse,
+}
+
+# Request payloads the gateway parses from the server. These schemas are plain `BaseModel`, so
+# `parse_obj` already ignores unknown fields in both pydantic versions — no shim, and nothing to
+# assert about strictness.
+GATEWAY_REQUESTS: dict[str, Any] = {
+    "register_replica_request": RegisterReplicaRequest,
+    "register_service_request": RegisterServiceRequest,
+}
+
+
+class TestRunnerResponseParsing:
+    @pytest.mark.parametrize("name", sorted(RUNNER_RESPONSES))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(RUNNER_RESPONSES[name], _load_input("runner", name))
+        _assert_parses("runner", name, model, regen)
+
+
+class TestGatewayRequestParsing:
+    @pytest.mark.parametrize("name", sorted(GATEWAY_REQUESTS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = GATEWAY_REQUESTS[name].parse_obj(_load_input("gateway", name))
+        _assert_parses("gateway", name, model, regen)
 
 
 class TestDbBlobExtraFieldTolerance:

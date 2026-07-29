@@ -105,9 +105,20 @@ def type_map(value: Any, path: str = "", out: Union[dict, None] = None) -> dict:
 
 
 def _class_name(value: Any) -> str:
-    # pydantic-duality names the concrete classes `XRequest` / `XResponse`. Those suffixes vanish
-    # in v2, so strip them or every line of every type map diffs on the migration branch.
-    name = type(value).__name__
-    for suffix in ("Request", "Response"):
-        name = name.removesuffix(suffix)
+    """
+    The model's name with pydantic-duality's generated suffix removed.
+
+    Duality names its concrete classes `XRequest` / `XResponse`, and those suffixes vanish in v2,
+    so leaving them in would make every line of every type map diff on the migration branch.
+
+    Strip only for classes duality actually generated, which is what `__response__` identifies.
+    Plenty of models are genuinely *named* `...Request` — every gateway registry schema, for one —
+    and those are plain `BaseModel`, so stripping there would report `RegisterService` for a class
+    called `RegisterServiceRequest`.
+    """
+    cls = type(value)
+    name = cls.__name__
+    if hasattr(cls, "__response__"):
+        for suffix in ("Request", "Response"):
+            name = name.removesuffix(suffix)
     return name

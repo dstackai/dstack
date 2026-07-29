@@ -59,13 +59,18 @@ from dstack._internal.core.models.resources import (
 )
 from dstack._internal.core.models.runs import (
     ImagePullProgress,
+    Job,
     JobPlan,
     JobProvisioningData,
     JobRuntimeData,
     JobSpec,
+    JobStatus,
+    JobSubmission,
     Requirements,
+    Run,
     RunPlan,
     RunSpec,
+    RunStatus,
     ServiceSpec,
 )
 from dstack._internal.core.models.secrets import Secret
@@ -83,6 +88,7 @@ from dstack._internal.core.models.volumes import (
     VolumeConfiguration,
     VolumeProvisioningData,
 )
+from dstack._internal.proxy.gateway.schemas.stats import ServiceStats, Stat
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanInput,
     ApplyFleetPlanRequest,
@@ -93,6 +99,7 @@ from dstack._internal.server.schemas.gateways import (
     ApplyGatewayPlanRequest,
 )
 from dstack._internal.server.schemas.repos import SaveRepoCredsRequest
+from dstack._internal.server.schemas.runner import HealthcheckResponse, SubmitBody
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanInput,
     ApplyRunPlanRequest,
@@ -494,3 +501,73 @@ def save_repo_creds_request() -> SaveRepoCredsRequest:
 
 def delete_fleets_request() -> DeleteFleetsRequest:
     return DeleteFleetsRequest(names=["fleet-a", "fleet-b"])
+
+
+# --- Runner API ------------------------------------------------------------------------
+# The server<->runner (shim) protocol. The server is the client here, so `serialization` holds
+# the bodies it sends and `parsing` holds the responses it reads back. Unlike the public API
+# there is no negotiation on this boundary: a server talks to whatever runner version is baked
+# into the running instance's image, so both directions have to stay compatible.
+
+
+def run() -> Run:
+    return Run(
+        id=_ID,
+        project_name="test-project",
+        user="test-user",
+        submitted_at=_CREATED_AT,
+        last_processed_at=_CREATED_AT,
+        status=RunStatus.SUBMITTED,
+        run_spec=run_spec(),
+        jobs=[Job(job_spec=job_spec(), job_submissions=[job_submission()])],
+    )
+
+
+def job_submission() -> JobSubmission:
+    return JobSubmission(
+        id=_ID,
+        submission_num=0,
+        submitted_at=_CREATED_AT,
+        last_processed_at=_CREATED_AT,
+        status=JobStatus.SUBMITTED,
+        job_provisioning_data=job_provisioning_data(),
+        job_runtime_data=job_runtime_data(),
+    )
+
+
+def submit_body() -> SubmitBody:
+    """The largest body on any boundary — it carries a whole `Run` plus the job spec."""
+    return SubmitBody(
+        run=run(),
+        job_spec=job_spec(),
+        job_submission=job_submission(),
+        run_spec=run_spec(),
+    )
+
+
+def healthcheck_response() -> HealthcheckResponse:
+    return HealthcheckResponse(service="dstack-shim", version="0.20.0")
+
+
+# No `PullResponse` factory: `LogEvent.message` is `bytes`, which the project's orjson dumper
+# refuses outright, so the model has no working `.json()` at all. Harmless today because the
+# server only ever parses it (`services/runner/client.py`), but it means that write path has
+# never run — worth knowing before the serializer is swapped.
+
+
+# --- Gateway API -----------------------------------------------------------------------
+# The server<->gateway protocol. Note the server builds these payloads as hand-written dicts
+# rather than dumping a model (see `services/gateways/client.py`), so only the gateway's own
+# parsing side is model-driven — hence the request shapes live in `parsing/gateway` with
+# hand-written inputs, and only the stats response is serialized from a model here.
+#
+# These schemas are plain `BaseModel`, not `CoreModel`: they already default to extra="ignore"
+# in both pydantic versions, so they need neither the duality shim nor a strictness test.
+
+
+def service_stats() -> ServiceStats:
+    return ServiceStats(
+        project_name="test-project",
+        run_name="test-run",
+        stats={60: Stat(requests=10, request_time=0.125)},
+    )

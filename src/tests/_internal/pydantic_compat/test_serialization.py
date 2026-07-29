@@ -16,6 +16,7 @@ subset of the `db/` fixtures, which outlive it because stored rows do.
 from typing import Callable
 
 import pytest
+from pydantic import BaseModel
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.fleets import FleetNodesSpec
@@ -95,6 +96,32 @@ class TestApiRequestSerialization:
     def test_matches_fixture(self, name, regen):
         payload = API_REQUESTS[name]().json()
         assert_matches_fixture("serialization/api_request", name, payload, regen=regen)
+
+
+# Sent by the server to the runner (shim) as a request body.
+RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "submit_body": factories.submit_body,
+}
+
+# Returned by the gateway to the server. The request direction is not model-driven — the server
+# hand-builds those payloads — so it is covered on the parsing side instead.
+GATEWAY_RESPONSES: dict[str, Callable[[], BaseModel]] = {
+    "service_stats": factories.service_stats,
+}
+
+
+class TestRunnerRequestSerialization:
+    @pytest.mark.parametrize("name", sorted(RUNNER_REQUESTS))
+    def test_matches_fixture(self, name, regen):
+        payload = RUNNER_REQUESTS[name]().json()
+        assert_matches_fixture("serialization/runner", name, payload, regen=regen)
+
+
+class TestGatewayResponseSerialization:
+    @pytest.mark.parametrize("name", sorted(GATEWAY_RESPONSES))
+    def test_matches_fixture(self, name, regen):
+        payload = GATEWAY_RESPONSES[name]().json()
+        assert_matches_fixture("serialization/gateway", name, payload, regen=regen)
 
 
 class TestFleetNodesTargetCompatHack:

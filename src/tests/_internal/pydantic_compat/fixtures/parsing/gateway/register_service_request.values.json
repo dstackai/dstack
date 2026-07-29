@@ -1,0 +1,21 @@
+{
+  "auth": false,
+  "client_max_body_size": 65536,
+  "domain": "test-run.example.com",
+  "has_router_replica": false,
+  "https": true,
+  "options": {
+    "openai": {
+      "model": {
+        "format": "openai",
+        "name": "llama",
+        "prefix": "/v1",
+        "type": "chat"
+      }
+    }
+  },
+  "rate_limits": [],
+  "router": null,
+  "run_name": "test-run",
+  "ssh_private_key": "PRIVATE-KEY"
+}
