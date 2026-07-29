@@ -288,7 +288,7 @@ class VolumePlan(CoreModel):
     project_name: str
     user: str
     spec: VolumeSpec
-    current_resource: Optional[Volume]
+    current_resource: Optional[Volume] = None
 
 
 def _split_mount_point(mount_point: str) -> Tuple[str, str]:

@@ -17,7 +17,7 @@ class SaveRepoCredsRequest(RepoRequest):
     repo_creds: Annotated[
         Optional[RemoteRepoCreds],
         Field(description="The repo creds for accessing private remote repo"),
-    ]
+    ] = None
 
 
 class DeleteReposRequest(CoreModel):

@@ -87,7 +87,7 @@ class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
     """
 
-    plaintext: Optional[str]
+    plaintext: Optional[str] = None
     """
     `plaintext` should not be read directly to avoid ignoring errors accidentally.
     Unpack with `get_plaintext_or_error()`.

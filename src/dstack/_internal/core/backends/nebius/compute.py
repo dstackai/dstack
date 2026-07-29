@@ -355,7 +355,7 @@ class NebiusClusterBackendData(CoreModel):
 
 
 class NebiusPlacementGroupBackendData(CoreModel):
-    cluster: Optional[NebiusClusterBackendData]
+    cluster: Optional[NebiusClusterBackendData] = None
 
     @classmethod
     def load(cls, raw: Optional[str]) -> "NebiusPlacementGroupBackendData":

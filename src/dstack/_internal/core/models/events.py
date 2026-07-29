@@ -39,7 +39,7 @@ class EventTarget(CoreModel):
                 " or `null` for target types not bound to a project (e.g., users)"
             )
         ),
-    ]
+    ] = None
     project_name: Annotated[
         Optional[str],
         Field(
@@ -48,7 +48,7 @@ class EventTarget(CoreModel):
                 " or `null` for target types not bound to a project (e.g., users)"
             )
         ),
-    ]
+    ] = None
     is_project_deleted: Annotated[
         Optional[bool],
         Field(
@@ -74,7 +74,7 @@ class Event(CoreModel):
                 " or `null` if the action was performed by the system"
             )
         ),
-    ]
+    ] = None
     actor_user: Annotated[
         Optional[str],
         Field(
@@ -83,7 +83,7 @@ class Event(CoreModel):
                 " or `null` if the action was performed by the system"
             )
         ),
-    ]
+    ] = None
     is_actor_user_deleted: Annotated[
         Optional[bool],
         Field(

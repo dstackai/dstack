@@ -845,7 +845,7 @@ class ReplicaGroup(CoreModel):
         Field(
             description="The name of the replica group. If not provided, defaults to '0', '1', etc. based on position."
         ),
-    ]
+    ] = None
     count: Annotated[
         Range[int],
         Field(

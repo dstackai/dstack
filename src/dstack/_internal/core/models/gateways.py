@@ -148,13 +148,13 @@ class Gateway(CoreModel):
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus
-    status_message: Optional[str]
-    hostname: Optional[str]
+    status_message: Optional[str] = None
+    hostname: Optional[str] = None
     """Hostname of the load balancer.
     Unset if there is no load balancer, in which case users are expected to point the gateway's
     wildcard domain name to `replicas[i].hostname`.
     """
-    wildcard_domain: Optional[str]
+    wildcard_domain: Optional[str] = None
     default: bool
     replicas: list[GatewayReplica] = []
     backend: Optional[BackendType] = None

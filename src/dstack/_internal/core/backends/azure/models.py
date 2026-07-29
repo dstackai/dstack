@@ -10,7 +10,7 @@ class AzureClientCreds(CoreModel):
     client_id: Annotated[str, Field(description="The client ID")]
     client_secret: Annotated[str, Field(description="The client secret")]
     # if tenant_id is missing, it will be populated from config info
-    tenant_id: Optional[str]
+    tenant_id: Optional[str] = None
 
 
 class AzureDefaultCreds(CoreModel):
