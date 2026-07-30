@@ -19,6 +19,7 @@ venv/
 .env
 .envrc
 uv.lock
+/CI_TESTING.md
 
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
