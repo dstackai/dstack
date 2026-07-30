@@ -1,9 +1,5 @@
 """
 Deterministic model instances for the comparison fixtures.
-
-Every value is pinned — no `uuid4()`, no `now()` — so a fixture only changes when serialization
-changes. Builds on `dstack._internal.server.testing.common` where a factory already exists, so
-these stay in sync with the shapes the rest of the suite uses.
 """
 
 import uuid

@@ -52,21 +52,14 @@ from tests._internal.pydantic_compat.compare import (
 )
 from tests._internal.pydantic_compat.compat import parse_forbid_extra, parse_ignore_extra
 
-# Parse cases are derived from the serialization surfaces rather than listed again: every model we
-# write, we also read, and a model added on one side must not silently lack coverage on the other.
-#
-# The input for each case is the payload v1 produced, frozen on disk. Where a hand-written input
-# already exists it is kept instead — those are strictly better, because they carry shapes a
-# canonical dump cannot show: a row missing fields that now default, or YAML shorthand.
+# The model *list* for each surface is taken from the serialization side rather than repeated here,
+# so a model added on one side cannot silently lack coverage on the other. That is the only thing
+# borrowed — every payload below is a hand-written input, because a canonical dump can never carry
+# the shapes that stress a parser: fields absent as an older writer left them, values in the
+# shorthand a user or CLI actually sends.
 #
 # `extra` policy follows the reader, not the model: the server forbids unknown fields in a request
-# body and ignores them in a stored row.
-READ_SURFACES: dict[str, str] = {
-    "db": "ignore",
-    "api_request": "forbid",
-    "api_response": "ignore",
-    "gateway": "ignore",
-}
+# body and ignores them in a stored row, and the same model can appear on both sides.
 
 
 def _derived_registry(surface: str) -> dict[str, Any]:
@@ -134,20 +127,26 @@ class TestDbBlobParsing:
         _assert_parses("db", name, model, regen)
 
 
-# Derived coverage: a serialization fixture is already a valid payload, so injecting one unknown
-# key into it reproduces exactly what a reader faces when the writer is a newer version. No
-# hand-written input needed, so this scales to every model on the surface for free.
+# Every case above earns a second assertion: inject an unknown key into the same input and check the
+# reader's `extra` policy holds. That covers what happens when the writer is a newer version.
 #
-# Only listed where *we* are the reader. `serialization/runner` is read by the Go runner and
-# `serialization/proxy` by an upstream model server — we cannot assert anything about how those parse.
-TOLERANT_SURFACES = ("db", "api_response", "gateway", "proxy_response")
+# Only the surfaces we read are listed. Runner request bodies are read by the Go runner and proxy
+# requests by an upstream model server, so there is nothing here we could assert about how they
+# parse — they are absent rather than passing vacuously.
+_REGISTRIES = {
+    "db": DB_BLOBS,
+    "api_request": API_REQUESTS,
+    "api_response": API_RESPONSES,
+    "gateway": GATEWAY_PAYLOADS,
+}
 
-# Same trick, opposite expectation: these are read with extra="forbid", so the injected key must
-# be an error rather than be dropped.
-FORBIDDING_SURFACES = ("api_request",)
-
-_TOLERANCE_CASES = [c for c in ser._CASES if c[0] in TOLERANT_SURFACES]
-_FORBID_CASES = [c for c in ser._CASES if c[0] in FORBIDDING_SURFACES]
+# Readers that ignore unknown fields, versus the one that must reject them.
+_TOLERANCE_CASES = [
+    (surface, name)
+    for surface in ("db", "api_response", "gateway")
+    for name in sorted(_REGISTRIES[surface])
+]
+_FORBID_CASES = [("api_request", name) for name in sorted(API_REQUESTS)]
 
 
 class TestUnknownFieldTolerance:
@@ -155,21 +154,13 @@ class TestUnknownFieldTolerance:
 
     @pytest.mark.parametrize(("surface", "name"), _TOLERANCE_CASES, ids=_case_id)
     def test_unknown_field_is_dropped(self, surface, name):
-        # The payload is produced from the factory rather than read from the committed fixture:
-        # the fixture is already pinned by `test_serialization`, and reading it here would make
-        # this test depend on that one having run first — which it has not, since `test_parsing`
-        # collects earlier.
-        #
-        # Compare perturbed against the *same payload parsed without* the extra key rather than
-        # against the payload itself. Parsing validates, and validation coerces defaults that were
-        # never validated on the way out — `Volume.cost: float = 0` holds an int until something
-        # parses it — so comparing to the input would fail for unrelated reasons.
-        registry, dump = ser.SURFACES[surface]
-        model = type(registry[name]())
-        payload = json.loads(ser.serialize(surface, name))
+        # Compare against the *same input parsed without* the extra key, not against the input
+        # itself: parsing fills defaults, so the two are not expected to match.
+        model = _REGISTRIES[surface][name]
+        payload = _load_input(surface, name)
         baseline = parse_ignore_extra(model, payload)
         perturbed = parse_ignore_extra(model, {**payload, "unknown_from_a_newer_writer": {"x": 1}})
-        assert canonicalize(dump(perturbed)) == canonicalize(dump(baseline))
+        assert canonicalize(perturbed.json()) == canonicalize(baseline.json())
 
 
 class TestUnknownFieldRejection:
@@ -183,10 +174,9 @@ class TestUnknownFieldRejection:
 
     @pytest.mark.parametrize(("surface", "name"), _FORBID_CASES, ids=_case_id)
     def test_unknown_field_is_rejected(self, surface, name):
-        registry, _ = ser.SURFACES[surface]
-        perturbed = {**json.loads(ser.serialize(surface, name)), "definitely_not_a_field": 1}
+        perturbed = {**_load_input(surface, name), "definitely_not_a_field": 1}
         with pytest.raises(Exception, match="(?i)extra"):
-            parse_forbid_extra(type(registry[name]()), perturbed)
+            parse_forbid_extra(_REGISTRIES[surface][name], perturbed)
 
 
 class TestApiRequestParsing:
