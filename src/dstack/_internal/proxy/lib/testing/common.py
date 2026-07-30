@@ -1,3 +1,4 @@
+import uuid
 from typing import AsyncGenerator, Optional
 
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
@@ -30,8 +31,12 @@ def make_service(
     https: Optional[bool] = None,
     auth: bool = False,
     strip_prefix: bool = True,
+    run_id: Optional[str] = None,
 ) -> Service:
+    if run_id is None:
+        run_id = uuid.uuid4().hex
     return Service(
+        id=run_id,
         project_name=project_name,
         run_name=run_name,
         domain=domain,
