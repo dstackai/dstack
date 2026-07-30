@@ -331,6 +331,7 @@ nav:
             - SGLang: docs/examples/inference/sglang.md
             - Dynamo: docs/examples/inference/dynamo.md
             - vLLM: docs/examples/inference/vllm.md
+            - LMCache: docs/examples/inference/lmcache.md
             - NIM: docs/examples/inference/nim.md
             - TensorRT-LLM: docs/examples/inference/trtllm.md
         - Models:

@@ -149,6 +149,15 @@ hide:
             Deploy Qwen3.6-27B with vLLM
         </p>
     </a>
+    <a href="/docs/examples/inference/lmcache"
+       class="feature-cell">
+       <h3>
+           LMCache
+       </h3>
+       <p>
+            Deploy Qwen3-8B with vLLM and LMCache
+        </p>
+    </a>
     <a href="/docs/examples/inference/nim" 
        class="feature-cell">
        <h3>
