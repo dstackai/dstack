@@ -124,10 +124,12 @@ class TestParseConfiguration:
                 },
             )
         ).replicas == Range(min=0, max=10)
-        with pytest.raises(
-            ConfigurationError,
-            match="When you set `replicas` to a range, ensure to specify `scaling`",
-        ):
+        # `metric: rpc` is a typo, so `scaling` itself fails to validate. The config stays
+        # rejected, but the message is no longer the `scaling`-is-missing one: pydantic v1 ran a
+        # bare `root_validator` even after a field had failed, handing it a partial `values` dict
+        # in which `scaling` was absent. A v2 `model_validator(mode="after")` does not run at all
+        # once a field is invalid, so what surfaces is the actual typo — the more precise error.
+        with pytest.raises(ConfigurationError, match="metric"):
             parse_run_configuration(
                 test_conf(
                     "0..10",

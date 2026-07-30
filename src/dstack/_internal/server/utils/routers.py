@@ -1,13 +1,12 @@
 from typing import Any, Dict, List, Optional
 
-import orjson
 import packaging.version
 from fastapi import HTTPException, Request, Response, status
 from fastapi.staticfiles import StaticFiles
+from pydantic_core import to_json
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.utils.json_utils import get_orjson_default_options, orjson_default
 from dstack._internal.utils.version import parse_version
 
 
@@ -27,26 +26,26 @@ class CustomStaticFiles(StaticFiles):
         await super().__call__(scope, receive, send)
 
 
-class CustomORJSONResponse(Response):
+class CustomJSONResponse(Response):
     """
-    Custom JSONResponse that uses orjson for serialization.
+    JSONResponse backed by pydantic's own Rust serializer.
 
     It's recommended to return this class from routers directly instead of
     returning pydantic models to avoid the FastAPI's jsonable_encoder overhead.
     See https://fastapi.tiangolo.com/advanced/custom-response/#use-orjsonresponse.
 
     Beware that FastAPI skips model validation when responses are returned directly.
-    If serialization needs to be modified, override `dict()` instead of adding validators.
+    If serialization needs to be modified, add a `@field_serializer`/`@model_serializer`
+    instead of adding validators.
     """
 
     media_type = "application/json"
 
     def render(self, content: Any) -> bytes:
-        return orjson.dumps(
-            content,
-            option=get_orjson_default_options(),
-            default=orjson_default,
-        )
+        # `content` is a model, a list of models, or a plain dict already patched by
+        # `server/compatibility/`, so it has to be serialized generically rather than through
+        # one model's `model_dump_json`. `fallback` keeps a stray unknown type from 500ing.
+        return to_json(content, fallback=str)
 
 
 class BadRequestDetailsModel(CoreModel):

@@ -16,7 +16,7 @@ from dstack._internal.core.models.templates import (
 class TestUITemplateParameter:
     def test_parses_name_parameter(self):
         data = {"type": "name"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -30,7 +30,7 @@ class TestUITemplateParameter:
 
     def test_parses_ide_parameter(self):
         data = {"type": "ide"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -43,7 +43,7 @@ class TestUITemplateParameter:
 
     def test_parses_resources_parameter(self):
         data = {"type": "resources"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -56,7 +56,7 @@ class TestUITemplateParameter:
 
     def test_parses_python_or_docker_parameter(self):
         data = {"type": "python_or_docker"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -69,7 +69,7 @@ class TestUITemplateParameter:
 
     def test_parses_repo_parameter(self):
         data = {"type": "repo"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -82,7 +82,7 @@ class TestUITemplateParameter:
 
     def test_parses_working_dir_parameter(self):
         data = {"type": "working_dir"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -100,7 +100,7 @@ class TestUITemplateParameter:
             "name": "PASSWORD",
             "value": "$random-password",
         }
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -117,7 +117,7 @@ class TestUITemplateParameter:
 
     def test_parses_env_parameter_with_no_optional_fields(self):
         data = {"type": "env"}
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -135,7 +135,7 @@ class TestUITemplateParameter:
     def test_rejects_unknown_parameter_type(self):
         data = {"type": "unknown_type"}
         with pytest.raises(ValidationError):
-            UITemplate.parse_obj(
+            UITemplate.model_validate(
                 {
                     "type": "template",
                     "name": "t",
@@ -163,7 +163,7 @@ class TestUITemplate:
             ],
             "configuration": {"type": "dev-environment"},
         }
-        template = UITemplate.parse_obj(data)
+        template = UITemplate.model_validate(data)
         assert template.name == "desktop-ide"
         assert template.title == "Desktop IDE"
         assert (
@@ -202,7 +202,7 @@ class TestUITemplate:
                 "probes": [{"type": "http", "url": "/healthz"}],
             },
         }
-        template = UITemplate.parse_obj(data)
+        template = UITemplate.model_validate(data)
         assert template.name == "in-browser-ide"
         assert template.title == "In-browser IDE"
         assert len(template.parameters) == 6
@@ -212,7 +212,7 @@ class TestUITemplate:
 
     def test_rejects_wrong_type(self):
         with pytest.raises(ValidationError):
-            UITemplate.parse_obj(
+            UITemplate.model_validate(
                 {
                     "type": "not-a-template",
                     "name": "t",
@@ -223,7 +223,7 @@ class TestUITemplate:
 
     def test_rejects_missing_configuration(self):
         with pytest.raises(ValidationError):
-            UITemplate.parse_obj(
+            UITemplate.model_validate(
                 {
                     "type": "template",
                     "name": "t",
@@ -233,7 +233,7 @@ class TestUITemplate:
 
     def test_rejects_missing_name(self):
         with pytest.raises(ValidationError):
-            UITemplate.parse_obj(
+            UITemplate.model_validate(
                 {
                     "type": "template",
                     "title": "T",
@@ -242,7 +242,7 @@ class TestUITemplate:
             )
 
     def test_empty_parameters_default(self):
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",
@@ -253,7 +253,7 @@ class TestUITemplate:
         assert template.parameters == []
 
     def test_description_is_optional(self):
-        template = UITemplate.parse_obj(
+        template = UITemplate.model_validate(
             {
                 "type": "template",
                 "name": "t",

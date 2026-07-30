@@ -80,6 +80,16 @@ from dstack._internal.server.testing.common import (
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 
+
+def _as_wire(value: datetime) -> str:
+    """
+    A datetime as the API renders it.
+
+    pydantic v2 spells a zero UTC offset `Z`, where `datetime.isoformat()` spells it `+00:00`.
+    """
+    return value.isoformat().replace("+00:00", "Z")
+
+
 pytestmark = pytest.mark.usefixtures("image_config_mock", "disable_sshproxy")
 
 
@@ -303,7 +313,7 @@ def get_dev_env_run_plan_dict(
                         "backend_options": None,
                     },
                     "retry": None,
-                    "volumes": volumes,
+                    "volumes": [json.loads(v.json()) for v in volumes],
                     "ssh_key": None,
                     "working_dir": None,
                     "repo_code_hash": None,
@@ -338,9 +348,9 @@ def get_dev_env_run_dict(
     username: str = "test_user",
     run_name: Optional[str] = "run_name",
     repo_id: str = "test_repo",
-    submitted_at: str = "2023-01-02T03:04:00+00:00",
-    last_processed_at: str = "2023-01-02T03:04:00+00:00",
-    finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
+    submitted_at: str = "2023-01-02T03:04:00Z",
+    last_processed_at: str = "2023-01-02T03:04:00Z",
+    finished_at: Optional[str] = "2023-01-02T03:04:00Z",
     privileged: bool = False,
     docker: Optional[bool] = None,
     deleted: bool = False,
@@ -695,14 +705,14 @@ class TestListRuns:
             fleet=fleet,
             submitted_at=run1_submitted_at,
         )
-        run1_spec = RunSpec.parse_raw(run1.run_spec)
+        run1_spec = RunSpec.model_validate_json(run1.run_spec)
         job = await create_job(
             session=session,
             run=run1,
             submitted_at=run1_submitted_at,
             last_processed_at=run1_submitted_at,
         )
-        job_spec = JobSpec.parse_raw(job.job_spec_data)
+        job_spec = JobSpec.model_validate_json(job.job_spec_data)
         run2_submitted_at = datetime(2023, 1, 1, 3, 4, tzinfo=timezone.utc)
         run2 = await create_run(
             session=session,
@@ -712,7 +722,7 @@ class TestListRuns:
             fleet=fleet,
             submitted_at=run2_submitted_at,
         )
-        run2_spec = RunSpec.parse_raw(run2.run_spec)
+        run2_spec = RunSpec.model_validate_json(run2.run_spec)
         response = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
@@ -728,8 +738,8 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": run1_submitted_at.isoformat(),
-                "last_processed_at": run1_submitted_at.isoformat(),
+                "submitted_at": _as_wire(run1_submitted_at),
+                "last_processed_at": _as_wire(run1_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run1_spec.dict(),
@@ -741,8 +751,8 @@ class TestListRuns:
                                 "id": str(job.id),
                                 "submission_num": 0,
                                 "deployment_num": 0,
-                                "submitted_at": run1_submitted_at.isoformat(),
-                                "last_processed_at": run1_submitted_at.isoformat(),
+                                "submitted_at": _as_wire(run1_submitted_at),
+                                "last_processed_at": _as_wire(run1_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -764,8 +774,8 @@ class TestListRuns:
                     "id": str(job.id),
                     "submission_num": 0,
                     "deployment_num": 0,
-                    "submitted_at": run1_submitted_at.isoformat(),
-                    "last_processed_at": run1_submitted_at.isoformat(),
+                    "submitted_at": _as_wire(run1_submitted_at),
+                    "last_processed_at": _as_wire(run1_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
@@ -779,7 +789,7 @@ class TestListRuns:
                     "probes": [],
                     "image_pull_progress": None,
                 },
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -795,14 +805,14 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": run2_submitted_at.isoformat(),
-                "last_processed_at": run2_submitted_at.isoformat(),
+                "submitted_at": _as_wire(run2_submitted_at),
+                "last_processed_at": _as_wire(run2_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run2_spec.dict(),
                 "jobs": [],
                 "latest_job_submission": None,
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -895,7 +905,7 @@ class TestListRuns:
             user=user,
             submitted_at=run_submitted_at,
         )
-        run_spec = RunSpec.parse_raw(run.run_spec)
+        run_spec = RunSpec.model_validate_json(run.run_spec)
         await create_job(
             session=session,
             run=run,
@@ -909,7 +919,7 @@ class TestListRuns:
             submitted_at=run_submitted_at,
             last_processed_at=run_submitted_at,
         )
-        job2_spec = JobSpec.parse_raw(job2.job_spec_data)
+        job2_spec = JobSpec.model_validate_json(job2.job_spec_data)
         response = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
@@ -922,8 +932,8 @@ class TestListRuns:
                 "project_name": project.name,
                 "user": user.name,
                 "fleet": None,
-                "submitted_at": run_submitted_at.isoformat(),
-                "last_processed_at": run_submitted_at.isoformat(),
+                "submitted_at": _as_wire(run_submitted_at),
+                "last_processed_at": _as_wire(run_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run_spec.dict(),
@@ -935,8 +945,8 @@ class TestListRuns:
                                 "id": str(job2.id),
                                 "submission_num": 1,
                                 "deployment_num": 0,
-                                "submitted_at": run_submitted_at.isoformat(),
-                                "last_processed_at": run_submitted_at.isoformat(),
+                                "submitted_at": _as_wire(run_submitted_at),
+                                "last_processed_at": _as_wire(run_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -958,8 +968,8 @@ class TestListRuns:
                     "id": str(job2.id),
                     "submission_num": 1,
                     "deployment_num": 0,
-                    "submitted_at": run_submitted_at.isoformat(),
-                    "last_processed_at": run_submitted_at.isoformat(),
+                    "submitted_at": _as_wire(run_submitted_at),
+                    "last_processed_at": _as_wire(run_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
@@ -973,7 +983,7 @@ class TestListRuns:
                     "probes": [],
                     "image_pull_progress": None,
                 },
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -3228,7 +3238,7 @@ class TestApplyPlan:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
@@ -3471,7 +3481,7 @@ class TestSubmitRun:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
@@ -3517,7 +3527,7 @@ class TestSubmitRun:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(

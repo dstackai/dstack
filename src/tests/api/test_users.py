@@ -9,7 +9,7 @@ from tests.api.common import RequestRecorder
 USER_PAYLOAD = {
     "id": "11111111-1111-4111-8111-111111111111",
     "username": "user",
-    "created_at": "2023-01-02T03:04:00+00:00",
+    "created_at": "2023-01-02T03:04:00Z",
     "global_role": "user",
     "email": None,
     "active": True,

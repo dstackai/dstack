@@ -4,6 +4,7 @@ import httpx
 from fastapi import status
 from pydantic import ValidationError
 
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.proxy.lib.errors import ProxyError
 from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatCompletionsChunk,
@@ -28,7 +29,7 @@ class OpenAIChatCompletions(ChatCompletionsClient):
             raise ProxyError(f"Error requesting model: {e!r}", status.HTTP_502_BAD_GATEWAY)
 
         try:
-            return ChatCompletionsResponse.__response__.parse_raw(resp.content)
+            return validate_json_extra_ignore(ChatCompletionsResponse, resp.content)
         except ValidationError as e:
             raise ProxyError(f"Invalid response from model: {e}", status.HTTP_502_BAD_GATEWAY)
 
@@ -52,7 +53,7 @@ class OpenAIChatCompletions(ChatCompletionsClient):
     @staticmethod
     def _parse_chunk_data(data: str) -> ChatCompletionsChunk:
         try:
-            return ChatCompletionsChunk.__response__.parse_raw(data)
+            return validate_json_extra_ignore(ChatCompletionsChunk, data)
         except ValidationError as e:
             raise ProxyError(f"Invalid chunk in model stream: {e}", status.HTTP_502_BAD_GATEWAY)
 

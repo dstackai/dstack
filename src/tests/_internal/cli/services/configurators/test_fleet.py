@@ -29,7 +29,7 @@ from dstack._internal.core.models.profiles import Profile
 
 
 def create_conf() -> FleetConfiguration:
-    return FleetConfiguration.parse_obj({"ssh_config": {"hosts": ["1.2.3.4"]}})
+    return FleetConfiguration.model_validate({"ssh_config": {"hosts": ["1.2.3.4"]}})
 
 
 def apply_args(
@@ -71,7 +71,7 @@ def get_ssh_fleet_spec(
     if hosts is None:
         hosts = ["10.0.0.100"]
     return FleetSpec(
-        configuration=FleetConfiguration.parse_obj(
+        configuration=FleetConfiguration.model_validate(
             {
                 "name": name,
                 "ssh_config": {"hosts": hosts},
@@ -130,22 +130,22 @@ class TestFleetConfigurator:
     def test_env(self):
         conf = create_conf()
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_env_override(self):
         conf = create_conf()
-        conf.env = Env.parse_obj({"A": "0"})
+        conf.env = Env.model_validate({"A": "0"})
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_env_value_from_environ(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("FROM_ENV", "2")
         conf = create_conf()
-        conf.env = Env.parse_obj({"FROM_CONF": "1"})
+        conf.env = Env.model_validate({"FROM_CONF": "1"})
         modified, args = apply_args(conf, ["--env", "FROM_ENV"])
-        conf.env = Env.parse_obj({"FROM_CONF": "1", "FROM_ENV": "2"})
+        conf.env = Env.model_validate({"FROM_CONF": "1", "FROM_ENV": "2"})
         assert modified.dict() == conf.dict()
 
     def test_env_value_from_environ_not_set(self, monkeypatch: pytest.MonkeyPatch):

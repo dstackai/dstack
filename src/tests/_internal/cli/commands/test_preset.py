@@ -162,7 +162,8 @@ class TestPresetLocalCommands:
 
         data = json.loads(capsys.readouterr().out)
         assert data["id"] == preset.id
-        assert data["created_at"] == preset.created_at.isoformat()
+        # pydantic v2 renders a UTC datetime with a `Z` suffix; `isoformat()` uses `+00:00`.
+        assert data["created_at"] == preset.created_at.isoformat().replace("+00:00", "Z")
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
@@ -183,7 +184,8 @@ class TestPresetLocalCommands:
         assert len(output["presets"]) == 1
         data = output["presets"][0]
         assert data["id"] == preset.id
-        assert data["created_at"] == preset.created_at.isoformat()
+        # pydantic v2 renders a UTC datetime with a `Z` suffix; `isoformat()` uses `+00:00`.
+        assert data["created_at"] == preset.created_at.isoformat().replace("+00:00", "Z")
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 

@@ -14,6 +14,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
@@ -418,19 +419,21 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
 
 
 def get_volume_configuration(volume_model: VolumeModel) -> AnyVolumeConfiguration:
-    return VolumeConfiguration.__response__.parse_raw(volume_model.configuration).__root__
+    return validate_json_extra_ignore(VolumeConfiguration, volume_model.configuration).root
 
 
 def get_volume_provisioning_data(volume_model: VolumeModel) -> Optional[VolumeProvisioningData]:
     if volume_model.volume_provisioning_data is None:
         return None
-    return VolumeProvisioningData.__response__.parse_raw(volume_model.volume_provisioning_data)
+    return validate_json_extra_ignore(
+        VolumeProvisioningData, volume_model.volume_provisioning_data
+    )
 
 
 def get_volume_attachment_data(volume_model: VolumeModel) -> Optional[VolumeAttachmentData]:
     if volume_model.volume_attachment_data is None:
         return None
-    return VolumeAttachmentData.__response__.parse_raw(volume_model.volume_attachment_data)
+    return validate_json_extra_ignore(VolumeAttachmentData, volume_model.volume_attachment_data)
 
 
 def get_attachment_data(
@@ -438,7 +441,9 @@ def get_attachment_data(
 ) -> Optional[VolumeAttachmentData]:
     if volume_attachment_model.attachment_data is None:
         return None
-    return VolumeAttachmentData.__response__.parse_raw(volume_attachment_model.attachment_data)
+    return validate_json_extra_ignore(
+        VolumeAttachmentData, volume_attachment_model.attachment_data
+    )
 
 
 def instance_model_to_volume_instance(instance_model: InstanceModel) -> VolumeInstance:

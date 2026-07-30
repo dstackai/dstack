@@ -3,13 +3,24 @@ from collections.abc import Mapping
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import gpuhunt
-from pydantic import Field, parse_obj_as, root_validator, validator
-from pydantic.generics import GenericModel
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    GetJsonSchemaHandler,
+    SerializerFunctionWrapHandler,
+    Tag,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Annotated
 
-from dstack._internal.core.models.common import CoreConfig, CoreModel, generate_dual_core_model
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.common import pretty_resources
-from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -17,18 +28,29 @@ logger = get_logger(__name__)
 
 T = TypeVar("T", bound=Union[int, float])
 
+# The shorthand forms these types accept in addition to their declared shape. Declared on the
+# type so that every field using it reports the same thing in the generated JSON Schema, instead
+# of each field restating it in a sibling config class.
+_INT_OR_STR_INPUT = [core_schema.int_schema(), core_schema.str_schema()]
 
-class Range(GenericModel, Generic[T]):
+
+class Range(BaseModel, Generic[T]):
+    model_config = ConfigDict(extra="forbid")
+
     min: Optional[T] = None
     max: Optional[T] = None
 
-    class Config:
-        extra = "forbid"
-
     @classmethod
-    def __get_validators__(cls):
-        yield cls._parse
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls._parse,
+            model_schema,
+            # A range is also written as `8`, `2..8`, or `16GB..`.
+            json_schema_input_schema=core_schema.union_schema([model_schema, *_INT_OR_STR_INPUT]),
+        )
 
     @classmethod
     def _parse(cls, v: Any) -> Any:
@@ -40,16 +62,13 @@ class Range(GenericModel, Generic[T]):
             return dict(min=v, max=v)
         return v
 
-    @root_validator()
-    def _post_validate(cls, values):
-        min = values.get("min")
-        max = values.get("max")
-
-        if min is None and max is None:
+    @model_validator(mode="after")
+    def _post_validate(self) -> "Range[T]":
+        if self.min is None and self.max is None:
             raise ValueError("Invalid empty range: ..")
-        if min is not None and max is not None and min > max:
-            raise ValueError(f"Invalid range order: {min}..{max}")
-        return values
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(f"Invalid range order: {self.min}..{self.max}")
+        return self
 
     def __str__(self) -> str:
         min = self.min if self.min is not None else ""
@@ -81,10 +100,6 @@ class Memory(float):
     """
 
     @classmethod
-    def __get_validators__(cls):
-        yield cls.parse
-
-    @classmethod
     def parse(cls, v: Any) -> "Memory":
         if isinstance(v, (float, int)):
             return cls(v)
@@ -102,12 +117,29 @@ class Memory(float):
     def __repr__(self):
         return f"{self:g}GB"
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls.parse,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                float, return_schema=core_schema.float_schema()
+            ),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        # A memory size is accepted as a number of gigabytes or as `16GB`/`512MB`/`1TB`,
+        # and always serializes as a number of gigabytes.
+        if handler.mode == "validation":
+            return {"anyOf": [{"type": "number"}, {"type": "integer"}, {"type": "string"}]}
+        return {"type": "number"}
+
 
 class ComputeCapability(Tuple[int, int]):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
     @classmethod
     def validate(cls, v: Any) -> Tuple[int, int]:
         if isinstance(v, float):
@@ -123,22 +155,34 @@ class ComputeCapability(Tuple[int, int]):
     def __str__(self):
         return f"{self[0]}.{self[1]}"
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls.validate,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                list, return_schema=core_schema.list_schema(core_schema.int_schema())
+            ),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        serialized = {"type": "array", "items": {"type": "integer"}}
+        if handler.mode == "validation":
+            # Written as `7.5` (a YAML float), as `"7.5"`, or as a two-element sequence.
+            return {"anyOf": [{"type": "number"}, {"type": "string"}, serialized]}
+        return serialized
+
 
 DEFAULT_CPU_COUNT = Range[int](min=2)
 DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
 DEFAULT_GPU_COUNT = Range[int](min=1)
 
 
-class CPUSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["count"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-
-
-class CPUSpec(generate_dual_core_model(CPUSpecConfig)):
+class CPUSpec(CoreModel):
     arch: Annotated[
         Optional[gpuhunt.CPUArchitecture],
         Field(description="The CPU architecture, one of: `x86`, `arm`"),
@@ -146,9 +190,16 @@ class CPUSpec(generate_dual_core_model(CPUSpecConfig)):
     count: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
 
     @classmethod
-    def __get_validators__(cls):
-        yield cls.parse
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls.parse,
+            model_schema,
+            # Also written as a count (`8`) or a `<arch>:<count>` shorthand (`arm:8`).
+            json_schema_input_schema=core_schema.union_schema([model_schema, *_INT_OR_STR_INPUT]),
+        )
 
     @classmethod
     def parse(cls, v: Any) -> Any:
@@ -176,11 +227,17 @@ class CPUSpec(generate_dual_core_model(CPUSpecConfig)):
         # Range and min/max dict - for backward compatibility
         if isinstance(v, Range):
             return {"arch": None, "count": v}
-        if isinstance(v, Mapping) and v.keys() == {"min", "max"}:
+        # A subset rather than exactly {"min", "max"}: `ResourcesSpec` serializes `cpu` down to its
+        # count for old clients, and under `exclude_none=True` that leaves just `{"min": ...}`.
+        # Requiring both keys made the round trip land on the `Range[int]` arm of `ResourcesSpec.cpu`
+        # instead of coming back as a `CPUSpec`. `arch`/`count` are the only `CPUSpec` fields, so a
+        # mapping of min/max is unambiguously a range.
+        if isinstance(v, Mapping) and v and v.keys() <= {"min", "max"}:
             return {"arch": None, "count": v}
         return v
 
-    @validator("arch", pre=True)
+    @field_validator("arch", mode="before")
+    @classmethod
     def _validate_arch(cls, v: Any) -> Any:
         if v is None:
             return None
@@ -191,28 +248,7 @@ class CPUSpec(generate_dual_core_model(CPUSpecConfig)):
         return v
 
 
-class GPUSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["count"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["name"],
-            extra_types=[{"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["memory"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["total_memory"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-
-
-class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
+class GPUSpec(CoreModel):
     vendor: Annotated[
         Optional[gpuhunt.AcceleratorVendor],
         Field(
@@ -241,9 +277,16 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
     ] = None
 
     @classmethod
-    def __get_validators__(cls):
-        yield cls.parse
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls.parse,
+            model_schema,
+            # Also written as a count (`8`) or a `:`-separated shorthand (`A100:8`, `nvidia:16GB`).
+            json_schema_input_schema=core_schema.union_schema([model_schema, *_INT_OR_STR_INPUT]),
+        )
 
     @classmethod
     def parse(cls, v: Any) -> Any:
@@ -280,7 +323,8 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
             return spec
         return v
 
-    @validator("name", pre=True)
+    @field_validator("name", mode="before", json_schema_input_type=Optional[Union[List[str], str]])
+    @classmethod
     def _validate_name(cls, v: Any) -> Any:
         if v is None:
             return None
@@ -297,7 +341,8 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
             logger.warning("`tpu-` prefix is deprecated, specify gpu_vendor instead")
         return validated
 
-    @validator("vendor", pre=True)
+    @field_validator("vendor", mode="before")
+    @classmethod
     def _validate_vendor(
         cls, v: Union[str, gpuhunt.AcceleratorVendor, None]
     ) -> Optional[gpuhunt.AcceleratorVendor]:
@@ -307,7 +352,9 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
             return v
         if isinstance(v, str):
             return cls._vendor_from_string(v)
-        raise TypeError(f"Unsupported type: {v!r}")
+        # A TypeError raised inside a validator is no longer converted to a ValidationError
+        # in pydantic v2, so it would escape as a 500 instead of a 422.
+        raise ValueError(f"Unsupported type: {v!r}")
 
     @classmethod
     def _vendor_from_string(cls, v: str) -> gpuhunt.AcceleratorVendor:
@@ -322,22 +369,20 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
 DEFAULT_GPU_SPEC = GPUSpec(count=Range[int](min=0, max=None))
 
 
-class DiskSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["size"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-
-
-class DiskSpec(generate_dual_core_model(DiskSpecConfig)):
+class DiskSpec(CoreModel):
     size: Annotated[Range[Memory], Field(description="Disk size")]
 
     @classmethod
-    def __get_validators__(cls):
-        yield cls._parse
-        yield cls.validate
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls._parse,
+            model_schema,
+            # Also written as a bare size (`100GB`).
+            json_schema_input_schema=core_schema.union_schema([model_schema, *_INT_OR_STR_INPUT]),
+        )
 
     @classmethod
     def _parse(cls, v: Any) -> Any:
@@ -349,36 +394,21 @@ class DiskSpec(generate_dual_core_model(DiskSpecConfig)):
 DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
-class ResourcesSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["cpu"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["memory"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["shm_size"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["gpu"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["disk"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-
-
-class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
+class ResourcesSpec(CoreModel):
     # TODO: remove `Range[int]` in 0.20. It is kept only for backward compatibility.
-    cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
-        CPUSpec()
-    )
+    cpu: Annotated[
+        Union[
+            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad `cpu`
+            # spells out the whole wrapped schema —
+            # `cpu.function-before[parse(), function-before[parse(), ... CPUSpec]].count` — which
+            # is what `dstack apply` shows the user.
+            Annotated[CPUSpec, Tag("CPUSpec")],
+            Annotated[Range[int], Tag("Range[int]")],
+        ],
+        # `CPUSpec` and `Range[int]` both accept a bare int/str, so the arm has to be picked by
+        # declaration order rather than by pydantic v2's "smart" union resolution.
+        Field(description="The CPU requirements", union_mode="left_to_right"),
+    ] = CPUSpec()
     memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
         DEFAULT_MEMORY_SIZE
     )
@@ -406,7 +436,7 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
 
     def pretty_format(self) -> str:
         # TODO: Remove in 0.20. Use self.cpu directly
-        cpu = parse_obj_as(CPUSpec, self.cpu)
+        cpu = CPUSpec.model_validate(self.cpu)
         resources: Dict[str, Any] = dict(cpu_arch=cpu.arch, cpus=cpu.count, memory=self.memory)
         if self.gpu:
             gpu = self.gpu
@@ -423,15 +453,15 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
         res = pretty_resources(**resources)
         return res
 
-    def dict(self, *args, **kwargs) -> Dict:
-        # super() does not work with pydantic-duality
-        res = CoreModel.dict(self, *args, **kwargs)
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Dict[str, Any]:
+        res = handler(self)
         self._update_serialized_cpu(res)
         return res
 
     # TODO: Remove in 0.20. Added for backward compatibility.
     def _update_serialized_cpu(self, values: Dict):
-        cpu = values["cpu"]
+        cpu = values.get("cpu")
         if cpu:
             arch = cpu.get("arch")
             count = cpu.get("count")

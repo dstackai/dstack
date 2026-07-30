@@ -7,7 +7,7 @@ types plus 18 `*BackendData` blobs — and interleaving them with the core model
 Three `Text` columns are involved, one registry each:
 
 - `BackendModel.config` holds `XStoredConfig(...).json()`, read back as the splice
-  `XConfig(**json.loads(config), creds=XCreds.parse_raw(auth))`. The registries below keep the
+  `XConfig(**json.loads(config), creds=XCreds.model_validate_json(auth))`. The registries below keep the
   two halves apart the way the columns do, so a fixture matches one column's bytes exactly.
 - `BackendModel.auth` holds `XCreds(...).json()`.
 - `InstanceModel.backend_data` and `VolumeModel.backend_data` hold a `*BackendData` blob.
@@ -327,17 +327,17 @@ def vultr_stored_config() -> VultrStoredConfig:
 
 
 def aws_creds_access_key() -> AWSCreds:
-    return AWSCreds.parse_obj(
+    return AWSCreds.model_validate(
         {"type": "access_key", "access_key": "AKIAIOSFODNN7EXAMPLE", "secret_key": "wJalrXUtnFEMI"}
     )
 
 
 def aws_creds_default() -> AWSCreds:
-    return AWSCreds.parse_obj({"type": "default"})
+    return AWSCreds.model_validate({"type": "default"})
 
 
 def azure_creds_client() -> AzureCreds:
-    return AzureCreds.parse_obj(
+    return AzureCreds.model_validate(
         {
             "type": "client",
             "client_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -348,21 +348,21 @@ def azure_creds_client() -> AzureCreds:
 
 
 def azure_creds_default() -> AzureCreds:
-    return AzureCreds.parse_obj({"type": "default"})
+    return AzureCreds.model_validate({"type": "default"})
 
 
 def gcp_creds_service_account() -> GCPCreds:
-    return GCPCreds.parse_obj(
+    return GCPCreds.model_validate(
         {"type": "service_account", "filename": "", "data": _SERVICE_ACCOUNT_JSON}
     )
 
 
 def gcp_creds_default() -> GCPCreds:
-    return GCPCreds.parse_obj({"type": "default"})
+    return GCPCreds.model_validate({"type": "default"})
 
 
 def oci_creds_client() -> OCICreds:
-    return OCICreds.parse_obj(
+    return OCICreds.model_validate(
         {
             "type": "client",
             "user": "ocid1.user.oc1..aaaaaaaadstack",
@@ -375,7 +375,7 @@ def oci_creds_client() -> OCICreds:
 
 
 def oci_creds_default() -> OCICreds:
-    return OCICreds.parse_obj({"type": "default"})
+    return OCICreds.model_validate({"type": "default"})
 
 
 def cloudrift_creds() -> CloudRiftCreds:

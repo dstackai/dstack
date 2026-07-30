@@ -7,6 +7,7 @@ from sqlalchemy.orm import contains_eager, joinedload
 
 import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import (
@@ -78,8 +79,8 @@ class ServerProxyRepo(BaseProxyRepo):
         router = run_spec.configuration.router
         replicas = []
         for job in jobs:
-            jpd: JobProvisioningData = JobProvisioningData.__response__.parse_raw(
-                job.job_provisioning_data
+            jpd: JobProvisioningData = validate_json_extra_ignore(
+                JobProvisioningData, get_or_error(job.job_provisioning_data)
             )
             assert jpd.hostname is not None
             assert jpd.ssh_port is not None
@@ -153,7 +154,9 @@ class ServerProxyRepo(BaseProxyRepo):
         )
         models = []
         for run in res.scalars().all():
-            service_spec: ServiceSpec = ServiceSpec.__response__.parse_raw(run.service_spec)
+            service_spec: ServiceSpec = validate_json_extra_ignore(
+                ServiceSpec, get_or_error(run.service_spec)
+            )
             model_spec = service_spec.model
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:

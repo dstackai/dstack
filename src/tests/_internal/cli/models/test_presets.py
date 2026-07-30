@@ -16,19 +16,19 @@ pytestmark = pytest.mark.windows
 class TestPresetBenchmark:
     def test_agent_schema_matches_benchmark_model(self):
         schema = AGENT_FINAL_REPORT_JSON_SCHEMA["properties"]["benchmark"]
-        assert set(schema["properties"]) == set(PresetBenchmark.__fields__) - {
+        assert set(schema["properties"]) == set(PresetBenchmark.model_fields) - {
             "target",
             "client",
         }
         assert set(schema["required"]) == set(schema["properties"])
         workload_schema = schema["properties"]["workload"]
         metrics_schema = schema["properties"]["metrics"]
-        assert set(workload_schema["properties"]) == set(PresetBenchmarkWorkload.__fields__)
+        assert set(workload_schema["properties"]) == set(PresetBenchmarkWorkload.model_fields)
         assert set(workload_schema["required"]) == set(workload_schema["properties"])
-        assert set(metrics_schema["properties"]) == set(PresetBenchmarkMetrics.__fields__)
+        assert set(metrics_schema["properties"]) == set(PresetBenchmarkMetrics.model_fields)
         assert set(metrics_schema["required"]) == set(metrics_schema["properties"])
         assert set(metrics_schema["properties"]["ttft_ms"]["properties"]) == set(
-            PresetBenchmarkLatency.__fields__
+            PresetBenchmarkLatency.model_fields
         )
 
     @pytest.mark.parametrize(
@@ -42,11 +42,13 @@ class TestPresetBenchmark:
         data = get_preset_benchmark().dict()
         data["metrics"][field] = value
         with pytest.raises(ValidationError, match=error):
-            PresetBenchmark.parse_obj(data)
+            PresetBenchmark.model_validate(data)
 
     def test_rejects_tool_specific_metrics(self):
         data = get_preset_benchmark().dict()
         data["metrics"]["tool_specific"] = 1
 
-        with pytest.raises(ValidationError, match="extra fields not permitted"):
-            PresetBenchmark.parse_obj(data)
+        # No `match=`: the wording is pydantic's, and v2 rewords it ("Extra inputs are not
+        # permitted" rather than "extra fields not permitted"). What matters is the rejection.
+        with pytest.raises(ValidationError):
+            PresetBenchmark.model_validate(data)

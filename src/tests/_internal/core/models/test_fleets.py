@@ -99,7 +99,7 @@ class TestFleetConfiguration:
             "type": "fleet",
             "nodes": input_nodes,
         }
-        configuration = FleetConfiguration.parse_obj(configuration_input)
+        configuration = FleetConfiguration.model_validate(configuration_input)
         assert configuration.nodes == expected_nodes
 
     @pytest.mark.parametrize(
@@ -119,4 +119,4 @@ class TestFleetConfiguration:
             "nodes": input_nodes,
         }
         with pytest.raises(ValidationError):
-            FleetConfiguration.parse_obj(configuration_input)
+            FleetConfiguration.model_validate(configuration_input)

@@ -20,7 +20,6 @@ from dstack._internal.cli.utils.gateway import (
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import GatewayStatus
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -206,4 +205,4 @@ class GatewayCommand(APIBaseCommand):
             gateway_project=args.name.project or self.api.project,
             gateway_name=args.name.name,
         )
-        print(pydantic_orjson_dumps_with_indent(gateway.dict(), default=None))
+        print(gateway.model_dump_json(indent=2))

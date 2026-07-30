@@ -33,14 +33,9 @@ def diff_models(
         A dict of changed fields in the form of
         `{<field_name>: {"old": old_value, "new": new_value}}`
     """
-    if not (
-        type(old) is type(new)
-        or (
-            isinstance(old, CoreModel)
-            and isinstance(new, CoreModel)
-            and type(old).__response__ is type(new).__response__
-        )
-    ):
+    # Used to also accept a request/response pair of the same pydantic-duality model. Now that
+    # a model is a single class, identity is the whole check.
+    if type(old) is not type(new):
         raise TypeError("Both instances must be of the same Pydantic model class.")
 
     if reset is not None:
@@ -48,7 +43,8 @@ def diff_models(
         new = copy_model(new, reset=reset)
 
     changes: ModelDiff = {}
-    for field in old.__fields__:
+    # Accessing `model_fields` on an instance is deprecated in pydantic 2.11+.
+    for field in type(old).model_fields:
         old_value = getattr(old, field)
         new_value = getattr(new, field)
         if old_value != new_value:
@@ -64,7 +60,7 @@ def copy_model(model: M, reset: Optional[IncludeExcludeType] = None) -> M:
     """
     Returns a deep copy of the model instance.
 
-    Implemented as `BaseModel.parse_obj(BaseModel.dict())`, thus,
+    Implemented as `BaseModel.model_validate(BaseModel.dict())`, thus,
     unlike `BaseModel.copy(deep=True)`, runs all validations.
 
     The fields specified in the `reset` option are reset to their default values.
@@ -75,7 +71,7 @@ def copy_model(model: M, reset: Optional[IncludeExcludeType] = None) -> M:
     Returns:
         A deep copy of the model instance.
     """
-    return type(model).parse_obj(model.dict(exclude=reset))
+    return type(model).model_validate(model.dict(exclude=reset))
 
 
 def flatten_diff_fields(diff: ModelDiff, prefix: str = "") -> list[str]:

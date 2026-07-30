@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import Field, ValidationError, validator
+from pydantic import Field, RootModel, ValidationError, field_validator
 from typing_extensions import Annotated, Self
 
 from dstack._internal.core.errors import ConfigurationError
@@ -67,10 +67,10 @@ class BaseVolumeConfiguration(CoreModel):
         ),
     ] = None
 
-    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
-    _validate_auto_cleanup_duration = validator(
-        "auto_cleanup_duration", pre=True, allow_reuse=True
-    )(parse_idle_duration)
+    _validate_tags = field_validator("tags", mode="before")(tags_validator)
+    _validate_auto_cleanup_duration = field_validator("auto_cleanup_duration", mode="before")(
+        parse_idle_duration
+    )
 
     @property
     def external_volume_id(self) -> Optional[str]:
@@ -184,13 +184,15 @@ AnyVolumeConfiguration = Union[
 ]
 
 
-class VolumeConfiguration(CoreModel):
-    __root__: Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]
+class VolumeConfiguration(
+    RootModel[Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]]
+):
+    pass
 
 
 def parse_volume_configuration(data: dict) -> AnyVolumeConfiguration:
     try:
-        return VolumeConfiguration.parse_obj(data).__root__
+        return VolumeConfiguration.model_validate(data).root
     except ValidationError as e:
         raise ConfigurationError(e)
 
@@ -323,7 +325,7 @@ class VolumeMountPoint(CoreModel):
     ]
     path: Annotated[str, Field(description="The absolute container path to mount the volume at")]
 
-    _validate_path = validator("path", allow_reuse=True)(_validate_mount_point_path)
+    _validate_path = field_validator("path")(_validate_mount_point_path)
 
     @classmethod
     def parse(cls, v: str) -> Self:
@@ -344,10 +346,8 @@ class InstanceMountPoint(CoreModel):
         ),
     ] = False
 
-    _validate_instance_path = validator("instance_path", allow_reuse=True)(
-        _validate_mount_point_path
-    )
-    _validate_path = validator("path", allow_reuse=True)(_validate_mount_point_path)
+    _validate_instance_path = field_validator("instance_path")(_validate_mount_point_path)
+    _validate_path = field_validator("path")(_validate_mount_point_path)
 
     @classmethod
     def parse(cls, v: str) -> Self:

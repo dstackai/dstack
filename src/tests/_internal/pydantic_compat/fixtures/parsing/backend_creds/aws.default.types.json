@@ -1,4 +1,4 @@
 {
   "/": "AWSCreds",
-  "/__root__": "AWSDefaultCreds"
+  "/root": "AWSDefaultCreds"
 }

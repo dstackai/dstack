@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import Field, root_validator
+from pydantic import Field, model_validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -28,7 +28,8 @@ class Gpu(CoreModel):
     `assert gpu.vendor is not None` should be a safe type narrowing.
     """
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_name_and_vendor(cls, values):
         is_tpu = False
         name = values.get("name")

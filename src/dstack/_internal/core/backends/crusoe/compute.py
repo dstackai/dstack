@@ -24,7 +24,7 @@ from dstack._internal.core.backends.crusoe.models import CrusoeConfig
 from dstack._internal.core.backends.crusoe.resources import CrusoeClient
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -422,7 +422,7 @@ class CrusoeInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "CrusoeInstanceBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class CrusoePlacementGroupBackendData(CoreModel):
@@ -433,4 +433,4 @@ class CrusoePlacementGroupBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "CrusoePlacementGroupBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)

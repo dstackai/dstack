@@ -34,7 +34,7 @@ class ConfigManager:
         try:
             with open(self.config_filepath, "r") as f:
                 config = yaml.safe_load(f)
-            self.config = GlobalConfig.parse_obj(config)
+            self.config = GlobalConfig.model_validate(config)
         except FileNotFoundError:
             self.config = GlobalConfig()
         except ValidationError:

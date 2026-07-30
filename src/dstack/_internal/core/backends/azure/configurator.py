@@ -46,6 +46,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 LOCATIONS = [
     ("(US) Central US", "centralus"),
@@ -129,18 +130,18 @@ class AzureConfigurator(
         )
         return BackendRecord(
             config=AzureStoredConfig(
-                **AzureBackendConfig.__response__.parse_obj(config).dict()
+                **validate_extra_ignore(AzureBackendConfig, config).dict()
             ).json(),
-            auth=AzureCreds.parse_obj(config.creds).__root__.json(),
+            auth=AzureCreds.model_validate(config.creds).root.json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> AzureBackendConfigWithCreds:
         config = self._get_config(record)
-        return AzureBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(AzureBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> AzureBackendConfig:
         config = self._get_config(record)
-        return AzureBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(AzureBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> AzureBackend:
         config = self._get_config(record)
@@ -152,10 +153,13 @@ class AzureConfigurator(
         if regions is None:
             # Legacy config stores regions as locations
             regions = config_dict.pop("locations")
-        return AzureConfig.__response__(
-            **config_dict,
-            regions=regions,
-            creds=AzureCreds.__response__.parse_raw(record.auth).__root__,
+        return validate_extra_ignore(
+            AzureConfig,
+            {
+                **config_dict,
+                "regions": regions,
+                "creds": validate_json_extra_ignore(AzureCreds, record.auth).root,
+            },
         )
 
     def _check_config_tenant_id(

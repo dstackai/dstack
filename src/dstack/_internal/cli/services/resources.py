@@ -45,9 +45,9 @@ def register_resources_args(parser: ArgsParser) -> None:
 
 def apply_resources_args(args: argparse.Namespace, conf: AnyRunConfiguration) -> None:
     if args.cpu_spec:
-        conf.resources.cpu = resources.CPUSpec.parse_obj(args.cpu_spec)
+        conf.resources.cpu = resources.CPUSpec.model_validate(args.cpu_spec)
     if args.gpu_spec:
-        conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
+        conf.resources.gpu = resources.GPUSpec.model_validate(args.gpu_spec)
     if args.memory_spec:
         conf.resources.memory = args.memory_spec
     if args.disk_spec:

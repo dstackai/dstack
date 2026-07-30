@@ -1,11 +1,10 @@
 from typing import List
 
-from pydantic import parse_obj_as
-
 from dstack._internal.core.compatibility.exports import (
     get_create_export_excludes,
     get_update_export_excludes,
 )
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.exports import Export
 from dstack._internal.server.schemas.exports import (
     CreateExportRequest,
@@ -18,7 +17,7 @@ from dstack.api.server._group import APIClientGroup
 class ExportsAPIClient(APIClientGroup):
     def list(self, project_name: str) -> List[Export]:
         resp = self._request(f"/api/project/{project_name}/exports/list")
-        return parse_obj_as(List[Export.__response__], resp.json())
+        return validate_extra_ignore(List[Export], resp.json())
 
     def create(
         self,
@@ -41,7 +40,7 @@ class ExportsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/exports/create",
             body=body.json(exclude=get_create_export_excludes(body)),
         )
-        return parse_obj_as(Export.__response__, resp.json())
+        return validate_extra_ignore(Export, resp.json())
 
     def update(
         self,
@@ -72,7 +71,7 @@ class ExportsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/exports/update",
             body=body.json(exclude=get_update_export_excludes(body)),
         )
-        return parse_obj_as(Export.__response__, resp.json())
+        return validate_extra_ignore(Export, resp.json())
 
     def delete(self, project_name: str, name: str) -> None:
         body = DeleteExportRequest(name=name)

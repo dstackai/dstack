@@ -1,7 +1,6 @@
 {
   "/": "DevEnvironmentConfiguration",
   "/env": "Env",
-  "/inactivity_duration": "Duration",
   "/python": "PythonVersion",
   "/resources": "ResourcesSpec",
   "/resources/cpu": "CPUSpec",

@@ -43,7 +43,7 @@ class TestListUserPublicKeys:
         assert response.json() == [
             {
                 "id": str(key.id),
-                "added_at": "2023-01-02T03:04:00+00:00",
+                "added_at": "2023-01-02T03:04:00Z",
                 "name": "my-key",
                 "type": "ssh-ed25519",
                 "fingerprint": "SHA256:testfingerprint",
@@ -137,7 +137,7 @@ class TestAddUserPublicKey:
             "type": "ssh-ed25519",
             "name": "test@example.com",
             "fingerprint": "SHA256:uALbfMqe7g4MMaRS5NMJen38dAEHwtxzR0iX0Ymuc80",
-            "added_at": "2023-01-02T03:04:00+00:00",
+            "added_at": "2023-01-02T03:04:00Z",
         }
         validate_openssh_public_key_mock.assert_awaited_once_with(self.PUBLIC_KEY)
 

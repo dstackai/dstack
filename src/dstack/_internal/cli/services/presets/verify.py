@@ -52,7 +52,7 @@ def load_preset_agent_report(
     # check below still rejects unknown leaked tokens.
     report_data = redact_structure(report_data, redacted_values)
     try:
-        report = AgentFinalReport.parse_obj(report_data)
+        report = AgentFinalReport.model_validate(report_data)
     except ValidationError as e:
         raise CLIError(f"Claude returned an invalid final report: {e}") from e
     if not report.success:

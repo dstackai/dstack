@@ -16,7 +16,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import ApplyAction, CoreModel
+from dstack._internal.core.models.common import ApplyAction, CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     ApplyFleetPlanInput,
@@ -907,7 +907,7 @@ def fleet_model_to_fleet(
 
 
 def get_fleet_spec(fleet_model: FleetModel) -> FleetSpec:
-    return FleetSpec.__response__.parse_raw(fleet_model.spec)
+    return validate_json_extra_ignore(FleetSpec, fleet_model.spec)
 
 
 async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> str:
@@ -982,8 +982,8 @@ def get_fleet_master_instance_provisioning_data(
                 and not instance_model.deleted
                 and instance_model.job_provisioning_data is not None
             ):
-                return JobProvisioningData.__response__.parse_raw(
-                    instance_model.job_provisioning_data
+                return validate_json_extra_ignore(
+                    JobProvisioningData, instance_model.job_provisioning_data
                 )
 
     return None
@@ -1391,9 +1391,14 @@ def _validate_fleet_configuration_subtype_specific_fields(conf: FleetConfigurati
         subtype = "Backend"
         props_model = SSHFleetConfigurationProps
     non_default_fields: list[str] = []
-    for field in props_model.__fields__.values():
-        if getattr(conf, field.name) != field.default:
-            non_default_fields.append(field.name)
+    for name, field in props_model.model_fields.items():
+        # `FieldInfo` has no `.name` in pydantic v2, and `.default` is `PydanticUndefined` rather
+        # than `None` for a required field — comparing against it directly would silently report
+        # every required field as non-default. No props field is required today, but that would
+        # arm itself the moment one is added.
+        default = None if field.is_required() else field.get_default(call_default_factory=True)
+        if getattr(conf, name) != default:
+            non_default_fields.append(name)
     if non_default_fields:
         raise ServerClientError(
             f"{subtype} fleet configuration does not support the following fields:"

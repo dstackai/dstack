@@ -3,7 +3,7 @@ import uuid
 from enum import Enum
 from typing import Dict, Optional, Union
 
-from pydantic import Field, validator
+from pydantic import Field, RootModel, field_validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
@@ -49,11 +49,8 @@ class ACMGatewayCertificate(CoreModel):
 AnyGatewayCertificate = Union[LetsEncryptGatewayCertificate, ACMGatewayCertificate]
 
 
-class GatewayCertificate(CoreModel):
-    __root__: Annotated[
-        AnyGatewayCertificate,
-        Field(discriminator="type"),
-    ]
+class GatewayCertificate(RootModel[Annotated[AnyGatewayCertificate, Field(discriminator="type")]]):
+    pass
 
 
 class GatewayConfiguration(CoreModel):
@@ -120,7 +117,7 @@ class GatewayConfiguration(CoreModel):
         ),
     ] = None
 
-    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+    _validate_tags = field_validator("tags", mode="before")(tags_validator)
 
 
 class GatewaySpec(CoreModel):

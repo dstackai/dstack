@@ -21,7 +21,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.errors import BackendError, ServerClientError, SkipOffer
-from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.common import NetworkMode, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
     ComputeGroupStatus,
@@ -891,8 +891,8 @@ def _get_master_job_provisioning_data(
     if master_job.job_submissions[-1].job_provisioning_data is None:
         return None
 
-    return JobProvisioningData.__response__.parse_obj(
-        master_job.job_submissions[-1].job_provisioning_data
+    return validate_extra_ignore(
+        JobProvisioningData, master_job.job_submissions[-1].job_provisioning_data
     )
 
 

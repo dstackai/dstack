@@ -79,7 +79,7 @@ def _build_service(
     service.name = configuration.name
     service.gateway = configuration.gateway
     service.env.update(configuration.env)
-    for field in ProfileParams.__fields__:
+    for field in ProfileParams.model_fields:
         value = getattr(configuration, field)
         if value is not None:
             setattr(service, field, value)

@@ -60,7 +60,7 @@ class TestListUsers:
             {
                 "id": str(admin.id),
                 "username": admin.name,
-                "created_at": "2023-01-02T03:05:00+00:00",
+                "created_at": "2023-01-02T03:05:00Z",
                 "global_role": admin.global_role,
                 "email": None,
                 "active": True,
@@ -72,7 +72,7 @@ class TestListUsers:
             {
                 "id": str(other_user.id),
                 "username": other_user.name,
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "global_role": other_user.global_role,
                 "email": None,
                 "active": True,
@@ -117,7 +117,7 @@ class TestListUsers:
                 {
                     "id": str(admin.id),
                     "username": admin.name,
-                    "created_at": "2023-01-02T03:06:00+00:00",
+                    "created_at": "2023-01-02T03:06:00Z",
                     "global_role": admin.global_role,
                     "email": None,
                     "active": True,
@@ -160,7 +160,7 @@ class TestListUsers:
             {
                 "id": str(admin.id),
                 "username": admin.name,
-                "created_at": "2023-01-02T03:06:00+00:00",
+                "created_at": "2023-01-02T03:06:00Z",
                 "global_role": admin.global_role,
                 "email": None,
                 "active": True,
@@ -174,7 +174,7 @@ class TestListUsers:
             "/api/users/list",
             headers=get_auth_headers(admin.token),
             json={
-                "prev_created_at": "2023-01-02T03:06:00+00:00",
+                "prev_created_at": "2023-01-02T03:06:00Z",
                 "prev_id": str(admin.id),
                 "limit": 1,
             },
@@ -184,7 +184,7 @@ class TestListUsers:
             {
                 "id": str(user_one.id),
                 "username": user_one.name,
-                "created_at": "2023-01-02T03:05:00+00:00",
+                "created_at": "2023-01-02T03:05:00Z",
                 "global_role": user_one.global_role,
                 "email": None,
                 "active": True,
@@ -228,7 +228,7 @@ class TestListUsers:
             {
                 "id": str(matching_user.id),
                 "username": matching_user.name,
-                "created_at": "2023-01-02T03:05:00+00:00",
+                "created_at": "2023-01-02T03:05:00Z",
                 "global_role": matching_user.global_role,
                 "email": None,
                 "active": True,
@@ -262,7 +262,7 @@ class TestListUsers:
             {
                 "id": str(other_user.id),
                 "username": other_user.name,
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "global_role": other_user.global_role,
                 "email": None,
                 "active": True,
@@ -315,7 +315,7 @@ class TestGetMyUser:
         assert response.json() == {
             "id": str(user.id),
             "username": user.name,
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "global_role": user.global_role,
             "email": None,
             "creds": {"token": user.token.get_plaintext_or_error()},
@@ -392,7 +392,7 @@ class TestGetUser:
         assert response.json() == {
             "id": str(other_user.id),
             "username": other_user.name,
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "global_role": other_user.global_role,
             "email": None,
             "creds": {"token": "1234"},
@@ -434,7 +434,7 @@ class TestCreateUser:
         assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "global_role": "user",
             "email": "test@example.com",
             "active": True,
@@ -472,7 +472,7 @@ class TestCreateUser:
         assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "Test",
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "global_role": "user",
             "email": None,
             "active": True,

@@ -29,7 +29,11 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, EntityReference
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    EntityReference,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayRouterConfig,
@@ -808,8 +812,8 @@ def _get_gateway_compute_router_config(
 ) -> Optional[AnyGatewayRouterConfig]:
     if compute.configuration is None:  # pre-0.18.2 gateway
         return None  # gateway routers introduced in 0.19.38
-    compute_config: GatewayComputeConfiguration = (
-        GatewayComputeConfiguration.__response__.parse_raw(compute.configuration)
+    compute_config: GatewayComputeConfiguration = validate_json_extra_ignore(
+        GatewayComputeConfiguration, compute.configuration
     )
     return compute_config.router
 
@@ -855,7 +859,7 @@ def get_gateway_compute_models(gateway_model: GatewayModel) -> List[GatewayCompu
 
 def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
     if gateway_model.configuration is not None:
-        return GatewayConfiguration.__response__.parse_raw(gateway_model.configuration)
+        return validate_json_extra_ignore(GatewayConfiguration, gateway_model.configuration)
     # Handle gateways created before GatewayConfiguration was introduced
     return GatewayConfiguration(
         name=gateway_model.name,
@@ -871,7 +875,9 @@ def get_gateway_compute_configuration(
     gateway_model: GatewayModel,
 ) -> GatewayComputeConfiguration:
     if gateway_compute.configuration is not None:
-        return GatewayComputeConfiguration.__response__.parse_raw(gateway_compute.configuration)
+        return validate_json_extra_ignore(
+            GatewayComputeConfiguration, gateway_compute.configuration
+        )
     # Handle gateways created before GatewayComputeConfiguration was introduced
     gateway_configuration = get_gateway_configuration(gateway_model)
     return GatewayComputeConfiguration(

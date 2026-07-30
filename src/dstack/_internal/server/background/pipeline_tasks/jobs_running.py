@@ -13,7 +13,11 @@ from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError, SSHError
-from dstack._internal.core.models.common import NetworkMode, RegistryAuth
+from dstack._internal.core.models.common import (
+    NetworkMode,
+    RegistryAuth,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     ServiceConfiguration,
@@ -413,7 +417,7 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
             # gate in _prepare_startup_context can read its status / IP.
             # _fetch_run_model handles both: same-replica jobs always, plus
             # all non-terminated jobs when one exists.
-            run_spec = RunSpec.__response__.parse_raw(job_model.run.run_spec)
+            run_spec = validate_json_extra_ignore(RunSpec, job_model.run.run_spec)
             run_model = await _fetch_run_model(
                 session=session,
                 run_id=job_model.run_id,
@@ -1215,7 +1219,7 @@ async def _register_service_replica(
     if context.run_model.gateway_id is None:
         return None
 
-    job_spec = JobSpec.__response__.parse_raw(context.job_model.job_spec_data)
+    job_spec = validate_json_extra_ignore(JobSpec, context.job_model.job_spec_data)
 
     # For router-based services (e.g. PD disaggregation), only router replicas should be
     # registered with the gateway. Worker replicas are discovered by the router-worker
@@ -1708,7 +1712,7 @@ def _terminate_if_inactivity_duration_exceeded(
     job_update_map: _JobUpdateMap,
     no_connections_secs: Optional[int],
 ) -> None:
-    conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
+    conf = validate_json_extra_ignore(RunSpec, run_model.run_spec).configuration
     if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
         conf.inactivity_duration, int
     ):
@@ -1929,7 +1933,7 @@ def _get_result_job_runtime_data(
     jrd = result.job_update_map.get("job_runtime_data", job_model.job_runtime_data)
     if jrd is None:
         return None
-    return JobRuntimeData.__response__.parse_raw(jrd)
+    return validate_json_extra_ignore(JobRuntimeData, jrd)
 
 
 def _get_result_registered(job_model: JobModel, result: _ProcessResult) -> bool:

@@ -55,7 +55,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -214,8 +214,8 @@ class GCPCompute(
 
             def reserved_offers_filter(offer: InstanceOfferWithAvailability) -> bool:
                 """Remove reserved-only offers"""
-                if GCPOfferBackendData.__response__.parse_obj(
-                    offer.backend_data
+                if validate_extra_ignore(
+                    GCPOfferBackendData, offer.backend_data
                 ).is_dws_calendar_mode:
                     return False
                 return True

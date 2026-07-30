@@ -108,7 +108,9 @@ def _add_session(table: Table, session: dict[str, Any]) -> None:
     created_at = session.get("created_at")
     if isinstance(created_at, str):
         try:
-            created = pretty_date(datetime.fromisoformat(created_at))
+            # `Z` is what pydantic v2 emits for UTC, and `datetime.fromisoformat` only
+            # accepts it from Python 3.11; dstack supports 3.10.
+            created = pretty_date(datetime.fromisoformat(created_at.replace("Z", "+00:00")))
         except ValueError:
             created = created_at
     benchmark = ""

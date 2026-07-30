@@ -17,6 +17,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.runs import (
     ImagePullProgress,
@@ -282,23 +283,23 @@ def job_model_to_job_submission(
 def get_job_provisioning_data(job_model: JobModel) -> Optional[JobProvisioningData]:
     if job_model.job_provisioning_data is None:
         return None
-    return JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
+    return validate_json_extra_ignore(JobProvisioningData, job_model.job_provisioning_data)
 
 
 def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
     if job_model.job_runtime_data is None:
         return None
-    return JobRuntimeData.__response__.parse_raw(job_model.job_runtime_data)
+    return validate_json_extra_ignore(JobRuntimeData, job_model.job_runtime_data)
 
 
 def _get_image_pull_progress(job_model: JobModel) -> Optional[ImagePullProgress]:
     if job_model.image_pull_progress is None:
         return None
-    return ImagePullProgress.__response__.parse_raw(job_model.image_pull_progress)
+    return validate_json_extra_ignore(ImagePullProgress, job_model.image_pull_progress)
 
 
 def get_job_spec(job_model: JobModel) -> JobSpec:
-    return JobSpec.__response__.parse_raw(job_model.job_spec_data)
+    return validate_json_extra_ignore(JobSpec, job_model.job_spec_data)
 
 
 def delay_job_instance_termination(job_model: JobModel):

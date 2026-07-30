@@ -3,7 +3,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional, Union, cast
+from typing import Annotated, BinaryIO, Callable, Dict, Optional, Union, cast
 
 import git
 import pydantic
@@ -17,7 +17,7 @@ from dstack._internal.core.errors import (
     RepoGitError,
     RepoInvalidGitRepositoryError,
 )
-from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.logging import get_logger
@@ -29,27 +29,14 @@ logger = get_logger(__name__)
 SCP_LOCATION_REGEX = re.compile(r"(?P<user>[^/]+)@(?P<host>[^/]+?):(?P<path>.+)", re.IGNORECASE)
 
 
-class RemoteRepoCredsConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        pass
-
-
-class RemoteRepoCreds(generate_dual_core_model(RemoteRepoCredsConfig)):
+class RemoteRepoCreds(CoreModel):
     clone_url: str
     private_key: Optional[str] = None
     oauth_token: Optional[str] = None
 
 
-class RemoteRepoInfoConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        pass
-
-
 class RemoteRepoInfo(
     BaseRepoInfo,
-    generate_dual_core_model(RemoteRepoInfoConfig),
 ):
     repo_type: Literal["remote"] = "remote"
     repo_name: str
@@ -266,6 +253,22 @@ class _DiffCollector:
         return self.buffer.getvalue()
 
 
+HTTPS_DEFAULT_PORT = 443
+
+
+def _explicit_port(port: Optional[int], default: int) -> Optional[int]:
+    """
+    The port only if it was written explicitly.
+
+    pydantic v2's URL types fill in the scheme's default port, where v1 left `port` as `None`
+    unless the URL spelled it out. Without this, every https repo URL would be rebuilt as
+    `https://github.com:443/...`.
+    """
+    if port is None or port == default:
+        return None
+    return port
+
+
 @dataclass
 class GitRepoURL:
     """
@@ -300,7 +303,7 @@ class GitRepoURL:
             return GitRepoURL(
                 ssh_user=ssh_config.get("user"),
                 host=url.host.lower(),
-                https_port=url.port,
+                https_port=_explicit_port(url.port, default=HTTPS_DEFAULT_PORT),
                 ssh_port=ssh_config.get("port"),
                 path=url.path or "/",
                 original_host=url.host.lower(),
@@ -308,7 +311,7 @@ class GitRepoURL:
 
         if url.scheme.lower() == "ssh":
             return GitRepoURL(
-                ssh_user=url.user or ssh_config.get("user"),
+                ssh_user=url.username or ssh_config.get("user"),
                 host=ssh_config.get("hostname", "").lower() or url.host.lower(),
                 https_port=None,
                 ssh_port=url.port or ssh_config.get("port"),

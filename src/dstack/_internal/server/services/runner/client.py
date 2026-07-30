@@ -13,7 +13,7 @@ from typing_extensions import Self
 
 from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.common import CoreModel, NetworkMode
+from dstack._internal.core.models.common import CoreModel, NetworkMode, validate_extra_ignore
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
@@ -110,7 +110,7 @@ class RunnerClient:
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
-        return MetricsResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(MetricsResponse, resp.json())
 
     def submit_job(
         self,
@@ -182,14 +182,14 @@ class RunnerClient:
         if not _is_json_response(resp):
             # Old runner or runner failed to get job info
             return None
-        return JobInfoResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(JobInfoResponse, resp.json())
 
     def pull(self, timestamp: int) -> PullResponse:
         resp = self._session.get(
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
         resp.raise_for_status()
-        return PullResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(PullResponse, resp.json())
 
     def stop(self):
         resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
@@ -201,7 +201,7 @@ class RunnerClient:
     def _healthcheck(self) -> HealthcheckResponse:
         resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
-        return HealthcheckResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(HealthcheckResponse, resp.json())
 
     def _negotiate(self, healthcheck_response: Optional[HealthcheckResponse] = None) -> None:
         if healthcheck_response is None:
@@ -624,7 +624,7 @@ class ShimClient:
     _M = TypeVar("_M", bound=CoreModel)
 
     def _response(self, model_cls: type[_M], response: requests.Response) -> _M:
-        return model_cls.__response__.parse_obj(response.json())
+        return validate_extra_ignore(model_cls, response.json())
 
     def _raise_for_status(self, response: requests.Response) -> None:
         try:

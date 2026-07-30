@@ -7,7 +7,6 @@ import pytest
 import yaml
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import Duration
 from dstack._internal.core.models.configurations import (
     PythonVersion,
     parse_apply_configuration,
@@ -253,7 +252,12 @@ _DURATION_SENTINEL_CASES = [
     pytest.param("idle_duration", "off", -1, int, id="idle-off"),
     pytest.param("idle_duration", False, -1, int, id="idle-false"),
     pytest.param("idle_duration", -1, -1, int, id="idle-legacy-minus-one"),
-    pytest.param("max_duration", "2h", 7200, Duration, id="max-duration"),
+    # `int`, not `Duration`: the field is declared `Union[Literal["off"], int]`, and the `Duration`
+    # the `pre=True` validator returns is an `int` subclass. pydantic v1 passed the subclass
+    # through untouched; v2 validates against the declared `int` and returns a plain one. The value
+    # is identical, the wire format is identical (both serialize as `7200`), and nothing in the
+    # codebase does `isinstance(..., Duration)` — verified during the v2 migration.
+    pytest.param("max_duration", "2h", 7200, int, id="max-duration"),
 ]
 
 

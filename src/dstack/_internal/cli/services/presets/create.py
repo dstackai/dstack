@@ -168,7 +168,7 @@ def _load_session_configuration(agent_session: PresetAgentSession) -> PresetConf
     # The session copy is canonical output, not user input: parse it without
     # the user-facing deprecation warnings.
     try:
-        return PresetConfiguration.parse_obj(
+        return PresetConfiguration.model_validate(
             yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
         )
     except (OSError, ValueError) as e:
@@ -357,7 +357,7 @@ def _resolve_preset_env(
                     raise ConfigurationError(str(e)) from e
         else:
             resolved[key] = value
-    configuration.env = Env.parse_obj(resolved)
+    configuration.env = Env.model_validate(resolved)
     return configuration
 
 
@@ -845,7 +845,7 @@ def _build_constraints(
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
-    constraints = PresetConstraints.parse_obj(
+    constraints = PresetConstraints.model_validate(
         {
             "run_name_prefix": build_name,
             "model": json.loads(configuration.model.json(exclude_none=True)),

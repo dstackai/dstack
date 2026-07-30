@@ -1,13 +1,14 @@
 from typing import List, Optional
 
 import yaml
-from pydantic import Field, ValidationError
+from pydantic import Field, RootModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
 import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
+    AnyBackendConfigWithCredsTagged,
     AnyBackendFileConfigWithCreds,
     BackendInfoYAML,
 )
@@ -221,7 +222,7 @@ class ServerConfigManager:
         except OSError:
             return
         config_dict = yaml.safe_load(content)
-        return ServerConfig.parse_obj(config_dict)
+        return ServerConfig.model_validate(config_dict)
 
     def _save_config(self, config: ServerConfig):
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
@@ -261,12 +262,10 @@ async def update_backend_config_yaml(
     await backends_services.update_backend(session=session, project=project, config=config)
 
 
-class _BackendConfigWithCreds(CoreModel):
+class _BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
     """
     Model for parsing API and file YAML configs.
     """
-
-    __root__: Annotated[AnyBackendConfigWithCreds, Field(..., discriminator="type")]
 
 
 def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds:
@@ -275,7 +274,7 @@ def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds
     except yaml.YAMLError:
         raise ServerClientError("Error parsing YAML")
     try:
-        backend_config = _BackendConfigWithCreds.parse_obj(config_dict).__root__
+        backend_config = _BackendConfigWithCreds.model_validate(config_dict).root
     except ValidationError as e:
         raise ServerClientError(str(e))
     return backend_config
@@ -283,8 +282,8 @@ def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds
 
 def file_config_to_config(file_config: AnyBackendFileConfigWithCreds) -> AnyBackendConfigWithCreds:
     backend_config_dict = file_config.dict()
-    backend_config = _BackendConfigWithCreds.parse_obj(backend_config_dict)
-    return backend_config.__root__
+    backend_config = _BackendConfigWithCreds.model_validate(backend_config_dict)
+    return backend_config.root
 
 
 def config_to_yaml(config: CoreModel) -> str:

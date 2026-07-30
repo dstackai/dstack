@@ -46,7 +46,7 @@ async def _get_repo_creds(
         return None
     creds_raw = repo_creds.creds.plaintext
     assert creds_raw is not None
-    return RemoteRepoCreds.parse_raw(creds_raw)
+    return RemoteRepoCreds.model_validate_json(creds_raw)
 
 
 @pytest_asyncio.fixture
@@ -299,7 +299,7 @@ class TestInitRemoteRepo:
         )
 
         assert repo.creds is None
-        assert RemoteRepoInfo.parse_raw(repo.info) == new_repo_info
+        assert RemoteRepoInfo.model_validate_json(repo.info) == new_repo_info
         assert await _get_repo_creds(session, repo.id, user.id) == our_repo_creds
 
     async def test_updates_repo_updating_user_creds(
@@ -394,7 +394,7 @@ class TestInitRemoteRepo:
 
         # legacy creds stored in the repo are still here
         assert repo.creds is not None
-        assert RemoteRepoCreds.parse_raw(repo.creds) == legacy_repo_creds
+        assert RemoteRepoCreds.model_validate_json(repo.creds) == legacy_repo_creds
         # our personal creds are deleted
         assert await _get_repo_creds(session, repo.id, user.id) is None
         # another user's creds are still here

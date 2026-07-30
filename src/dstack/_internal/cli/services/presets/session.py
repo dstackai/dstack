@@ -93,7 +93,7 @@ class PresetAgentSession:
             _get_claude_version,
         )
 
-        info = ClaudeAgentInfo.parse_obj(
+        info = ClaudeAgentInfo.model_validate(
             {
                 "executable": auth.executable,
                 "version": _get_claude_version(auth),

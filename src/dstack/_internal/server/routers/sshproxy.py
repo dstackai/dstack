@@ -10,7 +10,7 @@ from dstack._internal.server.schemas.sshproxy import GetUpstreamRequest, GetUpst
 from dstack._internal.server.security.permissions import AlwaysForbidden, ServiceAccount
 from dstack._internal.server.services.sshproxy.handlers import get_upstream_response
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -36,4 +36,4 @@ async def get_upstream(
     response = await get_upstream_response(session=session, upstream_id=body.id)
     if response is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(response)
+    return CustomJSONResponse(response)

@@ -139,7 +139,7 @@ class TestDynamoNoRetryValidator:
             retry={"on_events": ["error"]},
         )
         with pytest.raises(ValidationError, match="Dynamo"):
-            RunSpec.parse_obj(spec)
+            RunSpec.model_validate(spec)
 
     def test_dynamo_router_with_retry_in_configuration_is_rejected(self):
         # retry can also be specified at configuration level; _merged_profile
@@ -150,12 +150,12 @@ class TestDynamoNoRetryValidator:
             top_level_extras={"retry": {"on_events": ["error"]}},
         )
         with pytest.raises(ValidationError, match="Dynamo"):
-            RunSpec.parse_obj(spec)
+            RunSpec.model_validate(spec)
 
     def test_dynamo_router_without_retry_is_accepted(self):
         spec = _service_run_spec_dict(router_type="dynamo", retry=None)
         # Should not raise:
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_sglang_router_with_retry_is_accepted(self):
         spec = _service_run_spec_dict(
@@ -163,11 +163,11 @@ class TestDynamoNoRetryValidator:
             retry={"on_events": ["error"]},
         )
         # SGLang services are unaffected by the validator.
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_service_without_router_with_retry_is_accepted(self):
         spec = _service_run_spec_dict(router_type=None, retry={"on_events": ["error"]})
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_non_service_run_with_retry_is_accepted(self):
         # Validator is service-only. A task or dev-environment with retry
@@ -184,4 +184,4 @@ class TestDynamoNoRetryValidator:
             "ssh_key_pub": "ssh-rsa AAAA...",
             "repo_data": {"repo_type": "virtual"},
         }
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)

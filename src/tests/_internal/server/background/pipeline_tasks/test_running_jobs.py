@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from dstack._internal import settings
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.common import NetworkMode, validate_json_extra_ignore
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     ProbeConfig,
@@ -89,7 +89,7 @@ from dstack._internal.server.testing.common import (
     get_volume_configuration,
     list_events,
 )
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, get_or_error
 
 pytestmark = pytest.mark.usefixtures("image_config_mock", "test_log_storage")
 
@@ -594,7 +594,9 @@ class TestJobRunningWorker:
         assert job.lock_expires_at is None
         assert job.lock_owner is None
         assert job.last_processed_at > before_processed_at
-        job_runtime_data = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        job_runtime_data = validate_json_extra_ignore(
+            JobRuntimeData, get_or_error(job.job_runtime_data)
+        )
         assert job_runtime_data.working_dir == "/dstack/run"
         assert job_runtime_data.username == "dstack"
 
@@ -829,7 +831,9 @@ class TestJobRunningWorker:
         runner_client_mock.run_job.assert_called_once()
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
-        job_runtime_data = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        job_runtime_data = validate_json_extra_ignore(
+            JobRuntimeData, get_or_error(job.job_runtime_data)
+        )
         assert job_runtime_data.ports == {10022: 32771, 10999: 32772}
         assert job_runtime_data.working_dir == "/dstack/run"
         assert job_runtime_data.username == "dstack"
@@ -1227,7 +1231,9 @@ class TestJobRunningWorker:
 
         await session.refresh(job)
         assert job.status == JobStatus.PULLING
-        job_runtime_data = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        job_runtime_data = validate_json_extra_ignore(
+            JobRuntimeData, get_or_error(job.job_runtime_data)
+        )
         assert job_runtime_data.ports == expected_ports
 
     async def test_pulling_shim_failed(
@@ -2453,7 +2459,7 @@ class TestJobRunningWorker:
 
 
 def _router_service_configuration(router_type: str) -> ServiceConfiguration:
-    return ServiceConfiguration.parse_obj(
+    return ServiceConfiguration.model_validate(
         {
             "type": "service",
             "port": 8000,
@@ -2510,7 +2516,7 @@ class TestPrepareStartupContextRouterEnv:
             result.job_update_map.get("termination_reason_message") or ""
         )
 
-    @freeze_time("2023-01-01 12:00:00+00:00")
+    @freeze_time("2023-01-01 12:00:00Z")
     async def test_router_not_provisioned_within_timeout_defers(self):
         context = self._make_context(
             submitted_at=datetime(2023, 1, 1, 11, 45, 0, tzinfo=timezone.utc),
@@ -2524,7 +2530,7 @@ class TestPrepareStartupContextRouterEnv:
         assert out is None
         assert result.job_update_map == {}
 
-    @freeze_time("2023-01-01 12:00:00+00:00")
+    @freeze_time("2023-01-01 12:00:00Z")
     async def test_router_not_provisioned_past_timeout_terminates(self):
         context = self._make_context(
             submitted_at=datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
@@ -2627,7 +2633,7 @@ class TestFetchRunModelDynamoBranch:
             status=JobStatus.PROVISIONING,
         )
         run_id = run.id
-        parsed = RunSpec.__response__.parse_raw(run.run_spec)
+        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
         await session.commit()
         session.expire_all()
         run_model = await _fetch_run_model(
@@ -2663,7 +2669,7 @@ class TestFetchRunModelDynamoBranch:
             status=JobStatus.PROVISIONING,
         )
         run_id = run.id
-        parsed = RunSpec.__response__.parse_raw(run.run_spec)
+        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
         await session.commit()
         session.expire_all()
         run_model = await _fetch_run_model(

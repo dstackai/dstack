@@ -38,7 +38,7 @@ class TestValidateProfileBackendOptions:
 
 class TestProfileInstances:
     def test_string_is_parsed_as_instance_name_selector(self):
-        profile = Profile.parse_obj({"instances": ["my-fleet-1"]})
+        profile = Profile.model_validate({"instances": ["my-fleet-1"]})
 
         assert profile.instances == [InstanceNameSelector(name="my-fleet-1")]
 
@@ -58,12 +58,12 @@ class TestProfileInstances:
         ],
     )
     def test_object_selectors_are_parsed(self, value, expected):
-        profile = Profile.parse_obj({"instances": [value]})
+        profile = Profile.model_validate({"instances": [value]})
 
         assert profile.instances == [expected]
 
     def test_parses_fleet_selector_object_notation(self):
-        profile = Profile.parse_obj(
+        profile = Profile.model_validate(
             {"instances": [{"fleet": {"project": "main", "name": "my-fleet"}, "instance": 0}]}
         )
 
@@ -89,11 +89,11 @@ class TestProfileInstances:
     )
     def test_invalid_selector_is_rejected(self, value):
         with pytest.raises(ValidationError):
-            Profile.parse_obj({"instances": [value]})
+            Profile.model_validate({"instances": [value]})
 
     def test_empty_instances_list_is_rejected(self):
         with pytest.raises(ValidationError):
-            Profile.parse_obj({"instances": []})
+            Profile.model_validate({"instances": []})
 
 
 class TestProfileInstancesCompatibilityExcludes:

@@ -43,7 +43,7 @@ class GetRunRequest(CoreModel):
 class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
     max_offers: Optional[int] = Field(
-        description="The maximum number of offers to return", ge=1, le=10000
+        default=None, description="The maximum number of offers to return", ge=1, le=10000
     )
     full_offers: Annotated[
         bool, Field(description="Return full offers not adjusted by requirements")

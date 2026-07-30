@@ -26,7 +26,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.common import NetworkMode, validate_json_extra_ignore
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
     ComputeGroupStatus,
@@ -445,7 +445,7 @@ async def create_job(
 ) -> JobModel:
     if deployment_num is None:
         deployment_num = run.deployment_num
-    run_spec = RunSpec.__response__.parse_raw(run.run_spec)
+    run_spec = validate_json_extra_ignore(RunSpec, run.run_spec)
     job_spec = (
         await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
     )[0]
@@ -1038,7 +1038,7 @@ def get_remote_connection_info(
     if env is None:
         env = Env()
     elif isinstance(env, dict):
-        env = Env.parse_obj(env)
+        env = Env.model_validate(env)
     return RemoteConnectionInfo(
         host=host,
         port=port,
@@ -1173,7 +1173,7 @@ def get_volume_configuration(
     auto_cleanup_duration: Optional[Union[str, int]] = None,
 ) -> AnyVolumeConfiguration:
     assert backend != BackendType.KUBERNETES, "use get_kubernetes_volume_configuration() instead"
-    return VolumeConfiguration.parse_obj(
+    return VolumeConfiguration.model_validate(
         dict(
             name=name,
             backend=backend,
@@ -1182,7 +1182,7 @@ def get_volume_configuration(
             volume_id=volume_id,
             auto_cleanup_duration=auto_cleanup_duration,
         )
-    ).__root__
+    ).root
 
 
 def get_kubernetes_volume_configuration(

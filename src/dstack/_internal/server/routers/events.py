@@ -8,7 +8,7 @@ from dstack._internal.server.models import UserModel
 from dstack._internal.server.schemas.events import ListEventsRequest
 from dstack._internal.server.security.permissions import Authenticated
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -38,7 +38,7 @@ async def list_events(
     This should be taken into account when using the API to monitor recent events,
     so that delayed events are not missed during pagination.
     """
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await events_services.list_events(
             session=session,
             user=user,

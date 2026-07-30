@@ -4,16 +4,22 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import Field, root_validator, validator
-from typing_extensions import Annotated, Literal
+from pydantic import (
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
+from typing_extensions import Annotated, Literal, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
-    CoreConfig,
     CoreModel,
-    generate_dual_core_model,
+    drop_merged_profile,
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
@@ -27,7 +33,6 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import list_enum_values_for_annotation
-from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.tags import tags_validator
 
 
@@ -80,7 +85,7 @@ class SSHHostParams(CoreModel):
     ssh_key: Optional[SSHKey] = None
 
     blocks: Annotated[
-        Optional[Union[Literal["auto"], int]],
+        Optional[Union[Literal["auto"], Annotated[int, Field(ge=1)]]],
         Field(
             description=(
                 "The amount of blocks to split the instance into, a number or `auto`."
@@ -88,11 +93,11 @@ class SSHHostParams(CoreModel):
                 " The number of GPUs and CPUs must be divisible by the number of blocks."
                 " Defaults to the top-level `blocks` value"
             ),
-            ge=1,
         ),
     ] = None
 
-    @validator("internal_ip")
+    @field_validator("internal_ip")
+    @classmethod
     def validate_internal_ip(cls, value):
         if value is None:
             return value
@@ -134,7 +139,8 @@ class SSHParams(CoreModel):
         ),
     ] = None
 
-    @validator("network")
+    @field_validator("network")
+    @classmethod
     def validate_network(cls, value):
         if value is None:
             return value
@@ -169,16 +175,17 @@ class FleetNodesSpec(CoreModel):
         ),
     ] = None
 
-    def dict(self, *args, **kwargs) -> Dict:
-        # super() does not work with pydantic-duality
-        res = CoreModel.dict(self, *args, **kwargs)
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Dict[str, Any]:
+        res = handler(self)
         # For backward compatibility with old clients
         # that do not ignore extra fields due to https://github.com/dstackai/dstack/issues/3066
         if "target" in res and res["target"] == res["min"]:
             del res["target"]
         return res
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def set_min_and_target_defaults(cls, values):
         min_ = values.get("min")
         target = values.get("target")
@@ -188,24 +195,25 @@ class FleetNodesSpec(CoreModel):
             values["target"] = values["min"]
         return values
 
-    @validator("min")
+    @field_validator("min")
+    @classmethod
     def validate_min(cls, v: int) -> int:
         if v < 0:
             raise ValueError("min cannot be negative")
         return v
 
-    @root_validator(skip_on_failure=True)
-    def _post_validate_ranges(cls, values):
-        min_ = values["min"]
-        target = values["target"]
-        max_ = values.get("max")
+    @model_validator(mode="after")
+    def _post_validate_ranges(self) -> Self:
+        min_ = self.min
+        target = self.target
+        max_ = self.max
         if target < min_:
             raise ValueError("target must not be be less than min")
         if max_ is not None and max_ < min_:
             raise ValueError("max must not be less than min")
         if max_ is not None and max_ < target:
             raise ValueError("max must not be less than target")
-        return values
+        return self
 
 
 class CommonFleetConfigurationProps(CoreModel):
@@ -216,7 +224,7 @@ class CommonFleetConfigurationProps(CoreModel):
         Field(description="The placement of instances: `any` or `cluster`"),
     ] = None
     blocks: Annotated[
-        Union[Literal["auto"], int],
+        Union[Literal["auto"], Annotated[int, Field(ge=1)]],
         Field(
             description=(
                 "The amount of blocks to split the instance into, a number or `auto`."
@@ -224,7 +232,6 @@ class CommonFleetConfigurationProps(CoreModel):
                 " The number of GPUs and CPUs must be divisible by the number of blocks."
                 " Defaults to `1`, i.e. do not split"
             ),
-            ge=1,
         ),
     ] = 1
 
@@ -310,7 +317,10 @@ class BackendFleetConfiguraionProps(CoreModel):
         Field(description="Backend-specific options, applied only to offers from that backend"),
     ] = None
 
-    @validator("nodes", pre=True)
+    @field_validator(
+        "nodes", mode="before", json_schema_input_type=Optional[Union[FleetNodesSpec, int, str]]
+    )
+    @classmethod
     def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
         if isinstance(v, str) and ".." in v:
             v = v.replace(" ", "")
@@ -320,26 +330,11 @@ class BackendFleetConfiguraionProps(CoreModel):
             return dict(min=v, max=v)
         return v
 
-    _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
-        parse_idle_duration
-    )
-    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
-    _validate_backend_options = validator("backend_options", allow_reuse=True)(
-        validate_backend_options
-    )
-
-
-class BackendFleetConfigurationPropsConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["nodes"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["idle_duration"],
-            extra_types=[{"type": "string"}],
-        )
+    _validate_idle_duration = field_validator(
+        "idle_duration", mode="before", json_schema_input_type=Optional[Union[int, str]]
+    )(parse_idle_duration)
+    _validate_tags = field_validator("tags", mode="before")(tags_validator)
+    _validate_backend_options = field_validator("backend_options")(validate_backend_options)
 
 
 class SSHFleetConfigurationProps(CoreModel):
@@ -353,17 +348,10 @@ class SSHFleetConfigurationProps(CoreModel):
     ] = Env()
 
 
-class FleetConfigurationConfig(BackendFleetConfigurationPropsConfig):
-    @staticmethod
-    def schema_extra(schema: dict[str, Any]):
-        BackendFleetConfigurationPropsConfig.schema_extra(schema)
-
-
 class FleetConfiguration(
     SSHFleetConfigurationProps,
     BackendFleetConfiguraionProps,
     CommonFleetConfigurationProps,
-    generate_dual_core_model(FleetConfigurationConfig),
 ):
     pass
 
@@ -371,7 +359,6 @@ class FleetConfiguration(
 class BackendFleetConfiguration(
     BackendFleetConfiguraionProps,
     CommonFleetConfigurationProps,
-    generate_dual_core_model(BackendFleetConfigurationPropsConfig),
 ):
     """For the documentation only"""
 
@@ -383,14 +370,9 @@ class SSHFleetConfiguration(
     """For the documentation only"""
 
 
-class FleetSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        prop = schema.get("properties", {})
-        prop.pop("merged_profile", None)
+class FleetSpec(CoreModel):
+    model_config = ConfigDict(json_schema_extra=drop_merged_profile)
 
-
-class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     configuration: FleetConfiguration
     configuration_path: Optional[str] = None
     profile: Profile
@@ -405,14 +387,18 @@ class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     Read profile parameters from `merged_profile` instead of `profile` directly.
     """
 
-    @root_validator
+    @model_validator(mode="before")
+    @classmethod
     def _merged_profile(cls, values) -> Dict:
         try:
-            merged_profile = Profile.parse_obj(values["profile"])
-            conf = FleetConfiguration.parse_obj(values["configuration"])
+            # `model_validate` returns the *same* instance for a same-class input (v2 does not
+            # revalidate instances by default), where v1's `parse_obj` always built a new object. The
+            # `setattr` loop below would otherwise mutate the caller's profile in place.
+            merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
+            conf = FleetConfiguration.model_validate(values["configuration"])
         except KeyError:
             raise ValueError("Missing profile or configuration")
-        for key in ProfileParams.__fields__:
+        for key in ProfileParams.model_fields:
             conf_val = getattr(conf, key, None)
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)

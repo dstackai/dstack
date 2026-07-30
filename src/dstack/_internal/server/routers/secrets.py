@@ -14,7 +14,7 @@ from dstack._internal.server.schemas.secrets import (
 )
 from dstack._internal.server.security.permissions import ProjectManager
 from dstack._internal.server.services import secrets as secrets_services
-from dstack._internal.server.utils.routers import CustomORJSONResponse
+from dstack._internal.server.utils.routers import CustomJSONResponse
 
 router = APIRouter(
     prefix="/api/project/{project_name}/secrets",
@@ -28,7 +28,7 @@ async def list_secrets(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
     user, project = user_project
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await secrets_services.list_secrets(
             session=session,
             project=project,
@@ -52,7 +52,7 @@ async def get_secret(
     )
     if secret is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(secret)
+    return CustomJSONResponse(secret)
 
 
 @router.post("/create_or_update", summary="Create or update secret", response_model=Secret)
@@ -62,7 +62,7 @@ async def create_or_update_secret(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
     user, project = user_project
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await secrets_services.create_or_update_secret(
             session=session,
             project=project,

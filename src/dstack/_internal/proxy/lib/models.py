@@ -38,11 +38,11 @@ class IPAddressPartitioningKey(ImmutableModel):
 
 class HeaderPartitioningKey(ImmutableModel):
     type: Literal["header"] = "header"
-    header: Annotated[str, Field(regex=r"^[a-zA-Z0-9-_]+$")]  # prevent Nginx config injection
+    header: Annotated[str, Field(pattern=r"^[a-zA-Z0-9-_]+$")]  # prevent Nginx config injection
 
 
 class RateLimit(ImmutableModel):
-    prefix: Annotated[str, Field(regex=r"^/[^\s\\{}]*$")]  # prevent Nginx config injection
+    prefix: Annotated[str, Field(pattern=r"^/[^\s\\{}]*$")]  # prevent Nginx config injection
     key: Annotated[
         Union[IPAddressPartitioningKey, HeaderPartitioningKey],
         Field(discriminator="type"),

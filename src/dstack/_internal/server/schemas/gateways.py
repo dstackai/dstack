@@ -1,8 +1,8 @@
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, List, Optional
 
 from pydantic import Field
 
-from dstack._internal.core.models.common import CoreConfig, CoreModel, generate_dual_core_model
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     ApplyGatewayPlanInput,
     GatewayConfiguration,
@@ -10,13 +10,7 @@ from dstack._internal.core.models.gateways import (
 )
 
 
-class CreateGatewayRequestConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        pass
-
-
-class CreateGatewayRequest(generate_dual_core_model(CreateGatewayRequestConfig)):
+class CreateGatewayRequest(CoreModel):
     configuration: GatewayConfiguration
 
 

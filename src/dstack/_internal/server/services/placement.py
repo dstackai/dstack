@@ -11,6 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_placement_group_name,
 )
 from dstack._internal.core.errors import BackendError, PlacementGroupNotSupportedError
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.placement import (
     PlacementGroup,
@@ -50,7 +51,9 @@ def placement_group_model_to_placement_group_optional(
 def get_placement_group_configuration(
     placement_group_model: PlacementGroupModel,
 ) -> PlacementGroupConfiguration:
-    return PlacementGroupConfiguration.__response__.parse_raw(placement_group_model.configuration)
+    return validate_json_extra_ignore(
+        PlacementGroupConfiguration, placement_group_model.configuration
+    )
 
 
 def get_placement_group_provisioning_data(
@@ -58,8 +61,8 @@ def get_placement_group_provisioning_data(
 ) -> Optional[PlacementGroupProvisioningData]:
     if placement_group_model.provisioning_data is None:
         return None
-    return PlacementGroupProvisioningData.__response__.parse_raw(
-        placement_group_model.provisioning_data
+    return validate_json_extra_ignore(
+        PlacementGroupProvisioningData, placement_group_model.provisioning_data
     )
 
 

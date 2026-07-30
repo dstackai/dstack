@@ -493,8 +493,8 @@ def _get_effective_configuration(
     if getattr(args, "max_trials", None) is not None:
         configuration.max_trials = args.max_trials
     profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
-    for field in ProfileParams.__fields__:
+    for field in ProfileParams.model_fields:
         if getattr(configuration, field) is None:
             setattr(configuration, field, getattr(profile, field))
     apply_profile_args(args, configuration)
-    return PresetConfiguration.parse_obj(configuration.dict())
+    return PresetConfiguration.model_validate(configuration.dict())

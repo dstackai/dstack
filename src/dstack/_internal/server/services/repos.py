@@ -12,6 +12,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import model_as_field_dict, validate_extra_ignore
 from dstack._internal.core.models.repos import (
     AnyRepoInfo,
     RepoHead,
@@ -58,7 +59,7 @@ async def get_repo(
     if repo is None:
         return None
     if not include_creds or repo.type != RepoType.REMOTE:
-        return RepoHeadWithCreds.parse_obj(repo_model_to_repo_head(repo))
+        return RepoHeadWithCreds.model_validate(model_as_field_dict(repo_model_to_repo_head(repo)))
     repo_creds = await get_repo_creds(
         session=session,
         repo=repo,
@@ -343,11 +344,12 @@ async def get_code_model(
 
 
 def repo_model_to_repo_head(repo_model: RepoModel) -> RepoHead:
-    return RepoHead.__response__.parse_obj(
+    return validate_extra_ignore(
+        RepoHead,
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),
-        }
+        },
     )
 
 
@@ -359,10 +361,11 @@ def repo_model_to_repo_head_with_creds(
         repo_creds_raw = repo_model.creds
     else:
         repo_creds_raw = repo_creds_model.creds.plaintext
-    return RepoHeadWithCreds.__response__.parse_obj(
+    return validate_extra_ignore(
+        RepoHeadWithCreds,
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),
             "repo_creds": json.loads(repo_creds_raw) if repo_creds_raw else None,
-        }
+        },
     )

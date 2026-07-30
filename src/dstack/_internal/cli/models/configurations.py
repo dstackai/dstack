@@ -1,15 +1,18 @@
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import Field, PositiveInt, root_validator, validator
+from pydantic import (
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from dstack._internal.core.models.common import (
     CoreModel,
     EntityReference,
-    generate_dual_core_model,
 )
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.profiles import ProfileParams, ProfileParamsConfig
-from dstack._internal.utils.json_schema import add_extra_schema_types
+from dstack._internal.core.models.profiles import ProfileParams
 
 DEFAULT_CONCURRENCY = 8
 
@@ -32,11 +35,13 @@ class PresetModelRepo(CoreModel):
     def allows_variant_selection(self) -> bool:
         return False
 
-    @validator("repo")
+    @field_validator("repo")
+    @classmethod
     def validate_repo(cls, value: str) -> str:
         return _validate_model(value, field="repo")
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
@@ -61,7 +66,8 @@ class PresetModelBase(CoreModel):
     def allows_variant_selection(self) -> bool:
         return True
 
-    @validator("base")
+    @field_validator("base")
+    @classmethod
     def validate_base(cls, value: str) -> str:
         return _validate_model(value, field="base")
 
@@ -77,26 +83,16 @@ class PresetPromptFile(CoreModel):
         Field(description="The path to a prompt file, relative to the configuration file"),
     ]
 
-    @validator("path")
+    @field_validator("path")
+    @classmethod
     def validate_path(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Prompt path must be a non-empty string")
         return value
 
 
-class PresetConfigurationConfig(ProfileParamsConfig):
-    @staticmethod
-    def schema_extra(schema: dict[str, Any]):
-        ProfileParamsConfig.schema_extra(schema)
-        add_extra_schema_types(
-            schema["properties"]["model"],
-            extra_types=[{"type": "string"}],
-        )
-
-
 class PresetConfiguration(
     ProfileParams,
-    generate_dual_core_model(PresetConfigurationConfig),
 ):
     type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
     name: Annotated[
@@ -173,7 +169,8 @@ class PresetConfiguration(
     def effective_concurrency(self) -> int:
         return self.concurrency if self.concurrency is not None else DEFAULT_CONCURRENCY
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def apply_model_shorthand(cls, values: Any) -> Any:
         if not isinstance(values, dict):
             return values
@@ -189,13 +186,15 @@ class PresetConfiguration(
             values["model"] = {"base": base} if base else {"repo": repo}
         return values
 
-    @validator("model", pre=True)
+    @field_validator("model", mode="before", json_schema_input_type=Union[PresetModelSpec, str])
+    @classmethod
     def parse_model(cls, value: Any) -> Any:
         if isinstance(value, str):
             return {"repo": _validate_model(value, field="model")}
         return value
 
-    @validator("prompt")
+    @field_validator("prompt")
+    @classmethod
     def validate_prompt(cls, value: Any) -> Any:
         if isinstance(value, str):
             if not value.strip():
@@ -214,7 +213,7 @@ class PresetConstraints(CoreModel):
     context_length: Optional[PositiveInt] = None
     max_trials: PositiveInt
     concurrency: PositiveInt
-    fleets: list[str] = Field(min_items=1)
+    fleets: list[str] = Field(min_length=1)
     env: list[str] = []
 
 

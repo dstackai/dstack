@@ -16,13 +16,6 @@ class SpecApplyRequest(BaseModel, Generic[SpecType]):
     project: Annotated[str, Field(description="The name of the project the request is for")]
     spec: Annotated[SpecType, Field(description="The spec to be applied")]
 
-    # Override dict() to remove __orig_class__ attribute and avoid "TypeError: Object of type _GenericAlias is not JSON serializable"
-    # error. This issue doesn't happen though when running the code in pytest, only when running the server.
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
-        d.pop("__orig_class__", None)
-        return d
-
 
 RunSpecRequest = SpecApplyRequest[RunSpec]
 FleetSpecRequest = SpecApplyRequest[FleetSpec]

@@ -71,7 +71,7 @@ def get_next_redirect_url(code: str, state: str) -> Optional[str]:
 
 def _decode_state(state: str) -> Optional[OAuthState]:
     try:
-        return OAuthState.parse_raw(b64decode(state, validate=True).decode())
+        return OAuthState.model_validate_json(b64decode(state, validate=True).decode())
     except Exception as e:
         logger.debug("Exception when decoding OAuth2 state parameter: %s", repr(e))
         return None

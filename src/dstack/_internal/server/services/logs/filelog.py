@@ -4,6 +4,7 @@ from typing import Generator, List, Optional, Tuple, Union
 from uuid import UUID
 
 from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
     LogEvent,
@@ -72,7 +73,7 @@ class FileLogStorage(LogStorage):
                     current_line += 1
 
                     try:
-                        log_event = LogEvent.__response__.parse_raw(line)
+                        log_event = validate_json_extra_ignore(LogEvent, line)
                     except Exception:
                         # Skip malformed lines
                         continue
@@ -109,7 +110,7 @@ class FileLogStorage(LogStorage):
             for line_bytes, line_start_offset in line_generator:
                 try:
                     line_str = line_bytes.decode("utf-8")
-                    log_event = LogEvent.__response__.parse_raw(line_str)
+                    log_event = validate_json_extra_ignore(LogEvent, line_str)
                 except Exception:
                     continue  # Skip malformed lines
 

@@ -116,13 +116,13 @@ class TestGroupOrdering:
                 "id": "aaaaaaaa",
                 "status": "interrupted",
                 "model": old.base,
-                "created_at": "2026-07-01T00:00:00+00:00",
+                "created_at": "2026-07-01T00:00:00Z",
             },
             {
                 "id": "bbbbbbbb",
                 "status": "interrupted",
                 "model": old.base,
-                "created_at": "2026-07-02T00:00:00+00:00",
+                "created_at": "2026-07-02T00:00:00Z",
             },
         ]
 

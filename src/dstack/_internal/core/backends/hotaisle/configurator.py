@@ -17,6 +17,7 @@ from dstack._internal.core.backends.hotaisle.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class HotAisleConfigurator(
@@ -36,29 +37,32 @@ class HotAisleConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=HotAisleStoredConfig(
-                **HotAisleBackendConfig.__response__.parse_obj(config).dict()
+                **validate_extra_ignore(HotAisleBackendConfig, config).dict()
             ).json(),
-            auth=HotAisleCreds.parse_obj(config.creds).json(),
+            auth=HotAisleCreds.model_validate(config.creds).json(),
         )
 
     def get_backend_config_with_creds(
         self, record: BackendRecord
     ) -> HotAisleBackendConfigWithCreds:
         config = self._get_config(record)
-        return HotAisleBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(HotAisleBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> HotAisleBackendConfig:
         config = self._get_config(record)
-        return HotAisleBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(HotAisleBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> HotAisleBackend:
         config = self._get_config(record)
         return HotAisleBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> HotAisleConfig:
-        return HotAisleConfig.__response__(
-            **json.loads(record.config),
-            creds=HotAisleCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            HotAisleConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(HotAisleCreds, record.auth),
+            },
         )
 
     def _validate_creds(self, creds: AnyHotAisleCreds, team_handle: str):

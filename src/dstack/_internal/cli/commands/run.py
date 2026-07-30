@@ -5,7 +5,6 @@ from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError, ResourceNotExistsError
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
 class RunCommand(APIBaseCommand):
@@ -66,4 +65,4 @@ class RunCommand(APIBaseCommand):
             console.print(f"Run [code]{args.name or args.id}[/] not found")
             exit(1)
 
-        print(pydantic_orjson_dumps_with_indent(run.dict(), default=None))
+        print(run.model_dump_json(indent=2))

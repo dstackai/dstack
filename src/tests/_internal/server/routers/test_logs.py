@@ -43,9 +43,9 @@ class TestPollLogs:
         )
         runner_log_path.parent.mkdir(parents=True, exist_ok=True)
         runner_log_path.write_text(
-            '{"timestamp": "2023-10-06T10:01:53.234234+00:00", "log_source": "stdout", "message": "Hello"}\n'
-            '{"timestamp": "2023-10-06T10:01:53.234235+00:00", "log_source": "stdout", "message": "World"}\n'
-            '{"timestamp": "2023-10-06T10:01:53.234236+00:00", "log_source": "stdout", "message": "!"}\n'
+            '{"timestamp": "2023-10-06T10:01:53.234234Z", "log_source": "stdout", "message": "Hello"}\n'
+            '{"timestamp": "2023-10-06T10:01:53.234235Z", "log_source": "stdout", "message": "World"}\n'
+            '{"timestamp": "2023-10-06T10:01:53.234236Z", "log_source": "stdout", "message": "!"}\n'
         )
         response = await client.post(
             f"/api/project/{project.name}/logs/poll",
@@ -60,17 +60,17 @@ class TestPollLogs:
         assert response.json() == {
             "logs": [
                 {
-                    "timestamp": "2023-10-06T10:01:53.234234+00:00",
+                    "timestamp": "2023-10-06T10:01:53.234234Z",
                     "log_source": "stdout",
                     "message": "SGVsbG8=",
                 },
                 {
-                    "timestamp": "2023-10-06T10:01:53.234235+00:00",
+                    "timestamp": "2023-10-06T10:01:53.234235Z",
                     "log_source": "stdout",
                     "message": "V29ybGQ=",
                 },
                 {
-                    "timestamp": "2023-10-06T10:01:53.234236+00:00",
+                    "timestamp": "2023-10-06T10:01:53.234236Z",
                     "log_source": "stdout",
                     "message": "IQ==",
                 },
@@ -84,7 +84,7 @@ class TestPollLogs:
             json={
                 "run_name": "test_run",
                 "job_submission_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
-                "start_time": "2023-10-06T10:01:53.234235+00:00",
+                "start_time": "2023-10-06T10:01:53.234235Z",
                 "diagnose": True,
             },
         )
@@ -92,7 +92,7 @@ class TestPollLogs:
         assert response.json() == {
             "logs": [
                 {
-                    "timestamp": "2023-10-06T10:01:53.234236+00:00",
+                    "timestamp": "2023-10-06T10:01:53.234236Z",
                     "log_source": "stdout",
                     "message": "IQ==",
                 },

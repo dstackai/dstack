@@ -1,4 +1,4 @@
 {
   "/": "OCICreds",
-  "/__root__": "OCIClientCreds"
+  "/root": "OCIClientCreds"
 }

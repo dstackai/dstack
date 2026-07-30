@@ -55,7 +55,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayLoadBalancerConfiguration,
@@ -742,7 +742,7 @@ class AWSCompute(
             )
             return
         try:
-            backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(backend_data)
+            backend_data_parsed = validate_json_extra_ignore(AWSGatewayBackendData, backend_data)
         except ValidationError:
             logger.exception(
                 "Failed to terminate load balancer for gateway %s: backend_data parsing error.",
@@ -772,8 +772,8 @@ class AWSCompute(
                 " gateway_backend_data is None"
             )
         try:
-            gateway_backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(
-                gateway_backend_data
+            gateway_backend_data_parsed = validate_json_extra_ignore(
+                AWSGatewayBackendData, gateway_backend_data
             )
         except ValidationError as e:
             raise ComputeError(
@@ -810,8 +810,8 @@ class AWSCompute(
                 " gateway_backend_data is None"
             )
         try:
-            gateway_backend_data_parsed = AWSGatewayBackendData.__response__.parse_raw(
-                gateway_backend_data
+            gateway_backend_data_parsed = validate_json_extra_ignore(
+                AWSGatewayBackendData, gateway_backend_data
             )
         except ValidationError as e:
             raise ComputeError(
@@ -1424,7 +1424,7 @@ def _parse_instance_backend_data(backend_data: Optional[str]) -> "AWSInstanceBac
     if backend_data is None:
         return AWSInstanceBackendData()
     try:
-        return AWSInstanceBackendData.__response__.parse_raw(backend_data)
+        return validate_json_extra_ignore(AWSInstanceBackendData, backend_data)
     except ValidationError:
         logger.exception("Failed to parse AWS instance backend_data; treating as empty")
         return AWSInstanceBackendData()

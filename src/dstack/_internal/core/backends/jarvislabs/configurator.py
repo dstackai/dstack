@@ -18,6 +18,7 @@ from dstack._internal.core.backends.jarvislabs.models import (
 )
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class JarvisLabsConfigurator(
@@ -40,29 +41,32 @@ class JarvisLabsConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=JarvisLabsStoredConfig(
-                **JarvisLabsBackendConfig.__response__.parse_obj(config).dict()
+                **validate_extra_ignore(JarvisLabsBackendConfig, config).dict()
             ).json(),
-            auth=JarvisLabsCreds.parse_obj(config.creds).json(),
+            auth=JarvisLabsCreds.model_validate(config.creds).json(),
         )
 
     def get_backend_config_with_creds(
         self, record: BackendRecord
     ) -> JarvisLabsBackendConfigWithCreds:
         config = self._get_config(record)
-        return JarvisLabsBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(JarvisLabsBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> JarvisLabsBackendConfig:
         config = self._get_config(record)
-        return JarvisLabsBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(JarvisLabsBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> JarvisLabsBackend:
         config = self._get_config(record)
         return JarvisLabsBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> JarvisLabsConfig:
-        return JarvisLabsConfig.__response__(
-            **json.loads(record.config),
-            creds=JarvisLabsCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            JarvisLabsConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(JarvisLabsCreds, record.auth),
+            },
         )
 
     def _validate_api_key(self, api_key: str):

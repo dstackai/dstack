@@ -1,9 +1,8 @@
 from base64 import b64decode
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import Field, validator
-from typing_extensions import Annotated
+from pydantic import SerializerFunctionWrapHandler, field_validator, model_serializer
 
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
@@ -33,7 +32,8 @@ class LogEvent(CoreModel):
     """`timestamp` is stored in milliseconds."""
     message: bytes
 
-    @validator("message", pre=True)
+    @field_validator("message", mode="before")
+    @classmethod
     def decode_message(cls, v: Union[str, bytes]) -> bytes:
         if isinstance(v, str):
             return b64decode(v)
@@ -54,72 +54,82 @@ class JobInfoResponse(CoreModel):
     username: str
 
 
+# What the runner is actually sent. This used to be spelled as `Field(include=...)` per field, but
+# pydantic v2 removed `include` from `Field` — it is silently ignored there, which would have sent
+# the runner every field of `Run`, `JobSpec` and `JobSubmission` instead of these subsets. It lives
+# on the model rather than at the call site so that a new caller cannot bypass it.
+#
+# A name that the target model does not declare is ignored, as it was under v1: `entrypoint` and
+# `gateway` are listed for `job_spec` but `JobSpec` has neither.
+_SUBMIT_BODY_INCLUDE: Dict[str, Any] = {
+    "run": {
+        "id": True,
+        "run_spec": {
+            "run_name",
+            "repo_id",
+            "repo_data",
+            "configuration",
+            "configuration_path",
+        },
+    },
+    "job_spec": {
+        "replica_num",
+        "job_num",
+        "jobs_per_replica",
+        "user",
+        "commands",
+        "entrypoint",
+        "env",
+        "gateway",
+        "single_branch",
+        "max_duration",
+        "ssh_key",
+        "working_dir",
+        "repo_dir",
+        "repo_data",
+        "repo_exists_action",
+        "file_archives",
+    },
+    "job_submission": {"id"},
+    "cluster_info": True,
+    "secrets": True,
+    "repo_credentials": True,
+    "log_quota_hour": True,
+    "run_spec": {
+        "run_name",
+        "repo_id",
+        "repo_data",
+        "configuration",
+        "configuration_path",
+    },
+}
+
+
+def _apply_include(data: Any, spec: Any) -> Any:
+    """Keep only the keys named by `spec`, recursively. `True` keeps a value whole."""
+    if spec is True or not isinstance(data, dict):
+        return data
+    if isinstance(spec, (set, frozenset, list, tuple)):
+        spec = {key: True for key in spec}
+    return {key: _apply_include(data[key], sub) for key, sub in spec.items() if key in data}
+
+
 class SubmitBody(CoreModel):
-    run: Annotated[
-        Run,
-        Field(
-            include={
-                "id": True,
-                "run_spec": {
-                    "run_name",
-                    "repo_id",
-                    "repo_data",
-                    "configuration",
-                    "configuration_path",
-                },
-            }
-        ),
-    ]
-    job_spec: Annotated[
-        JobSpec,
-        Field(
-            include={
-                "replica_num",
-                "job_num",
-                "jobs_per_replica",
-                "user",
-                "commands",
-                "entrypoint",
-                "env",
-                "gateway",
-                "single_branch",
-                "max_duration",
-                "ssh_key",
-                "working_dir",
-                "repo_dir",
-                "repo_data",
-                "repo_exists_action",
-                "file_archives",
-            }
-        ),
-    ]
-    job_submission: Annotated[
-        JobSubmission,
-        Field(
-            include={
-                "id",
-            }
-        ),
-    ]
-    cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)] = None
-    secrets: Annotated[Optional[Dict[str, str]], Field(include=True)] = None
-    repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)] = None
-    log_quota_hour: Annotated[Optional[int], Field(include=True)] = None
+    run: Run
+    job_spec: JobSpec
+    job_submission: JobSubmission
+    cluster_info: Optional[ClusterInfo] = None
+    secrets: Optional[Dict[str, str]] = None
+    repo_credentials: Optional[RemoteRepoCreds] = None
+    log_quota_hour: Optional[int] = None
     """Maximum bytes of log output per hour. None means unlimited."""
     # TODO: remove `run_spec` once instances deployed with 0.19.8 or earlier are no longer supported.
-    run_spec: Annotated[
-        RunSpec,
-        Field(
-            include={
-                "run_name",
-                "repo_id",
-                "repo_data",
-                "configuration",
-                "configuration_path",
-            },
-        ),
-    ]
+    run_spec: RunSpec
     """`run_spec` is deprecated in favor of `run.run_spec`."""
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Dict[str, Any]:
+        return _apply_include(handler(self), _SUBMIT_BODY_INCLUDE)
 
 
 class HealthcheckResponse(CoreModel):

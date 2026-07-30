@@ -1,5 +1,4 @@
-from pydantic import parse_obj_as
-
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack.api.server._group import APIClientGroup
 
@@ -20,4 +19,4 @@ class MetricsAPIClient(APIClientGroup):
                 "job_num": job_num,
             },
         )
-        return parse_obj_as(JobMetrics.__response__, resp.json())
+        return validate_extra_ignore(JobMetrics, resp.json())

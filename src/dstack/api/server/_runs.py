@@ -3,14 +3,13 @@ from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import parse_obj_as
-
 from dstack._internal.core.compatibility.runs import (
     get_apply_plan_excludes,
     get_get_plan_excludes,
     get_list_runs_excludes,
     patch_run_spec,
 )
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Run,
@@ -57,7 +56,7 @@ class RunsAPIClient(APIClientGroup):
         resp = self._request(
             "/api/runs/list", body=body.json(exclude=get_list_runs_excludes(body))
         )
-        return parse_obj_as(List[Run.__response__], resp.json())
+        return validate_extra_ignore(List[Run], resp.json())
 
     def get(
         self, project_name: str, run_name: Optional[str] = None, run_id: Optional[UUID] = None
@@ -69,7 +68,7 @@ class RunsAPIClient(APIClientGroup):
         body = GetRunRequest(run_name=run_name, id=run_id)
         json_body = body.json()
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
-        return parse_obj_as(Run.__response__, resp.json())
+        return validate_extra_ignore(Run, resp.json())
 
     def get_plan(
         self,
@@ -91,7 +90,7 @@ class RunsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/runs/get_plan",
             body=body.json(exclude=get_get_plan_excludes(body)),
         )
-        return parse_obj_as(RunPlan.__response__, resp.json())
+        return validate_extra_ignore(RunPlan, resp.json())
 
     def apply_plan(
         self,
@@ -99,7 +98,7 @@ class RunsAPIClient(APIClientGroup):
         plan: Union[RunPlan, ApplyRunPlanInput],
         force: bool = False,
     ) -> Run:
-        plan_input: ApplyRunPlanInput = ApplyRunPlanInput.__response__.parse_obj(plan)
+        plan_input: ApplyRunPlanInput = validate_extra_ignore(ApplyRunPlanInput, plan)
         body = ApplyRunPlanRequest(plan=plan_input, force=force)
         body = copy.deepcopy(body)
         patch_run_spec(body.plan.run_spec)
@@ -109,7 +108,7 @@ class RunsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/runs/apply",
             body=body.json(exclude=get_apply_plan_excludes(plan_input)),
         )
-        return parse_obj_as(Run.__response__, resp.json())
+        return validate_extra_ignore(Run, resp.json())
 
     def stop(self, project_name: str, runs_names: List[str], abort: bool):
         body = StopRunsRequest(runs_names=runs_names, abort=abort)

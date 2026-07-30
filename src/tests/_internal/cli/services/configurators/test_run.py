@@ -46,7 +46,7 @@ class TestApplyArgs:
     def test_env(self):
         conf = TaskConfiguration(commands=["whoami"])
         modified, args = self.apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_ports(self):
@@ -64,9 +64,9 @@ class TestApplyArgs:
             self.apply_args(conf, ["-p", "8000:80", "--port", "8001:80"])
 
     def test_env_override(self):
-        conf = TaskConfiguration(commands=["whoami"], env=Env.parse_obj({"A": "0"}))
+        conf = TaskConfiguration(commands=["whoami"], env=Env.model_validate({"A": "0"}))
         modified, args = self.apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_ports_override(self):
@@ -96,7 +96,7 @@ class TestApplyArgs:
                 username="${{ env.REGISTRY_USERNAME }}",
                 password="${{ env.REGISTRY_PASSWORD }}",
             ),
-            env=Env.parse_obj(
+            env=Env.model_validate(
                 {
                     "REGISTRY_USERNAME": "test_user",
                     "REGISTRY_PASSWORD": "test_password",
@@ -129,7 +129,7 @@ class TestValidateGPUVendorAndImage:
             }
         if docker is not None:
             conf_dict["docker"] = docker
-        return BaseRunConfiguration.parse_obj(conf_dict)
+        return BaseRunConfiguration.model_validate(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
         BaseRunConfigurator(api_client=Mock()).validate_gpu_vendor_and_image(conf)
@@ -302,7 +302,7 @@ class TestValidateCPUArchAndImage:
             conf_dict["image"] = image
         if gpu_spec is not None:
             conf_dict["resources"]["gpu"] = gpu_spec
-        return BaseRunConfiguration.parse_obj(conf_dict)
+        return BaseRunConfiguration.model_validate(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
         # validate_gpu_vendor_and_image sets GPU vendor if not set

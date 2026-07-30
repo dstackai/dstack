@@ -1,7 +1,8 @@
 import uuid
 from typing import Any, Dict, Optional
 
-from pydantic import PositiveInt, root_validator
+from pydantic import PositiveInt, model_validator
+from typing_extensions import Self
 
 from dstack._internal.cli.models.presets import PresetBenchmark
 from dstack._internal.core.models.common import CoreModel
@@ -100,9 +101,9 @@ class AgentFinalReport(CoreModel):
     benchmark: Optional[PresetBenchmark] = None
     failure_summary: Optional[str] = None
 
-    @root_validator
-    def validate_report(cls, values: dict) -> dict:
-        if values.get("success"):
+    @model_validator(mode="after")
+    def validate_report(self) -> Self:
+        if self.success:
             required = (
                 "run_id",
                 "run_name",
@@ -112,12 +113,12 @@ class AgentFinalReport(CoreModel):
                 "context_length",
                 "benchmark",
             )
-            missing = [field for field in required if values.get(field) in (None, "")]
+            missing = [field for field in required if getattr(self, field) in (None, "")]
             if missing:
                 raise ValueError("successful agent report must include " + ", ".join(missing))
-        elif not values.get("failure_summary"):
+        elif not self.failure_summary:
             raise ValueError("failed agent report must include failure_summary")
-        return values
+        return self
 
 
 class PresetAgentInfo(CoreModel):

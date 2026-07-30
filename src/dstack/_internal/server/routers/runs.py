@@ -23,7 +23,7 @@ from dstack._internal.server.security.permissions import Authenticated, ProjectM
 from dstack._internal.server.services import runs, users
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
     get_client_version,
 )
@@ -86,7 +86,7 @@ async def list_runs(
     )
     for run in run_list:
         patch_run(run, client_version)
-    return CustomORJSONResponse(run_list)
+    return CustomJSONResponse(run_list)
 
 
 @project_router.post("/get", response_model=Run, summary="Get run")
@@ -111,7 +111,7 @@ async def get_run(
     if run is None:
         raise ResourceNotExistsError("Run not found")
     patch_run(run, client_version)
-    return CustomORJSONResponse(run)
+    return CustomJSONResponse(run)
 
 
 @project_router.post(
@@ -144,7 +144,7 @@ async def get_plan(
         legacy_repo_dir=legacy_repo_dir,
     )
     patch_run_plan(run_plan, client_version)
-    return CustomORJSONResponse(run_plan)
+    return CustomJSONResponse(run_plan)
 
 
 @project_router.post("/apply", response_model=Run, summary="Apply run plan")
@@ -175,7 +175,7 @@ async def apply_plan(
         legacy_repo_dir=legacy_repo_dir,
     )
     patch_run(run, client_version)
-    return CustomORJSONResponse(run)
+    return CustomJSONResponse(run)
 
 
 @project_router.post("/stop", summary="Stop runs")

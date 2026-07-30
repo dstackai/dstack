@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable, Generic, List, Optional, TypeVar, Union
 
+from pydantic import ConfigDict
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -24,7 +25,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
@@ -76,11 +77,9 @@ class NaiveDateTime(TypeDecorator):
         return value.replace(tzinfo=timezone.utc)
 
 
-class DecryptedStringConfig(CoreConfig):
-    arbitrary_types_allowed = True
+class DecryptedString(CoreModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-
-class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     """
     A type for representing plaintext strings encrypted with `EncryptedString`.
     Besides the string, stores information if the decryption was successful.

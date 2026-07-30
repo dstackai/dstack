@@ -1,11 +1,10 @@
 from typing import List, Optional
 
-from pydantic import parse_obj_as
-
 from dstack._internal.core.compatibility.gateways import (
     get_create_gateway_excludes,
     get_set_default_gateway_excludes,
 )
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.gateways import (
     ApplyGatewayPlanInput,
     Gateway,
@@ -32,24 +31,24 @@ class GatewaysAPIClient(APIClientGroup):
             include_imported=include_imported,
         )
         resp = self._request(f"/api/project/{project_name}/gateways/list", body=body.json())
-        return parse_obj_as(List[Gateway.__response__], resp.json())
+        return validate_extra_ignore(List[Gateway], resp.json())
 
     def get(self, project_name: str, gateway_name: str) -> Gateway:
         body = GetGatewayRequest(name=gateway_name)
         resp = self._request(f"/api/project/{project_name}/gateways/get", body=body.json())
-        return parse_obj_as(Gateway.__response__, resp.json())
+        return validate_extra_ignore(Gateway, resp.json())
 
     def get_plan(self, project_name: str, spec: GatewaySpec) -> GatewayPlan:
         body = GetGatewayPlanRequest(spec=spec)
         resp = self._request(f"/api/project/{project_name}/gateways/get_plan", body=body.json())
-        return parse_obj_as(GatewayPlan.__response__, resp.json())
+        return validate_extra_ignore(GatewayPlan, resp.json())
 
     def apply_plan(
         self, project_name: str, plan: ApplyGatewayPlanInput, *, force: bool = False
     ) -> Gateway:
         body = ApplyGatewayPlanRequest(plan=plan, force=force)
         resp = self._request(f"/api/project/{project_name}/gateways/apply", body=body.json())
-        return parse_obj_as(Gateway.__response__, resp.json())
+        return validate_extra_ignore(Gateway, resp.json())
 
     def create(
         self,
@@ -61,7 +60,7 @@ class GatewaysAPIClient(APIClientGroup):
             f"/api/project/{project_name}/gateways/create",
             body=body.json(exclude=get_create_gateway_excludes(configuration)),
         )
-        return parse_obj_as(Gateway.__response__, resp.json())
+        return validate_extra_ignore(Gateway, resp.json())
 
     def delete(self, project_name: str, gateways_names: List[str]) -> None:
         body = DeleteGatewaysRequest(names=gateways_names)
@@ -85,4 +84,4 @@ class GatewaysAPIClient(APIClientGroup):
         resp = self._request(
             f"/api/project/{project_name}/gateways/set_wildcard_domain", body=body.json()
         )
-        return parse_obj_as(Gateway.__response__, resp.json())
+        return validate_extra_ignore(Gateway, resp.json())

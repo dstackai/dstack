@@ -18,6 +18,7 @@ from dstack._internal.core.backends.cloudrift.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class CloudRiftConfigurator(
@@ -39,29 +40,32 @@ class CloudRiftConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=CloudRiftStoredConfig(
-                **CloudRiftBackendConfig.__response__.parse_obj(config).dict()
+                **validate_extra_ignore(CloudRiftBackendConfig, config).dict()
             ).json(),
-            auth=CloudRiftCreds.parse_obj(config.creds).json(),
+            auth=CloudRiftCreds.model_validate(config.creds).json(),
         )
 
     def get_backend_config_with_creds(
         self, record: BackendRecord
     ) -> CloudRiftBackendConfigWithCreds:
         config = self._get_config(record)
-        return CloudRiftBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(CloudRiftBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> CloudRiftBackendConfig:
         config = self._get_config(record)
-        return CloudRiftBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(CloudRiftBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> CloudRiftBackend:
         config = self._get_config(record)
         return CloudRiftBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> CloudRiftConfig:
-        return CloudRiftConfig.__response__(
-            **json.loads(record.config),
-            creds=CloudRiftCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            CloudRiftConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(CloudRiftCreds, record.auth),
+            },
         )
 
     def _validate_creds(self, creds: AnyCloudRiftCreds):

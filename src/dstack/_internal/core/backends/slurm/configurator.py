@@ -14,6 +14,7 @@ from dstack._internal.core.backends.slurm.models import (
 )
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class SlurmConfigurator(
@@ -36,23 +37,23 @@ class SlurmConfigurator(
         self, project_name: str, config: SlurmBackendConfigWithCreds
     ) -> BackendRecord:
         return BackendRecord(
-            config=SlurmStoredConfig.__response__.parse_obj(config).json(),
+            config=validate_extra_ignore(SlurmStoredConfig, config).json(),
             auth="",
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> SlurmBackendConfigWithCreds:
         config = self._get_config(record)
-        return SlurmBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(SlurmBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> SlurmBackendConfig:
         config = self._get_config(record)
-        return SlurmBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(SlurmBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> SlurmBackend:
         return SlurmBackend(self._get_config(record))
 
     def _get_config(self, record: BackendRecord) -> SlurmConfig:
-        return SlurmConfig.__response__.parse_raw(record.config)
+        return validate_json_extra_ignore(SlurmConfig, record.config)
 
     def _check_clusters(self, clusters: list[SlurmCluster]) -> None:
         error_messages: list[str] = []

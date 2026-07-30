@@ -1,7 +1,6 @@
 {
   "/": "FleetConfiguration",
   "/env": "Env",
-  "/idle_duration": "Duration",
   "/nodes": "FleetNodesSpec",
   "/resources": "ResourcesSpec",
   "/resources/cpu": "CPUSpec",

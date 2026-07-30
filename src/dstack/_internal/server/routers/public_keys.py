@@ -13,7 +13,7 @@ from dstack._internal.server.schemas.public_keys import (
 from dstack._internal.server.security.permissions import Authenticated
 from dstack._internal.server.services import public_keys as public_keys_services
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -30,7 +30,7 @@ async def list_user_public_keys(
     user: Annotated[UserModel, Depends(Authenticated())],
 ):
     public_keys = await public_keys_services.list_user_public_keys(session=session, user=user)
-    return CustomORJSONResponse(public_keys)
+    return CustomJSONResponse(public_keys)
 
 
 @router.post("/add", summary="Add SSH key", response_model=PublicKeyInfo)
@@ -42,7 +42,7 @@ async def add_user_public_key(
     public_key = await public_keys_services.add_user_public_key(
         session=session, user=user, key=body.key, name=body.name
     )
-    return CustomORJSONResponse(public_key)
+    return CustomJSONResponse(public_key)
 
 
 @router.post("/delete", summary="Delete SSH keys")

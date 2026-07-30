@@ -78,7 +78,7 @@ BACKEND_DATA = _derived_registry("backend_data")
 
 # The `config` column is written as `XStoredConfig` but read back as `XConfig`, so this is the one
 # surface whose parse target is a different class from the one that produced the bytes. The read is
-# a splice of two columns — `XConfig(**json.loads(config), creds=XCreds.parse_raw(auth))` — and the
+# a splice of two columns — `XConfig(**json.loads(config), creds=XCreds.model_validate_json(auth))` — and the
 # inputs mirror that by carrying `creds` inline, which additionally makes the creds union resolve
 # here rather than arrive pre-resolved.
 BACKEND_CONFIGS = backend_factories.BACKEND_CONFIG_MODELS
@@ -167,7 +167,7 @@ class TestBackendCredsParsing:
         expected = class_name(backend_factories.CREDS_ARMS[name])
         # Compared by name rather than `isinstance`: the permissive read yields duality's
         # `...Response` variant on v1 and the plain class on v2, and `class_name` erases that.
-        assert class_name(creds.__root__) == expected
+        assert class_name(creds.root) == expected
 
 
 class TestBackendDataParsing:

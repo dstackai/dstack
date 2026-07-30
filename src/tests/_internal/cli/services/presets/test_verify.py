@@ -34,7 +34,7 @@ class TestBuildVerifiedPreset:
         data.pop("benchmark")
 
         with pytest.raises(ValidationError, match="benchmark"):
-            AgentFinalReport.parse_obj(data)
+            AgentFinalReport.model_validate(data)
 
     def test_builds_portable_self_contained_preset(self):
         run = get_running_service_run()
@@ -62,7 +62,7 @@ class TestBuildVerifiedPreset:
         assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
-        assert all(getattr(preset.service, field) is None for field in ProfileParams.__fields__)
+        assert all(getattr(preset.service, field) is None for field in ProfileParams.model_fields)
         assert isinstance(preset.service.env["LICENSE"], EnvSentinel)
         assert preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert preset.service.resources.gpu.vendor.value == "nvidia"

@@ -2,14 +2,13 @@ import copy
 from typing import List, Optional, Union
 from uuid import UUID
 
-from pydantic import parse_obj_as
-
 from dstack._internal.core.compatibility.fleets import (
     get_apply_plan_excludes,
     get_create_fleet_excludes,
     get_get_plan_excludes,
     patch_fleet_spec,
 )
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, Fleet, FleetPlan, FleetSpec
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
@@ -27,7 +26,7 @@ class FleetsAPIClient(APIClientGroup):
     def list(self, project_name: str, *, include_imported: bool = False) -> List[Fleet]:
         body = ListProjectFleetsRequest(include_imported=include_imported)
         resp = self._request(f"/api/project/{project_name}/fleets/list", body=body.json())
-        return parse_obj_as(List[Fleet.__response__], resp.json())
+        return validate_extra_ignore(List[Fleet], resp.json())
 
     def get(
         self, project_name: str, name: Optional[str] = None, fleet_id: Optional[UUID] = None
@@ -41,7 +40,7 @@ class FleetsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/fleets/get",
             body=body.json(),
         )
-        return parse_obj_as(Fleet.__response__, resp.json())
+        return validate_extra_ignore(Fleet, resp.json())
 
     def get_plan(
         self,
@@ -53,7 +52,7 @@ class FleetsAPIClient(APIClientGroup):
         patch_fleet_spec(body.spec)
         body_json = body.json(exclude=get_get_plan_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
-        return parse_obj_as(FleetPlan.__response__, resp.json())
+        return validate_extra_ignore(FleetPlan, resp.json())
 
     def apply_plan(
         self,
@@ -61,7 +60,7 @@ class FleetsAPIClient(APIClientGroup):
         plan: Union[FleetPlan, ApplyFleetPlanInput],
         force: bool = False,
     ) -> Fleet:
-        plan_input = ApplyFleetPlanInput.__response__.parse_obj(plan)
+        plan_input = validate_extra_ignore(ApplyFleetPlanInput, plan)
         body = ApplyFleetPlanRequest(plan=plan_input, force=force)
         body = copy.deepcopy(body)
         patch_fleet_spec(body.plan.spec)
@@ -69,7 +68,7 @@ class FleetsAPIClient(APIClientGroup):
             patch_fleet_spec(body.plan.current_resource.spec)
         body_json = body.json(exclude=get_apply_plan_excludes(plan_input))
         resp = self._request(f"/api/project/{project_name}/fleets/apply", body=body_json)
-        return parse_obj_as(Fleet.__response__, resp.json())
+        return validate_extra_ignore(Fleet, resp.json())
 
     def delete(self, project_name: str, names: List[str]) -> None:
         body = DeleteFleetsRequest(names=names)
@@ -91,4 +90,4 @@ class FleetsAPIClient(APIClientGroup):
         patch_fleet_spec(body.spec)
         body_json = body.json(exclude=get_create_fleet_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
-        return parse_obj_as(Fleet.__response__, resp.json())
+        return validate_extra_ignore(Fleet, resp.json())

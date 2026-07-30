@@ -4,8 +4,7 @@
   "/plan/run_spec": "RunSpec",
   "/plan/run_spec/configuration": "TaskConfiguration",
   "/plan/run_spec/configuration/env": "Env",
-  "/plan/run_spec/configuration/env/__root__/HF_TOKEN": "EnvSentinel",
-  "/plan/run_spec/configuration/max_duration": "Duration",
+  "/plan/run_spec/configuration/env/root/HF_TOKEN": "EnvSentinel",
   "/plan/run_spec/configuration/python": "PythonVersion",
   "/plan/run_spec/configuration/resources": "ResourcesSpec",
   "/plan/run_spec/configuration/resources/cpu": "CPUSpec",
@@ -20,11 +19,9 @@
   "/plan/run_spec/merged_profile": "Profile",
   "/plan/run_spec/merged_profile/backends/0": "BackendType",
   "/plan/run_spec/merged_profile/creation_policy": "CreationPolicy",
-  "/plan/run_spec/merged_profile/max_duration": "Duration",
   "/plan/run_spec/merged_profile/spot_policy": "SpotPolicy",
   "/plan/run_spec/profile": "Profile",
   "/plan/run_spec/profile/backends/0": "BackendType",
-  "/plan/run_spec/profile/max_duration": "Duration",
   "/plan/run_spec/profile/spot_policy": "SpotPolicy",
   "/plan/run_spec/repo_data": "RemoteRunRepoData"
 }

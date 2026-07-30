@@ -2,7 +2,7 @@ import pathlib
 import string
 from uuid import UUID
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.common import CoreModel
@@ -54,7 +54,8 @@ class FilePathMapping(CoreModel):
             raise ValueError(f"invalid file path mapping: {v}")
         return cls(local_path=local_path, path=path)
 
-    @validator("path")
+    @field_validator("path")
+    @classmethod
     def validate_path(cls, v) -> str:
         # True for `C:/.*`, False otherwise, including `/abs/unix/path`, `rel\windows\path`, etc.
         if pathlib.PureWindowsPath(v).is_absolute():

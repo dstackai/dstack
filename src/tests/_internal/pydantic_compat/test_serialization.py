@@ -28,7 +28,7 @@ from dstack._internal.core.models.fleets import FleetConfiguration, FleetNodesSp
 from dstack._internal.core.models.repos.remote import RemoteRunRepoData
 from dstack._internal.core.models.resources import CPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.volumes import RunpodVolumeConfiguration, VolumeSpec
-from dstack._internal.server.utils.routers import CustomORJSONResponse
+from dstack._internal.server.utils.routers import CustomJSONResponse
 from tests._internal.pydantic_compat import backend_factories, factories
 from tests._internal.pydantic_compat.compare import assert_matches_fixture, canonicalize
 
@@ -75,7 +75,7 @@ API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
     "save_repo_creds_request": factories.save_repo_creds_request,
 }
 
-# Returned from a router via `CustomORJSONResponse` — orjson with a `default=` hook rather than
+# Returned from a router via `CustomJSONResponse` — orjson with a `default=` hook rather than
 # `.json()`, so this path can drift away from the one above.
 API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "fleet": factories.fleet,
@@ -132,7 +132,7 @@ SURFACES: dict[str, tuple[dict[str, Callable[[], Any]], Callable[[Any], Union[by
     "backend_creds": (BACKEND_CREDS, lambda model: model.json()),
     "backend_data": (BACKEND_DATA, lambda model: model.json()),
     "api_request": (API_REQUESTS, lambda model: model.json()),
-    "api_response": (API_RESPONSES, lambda model: bytes(CustomORJSONResponse(model).body)),
+    "api_response": (API_RESPONSES, lambda model: bytes(CustomJSONResponse(model).body)),
     "runner": (RUNNER_REQUESTS, lambda model: model.json()),
     "gateway": (GATEWAY_RESPONSES, lambda model: model.json()),
     "proxy": (PROXY_REQUESTS, lambda model: json.dumps(model.dict(exclude_unset=True))),
@@ -336,11 +336,11 @@ class TestFieldSerializationFilters:
         assert "availability_zone" not in json.loads(spec.json())["configuration"]
 
 
-class TestCustomORJSONResponseCompat:
+class TestCustomJSONResponseCompat:
     def test_response_uses_the_same_nested_serializer_overrides_as_model_json(self):
         configuration = FleetConfiguration(nodes=FleetNodesSpec(min=1, target=1, max=1))
 
-        response_body = bytes(CustomORJSONResponse(configuration).body)
+        response_body = bytes(CustomJSONResponse(configuration).body)
 
         assert canonicalize(response_body) == canonicalize(configuration.json())
         assert "target" not in json.loads(response_body)["nodes"]

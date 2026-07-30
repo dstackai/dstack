@@ -11,7 +11,12 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import EntityReference, NetworkMode, RegistryAuth
+from dstack._internal.core.models.common import (
+    EntityReference,
+    NetworkMode,
+    RegistryAuth,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
@@ -74,7 +79,7 @@ from dstack._internal.server.testing.common import (
     get_ssh_fleet_configuration,
     get_volume_provisioning_data,
 )
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, get_or_error
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -1548,8 +1553,12 @@ class TestJobSubmittedWorker:
         assert worker_job.instance is not None and worker_job.instance.id == selected_worker.id
         assert selected_master.busy_blocks == 2
         assert selected_worker.busy_blocks == 2
-        master_runtime = JobRuntimeData.__response__.parse_raw(master_job.job_runtime_data)
-        worker_runtime = JobRuntimeData.__response__.parse_raw(worker_job.job_runtime_data)
+        master_runtime = validate_json_extra_ignore(
+            JobRuntimeData, get_or_error(master_job.job_runtime_data)
+        )
+        worker_runtime = validate_json_extra_ignore(
+            JobRuntimeData, get_or_error(worker_job.job_runtime_data)
+        )
         assert master_runtime.network_mode == NetworkMode.HOST
         assert worker_runtime.network_mode == NetworkMode.HOST
         assert master_runtime.offer is not None and master_runtime.offer.blocks == 2
@@ -2566,7 +2575,7 @@ class TestJobSubmittedWorker:
             repo_id=repo.name,
             configuration=TaskConfiguration(
                 image="ubuntu",
-                env=Env.parse_obj({"TOKEN": "${{ secrets.token }}"}),
+                env=Env.model_validate({"TOKEN": "${{ secrets.token }}"}),
                 registry_auth=RegistryAuth(
                     username="${{ secrets.registry_user }}",
                     password="${{ secrets.registry_pass }}",

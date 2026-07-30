@@ -291,10 +291,10 @@ def host_info_to_instance_type(host_info: Dict[str, Any], arch: GoArchType) -> I
         resources=Resources(
             cpu_arch=arch.to_cpu_architecture(),
             cpus=host_info["cpus"],
-            memory_mib=host_info["memory"] / 1024 / 1024,
+            memory_mib=host_info["memory"] // 1024 // 1024,
             spot=False,
             gpus=gpus,
-            disk=Disk(size_mib=host_info["disk_size"] / 1024 / 1024),
+            disk=Disk(size_mib=host_info["disk_size"] // 1024 // 1024),
         ),
     )
     return instance_type

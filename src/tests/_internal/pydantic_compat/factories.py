@@ -262,7 +262,10 @@ def job_spec() -> JobSpec:
         job_num=0,
         job_name="test-run-0-0",
         commands=["/bin/bash", "-i", "-c", "echo hi"],
-        env=Env.parse_obj({"A": "1"}),
+        # `JobSpec.env` is a plain `Dict[str, str]`, not an `Env`. v1 happened to coerce an `Env`
+        # into it via the mapping protocol; v2 requires a real dict, which is what production
+        # passes anyway (`_env()` calls `Env.as_dict()`).
+        env={"A": "1"},
         image_name="dstackai/base:latest",
         requirements=requirements(),
         max_duration=7200,
@@ -354,7 +357,7 @@ def run_spec() -> RunSpec:
             # `image` is deliberately absent: it is mutually exclusive with `python`, and `python`
             # is the more valuable of the two to pin because it is a str enum fed by a YAML float.
             python=PythonVersion.PY311,
-            env=Env.parse_obj({"HF_TOKEN": "secret"}),
+            env=Env.model_validate({"HF_TOKEN": "secret"}),
             working_dir="/workflow",
             inactivity_duration=3600,
             resources=ResourcesSpec(
@@ -384,7 +387,7 @@ def volume_provisioning_data() -> VolumeProvisioningData:
 
 
 # --- API responses -------------------------------------------------------------------
-# Returned from a router through `CustomORJSONResponse`. Chosen by greedy set cover so that
+# Returned from a router through `CustomJSONResponse`. Chosen by greedy set cover so that
 # between them they reach every model class reachable from any response model — 129 of 129.
 # `run` and `instance` are absent on purpose: `run_plan` and `fleet` already reach everything
 # they would add.

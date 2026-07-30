@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-from pydantic import parse_obj_as
-
 from dstack._internal.core.compatibility.events import get_list_events_excludes
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.events import Event, EventTargetType
 from dstack._internal.server.schemas.events import LIST_EVENTS_DEFAULT_LIMIT, ListEventsRequest
 from dstack.api.server._group import APIClientGroup
@@ -61,4 +60,4 @@ class EventsAPIClient(APIClientGroup):
         resp = self._request(
             "/api/events/list", body=req.json(exclude=get_list_events_excludes(req))
         )
-        return parse_obj_as(list[Event.__response__], resp.json())
+        return validate_extra_ignore(list[Event], resp.json())

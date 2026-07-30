@@ -1,7 +1,7 @@
 import pytest
 
 import dstack._internal.server.settings as server_settings
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth, validate_extra_ignore
 from dstack._internal.server.services.docker import (
     ImageConfigObject,
     ImageManifest,
@@ -98,16 +98,16 @@ def sample_image_config_object():
 
 
 def test_parse_image_manifest(sample_image_manifest):
-    ImageManifest.__response__.parse_obj(sample_image_manifest)
+    validate_extra_ignore(ImageManifest, sample_image_manifest)
 
 
 def test_parse_image_config_object(sample_image_config_object):
-    ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    validate_extra_ignore(ImageConfigObject, sample_image_config_object)
 
 
 def test_parse_image_config_object_with_config_null(sample_image_config_object):
     sample_image_config_object["config"] = None
-    config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    config_object = validate_extra_ignore(ImageConfigObject, sample_image_config_object)
     assert config_object.config is not None
 
 
@@ -121,13 +121,13 @@ def test_parse_image_config_object_with_config_null(sample_image_config_object):
 )
 def test_parse_image_config_object_user_field(sample_image_config_object, value, expected):
     sample_image_config_object["config"]["User"] = value
-    config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    config_object = validate_extra_ignore(ImageConfigObject, sample_image_config_object)
     assert config_object.config.user == expected
 
 
 def test_parse_image_config_object_user_field_missing(sample_image_config_object):
     del sample_image_config_object["config"]["User"]
-    config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
+    config_object = validate_extra_ignore(ImageConfigObject, sample_image_config_object)
     assert config_object.config.user is None
 
 

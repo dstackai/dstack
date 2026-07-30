@@ -2,7 +2,7 @@
   "/": "RunSpec",
   "/configuration": "TaskConfiguration",
   "/configuration/env": "Env",
-  "/configuration/env/__root__/B": "EnvSentinel",
+  "/configuration/env/root/B": "EnvSentinel",
   "/configuration/python": "PythonVersion",
   "/configuration/resources": "ResourcesSpec",
   "/configuration/resources/cpu": "CPUSpec",
@@ -16,8 +16,6 @@
   "/configuration/resources/memory/min": "Memory",
   "/merged_profile": "Profile",
   "/merged_profile/creation_policy": "CreationPolicy",
-  "/merged_profile/max_duration": "Duration",
   "/profile": "Profile",
-  "/profile/max_duration": "Duration",
   "/repo_data": "LocalRunRepoData"
 }

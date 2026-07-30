@@ -55,10 +55,13 @@ class CustomApplyPolicy(ApplyPolicy):
         excludes: Optional[Dict],
     ) -> ApplySpec:
         response = None
+        # `{"spec": None}` is not a valid `exclude` value in pydantic v2 (it wants a set, a nested
+        # mapping, or a bool), so omit the key entirely when there is nothing to exclude.
+        exclude = {"spec": excludes} if excludes is not None else None
         try:
             response = requests.post(
                 f"{self._plugin_service_uri}{endpoint}",
-                json=spec_request.dict(exclude={"spec": excludes}),
+                json=spec_request.dict(exclude=exclude),
                 headers={"accept": "application/json", "Content-Type": "application/json"},
                 timeout=PLUGIN_REQUEST_TIMEOUT_SEC,
             )

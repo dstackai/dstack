@@ -18,7 +18,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import ApplyAction, validate_json_extra_ignore
 from dstack._internal.core.models.profiles import (
     RetryEvent,
 )
@@ -153,7 +153,7 @@ def get_run_status_change_message(
 
 
 def get_run_spec(run_model: RunModel) -> RunSpec:
-    return RunSpec.__response__.parse_raw(run_model.run_spec)
+    return validate_json_extra_ignore(RunSpec, run_model.run_spec)
 
 
 async def list_user_runs(
@@ -537,13 +537,13 @@ async def get_plan(
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
-    effective_run_spec = RunSpec.parse_obj(run_spec.dict())
+    effective_run_spec = RunSpec.model_validate(run_spec.dict())
     effective_run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_run_spec,
     )
-    effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
+    effective_run_spec = RunSpec.model_validate(effective_run_spec.dict())
     validate_run_spec_and_set_defaults(
         user=user,
         run_spec=effective_run_spec,
@@ -603,7 +603,7 @@ async def apply_plan(
         spec=run_spec,
     )
     # Spec must be copied by parsing to calculate merged_profile
-    run_spec = RunSpec.parse_obj(run_spec.dict())
+    run_spec = RunSpec.model_validate(run_spec.dict())
     validate_run_spec_and_set_defaults(
         user=user, run_spec=run_spec, legacy_repo_dir=legacy_repo_dir
     )
@@ -982,7 +982,7 @@ def run_model_to_run(
 
     service_spec = None
     if run_model.service_spec is not None:
-        service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
+        service_spec = validate_json_extra_ignore(ServiceSpec, run_model.service_spec)
 
     status_message = _get_run_status_message(run_model, job_models=job_models)
     error = _get_run_error(run_model)
