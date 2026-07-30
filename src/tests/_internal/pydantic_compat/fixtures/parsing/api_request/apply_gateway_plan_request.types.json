@@ -1,0 +1,8 @@
+{
+  "/": "ApplyGatewayPlanRequest",
+  "/plan": "ApplyGatewayPlanInput",
+  "/plan/spec": "GatewaySpec",
+  "/plan/spec/configuration": "GatewayConfiguration",
+  "/plan/spec/configuration/backend": "BackendType",
+  "/plan/spec/configuration/certificate": "LetsEncryptGatewayCertificate"
+}

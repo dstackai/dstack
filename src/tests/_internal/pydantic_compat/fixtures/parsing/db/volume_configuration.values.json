@@ -1,0 +1,11 @@
+{
+  "auto_cleanup_duration": null,
+  "availability_zone": "us-east-1a",
+  "backend": "aws",
+  "name": "training-data",
+  "region": "us-east-1",
+  "size": 500.0,
+  "tags": null,
+  "type": "volume",
+  "volume_id": "vol-0fe1a2b3c4d5e6f78"
+}

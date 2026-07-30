@@ -1,0 +1,8 @@
+{
+  "/": "UserWithCreds",
+  "/created_at": "datetime",
+  "/creds": "UserTokenCreds",
+  "/global_role": "GlobalRole",
+  "/id": "UUID",
+  "/permissions": "UserPermissions"
+}

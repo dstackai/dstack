@@ -1,0 +1,25 @@
+{
+  "force": false,
+  "plan": {
+    "current_resource": null,
+    "spec": {
+      "configuration": {
+        "backend": "aws",
+        "certificate": {
+          "type": "lets-encrypt"
+        },
+        "default": false,
+        "domain": "inference.example.com",
+        "instance_type": null,
+        "name": "prod-gateway",
+        "public_ip": true,
+        "region": "eu-west-1",
+        "replicas": null,
+        "router": null,
+        "tags": null,
+        "type": "gateway"
+      },
+      "configuration_path": ".dstack/gateway.yml"
+    }
+  }
+}

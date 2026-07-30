@@ -5,52 +5,116 @@
     "spec": {
       "autocreated": false,
       "configuration": {
-        "availability_zones": null,
+        "availability_zones": [
+          "us-east-1a"
+        ],
         "backend_options": null,
-        "backends": null,
+        "backends": [
+          "aws"
+        ],
         "blocks": 1,
         "env": {},
-        "idle_duration": null,
-        "instance_types": null,
-        "max_price": null,
+        "idle_duration": 600,
+        "instance_types": [
+          "p4d.24xlarge"
+        ],
+        "max_price": 25.5,
         "name": "test-fleet",
         "nodes": {
           "max": 1,
           "min": 1
         },
-        "placement": null,
-        "regions": null,
-        "reservation": null,
-        "resources": null,
+        "placement": "cluster",
+        "regions": [
+          "us-east-1"
+        ],
+        "reservation": "test-reservation",
+        "resources": {
+          "cpu": {
+            "max": 8,
+            "min": 2
+          },
+          "disk": {
+            "size": {
+              "max": null,
+              "min": 100.0
+            }
+          },
+          "gpu": {
+            "compute_capability": null,
+            "count": {
+              "max": null,
+              "min": 0
+            },
+            "memory": null,
+            "name": null,
+            "total_memory": null,
+            "vendor": null
+          },
+          "memory": {
+            "max": null,
+            "min": 16.0
+          },
+          "shm_size": null
+        },
         "retry": null,
-        "spot_policy": null,
+        "spot_policy": "auto",
         "ssh_config": null,
-        "tags": null,
+        "tags": {
+          "env": "test"
+        },
         "type": "fleet"
       },
       "configuration_path": "fleet.dstack.yml",
       "profile": {
-        "availability_zones": null,
+        "availability_zones": [
+          "us-east-1a"
+        ],
         "backend_options": null,
-        "backends": null,
-        "creation_policy": null,
+        "backends": [
+          "aws",
+          "gcp"
+        ],
+        "creation_policy": "reuse-or-create",
         "default": false,
-        "fleets": null,
-        "idle_duration": null,
-        "instance_types": null,
+        "fleets": [
+          {
+            "name": "test-fleet",
+            "project": null
+          }
+        ],
+        "idle_duration": 600,
+        "instance_types": [
+          "p4d.24xlarge"
+        ],
         "instances": null,
-        "max_duration": null,
-        "max_price": null,
-        "name": "",
-        "regions": null,
-        "reservation": null,
-        "retry": null,
-        "schedule": null,
-        "spot_policy": null,
-        "startup_order": null,
-        "stop_criteria": null,
-        "stop_duration": null,
-        "tags": null,
+        "max_duration": 7200,
+        "max_price": 25.5,
+        "name": "default",
+        "regions": [
+          "us-east-1",
+          "eu-west-1"
+        ],
+        "reservation": "test-reservation",
+        "retry": {
+          "duration": 3600,
+          "on_events": [
+            "no-capacity"
+          ]
+        },
+        "schedule": {
+          "cron": [
+            "0 0 * * *"
+          ]
+        },
+        "spot_policy": "auto",
+        "startup_order": "master-first",
+        "stop_criteria": "all-done",
+        "stop_duration": 300,
+        "tags": {
+          "env": "test",
+          "team": "core"
+        },
         "utilization_policy": null
       }
     }

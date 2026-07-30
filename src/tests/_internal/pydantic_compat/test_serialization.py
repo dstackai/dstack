@@ -16,7 +16,7 @@ db, api_request, api_response, runner, gateway, proxy.
 """
 
 import json
-from typing import Callable
+from typing import Any, Callable, Union
 
 import pytest
 from pydantic import BaseModel
@@ -80,13 +80,26 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
 
 # Sent by the server to the runner (shim) as a request body, via `.json()`.
 RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
+    "component_install_request": factories.component_install_request,
+    "legacy_submit_body": factories.legacy_submit_body,
+    "shutdown_request": factories.shutdown_request,
     "submit_body": factories.submit_body,
+    "task_submit_request": factories.task_submit_request,
+    "task_terminate_request": factories.task_terminate_request,
 }
 
 # Returned by the gateway to the server. The request direction is not model-driven — the server
 # hand-builds those payloads — so it is covered on the parsing side instead.
 GATEWAY_RESPONSES: dict[str, Callable[[], BaseModel]] = {
     "service_stats": factories.service_stats,
+}
+
+# Returned to the caller of the OpenAI-compatible API. A chunk is dumped one at a time into an SSE
+# stream (`f"data:{chunk.json()}"` in `proxy/lib/routers/model_proxy.py`) rather than as a body,
+# which makes it a fifth production dump path.
+PROXY_RESPONSES: dict[str, Callable[[], CoreModel]] = {
+    "chat_completions_chunk": factories.chat_completions_chunk,
+    "models_response": factories.models_response,
 }
 
 # Forwarded upstream by the model proxy. Dumped with `exclude_unset=True`, matching
@@ -98,46 +111,35 @@ PROXY_REQUESTS: dict[str, Callable[[], CoreModel]] = {
 }
 
 
-class TestDbBlobSerialization:
-    @pytest.mark.parametrize("name", sorted(DB_BLOBS))
-    def test_matches_fixture(self, name, regen):
-        payload = DB_BLOBS[name]().json()
-        assert_matches_fixture("serialization/db", name, payload, regen=regen)
+# Surface -> (models, the production call that serializes them). Keeping the dump here rather than
+# inside each test matters because `test_parsing` re-serializes these same fixtures to check
+# unknown-field tolerance: it has to use the identical path, or it compares orjson output against
+# `.json()` output and fails for reasons that have nothing to do with parsing.
+SURFACES: dict[str, tuple[dict[str, Callable[[], Any]], Callable[[Any], Union[bytes, str]]]] = {
+    "db": (DB_BLOBS, lambda model: model.json()),
+    "api_request": (API_REQUESTS, lambda model: model.json()),
+    "api_response": (API_RESPONSES, lambda model: bytes(CustomORJSONResponse(model).body)),
+    "runner": (RUNNER_REQUESTS, lambda model: model.json()),
+    "gateway": (GATEWAY_RESPONSES, lambda model: model.json()),
+    "proxy": (PROXY_REQUESTS, lambda model: json.dumps(model.dict(exclude_unset=True))),
+    "proxy_response": (PROXY_RESPONSES, lambda model: model.json()),
+}
+
+_CASES = [(surface, name) for surface, (reg, _) in SURFACES.items() for name in sorted(reg)]
 
 
-class TestApiRequestSerialization:
-    @pytest.mark.parametrize("name", sorted(API_REQUESTS))
-    def test_matches_fixture(self, name, regen):
-        payload = API_REQUESTS[name]().json()
-        assert_matches_fixture("serialization/api_request", name, payload, regen=regen)
+def serialize(surface: str, name: str) -> Union[bytes, str]:
+    """Build the model for a case and serialize it the way production does."""
+    registry, dump = SURFACES[surface]
+    return dump(registry[name]())
 
 
-class TestApiResponseSerialization:
-    @pytest.mark.parametrize("name", sorted(API_RESPONSES))
-    def test_matches_fixture(self, name, regen):
-        payload = bytes(CustomORJSONResponse(API_RESPONSES[name]()).body)
-        assert_matches_fixture("serialization/api_response", name, payload, regen=regen)
-
-
-class TestRunnerRequestSerialization:
-    @pytest.mark.parametrize("name", sorted(RUNNER_REQUESTS))
-    def test_matches_fixture(self, name, regen):
-        payload = RUNNER_REQUESTS[name]().json()
-        assert_matches_fixture("serialization/runner", name, payload, regen=regen)
-
-
-class TestGatewayResponseSerialization:
-    @pytest.mark.parametrize("name", sorted(GATEWAY_RESPONSES))
-    def test_matches_fixture(self, name, regen):
-        payload = GATEWAY_RESPONSES[name]().json()
-        assert_matches_fixture("serialization/gateway", name, payload, regen=regen)
-
-
-class TestProxyRequestSerialization:
-    @pytest.mark.parametrize("name", sorted(PROXY_REQUESTS))
-    def test_matches_fixture(self, name, regen):
-        payload = json.dumps(PROXY_REQUESTS[name]().dict(exclude_unset=True))
-        assert_matches_fixture("serialization/proxy", name, payload, regen=regen)
+class TestSerialization:
+    @pytest.mark.parametrize(("surface", "name"), _CASES, ids=lambda v: str(v))
+    def test_matches_fixture(self, surface, name, regen):
+        assert_matches_fixture(
+            f"serialization/{surface}", name, serialize(surface, name), regen=regen
+        )
 
 
 class TestFleetNodesTargetCompatHack:

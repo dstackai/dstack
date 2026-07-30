@@ -1,0 +1,9 @@
+{
+  "cpus": 96,
+  "memory_mib": 1179648,
+  "gpus": [{"name": "H100", "memory_mib": 81920, "vendor": "nvidia"}],
+  "spot": false,
+  "disk": {"size_mib": 8388608},
+  "description": "96xCPU, 1152GB, 1xH100 (80GB)",
+  "cpu_arch": "x86"
+}

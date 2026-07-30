@@ -1,0 +1,87 @@
+{
+  "autocreated": false,
+  "configuration": {
+    "availability_zones": null,
+    "backend_options": null,
+    "backends": [
+      "aws"
+    ],
+    "blocks": 1,
+    "env": {},
+    "idle_duration": 1800,
+    "instance_types": [
+      "p4d.24xlarge"
+    ],
+    "max_price": null,
+    "name": "research-cluster",
+    "nodes": {
+      "max": 8,
+      "min": 2
+    },
+    "placement": "cluster",
+    "regions": [
+      "us-east-1"
+    ],
+    "reservation": null,
+    "resources": {
+      "cpu": {
+        "max": null,
+        "min": 2
+      },
+      "disk": {
+        "size": {
+          "max": null,
+          "min": 100.0
+        }
+      },
+      "gpu": {
+        "compute_capability": null,
+        "count": {
+          "max": null,
+          "min": 0
+        },
+        "memory": null,
+        "name": null,
+        "total_memory": null,
+        "vendor": null
+      },
+      "memory": {
+        "max": null,
+        "min": 64.0
+      },
+      "shm_size": null
+    },
+    "retry": null,
+    "spot_policy": "on-demand",
+    "ssh_config": null,
+    "tags": {
+      "team": "research"
+    },
+    "type": "fleet"
+  },
+  "configuration_path": ".dstack/fleets/research.yml",
+  "profile": {
+    "availability_zones": null,
+    "backend_options": null,
+    "backends": null,
+    "creation_policy": null,
+    "default": false,
+    "fleets": null,
+    "idle_duration": 1800,
+    "instance_types": null,
+    "instances": null,
+    "max_duration": null,
+    "max_price": null,
+    "name": "prod",
+    "regions": null,
+    "reservation": null,
+    "retry": null,
+    "schedule": null,
+    "spot_policy": "on-demand",
+    "startup_order": null,
+    "stop_criteria": null,
+    "stop_duration": null,
+    "tags": null,
+    "utilization_policy": null
+  }
+}

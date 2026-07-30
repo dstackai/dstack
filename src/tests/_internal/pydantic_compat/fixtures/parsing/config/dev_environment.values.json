@@ -1,0 +1,81 @@
+{
+  "availability_zones": null,
+  "backend_options": null,
+  "backends": null,
+  "creation_policy": null,
+  "docker": null,
+  "dstack": false,
+  "entrypoint": null,
+  "env": {
+    "HF_TOKEN": "secret"
+  },
+  "files": [],
+  "fleets": null,
+  "home_dir": "/root",
+  "ide": "vscode",
+  "idle_duration": null,
+  "image": null,
+  "inactivity_duration": 3600,
+  "init": [],
+  "instance_types": null,
+  "instances": null,
+  "max_duration": null,
+  "max_price": null,
+  "name": null,
+  "nvcc": null,
+  "ports": [],
+  "priority": null,
+  "privileged": false,
+  "python": "3.11",
+  "regions": null,
+  "registry_auth": null,
+  "repos": [],
+  "reservation": null,
+  "resources": {
+    "cpu": {
+      "max": null,
+      "min": 2
+    },
+    "disk": {
+      "size": {
+        "max": null,
+        "min": 100.0
+      }
+    },
+    "gpu": {
+      "compute_capability": null,
+      "count": {
+        "max": null,
+        "min": 1
+      },
+      "memory": {
+        "max": 80.0,
+        "min": 24.0
+      },
+      "name": null,
+      "total_memory": null,
+      "vendor": null
+    },
+    "memory": {
+      "max": null,
+      "min": 8.0
+    },
+    "shm_size": 16.0
+  },
+  "retry": null,
+  "schedule": null,
+  "setup": [],
+  "shell": null,
+  "single_branch": null,
+  "spot_policy": null,
+  "startup_order": null,
+  "stop_criteria": null,
+  "stop_duration": null,
+  "tags": null,
+  "type": "dev-environment",
+  "user": null,
+  "utilization_policy": null,
+  "version": null,
+  "volumes": [],
+  "working_dir": null
+}

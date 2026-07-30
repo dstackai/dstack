@@ -11,11 +11,24 @@ from datetime import datetime, timezone
 
 from dstack._internal.core.backends.aws.models import AWSCreds
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    EntityReference,
+    NetworkMode,
+)
 from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    PythonVersion,
+)
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.fleets import Fleet, FleetPlan, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    Fleet,
+    FleetPlan,
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
@@ -32,16 +45,21 @@ from dstack._internal.core.models.instances import (
     InstanceStatus,
     RemoteConnectionInfo,
     Resources,
+    SSHKey,
 )
 from dstack._internal.core.models.placement import (
     PlacementGroupConfiguration,
     PlacementGroupProvisioningData,
 )
 from dstack._internal.core.models.profiles import (
+    CreationPolicy,
     Profile,
     ProfileRetry,
     RetryEvent,
+    Schedule,
     SpotPolicy,
+    StartupOrder,
+    StopCriteria,
 )
 from dstack._internal.core.models.projects import (
     Member,
@@ -52,6 +70,7 @@ from dstack._internal.core.models.projects import (
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds, RemoteRepoInfo
 from dstack._internal.core.models.resources import (
     ComputeCapability,
+    DiskSpec,
     GPUSpec,
     Memory,
     Range,
@@ -88,10 +107,15 @@ from dstack._internal.core.models.volumes import (
     VolumeConfiguration,
     VolumeProvisioningData,
 )
+from dstack._internal.proxy.gateway.schemas.registry import RegisterEntrypointRequest
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats, Stat
 from dstack._internal.proxy.lib.schemas.model_proxy import (
+    ChatCompletionsChunk,
+    ChatCompletionsChunkChoice,
     ChatCompletionsRequest,
     ChatMessage,
+    Model,
+    ModelsResponse,
 )
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanInput,
@@ -103,7 +127,20 @@ from dstack._internal.server.schemas.gateways import (
     ApplyGatewayPlanRequest,
 )
 from dstack._internal.server.schemas.repos import SaveRepoCredsRequest
-from dstack._internal.server.schemas.runner import HealthcheckResponse, SubmitBody
+from dstack._internal.server.schemas.runner import (
+    ComponentInstallRequest,
+    ComponentName,
+    HealthcheckResponse,
+    InstanceHealthResponse,
+    JobInfoResponse,
+    LegacySubmitBody,
+    ShutdownRequest,
+    SubmitBody,
+    TaskInfoResponse,
+    TaskStatus,
+    TaskSubmitRequest,
+    TaskTerminateRequest,
+)
 from dstack._internal.server.schemas.runs import (
     ApplyRunPlanInput,
     ApplyRunPlanRequest,
@@ -111,6 +148,7 @@ from dstack._internal.server.schemas.runs import (
 from dstack._internal.server.schemas.volumes import CreateVolumeRequest
 from dstack._internal.server.testing.common import (
     get_compute_group_provisioning_data,
+    get_fleet_configuration,
     get_fleet_spec,
     get_gateway_compute_configuration,
     get_instance_configuration,
@@ -145,7 +183,31 @@ def compute_group_provisioning_data() -> ComputeGroupProvisioningData:
 
 
 def fleet_spec() -> FleetSpec:
-    return get_fleet_spec()
+    """
+    Fills the optional configuration fields: unfilled they serialize as ~34 nulls, and a null
+    cannot drift, so the fixture would pin almost nothing.
+    """
+    spec = get_fleet_spec(
+        conf=get_fleet_configuration(
+            backends=[BackendType.AWS],
+            placement=InstanceGroupPlacement.CLUSTER,
+        ),
+        profile=profile(),
+    )
+    conf = spec.configuration
+    conf.regions = ["us-east-1"]
+    conf.availability_zones = ["us-east-1a"]
+    conf.instance_types = ["p4d.24xlarge"]
+    conf.reservation = "test-reservation"
+    conf.spot_policy = SpotPolicy.AUTO
+    conf.idle_duration = 600
+    conf.max_price = 25.5
+    conf.tags = {"env": "test"}
+    conf.resources = ResourcesSpec(
+        cpu=Range[int](min=2, max=8),
+        memory=Range[Memory](min=Memory(16), max=None),
+    )
+    return spec
 
 
 def gateway_compute_configuration() -> GatewayComputeConfiguration:
@@ -171,7 +233,12 @@ def image_pull_progress() -> ImagePullProgress:
 
 
 def instance_configuration() -> InstanceConfiguration:
-    return get_instance_configuration()
+    conf = get_instance_configuration()
+    conf.instance_id = "i-1234567890abcdef0"
+    conf.reservation = "test-reservation"
+    conf.tags = {"env": "test"}
+    conf.ssh_keys = [SSHKey(public="ssh-rsa PUBLIC", private=None)]
+    return conf
 
 
 def instance_offer() -> InstanceOffer:
@@ -190,6 +257,13 @@ def job_runtime_data() -> JobRuntimeData:
     """`ports` is a `dict[int, int]` — the only non-str dict keys in the models."""
     data = get_job_runtime_data()
     data.ports = {8080: 30080, 8081: 30081}
+    data.network_mode = NetworkMode.HOST
+    data.cpu = 2.0
+    data.gpu = 1
+    data.memory = float(16 * 1024**3)
+    data.volume_names = ["test-volume"]
+    data.working_dir = "/workflow"
+    data.username = "ubuntu"
     return data
 
 
@@ -217,11 +291,23 @@ def placement_group_provisioning_data() -> PlacementGroupProvisioningData:
 def profile() -> Profile:
     return Profile(
         name="default",
+        backends=[BackendType.AWS, BackendType.GCP],
+        regions=["us-east-1", "eu-west-1"],
+        availability_zones=["us-east-1a"],
+        instance_types=["p4d.24xlarge"],
+        reservation="test-reservation",
+        spot_policy=SpotPolicy.AUTO,
+        retry=ProfileRetry(on_events=[RetryEvent.NO_CAPACITY], duration=3600),
         max_duration=7200,
         stop_duration=300,
         idle_duration=600,
-        spot_policy=SpotPolicy.AUTO,
-        retry=ProfileRetry(on_events=[RetryEvent.NO_CAPACITY], duration=3600),
+        max_price=25.5,
+        creation_policy=CreationPolicy.REUSE_OR_CREATE,
+        stop_criteria=StopCriteria.ALL_DONE,
+        startup_order=StartupOrder.MASTER_FIRST,
+        fleets=[EntityReference(project=None, name="test-fleet")],
+        tags={"env": "test", "team": "core"},
+        schedule=Schedule(cron=["0 0 * * *"]),
     )
 
 
@@ -268,12 +354,24 @@ def run_spec() -> RunSpec:
     """
     return get_run_spec(
         repo_id="test-repo",
-        profile=Profile(name="default", max_duration=7200, idle_duration=300),
+        profile=profile(),
         configuration=DevEnvironmentConfiguration(
+            name="test-dev",
             ide="vscode",
+            version="1.85.0",
+            user="ubuntu",
+            privileged=False,
+            # `image` is deliberately absent: it is mutually exclusive with `python`, and `python`
+            # is the more valuable of the two to pin because it is a str enum fed by a YAML float.
+            python=PythonVersion.PY311,
+            env=Env.parse_obj({"HF_TOKEN": "secret"}),
+            working_dir="/workflow",
+            inactivity_duration=3600,
             resources=ResourcesSpec(
                 cpu=Range[int](min=2, max=8),
                 memory=Range[Memory](min=Memory(16), max=None),
+                shm_size=Memory(1024),
+                disk=DiskSpec(size=Range[Memory](min=Memory(100), max=None)),
             ),
         ),
     )
@@ -312,7 +410,7 @@ def fleet() -> Fleet:
         id=_ID,
         name="test-fleet",
         project_name="test-project",
-        spec=get_fleet_spec(),
+        spec=fleet_spec(),
         created_at=_CREATED_AT,
         status=FleetStatus.ACTIVE,
         instances=[
@@ -356,7 +454,7 @@ def fleet_plan() -> FleetPlan:
     return FleetPlan(
         project_name="test-project",
         user="test-user",
-        spec=get_fleet_spec(),
+        spec=fleet_spec(),
         effective_spec=None,
         current_resource=None,
         offers=[get_instance_offer_with_availability()],
@@ -462,7 +560,7 @@ def apply_fleet_plan_request() -> ApplyFleetPlanRequest:
     client side of the #3066 `target`-dropping hack too.
     """
     return ApplyFleetPlanRequest(
-        plan=ApplyFleetPlanInput(spec=get_fleet_spec(), current_resource=None),
+        plan=ApplyFleetPlanInput(spec=fleet_spec(), current_resource=None),
         force=False,
     )
 
@@ -559,6 +657,84 @@ def healthcheck_response() -> HealthcheckResponse:
 # never run — worth knowing before the serializer is swapped.
 
 
+def task_submit_request() -> TaskSubmitRequest:
+    """The newer per-task API; `TaskSubmitRequest` and `SubmitBody` are separate protocols."""
+    return TaskSubmitRequest(
+        id=str(_ID),
+        name="test-task",
+        registry_username="",
+        registry_password="",
+        image_name="dstackai/base:latest",
+        container_user="root",
+        privileged=False,
+        gpu=1,
+        cpu=2.0,
+        memory=16 * 1024**3,
+        shm_size=1024**3,
+        network_mode=NetworkMode.HOST,
+        volumes=[],
+        volume_mounts=[],
+        instance_mounts=[],
+        gpu_devices=[],
+        host_ssh_user="ubuntu",
+        host_ssh_keys=["ssh-rsa HOST"],
+        container_ssh_keys=["ssh-rsa CONTAINER"],
+    )
+
+
+def legacy_submit_body() -> LegacySubmitBody:
+    """Kept because old runners are still in the wild; its shape must not drift either."""
+    return LegacySubmitBody(
+        username="",
+        password="",
+        image_name="dstackai/base:latest",
+        privileged=False,
+        container_name="test-container",
+        container_user="root",
+        shm_size=1024**3,
+        public_keys=["ssh-rsa PUBLIC"],
+        ssh_user="ubuntu",
+        ssh_key="ssh-rsa SSH",
+        mounts=[],
+        volumes=[],
+        instance_mounts=[],
+    )
+
+
+def shutdown_request() -> ShutdownRequest:
+    return ShutdownRequest(force=True)
+
+
+def component_install_request() -> ComponentInstallRequest:
+    return ComponentInstallRequest(name=ComponentName.SHIM, url="https://example.com/shim.tar.gz")
+
+
+def task_terminate_request() -> TaskTerminateRequest:
+    return TaskTerminateRequest(
+        termination_reason="MAX_DURATION_EXCEEDED",
+        termination_message="max duration exceeded",
+        timeout=10,
+    )
+
+
+def job_info_response() -> JobInfoResponse:
+    return JobInfoResponse(working_dir="/workflow", username="ubuntu")
+
+
+def task_info_response() -> TaskInfoResponse:
+    return TaskInfoResponse(
+        id=str(_ID),
+        status=TaskStatus.RUNNING,
+        termination_reason="",
+        termination_message="",
+    )
+
+
+def instance_health_response() -> InstanceHealthResponse:
+    """All fields optional; the empty shape is what a runner without DCGM reports."""
+    return InstanceHealthResponse()
+
+
 # --- Gateway API -----------------------------------------------------------------------
 # The server<->gateway protocol. Note the server builds these payloads as hand-written dicts
 # rather than dumping a model (see `services/gateways/client.py`), so only the gateway's own
@@ -594,4 +770,34 @@ def chat_completions_request() -> ChatCompletionsRequest:
         messages=[ChatMessage(role="user", content="hi")],
         temperature=0.7,
         stop=["\n"],
+    )
+
+
+def register_entrypoint_request() -> RegisterEntrypointRequest:
+    return RegisterEntrypointRequest(domain="gateway.example.com", https=True)
+
+
+# --- Model proxy responses -------------------------------------------------------------------
+# Returned to the caller of the OpenAI-compatible API. `ChatCompletionsChunk` is serialized one
+# chunk at a time into an SSE stream (`proxy/lib/routers/model_proxy.py`), which is a fifth dump
+# path: `f"data:{chunk.json()}"` rather than a response body.
+
+
+def models_response() -> ModelsResponse:
+    return ModelsResponse(
+        data=[Model(object="model", id="llama", created=1700000000, owned_by="dstack")]
+    )
+
+
+def chat_completions_chunk() -> ChatCompletionsChunk:
+    return ChatCompletionsChunk(
+        id="chatcmpl-1",
+        choices=[
+            ChatCompletionsChunkChoice(
+                delta={"role": "assistant", "content": "hi"}, index=0, finish_reason=None
+            )
+        ],
+        created=1700000000,
+        model="llama",
+        system_fingerprint="fp_1",
     )

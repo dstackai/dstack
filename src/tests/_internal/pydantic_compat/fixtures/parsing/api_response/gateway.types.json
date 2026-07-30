@@ -1,0 +1,10 @@
+{
+  "/": "Gateway",
+  "/backend": "BackendType",
+  "/configuration": "GatewayConfiguration",
+  "/configuration/backend": "BackendType",
+  "/configuration/certificate": "LetsEncryptGatewayCertificate",
+  "/created_at": "datetime",
+  "/id": "UUID",
+  "/status": "GatewayStatus"
+}

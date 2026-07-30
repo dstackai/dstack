@@ -7,25 +7,27 @@
     "docker": null,
     "dstack": false,
     "entrypoint": null,
-    "env": {},
+    "env": {
+      "HF_TOKEN": "secret"
+    },
     "files": [],
     "fleets": null,
     "home_dir": "/root",
     "ide": "vscode",
     "idle_duration": null,
     "image": null,
-    "inactivity_duration": null,
+    "inactivity_duration": 3600,
     "init": [],
     "instance_types": null,
     "instances": null,
     "max_duration": null,
     "max_price": null,
-    "name": null,
+    "name": "test-dev",
     "nvcc": null,
     "ports": [],
     "priority": null,
     "privileged": false,
-    "python": null,
+    "python": "3.11",
     "regions": null,
     "registry_auth": null,
     "repos": [],
@@ -56,7 +58,7 @@
         "max": null,
         "min": 16.0
       },
-      "shm_size": null
+      "shm_size": 1024.0
     },
     "retry": null,
     "schedule": null,
@@ -69,36 +71,63 @@
     "stop_duration": null,
     "tags": null,
     "type": "dev-environment",
-    "user": null,
+    "user": "ubuntu",
     "utilization_policy": null,
-    "version": null,
+    "version": "1.85.0",
     "volumes": [],
-    "working_dir": null
+    "working_dir": "/workflow"
   },
   "configuration_path": "dstack.yaml",
   "file_archives": [],
   "profile": {
-    "availability_zones": null,
+    "availability_zones": [
+      "us-east-1a"
+    ],
     "backend_options": null,
-    "backends": null,
-    "creation_policy": null,
+    "backends": [
+      "aws",
+      "gcp"
+    ],
+    "creation_policy": "reuse-or-create",
     "default": false,
-    "fleets": null,
-    "idle_duration": 300,
-    "instance_types": null,
+    "fleets": [
+      {
+        "name": "test-fleet",
+        "project": null
+      }
+    ],
+    "idle_duration": 600,
+    "instance_types": [
+      "p4d.24xlarge"
+    ],
     "instances": null,
     "max_duration": 7200,
-    "max_price": null,
+    "max_price": 25.5,
     "name": "default",
-    "regions": null,
-    "reservation": null,
-    "retry": null,
-    "schedule": null,
-    "spot_policy": null,
-    "startup_order": null,
-    "stop_criteria": null,
-    "stop_duration": null,
-    "tags": null,
+    "regions": [
+      "us-east-1",
+      "eu-west-1"
+    ],
+    "reservation": "test-reservation",
+    "retry": {
+      "duration": 3600,
+      "on_events": [
+        "no-capacity"
+      ]
+    },
+    "schedule": {
+      "cron": [
+        "0 0 * * *"
+      ]
+    },
+    "spot_policy": "auto",
+    "startup_order": "master-first",
+    "stop_criteria": "all-done",
+    "stop_duration": 300,
+    "tags": {
+      "env": "test",
+      "team": "core"
+    },
     "utilization_policy": null
   },
   "repo_code_hash": null,

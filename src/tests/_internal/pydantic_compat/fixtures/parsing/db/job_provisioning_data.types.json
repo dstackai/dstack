@@ -1,0 +1,23 @@
+{
+  "/": "JobProvisioningData",
+  "/backend": "BackendType",
+  "/instance_type": "InstanceType",
+  "/instance_type/resources": "Resources",
+  "/instance_type/resources/disk": "Disk",
+  "/instance_type/resources/gpus/0": "Gpu",
+  "/instance_type/resources/gpus/0/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/1": "Gpu",
+  "/instance_type/resources/gpus/1/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/2": "Gpu",
+  "/instance_type/resources/gpus/2/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/3": "Gpu",
+  "/instance_type/resources/gpus/3/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/4": "Gpu",
+  "/instance_type/resources/gpus/4/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/5": "Gpu",
+  "/instance_type/resources/gpus/5/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/6": "Gpu",
+  "/instance_type/resources/gpus/6/vendor": "AcceleratorVendor",
+  "/instance_type/resources/gpus/7": "Gpu",
+  "/instance_type/resources/gpus/7/vendor": "AcceleratorVendor"
+}

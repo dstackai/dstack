@@ -1,10 +1,17 @@
 {
-  "instance_id": null,
+  "instance_id": "i-1234567890abcdef0",
   "instance_name": "test-instance",
   "project_name": "test-project",
-  "reservation": null,
-  "ssh_keys": [],
-  "tags": null,
+  "reservation": "test-reservation",
+  "ssh_keys": [
+    {
+      "private": null,
+      "public": "ssh-rsa PUBLIC"
+    }
+  ],
+  "tags": {
+    "env": "test"
+  },
   "user": "dstack-user",
   "volumes": null
 }

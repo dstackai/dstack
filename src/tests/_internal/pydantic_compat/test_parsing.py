@@ -23,22 +23,27 @@ from typing import Any
 import pytest
 import yaml
 
-from dstack._internal.core.backends.aws.models import AWSCreds
 from dstack._internal.core.models.configurations import DstackConfiguration
-from dstack._internal.core.models.fleets import Fleet
 from dstack._internal.core.models.profiles import ProfilesConfig
-from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.proxy.gateway.schemas.registry import (
+    RegisterEntrypointRequest,
     RegisterReplicaRequest,
     RegisterServiceRequest,
 )
+from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.proxy.lib.schemas.model_proxy import (
     ChatCompletionsChunk,
     ChatCompletionsRequest,
     ChatCompletionsResponse,
 )
-from dstack._internal.server.schemas.runner import HealthcheckResponse, MetricsResponse
-from dstack._internal.server.schemas.volumes import CreateVolumeRequest
+from dstack._internal.server.schemas.runner import (
+    HealthcheckResponse,
+    InstanceHealthResponse,
+    JobInfoResponse,
+    MetricsResponse,
+    TaskInfoResponse,
+)
+from tests._internal.pydantic_compat import test_serialization as ser
 from tests._internal.pydantic_compat.compare import (
     FIXTURES_DIR,
     assert_matches_fixture,
@@ -46,24 +51,32 @@ from tests._internal.pydantic_compat.compare import (
     type_map,
 )
 from tests._internal.pydantic_compat.compat import parse_forbid_extra, parse_ignore_extra
-from tests._internal.pydantic_compat.test_serialization import DB_BLOBS as SERIALIZED_DB_BLOBS
 
-# Read from a `Text` column with extra="ignore", so a row written by a newer server loads.
-DB_BLOBS: dict[str, Any] = {
-    "aws_creds": AWSCreds,
-    "job_spec": JobSpec,
-    "run_spec": RunSpec,
+# Parse cases are derived from the serialization surfaces rather than listed again: every model we
+# write, we also read, and a model added on one side must not silently lack coverage on the other.
+#
+# The input for each case is the payload v1 produced, frozen on disk. Where a hand-written input
+# already exists it is kept instead — those are strictly better, because they carry shapes a
+# canonical dump cannot show: a row missing fields that now default, or YAML shorthand.
+#
+# `extra` policy follows the reader, not the model: the server forbids unknown fields in a request
+# body and ignores them in a stored row.
+READ_SURFACES: dict[str, str] = {
+    "db": "ignore",
+    "api_request": "forbid",
+    "api_response": "ignore",
+    "gateway": "ignore",
 }
 
-# Validated from a request body with extra="forbid": an unknown field is a user-facing error.
-API_REQUESTS: dict[str, Any] = {
-    "create_volume_request": CreateVolumeRequest,
-}
 
-# Parsed by the API client from a server response with extra="ignore", so an older CLI works.
-API_RESPONSES: dict[str, Any] = {
-    "fleet": Fleet,
-}
+def _derived_registry(surface: str) -> dict[str, Any]:
+    registry, _ = ser.SURFACES[surface]
+    return {name: type(factory()) for name, factory in registry.items()}
+
+
+DB_BLOBS = _derived_registry("db")
+API_REQUESTS = _derived_registry("api_request")
+API_RESPONSES = _derived_registry("api_response")
 
 # Parsed from user-authored YAML with extra="forbid". The only surface whose inputs are `.yml`,
 # because the sugar pinned here is a YAML phenomenon: `python: 3.10` is a float that survives only
@@ -71,6 +84,7 @@ API_RESPONSES: dict[str, Any] = {
 # `DstackConfiguration` dispatches every `.dstack.yml` type through its `__root__` union, so one
 # entry point covers task, service, dev-environment, fleet, volume, and gateway.
 CONFIGS: dict[str, Any] = {
+    "dev_environment": DstackConfiguration,
     "fleet": DstackConfiguration,
     "profiles": ProfilesConfig,
     "service": DstackConfiguration,
@@ -82,15 +96,20 @@ CONFIGS: dict[str, Any] = {
 # fields, and the server has no say over which runner version an instance is running.
 RUNNER_RESPONSES: dict[str, Any] = {
     "healthcheck_response": HealthcheckResponse,
+    "instance_health_response": InstanceHealthResponse,
+    "job_info_response": JobInfoResponse,
     "metrics_response": MetricsResponse,
+    "task_info_response": TaskInfoResponse,
 }
 
 # Request payloads the gateway parses from the server. These schemas are plain `BaseModel`, so
 # `parse_obj` already ignores unknown fields in both pydantic versions — no shim needed, and
 # nothing to assert about strictness.
-GATEWAY_REQUESTS: dict[str, Any] = {
+GATEWAY_PAYLOADS: dict[str, Any] = {
+    "register_entrypoint_request": RegisterEntrypointRequest,
     "register_replica_request": RegisterReplicaRequest,
     "register_service_request": RegisterServiceRequest,
+    "service_stats": ServiceStats,
 }
 
 # The model proxy. The request comes from a caller and the response from an upstream model server,
@@ -104,6 +123,10 @@ PROXY_PAYLOADS: dict[str, Any] = {
 }
 
 
+def _case_id(value: Any) -> str:
+    return str(value)
+
+
 class TestDbBlobParsing:
     @pytest.mark.parametrize("name", sorted(DB_BLOBS))
     def test_parses_to_expected_values_and_types(self, name, regen):
@@ -111,23 +134,59 @@ class TestDbBlobParsing:
         _assert_parses("db", name, model, regen)
 
 
-class TestDbBlobExtraFieldTolerance:
-    """
-    Every stored model must survive a row extended by a newer writer.
+# Derived coverage: a serialization fixture is already a valid payload, so injecting one unknown
+# key into it reproduces exactly what a reader faces when the writer is a newer version. No
+# hand-written input needed, so this scales to every model on the surface for free.
+#
+# Only listed where *we* are the reader. `serialization/runner` is read by the Go runner and
+# `serialization/proxy` by an upstream model server — we cannot assert anything about how those parse.
+TOLERANT_SURFACES = ("db", "api_response", "gateway", "proxy_response")
 
-    This needs no hand-written input: the serialization fixture already *is* a valid row, so
-    injecting one unknown key into it produces the exact situation an older reader faces. Covers
-    all of `serialization/db` rather than only the models with an interesting input above, because
-    failing to read a `VolumeProvisioningData` row is a distinct bug from failing to read a
-    `RunSpec` row.
+# Same trick, opposite expectation: these are read with extra="forbid", so the injected key must
+# be an error rather than be dropped.
+FORBIDDING_SURFACES = ("api_request",)
+
+_TOLERANCE_CASES = [c for c in ser._CASES if c[0] in TOLERANT_SURFACES]
+_FORBID_CASES = [c for c in ser._CASES if c[0] in FORBIDDING_SURFACES]
+
+
+class TestUnknownFieldTolerance:
+    """Failing to read one model is a distinct bug from failing to read another, so cover all."""
+
+    @pytest.mark.parametrize(("surface", "name"), _TOLERANCE_CASES, ids=_case_id)
+    def test_unknown_field_is_dropped(self, surface, name):
+        # The payload is produced from the factory rather than read from the committed fixture:
+        # the fixture is already pinned by `test_serialization`, and reading it here would make
+        # this test depend on that one having run first — which it has not, since `test_parsing`
+        # collects earlier.
+        #
+        # Compare perturbed against the *same payload parsed without* the extra key rather than
+        # against the payload itself. Parsing validates, and validation coerces defaults that were
+        # never validated on the way out — `Volume.cost: float = 0` holds an int until something
+        # parses it — so comparing to the input would fail for unrelated reasons.
+        registry, dump = ser.SURFACES[surface]
+        model = type(registry[name]())
+        payload = json.loads(ser.serialize(surface, name))
+        baseline = parse_ignore_extra(model, payload)
+        perturbed = parse_ignore_extra(model, {**payload, "unknown_from_a_newer_writer": {"x": 1}})
+        assert canonicalize(dump(perturbed)) == canonicalize(dump(baseline))
+
+
+class TestUnknownFieldRejection:
+    """
+    The mirror image, and the reason the two lists are separate.
+
+    Forbidding extra fields is what makes `dstack apply` report a typo'd key instead of ignoring
+    it. The v2 `CoreModel` forbids by default with a per-call `extra="ignore"` override, so the
+    regression to guard against is that override leaking onto a surface listed here.
     """
 
-    @pytest.mark.parametrize("name", sorted(SERIALIZED_DB_BLOBS))
-    def test_unknown_field_is_dropped(self, name):
-        committed = (FIXTURES_DIR / "serialization" / "db" / f"{name}.json").read_text()
-        perturbed = {**json.loads(committed), "unknown_from_a_newer_writer": {"x": [1]}}
-        parsed = parse_ignore_extra(type(SERIALIZED_DB_BLOBS[name]()), perturbed)
-        assert canonicalize(parsed.json()) == canonicalize(committed)
+    @pytest.mark.parametrize(("surface", "name"), _FORBID_CASES, ids=_case_id)
+    def test_unknown_field_is_rejected(self, surface, name):
+        registry, _ = ser.SURFACES[surface]
+        perturbed = {**json.loads(ser.serialize(surface, name)), "definitely_not_a_field": 1}
+        with pytest.raises(Exception, match="(?i)extra"):
+            parse_forbid_extra(type(registry[name]()), perturbed)
 
 
 class TestApiRequestParsing:
@@ -171,9 +230,9 @@ class TestRunnerResponseParsing:
 
 
 class TestGatewayRequestParsing:
-    @pytest.mark.parametrize("name", sorted(GATEWAY_REQUESTS))
+    @pytest.mark.parametrize("name", sorted(GATEWAY_PAYLOADS))
     def test_parses_to_expected_values_and_types(self, name, regen):
-        model = GATEWAY_REQUESTS[name].parse_obj(_load_input("gateway", name))
+        model = parse_ignore_extra(GATEWAY_PAYLOADS[name], _load_input("gateway", name))
         _assert_parses("gateway", name, model, regen)
 
 

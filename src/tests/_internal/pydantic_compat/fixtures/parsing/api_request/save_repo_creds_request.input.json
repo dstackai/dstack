@@ -1,0 +1,8 @@
+{
+  "repo_id": "3f8a1c2e9b7d4a5f",
+  "repo_info": {"repo_type": "remote", "repo_name": "llm-training"},
+  "repo_creds": {
+    "clone_url": "https://github.com/example-org/llm-training.git",
+    "oauth_token": "gho_16C7e42F292c6912E7710c838347Ae178B4a"
+  }
+}

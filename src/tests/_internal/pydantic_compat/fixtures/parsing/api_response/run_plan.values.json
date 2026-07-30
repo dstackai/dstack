@@ -1,0 +1,242 @@
+{
+  "action": "create",
+  "current_resource": null,
+  "effective_run_spec": null,
+  "job_plans": [
+    {
+      "job_spec": {
+        "app_specs": null,
+        "commands": [
+          "/bin/bash",
+          "-i",
+          "-c",
+          "accelerate launch train.py"
+        ],
+        "env": {
+          "WANDB_PROJECT": "llm-training"
+        },
+        "file_archives": [],
+        "home_dir": null,
+        "image_name": "dstackai/base:py3.11-0.9-cuda-12.1",
+        "job_name": "llama-70b-sft-0-0",
+        "job_num": 0,
+        "jobs_per_replica": 1,
+        "max_duration": 259200,
+        "privileged": false,
+        "probes": [],
+        "registry_auth": null,
+        "replica_group": "0",
+        "replica_num": 0,
+        "repo_code_hash": null,
+        "repo_data": null,
+        "repo_dir": "/workflow",
+        "repo_exists_action": null,
+        "requirements": {
+          "backend_options": null,
+          "max_price": null,
+          "multinode": null,
+          "reservation": null,
+          "resources": {
+            "cpu": {
+              "max": null,
+              "min": 2
+            },
+            "disk": {
+              "size": {
+                "max": null,
+                "min": 100.0
+              }
+            },
+            "gpu": {
+              "compute_capability": null,
+              "count": {
+                "max": 8,
+                "min": 8
+              },
+              "memory": null,
+              "name": [
+                "A100"
+              ],
+              "total_memory": null,
+              "vendor": null
+            },
+            "memory": {
+              "max": null,
+              "min": 8.0
+            },
+            "shm_size": null
+          },
+          "spot": false
+        },
+        "retry": null,
+        "service_port": null,
+        "single_branch": null,
+        "ssh_key": null,
+        "stop_duration": null,
+        "user": null,
+        "utilization_policy": null,
+        "volumes": null,
+        "working_dir": "/workflow"
+      },
+      "max_price": 32.7726,
+      "offers": [
+        {
+          "availability": "available",
+          "availability_zones": null,
+          "backend": "aws",
+          "backend_data": {},
+          "blocks": 1,
+          "instance": {
+            "name": "p4d.24xlarge",
+            "resources": {
+              "cpu_arch": null,
+              "cpus": 96,
+              "description": "96xCPU, 1152GB, 8xA100 (40GB)",
+              "disk": {
+                "size_mib": 8388608
+              },
+              "gpus": [
+                {
+                  "memory_mib": 40960,
+                  "name": "A100",
+                  "vendor": "nvidia"
+                }
+              ],
+              "memory_mib": 1179648,
+              "spot": false
+            }
+          },
+          "instance_runtime": "shim",
+          "price": 32.7726,
+          "region": "us-east-1",
+          "total_blocks": 1
+        }
+      ],
+      "total_offers": 1
+    }
+  ],
+  "project_name": "main",
+  "run_spec": {
+    "configuration": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "commands": [
+        "accelerate launch train.py"
+      ],
+      "creation_policy": null,
+      "docker": null,
+      "dstack": false,
+      "entrypoint": null,
+      "env": {},
+      "files": [],
+      "fleets": null,
+      "home_dir": "/root",
+      "idle_duration": null,
+      "image": null,
+      "instance_types": null,
+      "instances": null,
+      "max_duration": null,
+      "max_price": null,
+      "name": "llama-70b-sft",
+      "nodes": 2,
+      "nvcc": null,
+      "ports": [],
+      "priority": null,
+      "privileged": false,
+      "python": "3.11",
+      "regions": null,
+      "registry_auth": null,
+      "repos": [],
+      "reservation": null,
+      "resources": {
+        "cpu": {
+          "max": null,
+          "min": 2
+        },
+        "disk": {
+          "size": {
+            "max": null,
+            "min": 100.0
+          }
+        },
+        "gpu": {
+          "compute_capability": null,
+          "count": {
+            "max": 8,
+            "min": 8
+          },
+          "memory": null,
+          "name": [
+            "A100"
+          ],
+          "total_memory": null,
+          "vendor": null
+        },
+        "memory": {
+          "max": null,
+          "min": 8.0
+        },
+        "shm_size": null
+      },
+      "retry": null,
+      "schedule": null,
+      "setup": [],
+      "shell": null,
+      "single_branch": null,
+      "spot_policy": null,
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "type": "task",
+      "user": null,
+      "utilization_policy": null,
+      "volumes": [],
+      "working_dir": null
+    },
+    "configuration_path": ".dstack/train.yml",
+    "file_archives": [],
+    "profile": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": [
+        "aws"
+      ],
+      "creation_policy": null,
+      "default": false,
+      "fleets": null,
+      "idle_duration": null,
+      "instance_types": null,
+      "instances": null,
+      "max_duration": null,
+      "max_price": null,
+      "name": "prod",
+      "regions": null,
+      "reservation": null,
+      "retry": null,
+      "schedule": null,
+      "spot_policy": null,
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "utilization_policy": null
+    },
+    "repo_code_hash": null,
+    "repo_data": {
+      "repo_branch": "main",
+      "repo_config_email": null,
+      "repo_config_name": null,
+      "repo_hash": "9f2c1a7",
+      "repo_name": "llm-training",
+      "repo_type": "remote"
+    },
+    "repo_dir": null,
+    "repo_id": "3f8a1c2e9b7d4a5f",
+    "run_name": "llama-70b-sft",
+    "ssh_key_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 alice@example.com",
+    "working_dir": null
+  },
+  "user": "alice"
+}

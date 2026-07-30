@@ -1,0 +1,10 @@
+{
+  "id": "9c2f7b31-5e4a-4d8c-9f01-2b3c4d5e6f70",
+  "username": "alice",
+  "created_at": "2025-03-14T09:26:53+00:00",
+  "global_role": "user",
+  "email": "alice@example.com",
+  "active": true,
+  "permissions": {"can_create_projects": true},
+  "creds": {"token": "0a1b2c3d-4e5f-6071-8293-a4b5c6d7e8f9"}
+}

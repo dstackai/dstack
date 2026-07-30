@@ -1,0 +1,5 @@
+{
+  "termination_message": "max duration exceeded",
+  "termination_reason": "MAX_DURATION_EXCEEDED",
+  "timeout": 10
+}

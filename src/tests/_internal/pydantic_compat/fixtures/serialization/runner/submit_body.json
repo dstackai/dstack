@@ -39,25 +39,27 @@
         "docker": null,
         "dstack": false,
         "entrypoint": null,
-        "env": {},
+        "env": {
+          "HF_TOKEN": "secret"
+        },
         "files": [],
         "fleets": null,
         "home_dir": "/root",
         "ide": "vscode",
         "idle_duration": null,
         "image": null,
-        "inactivity_duration": null,
+        "inactivity_duration": 3600,
         "init": [],
         "instance_types": null,
         "instances": null,
         "max_duration": null,
         "max_price": null,
-        "name": null,
+        "name": "test-dev",
         "nvcc": null,
         "ports": [],
         "priority": null,
         "privileged": false,
-        "python": null,
+        "python": "3.11",
         "regions": null,
         "registry_auth": null,
         "repos": [],
@@ -88,7 +90,7 @@
             "max": null,
             "min": 16.0
           },
-          "shm_size": null
+          "shm_size": 1024.0
         },
         "retry": null,
         "schedule": null,
@@ -101,11 +103,11 @@
         "stop_duration": null,
         "tags": null,
         "type": "dev-environment",
-        "user": null,
+        "user": "ubuntu",
         "utilization_policy": null,
-        "version": null,
+        "version": "1.85.0",
         "volumes": [],
-        "working_dir": null
+        "working_dir": "/workflow"
       },
       "configuration_path": "dstack.yaml",
       "repo_data": {
@@ -125,25 +127,27 @@
       "docker": null,
       "dstack": false,
       "entrypoint": null,
-      "env": {},
+      "env": {
+        "HF_TOKEN": "secret"
+      },
       "files": [],
       "fleets": null,
       "home_dir": "/root",
       "ide": "vscode",
       "idle_duration": null,
       "image": null,
-      "inactivity_duration": null,
+      "inactivity_duration": 3600,
       "init": [],
       "instance_types": null,
       "instances": null,
       "max_duration": null,
       "max_price": null,
-      "name": null,
+      "name": "test-dev",
       "nvcc": null,
       "ports": [],
       "priority": null,
       "privileged": false,
-      "python": null,
+      "python": "3.11",
       "regions": null,
       "registry_auth": null,
       "repos": [],
@@ -174,7 +178,7 @@
           "max": null,
           "min": 16.0
         },
-        "shm_size": null
+        "shm_size": 1024.0
       },
       "retry": null,
       "schedule": null,
@@ -187,11 +191,11 @@
       "stop_duration": null,
       "tags": null,
       "type": "dev-environment",
-      "user": null,
+      "user": "ubuntu",
       "utilization_policy": null,
-      "version": null,
+      "version": "1.85.0",
       "volumes": [],
-      "working_dir": null
+      "working_dir": "/workflow"
     },
     "configuration_path": "dstack.yaml",
     "repo_data": {

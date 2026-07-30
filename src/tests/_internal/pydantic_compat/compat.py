@@ -36,6 +36,11 @@ def parse_ignore_extra(model: Any, data: Any) -> BaseModel:
     Unknown fields are dropped, which is what lets an older reader survive a newer writer, so it
     is the behaviour the whole migration has to preserve.
     """
+    if not hasattr(model, "__response__"):
+        # Plain `BaseModel` rather than `CoreModel` — the proxy and gateway schemas. Their default
+        # is already extra="ignore" in both pydantic versions, so `parse_obj` is the ignore path
+        # and there is no duality variant to reach for.
+        return model.parse_obj(data)
     if PYDANTIC_V1:
         return model.__response__.parse_obj(data)
     # v2: from dstack._internal.core.models.common import validate_extra_ignore

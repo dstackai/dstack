@@ -1,0 +1,100 @@
+{
+  "action": "create",
+  "current_resource": null,
+  "effective_spec": null,
+  "max_offer_price": 32.7726,
+  "offers": [
+    {
+      "availability": "available",
+      "availability_zones": null,
+      "backend": "aws",
+      "backend_data": {},
+      "blocks": 1,
+      "instance": {
+        "name": "p4d.24xlarge",
+        "resources": {
+          "cpu_arch": null,
+          "cpus": 96,
+          "description": "96xCPU, 1152GB, 8xA100 (40GB)",
+          "disk": {
+            "size_mib": 8388608
+          },
+          "gpus": [
+            {
+              "memory_mib": 40960,
+              "name": "A100",
+              "vendor": "nvidia"
+            }
+          ],
+          "memory_mib": 1179648,
+          "spot": false
+        }
+      },
+      "instance_runtime": "shim",
+      "price": 32.7726,
+      "region": "us-east-1",
+      "total_blocks": 1
+    }
+  ],
+  "project_name": "main",
+  "spec": {
+    "autocreated": false,
+    "configuration": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": [
+        "aws"
+      ],
+      "blocks": 1,
+      "env": {},
+      "idle_duration": null,
+      "instance_types": [
+        "p4d.24xlarge"
+      ],
+      "max_price": null,
+      "name": "research-cluster",
+      "nodes": {
+        "max": 8,
+        "min": 2
+      },
+      "placement": "cluster",
+      "regions": [
+        "us-east-1"
+      ],
+      "reservation": null,
+      "resources": null,
+      "retry": null,
+      "spot_policy": "on-demand",
+      "ssh_config": null,
+      "tags": null,
+      "type": "fleet"
+    },
+    "configuration_path": ".dstack/fleets/research.yml",
+    "profile": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "creation_policy": null,
+      "default": false,
+      "fleets": null,
+      "idle_duration": null,
+      "instance_types": null,
+      "instances": null,
+      "max_duration": null,
+      "max_price": null,
+      "name": "prod",
+      "regions": null,
+      "reservation": null,
+      "retry": null,
+      "schedule": null,
+      "spot_policy": "on-demand",
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "utilization_policy": null
+    }
+  },
+  "total_offers": 1,
+  "user": "alice"
+}

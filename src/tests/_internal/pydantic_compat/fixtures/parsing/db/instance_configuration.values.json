@@ -1,0 +1,17 @@
+{
+  "instance_id": "i-0abc123def4567890",
+  "instance_name": "main-fleet-0",
+  "project_name": "main",
+  "reservation": "cr-0abc123def4567890",
+  "ssh_keys": [
+    {
+      "private": null,
+      "public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 alice@example.com"
+    }
+  ],
+  "tags": {
+    "team": "research"
+  },
+  "user": "alice",
+  "volumes": null
+}

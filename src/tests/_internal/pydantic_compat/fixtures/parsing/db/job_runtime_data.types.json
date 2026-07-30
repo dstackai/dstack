@@ -1,0 +1,5 @@
+{
+  "/": "JobRuntimeData",
+  "/memory": "Memory",
+  "/network_mode": "NetworkMode"
+}

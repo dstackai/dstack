@@ -1,0 +1,4 @@
+{
+  "/": "TaskInfoResponse",
+  "/status": "TaskStatus"
+}
