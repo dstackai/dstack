@@ -8,12 +8,16 @@ of accepting a wire change — every accepted diff shows up in review as a fixtu
 Layout is `fixtures/<direction>/<surface>/<model>[.<variant>].<role>`:
 
 - direction: `serialization` or `parsing`
-- surface: `db`, `api_request`, `api_response`, `config`
+- surface: the boundary, e.g. `db`, `backend_config`, `api_request`, `config`. The registries in
+  `test_serialization.py` are the list
 - variant: omitted while a model has only one case; added to *every* case for that model as soon
   as a second one exists, so `volume.input.yml` becomes `volume.size.input.yml` and
   `volume.kubernetes.input.yml` together
 - role: `input` for hand-written parse inputs, `values` / `types` for generated expectations, and
   a bare `.json` for serialization fixtures, which need no input
+
+`fixtures/schema/` is the exception: the published JSON Schemas have no surface or role level, so
+it is `fixtures/schema/<name>.json`. See `test_schema.py`.
 """
 
 import difflib
@@ -53,7 +57,7 @@ def canonicalize(payload: Union[bytes, str]) -> str:
 
 
 def assert_matches_fixture(kind: str, name: str, payload: Union[bytes, str], regen: bool) -> None:
-    """Compare a serialized payload against `fixtures/<kind>/<name>.json`."""
+    """Compare a JSON payload against `fixtures/<kind>/<name>.json`."""
     path = FIXTURES_DIR / kind / f"{name}.json"
     actual = canonicalize(payload)
 
@@ -75,7 +79,7 @@ def assert_matches_fixture(kind: str, name: str, payload: Union[bytes, str], reg
                 tofile=f"{kind}/{name}.json (actual)",
             )
         )
-        pytest.fail(f"{kind}/{name} serialization changed:\n{diff}\n{_REGEN_HINT}")
+        pytest.fail(f"{kind}/{name} changed:\n{diff}\n{_REGEN_HINT}")
 
 
 def type_map(value: Any, path: str = "", out: Union[dict, None] = None) -> dict:
