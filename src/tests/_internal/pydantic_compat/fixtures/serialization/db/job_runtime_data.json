@@ -1,0 +1,16 @@
+{
+  "cpu": 2.0,
+  "gpu": 1,
+  "memory": 17179869184.0,
+  "network_mode": "host",
+  "offer": null,
+  "ports": {
+    "8080": 30080,
+    "8081": 30081
+  },
+  "username": "ubuntu",
+  "volume_names": [
+    "test-volume"
+  ],
+  "working_dir": "/workflow"
+}

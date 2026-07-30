@@ -1,0 +1,60 @@
+{
+  "backends": [],
+  "created_at": null,
+  "is_public": false,
+  "members": [
+    {
+      "permissions": {
+        "can_manage_secrets": false,
+        "can_manage_ssh_fleets": true
+      },
+      "project_role": "admin",
+      "user": {
+        "active": true,
+        "created_at": null,
+        "email": "alice@example.com",
+        "global_role": "admin",
+        "id": "9c2f7b31-5e4a-4d8c-9f01-2b3c4d5e6f70",
+        "permissions": {
+          "can_create_projects": true
+        },
+        "ssh_public_key": null,
+        "username": "alice"
+      }
+    },
+    {
+      "permissions": {
+        "can_manage_secrets": false,
+        "can_manage_ssh_fleets": false
+      },
+      "project_role": "user",
+      "user": {
+        "active": true,
+        "created_at": null,
+        "email": null,
+        "global_role": "user",
+        "id": "5d6e7f80-9a1b-4c2d-8e3f-4a5b6c7d8e9f",
+        "permissions": {
+          "can_create_projects": false
+        },
+        "ssh_public_key": null,
+        "username": "bob"
+      }
+    }
+  ],
+  "owner": {
+    "active": true,
+    "created_at": "2025-01-08T11:02:41+00:00",
+    "email": "alice@example.com",
+    "global_role": "admin",
+    "id": "9c2f7b31-5e4a-4d8c-9f01-2b3c4d5e6f70",
+    "permissions": {
+      "can_create_projects": true
+    },
+    "ssh_public_key": null,
+    "username": "alice"
+  },
+  "project_id": "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9",
+  "project_name": "main",
+  "templates_repo": null
+}

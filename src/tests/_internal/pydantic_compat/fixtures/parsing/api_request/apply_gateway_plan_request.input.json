@@ -1,0 +1,16 @@
+{
+  "plan": {
+    "spec": {
+      "configuration": {
+        "type": "gateway",
+        "name": "prod-gateway",
+        "backend": "aws",
+        "region": "eu-west-1",
+        "domain": "inference.example.com",
+        "certificate": {"type": "lets-encrypt"}
+      },
+      "configuration_path": ".dstack/gateway.yml"
+    }
+  },
+  "force": false
+}

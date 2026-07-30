@@ -1,0 +1,27 @@
+{
+  "clusters": [
+    {
+      "cpu_partitions": [
+        "cpu"
+      ],
+      "gpu_partitions": [
+        {
+          "gpu": "H100",
+          "partitions": [
+            "gpu",
+            "gpu-long"
+          ]
+        }
+      ],
+      "hostname": "login.hpc.example.com",
+      "name": "hpc-1",
+      "port": 22,
+      "private_key": {
+        "content": "-----BEGIN PRIVATE KEY-----\nMIIBVgIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n",
+        "path": ""
+      },
+      "user": "dstack"
+    }
+  ],
+  "type": "slurm"
+}

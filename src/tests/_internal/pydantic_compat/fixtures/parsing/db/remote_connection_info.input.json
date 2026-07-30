@@ -1,0 +1,7 @@
+{
+  "host": "192.168.100.14",
+  "port": 22,
+  "ssh_user": "ubuntu",
+  "ssh_keys": [{"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 ops@example.com"}],
+  "env": {"CUDA_VISIBLE_DEVICES": "0,1"}
+}

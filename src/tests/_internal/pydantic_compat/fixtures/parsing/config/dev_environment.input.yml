@@ -1,0 +1,11 @@
+# The sixth `.dstack.yml` type. `ide` is a Literal union and `inactivity_duration` a Duration
+# shorthand, neither of which the other config inputs exercise.
+type: dev-environment
+ide: vscode
+python: 3.11
+inactivity_duration: 1h
+resources:
+  gpu: 24GB..80GB
+  shm_size: 16GB
+env:
+  HF_TOKEN: secret

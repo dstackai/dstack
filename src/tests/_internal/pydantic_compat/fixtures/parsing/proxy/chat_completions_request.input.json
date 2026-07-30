@@ -1,0 +1,7 @@
+{
+  "model": "llama",
+  "messages": [{"role": "user", "content": "hi"}],
+  "stop": "\n",
+  "tool_choice": "auto",
+  "extra_param_a_newer_caller_sent": 1
+}

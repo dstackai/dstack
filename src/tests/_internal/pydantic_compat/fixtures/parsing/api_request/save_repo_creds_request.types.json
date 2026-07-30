@@ -1,0 +1,5 @@
+{
+  "/": "SaveRepoCredsRequest",
+  "/repo_creds": "RemoteRepoCreds",
+  "/repo_info": "RemoteRepoInfo"
+}

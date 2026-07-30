@@ -1,0 +1,13 @@
+{
+  "messages": [
+    {
+      "content": "hi",
+      "role": "user"
+    }
+  ],
+  "model": "llama",
+  "stop": [
+    "\n"
+  ],
+  "temperature": 0.7
+}

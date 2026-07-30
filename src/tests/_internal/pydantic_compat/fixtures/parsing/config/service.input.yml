@@ -1,0 +1,6 @@
+# `model: <name>` is the shorthand a discriminator cannot read on its own; it survives only
+# because `convert_model` is a pre-validator. Phase 0 item 2 added that discriminator.
+type: service
+commands: [echo hi]
+port: 8000
+model: llama

@@ -1,0 +1,23 @@
+{
+  "creds": {
+    "filename": null,
+    "private_key_content": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIF9mYWtlTmViaXVzS2V5Q29udGVudEZvclRlc3Rz\n-----END PRIVATE KEY-----\n",
+    "private_key_file": null,
+    "public_key_id": "publickey-e00fake5f3a9c3e5f7b2d",
+    "service_account_id": "serviceaccount-e00fake9c2e8b1d4706",
+    "type": "service_account"
+  },
+  "fabrics": null,
+  "projects": [
+    "project-e00fake9c2e8b1d4706",
+    "project-e01fake5f3a9c3e5f7b"
+  ],
+  "regions": [
+    "eu-north1",
+    "eu-west1"
+  ],
+  "tags": {
+    "env": "prod"
+  },
+  "type": "nebius"
+}

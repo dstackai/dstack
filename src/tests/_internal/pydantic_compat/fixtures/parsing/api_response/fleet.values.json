@@ -1,0 +1,61 @@
+{
+  "created_at": "2024-01-02T03:04:05+00:00",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "instances": [],
+  "name": "test-fleet",
+  "project_name": "test-project",
+  "spec": {
+    "autocreated": false,
+    "configuration": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "blocks": 1,
+      "env": {},
+      "idle_duration": null,
+      "instance_types": null,
+      "max_price": null,
+      "name": "test-fleet",
+      "nodes": {
+        "max": 1,
+        "min": 1
+      },
+      "placement": null,
+      "regions": null,
+      "reservation": null,
+      "resources": null,
+      "retry": null,
+      "spot_policy": null,
+      "ssh_config": null,
+      "tags": null,
+      "type": "fleet"
+    },
+    "configuration_path": "fleet.dstack.yml",
+    "profile": {
+      "availability_zones": null,
+      "backend_options": null,
+      "backends": null,
+      "creation_policy": null,
+      "default": false,
+      "fleets": null,
+      "idle_duration": null,
+      "instance_types": null,
+      "instances": null,
+      "max_duration": null,
+      "max_price": null,
+      "name": "default",
+      "regions": null,
+      "reservation": null,
+      "retry": null,
+      "schedule": null,
+      "spot_policy": null,
+      "startup_order": null,
+      "stop_criteria": null,
+      "stop_duration": null,
+      "tags": null,
+      "utilization_policy": null
+    }
+  },
+  "status": "active",
+  "status_message": null
+}

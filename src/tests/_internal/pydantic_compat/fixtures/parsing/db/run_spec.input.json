@@ -1,0 +1,16 @@
+{
+  "run_name": "test-run",
+  "repo_id": "test-repo",
+  "repo_data": {"repo_type": "local", "repo_dir": "/"},
+  "configuration_path": "dstack.yaml",
+  "configuration": {
+    "type": "task",
+    "commands": ["echo hi"],
+    "python": "3.10",
+    "resources": {"cpu": "2..8", "memory": "16GB.."},
+    "env": ["A=1", "B"]
+  },
+  "profile": {"name": "default", "max_duration": "2h"},
+  "ssh_key_pub": "user_ssh_key",
+  "unknown_field_from_a_newer_server": {"nested": [1, 2]}
+}

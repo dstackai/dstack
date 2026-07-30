@@ -1,0 +1,16 @@
+{
+  "env": {
+    "CUDA_VISIBLE_DEVICES": "0,1"
+  },
+  "host": "192.168.100.14",
+  "port": 22,
+  "ssh_keys": [
+    {
+      "private": null,
+      "public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 ops@example.com"
+    }
+  ],
+  "ssh_proxy": null,
+  "ssh_proxy_keys": null,
+  "ssh_user": "ubuntu"
+}

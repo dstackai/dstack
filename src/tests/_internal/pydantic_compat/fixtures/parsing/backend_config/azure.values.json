@@ -1,0 +1,21 @@
+{
+  "creds": {
+    "client_id": "3f8c1d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
+    "client_secret": "Abc8Q~fakeAzureClientSecretValue_0123",
+    "tenant_id": "3f8c1d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
+    "type": "client"
+  },
+  "public_ips": true,
+  "regions": [
+    "eastus",
+    "westeurope"
+  ],
+  "resource_group": "",
+  "subnet_ids": null,
+  "subscription_id": "9c2e8b1d-4706-4a9c-8e5f-7b2d8a4c6e1f",
+  "tags": null,
+  "tenant_id": "3f8c1d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
+  "type": "azure",
+  "vm_managed_identity": null,
+  "vpc_ids": null
+}

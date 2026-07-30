@@ -1,0 +1,27 @@
+{
+  "id": "e7f80912-3a4b-4c5d-9e6f-708192a3b4c5",
+  "name": "training-data",
+  "user": "alice",
+  "project_name": "main",
+  "configuration": {
+    "backend": "aws",
+    "name": "training-data",
+    "region": "us-east-1",
+    "size": 500.0
+  },
+  "external": false,
+  "created_at": "2025-04-02T16:41:07+00:00",
+  "last_processed_at": "2025-04-02T16:41:22+00:00",
+  "status": "active",
+  "deleted": false,
+  "volume_id": "vol-0fe1a2b3c4d5e6f78",
+  "provisioning_data": {
+    "backend": "aws",
+    "volume_id": "vol-0fe1a2b3c4d5e6f78",
+    "size_gb": 500,
+    "availability_zone": "us-east-1a",
+    "attachable": true,
+    "detachable": true
+  },
+  "cost": 42.5
+}

@@ -1,0 +1,17 @@
+{
+  "/": "TaskConfiguration",
+  "/env": "Env",
+  "/env/__root__/B": "EnvSentinel",
+  "/max_duration": "Duration",
+  "/python": "PythonVersion",
+  "/resources": "ResourcesSpec",
+  "/resources/cpu": "CPUSpec",
+  "/resources/cpu/count": "Range[int]",
+  "/resources/disk": "DiskSpec",
+  "/resources/disk/size": "Range[Memory]",
+  "/resources/disk/size/min": "Memory",
+  "/resources/gpu": "GPUSpec",
+  "/resources/gpu/count": "Range[int]",
+  "/resources/memory": "Range[Memory]",
+  "/resources/memory/min": "Memory"
+}

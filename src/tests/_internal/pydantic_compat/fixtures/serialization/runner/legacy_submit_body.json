@@ -1,0 +1,17 @@
+{
+  "container_name": "test-container",
+  "container_user": "root",
+  "image_name": "dstackai/base:latest",
+  "instance_mounts": [],
+  "mounts": [],
+  "password": "",
+  "privileged": false,
+  "public_keys": [
+    "ssh-rsa PUBLIC"
+  ],
+  "shm_size": 1073741824,
+  "ssh_key": "ssh-rsa SSH",
+  "ssh_user": "ubuntu",
+  "username": "",
+  "volumes": []
+}

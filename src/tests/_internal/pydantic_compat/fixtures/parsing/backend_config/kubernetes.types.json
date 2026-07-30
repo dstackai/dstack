@@ -1,0 +1,6 @@
+{
+  "/": "KubernetesConfig",
+  "/contexts/1": "KubernetesContextConfig",
+  "/contexts/1/proxy_jump": "KubernetesProxyJumpConfig",
+  "/kubeconfig": "KubeconfigConfig"
+}

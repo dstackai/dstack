@@ -1,0 +1,8 @@
+{
+  "backend": "aws",
+  "volume_id": "vol-0fe1a2b3c4d5e6f78",
+  "size_gb": 500,
+  "availability_zone": "us-east-1a",
+  "attachable": true,
+  "detachable": true
+}

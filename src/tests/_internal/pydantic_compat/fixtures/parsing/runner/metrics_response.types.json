@@ -1,0 +1,4 @@
+{
+  "/": "MetricsResponse",
+  "/gpus/0": "GPUMetrics"
+}

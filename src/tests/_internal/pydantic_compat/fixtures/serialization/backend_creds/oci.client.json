@@ -1,0 +1,10 @@
+{
+  "fingerprint": "12:34:56:78:9a:bc:de:f0:12:34:56:78:9a:bc:de:f0",
+  "key_content": "-----BEGIN PRIVATE KEY-----\nMIIBVgIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n",
+  "key_file": null,
+  "pass_phrase": null,
+  "region": "eu-frankfurt-1",
+  "tenancy": "ocid1.tenancy.oc1..aaaaaaaadstack",
+  "type": "client",
+  "user": "ocid1.user.oc1..aaaaaaaadstack"
+}

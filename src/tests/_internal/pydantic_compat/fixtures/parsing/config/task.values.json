@@ -1,0 +1,83 @@
+{
+  "availability_zones": null,
+  "backend_options": null,
+  "backends": null,
+  "commands": [
+    "echo hi"
+  ],
+  "creation_policy": null,
+  "docker": null,
+  "dstack": false,
+  "entrypoint": null,
+  "env": {
+    "A": "1",
+    "B": {
+      "key": "B"
+    }
+  },
+  "files": [],
+  "fleets": null,
+  "home_dir": "/root",
+  "idle_duration": -1,
+  "image": null,
+  "instance_types": null,
+  "instances": null,
+  "max_duration": 7200,
+  "max_price": null,
+  "name": null,
+  "nodes": 2,
+  "nvcc": null,
+  "ports": [],
+  "priority": null,
+  "privileged": false,
+  "python": "3.10",
+  "regions": null,
+  "registry_auth": null,
+  "repos": [],
+  "reservation": null,
+  "resources": {
+    "cpu": {
+      "max": 8,
+      "min": 2
+    },
+    "disk": {
+      "size": {
+        "max": null,
+        "min": 100.0
+      }
+    },
+    "gpu": {
+      "compute_capability": null,
+      "count": {
+        "max": 2,
+        "min": 2
+      },
+      "memory": null,
+      "name": [
+        "A100"
+      ],
+      "total_memory": null,
+      "vendor": null
+    },
+    "memory": {
+      "max": null,
+      "min": 16.0
+    },
+    "shm_size": null
+  },
+  "retry": null,
+  "schedule": null,
+  "setup": [],
+  "shell": null,
+  "single_branch": null,
+  "spot_policy": null,
+  "startup_order": null,
+  "stop_criteria": null,
+  "stop_duration": null,
+  "tags": null,
+  "type": "task",
+  "user": null,
+  "utilization_policy": null,
+  "volumes": [],
+  "working_dir": null
+}

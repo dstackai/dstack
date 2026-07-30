@@ -1,0 +1,24 @@
+{
+  "plan": {
+    "run_spec": {
+      "run_name": "llama-70b-sft",
+      "repo_id": "3f8a1c2e9b7d4a5f",
+      "repo_data": {"repo_type": "remote", "repo_name": "llm-training", "repo_branch": "main", "repo_hash": "9f2c1a7"},
+      "repo_code_hash": "4b8e2d1f6a3c9075",
+      "configuration_path": ".dstack/train.yml",
+      "configuration": {
+        "type": "task",
+        "name": "llama-70b-sft",
+        "commands": ["accelerate launch train.py --model llama-3.1-70b"],
+        "nodes": 2,
+        "python": "3.11",
+        "env": ["HF_TOKEN", "WANDB_PROJECT=llm-training"],
+        "resources": {"gpu": "A100:8", "memory": "512GB..", "disk": "1TB.."},
+        "max_duration": "3d"
+      },
+      "profile": {"name": "prod", "backends": ["aws"], "spot_policy": "on-demand", "max_duration": "3d"},
+      "ssh_key_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 alice@example.com"
+    }
+  },
+  "force": false
+}

@@ -1,0 +1,9 @@
+{
+  "project_name": "main",
+  "run_name": "llama-70b",
+  "stats": {
+    "30": {"requests": 412, "request_time": 0.184},
+    "60": {"requests": 847, "request_time": 0.201},
+    "300": {"requests": 4103, "request_time": 0.223}
+  }
+}

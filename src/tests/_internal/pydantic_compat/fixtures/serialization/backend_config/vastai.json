@@ -1,0 +1,8 @@
+{
+  "community_cloud": false,
+  "regions": [
+    "Poland",
+    "Sweden"
+  ],
+  "type": "vastai"
+}

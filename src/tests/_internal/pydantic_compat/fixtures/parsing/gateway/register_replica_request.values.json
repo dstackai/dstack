@@ -1,0 +1,11 @@
+{
+  "app_port": 8000,
+  "internal_ip": null,
+  "job_id": "7d1e4f60-8a2b-4c3d-9e5f-0a1b2c3d4e5f",
+  "ssh_head_proxy": null,
+  "ssh_head_proxy_private_key": null,
+  "ssh_host": "ubuntu@54.221.13.207",
+  "ssh_port": 22,
+  "ssh_proxy": null,
+  "ssh_proxy_private_key": null
+}

@@ -1,0 +1,12 @@
+{
+  "creds": {
+    "api_key": "5F3A9C2E8B1D4706A9C3E5F7B2D8A4C6E1F0A3B5",
+    "type": "api_key"
+  },
+  "regions": [
+    "ewr",
+    "ams",
+    "nrt"
+  ],
+  "type": "vultr"
+}

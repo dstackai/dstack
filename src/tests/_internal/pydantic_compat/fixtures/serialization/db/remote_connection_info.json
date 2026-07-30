@@ -1,0 +1,14 @@
+{
+  "env": {},
+  "host": "10.0.0.10",
+  "port": 22,
+  "ssh_keys": [
+    {
+      "private": "\n                    -----BEGIN OPENSSH PRIVATE KEY-----\n                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n                    QyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpAAAAJCiWa5Volmu\n                    VQAAAAtzc2gtZWQyNTUxOQAAACDupicVWzbZtM14DC7wcq4VyQpiUb3kqycSwefzs3MgpA\n                    AAAEAncHi4AhS6XdMp5Gzd+IMse/4ekyQ54UngByf0Sp0uH+6mJxVbNtm0zXgMLvByrhXJ\n                    CmJRveSrJxLB5/OzcyCkAAAACWRlZkBkZWZwYwECAwQ=\n                    -----END OPENSSH PRIVATE KEY-----\n                ",
+      "public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO6mJxVbNtm0zXgMLvByrhXJCmJRveSrJxLB5/OzcyCk"
+    }
+  ],
+  "ssh_proxy": null,
+  "ssh_proxy_keys": null,
+  "ssh_user": "ubuntu"
+}

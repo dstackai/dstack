@@ -1,0 +1,133 @@
+{
+  "force": false,
+  "plan": {
+    "current_resource": null,
+    "run_spec": {
+      "configuration": {
+        "availability_zones": null,
+        "backend_options": null,
+        "backends": null,
+        "commands": [
+          "accelerate launch train.py --model llama-3.1-70b"
+        ],
+        "creation_policy": null,
+        "docker": null,
+        "dstack": false,
+        "entrypoint": null,
+        "env": {
+          "HF_TOKEN": {
+            "key": "HF_TOKEN"
+          },
+          "WANDB_PROJECT": "llm-training"
+        },
+        "files": [],
+        "fleets": null,
+        "home_dir": "/root",
+        "idle_duration": null,
+        "image": null,
+        "instance_types": null,
+        "instances": null,
+        "max_duration": 259200,
+        "max_price": null,
+        "name": "llama-70b-sft",
+        "nodes": 2,
+        "nvcc": null,
+        "ports": [],
+        "priority": null,
+        "privileged": false,
+        "python": "3.11",
+        "regions": null,
+        "registry_auth": null,
+        "repos": [],
+        "reservation": null,
+        "resources": {
+          "cpu": {
+            "max": null,
+            "min": 2
+          },
+          "disk": {
+            "size": {
+              "max": null,
+              "min": 1024.0
+            }
+          },
+          "gpu": {
+            "compute_capability": null,
+            "count": {
+              "max": 8,
+              "min": 8
+            },
+            "memory": null,
+            "name": [
+              "A100"
+            ],
+            "total_memory": null,
+            "vendor": null
+          },
+          "memory": {
+            "max": null,
+            "min": 512.0
+          },
+          "shm_size": null
+        },
+        "retry": null,
+        "schedule": null,
+        "setup": [],
+        "shell": null,
+        "single_branch": null,
+        "spot_policy": null,
+        "startup_order": null,
+        "stop_criteria": null,
+        "stop_duration": null,
+        "tags": null,
+        "type": "task",
+        "user": null,
+        "utilization_policy": null,
+        "volumes": [],
+        "working_dir": null
+      },
+      "configuration_path": ".dstack/train.yml",
+      "file_archives": [],
+      "profile": {
+        "availability_zones": null,
+        "backend_options": null,
+        "backends": [
+          "aws"
+        ],
+        "creation_policy": null,
+        "default": false,
+        "fleets": null,
+        "idle_duration": null,
+        "instance_types": null,
+        "instances": null,
+        "max_duration": 259200,
+        "max_price": null,
+        "name": "prod",
+        "regions": null,
+        "reservation": null,
+        "retry": null,
+        "schedule": null,
+        "spot_policy": "on-demand",
+        "startup_order": null,
+        "stop_criteria": null,
+        "stop_duration": null,
+        "tags": null,
+        "utilization_policy": null
+      },
+      "repo_code_hash": "4b8e2d1f6a3c9075",
+      "repo_data": {
+        "repo_branch": "main",
+        "repo_config_email": null,
+        "repo_config_name": null,
+        "repo_hash": "9f2c1a7",
+        "repo_name": "llm-training",
+        "repo_type": "remote"
+      },
+      "repo_dir": null,
+      "repo_id": "3f8a1c2e9b7d4a5f",
+      "run_name": "llama-70b-sft",
+      "ssh_key_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 alice@example.com",
+      "working_dir": null
+    }
+  }
+}

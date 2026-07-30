@@ -1,0 +1,12 @@
+{
+  "/": "Volume",
+  "/configuration": "AWSVolumeConfiguration",
+  "/configuration/backend": "BackendType",
+  "/configuration/size": "Memory",
+  "/created_at": "datetime",
+  "/id": "UUID",
+  "/last_processed_at": "datetime",
+  "/provisioning_data": "VolumeProvisioningData",
+  "/provisioning_data/backend": "BackendType",
+  "/status": "VolumeStatus"
+}

@@ -1,0 +1,7 @@
+{
+  "project_name": "dstack",
+  "regions": [
+    "tor1"
+  ],
+  "type": "amddevcloud"
+}

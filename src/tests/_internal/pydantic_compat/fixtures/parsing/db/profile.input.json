@@ -1,0 +1,13 @@
+{
+  "name": "prod",
+  "backends": ["aws", "gcp"],
+  "regions": ["us-east-1", "europe-west4"],
+  "instance_types": ["p4d.24xlarge", "a2-highgpu-8g"],
+  "spot_policy": "auto",
+  "retry": {"on_events": ["no-capacity", "interruption"], "duration": 21600},
+  "max_duration": 259200,
+  "idle_duration": 900,
+  "max_price": 40.0,
+  "creation_policy": "reuse-or-create",
+  "tags": {"team": "research", "cost-center": "ml-platform"}
+}

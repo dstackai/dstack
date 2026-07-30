@@ -1,0 +1,17 @@
+{
+  "backend": "gcp",
+  "instance": {
+    "name": "a2-highgpu-1g",
+    "resources": {
+      "cpus": 12,
+      "memory_mib": 87040,
+      "gpus": [{"name": "A100", "memory_mib": 40960, "vendor": "nvidia"}],
+      "spot": true,
+      "disk": {"size_mib": 102400},
+      "description": "12xCPU, 85GB, 1xA100 (40GB), 100GB (disk)"
+    }
+  },
+  "region": "europe-west4",
+  "price": 1.1213,
+  "availability": "available"
+}

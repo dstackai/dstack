@@ -1,0 +1,12 @@
+{
+  "vm_specs": {
+    "cpu": {
+      "count": 26
+    },
+    "gpu": {
+      "count": 1,
+      "model": "MI300X"
+    },
+    "ram": 224
+  }
+}

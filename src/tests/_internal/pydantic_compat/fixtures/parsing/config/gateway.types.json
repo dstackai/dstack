@@ -1,0 +1,6 @@
+{
+  "/": "GatewayConfiguration",
+  "/backend": "BackendType",
+  "/certificate": "ACMGatewayCertificate",
+  "/router": "SGLangGatewayRouterConfig"
+}

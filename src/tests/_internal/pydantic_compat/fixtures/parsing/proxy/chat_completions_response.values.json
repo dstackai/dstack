@@ -1,0 +1,22 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "hi",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1700000000,
+  "id": "chatcmpl-1",
+  "model": "llama",
+  "object": "chat.completion",
+  "system_fingerprint": "fp_1",
+  "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 3,
+    "total_tokens": 5
+  }
+}

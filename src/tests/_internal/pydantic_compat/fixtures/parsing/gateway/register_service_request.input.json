@@ -1,0 +1,20 @@
+{
+  "run_name": "test-run",
+  "domain": "test-run.example.com",
+  "https": true,
+  "auth": false,
+  "client_max_body_size": 65536,
+  "options": {
+    "openai": {
+      "model": {
+        "type": "chat",
+        "name": "llama",
+        "format": "openai",
+        "prefix": "/v1"
+      }
+    }
+  },
+  "rate_limits": [],
+  "ssh_private_key": "PRIVATE-KEY",
+  "field_added_by_a_newer_server": true
+}

@@ -1,0 +1,17 @@
+{
+  "plan": {
+    "spec": {
+      "configuration": {
+        "type": "fleet",
+        "name": "research-cluster",
+        "nodes": {"min": 2, "max": 8},
+        "placement": "cluster",
+        "backends": ["aws"],
+        "spot_policy": "on-demand"
+      },
+      "configuration_path": ".dstack/fleets/research.yml",
+      "profile": {"name": "prod", "spot_policy": "on-demand"}
+    }
+  },
+  "force": false
+}

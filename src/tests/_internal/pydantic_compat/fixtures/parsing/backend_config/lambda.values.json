@@ -1,0 +1,12 @@
+{
+  "creds": {
+    "api_key": "secret_dstack_9c2e8b1d47065f3a9c3e5f7b2d8a4c6e",
+    "type": "api_key"
+  },
+  "regions": [
+    "us-east-1",
+    "us-west-2",
+    "us-south-1"
+  ],
+  "type": "lambda"
+}

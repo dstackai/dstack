@@ -1,0 +1,5 @@
+{
+  "backend": "aws",
+  "placement_strategy": "cluster",
+  "region": "eu-central-1"
+}
