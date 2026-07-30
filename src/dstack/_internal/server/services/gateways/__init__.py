@@ -37,6 +37,7 @@ from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayLoadBalancerConfiguration,
     GatewayPlan,
     GatewayReplica,
     GatewayReplicaStatus,
@@ -884,6 +885,20 @@ def get_gateway_compute_configuration(
     )
 
 
+def get_gateway_lb_configuration(
+    gateway_model: GatewayModel,
+) -> GatewayLoadBalancerConfiguration:
+    configuration = get_gateway_configuration(gateway_model)
+    return GatewayLoadBalancerConfiguration(
+        project_name=gateway_model.project.name,
+        gateway_name=gateway_model.name,
+        region=configuration.region,
+        public_ip=configuration.public_ip,
+        certificate=configuration.certificate,
+        tags=configuration.tags,
+    )
+
+
 def gateway_model_to_gateway(
     gateway_model: GatewayModel, default_gateway_id: Optional[uuid.UUID]
 ) -> Gateway:
@@ -905,7 +920,6 @@ def gateway_model_to_gateway(
         all_compute_models, key=lambda c: c.replica_num
     ):
         relevant_compute_models.append(max(compute_models_for_num, key=lambda c: c.created_at))
-    gateway_hostname = None
     replicas = []
     for compute in relevant_compute_models:
         replicas.append(
@@ -919,13 +933,12 @@ def gateway_model_to_gateway(
                 status_message=compute.status_message,
             )
         )
-        gateway_hostname = compute.hostname
 
     return Gateway(
         id=gateway_model.id,
         name=gateway_model.name,
         project_name=gateway_model.project.name,
-        hostname=gateway_hostname,
+        hostname=gateway_model.hostname,
         backend=gateway_model.backend.type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
@@ -1129,11 +1142,16 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             )
         if configuration.certificate.type == "acm" and configuration.backend != BackendType.AWS:
             raise ServerClientError("acm certificate type is supported for aws backend only")
-        if replicas > 1:
-            raise ServerClientError(
-                "Replicated gateways do not support certificates."
-                " Set either `certificate: null` or `replicas: 1` in the gateway configuration"
+        if configuration.certificate.type == "lets-encrypt" and replicas > 1:
+            err = (
+                "The `lets-encrypt` certificate type is not supported for gateways with `replicas`"
+                " greater than `1`. To create a replicated gateway, set the `certificate`"
+                " configuration property to one of the supported values, such as"
+                " `certificate: null` (no HTTPS)"
             )
+            if configuration.backend == BackendType.AWS:
+                err += " or `certificate: { type: acm, arn: <arn> }` (AWS ACM)"
+            raise ServerClientError(err)
 
     if configuration.router is not None and replicas > 1:
         raise ServerClientError(

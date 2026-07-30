@@ -14,6 +14,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
     ComputeWithGroupProvisioningSupport,
     ComputeWithInstanceVolumesSupport,
@@ -46,10 +47,12 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
+    AnyGatewayCertificate,
     GatewayComputeConfiguration,
     GatewayConfiguration,
     GatewayReplicaStatus,
     GatewayStatus,
+    LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
@@ -649,6 +652,9 @@ async def create_gateway(
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     forbid_new_services: bool = False,
     populate_configuration: bool = True,
+    certificate: Optional[AnyGatewayCertificate] = LetsEncryptGatewayCertificate(),
+    hostname: Optional[str] = None,
+    backend_data: Optional[str] = None,
 ) -> GatewayModel:
     """
     Args:
@@ -666,6 +672,7 @@ async def create_gateway(
             region=region,
             domain=wildcard_domain,
             replicas=replicas,
+            certificate=certificate,
         ).json()
     gateway = GatewayModel(
         project_id=project_id,
@@ -678,6 +685,8 @@ async def create_gateway(
         desired_replica_count=replicas if replicas is not None else GATEWAY_REPLICAS_DEFAULT,
         last_processed_at=last_processed_at,
         forbid_new_services=forbid_new_services,
+        hostname=hostname,
+        backend_data=backend_data,
     )
     session.add(gateway)
     await session.commit()
@@ -699,6 +708,8 @@ async def create_gateway_compute(
     active: bool = True,
     configuration: Optional[str] = None,
     populate_configuration: bool = True,
+    hostname_deprecated_readonly: Optional[str] = None,
+    backend_data: Optional[str] = None,
 ) -> GatewayComputeModel:
     """
     Args:
@@ -735,6 +746,8 @@ async def create_gateway_compute(
         replica_num=replica_num,
         active=active,
         configuration=configuration,
+        hostname_deprecated_readonly=hostname_deprecated_readonly,
+        backend_data=backend_data,
     )
     session.add(gateway_compute)
     await session.commit()
@@ -1415,6 +1428,7 @@ class ComputeMockSpec(
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
 ):

@@ -8,7 +8,10 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import InstrumentedAttribute, joinedload, load_only
 from sqlalchemy.sql.base import ExecutableOption
 
-from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
+from dstack._internal.core.backends.base.compute import (
+    ComputeWithGatewayLoadBalancerSupport,
+    ComputeWithGatewaySupport,
+)
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -33,7 +36,11 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import gateways as gateways_services
-from dstack._internal.server.services.gateways import get_gateway_compute_configuration
+from dstack._internal.server.services.gateways import (
+    get_gateway_compute_configuration,
+    get_gateway_configuration,
+    get_gateway_lb_configuration,
+)
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -248,7 +255,6 @@ class _GatewayReplicaUpdateMap(ItemUpdateMap, total=False):
     instance_id: Optional[str]
     ip_address: Optional[str]
     region: Optional[str]
-    hostname: Optional[str]
     backend_data: Optional[str]
 
 
@@ -475,7 +481,6 @@ async def _provision_gateway_replica(
         instance_id=gpd.instance_id,
         ip_address=gpd.ip_address,
         region=gpd.region,
-        hostname=gpd.hostname,
         backend_data=gpd.backend_data,
     )
 
@@ -488,8 +493,20 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
             GatewayComputeModel.ip_address,
             GatewayComputeModel.ssh_private_key,
             GatewayComputeModel.scale_in,
+            GatewayComputeModel.instance_id,
+            GatewayComputeModel.backend_id,
+            GatewayComputeModel.configuration,
         ],
-        gateway_fields=_GATEWAY_FIELDS_MIN,
+        gateway_fields=_GATEWAY_FIELDS_MIN
+        + [
+            GatewayModel.configuration,
+            GatewayModel.region,
+            GatewayModel.wildcard_domain,
+            GatewayModel.hostname,
+            GatewayModel.backend_data,
+        ],
+        load_backends=True,
+        load_gateway_backend_type=True,
     )
     if replica_model is None:
         return
@@ -500,25 +517,95 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
     if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
         await _commit_update(item, replica_model, update_map=update_map)
         return
+    if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
+        await _commit_update(item, replica_model, update_map={})
+        return
     error = await _connect_and_configure_gateway_replica(gateway_model, replica_model)
-    if error is None:
-        logger.info(
-            "%s replica %d: running",
-            fmt(gateway_model),
-            replica_model.replica_num,
-        )
-        update_map = _GatewayReplicaUpdateMap(status=GatewayReplicaStatus.RUNNING, active=True)
-    else:
+    if error is not None:
         logger.warning(
             "%s replica %d: provisioning failed: %s",
             fmt(gateway_model),
             replica_model.replica_num,
             error,
         )
-        update_map = _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATING, status_message=error, active=False
+        await _commit_update(
+            item,
+            replica_model,
+            _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATING, status_message=error, active=False
+            ),
         )
-    await _commit_update(item, replica_model, update_map)
+        return
+
+    if gateway_model.hostname is not None:
+        reg_error = await _register_replica_with_load_balancer(gateway_model, replica_model)
+        if reg_error is not None:
+            logger.warning(
+                "%s replica %d: failed to register with load balancer: %s",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                reg_error,
+            )
+            await _commit_update(
+                item,
+                replica_model,
+                _GatewayReplicaUpdateMap(
+                    status=GatewayReplicaStatus.TERMINATING,
+                    status_message=reg_error,
+                    active=False,
+                ),
+            )
+            return
+
+    logger.info("%s replica %d: running", fmt(gateway_model), replica_model.replica_num)
+    await _commit_update(
+        item,
+        replica_model,
+        _GatewayReplicaUpdateMap(status=GatewayReplicaStatus.RUNNING, active=True),
+    )
+
+
+async def _register_replica_with_load_balancer(
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+) -> Optional[str]:
+    """Registers the replica instance with the gateway's load balancer.
+    Returns an error message on failure, None on success.
+    """
+    if replica_model.instance_id is None:
+        return "instance_id is None, cannot register with load balancer"
+    try:
+        if replica_model.backend_id is None:
+            raise BackendNotAvailable()
+        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
+            project=gateway_model.project, backend_id=replica_model.backend_id
+        )
+    except BackendNotAvailable:
+        return "Backend not available"
+    compute = backend.compute()
+    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+        return "Backend does not support load balancer operations"
+    lb_configuration = get_gateway_lb_configuration(gateway_model)
+    try:
+        await run_async(
+            compute.register_gateway_replica_with_load_balancer,
+            replica_model.instance_id,
+            lb_configuration,
+            gateway_model.backend_data,
+        )
+    except Exception:
+        logger.exception(
+            "%s replica %d: error registering with load balancer",
+            fmt(gateway_model),
+            replica_model.replica_num,
+        )
+        return "Error registering with load balancer"
+    logger.info(
+        "%s replica %d: registered with load balancer",
+        fmt(gateway_model),
+        replica_model.replica_num,
+    )
+    return None
 
 
 async def _connect_and_configure_gateway_replica(
@@ -604,6 +691,8 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
             GatewayModel.configuration,
             GatewayModel.region,
             GatewayModel.wildcard_domain,
+            GatewayModel.hostname,
+            GatewayModel.backend_data,
         ],
         load_backends=True,
         load_gateway_backend_type=True,
@@ -643,6 +732,12 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         )
         await _commit_update(item, replica_model, mark_terminated_update_map)
         return
+    if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
+        await _commit_update(item, replica_model, update_map={})
+        return
+
+    if gateway_model.hostname is not None:
+        await _deregister_gateway_replica_from_load_balancer(compute, gateway_model, replica_model)
 
     logger.debug(
         "%s replica %d: terminating gateway compute",
@@ -675,3 +770,75 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         await gateway_connections_pool.remove(replica_model.ip_address)
 
     await _commit_update(item, replica_model, mark_terminated_update_map)
+
+
+async def _deregister_gateway_replica_from_load_balancer(
+    compute: ComputeWithGatewaySupport,
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+) -> None:
+    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+        logger.error(
+            (
+                "%s replica %d: cannot deregister from load balancer,"
+                " backend does not support load balancer operations"
+            ),
+            fmt(gateway_model),
+            replica_model.replica_num,
+        )
+        return
+    if replica_model.instance_id is None:
+        logger.error(
+            "%s replica %d: cannot deregister from load balancer, instance_id is None",
+            fmt(gateway_model),
+            replica_model.replica_num,
+        )
+        return
+    logger.debug(
+        "%s replica %d: deregistering from load balancer",
+        fmt(gateway_model),
+        replica_model.replica_num,
+    )
+    try:
+        await run_async(
+            compute.deregister_gateway_replica_from_load_balancer,
+            replica_model.instance_id,
+            get_gateway_lb_configuration(gateway_model),
+            gateway_model.backend_data,
+        )
+        logger.info(
+            "%s replica %d: deregistered from load balancer",
+            fmt(gateway_model),
+            replica_model.replica_num,
+        )
+    except Exception:
+        logger.exception(
+            (
+                "%s replica %d: error deregistering from load balancer."
+                " Proceeding with gateway replica termination,"
+                " relying on automatic deregistration by the load balancer"
+            ),
+            fmt(gateway_model),
+            replica_model.replica_num,
+        )
+
+
+def _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model: GatewayModel) -> bool:
+    """
+    If `True`, the gateway cannot be used for replica (de)register operations until the migration
+    completes, since its `backend_data` does not yet have the relevant load balancer details.
+    """
+    configuration = get_gateway_configuration(gateway_model)
+    if (
+        configuration.certificate is not None
+        and configuration.certificate.type == "acm"
+        and gateway_model.hostname is None
+    ):
+        logger.warning(
+            "Found AWS ACM gateway %s without a hostname, which should indicate a pre-0.20.30"
+            " gateway not yet migrated to the 0.20.30 format. Waiting for the gateway pipeline to"
+            " perform the migration",
+            gateway_model.id,
+        )
+        return True
+    return False

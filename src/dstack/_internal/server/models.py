@@ -632,6 +632,14 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
     backend: Mapped["BackendModel"] = relationship()
 
+    hostname: Mapped[Optional[str]] = mapped_column(String(255))
+    """Hostname of the gateway's load balancer (e.g. ALB domain name for AWS ACM gateways).
+    Unset when there is no load balancer.
+    """
+    backend_data: Mapped[Optional[str]] = mapped_column(Text)
+    """Backend-specific load balancer resource data in JSON.
+    """
+
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
@@ -682,10 +690,8 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     """Gateway replica IP address or domain name (e.g., k8s can use domain names).
     **TODO**: rename.
     """
-    hostname: Mapped[Optional[str]] = mapped_column(String(100))
-    """Hostname of the gateway's load balancer.
-    **TODO**: move to `GatewayModel`.
-    """
+    hostname_deprecated_readonly: Mapped[Optional[str]] = mapped_column("hostname", String(100))
+    """Replaced by GatewayModel.hostname since 0.20.30"""
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     """`configuration` is optional for compatibility with pre-0.18.2 gateways.
     Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.

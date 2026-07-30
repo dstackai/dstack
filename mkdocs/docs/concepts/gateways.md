@@ -221,7 +221,7 @@ $ dstack gateway list
     Replicated gateways are an experimental feature and currently have limitations:
 
     - Changing the number of replicas or redeploying replicas is not supported.
-    - HTTPS is not supported. Use an external load balancer for TLS termination.
+    - HTTPS is only supported for AWS gateways with the `acm` [certificate type](#certificate). For other gateways, use an external load balancer for TLS termination.
     - An unavailable gateway replica prevents any new services or service replicas from being added.
     - All replicas are bound to the same backend and region.
     - At most 3 replicas are allowed per gateway.
