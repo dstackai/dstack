@@ -1,0 +1,22 @@
+{
+  "backend": "aws",
+  "certificate": {
+    "arn": "arn:aws:acm:us-east-1:123456789012:certificate/abc123",
+    "type": "acm"
+  },
+  "default": true,
+  "domain": "example.com",
+  "instance_type": "t3.small",
+  "name": "inference-gateway",
+  "public_ip": false,
+  "region": "us-east-1",
+  "replicas": 2,
+  "router": {
+    "policy": "round_robin",
+    "type": "sglang"
+  },
+  "tags": {
+    "env": "prod"
+  },
+  "type": "gateway"
+}

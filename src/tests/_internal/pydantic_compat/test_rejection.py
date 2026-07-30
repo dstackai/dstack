@@ -16,7 +16,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.core.models.configurations import DstackConfiguration
+from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.configurations import parse_apply_configuration
 from dstack._internal.server.schemas.volumes import CreateVolumeRequest
 from tests._internal.pydantic_compat.compat import parse_forbid_extra
 
@@ -27,41 +28,57 @@ def _task(extra_yaml: str) -> Any:
     return yaml.safe_load(_VALID_TASK + extra_yaml)
 
 
-# name -> (parser, input). Each input is rejected by v1 today; the test pins that it stays rejected.
-REJECTED_INPUTS: dict[str, tuple[Callable, Any]] = {
+# name -> (parser, input, exception). Each input is rejected by v1 today; the test pins that it
+# stays rejected. The production configuration parser wraps pydantic's error in ConfigurationError.
+REJECTED_INPUTS: dict[str, tuple[Callable, Any, type[Exception]]] = {
     # A mistyped key must not be silently ignored — this is the whole point of `extra="forbid"`,
     # and the v2 `CoreModel` reaches it through a per-call override that could leak.
-    "config_unknown_key": (DstackConfiguration.parse_obj, _task("comands: [oops]\n")),
+    "config_unknown_key": (
+        parse_apply_configuration,
+        _task("comands: [oops]\n"),
+        ConfigurationError,
+    ),
     "request_unknown_key": (
         CreateVolumeRequest.parse_obj,
         {
             "configuration": {"type": "volume", "name": "v", "backend": "aws", "region": "r"},
             "unexpected": 1,
         },
+        ValidationError,
     ),
     # Reversed ranges: caught by a validator, not by the type, so a dropped validator during the
     # `__get_pydantic_core_schema__` port would make these start passing.
     "resources_cpu_reversed_range": (
-        DstackConfiguration.parse_obj,
+        parse_apply_configuration,
         _task("resources:\n  cpu: 8..2\n"),
+        ConfigurationError,
     ),
     "resources_memory_reversed_range": (
-        DstackConfiguration.parse_obj,
+        parse_apply_configuration,
         _task("resources:\n  memory: 32GB..8GB\n"),
+        ConfigurationError,
     ),
     # Custom-type parsing: `Duration.parse` rejects unknown units and non-numeric input.
-    "duration_bad_unit": (DstackConfiguration.parse_obj, _task("max_duration: 5 years\n")),
-    # An unknown discriminator tag. `AnyDstackConfiguration` declares `discriminator="type"`, so
+    "duration_bad_unit": (
+        parse_apply_configuration,
+        _task("max_duration: 5 years\n"),
+        ConfigurationError,
+    ),
+    # An unknown discriminator tag. `BaseApplyConfiguration` declares `discriminator="type"`, so
     # the error names the tag instead of accumulating one failure per arm.
-    "unknown_config_type": (DstackConfiguration.parse_obj, {"type": "not-a-real-type"}),
+    "unknown_config_type": (
+        parse_apply_configuration,
+        {"type": "not-a-real-type"},
+        ConfigurationError,
+    ),
 }
 
 
 class TestRejectionParity:
     @pytest.mark.parametrize("name", sorted(REJECTED_INPUTS))
     def test_still_rejected(self, name):
-        parser, data = REJECTED_INPUTS[name]
-        with pytest.raises(ValidationError):
+        parser, data, exception = REJECTED_INPUTS[name]
+        with pytest.raises(exception):
             parser(data)
 
 

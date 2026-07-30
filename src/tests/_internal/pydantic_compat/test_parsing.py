@@ -19,13 +19,13 @@ gateway, proxy.
 """
 
 import json
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 import yaml
 
 from dstack._internal.core.backends.nebius.models import NebiusOfferBackendData
-from dstack._internal.core.models.configurations import DstackConfiguration
+from dstack._internal.core.models.configurations import parse_apply_configuration
 from dstack._internal.core.models.profiles import ProfilesConfig
 from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterEntrypointRequest,
@@ -84,18 +84,19 @@ BACKEND_DATA = _derived_registry("backend_data")
 BACKEND_CONFIGS = backend_factories.BACKEND_CONFIG_MODELS
 BACKEND_CREDS = backend_factories.BACKEND_CREDS_MODELS
 
-# Parsed from user-authored YAML with extra="forbid". The only surface whose inputs are `.yml`,
-# because the sugar pinned here is a YAML phenomenon: `python: 3.10` is a float that survives only
-# via number->str coercion, and `16GB..` / `2..8` / an env list are shorthands people type by hand.
-# `DstackConfiguration` dispatches every `.dstack.yml` type through its `__root__` union, so one
-# entry point covers task, service, dev-environment, fleet, volume, and gateway.
-CONFIGS: dict[str, Any] = {
-    "dev_environment": DstackConfiguration,
-    "fleet": DstackConfiguration,
-    "profiles": ProfilesConfig,
-    "service": DstackConfiguration,
-    "task": DstackConfiguration,
-    "volume": DstackConfiguration,
+# Parsed from user-authored YAML through the same entry points as production. Apply configurations
+# go through `parse_apply_configuration`, whose two-pass dispatch first identifies a configuration
+# permissively, then validates it strictly and reparses volumes by backend. Profiles have their own
+# production entry point. The `.yml` inputs preserve YAML-only shapes such as numeric Python
+# versions, duration/range shorthand, and environment-variable lists.
+CONFIG_PARSERS: dict[str, Callable[[Any], Any]] = {
+    "dev_environment": parse_apply_configuration,
+    "fleet": parse_apply_configuration,
+    "gateway": parse_apply_configuration,
+    "profiles": ProfilesConfig.parse_obj,
+    "service": parse_apply_configuration,
+    "task": parse_apply_configuration,
+    "volume": parse_apply_configuration,
 }
 
 # Responses the server reads back from the runner (shim), permissively: a newer runner may add
@@ -279,9 +280,11 @@ class TestApiResponseParsing:
 
 
 class TestConfigParsing:
-    @pytest.mark.parametrize("name", sorted(CONFIGS))
+    @pytest.mark.parametrize("name", sorted(CONFIG_PARSERS))
     def test_parses_to_expected_values_and_types(self, name, regen):
-        model = parse_forbid_extra(CONFIGS[name], _load_yaml_input("config", name))
+        parser = CONFIG_PARSERS[name]
+        data = _load_yaml_input("config", name)
+        model = parser(data)
         _assert_parses("config", name, model, regen)
 
 

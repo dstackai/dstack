@@ -1,7 +1,5 @@
 {
-  "/": "DstackConfiguration",
-  "/__root__": "VolumeConfiguration",
-  "/__root__/__root__": "AWSVolumeConfiguration",
-  "/__root__/__root__/backend": "BackendType",
-  "/__root__/__root__/size": "Memory"
+  "/": "AWSVolumeConfiguration",
+  "/backend": "BackendType",
+  "/size": "Memory"
 }
