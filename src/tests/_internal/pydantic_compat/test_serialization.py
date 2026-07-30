@@ -18,14 +18,19 @@ db, backend_config, backend_creds, backend_data, api_request, api_response, runn
 import json
 from typing import Any, Callable, Union
 
+import gpuhunt
 import pytest
 from pydantic import BaseModel
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.fleets import FleetNodesSpec
+from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.fleets import FleetConfiguration, FleetNodesSpec
+from dstack._internal.core.models.repos.remote import RemoteRunRepoData
+from dstack._internal.core.models.resources import CPUSpec, Range, ResourcesSpec
+from dstack._internal.core.models.volumes import RunpodVolumeConfiguration, VolumeSpec
 from dstack._internal.server.utils.routers import CustomORJSONResponse
 from tests._internal.pydantic_compat import backend_factories, factories
-from tests._internal.pydantic_compat.compare import assert_matches_fixture
+from tests._internal.pydantic_compat.compare import assert_matches_fixture, canonicalize
 
 # Written to a `Text` column via `.json()`.
 DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
@@ -170,7 +175,172 @@ class TestFleetNodesTargetCompatHack:
     def test_target_is_kept_when_it_differs_from_min(self):
         assert FleetNodesSpec(min=1, target=5, max=5).dict()["target"] == 5
 
+    @pytest.mark.parametrize(
+        ("nodes", "expected"),
+        [
+            pytest.param(
+                FleetNodesSpec(min=1, target=1, max=1),
+                {"min": 1, "max": 1},
+                id="target-equals-min",
+            ),
+            pytest.param(
+                FleetNodesSpec(min=1, target=5, max=5),
+                {"min": 1, "target": 5, "max": 5},
+                id="target-differs-from-min",
+            ),
+        ],
+    )
+    def test_dict_and_json_apply_the_same_override(self, nodes, expected):
+        assert nodes.dict() == expected
+        assert json.loads(nodes.json()) == expected
+
+    @pytest.mark.parametrize(
+        ("nodes", "expected"),
+        [
+            pytest.param(
+                FleetNodesSpec(min=1, target=1, max=1),
+                {"min": 1, "max": 1},
+                id="target-equals-min",
+            ),
+            pytest.param(
+                FleetNodesSpec(min=1, target=5, max=5),
+                {"min": 1, "target": 5, "max": 5},
+                id="target-differs-from-min",
+            ),
+        ],
+    )
+    def test_override_is_applied_when_nested(self, nodes, expected):
+        configuration = FleetConfiguration(nodes=nodes)
+
+        assert configuration.dict()["nodes"] == expected
+        assert json.loads(configuration.json())["nodes"] == expected
+
     def test_the_api_fixture_exercises_the_hack(self):
         nodes = factories.fleet().spec.configuration.nodes
         assert nodes is not None
         assert nodes.min == nodes.target, "fixture must hit the target == min branch"
+
+
+class TestResourcesSpecCPUCompatHack:
+    @pytest.mark.parametrize(
+        ("arch", "expected"),
+        [
+            pytest.param(None, {"min": 2, "max": 8}, id="unspecified-architecture"),
+            pytest.param(
+                gpuhunt.CPUArchitecture.X86,
+                {"min": 2, "max": 8},
+                id="x86-architecture",
+            ),
+            pytest.param(
+                gpuhunt.CPUArchitecture.ARM,
+                {"arch": "arm", "count": {"min": 2, "max": 8}},
+                id="arm-architecture",
+            ),
+        ],
+    )
+    def test_dict_and_json_apply_the_same_override(self, arch, expected):
+        resources = ResourcesSpec(
+            cpu=CPUSpec(arch=arch, count=Range[int](min=2, max=8)),
+        )
+
+        assert json.loads(resources.json())["cpu"] == expected
+        # CoreModel.json() must call the overridden dict(); this assertion would expose a drift
+        # even if only one of the two methods retained the compatibility rewrite.
+        assert canonicalize(json.dumps(resources.dict()["cpu"])) == canonicalize(
+            json.dumps(expected)
+        )
+
+    @pytest.mark.parametrize(
+        ("arch", "expected"),
+        [
+            pytest.param(None, {"min": 2, "max": 8}, id="unspecified-architecture"),
+            pytest.param(
+                gpuhunt.CPUArchitecture.ARM,
+                {"arch": "arm", "count": {"min": 2, "max": 8}},
+                id="arm-architecture",
+            ),
+        ],
+    )
+    def test_override_is_applied_when_nested(self, arch, expected):
+        configuration = TaskConfiguration(
+            commands=["echo hi"],
+            resources=ResourcesSpec(
+                cpu=CPUSpec(arch=arch, count=Range[int](min=2, max=8)),
+            ),
+        )
+
+        assert json.loads(configuration.json())["resources"]["cpu"] == expected
+        assert canonicalize(json.dumps(configuration.dict()["resources"]["cpu"])) == canonicalize(
+            json.dumps(expected)
+        )
+
+
+class TestFieldSerializationFilters:
+    def test_submit_body_nested_field_includes_are_preserved(self):
+        body = factories.submit_body().dict()
+
+        assert set(body["run"]) == {"id", "run_spec"}
+        assert set(body["run"]["run_spec"]) == {
+            "run_name",
+            "repo_id",
+            "repo_data",
+            "configuration",
+            "configuration_path",
+        }
+        assert set(body["job_spec"]) == {
+            "replica_num",
+            "job_num",
+            "jobs_per_replica",
+            "user",
+            "commands",
+            "env",
+            "single_branch",
+            "max_duration",
+            "ssh_key",
+            "working_dir",
+            "repo_data",
+            "repo_dir",
+            "repo_exists_action",
+            "file_archives",
+        }
+        assert set(body["job_submission"]) == {"id"}
+
+    def test_derived_merged_profile_is_excluded_from_dict_and_json(self):
+        spec = factories.run_spec()
+        assert spec.merged_profile is not None
+
+        assert "merged_profile" not in spec.dict()
+        assert "merged_profile" not in json.loads(spec.json())
+
+    def test_remote_repo_diff_bytes_are_excluded_from_dict_and_json(self):
+        repo = RemoteRunRepoData(repo_name="dstack", repo_diff=b"secret diff")
+        assert repo.repo_diff == b"secret diff"
+
+        assert "repo_diff" not in repo.dict()
+        assert "repo_diff" not in json.loads(repo.json())
+
+    def test_runpod_compatibility_availability_zone_is_excluded_directly_and_nested(self):
+        configuration = RunpodVolumeConfiguration(
+            name="cache",
+            region="US-KS-2",
+            size="100GB",
+            availability_zone="legacy-zone",
+        )
+        assert configuration.availability_zone == "legacy-zone"
+
+        assert "availability_zone" not in configuration.dict()
+        assert "availability_zone" not in json.loads(configuration.json())
+
+        spec = VolumeSpec(configuration=configuration)
+        assert "availability_zone" not in spec.dict()["configuration"]
+        assert "availability_zone" not in json.loads(spec.json())["configuration"]
+
+
+class TestCustomORJSONResponseCompat:
+    def test_response_uses_the_same_nested_serializer_overrides_as_model_json(self):
+        configuration = FleetConfiguration(nodes=FleetNodesSpec(min=1, target=1, max=1))
+
+        response_body = bytes(CustomORJSONResponse(configuration).body)
+
+        assert canonicalize(response_body) == canonicalize(configuration.json())
+        assert "target" not in json.loads(response_body)["nodes"]
