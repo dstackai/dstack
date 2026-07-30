@@ -15,6 +15,7 @@ from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, Job, Run
@@ -29,6 +30,7 @@ from dstack._internal.server.schemas.runner import (
     GPUDevice,
     HealthcheckResponse,
     InstanceHealthResponse,
+    InstanceInfoResponse,
     JobInfoResponse,
     LegacyPullResponse,
     LegacyStopBody,
@@ -308,6 +310,9 @@ class ShimClient:
     # `/api/instance/health`
     _INSTANCE_HEALTH_MIN_SHIM_VERSION = (0, 19, 22)
 
+    # `/api/instance/info`
+    _INSTANCE_INFO_MIN_SHIM_VERSION = (0, 20, 30)
+
     # `/api/components`
     _COMPONENTS_MIN_SHIM_VERSION = (0, 20, 0)
 
@@ -361,6 +366,14 @@ class ShimClient:
             or self._shim_version_tuple >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
         )
 
+    def is_instance_info_supported(self) -> bool:
+        if not self._negotiated:
+            self._negotiate()
+        return (
+            self._shim_version_tuple is None
+            or self._shim_version_tuple >= self._INSTANCE_INFO_MIN_SHIM_VERSION
+        )
+
     def are_components_supported(self) -> bool:
         if not self._negotiated:
             self._negotiate()
@@ -406,6 +419,18 @@ class ShimClient:
             return None
         self._raise_for_status(resp)
         return self._response(InstanceHealthResponse, resp)
+
+    def get_instance_info(self) -> Optional[InstanceInfoResponse]:
+        if not self.is_instance_info_supported():
+            logger.debug("instance info is not supported: %s", self._shim_version_string)
+            return None
+        resp = self._request("GET", "/api/instance/info")
+        if resp.status_code == HTTPStatus.NOT_FOUND:
+            # Old dev build of shim
+            logger.debug("instance info is not supported: %s", self._shim_version_string)
+            return None
+        self._raise_for_status(resp)
+        return self._response(InstanceInfoResponse, resp)
 
     def shutdown(self, *, force: bool) -> bool:
         if not self.is_shutdown_supported():
@@ -675,6 +700,7 @@ def _make_session_and_base_url(
 def healthcheck_response_to_instance_check(
     response: HealthcheckResponse,
     instance_health_response: Optional[InstanceHealthResponse] = None,
+    gpu_driver: Optional[GpuDriverInfo] = None,
 ) -> InstanceCheck:
     if response.service == "dstack-shim":
         message: Optional[str] = None
@@ -685,12 +711,25 @@ def healthcheck_response_to_instance_check(
         ):
             message = instance_health_response.dcgm.incidents[0].error_message
         return InstanceCheck(
-            reachable=True, health_response=instance_health_response, message=message
+            reachable=True,
+            health_response=instance_health_response,
+            message=message,
+            gpu_driver=gpu_driver,
         )
     return InstanceCheck(
         reachable=False,
         message=f"unexpected service: {response.service} version: {response.version}",
         health_response=instance_health_response,
+    )
+
+
+def instance_info_response_to_gpu_driver(
+    response: Optional[InstanceInfoResponse],
+) -> Optional[GpuDriverInfo]:
+    if response is None or not response.gpu_driver_version:
+        return None
+    return GpuDriverInfo.parse_obj(
+        {"vendor": response.gpu_vendor, "version": response.gpu_driver_version}
     )
 
 

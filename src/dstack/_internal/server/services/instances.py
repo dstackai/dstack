@@ -259,6 +259,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
         instance.availability_zone = jpd.availability_zone
+        instance.gpu_driver = jpd.gpu_driver
 
     return instance
 

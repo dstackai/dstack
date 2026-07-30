@@ -51,6 +51,18 @@ func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Reques
 	return &response, nil
 }
 
+func (s *ShimServer) InstanceInfoHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	response := InstanceInfoResponse{}
+	// GPUs are detected once on startup, so this is not an expensive call.
+	// The driver is a host-wide property, hence any GPU can be used as the source.
+	if gpus := s.runner.Gpus(r.Context()); len(gpus) > 0 {
+		response.GpuVendor = string(gpus[0].Vendor)
+		response.GpuDriverVersion = gpus[0].DriverVersion
+	}
+
+	return &response, nil
+}
+
 func (s *ShimServer) TaskListHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	tasks := s.runner.TaskList()
 	return &TaskListResponse{tasks}, nil

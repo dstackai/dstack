@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
     InstanceStatus,
     InstanceTerminationReason,
     SSHKey,
@@ -175,4 +176,25 @@ def set_unreachable_update(
     if not instance_model.status.is_available() or instance_model.unreachable == unreachable:
         return False
     update_map["unreachable"] = unreachable
+    return True
+
+
+def set_gpu_driver_update(
+    update_map: InstanceUpdateMap,
+    job_provisioning_data: JobProvisioningData,
+    gpu_driver: Optional[GpuDriverInfo],
+) -> bool:
+    """
+    Stores the shim-reported GPU driver in the instance provisioning data if it changed,
+    e.g., because the host driver was upgraded. Also fills it for instances provisioned
+    before the server upgrade. A GPU driver that could not be detected keeps the stored
+    one, as an undetectable driver is less informative than a possibly outdated one.
+    """
+    if gpu_driver is None:
+        return False
+    current = job_provisioning_data.gpu_driver
+    if current is not None and current.dict() == gpu_driver.dict():
+        return False
+    job_provisioning_data.gpu_driver = gpu_driver
+    update_map["job_provisioning_data"] = job_provisioning_data.json()
     return True
