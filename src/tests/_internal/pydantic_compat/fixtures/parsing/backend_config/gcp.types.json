@@ -1,0 +1,4 @@
+{
+  "/": "GCPConfig",
+  "/creds": "GCPServiceAccountCreds"
+}

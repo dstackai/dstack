@@ -1,0 +1,30 @@
+{
+  "creds": {
+    "access_key": "AKIAIOSFODNN7EXAMPLE",
+    "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "type": "access_key"
+  },
+  "default_vpcs": null,
+  "experimental_instance_types": [
+    "p5.48xlarge",
+    "p4d.24xlarge"
+  ],
+  "iam_instance_profile": "dstack-instance-profile",
+  "os_images": null,
+  "public_ips": false,
+  "regions": [
+    "us-east-1",
+    "us-west-2",
+    "eu-central-1"
+  ],
+  "tags": {
+    "cost-center": "ml-research",
+    "env": "prod"
+  },
+  "type": "aws",
+  "vpc_ids": {
+    "us-east-1": "vpc-0a1b2c3d4e5f67890",
+    "us-west-2": "vpc-0f9e8d7c6b5a43210"
+  },
+  "vpc_name": null
+}

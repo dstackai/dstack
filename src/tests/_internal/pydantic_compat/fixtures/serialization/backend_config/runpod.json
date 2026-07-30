@@ -1,0 +1,8 @@
+{
+  "community_cloud": true,
+  "regions": [
+    "US-KS-2",
+    "EU-RO-1"
+  ],
+  "type": "runpod"
+}

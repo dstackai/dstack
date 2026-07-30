@@ -1,0 +1,4 @@
+{
+  "/": "LambdaConfig",
+  "/creds": "LambdaAPIKeyCreds"
+}

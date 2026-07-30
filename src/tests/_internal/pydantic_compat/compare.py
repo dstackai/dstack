@@ -90,7 +90,7 @@ def type_map(value: Any, path: str = "", out: Union[dict, None] = None) -> dict:
     """
     out = {} if out is None else out
     if isinstance(value, BaseModel):
-        out[path or "/"] = _class_name(value)
+        out[path or "/"] = class_name(value)
         for name, attr in value.__dict__.items():
             type_map(attr, f"{path}/{name}", out)
     elif isinstance(value, dict):
@@ -100,11 +100,11 @@ def type_map(value: Any, path: str = "", out: Union[dict, None] = None) -> dict:
         for i, attr in enumerate(value):
             type_map(attr, f"{path}/{i}", out)
     elif type(value) not in _JSON_NATIVE:
-        out[path] = _class_name(value)
+        out[path] = class_name(value)
     return out
 
 
-def _class_name(value: Any) -> str:
+def class_name(value: Any) -> str:
     """
     The model's name with pydantic-duality's generated suffix removed.
 
@@ -116,7 +116,7 @@ def _class_name(value: Any) -> str:
     and those are plain `BaseModel`, so stripping there would report `RegisterService` for a class
     called `RegisterServiceRequest`.
     """
-    cls = type(value)
+    cls = value if isinstance(value, type) else type(value)
     name = cls.__name__
     if hasattr(cls, "__response__"):
         for suffix in ("Request", "Response"):

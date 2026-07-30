@@ -1,0 +1,9 @@
+{
+  "vm_specs": {
+    "cpu": {"count": 32, "model": "EPYC"},
+    "gpu": {"count": 2, "model": "MI325X"},
+    "ram": 512,
+    "features": ["infiniband", "local-nvme"]
+  },
+  "offer_schema_version": 2
+}

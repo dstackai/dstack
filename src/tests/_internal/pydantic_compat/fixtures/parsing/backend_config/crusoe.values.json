@@ -1,0 +1,10 @@
+{
+  "creds": {
+    "access_key": "CRUSOE7K3JVQZHX2MFAKE",
+    "secret_key": "wJ4lrXUtnFEMI7K3MDENGbPxRfiCYcrusoeKEY",
+    "type": "access_key"
+  },
+  "project_id": "7b2d8a4c-6e1f-4a3b-9c7d-9e2f4a6b8c0d",
+  "regions": null,
+  "type": "crusoe"
+}

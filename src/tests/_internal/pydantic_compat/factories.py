@@ -5,7 +5,6 @@ Deterministic model instances for the comparison fixtures.
 import uuid
 from datetime import datetime, timezone
 
-from dstack._internal.core.backends.aws.models import AWSCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
@@ -167,11 +166,6 @@ _CREATED_AT = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
 # --- DB blobs ------------------------------------------------------------------------
 # Written to a `Text` column with `.json()`.
-
-
-def aws_creds() -> AWSCreds:
-    """A custom-root discriminated union, read from `BackendModel.auth`."""
-    return AWSCreds.parse_obj({"type": "access_key", "access_key": "AK", "secret_key": "SK"})
 
 
 def compute_group_provisioning_data() -> ComputeGroupProvisioningData:

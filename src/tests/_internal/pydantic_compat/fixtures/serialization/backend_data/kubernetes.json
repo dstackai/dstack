@@ -1,0 +1,5 @@
+{
+  "jump_pod_name": "dstack-jump-pod",
+  "jump_pod_service_name": "dstack-jump-pod-service",
+  "user_ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD dstack@localhost"
+}

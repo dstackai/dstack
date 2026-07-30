@@ -1,0 +1,10 @@
+{
+  "compartment_id": "ocid1.compartment.oc1..aaaaaaaadstack",
+  "regions": [
+    "eu-frankfurt-1"
+  ],
+  "subnet_ids_per_region": {
+    "eu-frankfurt-1": "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaadstack"
+  },
+  "type": "oci"
+}

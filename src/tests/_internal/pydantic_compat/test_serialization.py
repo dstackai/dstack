@@ -12,7 +12,7 @@ Disposable: this package is deleted once the v2 release is verified in prod, exc
 subset of the `db/` fixtures, which outlive it because stored rows do.
 
 Registries and test classes follow the same surface order as `test_parsing.py`:
-db, api_request, api_response, runner, gateway, proxy.
+db, backend_config, backend_creds, backend_data, api_request, api_response, runner, gateway, proxy.
 """
 
 import json
@@ -24,12 +24,11 @@ from pydantic import BaseModel
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.server.utils.routers import CustomORJSONResponse
-from tests._internal.pydantic_compat import factories
+from tests._internal.pydantic_compat import backend_factories, factories
 from tests._internal.pydantic_compat.compare import assert_matches_fixture
 
 # Written to a `Text` column via `.json()`.
 DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
-    "aws_creds": factories.aws_creds,
     "compute_group_provisioning_data": factories.compute_group_provisioning_data,
     "fleet_spec": factories.fleet_spec,
     "gateway_compute_configuration": factories.gateway_compute_configuration,
@@ -52,6 +51,13 @@ DB_BLOBS: dict[str, Callable[[], CoreModel]] = {
     "volume_configuration": factories.volume_configuration,
     "volume_provisioning_data": factories.volume_provisioning_data,
 }
+
+# The three backend `Text` columns, all written with `.json()`. Split by column rather than by
+# backend so a fixture is the exact bytes of one column: `config` and `auth` are written and read
+# separately, and only recombined into an `XConfig` after both have been decoded.
+BACKEND_STORED_CONFIGS = backend_factories.BACKEND_STORED_CONFIGS
+BACKEND_CREDS = backend_factories.BACKEND_CREDS
+BACKEND_DATA = backend_factories.BACKEND_DATA
 
 # Sent by the API client as a request body — `body=X.json()`, 40 call sites in `api/server/`.
 # This is the new-CLI-against-old-server direction.
@@ -117,6 +123,9 @@ PROXY_REQUESTS: dict[str, Callable[[], CoreModel]] = {
 # `.json()` output and fails for reasons that have nothing to do with parsing.
 SURFACES: dict[str, tuple[dict[str, Callable[[], Any]], Callable[[Any], Union[bytes, str]]]] = {
     "db": (DB_BLOBS, lambda model: model.json()),
+    "backend_config": (BACKEND_STORED_CONFIGS, lambda model: model.json()),
+    "backend_creds": (BACKEND_CREDS, lambda model: model.json()),
+    "backend_data": (BACKEND_DATA, lambda model: model.json()),
     "api_request": (API_REQUESTS, lambda model: model.json()),
     "api_response": (API_RESPONSES, lambda model: bytes(CustomORJSONResponse(model).body)),
     "runner": (RUNNER_REQUESTS, lambda model: model.json()),

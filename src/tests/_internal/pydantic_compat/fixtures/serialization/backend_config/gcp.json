@@ -1,0 +1,25 @@
+{
+  "extra_vpcs": [
+    "dstack-extra-vpc"
+  ],
+  "nat_check": false,
+  "preview_features": [
+    "g4"
+  ],
+  "project_id": "dstack-prod",
+  "public_ips": true,
+  "regions": [
+    "us-central1",
+    "europe-west4"
+  ],
+  "roce_vpcs": [
+    "dstack-roce-vpc"
+  ],
+  "tags": {
+    "env": "prod"
+  },
+  "type": "gcp",
+  "vm_service_account": "dstack@dstack-prod.iam.gserviceaccount.com",
+  "vpc_name": "dstack-vpc",
+  "vpc_project_id": "dstack-network"
+}

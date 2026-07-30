@@ -1,0 +1,6 @@
+{
+  "ssh_key_ids": [
+    "a1b2c3d4-5678-4abc-9def-000000000005"
+  ],
+  "startup_script_id": "a1b2c3d4-5678-4abc-9def-000000000004"
+}

@@ -1,0 +1,19 @@
+{
+  "contexts": [
+    "staging-cluster",
+    {
+      "name": "prod-cluster",
+      "proxy_jump": {
+        "hostname": "10.0.0.1",
+        "port": 22
+      }
+    }
+  ],
+  "kubeconfig": {
+    "data": "apiVersion: v1\nkind: Config\nclusters:\n- name: prod-cluster\n",
+    "filename": ""
+  },
+  "namespace": "dstack",
+  "proxy_jump": null,
+  "type": "kubernetes"
+}

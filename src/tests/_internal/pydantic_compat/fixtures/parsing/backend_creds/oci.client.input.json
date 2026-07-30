@@ -1,0 +1,8 @@
+{
+  "type": "client",
+  "user": "ocid1.user.oc1..aaaaaaaa7k3jvqzhx2mfakeuserocid",
+  "tenancy": "ocid1.tenancy.oc1..aaaaaaaaq4d9wmfaketenancyocid",
+  "key_content": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC\n-----END PRIVATE KEY-----\n",
+  "fingerprint": "a1:b2:c3:d4:e5:f6:07:18:29:3a:4b:5c:6d:7e:8f:90",
+  "region": "eu-frankfurt-1"
+}

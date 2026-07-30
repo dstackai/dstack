@@ -1,0 +1,29 @@
+{
+  "default_vpcs": false,
+  "experimental_instance_types": [
+    "p5.48xlarge"
+  ],
+  "iam_instance_profile": "dstack-instance-profile",
+  "os_images": {
+    "cpu": null,
+    "nvidia": {
+      "name": "dstack-nvidia-ubuntu-22.04",
+      "owner": "123456789012",
+      "user": "ubuntu"
+    }
+  },
+  "public_ips": true,
+  "regions": [
+    "us-east-1",
+    "us-west-2"
+  ],
+  "tags": {
+    "env": "prod",
+    "team": "ml"
+  },
+  "type": "aws",
+  "vpc_ids": {
+    "us-east-1": "vpc-0a1b2c3d4e5f67890"
+  },
+  "vpc_name": null
+}

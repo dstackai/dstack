@@ -1,0 +1,4 @@
+{
+  "/": "BaseDigitalOceanConfig",
+  "/creds": "BaseDigitalOceanAPIKeyCreds"
+}

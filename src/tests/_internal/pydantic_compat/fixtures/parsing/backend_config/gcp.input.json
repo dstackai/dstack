@@ -1,0 +1,16 @@
+{
+  "type": "gcp",
+  "project_id": "dstack-prod",
+  "regions": ["us-central1", "europe-west4", "asia-northeast1"],
+  "vpc_name": "dstack-vpc",
+  "extra_vpcs": ["dstack-extra-vpc"],
+  "public_ips": true,
+  "nat_check": true,
+  "vm_service_account": "dstack@dstack-prod.iam.gserviceaccount.com",
+  "tags": {"env": "prod"},
+  "creds": {
+    "type": "service_account",
+    "filename": "",
+    "data": "{\"type\": \"service_account\", \"project_id\": \"dstack-prod\", \"private_key_id\": \"7b1e4f2a9c8d6e5f4a3b2c1d0e9f8a7b6c5d4e3f\"}"
+  }
+}

@@ -14,7 +14,8 @@ Inputs are hand-written and must never be regenerated. `--regen-fixtures` rewrit
 `*.values.json` and `*.types.json` only.
 
 Registries and test classes below follow the same surface order as `test_serialization.py`:
-db, api_request, api_response, config, runner, gateway, proxy.
+db, backend_config, backend_creds, backend_data, api_request, api_response, config, runner,
+gateway, proxy.
 """
 
 import json
@@ -23,6 +24,7 @@ from typing import Any
 import pytest
 import yaml
 
+from dstack._internal.core.backends.nebius.models import NebiusOfferBackendData
 from dstack._internal.core.models.configurations import DstackConfiguration
 from dstack._internal.core.models.profiles import ProfilesConfig
 from dstack._internal.proxy.gateway.schemas.registry import (
@@ -43,11 +45,13 @@ from dstack._internal.server.schemas.runner import (
     MetricsResponse,
     TaskInfoResponse,
 )
+from tests._internal.pydantic_compat import backend_factories
 from tests._internal.pydantic_compat import test_serialization as ser
 from tests._internal.pydantic_compat.compare import (
     FIXTURES_DIR,
     assert_matches_fixture,
     canonicalize,
+    class_name,
     type_map,
 )
 from tests._internal.pydantic_compat.compat import parse_forbid_extra, parse_ignore_extra
@@ -70,6 +74,15 @@ def _derived_registry(surface: str) -> dict[str, Any]:
 DB_BLOBS = _derived_registry("db")
 API_REQUESTS = _derived_registry("api_request")
 API_RESPONSES = _derived_registry("api_response")
+BACKEND_DATA = _derived_registry("backend_data")
+
+# The `config` column is written as `XStoredConfig` but read back as `XConfig`, so this is the one
+# surface whose parse target is a different class from the one that produced the bytes. The read is
+# a splice of two columns — `XConfig(**json.loads(config), creds=XCreds.parse_raw(auth))` — and the
+# inputs mirror that by carrying `creds` inline, which additionally makes the creds union resolve
+# here rather than arrive pre-resolved.
+BACKEND_CONFIGS = backend_factories.BACKEND_CONFIG_MODELS
+BACKEND_CREDS = backend_factories.BACKEND_CREDS_MODELS
 
 # Parsed from user-authored YAML with extra="forbid". The only surface whose inputs are `.yml`,
 # because the sugar pinned here is a YAML phenomenon: `python: 3.10` is a float that survives only
@@ -127,6 +140,56 @@ class TestDbBlobParsing:
         _assert_parses("db", name, model, regen)
 
 
+class TestBackendConfigParsing:
+    @pytest.mark.parametrize("name", sorted(BACKEND_CONFIGS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(BACKEND_CONFIGS[name], _load_input("backend_config", name))
+        _assert_parses("backend_config", name, model, regen)
+
+
+class TestBackendCredsParsing:
+    @pytest.mark.parametrize("name", sorted(BACKEND_CREDS))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(BACKEND_CREDS[name], _load_input("backend_creds", name))
+        _assert_parses("backend_creds", name, model, regen)
+
+    @pytest.mark.parametrize("name", sorted(backend_factories.CREDS_ARMS))
+    def test_resolves_the_intended_union_arm(self, name):
+        """
+        The four custom-root creds unions get this on top of the type map.
+
+        A wrong arm can still produce a byte-identical dump — `AWSDefaultCreds` and a hypothetical
+        arm carrying only `type` would — so the arm is asserted by name. This is the check that
+        catches v2 resolving a union in smart mode where v1 went left to right.
+        """
+        creds = parse_ignore_extra(BACKEND_CREDS[name], _load_input("backend_creds", name))
+        expected = class_name(backend_factories.CREDS_ARMS[name])
+        # Compared by name rather than `isinstance`: the permissive read yields duality's
+        # `...Response` variant on v1 and the plain class on v2, and `class_name` erases that.
+        assert class_name(creds.__root__) == expected
+
+
+class TestBackendDataParsing:
+    @pytest.mark.parametrize("name", sorted(BACKEND_DATA))
+    def test_parses_to_expected_values_and_types(self, name, regen):
+        model = parse_ignore_extra(BACKEND_DATA[name], _load_input("backend_data", name))
+        _assert_parses("backend_data", name, model, regen)
+
+
+class TestNebiusOfferBackendDataSetField:
+    """
+    Excluded from `BACKEND_DATA` because `.json()` raises on its `set` field, so there is nothing
+    for `_assert_parses` to compare. The read path is real regardless, so assert on the value.
+    """
+
+    def test_parses_a_list_into_a_set(self):
+        data = parse_ignore_extra(NebiusOfferBackendData, {"fabrics": ["fabric-3", "fabric-6"]})
+        assert data.fabrics == {"fabric-3", "fabric-6"}
+
+    def test_missing_field_defaults_to_an_empty_set(self):
+        assert parse_ignore_extra(NebiusOfferBackendData, {}).fabrics == set()
+
+
 # Every case above earns a second assertion: inject an unknown key into the same input and check the
 # reader's `extra` policy holds. That covers what happens when the writer is a newer version.
 #
@@ -135,6 +198,9 @@ class TestDbBlobParsing:
 # parse — they are absent rather than passing vacuously.
 _REGISTRIES = {
     "db": DB_BLOBS,
+    "backend_config": BACKEND_CONFIGS,
+    "backend_creds": BACKEND_CREDS,
+    "backend_data": BACKEND_DATA,
     "api_request": API_REQUESTS,
     "api_response": API_RESPONSES,
     "gateway": GATEWAY_PAYLOADS,
@@ -143,7 +209,14 @@ _REGISTRIES = {
 # Readers that ignore unknown fields, versus the one that must reject them.
 _TOLERANCE_CASES = [
     (surface, name)
-    for surface in ("db", "api_response", "gateway")
+    for surface in (
+        "db",
+        "backend_config",
+        "backend_creds",
+        "backend_data",
+        "api_response",
+        "gateway",
+    )
     for name in sorted(_REGISTRIES[surface])
 ]
 _FORBID_CASES = [("api_request", name) for name in sorted(API_REQUESTS)]
