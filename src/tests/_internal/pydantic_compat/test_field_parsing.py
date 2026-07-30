@@ -113,6 +113,15 @@ class TestPortFieldParsing:
         assert class_name(config.port) == "PortMapping"
         assert config.port.dict() == expected
 
+    @pytest.mark.parametrize("ports", [[65536], ["65536:80"], ["80:65536"]])
+    def test_task_ports_above_tcp_range_are_rejected(self, ports: list[Any]):
+        with pytest.raises(ConfigurationError, match="65535"):
+            parse_apply_configuration(_task(ports=ports))
+
+    def test_service_port_above_tcp_range_is_rejected(self):
+        with pytest.raises(ConfigurationError, match="65535"):
+            parse_apply_configuration(_service(port=65536))
+
 
 class TestMountPointFieldParsing:
     def test_string_arms_select_volume_and_instance_mount_models(self):
