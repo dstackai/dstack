@@ -3297,7 +3297,7 @@ class TestApplyPlan:
         )
         run = run_model_to_run(run_model)
         run_spec.configuration_path = "new.dstack.yml"
-        run_spec.configuration.replicas = Range(min=2, max=2)
+        run_spec.configuration.replicas = Range[int](min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
             headers=get_auth_headers(user.token),

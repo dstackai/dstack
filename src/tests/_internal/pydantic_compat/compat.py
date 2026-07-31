@@ -3,7 +3,7 @@ The one place in this package that knows how each `extra` mode is spelled.
 
 Every test here was written to run unchanged on v1 and v2, which ruled out touching the duality
 API directly. Forbidding extra fields needs no help — `model_validate` forbids them in both
-versions. Ignoring them did: v1 spelled it `X.__response__`, and v2 spells it
+versions. Ignoring them did: v1 spelled it with the duality response variant, and v2 spells it
 `validate_extra_ignore`.
 
 Both helpers are named for the `extra` setting they apply, deliberately avoiding the word

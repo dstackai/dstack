@@ -7,7 +7,10 @@ from pydantic_core import to_json
 
 from dstack._internal.core.errors import ServerClientError, ServerClientErrorCode
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.version import parse_version
+
+logger = get_logger(__name__)
 
 
 class CustomStaticFiles(StaticFiles):
@@ -42,10 +45,25 @@ class CustomJSONResponse(Response):
     media_type = "application/json"
 
     def render(self, content: Any) -> bytes:
-        # `content` is a model, a list of models, or a plain dict already patched by
-        # `server/compatibility/`, so it has to be serialized generically rather than through
-        # one model's `model_dump_json`. `fallback` keeps a stray unknown type from 500ing.
-        return to_json(content, fallback=str)
+        # `content` is a model, a list of models, or a plain dict (the `server/compatibility/`
+        # patches mutate models in place, but some routers do assemble dicts), so it has to be
+        # serialized generically rather than through one model's `model_dump_json`.
+        return to_json(content, fallback=_fallback)
+
+
+def _fallback(obj: Any) -> str:
+    """
+    Last resort for a type `to_json` cannot serialize.
+
+    Returning a string keeps one unexpected value from turning the whole response into a 500, but
+    it also puts a `repr` on the wire where the client expects real data, so it must not pass
+    silently: the fix is a `@field_serializer` on the field that produced it.
+    """
+    logger.error(
+        "Response contains a value of non-serializable type %s. Add a serializer for it.",
+        type(obj).__name__,
+    )
+    return str(obj)
 
 
 class BadRequestDetailsModel(CoreModel):

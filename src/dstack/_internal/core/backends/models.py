@@ -1,6 +1,6 @@
 from typing import Annotated, Union
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from dstack._internal.core.backends.aws.models import (
     AWSBackendConfig,
@@ -153,6 +153,11 @@ AnyBackendConfigWithCredsTagged = Annotated[
     AnyBackendConfigWithCreds,
     Field(discriminator="type"),
 ]
+
+
+class BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
+    pass
+
 
 # Backend config accepted in server/config.yaml.
 # This can be different from the API config.

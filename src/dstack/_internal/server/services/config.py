@@ -1,15 +1,15 @@
 from typing import List, Optional
 
 import yaml
-from pydantic import Field, RootModel, ValidationError
+from pydantic import Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
 import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
-    AnyBackendConfigWithCredsTagged,
     AnyBackendFileConfigWithCreds,
+    BackendConfigWithCreds,
     BackendInfoYAML,
 )
 from dstack._internal.core.errors import (
@@ -262,19 +262,13 @@ async def update_backend_config_yaml(
     await backends_services.update_backend(session=session, project=project, config=config)
 
 
-class _BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
-    """
-    Model for parsing API and file YAML configs.
-    """
-
-
 def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds:
     try:
         config_dict = yaml.safe_load(config_yaml)
     except yaml.YAMLError:
         raise ServerClientError("Error parsing YAML")
     try:
-        backend_config = _BackendConfigWithCreds.model_validate(config_dict).root
+        backend_config = BackendConfigWithCreds.model_validate(config_dict).root
     except ValidationError as e:
         raise ServerClientError(str(e))
     return backend_config
@@ -282,7 +276,7 @@ def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds
 
 def file_config_to_config(file_config: AnyBackendFileConfigWithCreds) -> AnyBackendConfigWithCreds:
     backend_config_dict = file_config.model_dump()
-    backend_config = _BackendConfigWithCreds.model_validate(backend_config_dict)
+    backend_config = BackendConfigWithCreds.model_validate(backend_config_dict)
     return backend_config.root
 
 

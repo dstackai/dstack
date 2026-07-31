@@ -5,8 +5,8 @@ Each model is serialized through the *production* path — there are four distin
 each registry below — and compared against a fixture generated under pydantic v1. On v1 these are
 regression tests; on the v2 branch they are the compat assertion.
 
-Nothing here may reference the duality API (`__request__` / `__response__`): these tests have to
-run unchanged on both versions, and duality is gone in v2.
+Nothing here may reference the duality request/response variants directly: these tests have to run
+unchanged on both versions, and duality is gone in v2. See `compat.py`.
 
 Disposable: this package is deleted once the v2 release is verified in prod, except for a curated
 subset of the `db/` fixtures, which outlive it because stored rows do.

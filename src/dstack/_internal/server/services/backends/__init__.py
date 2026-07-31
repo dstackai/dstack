@@ -6,7 +6,7 @@ from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from cachetools import TTLCache
-from pydantic import RootModel, ValidationError
+from pydantic import ValidationError
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,8 +21,8 @@ from dstack._internal.core.backends.configurators import (
 )
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
-    AnyBackendConfigWithCredsTagged,
     AnyBackendConfigWithoutCreds,
+    BackendConfigWithCreds,
 )
 from dstack._internal.core.errors import (
     BackendAuthError,
@@ -45,10 +45,6 @@ from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class _BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
-    pass
 
 
 def serialize_source_backend_config(
@@ -217,7 +213,7 @@ def get_source_backend_config_from_backend_model(
             )
             return None
     try:
-        return _BackendConfigWithCreds.model_validate(source_config_dict).root
+        return BackendConfigWithCreds.model_validate(source_config_dict).root
     except ValidationError:
         logger.warning(
             "Failed to validate source config for %s backend. Falling back to stored config.",

@@ -5,6 +5,7 @@ from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import Profile, ProfileRetry, SpotPolicy
 
 
@@ -35,8 +36,16 @@ class TestProfileArgs:
     def test_backends(self):
         profile = Profile(name="test")
         modified, _ = apply_args(profile, ["-b", "gcp", "--backend", "aws"])
-        profile.backends = ["gcp", "aws"]
+        # `BackendType`, not `str`: the args are assigned onto the model without validation, so
+        # anything but the declared type makes the serializer warn.
+        profile.backends = [BackendType.GCP, BackendType.AWS]
         assert profile.model_dump() == modified.model_dump()
+
+    def test_backends_passes_through_unknown_name(self):
+        # A newer server may know a backend this CLI's enum does not. Rejecting locally would
+        # break that, so the name is forwarded and the server decides.
+        modified, _ = apply_args(Profile(name="test"), ["-b", "quantum-cloud-9000"])
+        assert modified.backends == ["quantum-cloud-9000"]
 
     def test_spot_policy_spot(self):
         profile = Profile(name="test")

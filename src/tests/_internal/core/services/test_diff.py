@@ -58,9 +58,6 @@ class TestDiffModels:
                 {},
                 id="core-model-no-diff",
             ),
-            # The five cases that used to pair `_CoreModelA` with its `__request__` /
-            # `__response__` variants are gone: a CoreModel is one class now, so all of them
-            # collapse into `core-model` above.
         ],
     )
     def test_diff_models(self, old: BaseModel, new: BaseModel, expected: ModelDiff) -> None:

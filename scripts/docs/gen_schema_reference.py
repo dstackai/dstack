@@ -266,9 +266,11 @@ def generate_schema_reference(
                 "",
             ]
         )
-    # Get JSON schema to detect extra accepted types from schema_extra
+    # The schema says what a field *accepts*, which is wider than its annotation wherever a
+    # before-validator coerces. `mode="validation"` is pydantic's default, but state it: the
+    # serialization schema carries the narrow type and would defeat the whole point.
     try:
-        schema_props = cls.model_json_schema().get("properties", {})
+        schema_props = cls.model_json_schema(mode="validation").get("properties", {})
     except Exception:
         schema_props = {}
     for name, field in cls.model_fields.items():
