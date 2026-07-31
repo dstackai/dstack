@@ -79,16 +79,7 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
-
-
-def _as_wire(value: datetime) -> str:
-    """
-    A datetime as the API renders it.
-
-    pydantic v2 spells a zero UTC offset `Z`, where `datetime.isoformat()` spells it `+00:00`.
-    """
-    return value.isoformat().replace("+00:00", "Z")
-
+from dstack._internal.utils.common import render_datetime_as_api
 
 pytestmark = pytest.mark.usefixtures("image_config_mock", "disable_sshproxy")
 
@@ -738,8 +729,8 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": _as_wire(run1_submitted_at),
-                "last_processed_at": _as_wire(run1_submitted_at),
+                "submitted_at": render_datetime_as_api(run1_submitted_at),
+                "last_processed_at": render_datetime_as_api(run1_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run1_spec.model_dump(),
@@ -751,8 +742,8 @@ class TestListRuns:
                                 "id": str(job.id),
                                 "submission_num": 0,
                                 "deployment_num": 0,
-                                "submitted_at": _as_wire(run1_submitted_at),
-                                "last_processed_at": _as_wire(run1_submitted_at),
+                                "submitted_at": render_datetime_as_api(run1_submitted_at),
+                                "last_processed_at": render_datetime_as_api(run1_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -774,8 +765,8 @@ class TestListRuns:
                     "id": str(job.id),
                     "submission_num": 0,
                     "deployment_num": 0,
-                    "submitted_at": _as_wire(run1_submitted_at),
-                    "last_processed_at": _as_wire(run1_submitted_at),
+                    "submitted_at": render_datetime_as_api(run1_submitted_at),
+                    "last_processed_at": render_datetime_as_api(run1_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
@@ -805,8 +796,8 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": _as_wire(run2_submitted_at),
-                "last_processed_at": _as_wire(run2_submitted_at),
+                "submitted_at": render_datetime_as_api(run2_submitted_at),
+                "last_processed_at": render_datetime_as_api(run2_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run2_spec.model_dump(),
@@ -932,8 +923,8 @@ class TestListRuns:
                 "project_name": project.name,
                 "user": user.name,
                 "fleet": None,
-                "submitted_at": _as_wire(run_submitted_at),
-                "last_processed_at": _as_wire(run_submitted_at),
+                "submitted_at": render_datetime_as_api(run_submitted_at),
+                "last_processed_at": render_datetime_as_api(run_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
                 "run_spec": run_spec.model_dump(),
@@ -945,8 +936,8 @@ class TestListRuns:
                                 "id": str(job2.id),
                                 "submission_num": 1,
                                 "deployment_num": 0,
-                                "submitted_at": _as_wire(run_submitted_at),
-                                "last_processed_at": _as_wire(run_submitted_at),
+                                "submitted_at": render_datetime_as_api(run_submitted_at),
+                                "last_processed_at": render_datetime_as_api(run_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -968,8 +959,8 @@ class TestListRuns:
                     "id": str(job2.id),
                     "submission_num": 1,
                     "deployment_num": 0,
-                    "submitted_at": _as_wire(run_submitted_at),
-                    "last_processed_at": _as_wire(run_submitted_at),
+                    "submitted_at": render_datetime_as_api(run_submitted_at),
+                    "last_processed_at": render_datetime_as_api(run_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",

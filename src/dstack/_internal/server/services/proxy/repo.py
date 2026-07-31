@@ -35,8 +35,6 @@ from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 from dstack._internal.utils.common import get_or_error
 
-# Hoisted: this validates once per run inside a loop, and constructing a `TypeAdapter`
-# rebuilds the schema every time.
 _ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
 
 

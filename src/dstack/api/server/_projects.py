@@ -1,7 +1,8 @@
-import json
 from datetime import datetime
 from typing import Any, List, Literal, Optional, Union, overload
 from uuid import UUID
+
+from pydantic_core import to_json
 
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.projects import (
@@ -70,14 +71,14 @@ class ProjectsAPIClient(APIClientGroup):
         if name_pattern is not None:
             body["name_pattern"] = name_pattern
         if prev_created_at is not None:
-            body["prev_created_at"] = prev_created_at.isoformat()
+            body["prev_created_at"] = prev_created_at
         if prev_id is not None:
-            body["prev_id"] = str(prev_id)
+            body["prev_id"] = prev_id
         if limit is not None:
             body["limit"] = limit
         if ascending is not None:
             body["ascending"] = ascending
-        resp = self._request("/api/projects/list", body=json.dumps(body))
+        resp = self._request("/api/projects/list", body=to_json(body))
         resp_json = resp.json()
         if isinstance(resp_json, list):
             return validate_extra_ignore(List[Project], resp_json)

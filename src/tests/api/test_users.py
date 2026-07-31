@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from dstack._internal.utils.common import render_datetime_as_api
 from dstack.api.server._users import UsersAPIClient
 from tests.api.common import RequestRecorder
 
@@ -38,8 +39,7 @@ class TestUsersAPIClientList:
         assert recorder.last_path == "/api/users/list"
         assert payload["return_total_count"] is True
         assert payload["name_pattern"] == "user"
-        # pydantic v2 spells a UTC offset `Z`, where `isoformat()` uses `+00:00`.
-        assert payload["prev_created_at"] == dt.isoformat().replace("+00:00", "Z")
+        assert payload["prev_created_at"] == render_datetime_as_api(dt)
         assert payload["prev_id"] == str(uid)
         assert payload["limit"] == 1
         assert payload["ascending"] is True

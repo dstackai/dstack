@@ -8,6 +8,7 @@ import pytest
 
 from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.utils.common import render_datetime_as_api
 from tests._internal.cli.common import plain_console, run_dstack_cli
 from tests._internal.cli.preset_factories import get_preset
 
@@ -162,8 +163,7 @@ class TestPresetLocalCommands:
 
         data = json.loads(capsys.readouterr().out)
         assert data["id"] == preset.id
-        # pydantic v2 renders a UTC datetime with a `Z` suffix; `isoformat()` uses `+00:00`.
-        assert data["created_at"] == preset.created_at.isoformat().replace("+00:00", "Z")
+        assert data["created_at"] == render_datetime_as_api(preset.created_at)
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
@@ -184,8 +184,7 @@ class TestPresetLocalCommands:
         assert len(output["presets"]) == 1
         data = output["presets"][0]
         assert data["id"] == preset.id
-        # pydantic v2 renders a UTC datetime with a `Z` suffix; `isoformat()` uses `+00:00`.
-        assert data["created_at"] == preset.created_at.isoformat().replace("+00:00", "Z")
+        assert data["created_at"] == render_datetime_as_api(preset.created_at)
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 

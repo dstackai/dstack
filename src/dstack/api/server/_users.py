@@ -46,7 +46,7 @@ class UsersAPIClient(APIClientGroup):
         if ascending is not None:
             body["ascending"] = ascending
         if body:
-            resp = self._request("/api/users/list", body=to_json(body).decode())
+            resp = self._request("/api/users/list", body=to_json(body))
         else:
             resp = self._request("/api/users/list")
         resp_json = resp.json()

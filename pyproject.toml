@@ -115,14 +115,12 @@ include = [
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
-    "src/dstack/_internal/cli/services",
+    "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",
-    # Pre-existing argcomplete stub issues, unrelated to the rest of cli/services.
-    "src/dstack/_internal/cli/services/completion.py",
 ]
 
 [tool.pytest.ini_options]

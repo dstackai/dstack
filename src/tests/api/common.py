@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import requests
 
@@ -9,13 +9,13 @@ import requests
 class RequestRecorder:
     payload: Any
     last_path: Optional[str] = None
-    last_body: Optional[str] = None
+    last_body: Optional[Union[str, bytes]] = None
     last_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __call__(
         self,
         path: str,
-        body: Optional[str] = None,
+        body: Optional[Union[str, bytes]] = None,
         raise_for_status: bool = True,
         method: str = "POST",
         **kwargs,
