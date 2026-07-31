@@ -2,7 +2,7 @@ from base64 import b64decode
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import SerializerFunctionWrapHandler, field_validator, model_serializer
+from pydantic import field_validator
 
 from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
@@ -59,8 +59,8 @@ class JobInfoResponse(CoreModel):
 # the runner every field of `Run`, `JobSpec` and `JobSubmission` instead of these subsets. It lives
 # on the model rather than at the call site so that a new caller cannot bypass it.
 #
-# A name that the target model does not declare is ignored, as it was under v1: `entrypoint` and
-# `gateway` are listed for `job_spec` but `JobSpec` has neither.
+# A name the target model does not declare is ignored: `entrypoint` and `gateway` are listed for
+# `job_spec` but `JobSpec` has neither.
 _SUBMIT_BODY_INCLUDE: Dict[str, Any] = {
     "run": {
         "id": True,
@@ -105,15 +105,6 @@ _SUBMIT_BODY_INCLUDE: Dict[str, Any] = {
 }
 
 
-def _apply_include(data: Any, spec: Any) -> Any:
-    """Keep only the keys named by `spec`, recursively. `True` keeps a value whole."""
-    if spec is True or not isinstance(data, dict):
-        return data
-    if isinstance(spec, (set, frozenset, list, tuple)):
-        spec = {key: True for key in spec}
-    return {key: _apply_include(data[key], sub) for key, sub in spec.items() if key in data}
-
-
 class SubmitBody(CoreModel):
     run: Run
     job_spec: JobSpec
@@ -127,9 +118,9 @@ class SubmitBody(CoreModel):
     run_spec: RunSpec
     """`run_spec` is deprecated in favor of `run.run_spec`."""
 
-    @model_serializer(mode="wrap")
-    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Dict[str, Any]:
-        return _apply_include(handler(self), _SUBMIT_BODY_INCLUDE)
+    def json_for_runner(self) -> str:
+        """The JSON the runner is sent, restricted to `_SUBMIT_BODY_INCLUDE`."""
+        return self.model_dump_json(include=_SUBMIT_BODY_INCLUDE)
 
 
 class HealthcheckResponse(CoreModel):

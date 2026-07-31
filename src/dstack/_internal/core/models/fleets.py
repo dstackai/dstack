@@ -391,9 +391,8 @@ class FleetSpec(CoreModel):
     @classmethod
     def _merged_profile(cls, values) -> Dict:
         try:
-            # `model_validate` returns the *same* instance for a same-class input (v2 does not
-            # revalidate instances by default), where v1's `parse_obj` always built a new object. The
-            # `setattr` loop below would otherwise mutate the caller's profile in place.
+            # Copy first: `model_validate` returns the *same* instance for a same-class input, so
+            # the `setattr` loop below would otherwise mutate the caller's profile in place.
             merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
             conf = FleetConfiguration.model_validate(values["configuration"])
         except KeyError:

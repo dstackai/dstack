@@ -154,9 +154,8 @@ class RunnerClient:
             run_spec=run.run_spec,
         )
         resp = self._session.post(
-            # use .json() to encode enums
             self._url("/api/submit"),
-            data=body.json(),
+            data=body.json_for_runner(),
             headers={"Content-Type": "application/json"},
             timeout=REQUEST_TIMEOUT,
         )

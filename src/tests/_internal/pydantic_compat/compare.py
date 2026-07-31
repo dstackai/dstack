@@ -112,14 +112,9 @@ def class_name(value: Any) -> str:
     """
     The model's class name.
 
-    Under pydantic v1 this stripped the `Request`/`Response` suffix that pydantic-duality gave its
-    generated classes, so that the fixtures would not all diff when duality went away. A model is
-    a single class now, and its name is already the undecorated one, so there is nothing to strip
-    and the fixtures generated under v1 still match.
-
-    Note this is why the stripping was conditional rather than unconditional: plenty of models are
-    genuinely *named* `...Request` — every gateway registry schema, for one — and reporting
-    `RegisterService` for `RegisterServiceRequest` would have been wrong.
+    Kept as a function because the fixtures were generated under pydantic v1, where this stripped
+    the `Request`/`Response` suffix pydantic-duality gave its generated classes. A model is a single
+    class now, so there is nothing to strip and those fixtures still match.
     """
     cls = value if isinstance(value, type) else type(value)
     return cls.__name__

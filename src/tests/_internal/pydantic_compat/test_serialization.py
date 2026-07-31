@@ -89,7 +89,8 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "volume": factories.volume,
 }
 
-# Sent by the server to the runner (shim) as a request body, via `.json()`.
+# Sent by the server to the runner (shim) as a request body. `SubmitBody` restricts what it
+# sends via `json_for_runner()`; the rest go out as plain `.json()`.
 RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
     "component_install_request": factories.component_install_request,
     "legacy_submit_body": factories.legacy_submit_body,
@@ -133,7 +134,12 @@ SURFACES: dict[str, tuple[dict[str, Callable[[], Any]], Callable[[Any], Union[by
     "backend_data": (BACKEND_DATA, lambda model: model.json()),
     "api_request": (API_REQUESTS, lambda model: model.json()),
     "api_response": (API_RESPONSES, lambda model: bytes(CustomJSONResponse(model).body)),
-    "runner": (RUNNER_REQUESTS, lambda model: model.json()),
+    "runner": (
+        RUNNER_REQUESTS,
+        lambda model: model.json_for_runner()
+        if hasattr(model, "json_for_runner")
+        else model.json(),
+    ),
     "gateway": (GATEWAY_RESPONSES, lambda model: model.json()),
     "proxy": (PROXY_REQUESTS, lambda model: json.dumps(model.dict(exclude_unset=True))),
     "proxy_response": (PROXY_RESPONSES, lambda model: model.json()),
@@ -277,7 +283,7 @@ class TestResourcesSpecCPUCompatHack:
 
 class TestFieldSerializationFilters:
     def test_submit_body_nested_field_includes_are_preserved(self):
-        body = factories.submit_body().dict()
+        body = json.loads(factories.submit_body().json_for_runner())
 
         assert set(body["run"]) == {"id", "run_spec"}
         assert set(body["run"]["run_spec"]) == {

@@ -252,11 +252,9 @@ _DURATION_SENTINEL_CASES = [
     pytest.param("idle_duration", "off", -1, int, id="idle-off"),
     pytest.param("idle_duration", False, -1, int, id="idle-false"),
     pytest.param("idle_duration", -1, -1, int, id="idle-legacy-minus-one"),
-    # `int`, not `Duration`: the field is declared `Union[Literal["off"], int]`, and the `Duration`
-    # the `pre=True` validator returns is an `int` subclass. pydantic v1 passed the subclass
-    # through untouched; v2 validates against the declared `int` and returns a plain one. The value
-    # is identical, the wire format is identical (both serialize as `7200`), and nothing in the
-    # codebase does `isinstance(..., Duration)` — verified during the v2 migration.
+    # `int`, not `Duration`: the field is declared `Union[Literal["off"], int]`, so the `Duration`
+    # int-subclass the before-validator returns does not survive validation. Value and wire format
+    # are unaffected, and nothing does `isinstance(..., Duration)`.
     pytest.param("max_duration", "2h", 7200, int, id="max-duration"),
 ]
 

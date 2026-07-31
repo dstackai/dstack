@@ -8,7 +8,6 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
-    RootModel,
     TypeAdapter,
 )
 from pydantic.json_schema import JsonSchemaValue
@@ -54,8 +53,7 @@ class CoreModel(BaseModel):
 
     model_config = ConfigDict(
         extra="forbid",
-        # YAML numbers reach str fields as int/float (e.g. a `python: 3.10` style shorthand),
-        # which pydantic v1 coerced implicitly and v2 does not.
+        # YAML numbers reach str fields as int/float, e.g. a `python: 3.10` style shorthand.
         coerce_numbers_to_str=True,
     )
 
@@ -84,42 +82,13 @@ def validate_extra_ignore(tp: Any, obj: Any) -> Any:
     This is the read path: anything decoded from a stored blob or from a peer's response goes
     through here, so that a newer writer adding a field does not break an older reader.
 
-    `obj` may also be an instance of a *different* model class, which is how the backend
-    configurators convert e.g. an `AWSBackendConfigWithCreds` into an `AWSConfig`.
+    `obj` may be an instance of a *different* model class, which is how the backend configurators
+    re-read an `AWSBackendConfigWithCreds` as an `AWSConfig`. v1's `parse_obj` accepted that
+    directly; v2 needs a dict, so dump first.
     """
     if isinstance(obj, BaseModel):
-        obj = model_as_field_dict(obj)
+        obj = obj.model_dump()
     return _get_type_adapter(tp).validate_python(obj, extra="ignore")
-
-
-def model_as_field_dict(model: BaseModel) -> dict[str, Any]:
-    """
-    A model's fields as a dict, recursing into nested models.
-
-    This is how pydantic v1's `parse_obj` read an instance of a *different* model class, which is
-    what lets e.g. an `AWSBackendConfigWithCreds` be re-validated as an `AWSConfig`, or a
-    `List[SlurmClusterConfigWithCreds]` as a `List[SlurmClusterConfig]`. v2 accepts only a dict or
-    an instance of the same class, so the conversion has to be explicit.
-
-    Deliberately not `model_dump()`: field and model serializers exist to shape the wire format
-    (dropping `target` when it equals `min`, collapsing `cpu` to a count), and running them on the
-    way into another model would feed it already-transformed values.
-    """
-    return {name: _as_validation_input(getattr(model, name)) for name in type(model).model_fields}
-
-
-def _as_validation_input(value: Any) -> Any:
-    if isinstance(value, RootModel):
-        # A root model validates from its root value, not from `{"root": ...}`. Unwrapping `Env`
-        # into a dict would turn it into an env var literally named "root".
-        return value
-    if isinstance(value, BaseModel):
-        return model_as_field_dict(value)
-    if isinstance(value, (list, tuple)):
-        return [_as_validation_input(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _as_validation_input(item) for key, item in value.items()}
-    return value
 
 
 @overload

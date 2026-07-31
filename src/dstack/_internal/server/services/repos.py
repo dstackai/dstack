@@ -12,7 +12,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import model_as_field_dict, validate_extra_ignore
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.repos import (
     AnyRepoInfo,
     RepoHead,
@@ -59,7 +59,7 @@ async def get_repo(
     if repo is None:
         return None
     if not include_creds or repo.type != RepoType.REMOTE:
-        return RepoHeadWithCreds.model_validate(model_as_field_dict(repo_model_to_repo_head(repo)))
+        return RepoHeadWithCreds.model_validate(repo_model_to_repo_head(repo).model_dump())
     repo_creds = await get_repo_creds(
         session=session,
         repo=repo,

@@ -1,8 +1,10 @@
 import pathlib
 import string
+from typing import Any
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, GetCoreSchemaHandler, field_validator
+from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.common import CoreModel
@@ -32,6 +34,25 @@ class FilePathMapping(CoreModel):
             )
         ),
     ]
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls._parse_shorthand,
+            model_schema,
+            json_schema_input_schema=core_schema.union_schema(
+                [model_schema, core_schema.str_schema()]
+            ),
+        )
+
+    @classmethod
+    def _parse_shorthand(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return cls.parse(v)
+        return v
 
     @classmethod
     def parse(cls, v: str) -> Self:

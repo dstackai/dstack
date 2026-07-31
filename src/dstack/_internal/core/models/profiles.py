@@ -156,9 +156,6 @@ class ProfileRetry(CoreModel):
         return self
 
 
-# A module-level constant rather than a class attribute: pydantic v2 turns an underscore-prefixed
-# class attribute into a `ModelPrivateAttr`, so `cls._min_time_window` would be the descriptor
-# rather than the string.
 MIN_UTILIZATION_TIME_WINDOW = "5m"
 
 
@@ -270,14 +267,14 @@ def parse_instance_selector(v: Union[InstanceSelector, str]) -> InstanceSelector
     return v
 
 
-AnyFleetReference = Annotated[
+FleetReferenceOrShorthand = Annotated[
     Union[
         EntityReference,
         str,  # For server response compatibility with pre-0.20.14 clients
     ],
     AfterValidator(EntityReference.parse),
 ]
-AnyInstanceSelector = Annotated[
+InstanceSelectorOrShorthand = Annotated[
     InstanceSelector,
     BeforeValidator(parse_instance_selector, json_schema_input_type=Union[InstanceSelector, str]),
 ]
@@ -407,7 +404,7 @@ class ProfileParams(CoreModel):
         Field(description=("The schedule for starting the run at specified time")),
     ] = None
     fleets: Annotated[
-        Optional[list[AnyFleetReference]],
+        Optional[list[FleetReferenceOrShorthand]],
         Field(
             description=(
                 "The fleets considered for reuse."
@@ -417,7 +414,7 @@ class ProfileParams(CoreModel):
         ),
     ] = None
     instances: Annotated[
-        Optional[List[AnyInstanceSelector]],
+        Optional[List[InstanceSelectorOrShorthand]],
         Field(
             description=(
                 "The specific fleet instances to consider for reuse."

@@ -587,9 +587,8 @@ class RunSpec(CoreModel):
         if values.get("profile") is None:
             merged_profile = Profile(name="default")
         else:
-            # `model_validate` returns the *same* instance for a same-class input (v2 does not
-            # revalidate instances by default), where v1's `parse_obj` always built a new object. The
-            # `setattr` loop below would otherwise mutate the caller's profile in place.
+            # Copy first: `model_validate` returns the *same* instance for a same-class input, so
+            # the `setattr` loop below would otherwise mutate the caller's profile in place.
             merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
         try:
             conf = RunConfiguration.model_validate(values["configuration"]).root

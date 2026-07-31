@@ -9,6 +9,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    GetCoreSchemaHandler,
     RootModel,
     ValidationError,
     ValidationInfo,
@@ -17,6 +18,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
@@ -171,6 +173,25 @@ class RepoSpec(CoreModel):
             ),
         ),
     ] = RepoExistsAction.ERROR
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls._parse_shorthand,
+            model_schema,
+            json_schema_input_schema=core_schema.union_schema(
+                [model_schema, core_schema.str_schema()]
+            ),
+        )
+
+    @classmethod
+    def _parse_shorthand(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return cls.parse(v)
+        return v
 
     @classmethod
     def parse(cls, v: str) -> Self:
@@ -465,25 +486,13 @@ class ProbeConfig(CoreModel):
         return self
 
 
-def _convert_volume(v: Union[MountPoint, str]) -> MountPoint:
+def _parse_mount_point_shorthand(v: Union[MountPoint, str]) -> MountPoint:
     if isinstance(v, str):
         return parse_mount_point(v)
     return v
 
 
-def _convert_file(v: Union[FilePathMapping, str]) -> FilePathMapping:
-    if isinstance(v, str):
-        return FilePathMapping.parse(v)
-    return v
-
-
-def _convert_repo(v: Union[RepoSpec, str]) -> RepoSpec:
-    if isinstance(v, str):
-        return RepoSpec.parse(v)
-    return v
-
-
-def _convert_port(v: Union[int, str, PortMapping]) -> PortMapping:
+def _parse_port_shorthand(v: Union[int, str, PortMapping]) -> PortMapping:
     if isinstance(v, int):
         return PortMapping(local_port=v, container_port=v)
     if isinstance(v, str):
@@ -493,25 +502,16 @@ def _convert_port(v: Union[int, str, PortMapping]) -> PortMapping:
 
 # `json_schema_input_type` keeps the shorthand visible in the generated JSON Schema, which used to
 # be patched in per field by a sibling config class.
-AnyMountPoint = Annotated[
+MountPointOrShorthand = Annotated[
     MountPoint,
-    BeforeValidator(_convert_volume, json_schema_input_type=Union[MountPoint, str]),
+    BeforeValidator(_parse_mount_point_shorthand, json_schema_input_type=Union[MountPoint, str]),
 ]
-AnyFilePathMapping = Annotated[
-    FilePathMapping,
-    BeforeValidator(_convert_file, json_schema_input_type=Union[FilePathMapping, str]),
-]
-AnyRepoSpec = Annotated[
-    RepoSpec,
-    BeforeValidator(_convert_repo, json_schema_input_type=Union[RepoSpec, str]),
-]
-# Declared as `PortMapping` rather than the input union, because that is what the value always is
-# once `_convert_port` has run. The union stayed in the annotation under pydantic v1 only because
-# `constr()` returned an opaque class there, so nothing checked the lie.
-AnyPortMapping = Annotated[
+# Declared as `PortMapping` rather than the input union: that is what the value always is once
+# `_parse_port_shorthand` has run.
+PortMappingOrShorthand = Annotated[
     PortMapping,
     BeforeValidator(
-        _convert_port,
+        _parse_port_shorthand,
         json_schema_input_type=Union[
             ValidPort, constr(pattern=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping
         ],
@@ -613,7 +613,9 @@ class BaseRunConfiguration(CoreModel):
             ),
         ),
     ] = None
-    volumes: Annotated[List[AnyMountPoint], Field(description="The volumes mount points")] = []
+    volumes: Annotated[
+        List[MountPointOrShorthand], Field(description="The volumes mount points")
+    ] = []
     docker: Annotated[
         Optional[bool],
         Field(
@@ -621,11 +623,11 @@ class BaseRunConfiguration(CoreModel):
         ),
     ] = None
     repos: Annotated[
-        list[AnyRepoSpec],
+        list[RepoSpec],
         Field(description="The list of Git repos"),
     ] = []
     files: Annotated[
-        list[AnyFilePathMapping],
+        list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
     dstack: Annotated[
@@ -699,7 +701,7 @@ class BaseRunConfiguration(CoreModel):
 
 class ConfigurationWithPortsParams(CoreModel):
     ports: Annotated[
-        List[AnyPortMapping],
+        List[PortMappingOrShorthand],
         Field(description="Port numbers/mapping to expose"),
     ] = []
 
@@ -792,10 +794,7 @@ class DevEnvironmentConfiguration(
 
     @model_validator(mode="after")
     def validate_dstack_and_inactivity_duration(self) -> Self:
-        if (
-            getattr(self, "dstack", None)
-            and getattr(self, "inactivity_duration", None) is not None
-        ):
+        if self.dstack and self.inactivity_duration is not None:
             # The persistent server connection counts as activity, so inactivity is never detected
             raise ValueError("`dstack` is not supported together with `inactivity_duration`")
         return self

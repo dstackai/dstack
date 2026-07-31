@@ -29,7 +29,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 from dstack._internal.core.models.common import (
-    model_as_field_dict,
     validate_extra_ignore,
     validate_json_extra_ignore,
 )
@@ -188,7 +187,7 @@ class AWSConfigurator(
                     compute.get_vpc_id_subnets_ids_or_error,
                     ec2_client=ec2_client,
                     # `config` is an `AWSBackendConfigWithCreds`, a different class.
-                    config=AWSConfig.model_validate(model_as_field_dict(config)),
+                    config=AWSConfig.model_validate(config.model_dump()),
                     region=region,
                     allocate_public_ip=allocate_public_ip,
                 )
