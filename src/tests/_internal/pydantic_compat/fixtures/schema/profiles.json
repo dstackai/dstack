@@ -222,6 +222,10 @@
         "idle_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {

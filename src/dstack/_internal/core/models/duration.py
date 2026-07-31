@@ -116,7 +116,10 @@ Negative values are rejected — contrast `OptionalIdleDuration`.
 
 OptionalIdleDuration = Annotated[
     Optional[int],
-    BeforeValidator(parse_idle_duration, json_schema_input_type=Optional[Union[int, str, bool]]),
+    BeforeValidator(
+        parse_idle_duration,
+        json_schema_input_type=Optional[Union[Literal["off"], int, str, bool]],
+    ),
 ]
 """
 A duration whose "off" state is the sentinel `-1` rather than a string.

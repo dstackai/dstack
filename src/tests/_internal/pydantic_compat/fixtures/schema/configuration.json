@@ -28,6 +28,10 @@
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
@@ -408,6 +412,10 @@
         },
         "idle_duration": {
           "anyOf": [
+            {
+              "const": "off",
+              "type": "string"
+            },
             {
               "type": "integer"
             },
@@ -1120,6 +1128,10 @@
         "idle_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
@@ -1383,6 +1395,10 @@
       "properties": {
         "auto_cleanup_duration": {
           "anyOf": [
+            {
+              "const": "off",
+              "type": "string"
+            },
             {
               "type": "integer"
             },
@@ -1908,6 +1924,10 @@
         },
         "auto_cleanup_duration": {
           "anyOf": [
+            {
+              "const": "off",
+              "type": "string"
+            },
             {
               "type": "integer"
             },
@@ -2864,6 +2884,10 @@
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
@@ -3608,6 +3632,10 @@
         },
         "idle_duration": {
           "anyOf": [
+            {
+              "const": "off",
+              "type": "string"
+            },
             {
               "type": "integer"
             },
@@ -4432,6 +4460,10 @@
         },
         "idle_duration": {
           "anyOf": [
+            {
+              "const": "off",
+              "type": "string"
+            },
             {
               "type": "integer"
             },

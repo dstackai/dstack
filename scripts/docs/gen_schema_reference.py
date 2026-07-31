@@ -13,7 +13,8 @@ from typing import Optional
 
 import mkdocs_gen_files
 import yaml
-from pydantic.main import BaseModel
+from pydantic import BaseModel, RootModel
+from pydantic_core import PydanticUndefined
 from typing_extensions import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 from dstack._internal.core.models.resources import Range
@@ -25,20 +26,65 @@ logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 logger.info("Generating schema reference...")
 
 
-def _is_linkable_type(annotation: Any) -> bool:
-    """Check if a type annotation contains a BaseModel subclass (excluding Range)."""
+def _unwrap_optional(annotation: Any) -> Any:
+    """The non-`None` member of an `Optional[...]`, or the annotation unchanged."""
+    if get_origin(annotation) is Union:
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return annotation
+
+
+def _linkable_model(annotation: Any) -> Optional[type]:
+    """
+    The `BaseModel` subclass a field links to in the reference, if any.
+
+    pydantic v2 strips `Annotated` off `FieldInfo.annotation`, so the shape this used to unwrap by
+    hand (`Annotated[Optional[SSHParams], Field(...)]`) now arrives as plain `Optional[SSHParams]`.
+    Recursing over the annotation covers both, and also catches a bare model field, which the old
+    `get_args(...)[0]` approach silently missed.
+    """
     origin = get_origin(annotation)
+    # The container cases come first: `get_origin(Annotated[X, ...])` is `Annotated`, which is
+    # itself a class, so testing `inspect.isclass` first would stop before ever unwrapping it.
+    if origin in (Annotated, Union, list):
+        for arg in get_args(annotation):
+            if arg is type(None):
+                continue
+            found = _linkable_model(arg)
+            if found is not None:
+                return found
+        return None
     type_ = origin if origin is not None else annotation
-    if inspect.isclass(type_):
-        return issubclass(type_, BaseModel) and not issubclass(type_, Range)
-    if origin is Annotated:
-        return _is_linkable_type(get_args(annotation)[0])
-    if origin is Union:
-        return any(_is_linkable_type(arg) for arg in get_args(annotation))
-    if origin is list:
-        args = get_args(annotation)
-        return bool(args) and _is_linkable_type(args[0])
-    return False
+    if inspect.isclass(type_) and issubclass(type_, BaseModel) and not issubclass(type_, Range):
+        return type_
+    return None
+
+
+# Scalar JSON Schema types, mapped to how the docs spell them. Deliberately an allowlist rather
+# than a full mapping: `array` and `object` would only restate what the annotation already renders
+# more precisely (`list[str]` gaining a bare `list`, `dict` gaining `object`), and merging anything
+# into a bracketed type corrupts it, since `_enrich_type_from_schema` splits the rendered type on
+# `" | "` — which `list["no-capacity" | "interruption"]` contains.
+_ENRICHABLE = {"string": "str", "integer": "int", "boolean": "bool", "number": "float"}
+
+
+def _shorthand_primitives(model: Type) -> list:
+    """
+    The primitive types a model accepts in place of its object form, e.g. `8` or `arm:8` for
+    `CPUSpec`. Taken from the model's own validation JSON Schema, which is the same declaration
+    that produces the published `configuration.json`.
+    """
+    try:
+        schema = model.model_json_schema(mode="validation")
+    except Exception:
+        return []
+    found = {
+        _ENRICHABLE[entry["type"]]
+        for entry in schema.get("anyOf", [])
+        if entry.get("type") in _ENRICHABLE
+    }
+    return sorted(found, key=_type_sort_key)
 
 
 def _type_sort_key(t: str) -> tuple:
@@ -57,7 +103,7 @@ def _type_sort_key(t: str) -> tuple:
     return (5, t)
 
 
-def get_friendly_type(annotation: Type) -> str:
+def get_friendly_type(annotation: Any) -> str:
     """Get a user-friendly type string for documentation.
 
     Produces types like: ``int | str``, ``"vscode" | "cursor"``, ``list[object]``.
@@ -113,9 +159,10 @@ def get_friendly_type(annotation: Type) -> str:
         # Range — depends on inner type parameter
         if issubclass(annotation, Range):
             min_field = annotation.model_fields.get("min")
-            if min_field and inspect.isclass(min_field.type_):
+            inner = _unwrap_optional(min_field.annotation) if min_field else None
+            if inspect.isclass(inner):
                 # Range[Memory] → str, Range[int] → int | str
-                if issubclass(min_field.type_, float):
+                if issubclass(inner, float):
                     return "str"
             return "int | str"
 
@@ -127,13 +174,16 @@ def get_friendly_type(annotation: Type) -> str:
 
         # BaseModel subclass (not Range)
         if issubclass(annotation, BaseModel) and not issubclass(annotation, Range):
-            # Root models (with __root__ field) — resolve from the root type
-            if "__root__" in annotation.model_fields:
-                return get_friendly_type(annotation.model_fields["__root__"].annotation)
-            # Models with custom __get_validators__ accept primitive input (int, str)
-            # in addition to the full object form (e.g., GPUSpec, CPUSpec, DiskSpec)
-            if "__get_validators__" in annotation.__dict__:
-                return "int | str | object"
+            # Root models — resolve from the root type
+            if issubclass(annotation, RootModel):
+                return get_friendly_type(annotation.model_fields["root"].annotation)
+            # Models that define their own core schema also accept a shorthand. Read which
+            # primitives from the model's own JSON Schema rather than assuming `int | str`:
+            # `CPUSpec` takes both, but `FilePathMapping` and `RepoSpec` take only a string.
+            if "__get_pydantic_core_schema__" in annotation.__dict__:
+                shorthand = _shorthand_primitives(annotation)
+                if shorthand:
+                    return " | ".join([*shorthand, "object"])
             return "object"
 
         # ComputeCapability (tuple subclass that parses "7.5" strings)
@@ -163,33 +213,24 @@ def get_friendly_type(annotation: Type) -> str:
     return str(annotation)
 
 
-_JSON_SCHEMA_TYPE_MAP = {
-    "string": "str",
-    "integer": "int",
-    "number": "float",
-    "boolean": "bool",
-    "array": "list",
-    "object": "object",
-}
-
-
 def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) -> str:
     """Enrich the friendly type with extra accepted types from the JSON schema.
 
-    Models may define ``schema_extra`` that adds ``anyOf`` entries for fields
-    that accept alternative input types (e.g., duration fields typed as ``int``
-    but also accepting ``str`` like ``"5m"``).
+    A field's annotation is its *post-validation* type, so it does not show what a before-validator
+    also accepts — a duration typed ``int`` takes ``"5m"``, ``false`` and ``"off"`` as well. Those
+    come from the type's ``json_schema_input_type``, i.e. the same declaration that produces the
+    published schema.
     """
     any_of = prop_schema.get("anyOf")
     if not any_of:
         return friendly_type
-    # Only consider string/integer — the most common alternative input types.
-    # Skip boolean (typically a backward-compat artifact) and object/array.
-    _ENRICHABLE = {"string": "str", "integer": "int"}
     schema_types = set()
     for entry in any_of:
-        # Skip entries with enum constraints — those are already captured as literal values
-        if "enum" in entry:
+        # A single accepted value (`Literal["off"]`) is more useful spelled out than as `str`.
+        # Duplicates are removed below, so an annotation that already shows it is unaffected.
+        literals = [entry["const"]] if "const" in entry else entry.get("enum", [])
+        if literals:
+            schema_types.update(f'"{v}"' for v in literals if isinstance(v, str))
             continue
         mapped = _ENRICHABLE.get(entry.get("type", ""))
         if mapped:
@@ -200,9 +241,6 @@ def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) ->
     if not new_parts:
         return friendly_type
     all_parts = list(set(current_parts) | new_parts)
-    # If str is now present, single-value literals are redundant
-    if "str" in all_parts:
-        all_parts = [p for p in all_parts if not p.startswith('"') or p in all_parts]
     all_parts.sort(key=_type_sort_key)
     return " | ".join(all_parts)
 
@@ -230,13 +268,13 @@ def generate_schema_reference(
         )
     # Get JSON schema to detect extra accepted types from schema_extra
     try:
-        schema_props = cls.schema().get("properties", {})
+        schema_props = cls.model_json_schema().get("properties", {})
     except Exception:
         schema_props = {}
     for name, field in cls.model_fields.items():
         default = field.default
         default_repr: Optional[str]
-        if default is None:
+        if default is None or default is PydanticUndefined:
             default_repr = None
         elif isinstance(default, (list, tuple, dict)) and len(default) == 0:
             default_repr = None
@@ -252,24 +290,17 @@ def generate_schema_reference(
         friendly_type = _enrich_type_from_schema(friendly_type, schema_props.get(name, {}))
         values = dict(
             name=name,
-            description=field.field_info.description,
+            description=field.description,
             type=friendly_type,
             default=default_repr,
-            required=field.required,
+            required=field.is_required(),
         )
         # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring
         if values["description"]:
             if overrides and name in overrides:
                 values.update(overrides[name])
-            field_type = next(iter(get_args(field.annotation)), None)
-            # TODO: This is a dirty workaround
-            if field_type:
-                if field.annotation.__name__ == "Annotated":
-                    if field_type.__name__ in ["Optional", "List", "list", "Union"]:
-                        field_type = get_args(field_type)[0]
-                base_model = _is_linkable_type(field_type)
-            else:
-                base_model = False
+            field_type = _linkable_model(field.annotation)
+            base_model = field_type is not None
             _defaults = (
                 f"Defaults to `{values['default']}`."
                 if not base_model and values.get("default")
