@@ -2,14 +2,17 @@ import argparse
 import os
 
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.duration import (
+    parse_duration,
+    parse_idle_duration,
+    parse_off_duration,
+)
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
-    parse_duration,
-    parse_max_duration,
 )
 from dstack._internal.utils.env import environ
 from dstack._internal.utils.path import PathLike
@@ -104,8 +107,9 @@ def register_profile_args(parser: argparse.ArgumentParser):
     fleets_group_exc.add_argument(
         "--idle-duration",
         dest="idle_duration",
-        type=str,
+        type=idle_duration,
         help="Time to wait before destroying the idle instance (if the run provisions a new instance)",
+        metavar="DURATION",
     )
 
     spot_group = parser.add_argument_group("Spot policy")
@@ -204,8 +208,12 @@ def apply_profile_args(
         )
 
 
-def max_duration(v: str) -> int:
-    return parse_max_duration(v)
+def max_duration(v: str):
+    return parse_off_duration(v)
+
+
+def idle_duration(v: str):
+    return parse_idle_duration(v)
 
 
 def retry_duration(v: str) -> int:

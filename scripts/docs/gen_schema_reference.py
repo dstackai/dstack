@@ -112,7 +112,7 @@ def get_friendly_type(annotation: Type) -> str:
 
         # Range — depends on inner type parameter
         if issubclass(annotation, Range):
-            min_field = annotation.__fields__.get("min")
+            min_field = annotation.model_fields.get("min")
             if min_field and inspect.isclass(min_field.type_):
                 # Range[Memory] → str, Range[int] → int | str
                 if issubclass(min_field.type_, float):
@@ -128,8 +128,8 @@ def get_friendly_type(annotation: Type) -> str:
         # BaseModel subclass (not Range)
         if issubclass(annotation, BaseModel) and not issubclass(annotation, Range):
             # Root models (with __root__ field) — resolve from the root type
-            if "__root__" in annotation.__fields__:
-                return get_friendly_type(annotation.__fields__["__root__"].annotation)
+            if "__root__" in annotation.model_fields:
+                return get_friendly_type(annotation.model_fields["__root__"].annotation)
             # Models with custom __get_validators__ accept primitive input (int, str)
             # in addition to the full object form (e.g., GPUSpec, CPUSpec, DiskSpec)
             if "__get_validators__" in annotation.__dict__:
@@ -233,7 +233,7 @@ def generate_schema_reference(
         schema_props = cls.schema().get("properties", {})
     except Exception:
         schema_props = {}
-    for name, field in cls.__fields__.items():
+    for name, field in cls.model_fields.items():
         default = field.default
         default_repr: Optional[str]
         if default is None:

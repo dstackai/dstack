@@ -15,7 +15,7 @@ from uuid import UUID
 
 from typing_extensions import ParamSpec
 
-from dstack._internal.core.models.common import Duration
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
 

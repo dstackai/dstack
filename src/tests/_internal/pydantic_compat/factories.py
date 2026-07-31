@@ -16,6 +16,7 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     PythonVersion,
 )
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -290,7 +291,7 @@ def profile() -> Profile:
         instance_types=["p4d.24xlarge"],
         reservation="test-reservation",
         spot_policy=SpotPolicy.AUTO,
-        retry=ProfileRetry(on_events=[RetryEvent.NO_CAPACITY], duration=3600),
+        retry=ProfileRetry(on_events=[RetryEvent.NO_CAPACITY], duration=Duration(3600)),
         max_duration=7200,
         stop_duration=300,
         idle_duration=600,

@@ -25,11 +25,11 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import (
     JSON_SCHEMA_DIALECT,
     CoreModel,
-    Duration,
     EntityReference,
     RegistryAuth,
     validate_extra_ignore,
 )
+from dstack._internal.core.models.duration import Duration, parse_off_duration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
@@ -37,8 +37,6 @@ from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import (
     ProfileParams,
     SpotPolicy,
-    parse_duration,
-    parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
@@ -407,7 +405,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     timeout: Annotated[
-        Optional[int],
+        Optional[Duration],
         Field(
             description=(
                 f"Maximum amount of time the HTTP request is allowed to take. Defaults to `{DEFAULT_PROBE_TIMEOUT}s`"
@@ -415,7 +413,7 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
     interval: Annotated[
-        Optional[int],
+        Optional[Duration],
         Field(
             description=(
                 "Minimum amount of time between the end of one probe execution"
@@ -445,25 +443,19 @@ class ProbeConfig(CoreModel):
         ),
     ] = None
 
-    @field_validator("timeout", mode="before", json_schema_input_type=Optional[Union[int, str]])
+    @field_validator("timeout")
     @classmethod
-    def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
-        if v is None:
-            return v
-        parsed = parse_duration(v)
-        if parsed < MIN_PROBE_TIMEOUT:
+    def validate_timeout(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v < MIN_PROBE_TIMEOUT:
             raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
-        return parsed
+        return v
 
-    @field_validator("interval", mode="before", json_schema_input_type=Optional[Union[int, str]])
+    @field_validator("interval")
     @classmethod
-    def parse_interval(cls, v: Optional[Union[int, str]]) -> Optional[int]:
-        if v is None:
-            return v
-        parsed = parse_duration(v)
-        if parsed < MIN_PROBE_INTERVAL:
+    def validate_interval(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v < MIN_PROBE_INTERVAL:
             raise ValueError(f"Probe interval cannot be shorter than {MIN_PROBE_INTERVAL}s")
-        return parsed
+        return v
 
     @field_validator("url")
     @classmethod
@@ -736,7 +728,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
     ] = None
     init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
-        Optional[Union[Literal["off"], int, bool, str]],
+        Optional[int],
         Field(
             description=(
                 "The maximum amount of time the dev environment can be inactive"
@@ -751,7 +743,12 @@ class DevEnvironmentConfigurationParams(CoreModel):
         ),
     ] = None
 
-    @field_validator("inactivity_duration", mode="before")
+    # Not `OptionalOffableDuration`: "off" collapses to `None` here rather than staying as the string.
+    @field_validator(
+        "inactivity_duration",
+        mode="before",
+        json_schema_input_type=Optional[Union[Literal["off"], int, bool, str]],
+    )
     @classmethod
     def parse_inactivity_duration(
         cls, v: Optional[Union[Literal["off"], int, bool, str]]

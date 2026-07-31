@@ -10,7 +10,7 @@ from typing_extensions import Annotated, Self
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.profiles import parse_idle_duration
+from dstack._internal.core.models.duration import OptionalIdleDuration
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.tags import tags_validator
@@ -47,7 +47,7 @@ class BaseVolumeConfiguration(CoreModel):
         Field(description="The volume size. Must be specified when creating new volumes"),
     ] = None
     auto_cleanup_duration: Annotated[
-        Optional[Union[str, int]],
+        OptionalIdleDuration,
         Field(
             description=(
                 "Time to wait after volume is no longer used by any job before deleting it. "
@@ -68,9 +68,6 @@ class BaseVolumeConfiguration(CoreModel):
     ] = None
 
     _validate_tags = field_validator("tags", mode="before")(tags_validator)
-    _validate_auto_cleanup_duration = field_validator("auto_cleanup_duration", mode="before")(
-        parse_idle_duration
-    )
 
     @property
     def external_volume_id(self) -> Optional[str]:

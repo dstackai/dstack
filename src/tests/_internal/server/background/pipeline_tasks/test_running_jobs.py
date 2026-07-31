@@ -23,6 +23,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
@@ -1806,7 +1807,7 @@ class TestJobRunningWorker:
                     ide="vscode",
                     utilization_policy=UtilizationPolicy(
                         min_gpu_utilization=80,
-                        time_window=600,
+                        time_window=Duration(600),
                     ),
                 ),
             ),

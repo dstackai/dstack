@@ -13,7 +13,7 @@ from typing import Any, Callable
 import pytest
 from pydantic import ValidationError, parse_obj_as
 
-from dstack._internal.core.models.common import Duration
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.gateways import GatewaySpec
 from dstack._internal.core.models.resources import (
     ComputeCapability,

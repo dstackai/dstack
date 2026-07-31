@@ -173,8 +173,7 @@ class TestShouldDeleteVolume:
         project = await create_project(session=session)
         user = await create_user(session=session)
 
-        config = get_volume_configuration(name="test-volume")
-        config.auto_cleanup_duration = "1h"
+        config = get_volume_configuration(name="test-volume", auto_cleanup_duration=3600)
 
         volume = await create_volume(
             session=session,
@@ -198,8 +197,7 @@ class TestShouldDeleteVolume:
         project = await create_project(session=session)
         user = await create_user(session=session)
 
-        config = get_volume_configuration(name="test-volume")
-        config.auto_cleanup_duration = "1h"
+        config = get_volume_configuration(name="test-volume", auto_cleanup_duration=3600)
 
         volume = await create_volume(
             session=session,

@@ -21,6 +21,7 @@ from dstack._internal.core.models.common import (
     CoreModel,
     drop_merged_profile,
 )
+from dstack._internal.core.models.duration import OptionalIdleDuration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Instance, InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
@@ -28,7 +29,6 @@ from dstack._internal.core.models.profiles import (
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
-    parse_idle_duration,
     validate_backend_options,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -292,7 +292,7 @@ class BackendFleetConfiguraionProps(CoreModel):
         Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
     idle_duration: Annotated[
-        Optional[int],
+        OptionalIdleDuration,
         Field(
             description=(
                 "Time to wait before terminating idle instances."
@@ -330,9 +330,6 @@ class BackendFleetConfiguraionProps(CoreModel):
             return dict(min=v, max=v)
         return v
 
-    _validate_idle_duration = field_validator(
-        "idle_duration", mode="before", json_schema_input_type=Optional[Union[int, str]]
-    )(parse_idle_duration)
     _validate_tags = field_validator("tags", mode="before")(tags_validator)
     _validate_backend_options = field_validator("backend_options")(validate_backend_options)
 

@@ -1,4 +1,3 @@
-import re
 from enum import Enum
 from typing import Any, Optional, TypeVar, Union, overload
 
@@ -6,12 +5,8 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    GetCoreSchemaHandler,
-    GetJsonSchemaHandler,
     TypeAdapter,
 )
-from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Annotated
 
 # pydantic v2 generates draft 2020-12. The published `configuration.json` / `profiles.json`
@@ -118,57 +113,6 @@ def _get_type_adapter(tp: Any) -> TypeAdapter:
         adapter = TypeAdapter(tp)
         _type_adapters[tp] = adapter
     return adapter
-
-
-class Duration(int):
-    """
-    Duration in seconds.
-    """
-
-    @classmethod
-    def parse(cls, v: Union[int, str]) -> "Duration":
-        if isinstance(v, (int, float)):
-            return cls(v)
-        if isinstance(v, str):
-            try:
-                return cls(int(v))
-            except ValueError:
-                pass
-            regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
-            re_match = regex.match(v)
-            if not re_match:
-                raise ValueError(f"Cannot parse the duration {v}")
-            amount, unit = int(re_match.group("amount")), re_match.group("unit")
-            multiplier = {
-                "s": 1,
-                "m": 60,
-                "h": 3600,
-                "d": 24 * 3600,
-                "w": 7 * 24 * 3600,
-            }[unit]
-            return cls(amount * multiplier)
-        raise ValueError(f"Cannot parse the duration {v}")
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_plain_validator_function(
-            cls.parse,
-            serialization=core_schema.plain_serializer_function_ser_schema(
-                int, return_schema=core_schema.int_schema()
-            ),
-        )
-
-    @classmethod
-    def __get_pydantic_json_schema__(
-        cls, schema: CoreSchema, handler: GetJsonSchemaHandler
-    ) -> JsonSchemaValue:
-        # A duration is accepted either as a number of seconds or as a shorthand string
-        # like `2h`, but it always serializes as a number of seconds.
-        if handler.mode == "validation":
-            return {"anyOf": [{"type": "integer"}, {"type": "string"}]}
-        return {"type": "integer"}
 
 
 class RegistryAuth(FrozenCoreModel):

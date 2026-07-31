@@ -35,6 +35,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
 )
+from dstack._internal.core.models.duration import OptionalIdleDuration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
@@ -1170,7 +1171,7 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
-    auto_cleanup_duration: Optional[Union[str, int]] = None,
+    auto_cleanup_duration: OptionalIdleDuration = None,
 ) -> AnyVolumeConfiguration:
     assert backend != BackendType.KUBERNETES, "use get_kubernetes_volume_configuration() instead"
     return VolumeConfiguration.model_validate(
@@ -1189,7 +1190,7 @@ def get_kubernetes_volume_configuration(
     name: str = "test-volume",
     size: Optional[Memory] = Memory(100),
     claim_name: Optional[str] = None,
-    auto_cleanup_duration: Optional[Union[str, int]] = None,
+    auto_cleanup_duration: OptionalIdleDuration = None,
     storage_class_name: Optional[str] = None,
 ) -> KubernetesVolumeConfiguration:
     return KubernetesVolumeConfiguration(

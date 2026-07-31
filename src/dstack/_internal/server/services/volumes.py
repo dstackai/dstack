@@ -15,7 +15,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import validate_json_extra_ignore
-from dstack._internal.core.models.profiles import parse_duration
+from dstack._internal.core.models.duration import parse_duration
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
     Volume,

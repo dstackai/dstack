@@ -27,16 +27,14 @@ dependencies = [
     "rich-argparse",
     "tqdm",
     "questionary>=2.0.1",
-    "pydantic>=1.10.10,<2.0.0",
-    "pydantic-duality>=1.2.4",
+    "pydantic>=2.12",
     "websocket-client",
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.27",
+    "gpuhunt",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
-    "orjson",
     "apscheduler<4",
 ]
 
@@ -89,6 +87,9 @@ ignore-case = true
 
 [tool.uv.sources]
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
+# TODO: pin back to a released version once the pydantic v2 gpuhunt release is out.
+# https://github.com/dstackai/gpuhunt/pull/247
+gpuhunt = { git = "https://github.com/dstackai/gpuhunt", branch = "pr_pydantic_v2" }
 
 [tool.ruff]
 target-version = "py310"
@@ -115,7 +116,6 @@ include = [
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
     "src/dstack/_internal/cli/services/configurators",
-    "src/dstack/_internal/cli/services/endpoints",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
