@@ -33,8 +33,6 @@ def diff_models(
         A dict of changed fields in the form of
         `{<field_name>: {"old": old_value, "new": new_value}}`
     """
-    # Used to also accept a request/response pair of the same pydantic-duality model. Now that
-    # a model is a single class, identity is the whole check.
     if type(old) is not type(new):
         raise TypeError("Both instances must be of the same Pydantic model class.")
 
@@ -43,7 +41,6 @@ def diff_models(
         new = copy_model(new, reset=reset)
 
     changes: ModelDiff = {}
-    # Accessing `model_fields` on an instance is deprecated in pydantic 2.11+.
     for field in type(old).model_fields:
         old_value = getattr(old, field)
         new_value = getattr(new, field)

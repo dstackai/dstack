@@ -536,13 +536,13 @@ async def get_plan(
     unallocated_resources: bool,
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
-    # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.model_validate(run_spec.model_dump())
     effective_run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_run_spec,
     )
+    # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.model_validate(effective_run_spec.model_dump())
     validate_run_spec_and_set_defaults(
         user=user,

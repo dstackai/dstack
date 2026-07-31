@@ -415,7 +415,6 @@ async def get_plan(
     user: UserModel,
     spec: FleetSpec,
 ) -> FleetPlan:
-    # Spec must be copied by parsing to calculate merged_profile
     effective_spec = copy_model(spec)
     effective_spec = await apply_plugin_policies(
         user=user.name,
@@ -1363,6 +1362,11 @@ def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
 
 
 def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
+    # Callers do not reparse afterwards, so the defaults set here must not touch any field that
+    # `ProfileParams` also declares — `spec.merged_profile` is computed at parse time and would
+    # silently keep the pre-default value. Only `configuration.resources` is written, which
+    # `ProfileParams` does not declare.
+    # TODO: Make callers reparse if this changes.
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
     _validate_fleet_configuration_subtype_specific_fields(spec.configuration)

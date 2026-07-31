@@ -378,7 +378,7 @@ class FleetSpec(CoreModel):
     autocreated: bool = False
     """Deprecated. Kept for deserialization of old client requests and existing DB records.
     """
-    # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
+    # TODO: consider a `property` or `cached_property` instead of an excluded field.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
     """`merged_profile` stores profile parameters merged from `profile` and `configuration`.
     Read profile parameters from `merged_profile` instead of `profile` directly.
