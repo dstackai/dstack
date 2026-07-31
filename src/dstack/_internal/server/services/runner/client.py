@@ -727,7 +727,7 @@ def instance_info_response_to_gpu_driver(
 ) -> Optional[GpuDriverInfo]:
     if response is None or not response.gpu_driver_version:
         return None
-    return GpuDriverInfo.parse_obj(
+    return GpuDriverInfo.model_validate(
         {"vendor": response.gpu_vendor, "version": response.gpu_driver_version}
     )
 
