@@ -131,6 +131,14 @@ class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
 
 
+class InstanceInfoResponse(CoreModel):
+    gpu_vendor: Optional[str] = None
+    """`gpu_vendor` is not set on hosts without GPUs."""
+    gpu_driver_version: Optional[str] = None
+    """`gpu_driver_version` is not set on hosts without GPUs
+    and when driver detection fails."""
+
+
 class ShutdownRequest(CoreModel):
     force: bool
 

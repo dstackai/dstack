@@ -46,6 +46,12 @@ class Gpu(CoreModel):
         return values
 
 
+class GpuDriverInfo(CoreModel):
+    vendor: Optional[gpuhunt.AcceleratorVendor] = None
+    """`vendor` is not set on hosts where shim could not detect it."""
+    version: str
+
+
 class Disk(CoreModel):
     size_mib: int
     """`size_mib=0` has a special meaning -- size is unknown"""
@@ -325,3 +331,5 @@ class Instance(CoreModel):
     price: Optional[float] = None
     total_blocks: Optional[int] = None
     busy_blocks: int = 0
+    gpu_driver: Optional[GpuDriverInfo] = None
+    """`gpu_driver` is the accelerator driver installed on the host, when known."""
