@@ -1,6 +1,5 @@
 import argparse
 import os
-from typing import Union
 
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.backends.base import BackendType
@@ -66,7 +65,7 @@ def register_profile_args(parser: argparse.ArgumentParser):
         action="append",
         metavar="NAME",
         dest="backends",
-        type=backend_type,
+        type=BackendType,
         help="The backends that will be tried for provisioning",
     )
     profile_group.add_argument(
@@ -209,20 +208,6 @@ def apply_profile_args(
         profile_settings.retry = ProfileRetry(
             duration=args.retry_duration,
         )
-
-
-def backend_type(v: str) -> Union[BackendType, str]:
-    # `apply_profile_args` assigns straight onto the model, and pydantic does not validate on
-    # assignment, so a raw `str` left here would sit in a `List[BackendType]` field and make the
-    # serializer warn on every `dstack apply -b ...`.
-    #
-    # An unknown name is passed through rather than rejected: a newer server may know a backend
-    # this CLI's enum does not, the same forward compatibility `list_backend_types()` preserves.
-    # Such a name still reaches the server, which reports it.
-    try:
-        return BackendType(v)
-    except ValueError:
-        return v
 
 
 def max_duration(v: str):

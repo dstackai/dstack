@@ -326,3 +326,32 @@ class TestGatewayReferenceFieldParsing:
             "project": "other-project",
             "name": "shared-gateway",
         }
+
+    def test_bare_string_becomes_entity_reference(self):
+        config = parse_apply_configuration(_service(gateway="shared-gateway"))
+
+        assert class_name(config.gateway) == "EntityReference"
+        assert config.gateway.model_dump() == {"project": None, "name": "shared-gateway"}
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (True, True),
+            (False, False),
+            # Quoted in YAML, so the field receives a `str`. The `bool` arm must still claim it:
+            # the union also has a `str` arm, which pydantic v2's "smart" mode prefers for an exact
+            # type match, turning `gateway: "false"` into a gateway *named* `false`.
+            ("true", True),
+            ("false", False),
+            ("yes", True),
+            ("no", False),
+            ("on", True),
+            ("off", False),
+            ("1", True),
+            ("0", False),
+        ],
+    )
+    def test_boolean_and_quoted_boolean_stay_boolean(self, value: Any, expected: bool):
+        config = parse_apply_configuration(_service(gateway=value))
+
+        assert config.gateway is expected

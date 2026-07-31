@@ -1,6 +1,8 @@
 import argparse
 from typing import List, Tuple
 
+import pytest
+
 from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
@@ -41,11 +43,10 @@ class TestProfileArgs:
         profile.backends = [BackendType.GCP, BackendType.AWS]
         assert profile.model_dump() == modified.model_dump()
 
-    def test_backends_passes_through_unknown_name(self):
-        # A newer server may know a backend this CLI's enum does not. Rejecting locally would
-        # break that, so the name is forwarded and the server decides.
-        modified, _ = apply_args(Profile(name="test"), ["-b", "quantum-cloud-9000"])
-        assert modified.backends == ["quantum-cloud-9000"]
+    def test_backends_rejects_unknown_name(self, capsys: pytest.CaptureFixture):
+        with pytest.raises(SystemExit):
+            apply_args(Profile(name="test"), ["-b", "quantum-cloud-9000"])
+        assert "invalid BackendType value: 'quantum-cloud-9000'" in capsys.readouterr().err
 
     def test_spot_policy_spot(self):
         profile = Profile(name="test")

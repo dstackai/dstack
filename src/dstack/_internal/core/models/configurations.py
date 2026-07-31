@@ -986,6 +986,7 @@ class ServiceConfigurationParams(CoreModel):
             ]
         ],
         Field(
+            union_mode="left_to_right",  # preserving pydantic v1 parsing behavior
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
                 " Specify boolean `true` to run with the default gateway."

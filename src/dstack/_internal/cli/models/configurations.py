@@ -154,11 +154,12 @@ class PresetConfiguration(
     gateway: Annotated[
         Optional[Union[bool, EntityReference, str]],
         Field(
+            union_mode="left_to_right",  # preserving pydantic v1 parsing behavior
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
                 " Specify boolean `true` to run with the default gateway."
                 " Omit to run with the default gateway if there is one, or without a gateway otherwise"
-            )
+            ),
         ),
     ] = None
     env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (
