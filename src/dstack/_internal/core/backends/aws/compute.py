@@ -204,7 +204,7 @@ class AWSCompute(
 
     def _get_offers_post_filter_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
-        return hash(requirements.json())
+        return hash(requirements.model_dump_json())
 
     @cachedmethod(
         cache=lambda self: self._offers_post_filter_cache.cache,
@@ -468,7 +468,7 @@ class AWSCompute(
             )
             provisioning_data.backend_data = AWSInstanceBackendData(
                 eip_allocation_id=allocation_id
-            ).json()
+            ).model_dump_json()
             provisioning_data.hostname = public_ip
         else:
             provisioning_data.hostname = _get_instance_ip(
@@ -715,7 +715,7 @@ class AWSCompute(
                 tg_arn=tg_arn,
                 listener_arn=listener_arn,
                 http_listener_arn=http_listener_arn,
-            ).json(),
+            ).model_dump_json(),
         )
 
     def terminate_gateway(
@@ -861,7 +861,7 @@ class AWSCompute(
             backend_data=AWSVolumeBackendData(
                 volume_type=response_volume["VolumeType"],
                 iops=response_volume["Iops"],
-            ).json(),
+            ).model_dump_json(),
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
@@ -920,7 +920,7 @@ class AWSCompute(
             backend_data=AWSVolumeBackendData(
                 volume_type=response["VolumeType"],
                 iops=iops,
-            ).json(),
+            ).model_dump_json(),
         )
 
     def delete_volume(self, volume: Volume):
@@ -1161,7 +1161,10 @@ class AWSCompute(
         image_config: Optional[AWSOSImageConfig] = None,
     ) -> tuple:
         return hashkey(
-            region, gpu_name, instance_type, image_config.json() if image_config else None
+            region,
+            gpu_name,
+            instance_type,
+            image_config.model_dump_json() if image_config else None,
         )
 
     @cachedmethod(

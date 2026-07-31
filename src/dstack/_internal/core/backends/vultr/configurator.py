@@ -43,9 +43,9 @@ class VultrConfigurator(
             config.regions = REGIONS
         return BackendRecord(
             config=VultrStoredConfig(
-                **validate_extra_ignore(VultrBackendConfig, config).dict()
-            ).json(),
-            auth=VultrCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(VultrBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=VultrCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> VultrBackendConfigWithCreds:

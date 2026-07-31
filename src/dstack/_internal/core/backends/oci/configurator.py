@@ -82,14 +82,14 @@ class OCIConfigurator(
         stored_config = validate_extra_ignore(
             OCIStoredConfig,
             {
-                **config.dict(),
+                **config.model_dump(),
                 "subnet_ids_per_region": subnet_ids_per_region,
             },
         )
 
         return BackendRecord(
-            config=stored_config.json(),
-            auth=OCICreds.model_validate(config.creds).json(),
+            config=stored_config.model_dump_json(),
+            auth=OCICreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> OCIBackendConfigWithCreds:

@@ -55,9 +55,9 @@ class CrusoeConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=CrusoeStoredConfig(
-                **validate_extra_ignore(CrusoeBackendConfig, config).dict()
-            ).json(),
-            auth=CrusoeCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(CrusoeBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=CrusoeCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> CrusoeBackendConfigWithCreds:

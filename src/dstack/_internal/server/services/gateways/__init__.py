@@ -220,7 +220,7 @@ def create_gateway_compute_model(
         gateway_id=gateway_id,
         backend_id=backend_id,
         replica_num=replica_num,
-        configuration=compute_configuration.json(),
+        configuration=compute_configuration.model_dump_json(),
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
         status=GatewayReplicaStatus.SUBMITTED,
@@ -274,7 +274,7 @@ async def create_gateway(
             project_id=project.id,
             backend_id=backend_model.id,
             wildcard_domain=configuration.domain,
-            configuration=configuration.json(),
+            configuration=configuration.model_dump_json(),
             status=GatewayStatus.SUBMITTED,
             desired_replica_count=(
                 configuration.replicas
@@ -420,7 +420,7 @@ async def set_gateway_wildcard_domain(
             if gateway.configuration is not None:
                 conf = get_gateway_configuration(gateway)
                 conf.domain = wildcard_domain
-                gateway.configuration = conf.json()
+                gateway.configuration = conf.model_dump_json()
             events.emit(
                 session,
                 f"Gateway wildcard domain changed {old_domain!r} -> {gateway.wildcard_domain!r}",
@@ -1085,7 +1085,7 @@ async def apply_plan(
                 if new_configuration.replicas is not None
                 else GATEWAY_REPLICAS_DEFAULT
             )
-        gateway_model.configuration = new_configuration.json()
+        gateway_model.configuration = new_configuration.model_dump_json()
         gateway_model.last_update_at = get_current_datetime()
         events.emit(
             session,

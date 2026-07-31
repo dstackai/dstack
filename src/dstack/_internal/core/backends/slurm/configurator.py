@@ -37,7 +37,7 @@ class SlurmConfigurator(
         self, project_name: str, config: SlurmBackendConfigWithCreds
     ) -> BackendRecord:
         return BackendRecord(
-            config=validate_extra_ignore(SlurmStoredConfig, config).json(),
+            config=validate_extra_ignore(SlurmStoredConfig, config).model_dump_json(),
             auth="",
         )
 

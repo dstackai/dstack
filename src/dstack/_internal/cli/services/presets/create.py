@@ -346,7 +346,7 @@ def _resolve_preset_env(
     """Resolves `EnvSentinel` entries from the process environment. Non-strict
     drops unresolvable entries instead of raising — for attach, where env values
     only feed redaction and the agent already runs."""
-    configuration = configuration.copy(deep=True)
+    configuration = configuration.model_copy(deep=True)
     resolved: dict[str, str] = {}
     for key, value in configuration.env.items():
         if isinstance(value, EnvSentinel):
@@ -848,7 +848,7 @@ def _build_constraints(
     constraints = PresetConstraints.model_validate(
         {
             "run_name_prefix": build_name,
-            "model": json.loads(configuration.model.json(exclude_none=True)),
+            "model": json.loads(configuration.model.model_dump_json(exclude_none=True)),
             "context_length": configuration.context_length,
             "max_trials": configuration.max_trials,
             "concurrency": configuration.effective_concurrency,
@@ -857,7 +857,7 @@ def _build_constraints(
         }
     )
     # All fields are always present; unset optional constraints render as null.
-    return json.dumps(json.loads(constraints.json()), indent=2) + "\n"
+    return json.dumps(json.loads(constraints.model_dump_json()), indent=2) + "\n"
 
 
 def _save_final_report_copy(

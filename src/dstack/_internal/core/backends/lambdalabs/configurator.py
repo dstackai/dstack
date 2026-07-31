@@ -37,9 +37,9 @@ class LambdaConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=LambdaStoredConfig(
-                **validate_extra_ignore(LambdaBackendConfig, config).dict()
-            ).json(),
-            auth=LambdaCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(LambdaBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=LambdaCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> LambdaBackendConfigWithCreds:

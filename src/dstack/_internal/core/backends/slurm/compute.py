@@ -361,7 +361,7 @@ class SlurmCompute(
         if not filtered_partitions:
             return None
 
-        offer_copy = offer.copy(deep=True)
+        offer_copy = offer.model_copy(deep=True)
         _adjust_resources(offer_copy.instance.resources, requested_resources)
         offer_copy.availability_zones = list(filtered_partitions)
         return offer_copy

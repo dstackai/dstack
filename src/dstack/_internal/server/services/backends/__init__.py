@@ -55,7 +55,7 @@ def serialize_source_backend_config(
     config: AnyBackendConfigWithCreds,
 ) -> Tuple[str, Optional[str]]:
     """Split user-intent backend config into non-sensitive and sensitive JSON blobs."""
-    source_config_dict = config.dict()
+    source_config_dict = config.model_dump()
     source_auth = source_config_dict.pop("creds", None)
     source_auth_json = None if source_auth is None else json.dumps(source_auth)
     return json.dumps(source_config_dict), source_auth_json

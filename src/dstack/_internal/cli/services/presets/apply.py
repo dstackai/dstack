@@ -75,7 +75,7 @@ def _build_service(
     configuration: PresetConfiguration,
     preset: Preset,
 ) -> ServiceConfiguration:
-    service = preset.service.copy(deep=True)
+    service = preset.service.model_copy(deep=True)
     service.name = configuration.name
     service.gateway = configuration.gateway
     service.env.update(configuration.env)

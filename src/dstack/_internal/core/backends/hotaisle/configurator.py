@@ -37,9 +37,9 @@ class HotAisleConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=HotAisleStoredConfig(
-                **validate_extra_ignore(HotAisleBackendConfig, config).dict()
-            ).json(),
-            auth=HotAisleCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(HotAisleBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=HotAisleCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(

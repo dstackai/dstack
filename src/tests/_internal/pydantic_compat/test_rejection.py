@@ -39,7 +39,7 @@ REJECTED_INPUTS: dict[str, tuple[Callable, Any, type[Exception]]] = {
         ConfigurationError,
     ),
     "request_unknown_key": (
-        CreateVolumeRequest.parse_obj,
+        CreateVolumeRequest.model_validate,
         {
             "configuration": {"type": "volume", "name": "v", "backend": "aws", "region": "r"},
             "unexpected": 1,

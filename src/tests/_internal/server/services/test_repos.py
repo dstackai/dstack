@@ -76,7 +76,7 @@ class TestGetRemoteRepo:
             project_id=another_project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
+            info=repo_info.model_dump(),
         )
 
         repo = await get_repo(
@@ -99,8 +99,8 @@ class TestGetRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
-            creds=legacy_repo_creds.dict(),
+            info=repo_info.model_dump(),
+            creds=legacy_repo_creds.model_dump(),
         )
         user_repo_creds = RemoteRepoCreds(
             clone_url="https://git.example.com/repo.git",
@@ -111,7 +111,7 @@ class TestGetRemoteRepo:
             session=session,
             repo_id=repo_model.id,
             user_id=user.id,
-            creds=user_repo_creds.dict(),
+            creds=user_repo_creds.model_dump(),
         )
 
         repo = await get_repo(
@@ -134,7 +134,7 @@ class TestGetRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
+            info=repo_info.model_dump(),
             creds=None,
         )
         # another user's creds should be ignored
@@ -148,7 +148,7 @@ class TestGetRemoteRepo:
             session=session,
             repo_id=repo_model.id,
             user_id=another_user.id,
-            creds=another_user_repo_creds.dict(),
+            creds=another_user_repo_creds.model_dump(),
         )
 
         repo = await get_repo(
@@ -193,8 +193,8 @@ class TestGetRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
-            creds=legacy_repo_creds.dict() if legacy_repo_creds else None,
+            info=repo_info.model_dump(),
+            creds=legacy_repo_creds.model_dump() if legacy_repo_creds else None,
         )
         user_repo_creds = RemoteRepoCreds(
             clone_url="https://git.example.com/repo.git",
@@ -205,7 +205,7 @@ class TestGetRemoteRepo:
             session=session,
             repo_id=repo_model.id,
             user_id=user.id,
-            creds=user_repo_creds.dict(),
+            creds=user_repo_creds.model_dump(),
         )
 
         repo = await get_repo(
@@ -232,8 +232,8 @@ class TestGetRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
-            creds=legacy_repo_creds.dict(),
+            info=repo_info.model_dump(),
+            creds=legacy_repo_creds.model_dump(),
         )
 
         repo = await get_repo(
@@ -285,7 +285,7 @@ class TestInitRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=old_repo_info.dict(),
+            info=old_repo_info.model_dump(),
             creds=None,
         )
 
@@ -311,7 +311,7 @@ class TestInitRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
+            info=repo_info.model_dump(),
             creds=None,
         )
         old_repo_creds = RemoteRepoCreds(
@@ -323,7 +323,7 @@ class TestInitRemoteRepo:
             session=session,
             repo_id=repo.id,
             user_id=user.id,
-            creds=old_repo_creds.dict(),
+            creds=old_repo_creds.model_dump(),
         )
         new_repo_creds = RemoteRepoCreds(
             clone_url="ssh://git@git.example.com/repo.git",
@@ -356,8 +356,8 @@ class TestInitRemoteRepo:
             project_id=project.id,
             repo_name=_REPO_ID,
             repo_type=RepoType.REMOTE,
-            info=repo_info.dict(),
-            creds=legacy_repo_creds.dict(),
+            info=repo_info.model_dump(),
+            creds=legacy_repo_creds.model_dump(),
         )
         our_repo_creds = RemoteRepoCreds(
             clone_url="https://git.example.com/repo.git",
@@ -368,7 +368,7 @@ class TestInitRemoteRepo:
             session=session,
             repo_id=repo.id,
             user_id=user.id,
-            creds=our_repo_creds.dict(),
+            creds=our_repo_creds.model_dump(),
         )
         another_user = await _create_user(session, project, name="another-user")
         another_user_repo_creds = RemoteRepoCreds(
@@ -380,7 +380,7 @@ class TestInitRemoteRepo:
             session=session,
             repo_id=repo.id,
             user_id=another_user.id,
-            creds=another_user_repo_creds.dict(),
+            creds=another_user_repo_creds.model_dump(),
         )
 
         repo = await init_repo(

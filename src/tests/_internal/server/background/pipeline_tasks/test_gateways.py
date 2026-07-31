@@ -314,7 +314,7 @@ class TestGatewayFetcher:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.replica_scale_attempt = 1
         await session.commit()
@@ -885,7 +885,7 @@ class TestGatewayWorkerProvisioning:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -1237,7 +1237,7 @@ class TestGatewayWorkerRunning:
             ip_address=None,
             instance_id=None,
             region=None,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         submitted.created_at = datetime(2025, 1, 2)
         gateway.lock_token = uuid.uuid4()
@@ -1425,7 +1425,7 @@ class TestGatewayWorkerRunning:
             region=None,
             status=GatewayReplicaStatus.PROVISIONING,
             replica_num=0,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.replica_scale_attempt = 2
         gateway.lock_token = uuid.uuid4()

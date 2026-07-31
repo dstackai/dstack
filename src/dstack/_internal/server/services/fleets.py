@@ -1043,7 +1043,7 @@ async def _create_fleet(
             name=spec.configuration.name,
             project=project,
             status=FleetStatus.ACTIVE,
-            spec=spec.json(),
+            spec=spec.model_dump_json(),
             instances=[],
             created_at=now,
             last_processed_at=now,
@@ -1134,7 +1134,7 @@ async def _update_fleet(
 
     _check_can_update_fleet_spec(fleet_sensitive.spec, spec)
 
-    fleet_model.spec = spec.json()
+    fleet_model.spec = spec.model_dump_json()
     # Reset consolidation attempt so the next pipeline pass picks up the spec change promptly.
     fleet_model.consolidation_attempt = 0
 

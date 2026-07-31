@@ -349,7 +349,7 @@ class KubernetesCompute(
             instance_type=instance_offer.instance,
             internal_ip=None,
             ssh_proxy=None,
-            backend_data=backend_data.json(),
+            backend_data=backend_data.model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -821,7 +821,7 @@ def _get_amd_gpu_node_affinity(
 def _offer_modifier(
     resource_requests: ResourceRequests, offer: InstanceOfferWithAvailability
 ) -> InstanceOfferWithAvailability:
-    offer_copy = offer.copy(deep=True)
+    offer_copy = offer.model_copy(deep=True)
     adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
     return offer_copy
 

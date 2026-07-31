@@ -25,7 +25,9 @@ from dstack.api.server._group import APIClientGroup
 class FleetsAPIClient(APIClientGroup):
     def list(self, project_name: str, *, include_imported: bool = False) -> List[Fleet]:
         body = ListProjectFleetsRequest(include_imported=include_imported)
-        resp = self._request(f"/api/project/{project_name}/fleets/list", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/fleets/list", body=body.model_dump_json()
+        )
         return validate_extra_ignore(List[Fleet], resp.json())
 
     def get(
@@ -38,7 +40,7 @@ class FleetsAPIClient(APIClientGroup):
         body = GetFleetRequest(name=name, id=fleet_id)
         resp = self._request(
             f"/api/project/{project_name}/fleets/get",
-            body=body.json(),
+            body=body.model_dump_json(),
         )
         return validate_extra_ignore(Fleet, resp.json())
 
@@ -50,7 +52,7 @@ class FleetsAPIClient(APIClientGroup):
         body = GetFleetPlanRequest(spec=spec)
         body = copy.deepcopy(body)
         patch_fleet_spec(body.spec)
-        body_json = body.json(exclude=get_get_plan_excludes(spec))
+        body_json = body.model_dump_json(exclude=get_get_plan_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
         return validate_extra_ignore(FleetPlan, resp.json())
 
@@ -66,17 +68,19 @@ class FleetsAPIClient(APIClientGroup):
         patch_fleet_spec(body.plan.spec)
         if body.plan.current_resource is not None:
             patch_fleet_spec(body.plan.current_resource.spec)
-        body_json = body.json(exclude=get_apply_plan_excludes(plan_input))
+        body_json = body.model_dump_json(exclude=get_apply_plan_excludes(plan_input))
         resp = self._request(f"/api/project/{project_name}/fleets/apply", body=body_json)
         return validate_extra_ignore(Fleet, resp.json())
 
     def delete(self, project_name: str, names: List[str]) -> None:
         body = DeleteFleetsRequest(names=names)
-        self._request(f"/api/project/{project_name}/fleets/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/fleets/delete", body=body.model_dump_json())
 
     def delete_instances(self, project_name: str, name: str, instance_nums: List[int]) -> None:
         body = DeleteFleetInstancesRequest(name=name, instance_nums=instance_nums)
-        self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())
+        self._request(
+            f"/api/project/{project_name}/fleets/delete_instances", body=body.model_dump_json()
+        )
 
     # Deprecated
     # TODO: Remove in 0.21
@@ -88,6 +92,6 @@ class FleetsAPIClient(APIClientGroup):
         body = CreateFleetRequest(spec=spec)
         body = copy.deepcopy(body)
         patch_fleet_spec(body.spec)
-        body_json = body.json(exclude=get_create_fleet_excludes(spec))
+        body_json = body.model_dump_json(exclude=get_create_fleet_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
         return validate_extra_ignore(Fleet, resp.json())

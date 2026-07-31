@@ -6,10 +6,10 @@ types plus 18 `*BackendData` blobs — and interleaving them with the core model
 
 Three `Text` columns are involved, one registry each:
 
-- `BackendModel.config` holds `XStoredConfig(...).json()`, read back as the splice
+- `BackendModel.config` holds `XStoredConfig(...).model_dump_json()`, read back as the splice
   `XConfig(**json.loads(config), creds=XCreds.model_validate_json(auth))`. The registries below keep the
   two halves apart the way the columns do, so a fixture matches one column's bytes exactly.
-- `BackendModel.auth` holds `XCreds(...).json()`.
+- `BackendModel.auth` holds `XCreds(...).model_dump_json()`.
 - `InstanceModel.backend_data` and `VolumeModel.backend_data` hold a `*BackendData` blob.
 """
 

@@ -245,8 +245,8 @@ jobs:
       - name: Generate json schema
         run: |
           mkdir /tmp/json-schemas
-          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json())" > /tmp/json-schemas/configuration.json
-          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json())" > /tmp/json-schemas/profiles.json
+          uv run python -c "from dstack._internal.core.models.configurations import DstackConfiguration; import json; print(json.dumps(DstackConfiguration.model_json_schema()))" > /tmp/json-schemas/configuration.json
+          uv run python -c "from dstack._internal.core.models.profiles import ProfilesConfig; import json; print(json.dumps(ProfilesConfig.model_json_schema()))" > /tmp/json-schemas/profiles.json
       - uses: actions/upload-artifact@v4
         with:
           name: json-schemas

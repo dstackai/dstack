@@ -195,8 +195,8 @@ async def add_ssh_instance(instance_model: InstanceModel) -> ProcessResult:
     )
     result.instance_update_map["backend"] = BackendType.REMOTE
     result.instance_update_map["price"] = 0
-    result.instance_update_map["offer"] = instance_offer.json()
-    result.instance_update_map["job_provisioning_data"] = job_provisioning_data.json()
+    result.instance_update_map["offer"] = instance_offer.model_dump_json()
+    result.instance_update_map["job_provisioning_data"] = job_provisioning_data.model_dump_json()
     result.instance_update_map["started_at"] = NOW_PLACEHOLDER
     result.instance_update_map["total_blocks"] = blocks
     return result

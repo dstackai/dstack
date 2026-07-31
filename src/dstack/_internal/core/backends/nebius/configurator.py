@@ -75,9 +75,9 @@ class NebiusConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=NebiusStoredConfig(
-                **validate_extra_ignore(NebiusBackendConfig, config).dict()
-            ).json(),
-            auth=NebiusCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(NebiusBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=NebiusCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> NebiusBackendConfigWithCreds:

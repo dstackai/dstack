@@ -50,7 +50,7 @@ class KubernetesConfigurator(
         self, project_name: str, config: KubernetesBackendConfigWithCreds
     ) -> BackendRecord:
         return BackendRecord(
-            config=validate_extra_ignore(KubernetesStoredConfig, config).json(),
+            config=validate_extra_ignore(KubernetesStoredConfig, config).model_dump_json(),
             auth="",
         )
 

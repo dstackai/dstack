@@ -409,7 +409,7 @@ async def create_run(
         run_name=run_name,
         status=status,
         termination_reason=termination_reason,
-        run_spec=run_spec.json(),
+        run_spec=run_spec.model_dump_json(),
         last_processed_at=last_processed_at,
         jobs=[],
         priority=priority,
@@ -465,9 +465,11 @@ async def create_job(
         last_processed_at=last_processed_at,
         status=status,
         termination_reason=termination_reason,
-        job_spec_data=job_spec.json(),
-        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        job_runtime_data=job_runtime_data.json() if job_runtime_data else None,
+        job_spec_data=job_spec.model_dump_json(),
+        job_provisioning_data=job_provisioning_data.model_dump_json()
+        if job_provisioning_data
+        else None,
+        job_runtime_data=job_runtime_data.model_dump_json() if job_runtime_data else None,
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
@@ -589,7 +591,7 @@ async def create_compute_group(
         project=project,
         fleet=fleet,
         status=status,
-        provisioning_data=provisioning_data.json(),
+        provisioning_data=provisioning_data.model_dump_json(),
         last_processed_at=last_processed_at,
     )
     session.add(compute_group)
@@ -674,7 +676,7 @@ async def create_gateway(
             domain=wildcard_domain,
             replicas=replicas,
             certificate=certificate,
-        ).json()
+        ).model_dump_json()
     gateway = GatewayModel(
         project_id=project_id,
         backend_id=backend_id,
@@ -733,7 +735,7 @@ async def create_gateway_compute(
             public_ip=True,
             ssh_key_pub=ssh_public_key,
             certificate=None,
-        ).json()
+        ).model_dump_json()
     gateway_compute = GatewayComputeModel(
         gateway_id=gateway_id,
         backend_id=backend_id,
@@ -797,7 +799,7 @@ async def create_fleet(
         name=spec.configuration.name,
         status=status,
         created_at=created_at,
-        spec=spec.json(),
+        spec=spec.model_dump_json(),
         instances=[],
         runs=[],
         last_processed_at=last_processed_at,
@@ -943,17 +945,21 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        offer=offer.json() if offer else None,
+        job_provisioning_data=job_provisioning_data.model_dump_json()
+        if job_provisioning_data
+        else None,
+        offer=offer.model_dump_json() if offer else None,
         price=price,
         region=region,
         backend=backend,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        profile=profile.json(),
-        requirements=requirements.json(),
-        instance_configuration=instance_configuration.json(),
-        remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
+        profile=profile.model_dump_json(),
+        requirements=requirements.model_dump_json(),
+        instance_configuration=instance_configuration.model_dump_json(),
+        remote_connection_info=remote_connection_info.model_dump_json()
+        if remote_connection_info
+        else None,
         volume_attachments=volume_attachments,
         total_blocks=total_blocks,
         busy_blocks=busy_blocks,
@@ -1110,8 +1116,8 @@ async def create_volume(
         created_at=created_at,
         last_processed_at=last_processed_at,
         last_job_processed_at=last_job_processed_at,
-        configuration=configuration.json(),
-        volume_provisioning_data=volume_provisioning_data.json()
+        configuration=configuration.model_dump_json(),
+        volume_provisioning_data=volume_provisioning_data.model_dump_json()
         if volume_provisioning_data
         else None,
         attachments=[],
@@ -1242,8 +1248,8 @@ async def create_placement_group(
         fleet=fleet,
         name=name,
         created_at=created_at,
-        configuration=configuration.json(),
-        provisioning_data=provisioning_data.json(),
+        configuration=configuration.model_dump_json(),
+        provisioning_data=provisioning_data.model_dump_json(),
         fleet_deleted=fleet_deleted,
         deleted=deleted,
         deleted_at=deleted_at,

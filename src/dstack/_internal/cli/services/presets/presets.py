@@ -29,7 +29,7 @@ def build_preset(
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
 ) -> Preset:
-    service = service.copy(deep=True)
+    service = service.model_copy(deep=True)
     service.name = None
     service.gateway = None
     for field in ProfileParams.model_fields:
@@ -76,7 +76,8 @@ def preset_to_data(preset: Preset) -> dict[str, Any]:
         "created_at": preset.created_at.isoformat(),
         "service": service_configuration_to_preset_data(preset.service),
         "validations": [
-            json.loads(validation.json(exclude_none=True)) for validation in preset.validations
+            json.loads(validation.model_dump_json(exclude_none=True))
+            for validation in preset.validations
         ],
     }
 
@@ -84,7 +85,7 @@ def preset_to_data(preset: Preset) -> dict[str, Any]:
 def service_configuration_to_preset_data(
     configuration: ServiceConfiguration,
 ) -> dict[str, Any]:
-    service_data = json.loads(configuration.json(exclude_none=True))
+    service_data = json.loads(configuration.model_dump_json(exclude_none=True))
     service_data.pop("type", None)
     service_data.pop("name", None)
     service_data.pop("gateway", None)

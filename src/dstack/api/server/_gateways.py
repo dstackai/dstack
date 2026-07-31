@@ -30,24 +30,32 @@ class GatewaysAPIClient(APIClientGroup):
         body = ListGatewaysRequest(
             include_imported=include_imported,
         )
-        resp = self._request(f"/api/project/{project_name}/gateways/list", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/gateways/list", body=body.model_dump_json()
+        )
         return validate_extra_ignore(List[Gateway], resp.json())
 
     def get(self, project_name: str, gateway_name: str) -> Gateway:
         body = GetGatewayRequest(name=gateway_name)
-        resp = self._request(f"/api/project/{project_name}/gateways/get", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/gateways/get", body=body.model_dump_json()
+        )
         return validate_extra_ignore(Gateway, resp.json())
 
     def get_plan(self, project_name: str, spec: GatewaySpec) -> GatewayPlan:
         body = GetGatewayPlanRequest(spec=spec)
-        resp = self._request(f"/api/project/{project_name}/gateways/get_plan", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/gateways/get_plan", body=body.model_dump_json()
+        )
         return validate_extra_ignore(GatewayPlan, resp.json())
 
     def apply_plan(
         self, project_name: str, plan: ApplyGatewayPlanInput, *, force: bool = False
     ) -> Gateway:
         body = ApplyGatewayPlanRequest(plan=plan, force=force)
-        resp = self._request(f"/api/project/{project_name}/gateways/apply", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/gateways/apply", body=body.model_dump_json()
+        )
         return validate_extra_ignore(Gateway, resp.json())
 
     def create(
@@ -58,13 +66,13 @@ class GatewaysAPIClient(APIClientGroup):
         body = CreateGatewayRequest(configuration=configuration)
         resp = self._request(
             f"/api/project/{project_name}/gateways/create",
-            body=body.json(exclude=get_create_gateway_excludes(configuration)),
+            body=body.model_dump_json(exclude=get_create_gateway_excludes(configuration)),
         )
         return validate_extra_ignore(Gateway, resp.json())
 
     def delete(self, project_name: str, gateways_names: List[str]) -> None:
         body = DeleteGatewaysRequest(names=gateways_names)
-        self._request(f"/api/project/{project_name}/gateways/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/gateways/delete", body=body.model_dump_json())
 
     def set_default(
         self, project_name: str, gateway_name: str, *, gateway_project: Optional[str] = None
@@ -74,7 +82,7 @@ class GatewaysAPIClient(APIClientGroup):
         body = SetDefaultGatewayRequest(name=gateway_name, gateway_project=gateway_project)
         self._request(
             f"/api/project/{project_name}/gateways/set_default",
-            body=body.json(exclude=get_set_default_gateway_excludes(body)),
+            body=body.model_dump_json(exclude=get_set_default_gateway_excludes(body)),
         )
 
     def set_wildcard_domain(
@@ -82,6 +90,7 @@ class GatewaysAPIClient(APIClientGroup):
     ) -> Gateway:
         body = SetWildcardDomainRequest(name=gateway_name, wildcard_domain=wildcard_domain)
         resp = self._request(
-            f"/api/project/{project_name}/gateways/set_wildcard_domain", body=body.json()
+            f"/api/project/{project_name}/gateways/set_wildcard_domain",
+            body=body.model_dump_json(),
         )
         return validate_extra_ignore(Gateway, resp.json())

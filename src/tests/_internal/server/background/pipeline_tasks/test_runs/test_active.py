@@ -985,7 +985,7 @@ class TestRunActiveWorker:
         # cannot be applied and rolling deployment is triggered instead.
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1054,7 +1054,7 @@ class TestRunActiveWorker:
         )
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1112,7 +1112,7 @@ class TestRunActiveWorker:
         # Patch the job spec to have replica_group="old"
         old_spec = get_job_spec(old_group_job)
         old_spec.replica_group = "old"
-        old_group_job.job_spec_data = old_spec.json()
+        old_group_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)

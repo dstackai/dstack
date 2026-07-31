@@ -25,6 +25,6 @@ class GpusAPIClient(APIClientGroup):
         )
         resp = self._request(
             f"/api/project/{project_name}/gpus/list",
-            body=body.json(exclude=get_list_gpus_excludes(body)),
+            body=body.model_dump_json(exclude=get_list_gpus_excludes(body)),
         )
         return validate_extra_ignore(ListGpusResponse, resp.json()).gpus

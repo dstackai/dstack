@@ -354,7 +354,7 @@ class TestTerminateInstance:
         backend_data = VerdaInstanceBackendData(
             startup_script_id="script-id",
             ssh_key_ids=["ssh-key-id-1", "ssh-key-id-2"],
-        ).json()
+        ).model_dump_json()
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
@@ -369,7 +369,7 @@ class TestTerminateInstance:
         backend_data = VerdaInstanceBackendData(
             startup_script_id="script-id",
             ssh_key_ids=["ssh-key-id-1"],
-        ).json()
+        ).model_dump_json()
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
@@ -385,7 +385,7 @@ class TestTerminateInstance:
         backend_data = VerdaInstanceBackendData(
             startup_script_id="script-id",
             ssh_key_ids=["ssh-key-id-1"],
-        ).json()
+        ).model_dump_json()
 
         with pytest.raises(APIException):
             compute.terminate_instance("instance-id", "FIN-01", backend_data)
@@ -399,7 +399,7 @@ class TestTerminateInstance:
         backend_data = VerdaInstanceBackendData(
             startup_script_id="script-id",
             ssh_key_ids=["ssh-key-id-1"],
-        ).json()
+        ).model_dump_json()
 
         with pytest.raises(APIException):
             compute.terminate_instance("instance-id", "FIN-01", backend_data)

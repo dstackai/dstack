@@ -147,9 +147,9 @@ class GCPConfigurator(
             config.regions = DEFAULT_REGIONS
         return BackendRecord(
             config=GCPStoredConfig(
-                **validate_extra_ignore(GCPBackendConfig, config).dict(),
-            ).json(),
-            auth=GCPCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(GCPBackendConfig, config).model_dump(),
+            ).model_dump_json(),
+            auth=GCPCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> GCPBackendConfigWithCreds:

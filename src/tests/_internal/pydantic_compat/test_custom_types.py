@@ -11,7 +11,7 @@ import json
 from typing import Any, Callable
 
 import pytest
-from pydantic import ValidationError, parse_obj_as
+from pydantic import TypeAdapter, ValidationError
 
 from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.gateways import GatewaySpec
@@ -92,19 +92,19 @@ class TestRESTPluginGenericModels:
     ):
         """
         Pydantic v1 represents these specializations as typing aliases and adds
-        `__orig_class__` after construction. Production sends `.dict()` to requests, relying on
+        `__orig_class__` after construction. Production sends `.model_dump()` to requests, relying on
         the request model's override to remove that non-JSON value.
         """
         spec = spec_factory()
         request = request_model(user="alice", project="main", spec=spec)
 
         assert class_name(request.spec) == expected_spec_type
-        body = request.dict()
+        body = request.model_dump()
         assert "__orig_class__" not in body
 
         # Match the exact production handoff: requests receives a plain, stdlib-JSON-safe dict.
         encoded_body = json.dumps(body)
-        assert canonicalize(json.dumps(body["spec"])) == canonicalize(spec.json())
+        assert canonicalize(json.dumps(body["spec"])) == canonicalize(spec.model_dump_json())
 
         # The generic must also choose the same type when its value arrives as an untyped payload.
         reparsed_request = request_model(**json.loads(encoded_body))
@@ -160,24 +160,24 @@ class TestRangeGenericModel:
         expected: dict[str, Any],
         bound_type: type,
     ):
-        value = parse_obj_as(range_type, raw)
+        value = TypeAdapter(range_type).validate_python(raw)
 
         assert type(value) is range_type
-        assert value.dict() == expected
+        assert value.model_dump() == expected
         for bound in (value.min, value.max):
             if bound is not None:
                 assert type(bound) is bound_type
-        assert canonicalize(value.json()) == canonicalize(json.dumps(expected))
+        assert canonicalize(value.model_dump_json()) == canonicalize(json.dumps(expected))
 
     @pytest.mark.parametrize("raw", ["..", "8..2", "1...3"])
     def test_invalid_int_ranges_stay_rejected(self, raw: str):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[int], raw)
+            Range[int].model_validate(raw)
 
     @pytest.mark.parametrize("raw", ["...", "2TB..1TB"])
     def test_invalid_memory_ranges_stay_rejected(self, raw: str):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[Memory], raw)
+            Range[Memory].model_validate(raw)
 
 
 _SCALAR_CASES = [
@@ -239,7 +239,7 @@ class TestCustomScalarTypes:
         expected_type: type,
         expected_json: Any,
     ):
-        value = parse_obj_as(scalar_type, raw)
+        value = TypeAdapter(scalar_type).validate_python(raw)
 
         assert value == expected
         assert type(value) is expected_type
@@ -258,7 +258,7 @@ class TestCustomScalarTypes:
     )
     def test_invalid_values_stay_rejected(self, scalar_type: Any, raw: Any):
         with pytest.raises(ValidationError):
-            parse_obj_as(scalar_type, raw)
+            TypeAdapter(scalar_type).validate_python(raw)
 
 
 _CUSTOM_MODEL_CASES = [
@@ -391,9 +391,9 @@ class TestCustomModelTypes:
         expected_json: dict[str, Any],
         expected_types: dict[str, str],
     ):
-        value = parse_obj_as(model_type, raw)
+        value = TypeAdapter(model_type).validate_python(raw)
 
-        assert canonicalize(value.json()) == canonicalize(json.dumps(expected_json))
+        assert canonicalize(value.model_dump_json()) == canonicalize(json.dumps(expected_json))
         assert type_map(value) == expected_types
 
     @pytest.mark.parametrize(
@@ -408,4 +408,4 @@ class TestCustomModelTypes:
     )
     def test_invalid_custom_model_values_stay_rejected(self, model_type: Any, raw: Any):
         with pytest.raises(ValidationError):
-            parse_obj_as(model_type, raw)
+            TypeAdapter(model_type).validate_python(raw)

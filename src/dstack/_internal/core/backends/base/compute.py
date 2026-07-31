@@ -342,7 +342,7 @@ class ComputeWithFilteredOffersCached(ABC):
     ) -> int:
         hash_items: list[Union[str, bool]] = []
         # Requirements is not hashable, so we use a hack to get arguments hash
-        hash_items.append(requirements.json())
+        hash_items.append(requirements.model_dump_json())
         if self.full_offers_argument_has_effect:
             hash_items.append(full_offers)
         if self.unallocated_resources_argument_has_effect:
@@ -405,7 +405,7 @@ class ComputeWithCreateInstanceSupport(ABC):
             reservation=job.job_spec.requirements.reservation,
             tags=run.run_spec.merged_profile.tags,
         )
-        instance_offer = instance_offer.copy()
+        instance_offer = instance_offer.model_copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
         return self.create_instance(
             instance_offer, instance_config, placement_group=placement_group

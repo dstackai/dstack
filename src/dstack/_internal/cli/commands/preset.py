@@ -230,7 +230,7 @@ class PresetCommand(BaseCommand):
         if args.json:
             self._reconcile()
             presets = _filter_presets(PresetStore().list(), base=base, repo=repo)
-            print(PresetListOutput(presets=presets).json())
+            print(PresetListOutput(presets=presets).model_dump_json())
             return
         verbose = args.verbose
         if not getattr(args, "watch", False):
@@ -330,7 +330,7 @@ class PresetCommand(BaseCommand):
         preset = PresetStore().find_by_id_or_name(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
-        print(preset.json())
+        print(preset.model_dump_json())
 
     def _apply(self, args: argparse.Namespace) -> None:
         self._reconcile()
@@ -497,4 +497,4 @@ def _get_effective_configuration(
         if getattr(configuration, field) is None:
             setattr(configuration, field, getattr(profile, field))
     apply_profile_args(args, configuration)
-    return PresetConfiguration.model_validate(configuration.dict())
+    return PresetConfiguration.model_validate(configuration.model_dump())

@@ -15,4 +15,4 @@ class ImportsAPIClient(APIClientGroup):
         body = DeleteImportRequest(
             export_project_name=export_project_name, export_name=export_name
         )
-        self._request(f"/api/project/{project_name}/imports/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/imports/delete", body=body.model_dump_json())

@@ -35,7 +35,7 @@ def list_providers() -> list[OAuthProviderInfo]:
 def generate_oauth_state(local_port: Optional[int] = None) -> str:
     value = str(secrets.token_hex(16))
     state = OAuthState(value=value, local_port=local_port)
-    return b64encode(state.json().encode()).decode()
+    return b64encode(state.model_dump_json().encode()).decode()
 
 
 def set_state_cookie(response: Response, state: str):

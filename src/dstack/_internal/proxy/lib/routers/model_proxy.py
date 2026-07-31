@@ -99,4 +99,4 @@ class StreamingAdaptor:
 
     @staticmethod
     def _encode_chunk(chunk: ChatCompletionsChunk) -> bytes:
-        return f"data:{chunk.json()}\n\n".encode()
+        return f"data:{chunk.model_dump_json()}\n\n".encode()

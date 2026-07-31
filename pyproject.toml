@@ -115,12 +115,14 @@ include = [
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
-    "src/dstack/_internal/cli/services/configurators",
+    "src/dstack/_internal/cli/services",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",
+    # Pre-existing argcomplete stub issues, unrelated to the rest of cli/services.
+    "src/dstack/_internal/cli/services/completion.py",
 ]
 
 [tool.pytest.ini_options]
@@ -140,9 +142,12 @@ env = [
     "DSTACK_SSHPROXY_API_TOKEN=test-token",
 ]
 filterwarnings = [
+    # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
+    # so they cannot creep back after the v2 migration.
+    "error::pydantic.PydanticDeprecatedSince20",
     # testcontainers modules use deprecated decorators – nothing we can do:
     # https://github.com/testcontainers/testcontainers-python/issues/874
-    "ignore:^The @wait_container_is_ready decorator:DeprecationWarning"
+    "ignore:^The @wait_container_is_ready decorator:DeprecationWarning",
 ]
 
 [dependency-groups]

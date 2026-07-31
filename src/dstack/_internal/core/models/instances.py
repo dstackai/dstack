@@ -199,7 +199,7 @@ class InstanceOffer(CoreModel):
         """Convert to InstanceOfferWithAvailability without re-serializing/re-validating fields.
         The result shares nested objects with self. This is generally safe because callers
         discard the original InstanceOffer after conversion."""
-        return InstanceOfferWithAvailability.construct(**self.__dict__, **kwargs)
+        return InstanceOfferWithAvailability.model_construct(**self.__dict__, **kwargs)
 
 
 class InstanceOfferWithAvailability(InstanceOffer):

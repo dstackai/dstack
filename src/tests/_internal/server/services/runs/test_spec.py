@@ -77,7 +77,7 @@ def _run_spec_with_overrides(configuration: ServiceConfiguration, **overrides) -
     )
     if not run_spec_overrides:
         return run_spec
-    return RunSpec.model_validate({**run_spec.dict(), **run_spec_overrides})
+    return RunSpec.model_validate({**run_spec.model_dump(), **run_spec_overrides})
 
 
 class TestValidateRunSpecRetryDuration:

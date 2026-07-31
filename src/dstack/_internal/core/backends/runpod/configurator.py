@@ -35,9 +35,9 @@ class RunpodConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=RunpodStoredConfig(
-                **validate_extra_ignore(RunpodBackendConfig, config).dict()
-            ).json(),
-            auth=RunpodCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(RunpodBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=RunpodCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> RunpodBackendConfigWithCreds:

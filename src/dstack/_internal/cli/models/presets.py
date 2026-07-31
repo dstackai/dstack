@@ -8,7 +8,6 @@ from pydantic import (
     PositiveInt,
     field_validator,
     model_validator,
-    parse_obj_as,
 )
 from typing_extensions import Self
 
@@ -160,7 +159,7 @@ class PresetListOutput(CoreModel):
 
 
 def _validate_exact_resources(resources: ResourcesSpec) -> None:
-    cpu = parse_obj_as(CPUSpec, resources.cpu)
+    cpu = CPUSpec.model_validate(resources.cpu)
     if not _is_exact(cpu.count) or not _is_exact(resources.memory):
         raise ValueError("preset validation resources must be exact")
     if resources.disk is None or not _is_exact(resources.disk.size):

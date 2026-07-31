@@ -145,7 +145,7 @@ class TestGetOffersByRequirements:
             aws_offer3 = get_instance_offer_with_availability(
                 backend=BackendType.AWS, availability_zones=["az2", "az3"]
             )
-            expected_aws_offer3 = aws_offer3.copy()
+            expected_aws_offer3 = aws_offer3.model_copy()
             expected_aws_offer3.availability_zones = ["az3"]
             aws_offer4 = get_instance_offer_with_availability(
                 backend=BackendType.AWS, availability_zones=None

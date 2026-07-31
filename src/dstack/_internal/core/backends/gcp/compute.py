@@ -194,7 +194,7 @@ class GCPCompute(
                             zones_with_capacity.append(zone)
                 if not matching_zones:
                     return None
-                offer = offer.copy(deep=True)
+                offer = offer.model_copy(deep=True)
                 if zones_with_capacity:
                     offer.availability_zones = zones_with_capacity
                 else:
@@ -678,7 +678,7 @@ class GCPCompute(
                     detachable=True,
                     backend_data=GCPVolumeDiskBackendData(
                         disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
-                    ).json(),
+                    ).model_dump_json(),
                 )
         raise ComputeError(f"Persistent disk {volume.configuration.volume_id} not found")
 
@@ -746,7 +746,7 @@ class GCPCompute(
             detachable=True,
             backend_data=GCPVolumeDiskBackendData(
                 disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
-            ).json(),
+            ).model_dump_json(),
         )
 
     def delete_volume(self, volume: Volume):

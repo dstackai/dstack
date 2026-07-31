@@ -15,7 +15,9 @@ class TestPresetConfiguration:
         assert all(field.description for field in PresetConfiguration.model_fields.values())
         assert all(field.description for field in PresetModelBase.model_fields.values())
         assert all(field.description for field in PresetModelRepo.model_fields.values())
-        assert {"type": "string"} in PresetConfiguration.schema()["properties"]["model"]["anyOf"]
+        assert {"type": "string"} in PresetConfiguration.model_json_schema()["properties"][
+            "model"
+        ]["anyOf"]
 
     def test_parses_string_as_exact_repo(self):
         configuration = PresetConfiguration(model="Qwen/Qwen3.5-27B")
@@ -65,7 +67,7 @@ class TestPresetConfiguration:
     def test_shorthand_round_trips_through_dict(self):
         configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
 
-        round_tripped = PresetConfiguration.model_validate(configuration.dict())
+        round_tripped = PresetConfiguration.model_validate(configuration.model_dump())
 
         assert round_tripped.model == configuration.model
 

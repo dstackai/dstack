@@ -38,7 +38,7 @@ class TestPythonVersionFieldParsing:
         config = parse_apply_configuration(data)
 
         assert config.python is PythonVersion.PY310
-        assert json.loads(config.json())["python"] == "3.10"
+        assert json.loads(config.model_dump_json())["python"] == "3.10"
 
     def test_yaml_311_float_stays_python_311(self):
         data = yaml.safe_load(
@@ -62,7 +62,7 @@ class TestEnvironmentFieldParsing:
         assert config.env["EMPTY"] == ""
         assert config.env["B"] == EnvSentinel(key="B")
         assert class_name(config.env["B"]) == "EnvSentinel"
-        assert json.loads(config.json())["env"] == {
+        assert json.loads(config.model_dump_json())["env"] == {
             "A": "1",
             "B": {"key": "B"},
             "EMPTY": "",
@@ -85,7 +85,7 @@ class TestPortFieldParsing:
         config = parse_apply_configuration(_task(ports=[8080, "8081:81", "*:82"]))
 
         assert all(class_name(port) == "PortMapping" for port in config.ports)
-        assert [port.dict() for port in config.ports] == [
+        assert [port.model_dump() for port in config.ports] == [
             {"local_port": 8080, "container_port": 8080},
             {"local_port": 8081, "container_port": 81},
             {"local_port": None, "container_port": 82},
@@ -110,7 +110,7 @@ class TestPortFieldParsing:
         config = parse_apply_configuration(_service(port=raw))
 
         assert class_name(config.port) == "PortMapping"
-        assert config.port.dict() == expected
+        assert config.port.model_dump() == expected
 
 
 class TestMountPointFieldParsing:
@@ -120,9 +120,9 @@ class TestMountPointFieldParsing:
         )
 
         assert class_name(config.volumes[0]) == "VolumeMountPoint"
-        assert config.volumes[0].dict() == {"name": "my-volume", "path": "/mnt/data"}
+        assert config.volumes[0].model_dump() == {"name": "my-volume", "path": "/mnt/data"}
         assert class_name(config.volumes[1]) == "InstanceMountPoint"
-        assert config.volumes[1].dict() == {
+        assert config.volumes[1].model_dump() == {
             "instance_path": "/host/cache",
             "path": "/cache",
             "optional": False,
@@ -141,7 +141,7 @@ class TestFileMappingFieldParsing:
         )
 
         assert all(class_name(mapping) == "FilePathMapping" for mapping in config.files)
-        assert [mapping.dict() for mapping in config.files] == [
+        assert [mapping.model_dump() for mapping in config.files] == [
             {"local_path": "data", "path": "/workspace/data"},
             {"local_path": r"C:\data", "path": "/workspace/windows"},
         ]
@@ -229,7 +229,7 @@ class TestUnixUserFieldParsing:
         config = parse_apply_configuration(_task(user=raw))
 
         assert config.user == raw
-        assert UnixUser.parse(config.user).dict() == parsed
+        assert UnixUser.parse(config.user).model_dump() == parsed
 
     @pytest.mark.parametrize(
         "raw",
@@ -293,7 +293,7 @@ class TestServiceModelFieldParsing:
         config = parse_apply_configuration(_service(model="llama"))
 
         assert class_name(config.model) == "OpenAIChatModel"
-        assert config.model.dict() == {
+        assert config.model.model_dump() == {
             "type": "chat",
             "name": "llama",
             "format": "openai",
@@ -322,7 +322,7 @@ class TestGatewayReferenceFieldParsing:
         config = parse_apply_configuration(_service(gateway="other-project/shared-gateway"))
 
         assert class_name(config.gateway) == "EntityReference"
-        assert config.gateway.dict() == {
+        assert config.gateway.model_dump() == {
             "project": "other-project",
             "name": "shared-gateway",
         }

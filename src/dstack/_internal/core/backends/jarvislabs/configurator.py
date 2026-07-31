@@ -41,9 +41,9 @@ class JarvisLabsConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=JarvisLabsStoredConfig(
-                **validate_extra_ignore(JarvisLabsBackendConfig, config).dict()
-            ).json(),
-            auth=JarvisLabsCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(JarvisLabsBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=JarvisLabsCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(

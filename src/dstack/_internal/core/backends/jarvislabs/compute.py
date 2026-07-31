@@ -169,7 +169,7 @@ class JarvisLabsCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).json(),
+            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).model_dump_json(),
         )
 
     def update_provisioning_data(

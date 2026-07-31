@@ -876,7 +876,9 @@ async def _process_pulling_status(
             _set_job_runtime_data(result, shim_state.job_runtime_data)
 
         if shim_state.image_pull_progress is not None:
-            result.job_update_map["image_pull_progress"] = shim_state.image_pull_progress.json()
+            result.job_update_map["image_pull_progress"] = (
+                shim_state.image_pull_progress.model_dump_json()
+            )
 
         if shim_state.state == _ShimPullingState.WAITING:
             _reset_disconnected_at(context.job_model, result)
@@ -1246,7 +1248,7 @@ async def _register_service_replica(
         instance_project_ssh_private_key = context.job_model.instance.project.ssh_private_key
     # JobRuntimeData might change on PULLING -> RUNNING path
     # so we must update job_submission with the result value.
-    job_submission = context.job_submission.copy(deep=True)
+    job_submission = context.job_submission.model_copy(deep=True)
     job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
     for conn in connections:
         try:
@@ -1395,7 +1397,7 @@ def _process_provisioning_with_shim(
     instance_mounts: list[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
         if isinstance(mount, VolumeMountPoint):
-            volume_mounts.append(mount.copy())
+            volume_mounts.append(mount.model_copy())
         elif isinstance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
@@ -1517,7 +1519,7 @@ def _sync_shim_pulling_state(
                 task.termination_reason,
                 task.termination_message,
             )
-            logger.debug("task status: %s", task.dict())
+            logger.debug("task status: %s", task.model_dump())
             return _SyncShimPullingStateResult(
                 state=_ShimPullingState.FAILED,
                 termination_reason=JobTerminationReason(task.termination_reason.lower()),
@@ -1537,7 +1539,7 @@ def _sync_shim_pulling_state(
                     state=_ShimPullingState.WAITING,
                     image_pull_progress=image_pull_progress,
                 )
-            jrd = jrd.copy(update={"ports": {pm.container: pm.host for pm in task.ports}})
+            jrd = jrd.model_copy(update={"ports": {pm.container: pm.host for pm in task.ports}})
     else:
         shim_status = shim_client.pull()
         if (
@@ -1551,7 +1553,7 @@ def _sync_shim_pulling_state(
                 shim_status.result.reason,
                 shim_status.result.reason_message,
             )
-            logger.debug("shim status: %s", shim_status.dict())
+            logger.debug("shim status: %s", shim_status.model_dump())
             return _SyncShimPullingStateResult(
                 state=_ShimPullingState.FAILED,
                 termination_reason=JobTerminationReason(shim_status.result.reason.lower()),
@@ -1634,7 +1636,7 @@ def _submit_job_to_runner(
     job_info = runner_client.run_job()
     if job_info is not None:
         if jrd is not None:
-            jrd = jrd.copy(
+            jrd = jrd.model_copy(
                 update={"working_dir": job_info.working_dir, "username": job_info.username}
             )
     return _SubmitJobToRunnerResult(
@@ -1900,7 +1902,7 @@ def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: Job
 
 
 def _set_job_runtime_data(result: _ProcessResult, jrd: Optional[JobRuntimeData]) -> None:
-    result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.json()
+    result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.model_dump_json()
 
 
 def _apply_submit_job_to_runner_result(

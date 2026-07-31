@@ -1,9 +1,8 @@
-import json
 from datetime import datetime
 from typing import Any, List, Optional
 from uuid import UUID
 
-from pydantic.json import pydantic_encoder
+from pydantic_core import to_json
 
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.users import (
@@ -47,9 +46,7 @@ class UsersAPIClient(APIClientGroup):
         if ascending is not None:
             body["ascending"] = ascending
         if body:
-            resp = self._request(
-                "/api/users/list", body=json.dumps(body, default=pydantic_encoder)
-            )
+            resp = self._request("/api/users/list", body=to_json(body).decode())
         else:
             resp = self._request("/api/users/list")
         resp_json = resp.json()
@@ -63,20 +60,20 @@ class UsersAPIClient(APIClientGroup):
 
     def get_user(self, username: str) -> User:
         body = GetUserRequest(username=username)
-        resp = self._request("/api/users/get_user", body=body.json())
+        resp = self._request("/api/users/get_user", body=body.model_dump_json())
         return validate_extra_ignore(User, resp.json())
 
     def create(self, username: str, global_role: GlobalRole) -> User:
         body = CreateUserRequest(username=username, global_role=global_role, email=None)
-        resp = self._request("/api/users/create", body=body.json())
+        resp = self._request("/api/users/create", body=body.model_dump_json())
         return validate_extra_ignore(User, resp.json())
 
     def update(self, username: str, global_role: GlobalRole) -> User:
         body = UpdateUserRequest(username=username, global_role=global_role, email=None)
-        resp = self._request("/api/users/update", body=body.json())
+        resp = self._request("/api/users/update", body=body.model_dump_json())
         return validate_extra_ignore(User, resp.json())
 
     def refresh_token(self, username: str) -> UserWithCreds:
         body = RefreshTokenRequest(username=username)
-        resp = self._request("/api/users/refresh_token", body=body.json())
+        resp = self._request("/api/users/refresh_token", body=body.model_dump_json())
         return validate_extra_ignore(UserWithCreds, resp.json())

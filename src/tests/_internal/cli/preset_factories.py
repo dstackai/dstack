@@ -41,7 +41,7 @@ def get_preset_benchmark(*, verified: bool = True) -> PresetBenchmark:
     )
     if not verified:
         return benchmark
-    return benchmark.copy(
+    return benchmark.model_copy(
         update={
             "target": PresetBenchmarkTarget(type="server-proxy"),
             "client": PresetBenchmarkClient(type="local"),
@@ -125,7 +125,7 @@ def get_running_service_run() -> Run:
             )
         ],
     )
-    return Run.construct(
+    return Run.model_construct(
         id=uuid4(),
         project_name="main",
         status=RunStatus.RUNNING,

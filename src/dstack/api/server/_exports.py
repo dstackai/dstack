@@ -38,7 +38,7 @@ class ExportsAPIClient(APIClientGroup):
         )
         resp = self._request(
             f"/api/project/{project_name}/exports/create",
-            body=body.json(exclude=get_create_export_excludes(body)),
+            body=body.model_dump_json(exclude=get_create_export_excludes(body)),
         )
         return validate_extra_ignore(Export, resp.json())
 
@@ -69,10 +69,10 @@ class ExportsAPIClient(APIClientGroup):
         )
         resp = self._request(
             f"/api/project/{project_name}/exports/update",
-            body=body.json(exclude=get_update_export_excludes(body)),
+            body=body.model_dump_json(exclude=get_update_export_excludes(body)),
         )
         return validate_extra_ignore(Export, resp.json())
 
     def delete(self, project_name: str, name: str) -> None:
         body = DeleteExportRequest(name=name)
-        self._request(f"/api/project/{project_name}/exports/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/exports/delete", body=body.model_dump_json())

@@ -197,10 +197,12 @@ class TestPresetLocalCommands:
         preset = get_preset()
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
-        store.save(preset.copy(update={"id": "01234567"}))
+        store.save(preset.model_copy(update={"id": "01234567"}))
         # A preset of a different model must survive the delete.
         store.save(
-            preset.copy(update={"id": "89abcdef", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+            preset.model_copy(
+                update={"id": "89abcdef", "base": "meta/Llama-4", "model": "meta/Llama-4"}
+            )
         )
 
         with patch("dstack.api.Client.from_config") as from_config:
@@ -222,7 +224,9 @@ class TestPresetLocalCommands:
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         store.save(
-            preset.copy(update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+            preset.model_copy(
+                update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"}
+            )
         )
 
         args = ["preset", "list", "--json", flag, getattr(preset, attribute)]
@@ -370,7 +374,7 @@ env:
 
 class TestPresetNameClaims:
     def test_create_detaches_the_name_from_the_old_preset(self, tmp_path):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
@@ -393,7 +397,7 @@ class TestPresetNameClaims:
         assert store.get(preset.id).name is None
 
     def test_create_without_confirmation_exits_before_creating(self, tmp_path):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
@@ -416,7 +420,7 @@ class TestPresetNameClaims:
         assert store.get(preset.id).name == "qwen"
 
     def test_get_and_delete_resolve_names(self, tmp_path, capsys):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
         assert run_dstack_cli(["preset", "get", "qwen", "--json"], home_dir=tmp_path) == 0

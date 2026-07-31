@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
-from pydantic import parse_obj_as
 
 from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.services.configurators.base import (
@@ -535,7 +534,7 @@ class BaseRunConfigurator(
         Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
         """
         # TODO: Remove in 0.20. Use conf.resources.cpu directly
-        cpu_spec = parse_obj_as(CPUSpec, conf.resources.cpu)
+        cpu_spec = CPUSpec.model_validate(conf.resources.cpu)
         arch = cpu_spec.arch
         if arch is None:
             gpu_spec = conf.resources.gpu

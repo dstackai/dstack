@@ -39,9 +39,9 @@ class VerdaConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=VerdaStoredConfig(
-                **validate_extra_ignore(VerdaBackendConfig, config).dict()
-            ).json(),
-            auth=VerdaCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(VerdaBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=VerdaCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> VerdaBackendConfigWithCreds:

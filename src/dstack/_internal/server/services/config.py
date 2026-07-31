@@ -281,10 +281,10 @@ def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds
 
 
 def file_config_to_config(file_config: AnyBackendFileConfigWithCreds) -> AnyBackendConfigWithCreds:
-    backend_config_dict = file_config.dict()
+    backend_config_dict = file_config.model_dump()
     backend_config = _BackendConfigWithCreds.model_validate(backend_config_dict)
     return backend_config.root
 
 
 def config_to_yaml(config: CoreModel) -> str:
-    return yaml.dump(config.dict(exclude_none=True), sort_keys=False)
+    return yaml.dump(config.model_dump(exclude_none=True), sort_keys=False)

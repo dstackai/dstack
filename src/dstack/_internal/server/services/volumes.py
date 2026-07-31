@@ -301,7 +301,7 @@ async def create_volume(
             user_id=user.id,
             project=project,
             status=VolumeStatus.SUBMITTED,
-            configuration=configuration.json(),
+            configuration=configuration.model_dump_json(),
             auto_cleanup_enabled=_get_autocleanup_enabled(configuration),
             attachments=[],
             created_at=now,

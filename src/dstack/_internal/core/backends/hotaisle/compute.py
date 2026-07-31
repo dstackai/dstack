@@ -94,7 +94,9 @@ class HotAisleCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=HotAisleInstanceBackendData(ip_address=vm_data["ip_address"]).json(),
+            backend_data=HotAisleInstanceBackendData(
+                ip_address=vm_data["ip_address"]
+            ).model_dump_json(),
         )
 
     def update_provisioning_data(

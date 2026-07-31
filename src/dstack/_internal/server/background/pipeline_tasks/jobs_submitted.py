@@ -1178,7 +1178,7 @@ def _assign_instance_to_job(
     job_model.instance = instance_model
     job_model.used_instance_id = instance_model.id
     job_model.job_provisioning_data = instance_model.job_provisioning_data
-    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).model_dump_json()
     job_model.skip_min_processing_interval = True
 
     switch_instance_status(session, instance_model, InstanceStatus.BUSY)
@@ -1360,7 +1360,7 @@ async def _apply_existing_instance_provisioning(
         context.job_model.job_runtime_data = _prepare_job_runtime_data(
             offer=get_or_error(get_instance_offer(instance_model)),
             multinode=context.multinode,
-        ).json()
+        ).model_dump_json()
     switch_job_status(session, context.job_model, JobStatus.PROVISIONING)
     await _apply_volume_attachment_result(
         session=session,
@@ -1580,7 +1580,7 @@ def _resolve_provisioned_jobs_and_data(
             project=context.project,
             fleet=fleet_model,
             status=ComputeGroupStatus.RUNNING,
-            provisioning_data=provisioning_data.json(),
+            provisioning_data=provisioning_data.model_dump_json(),
         )
         return (
             context.jobs_to_provision,
@@ -1611,7 +1611,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         provisioned_job_models, job_provisioning_datas
     ):
         provisioned_job_model.fleet_id = fleet_model.id
-        provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
+        provisioned_job_model.job_provisioning_data = job_provisioning_data.model_dump_json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
         provisioned_job_model.skip_min_processing_interval = True
 
@@ -1646,7 +1646,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         instance_models.append(instance_model)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
             offer, context.multinode
-        ).json()
+        ).model_dump_json()
         events.emit(
             session,
             f"Instance provisioned for job. Instance status: {instance_model.status.upper()}",
@@ -1714,8 +1714,8 @@ def _create_instance_model_for_job(
         started_at=get_current_datetime(),
         status=InstanceStatus.PROVISIONING,
         unreachable=False,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
+        job_provisioning_data=job_provisioning_data.model_dump_json(),
+        offer=offer.model_dump_json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
         jobs=[job_model],
@@ -1747,8 +1747,8 @@ def _promote_placeholder_instance(
     instance_model.status = InstanceStatus.PROVISIONING
     instance_model.started_at = get_current_datetime()
     instance_model.compute_group = compute_group_model
-    instance_model.job_provisioning_data = job_provisioning_data.json()
-    instance_model.offer = offer.json()
+    instance_model.job_provisioning_data = job_provisioning_data.model_dump_json()
+    instance_model.offer = offer.model_dump_json()
     instance_model.backend = offer.backend
     instance_model.price = offer.price
     instance_model.region = offer.region
@@ -1822,7 +1822,7 @@ async def _process_volume_attachments(
                 attachments.append(
                     _VolumeAttachmentPayload(
                         volume_id=volume_model.id,
-                        attachment_data=attachment_data.json(),
+                        attachment_data=attachment_data.model_dump_json(),
                         volume_name=volume.name,
                     )
                 )
@@ -1990,7 +1990,7 @@ async def _apply_volume_attachment_result(
     job_runtime_data.volume_names = [
         attachment.volume_name for attachment in volume_attachment_result.attachments
     ]
-    job_model.job_runtime_data = job_runtime_data.json()
+    job_model.job_runtime_data = job_runtime_data.model_dump_json()
 
     volume_ids = [attachment.volume_id for attachment in volume_attachment_result.attachments]
     if volume_ids:

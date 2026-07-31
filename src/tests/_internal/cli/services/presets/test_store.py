@@ -38,7 +38,7 @@ class TestPresetStore:
         preset = get_preset()
         store.save(preset)
 
-        updated = preset.copy(update={"base": "Qwen/Another-Model", "context_length": 16384})
+        updated = preset.model_copy(update={"base": "Qwen/Another-Model", "context_length": 16384})
         store.save(updated)
 
         assert store.get(preset.id) == updated
@@ -67,7 +67,7 @@ class TestPresetStore:
 
     def test_skips_invalid_preset_on_list_but_keeps_it_deletable(self, tmp_path: Path, capsys):
         store = PresetStore(tmp_path / "presets")
-        valid = get_preset().copy(update={"id": "01234567"})
+        valid = get_preset().model_copy(update={"id": "01234567"})
         store.save(valid)
         path = store.save(get_preset())
         data = yaml.safe_load(path.read_text())
@@ -168,9 +168,9 @@ class TestResolvePresetPrompt:
 class TestPresetNames:
     def test_finds_and_detaches_names(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
-        named = get_preset().copy(update={"name": "qwen"})
+        named = get_preset().model_copy(update={"name": "qwen"})
         store.save(named)
-        store.save(get_preset().copy(update={"id": "01234567"}))
+        store.save(get_preset().model_copy(update={"id": "01234567"}))
 
         assert store.find_by_name("qwen").id == named.id
         assert store.find_by_name("other") is None

@@ -47,7 +47,7 @@ class TestServerAccess:
 
         job_spec = (await configurator.get_job_specs(replica_num=0))[0]
 
-        assert "dstack" not in job_spec.dict()
+        assert "dstack" not in job_spec.model_dump()
         assert job_spec.env == {
             "DSTACK_SERVER_URL": "http+unix://%2Frun%2Fdstack%2Fserver.sock",
         }

@@ -244,7 +244,9 @@ class NebiusCompute(
             ssh_port=22,
             username="ubuntu",
             dockerized=True,
-            backend_data=NebiusInstanceBackendData(boot_disk_id=create_disk_op.resource_id).json(),
+            backend_data=NebiusInstanceBackendData(
+                boot_disk_id=create_disk_op.resource_id
+            ).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -312,7 +314,7 @@ class NebiusCompute(
             )
         return PlacementGroupProvisioningData(
             backend=BackendType.NEBIUS,
-            backend_data=placement_group_backend_data.json(),
+            backend_data=placement_group_backend_data.model_dump_json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:

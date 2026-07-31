@@ -39,13 +39,13 @@ class TestPresetBenchmark:
         ],
     )
     def test_rejects_inconsistent_successful_metrics(self, field, value, error):
-        data = get_preset_benchmark().dict()
+        data = get_preset_benchmark().model_dump()
         data["metrics"][field] = value
         with pytest.raises(ValidationError, match=error):
             PresetBenchmark.model_validate(data)
 
     def test_rejects_tool_specific_metrics(self):
-        data = get_preset_benchmark().dict()
+        data = get_preset_benchmark().model_dump()
         data["metrics"]["tool_specific"] = 1
 
         # No `match=`: the wording is pydantic's, and v2 rewords it ("Extra inputs are not

@@ -58,6 +58,6 @@ class EventsAPIClient(APIClientGroup):
             ascending=ascending,
         )
         resp = self._request(
-            "/api/events/list", body=req.json(exclude=get_list_events_excludes(req))
+            "/api/events/list", body=req.model_dump_json(exclude=get_list_events_excludes(req))
         )
         return validate_extra_ignore(list[Event], resp.json())

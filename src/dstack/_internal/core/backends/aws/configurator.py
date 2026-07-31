@@ -90,9 +90,9 @@ class AWSConfigurator(
             config.regions = DEFAULT_REGIONS
         return BackendRecord(
             config=AWSStoredConfig(
-                **validate_extra_ignore(AWSBackendConfig, config).dict()
-            ).json(),
-            auth=AWSCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(AWSBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=AWSCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> AWSBackendConfigWithCreds:

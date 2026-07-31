@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 
 import httpx
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
@@ -60,10 +60,10 @@ class GatewayClient:
             "auth": auth,
             "client_max_body_size": client_max_body_size,
             "options": options,
-            "rate_limits": [limit.dict() for limit in rate_limits],
+            "rate_limits": [limit.model_dump() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
             "has_router_replica": has_router_replica,
-            "router": router.dict() if router is not None else None,
+            "router": router.model_dump() if router is not None else None,
         }
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/services/register"), json=payload
@@ -95,7 +95,7 @@ class GatewayClient:
         payload = {
             "job_id": job_submission.id.hex,
             "app_port": get_service_port(job_spec, run.run_spec.configuration),
-            "ssh_head_proxy": ssh_head_proxy.dict() if ssh_head_proxy is not None else None,
+            "ssh_head_proxy": ssh_head_proxy.model_dump() if ssh_head_proxy is not None else None,
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }
         jpd = job_submission.job_provisioning_data
@@ -108,7 +108,7 @@ class GatewayClient:
                 {
                     "ssh_port": jpd.ssh_port,
                     "ssh_host": f"{jpd.username}@{jpd.hostname}",
-                    "ssh_proxy": jpd.ssh_proxy.dict() if jpd.ssh_proxy is not None else None,
+                    "ssh_proxy": jpd.ssh_proxy.model_dump() if jpd.ssh_proxy is not None else None,
                 }
             )
         else:
@@ -124,7 +124,7 @@ class GatewayClient:
                         hostname=jpd.hostname,
                         username=jpd.username,
                         port=jpd.ssh_port,
-                    ).dict(),
+                    ).model_dump(),
                     "ssh_proxy_private_key": instance_project_ssh_private_key,
                 }
             )
@@ -196,7 +196,7 @@ class GatewayClient:
             # Avoid errors if gateway is updated to new format and current server replica isn't.
             # TODO: remove after a few releases
             return []
-        return parse_obj_as(list[ServiceStats], resp_data)
+        return TypeAdapter(list[ServiceStats]).validate_python(resp_data)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"

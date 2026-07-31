@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Iterable, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
@@ -14,8 +14,7 @@ from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 # Models should be immutable so that they can be stored in memory and safely shared by
 # coroutines without copying on every read operation.
 class ImmutableModel(BaseModel):
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class Replica(ImmutableModel):
@@ -78,7 +77,7 @@ class Service(ImmutableModel):
         return self.https
 
     def with_replicas(self, new_replicas: Iterable[Replica]) -> "Service":
-        return Service(**{**self.dict(), "replicas": tuple(new_replicas)})
+        return Service(**{**self.model_dump(), "replicas": tuple(new_replicas)})
 
     def find_replica(self, replica_id: str) -> Optional[Replica]:
         for replica in self.replicas:

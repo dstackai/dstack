@@ -35,6 +35,10 @@ from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 from dstack._internal.utils.common import get_or_error
 
+# Hoisted: this validates once per run inside a loop, and constructing a `TypeAdapter`
+# rebuilds the schema every time.
+_ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
+
 
 class ServerProxyRepo(BaseProxyRepo):
     """
@@ -161,7 +165,7 @@ class ServerProxyRepo(BaseProxyRepo):
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:
                 continue
-            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)  # type: ignore[arg-type]
+            model_options = _ANY_MODEL_ADAPTER.validate_python(model_options_obj)
             model = ChatModel(
                 project_name=project_name,
                 name=model_spec.name,

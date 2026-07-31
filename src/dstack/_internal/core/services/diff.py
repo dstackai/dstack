@@ -60,8 +60,8 @@ def copy_model(model: M, reset: Optional[IncludeExcludeType] = None) -> M:
     """
     Returns a deep copy of the model instance.
 
-    Implemented as `BaseModel.model_validate(BaseModel.dict())`, thus,
-    unlike `BaseModel.copy(deep=True)`, runs all validations.
+    Implemented as `model_validate(model_dump())`, thus,
+    unlike `model_copy(deep=True)`, runs all validations.
 
     The fields specified in the `reset` option are reset to their default values.
 
@@ -71,7 +71,7 @@ def copy_model(model: M, reset: Optional[IncludeExcludeType] = None) -> M:
     Returns:
         A deep copy of the model instance.
     """
-    return type(model).model_validate(model.dict(exclude=reset))
+    return type(model).model_validate(model.model_dump(exclude=reset))
 
 
 def flatten_diff_fields(diff: ModelDiff, prefix: str = "") -> list[str]:

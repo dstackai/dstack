@@ -537,13 +537,13 @@ async def get_plan(
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
-    effective_run_spec = RunSpec.model_validate(run_spec.dict())
+    effective_run_spec = RunSpec.model_validate(run_spec.model_dump())
     effective_run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_run_spec,
     )
-    effective_run_spec = RunSpec.model_validate(effective_run_spec.dict())
+    effective_run_spec = RunSpec.model_validate(effective_run_spec.model_dump())
     validate_run_spec_and_set_defaults(
         user=user,
         run_spec=effective_run_spec,
@@ -603,7 +603,7 @@ async def apply_plan(
         spec=run_spec,
     )
     # Spec must be copied by parsing to calculate merged_profile
-    run_spec = RunSpec.model_validate(run_spec.dict())
+    run_spec = RunSpec.model_validate(run_spec.model_dump())
     validate_run_spec_and_set_defaults(
         user=user, run_spec=run_spec, legacy_repo_dir=legacy_repo_dir
     )
@@ -658,7 +658,7 @@ async def apply_plan(
         update(RunModel)
         .where(RunModel.id == current_resource.id)
         .values(
-            run_spec=run_spec.json(),
+            run_spec=run_spec.model_dump_json(),
             priority=run_spec.configuration.priority,
             deployment_num=new_deployment_num,
         )
@@ -743,7 +743,7 @@ async def submit_run(
             run_name=run_spec.run_name,
             submitted_at=submitted_at,
             status=initial_status,
-            run_spec=run_spec.json(),
+            run_spec=run_spec.model_dump_json(),
             last_processed_at=submitted_at,
             priority=run_spec.configuration.priority,
             deployment_num=0,
@@ -859,7 +859,7 @@ def create_job_model_for_new_submission(
         last_processed_at=now,
         status=status,
         termination_reason=None,
-        job_spec_data=job.job_spec.json(),
+        job_spec_data=job.job_spec.model_dump_json(),
         job_provisioning_data=None,
         probes=[],
         waiting_master_job=job.job_spec.job_num != 0,

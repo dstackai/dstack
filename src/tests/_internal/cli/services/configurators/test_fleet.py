@@ -38,7 +38,7 @@ def apply_args(
     parser = argparse.ArgumentParser()
     configurator = FleetConfigurator(Mock())
     configurator.register_args(parser)
-    conf = conf.copy(deep=True)
+    conf = conf.model_copy(deep=True)
     configurator_args = parser.parse_args(args)
     configurator.apply_args(conf, configurator_args)
     return conf, configurator_args
@@ -131,14 +131,14 @@ class TestFleetConfigurator:
         conf = create_conf()
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
         conf.env = Env.model_validate({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_override(self):
         conf = create_conf()
         conf.env = Env.model_validate({"A": "0"})
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
         conf.env = Env.model_validate({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_value_from_environ(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("FROM_ENV", "2")
@@ -146,7 +146,7 @@ class TestFleetConfigurator:
         conf.env = Env.model_validate({"FROM_CONF": "1"})
         modified, args = apply_args(conf, ["--env", "FROM_ENV"])
         conf.env = Env.model_validate({"FROM_CONF": "1", "FROM_ENV": "2"})
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_value_from_environ_not_set(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("FROM_ENV", raising=False)
@@ -199,7 +199,7 @@ class TestApplyPlanMessages:
         spec = get_cloud_fleet_spec()
         plan = create_fleet_plan(
             current_spec=spec,
-            spec=spec.copy(deep=True),
+            spec=spec.model_copy(deep=True),
             action=ApplyAction.UPDATE,
         )
 
@@ -244,4 +244,4 @@ class TestRenderFleetSpecDiff:
     def test_no_diff(self):
         spec = get_cloud_fleet_spec()
 
-        assert _render_fleet_spec_diff(spec, spec.copy(deep=True)) is None
+        assert _render_fleet_spec_diff(spec, spec.model_copy(deep=True)) is None

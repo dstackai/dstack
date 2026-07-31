@@ -7,7 +7,7 @@ from typing import Annotated, BinaryIO, Callable, Dict, Optional, Union, cast
 
 import git
 import pydantic
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 from typing_extensions import Literal
 
 from dstack._internal.core.deprecated import Deprecated
@@ -290,7 +290,7 @@ class GitRepoURL:
         get_ssh_config: Callable[[str], Dict[str, str]] = lambda host: {},
     ) -> "GitRepoURL":
         try:
-            url = pydantic.parse_obj_as(pydantic.AnyUrl, value)
+            url = TypeAdapter(pydantic.AnyUrl).validate_python(value)
         except pydantic.ValidationError:
             url = scp_location_to_ssh_url(value)
 
@@ -352,7 +352,7 @@ def scp_location_to_ssh_url(scp_location: str) -> Optional[pydantic.AnyHttpUrl]:
         return None
     user, host, path = match.group("user"), match.group("host"), match.group("path")
     try:
-        return pydantic.parse_obj_as(pydantic.AnyUrl, f"ssh://{user}@{host}/{path}")
+        return TypeAdapter(pydantic.AnyUrl).validate_python(f"ssh://{user}@{host}/{path}")
     except pydantic.ValidationError:
         return None
 

@@ -100,13 +100,13 @@ def build_verified_preset(
     target_type = (
         "gateway" if urlparse(run.service.url).scheme in {"http", "https"} else "server-proxy"
     )
-    benchmark = report.benchmark.copy(
+    benchmark = report.benchmark.model_copy(
         update={
             "target": PresetBenchmarkTarget(type=target_type),
             "client": PresetBenchmarkClient(type="local"),
         }
     )
-    portable_service = service.copy(deep=True)
+    portable_service = service.model_copy(deep=True)
     # The CLI resolved preset env references before submission; presets retain the references.
     for key, value in preset_configuration.env.items():
         if isinstance(value, EnvSentinel) and key in portable_service.env:

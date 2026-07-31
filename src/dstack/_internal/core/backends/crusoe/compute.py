@@ -291,7 +291,7 @@ class CrusoeCompute(
             ssh_port=22,
             username="ubuntu",
             dockerized=True,
-            backend_data=CrusoeInstanceBackendData(data_disk_id=data_disk_id).json(),
+            backend_data=CrusoeInstanceBackendData(data_disk_id=data_disk_id).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -356,7 +356,7 @@ class CrusoeCompute(
                 backend=BackendType.CRUSOE,
                 backend_data=CrusoePlacementGroupBackendData(
                     ib_partition_id=None, ib_network_id=None
-                ).json(),
+                ).model_dump_json(),
             )
 
         ib_networks = self._client.list_ib_networks()
@@ -385,7 +385,7 @@ class CrusoeCompute(
             backend_data=CrusoePlacementGroupBackendData(
                 ib_partition_id=partition["id"],
                 ib_network_id=target_network["id"],
-            ).json(),
+            ).model_dump_json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:

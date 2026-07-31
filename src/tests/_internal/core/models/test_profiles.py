@@ -100,11 +100,11 @@ class TestProfileInstancesCompatibilityExcludes:
     def test_excludes_unset_instances(self):
         profile = Profile()
 
-        assert "instances" not in profile.dict(exclude=get_profile_excludes(profile))
+        assert "instances" not in profile.model_dump(exclude=get_profile_excludes(profile))
 
     def test_preserves_configured_instances(self):
         profile = Profile(instances=[InstanceNameSelector(name="my-fleet-1")])
 
-        assert profile.dict(exclude=get_profile_excludes(profile))["instances"] == [
+        assert profile.model_dump(exclude=get_profile_excludes(profile))["instances"] == [
             {"name": "my-fleet-1"}
         ]

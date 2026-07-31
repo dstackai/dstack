@@ -131,7 +131,7 @@ async def create_repo(
         project_id=project.id,
         name=repo_id,
         type=RepoType(repo_info.repo_type),
-        info=repo_info.json(),
+        info=repo_info.model_dump_json(),
     )
     try:
         async with session.begin_nested():
@@ -155,7 +155,7 @@ async def update_repo(
             RepoModel.name == repo_id,
         )
         .values(
-            info=repo_info.json(),
+            info=repo_info.model_dump_json(),
         )
     )
     await session.commit()
@@ -222,7 +222,7 @@ async def create_repo_creds(
     repo_creds = RepoCredsModel(
         repo_id=repo.id,
         user_id=user.id,
-        creds=DecryptedString(plaintext=creds.json()),
+        creds=DecryptedString(plaintext=creds.model_dump_json()),
     )
     try:
         async with session.begin_nested():
@@ -246,7 +246,7 @@ async def update_repo_creds(
             RepoCredsModel.user_id == user.id,
         )
         .values(
-            creds=DecryptedString(plaintext=creds.json()),
+            creds=DecryptedString(plaintext=creds.model_dump_json()),
         )
     )
     await session.commit()

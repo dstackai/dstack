@@ -329,7 +329,7 @@ def requirements() -> Requirements:
 
 
 def resources() -> Resources:
-    """`Resources.dict()` rewrites `cpu` for old clients — the other custom serializer."""
+    """`Resources.model_dump()` rewrites `cpu` for old clients — the other custom serializer."""
     return Resources(
         cpus=8,
         memory_mib=16384,
@@ -396,7 +396,7 @@ def volume_provisioning_data() -> VolumeProvisioningData:
 
 def fleet() -> Fleet:
     """
-    The default `FleetNodesSpec` has `target == min`, which is what makes `FleetNodesSpec.dict()`
+    The default `FleetNodesSpec` has `target == min`, which is what makes `FleetNodesSpec.model_dump()`
     drop `target` — the old-client compat hack from #3066. That override becomes a
     `@model_serializer` in v2, so this fixture is what proves the hack survived.
     """

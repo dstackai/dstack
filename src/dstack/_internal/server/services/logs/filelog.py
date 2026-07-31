@@ -222,7 +222,7 @@ class FileLogStorage(LogStorage):
         log_events_parsed = [self._runner_log_event_to_log_event(event) for event in log_events]
         log_file_path.parent.mkdir(exist_ok=True, parents=True)
         with open(log_file_path, "a") as f:
-            f.writelines(log.json() + "\n" for log in log_events_parsed)
+            f.writelines(log.model_dump_json() + "\n" for log in log_events_parsed)
 
     def _get_log_file_path(
         self,

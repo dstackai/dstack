@@ -61,7 +61,7 @@ class CustomApplyPolicy(ApplyPolicy):
         try:
             response = requests.post(
                 f"{self._plugin_service_uri}{endpoint}",
-                json=spec_request.dict(exclude=exclude),
+                json=spec_request.model_dump(exclude=exclude),
                 headers={"accept": "application/json", "Content-Type": "application/json"},
                 timeout=PLUGIN_REQUEST_TIMEOUT_SEC,
             )

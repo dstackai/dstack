@@ -29,12 +29,12 @@ class ReposAPIClient(APIClientGroup):
                 " the repo without creds. Use `get_with_creds()` to get the repo with creds"
             )
         body = GetRepoRequest(repo_id=repo_id, include_creds=False)
-        resp = self._request(f"/api/project/{project_name}/repos/get", body=body.json())
+        resp = self._request(f"/api/project/{project_name}/repos/get", body=body.model_dump_json())
         return validate_extra_ignore(RepoHead, resp.json())
 
     def get_with_creds(self, project_name: str, repo_id: str) -> RepoHeadWithCreds:
         body = GetRepoRequest(repo_id=repo_id, include_creds=True)
-        resp = self._request(f"/api/project/{project_name}/repos/get", body=body.json())
+        resp = self._request(f"/api/project/{project_name}/repos/get", body=body.model_dump_json())
         return validate_extra_ignore(RepoHeadWithCreds, resp.json())
 
     def init(
@@ -49,11 +49,11 @@ class ReposAPIClient(APIClientGroup):
             repo_info=repo_info,
             repo_creds=repo_creds,
         )
-        self._request(f"/api/project/{project_name}/repos/init", body=body.json())
+        self._request(f"/api/project/{project_name}/repos/init", body=body.model_dump_json())
 
     def delete(self, project_name: str, repos_ids: List[str]):
         body = DeleteReposRequest(repos_ids=repos_ids)
-        self._request(f"/api/project/{project_name}/repos/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/repos/delete", body=body.model_dump_json())
 
     def upload_code(self, project_name: str, repo_id: str, code_hash: str, fp: BinaryIO):
         self._request(

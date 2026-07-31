@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
@@ -16,7 +16,7 @@ class BackendsAPIClient(APIClientGroup):
     def list_backend_types(self) -> List[BackendType]:
         resp = self._request("/api/backends/list_types")
         backend_types = []
-        for value in parse_obj_as(List[str], resp.json()):
+        for value in TypeAdapter(List[str]).validate_python(resp.json()):
             try:
                 backend_types.append(BackendType(value))
             except ValueError:
@@ -26,18 +26,22 @@ class BackendsAPIClient(APIClientGroup):
     def create(
         self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> AnyBackendConfigWithCreds:
-        resp = self._request(f"/api/project/{project_name}/backends/create", body=config.json())
+        resp = self._request(
+            f"/api/project/{project_name}/backends/create", body=config.model_dump_json()
+        )
         return validate_extra_ignore(AnyBackendConfigWithCredsTagged, resp.json())
 
     def update(
         self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> AnyBackendConfigWithCreds:
-        resp = self._request(f"/api/project/{project_name}/backends/update", body=config.json())
+        resp = self._request(
+            f"/api/project/{project_name}/backends/update", body=config.model_dump_json()
+        )
         return validate_extra_ignore(AnyBackendConfigWithCredsTagged, resp.json())
 
     def delete(self, project_name: str, backends_names: List[BackendType]):
         body = DeleteBackendsRequest(backends_names=backends_names)
-        self._request(f"/api/project/{project_name}/backends/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/backends/delete", body=body.model_dump_json())
 
     def config_info(
         self, project_name: str, backend_name: BackendType

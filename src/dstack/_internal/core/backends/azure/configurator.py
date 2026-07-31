@@ -130,9 +130,9 @@ class AzureConfigurator(
         )
         return BackendRecord(
             config=AzureStoredConfig(
-                **validate_extra_ignore(AzureBackendConfig, config).dict()
-            ).json(),
-            auth=AzureCreds.model_validate(config.creds).root.json(),
+                **validate_extra_ignore(AzureBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=AzureCreds.model_validate(config.creds).root.model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> AzureBackendConfigWithCreds:

@@ -110,7 +110,9 @@ class TestGroupOrdering:
         buffer = StringIO()
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         old = get_preset()
-        new = old.copy(update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)})
+        new = old.model_copy(
+            update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)}
+        )
         sessions = [
             {
                 "id": "aaaaaaaa",

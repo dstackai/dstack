@@ -40,9 +40,9 @@ class {{ backend_name }}Configurator(
     ) -> BackendRecord:
         return BackendRecord(
             config={{ backend_name }}StoredConfig(
-                **{{ backend_name }}validate_extra_ignore(BackendConfig, config).dict()
-            ).json(),
-            auth={{ backend_name }}Creds.model_validate(config.creds).json(),
+                **{{ backend_name }}validate_extra_ignore(BackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth={{ backend_name }}Creds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> {{ backend_name }}BackendConfigWithCreds:

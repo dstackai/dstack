@@ -22,7 +22,7 @@ class OpenAIChatCompletions(ChatCompletionsClient):
     async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
         try:
             resp = await self._http.post(
-                f"{self._prefix}/chat/completions", json=request.dict(exclude_unset=True)
+                f"{self._prefix}/chat/completions", json=request.model_dump(exclude_unset=True)
             )
             await self._propagate_error(resp)
         except httpx.RequestError as e:
@@ -36,7 +36,9 @@ class OpenAIChatCompletions(ChatCompletionsClient):
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
         try:
             async with self._http.stream(
-                "POST", f"{self._prefix}/chat/completions", json=request.dict(exclude_unset=True)
+                "POST",
+                f"{self._prefix}/chat/completions",
+                json=request.model_dump(exclude_unset=True),
             ) as resp:
                 await self._propagate_error(resp)
 

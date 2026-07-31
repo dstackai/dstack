@@ -96,7 +96,7 @@ class PresetStore:
         preset = self.find_by_name(name)
         if preset is None:
             return None
-        detached = preset.copy(update={"name": None})
+        detached = preset.model_copy(update={"name": None})
         self.save(detached)
         return detached
 

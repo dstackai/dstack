@@ -321,7 +321,7 @@ class TestCreateVolume:
             response = await client.post(
                 f"/api/project/{project.name}/volumes/create",
                 headers=get_auth_headers(user.token),
-                json={"configuration": configuration.dict()},
+                json={"configuration": configuration.model_dump()},
             )
         assert response.status_code == 200
         assert response.json() == {

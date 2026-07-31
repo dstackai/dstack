@@ -193,7 +193,7 @@ class VerdaCompute(
             backend_data=VerdaInstanceBackendData(
                 startup_script_id=startup_script_id,
                 ssh_key_ids=ssh_ids,
-            ).json(),
+            ).model_dump_json(),
         )
 
     def terminate_instance(

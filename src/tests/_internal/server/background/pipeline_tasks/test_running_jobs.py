@@ -1321,7 +1321,7 @@ class TestJobRunningWorker:
 
         await session.refresh(job)
         assert job.status == JobStatus.PULLING
-        assert job.image_pull_progress == progress.json()
+        assert job.image_pull_progress == progress.model_dump_json()
 
     async def test_provisioning_shim_force_stop_if_already_running_api_v1(
         self,

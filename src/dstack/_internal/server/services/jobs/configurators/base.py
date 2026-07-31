@@ -446,7 +446,7 @@ def interpolate_job_volumes(
     job_volumes = []
     for mount_point in run_volumes:
         if not isinstance(mount_point, VolumeMountPoint):
-            job_volumes.append(mount_point.copy())
+            job_volumes.append(mount_point.model_copy())
             continue
         if isinstance(mount_point.name, str):
             names = [mount_point.name]

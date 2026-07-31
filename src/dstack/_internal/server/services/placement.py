@@ -173,7 +173,7 @@ async def create_placement_group(
             backend=master_instance_offer.backend,
             region=master_instance_offer.region,
             placement_strategy=PlacementStrategy.CLUSTER,
-        ).json(),
+        ).model_dump_json(),
     )
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     logger.debug(
@@ -217,5 +217,5 @@ async def create_placement_group(
         placement_group.configuration.backend.value,
         placement_group.configuration.region,
     )
-    placement_group_model.provisioning_data = pgpd.json()
+    placement_group_model.provisioning_data = pgpd.model_dump_json()
     return placement_group_model

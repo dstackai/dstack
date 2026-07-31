@@ -51,7 +51,7 @@ class TestValidatePresetMatches:
         _validate_preset_matches(matching, configuration=configuration)
         with pytest.raises(CLIError, match="does not serve repo"):
             _validate_preset_matches(
-                matching.copy(update={"model": "other/repo"}),
+                matching.model_copy(update={"model": "other/repo"}),
                 configuration=configuration,
             )
 

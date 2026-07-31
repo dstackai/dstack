@@ -18,12 +18,12 @@ class AuthAPIClient(APIClientGroup):
 
     def authorize(self, provider: str, local_port: Optional[int] = None) -> OAuthAuthorizeResponse:
         body = OAuthAuthorizeRequest(local_port=local_port)
-        resp = self._request(f"/api/auth/{provider}/authorize", body=body.json())
+        resp = self._request(f"/api/auth/{provider}/authorize", body=body.model_dump_json())
         return validate_extra_ignore(OAuthAuthorizeResponse, resp.json())
 
     def callback(
         self, provider: str, code: str, state: str, base_url: Optional[str] = None
     ) -> UserWithCreds:
         body = OAuthCallbackRequest(code=code, state=state, base_url=base_url)
-        resp = self._request(f"/api/auth/{provider}/callback", body=body.json())
+        resp = self._request(f"/api/auth/{provider}/callback", body=body.model_dump_json())
         return validate_extra_ignore(UserWithCreds, resp.json())

@@ -140,7 +140,7 @@ class RunnerClient:
                 merged_env.update(router_env)
             if server_access:
                 merged_env.setdefault(DSTACK_PROJECT_ENV, run.project_name)
-            job_spec = job_spec.copy(deep=True)
+            job_spec = job_spec.model_copy(deep=True)
             job_spec.env = merged_env
         quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR
         body = SubmitBody(
@@ -612,7 +612,7 @@ class ShimClient:
     ) -> requests.Response:
         url = f"{self._base_url}/{path.lstrip('/')}"
         if body is not None:
-            json = body.dict()
+            json = body.model_dump()
         else:
             json = None
         resp = self._session.request(method, url, json=json, timeout=REQUEST_TIMEOUT)

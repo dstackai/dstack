@@ -9,6 +9,6 @@ class LogsAPIClient(APIClientGroup):
     def poll(self, project_name: str, body: PollLogsRequest) -> JobSubmissionLogs:
         resp = self._request(
             f"/api/project/{project_name}/logs/poll",
-            body=body.json(exclude=get_poll_logs_excludes(body)),
+            body=body.model_dump_json(exclude=get_poll_logs_excludes(body)),
         )
         return validate_extra_ignore(JobSubmissionLogs, resp.json())

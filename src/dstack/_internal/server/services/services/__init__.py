@@ -93,7 +93,7 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
             "This dstack-server installation forbids services without a gateway."
             " Please configure a gateway."
         )
-    run_model.service_spec = service_spec.json()
+    run_model.service_spec = service_spec.model_dump_json()
 
 
 async def _register_service_in_gateway(

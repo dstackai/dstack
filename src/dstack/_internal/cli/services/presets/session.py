@@ -105,7 +105,8 @@ class PresetAgentSession:
             }
         )
         _write_private_text(
-            self.path / "agent.json", json.dumps(json.loads(info.json()), indent=2) + "\n"
+            self.path / "agent.json",
+            json.dumps(json.loads(info.model_dump_json()), indent=2) + "\n",
         )
 
     def append_log(self, line: str) -> None:
@@ -177,7 +178,7 @@ def create_preset_agent_session(
             "debug": debug,
         }
         _write_private_text(path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
-        data = json.loads(configuration.json(exclude_none=True))
+        data = json.loads(configuration.model_dump_json(exclude_none=True))
         if configuration.env:
             data["env"] = list(configuration.env)
         else:

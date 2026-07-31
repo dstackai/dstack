@@ -17,7 +17,9 @@ class SecretsAPIClient(APIClientGroup):
 
     def get(self, project_name: str, name: str) -> Secret:
         body = GetSecretRequest(name=name)
-        resp = self._request(f"/api/project/{project_name}/secrets/get", body=body.json())
+        resp = self._request(
+            f"/api/project/{project_name}/secrets/get", body=body.model_dump_json()
+        )
         return validate_extra_ignore(Secret, resp.json())
 
     def create_or_update(self, project_name: str, name: str, value: str) -> Secret:
@@ -26,10 +28,10 @@ class SecretsAPIClient(APIClientGroup):
             value=value,
         )
         resp = self._request(
-            f"/api/project/{project_name}/secrets/create_or_update", body=body.json()
+            f"/api/project/{project_name}/secrets/create_or_update", body=body.model_dump_json()
         )
         return validate_extra_ignore(Secret, resp.json())
 
     def delete(self, project_name: str, names: List[str]):
         body = DeleteSecretsRequest(secrets_names=names)
-        self._request(f"/api/project/{project_name}/secrets/delete", body=body.json())
+        self._request(f"/api/project/{project_name}/secrets/delete", body=body.model_dump_json())

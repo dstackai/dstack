@@ -40,9 +40,9 @@ class CloudRiftConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=CloudRiftStoredConfig(
-                **validate_extra_ignore(CloudRiftBackendConfig, config).dict()
-            ).json(),
-            auth=CloudRiftCreds.model_validate(config.creds).json(),
+                **validate_extra_ignore(CloudRiftBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=CloudRiftCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(

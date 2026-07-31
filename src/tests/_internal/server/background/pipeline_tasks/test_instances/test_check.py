@@ -399,7 +399,7 @@ class TestCheckInstance:
         res = await session.execute(select(InstanceHealthCheckModel))
         health_check = res.scalars().one()
         assert health_check.status == HealthStatus.WARNING
-        assert health_check.response == health_response.json()
+        assert health_check.response == health_response.model_dump_json()
 
 
 @pytest.mark.asyncio

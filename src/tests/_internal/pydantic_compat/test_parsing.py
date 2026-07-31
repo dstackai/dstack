@@ -93,7 +93,7 @@ CONFIG_PARSERS: dict[str, Callable[[Any], Any]] = {
     "dev_environment": parse_apply_configuration,
     "fleet": parse_apply_configuration,
     "gateway": parse_apply_configuration,
-    "profiles": ProfilesConfig.parse_obj,
+    "profiles": ProfilesConfig.model_validate,
     "service": parse_apply_configuration,
     "task": parse_apply_configuration,
     "volume": parse_apply_configuration,
@@ -179,7 +179,7 @@ class TestBackendDataParsing:
 
 class TestNebiusOfferBackendDataSetField:
     """
-    Excluded from `BACKEND_DATA` because `.json()` raises on its `set` field, so there is nothing
+    Excluded from `BACKEND_DATA` because `.model_dump_json()` raises on its `set` field, so there is nothing
     for `_assert_parses` to compare. The read path is real regardless, so assert on the value.
     """
 
@@ -234,7 +234,9 @@ class TestUnknownFieldTolerance:
         payload = _load_input(surface, name)
         baseline = parse_ignore_extra(model, payload)
         perturbed = parse_ignore_extra(model, {**payload, "unknown_from_a_newer_writer": {"x": 1}})
-        assert canonicalize(perturbed.json()) == canonicalize(baseline.json())
+        assert canonicalize(perturbed.model_dump_json()) == canonicalize(
+            baseline.model_dump_json()
+        )
 
 
 class TestUnknownFieldRejection:
@@ -311,7 +313,7 @@ class TestProxyPayloadParsing:
 
 def _assert_parses(surface: str, name: str, model, regen: bool) -> None:
     kind = f"parsing/{surface}"
-    assert_matches_fixture(kind, f"{name}.values", model.json(), regen=regen)
+    assert_matches_fixture(kind, f"{name}.values", model.model_dump_json(), regen=regen)
     assert_matches_fixture(kind, f"{name}.types", json.dumps(type_map(model)), regen=regen)
 
 
