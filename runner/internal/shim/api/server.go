@@ -13,6 +13,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
 type TaskRunner interface {
@@ -22,6 +23,7 @@ type TaskRunner interface {
 	Remove(ctx context.Context, taskID string) error
 
 	Resources(context.Context) shim.Resources
+	Gpus(context.Context) []host.GpuInfo
 	TaskList() []*shim.TaskListItem
 	TaskInfo(taskID string) shim.TaskInfo
 }
@@ -85,6 +87,7 @@ func NewShimServer(
 	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
 	r.AddHandler("POST", "/api/shutdown", s.ShutdownHandler)
 	r.AddHandler("GET", "/api/instance/health", s.InstanceHealthHandler)
+	r.AddHandler("GET", "/api/instance/info", s.InstanceInfoHandler)
 	r.AddHandler("GET", "/api/components", s.ComponentListHandler)
 	r.AddHandler("POST", "/api/components/install", s.ComponentInstallHandler)
 	r.AddHandler("GET", "/api/tasks", s.TaskListHandler)

@@ -418,6 +418,8 @@ dstack fleet delete my-fleet -y
 dstack fleet delete my-fleet -i <instance num> -y
 ```
 
+**Host GPU driver:** for NVIDIA, AMD, and Tenstorrent, VM-based backends and SSH fleets report the host GPU driver version in `instances[].gpu_driver.version`, available via `dstack fleet get my-fleet --json` once the instance is `idle` or `busy`. Useful when you're uncertain whether a host's driver is compatible with your workload.
+
 ### Monitor runs
 
 ```bash

@@ -21,7 +21,11 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
-from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
+from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
+    InstanceStatus,
+    InstanceTerminationReason,
+)
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server import settings as server_settings
@@ -32,6 +36,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
     can_terminate_fleet_instances_on_idle_duration,
     get_instance_idle_duration,
     get_provisioning_deadline,
+    set_gpu_driver_update,
     set_health_update,
     set_status_update,
     set_unreachable_update,
@@ -145,6 +150,7 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
         instance_model=instance_model,
         job_provisioning_data=job_provisioning_data,
         check_instance_health=check_instance_health,
+        check_instance_info=_should_check_instance_info(job_provisioning_data),
     )
     health_status = _get_health_status_for_instance_check(
         instance_model=instance_model,
@@ -181,6 +187,11 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
 
     if instance_check.reachable:
         result.instance_update_map["termination_deadline"] = None
+        set_gpu_driver_update(
+            update_map=result.instance_update_map,
+            job_provisioning_data=job_provisioning_data,
+            gpu_driver=instance_check.gpu_driver,
+        )
         if instance_model.status == InstanceStatus.PROVISIONING:
             set_status_update(
                 update_map=result.instance_update_map,
@@ -235,10 +246,22 @@ async def _should_check_instance_health(instance_id) -> bool:
     return res.scalar_one() == 0
 
 
+def _should_check_instance_info(job_provisioning_data: JobProvisioningData) -> bool:
+    """
+    Instance info reports host facts that shim detects on start, e.g., the GPU driver
+    version, so they change after shim is restarted, which is required if the host GPUs
+    or their driver change. Such a restart is not necessarily observed by the server,
+    hence the facts are requested on every check, and only stored if they changed.
+    Hosts without GPUs report nothing, hence are never asked.
+    """
+    return bool(job_provisioning_data.instance_type.resources.gpus)
+
+
 async def _run_instance_check(
     instance_model: InstanceModel,
     job_provisioning_data: JobProvisioningData,
     check_instance_health: bool,
+    check_instance_info: bool,
 ) -> InstanceCheck:
     ssh_private_keys = get_instance_ssh_private_keys(instance_model)
     instance_check = await run_async(
@@ -248,6 +271,7 @@ async def _run_instance_check(
         None,
         instance=instance_model,
         check_instance_health=check_instance_health,
+        check_instance_info=check_instance_info,
     )
     # May return False if fails to establish ssh connection.
     if instance_check is False:
@@ -382,6 +406,7 @@ def _check_instance_inner(
     *,
     instance: InstanceModel,
     check_instance_health: bool = False,
+    check_instance_info: bool = False,
 ) -> InstanceCheck:
     instance_health_response: Optional[InstanceHealthResponse] = None
     shim_client = runner_client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
@@ -402,6 +427,8 @@ def _check_instance_inner(
         logger.exception(template, *args)
         return InstanceCheck(reachable=False, message=template % args)
 
+    gpu_driver = _get_gpu_driver(instance, shim_client) if check_instance_info else None
+
     try:
         remove_dangling_tasks_from_instance(shim_client, instance)
     except Exception as exc:
@@ -412,7 +439,30 @@ def _check_instance_inner(
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response,
         instance_health_response,
+        gpu_driver,
     )
+
+
+def _get_gpu_driver(
+    instance_model: InstanceModel,
+    shim_client: runner_client.ShimClient,
+) -> Optional[GpuDriverInfo]:
+    """
+    Returns the host GPU driver reported by shim, or `None` if it cannot be retrieved.
+    The driver is optional metadata, so errors are not propagated to the instance check.
+    """
+    try:
+        instance_info = shim_client.get_instance_info()
+    except requests.RequestException as exc:
+        logger.warning(
+            "Instance %s: shim.get_instance_info(): request error: %s", instance_model.name, exc
+        )
+        return None
+    try:
+        return runner_client.instance_info_response_to_gpu_driver(instance_info)
+    except ValueError as exc:
+        logger.warning("Instance %s: unexpected instance info: %s", instance_model.name, exc)
+        return None
 
 
 def _maybe_install_components(

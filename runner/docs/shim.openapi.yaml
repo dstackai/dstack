@@ -2,7 +2,7 @@ openapi: 3.1.2
 
 info:
   title: dstack-shim API
-  version: v2/0.20.1
+  version: v2/0.20.30
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
   description: >
@@ -85,6 +85,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InstanceHealthResponse"
+
+  /instance/info:
+    get:
+      summary: Get instance info
+      description: >
+        (since [0.20.30](https://github.com/dstackai/dstack/releases/tag/0.20.30))
+        Returns facts about the host observed by shim, e.g., the GPU driver version.
+        Unlike `/components`, the reported entities are not managed by shim.
+      tags: [Instance]
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstanceInfoResponse"
 
   /components:
     get:
@@ -502,6 +518,24 @@ components:
       properties:
         dcgm:
           $ref: "#/components/schemas/DCGMHealth"
+      additionalProperties: false
+
+    InstanceInfoResponse:
+      title: shim.api.InstanceInfoResponse
+      type: object
+      properties:
+        gpu_vendor:
+          description: Host GPU vendor. Omitted on hosts without GPUs.
+          type: string
+          examples:
+            - nvidia
+        gpu_driver_version:
+          description: >
+            Host GPU driver version. Omitted on hosts without GPUs
+            or if detection failed.
+          type: string
+          examples:
+            - 570.86.15
       additionalProperties: false
 
     ComponentListResponse:
