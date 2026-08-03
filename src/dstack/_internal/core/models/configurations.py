@@ -50,7 +50,7 @@ from dstack._internal.utils.json_utils import (
 )
 
 CommandsList = List[str]
-ValidPort = conint(gt=0, le=65536)
+ValidPort = conint(gt=0, le=65535)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
