@@ -5,6 +5,9 @@
 dist/
 build/
 venv/
+.venv/
+.tox/
+.python-version
 /site/
 /.cache/
 .pytest_cache/

@@ -145,9 +145,38 @@ filterwarnings = [
     "ignore:^The @wait_container_is_ready decorator:DeprecationWarning",
 ]
 
+[tool.tox]
+env_list = ["default"]
+
+[tool.tox.env_run_base]
+description = "Run tests under {base_python}"
+extras = ["all"]
+dependency_groups = ["test"]
+commands = [["pytest", { replace = "posargs", extend = true }]]
+
+# `tox run [-e default]` -- run tests inside an isolated environment
+# with Python version read from `.python-version` file
+[tool.tox.env.default]
+base_python_file = [".python-version"]
+
+# `tox run -e dummy --skip-env-install` -- run tests inside the current environment
+# all dependencies must be already installed; a dummy environment is still created
+[tool.tox.env.dummy]
+description = "Run tests inside the current environment"
+# Must be called with --skip-env-install
+dependency_groups = ["nonexistent-group-to-trigger-failure"]
+allowlist_externals = ["pytest"]
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.2.0",
+    "ruff==0.12.7",  # should match .pre-commit-config.yaml
+    "pyinstrument>=5.0.0",
+    "kubernetes-stubs-elephant-fork>=35.0.0.post3",
+    {include-group = "test"},
+    {include-group = "docs"},
+]
+test = [
     "pytest~=8.0",
     "pytest-asyncio>=0.25.2",
     "pytest-mock>=3.14.0",
@@ -155,16 +184,12 @@ dev = [
     "pytest-socket>=0.7.0",
     "pytest-env>=1.1.0",
     "pytest-unordered>=0.7.0",
-    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
-    "requests-mock>=1.12.1",
-    "openai>=1.68.2",
-    "freezegun>=1.5.1",
-    "ruff==0.12.7",  # should match .pre-commit-config.yaml
-    "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
-    "pyinstrument>=5.0.0",
-    "kubernetes-stubs-elephant-fork>=35.0.0.post3",
-    {include-group = "docs"},
+    "requests-mock>=1.12.1",
+    "freezegun>=1.5.1",
+    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
+    "openai>=1.68.2",
+    "testcontainers>=4.9.2",
 ]
 docs = [
     "dstack[server]",
