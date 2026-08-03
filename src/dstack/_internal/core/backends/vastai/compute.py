@@ -131,7 +131,7 @@ class VastAICompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        offer_backend_data: VastAIOfferBackendData = validate_extra_ignore(
+        offer_backend_data = validate_extra_ignore(
             VastAIOfferBackendData, instance_offer.backend_data
         )
         bid = None

@@ -78,7 +78,7 @@ class HotAisleCompute(
     ) -> JobProvisioningData:
         project_ssh_key = instance_config.ssh_keys[0]
         self.api_client.upload_ssh_key(project_ssh_key.public)
-        offer_backend_data: HotAisleOfferBackendData = validate_extra_ignore(
+        offer_backend_data = validate_extra_ignore(
             HotAisleOfferBackendData, instance_offer.backend_data
         )
         vm_data = self.api_client.create_virtual_machine(offer_backend_data.vm_specs)

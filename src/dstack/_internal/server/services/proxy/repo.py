@@ -81,7 +81,7 @@ class ServerProxyRepo(BaseProxyRepo):
         router = run_spec.configuration.router
         replicas = []
         for job in jobs:
-            jpd: JobProvisioningData = validate_json_extra_ignore(
+            jpd = validate_json_extra_ignore(
                 JobProvisioningData, get_or_error(job.job_provisioning_data)
             )
             assert jpd.hostname is not None
@@ -156,9 +156,7 @@ class ServerProxyRepo(BaseProxyRepo):
         )
         models = []
         for run in res.scalars().all():
-            service_spec: ServiceSpec = validate_json_extra_ignore(
-                ServiceSpec, get_or_error(run.service_spec)
-            )
+            service_spec = validate_json_extra_ignore(ServiceSpec, get_or_error(run.service_spec))
             model_spec = service_spec.model
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:
