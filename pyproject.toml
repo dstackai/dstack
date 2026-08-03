@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt",
+    "gpuhunt==0.1.29",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -87,9 +87,6 @@ ignore-case = true
 
 [tool.uv.sources]
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
-# TODO: pin back to a released version once the pydantic v2 gpuhunt release is out.
-# https://github.com/dstackai/gpuhunt/pull/247
-gpuhunt = { git = "https://github.com/dstackai/gpuhunt", branch = "pr_pydantic_v2" }
 
 [tool.ruff]
 target-version = "py310"
