@@ -133,8 +133,10 @@ markers = [
     "dockerized",
 ]
 env = [
-    "DSTACK_CLI_RICH_FORCE_TERMINAL=0",
     "DSTACK_SSHPROXY_API_TOKEN=test-token",
+    # Pin every rich console in the process to non-terminal output so tests asserting on plain CLI
+    # text never see ANSI escapes.
+    "TTY_COMPATIBLE=0",
 ]
 filterwarnings = [
     # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
