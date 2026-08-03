@@ -46,5 +46,7 @@ class BackendsAPIClient(APIClientGroup):
     def config_info(
         self, project_name: str, backend_name: BackendType
     ) -> AnyBackendConfigWithCreds:
-        resp = self._request(f"/api/project/{project_name}/backends/{backend_name}/config_info")
+        resp = self._request(
+            f"/api/project/{project_name}/backends/{backend_name.value}/config_info"
+        )
         return validate_extra_ignore(AnyBackendConfigWithCredsTagged, resp.json())
