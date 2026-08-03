@@ -1,5 +1,10 @@
 # Repository Guidelines
 
+Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHITECTURE.md`,
+`PIPELINES.md`, `LOCKING.md`, `MIGRATIONS.md`, `RUNS-AND-JOBS.md`, `AUTOSCALING.md`,
+`BACKENDS.md`, `GPUHUNT.md`, `PROXY.md`, `RUNNER-AND-SHIM.md`, `FRONTEND.md`, `DOCS.md`,
+`DEVELOPMENT.md`, `RELEASE.md`.
+
 ## Project Structure & Module Organization
 - Core Python package lives in `src/dstack`; internal modules (including server) sit under `_internal`, API surfaces under `api`, and plugin integrations under `plugins`.
 - Tests reside in `src/tests` and mirror package paths; add new suites alongside the code they cover.
@@ -24,6 +29,9 @@
 - Prefer pydantic-style models in `core/models`.
 - Document attributes when the note adds behavior, compatibility, or semantic context that is not obvious from the name and type. Use attribute docstrings without leading newline.
 - Tests use `test_*.py` modules and `test_*` functions; fixtures live near usage.
+- Never make network calls inside a DB session or transaction. Fetch what you need before opening the session, or commit and close it before the call.
+- Don't use function-level (inner) imports to break circular imports. Inject the dependency or move the shared code to a lower-level module instead.
+- Never edit a migration that has already been applied or released; add a new migration instead.
 
 ## Testing Guidelines
 - Default to `uv run pytest`. Use markers from `tests/conftest.py` like `--runpostgres` if need to include specific tests.
