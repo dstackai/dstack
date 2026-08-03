@@ -35,6 +35,8 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 
 ## Testing Guidelines
 - Default to `uv run pytest`. Use markers from `tests/conftest.py` like `--runpostgres` if need to include specific tests.
+- Scope the run to the change: for trivial or localized edits, run only the affected test modules, `Test*` classes, or `-k` selection instead of the whole suite. Reserve the full suite for broad or cross-cutting changes.
+- Speed up large runs with `-n auto` (pytest-xdist), e.g. `uv run pytest -n auto`.
 - Group tests for the same unit (function/class) using `Test*` classes that mirror unit's name.
 - Keep tests hermetic (network disabled except localhost per `pytest.ini`); stub cloud calls with mocks.
 
