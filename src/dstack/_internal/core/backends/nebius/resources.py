@@ -60,6 +60,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
+from dstack.version import __version__
 
 #
 # Guidelines on using the Nebius SDK:
@@ -107,6 +108,7 @@ def make_sdk(creds: NebiusServiceAccountCreds) -> SDK:
             service_account_private_key_file_name=f.name,
             service_account_public_key_id=creds.public_key_id,
             service_account_id=creds.service_account_id,
+            user_agent_prefix=f"dstack/{__version__}",
         )
 
 
