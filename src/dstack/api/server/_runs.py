@@ -98,7 +98,7 @@ class RunsAPIClient(APIClientGroup):
         plan: Union[RunPlan, ApplyRunPlanInput],
         force: bool = False,
     ) -> Run:
-        plan_input: ApplyRunPlanInput = validate_extra_ignore(ApplyRunPlanInput, plan)
+        plan_input = validate_extra_ignore(ApplyRunPlanInput, plan)
         body = ApplyRunPlanRequest(plan=plan_input, force=force)
         body = copy.deepcopy(body)
         patch_run_spec(body.plan.run_spec)

@@ -258,9 +258,7 @@ def get_all_infiniband_fabrics() -> set[str]:
     offers = get_catalog_offers(backend=BackendType.NEBIUS)
     result = set()
     for offer in offers:
-        backend_data: NebiusOfferBackendData = validate_extra_ignore(
-            NebiusOfferBackendData, offer.backend_data
-        )
+        backend_data = validate_extra_ignore(NebiusOfferBackendData, offer.backend_data)
         result |= backend_data.fabrics
     return result
 

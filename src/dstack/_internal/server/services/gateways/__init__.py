@@ -812,9 +812,7 @@ def _get_gateway_compute_router_config(
 ) -> Optional[AnyGatewayRouterConfig]:
     if compute.configuration is None:  # pre-0.18.2 gateway
         return None  # gateway routers introduced in 0.19.38
-    compute_config: GatewayComputeConfiguration = validate_json_extra_ignore(
-        GatewayComputeConfiguration, compute.configuration
-    )
+    compute_config = validate_json_extra_ignore(GatewayComputeConfiguration, compute.configuration)
     return compute_config.router
 
 

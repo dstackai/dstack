@@ -291,7 +291,7 @@ class NebiusCompute(
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         assert placement_group.configuration.placement_strategy == PlacementStrategy.CLUSTER
-        master_instance_offer_backend_data: NebiusOfferBackendData = validate_extra_ignore(
+        master_instance_offer_backend_data = validate_extra_ignore(
             NebiusOfferBackendData, master_instance_offer.backend_data
         )
         fabrics = list(master_instance_offer_backend_data.fabrics)
@@ -337,7 +337,7 @@ class NebiusCompute(
         placement_group_backend_data = NebiusPlacementGroupBackendData.load(
             placement_group.provisioning_data.backend_data
         )
-        instance_offer_backend_data: NebiusOfferBackendData = validate_extra_ignore(
+        instance_offer_backend_data = validate_extra_ignore(
             NebiusOfferBackendData, instance_offer.backend_data
         )
         return (
