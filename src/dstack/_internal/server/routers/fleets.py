@@ -28,7 +28,7 @@ from dstack._internal.server.security.permissions import (
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
     get_client_version,
 )
@@ -73,7 +73,7 @@ async def list_fleets(
     )
     for fleet in fleet_list:
         patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet_list)
+    return CustomJSONResponse(fleet_list)
 
 
 @project_router.post("/list", summary="List project fleets", response_model=List[Fleet])
@@ -97,7 +97,7 @@ async def list_project_fleets(
     )
     for fleet in fleet_list:
         patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet_list)
+    return CustomJSONResponse(fleet_list)
 
 
 @project_router.post("/get", summary="Get fleet", response_model=Fleet)
@@ -122,7 +122,7 @@ async def get_fleet(
     if fleet is None:
         raise ResourceNotExistsError()
     patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
+    return CustomJSONResponse(fleet)
 
 
 @project_router.post("/get_plan", summary="Get fleet plan", response_model=FleetPlan)
@@ -143,7 +143,7 @@ async def get_plan(
         spec=body.spec,
     )
     patch_fleet_plan(plan, client_version)
-    return CustomORJSONResponse(plan)
+    return CustomJSONResponse(plan)
 
 
 @project_router.post("/apply", summary="Apply fleet plan", response_model=Fleet)
@@ -169,7 +169,7 @@ async def apply_plan(
         pipeline_hinter=pipeline_hinter,
     )
     patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
+    return CustomJSONResponse(fleet)
 
 
 @project_router.post("/create", summary="Create fleet", response_model=Fleet, deprecated=True)
@@ -192,7 +192,7 @@ async def create_fleet(
         pipeline_hinter=pipeline_hinter,
     )
     patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
+    return CustomJSONResponse(fleet)
 
 
 @project_router.post("/delete", summary="Delete fleets")

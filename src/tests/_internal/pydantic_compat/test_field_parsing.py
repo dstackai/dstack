@@ -7,7 +7,6 @@ import pytest
 import yaml
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import Duration
 from dstack._internal.core.models.configurations import (
     PythonVersion,
     parse_apply_configuration,
@@ -39,7 +38,7 @@ class TestPythonVersionFieldParsing:
         config = parse_apply_configuration(data)
 
         assert config.python is PythonVersion.PY310
-        assert json.loads(config.json())["python"] == "3.10"
+        assert json.loads(config.model_dump_json())["python"] == "3.10"
 
     def test_yaml_311_float_stays_python_311(self):
         data = yaml.safe_load(
@@ -63,7 +62,7 @@ class TestEnvironmentFieldParsing:
         assert config.env["EMPTY"] == ""
         assert config.env["B"] == EnvSentinel(key="B")
         assert class_name(config.env["B"]) == "EnvSentinel"
-        assert json.loads(config.json())["env"] == {
+        assert json.loads(config.model_dump_json())["env"] == {
             "A": "1",
             "B": {"key": "B"},
             "EMPTY": "",
@@ -86,7 +85,7 @@ class TestPortFieldParsing:
         config = parse_apply_configuration(_task(ports=[8080, "8081:81", "*:82"]))
 
         assert all(class_name(port) == "PortMapping" for port in config.ports)
-        assert [port.dict() for port in config.ports] == [
+        assert [port.model_dump() for port in config.ports] == [
             {"local_port": 8080, "container_port": 8080},
             {"local_port": 8081, "container_port": 81},
             {"local_port": None, "container_port": 82},
@@ -111,7 +110,7 @@ class TestPortFieldParsing:
         config = parse_apply_configuration(_service(port=raw))
 
         assert class_name(config.port) == "PortMapping"
-        assert config.port.dict() == expected
+        assert config.port.model_dump() == expected
 
     @pytest.mark.parametrize("ports", [[65536], ["65536:80"], ["80:65536"]])
     def test_task_ports_above_tcp_range_are_rejected(self, ports: list[Any]):
@@ -130,9 +129,9 @@ class TestMountPointFieldParsing:
         )
 
         assert class_name(config.volumes[0]) == "VolumeMountPoint"
-        assert config.volumes[0].dict() == {"name": "my-volume", "path": "/mnt/data"}
+        assert config.volumes[0].model_dump() == {"name": "my-volume", "path": "/mnt/data"}
         assert class_name(config.volumes[1]) == "InstanceMountPoint"
-        assert config.volumes[1].dict() == {
+        assert config.volumes[1].model_dump() == {
             "instance_path": "/host/cache",
             "path": "/cache",
             "optional": False,
@@ -151,7 +150,7 @@ class TestFileMappingFieldParsing:
         )
 
         assert all(class_name(mapping) == "FilePathMapping" for mapping in config.files)
-        assert [mapping.dict() for mapping in config.files] == [
+        assert [mapping.model_dump() for mapping in config.files] == [
             {"local_path": "data", "path": "/workspace/data"},
             {"local_path": r"C:\data", "path": "/workspace/windows"},
         ]
@@ -239,7 +238,7 @@ class TestUnixUserFieldParsing:
         config = parse_apply_configuration(_task(user=raw))
 
         assert config.user == raw
-        assert UnixUser.parse(config.user).dict() == parsed
+        assert UnixUser.parse(config.user).model_dump() == parsed
 
     @pytest.mark.parametrize(
         "raw",
@@ -262,7 +261,10 @@ _DURATION_SENTINEL_CASES = [
     pytest.param("idle_duration", "off", -1, int, id="idle-off"),
     pytest.param("idle_duration", False, -1, int, id="idle-false"),
     pytest.param("idle_duration", -1, -1, int, id="idle-legacy-minus-one"),
-    pytest.param("max_duration", "2h", 7200, Duration, id="max-duration"),
+    # `int`, not `Duration`: the field is declared `Union[Literal["off"], int]`, so the `Duration`
+    # int-subclass the before-validator returns does not survive validation. Value and wire format
+    # are unaffected, and nothing does `isinstance(..., Duration)`.
+    pytest.param("max_duration", "2h", 7200, int, id="max-duration"),
 ]
 
 
@@ -300,7 +302,7 @@ class TestServiceModelFieldParsing:
         config = parse_apply_configuration(_service(model="llama"))
 
         assert class_name(config.model) == "OpenAIChatModel"
-        assert config.model.dict() == {
+        assert config.model.model_dump() == {
             "type": "chat",
             "name": "llama",
             "format": "openai",
@@ -329,7 +331,36 @@ class TestGatewayReferenceFieldParsing:
         config = parse_apply_configuration(_service(gateway="other-project/shared-gateway"))
 
         assert class_name(config.gateway) == "EntityReference"
-        assert config.gateway.dict() == {
+        assert config.gateway.model_dump() == {
             "project": "other-project",
             "name": "shared-gateway",
         }
+
+    def test_bare_string_becomes_entity_reference(self):
+        config = parse_apply_configuration(_service(gateway="shared-gateway"))
+
+        assert class_name(config.gateway) == "EntityReference"
+        assert config.gateway.model_dump() == {"project": None, "name": "shared-gateway"}
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (True, True),
+            (False, False),
+            # Quoted in YAML, so the field receives a `str`. The `bool` arm must still claim it:
+            # the union also has a `str` arm, which pydantic v2's "smart" mode prefers for an exact
+            # type match, turning `gateway: "false"` into a gateway *named* `false`.
+            ("true", True),
+            ("false", False),
+            ("yes", True),
+            ("no", False),
+            ("on", True),
+            ("off", False),
+            ("1", True),
+            ("0", False),
+        ],
+    )
+    def test_boolean_and_quoted_boolean_stay_boolean(self, value: Any, expected: bool):
+        config = parse_apply_configuration(_service(gateway=value))
+
+        assert config.gateway is expected

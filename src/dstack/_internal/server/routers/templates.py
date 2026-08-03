@@ -6,7 +6,7 @@ from dstack._internal.core.models.templates import UITemplate
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import templates as templates_service
-from dstack._internal.server.utils.routers import CustomORJSONResponse
+from dstack._internal.server.utils.routers import CustomJSONResponse
 
 router = APIRouter(
     prefix="/api/project/{project_name}/templates",
@@ -19,4 +19,4 @@ async def list_templates(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     _, project = user_project
-    return CustomORJSONResponse(await templates_service.list_templates(project))
+    return CustomJSONResponse(await templates_service.list_templates(project))

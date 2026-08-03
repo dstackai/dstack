@@ -4,7 +4,7 @@ from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import Field, root_validator
+from pydantic import Field, model_validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -28,7 +28,8 @@ class Gpu(CoreModel):
     `assert gpu.vendor is not None` should be a safe type narrowing.
     """
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_name_and_vendor(cls, values):
         is_tpu = False
         name = values.get("name")
@@ -204,7 +205,7 @@ class InstanceOffer(CoreModel):
         """Convert to InstanceOfferWithAvailability without re-serializing/re-validating fields.
         The result shares nested objects with self. This is generally safe because callers
         discard the original InstanceOffer after conversion."""
-        return InstanceOfferWithAvailability.construct(**self.__dict__, **kwargs)
+        return InstanceOfferWithAvailability.model_construct(**self.__dict__, **kwargs)
 
 
 class InstanceOfferWithAvailability(InstanceOffer):

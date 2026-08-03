@@ -17,6 +17,7 @@ from dstack._internal.core.backends.{{ backend_name|lower }}.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class {{ backend_name }}Configurator(
@@ -39,27 +40,30 @@ class {{ backend_name }}Configurator(
     ) -> BackendRecord:
         return BackendRecord(
             config={{ backend_name }}StoredConfig(
-                **{{ backend_name }}BackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth={{ backend_name }}Creds.parse_obj(config.creds).json(),
+                **validate_extra_ignore({{ backend_name }}BackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth={{ backend_name }}Creds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> {{ backend_name }}BackendConfigWithCreds:
         config = self._get_config(record)
-        return {{ backend_name }}BackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore({{ backend_name }}BackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> {{ backend_name }}BackendConfig:
         config = self._get_config(record)
-        return {{ backend_name }}BackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore({{ backend_name }}BackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> {{ backend_name }}Backend:
         config = self._get_config(record)
         return {{ backend_name }}Backend(config=config)
 
     def _get_config(self, record: BackendRecord) -> {{ backend_name }}Config:
-        return {{ backend_name }}Config.__response__(
-            **json.loads(record.config),
-            creds={{ backend_name }}Creds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            {{ backend_name }}Config,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore({{ backend_name }}Creds, record.auth),
+            },
         )
 
     def _validate_creds(self, creds: Any{{ backend_name }}Creds):

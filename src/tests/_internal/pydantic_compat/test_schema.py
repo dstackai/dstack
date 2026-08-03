@@ -38,7 +38,7 @@ class TestPublishedSchemas:
     @pytest.mark.parametrize("name", sorted(PUBLISHED_SCHEMAS))
     def test_matches_fixture(self, name, regen):
         # The exact call the CI job makes.
-        schema_json = PUBLISHED_SCHEMAS[name].schema_json()
+        schema_json = json.dumps(PUBLISHED_SCHEMAS[name].model_json_schema())
         assert_matches_fixture("schema", name, schema_json, regen=regen)
 
     @pytest.mark.parametrize("name", sorted(PUBLISHED_SCHEMAS))
@@ -51,7 +51,7 @@ class TestPublishedSchemas:
         This is not hypothetical: `add_extra_schema_types` in `utils/json_schema.py` rewrites
         properties in place and has already produced a `KeyError: '$ref'` in this job once.
         """
-        schema = json.loads(PUBLISHED_SCHEMAS[name].schema_json())
+        schema = PUBLISHED_SCHEMAS[name].model_json_schema()
         definitions = _definitions(schema)
         assert definitions, "expected the schema to define types to reference"
         unresolved = sorted(

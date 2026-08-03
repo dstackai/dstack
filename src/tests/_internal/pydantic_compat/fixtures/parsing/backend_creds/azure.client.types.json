@@ -1,4 +1,4 @@
 {
   "/": "AzureCreds",
-  "/__root__": "AzureClientCreds"
+  "/root": "AzureClientCreds"
 }

@@ -20,7 +20,7 @@ def get_retry(profile: Profile) -> Optional[Retry]:
                 duration=DEFAULT_RETRY_DURATION,
             )
         return None
-    profile_retry = profile_retry.copy()
+    profile_retry = profile_retry.model_copy()
     if profile_retry.on_events is None:
         profile_retry.on_events = [
             RetryEvent.NO_CAPACITY,
@@ -29,7 +29,7 @@ def get_retry(profile: Profile) -> Optional[Retry]:
         ]
     if profile_retry.duration is None:
         profile_retry.duration = DEFAULT_RETRY_DURATION
-    return Retry.parse_obj(profile_retry)
+    return Retry.model_validate(profile_retry.model_dump())
 
 
 def get_termination(

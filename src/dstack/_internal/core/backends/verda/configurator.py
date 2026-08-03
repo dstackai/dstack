@@ -19,6 +19,7 @@ from dstack._internal.core.backends.verda.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class VerdaConfigurator(
@@ -38,27 +39,30 @@ class VerdaConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=VerdaStoredConfig(
-                **VerdaBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=VerdaCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(VerdaBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=VerdaCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> VerdaBackendConfigWithCreds:
         config = self._get_config(record)
-        return VerdaBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(VerdaBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> VerdaBackendConfig:
         config = self._get_config(record)
-        return VerdaBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(VerdaBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> VerdaBackend:
         config = self._get_config(record)
         return VerdaBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> VerdaConfig:
-        return VerdaConfig.__response__(
-            **json.loads(record.config),
-            creds=VerdaCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            VerdaConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(VerdaCreds, record.auth),
+            },
         )
 
     def _validate_creds(self, creds: VerdaCreds):

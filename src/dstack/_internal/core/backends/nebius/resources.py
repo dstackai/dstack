@@ -57,6 +57,7 @@ from dstack._internal.core.backends.nebius.models import (
 )
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
 
@@ -257,8 +258,8 @@ def get_all_infiniband_fabrics() -> set[str]:
     offers = get_catalog_offers(backend=BackendType.NEBIUS)
     result = set()
     for offer in offers:
-        backend_data: NebiusOfferBackendData = NebiusOfferBackendData.__response__.parse_obj(
-            offer.backend_data
+        backend_data: NebiusOfferBackendData = validate_extra_ignore(
+            NebiusOfferBackendData, offer.backend_data
         )
         result |= backend_data.fabrics
     return result

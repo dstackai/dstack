@@ -142,7 +142,7 @@ async def call_gpus_api(
     unallocated_resources: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
-    json_data = {"run_spec": run_spec.dict()}
+    json_data = {"run_spec": run_spec.model_dump()}
     if group_by is not None:
         json_data["group_by"] = group_by
     if full_offers is not None:
@@ -439,7 +439,7 @@ class TestListGpus:
             response = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict()},
+                json={"run_spec": run_spec.model_dump()},
             )
 
         assert response.status_code == 200
@@ -465,7 +465,7 @@ class TestListGpus:
         response = await client.post(
             f"/api/project/{project.name}/gpus/list",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict(), "group_by": ["invalid_field"]},
+            json={"run_spec": run_spec.model_dump(), "group_by": ["invalid_field"]},
         )
         assert response.status_code == 422
         assert "validation error" in response.text.lower() or "invalid" in response.text.lower()
@@ -602,7 +602,7 @@ class TestListGpus:
             response = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict()},
+                json={"run_spec": run_spec.model_dump()},
             )
             assert response.status_code == 200
             data = response.json()
@@ -626,7 +626,7 @@ class TestListGpus:
             response_count_grouped = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict(), "group_by": ["count"]},
+                json={"run_spec": run_spec.model_dump(), "group_by": ["count"]},
             )
             assert response_count_grouped.status_code == 200
             count_grouped_data = response_count_grouped.json()
@@ -666,7 +666,7 @@ class TestListGpus:
             response_backend = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict(), "group_by": ["backend"]},
+                json={"run_spec": run_spec.model_dump(), "group_by": ["backend"]},
             )
             assert response_backend.status_code == 200
             backend_data = response_backend.json()
@@ -710,7 +710,7 @@ class TestListGpus:
             response_region = await client.post(
                 f"/api/project/{project.name}/gpus/list",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict(), "group_by": ["backend", "region"]},
+                json={"run_spec": run_spec.model_dump(), "group_by": ["backend", "region"]},
             )
             assert response_region.status_code == 200
             region_data = response_region.json()

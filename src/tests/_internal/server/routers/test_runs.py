@@ -79,6 +79,7 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
+from dstack._internal.utils.common import render_datetime_as_api
 
 pytestmark = pytest.mark.usefixtures("image_config_mock", "disable_sshproxy")
 
@@ -187,7 +188,7 @@ def get_dev_env_run_plan_dict(
                 "gpu": None,
                 "shm_size": None,
             },
-            "volumes": [json.loads(v.json()) for v in volumes],
+            "volumes": [json.loads(v.model_dump_json()) for v in volumes],
             "repos": [
                 {
                     "url": "https://github.com/dstackai/dstack",
@@ -303,7 +304,7 @@ def get_dev_env_run_plan_dict(
                         "backend_options": None,
                     },
                     "retry": None,
-                    "volumes": volumes,
+                    "volumes": [json.loads(v.model_dump_json()) for v in volumes],
                     "ssh_key": None,
                     "working_dir": None,
                     "repo_code_hash": None,
@@ -321,12 +322,12 @@ def get_dev_env_run_plan_dict(
                     "service_port": None,
                     "probes": [],
                 },
-                "offers": [json.loads(o.json()) for o in offers],
+                "offers": [json.loads(o.model_dump_json()) for o in offers],
                 "total_offers": total_offers,
                 "max_price": max_price,
             }
         ],
-        "current_resource": current_resource.dict() if current_resource else None,
+        "current_resource": current_resource.model_dump() if current_resource else None,
         "action": action.value,
     }
 
@@ -338,9 +339,9 @@ def get_dev_env_run_dict(
     username: str = "test_user",
     run_name: Optional[str] = "run_name",
     repo_id: str = "test_repo",
-    submitted_at: str = "2023-01-02T03:04:00+00:00",
-    last_processed_at: str = "2023-01-02T03:04:00+00:00",
-    finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
+    submitted_at: str = "2023-01-02T03:04:00Z",
+    last_processed_at: str = "2023-01-02T03:04:00Z",
+    finished_at: Optional[str] = "2023-01-02T03:04:00Z",
     privileged: bool = False,
     docker: Optional[bool] = None,
     deleted: bool = False,
@@ -695,14 +696,14 @@ class TestListRuns:
             fleet=fleet,
             submitted_at=run1_submitted_at,
         )
-        run1_spec = RunSpec.parse_raw(run1.run_spec)
+        run1_spec = RunSpec.model_validate_json(run1.run_spec)
         job = await create_job(
             session=session,
             run=run1,
             submitted_at=run1_submitted_at,
             last_processed_at=run1_submitted_at,
         )
-        job_spec = JobSpec.parse_raw(job.job_spec_data)
+        job_spec = JobSpec.model_validate_json(job.job_spec_data)
         run2_submitted_at = datetime(2023, 1, 1, 3, 4, tzinfo=timezone.utc)
         run2 = await create_run(
             session=session,
@@ -712,7 +713,7 @@ class TestListRuns:
             fleet=fleet,
             submitted_at=run2_submitted_at,
         )
-        run2_spec = RunSpec.parse_raw(run2.run_spec)
+        run2_spec = RunSpec.model_validate_json(run2.run_spec)
         response = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
@@ -728,21 +729,21 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": run1_submitted_at.isoformat(),
-                "last_processed_at": run1_submitted_at.isoformat(),
+                "submitted_at": render_datetime_as_api(run1_submitted_at),
+                "last_processed_at": render_datetime_as_api(run1_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
-                "run_spec": run1_spec.dict(),
+                "run_spec": run1_spec.model_dump(),
                 "jobs": [
                     {
-                        "job_spec": job_spec.dict(),
+                        "job_spec": job_spec.model_dump(),
                         "job_submissions": [
                             {
                                 "id": str(job.id),
                                 "submission_num": 0,
                                 "deployment_num": 0,
-                                "submitted_at": run1_submitted_at.isoformat(),
-                                "last_processed_at": run1_submitted_at.isoformat(),
+                                "submitted_at": render_datetime_as_api(run1_submitted_at),
+                                "last_processed_at": render_datetime_as_api(run1_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -764,8 +765,8 @@ class TestListRuns:
                     "id": str(job.id),
                     "submission_num": 0,
                     "deployment_num": 0,
-                    "submitted_at": run1_submitted_at.isoformat(),
-                    "last_processed_at": run1_submitted_at.isoformat(),
+                    "submitted_at": render_datetime_as_api(run1_submitted_at),
+                    "last_processed_at": render_datetime_as_api(run1_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
@@ -779,7 +780,7 @@ class TestListRuns:
                     "probes": [],
                     "image_pull_progress": None,
                 },
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -795,14 +796,14 @@ class TestListRuns:
                     "id": str(fleet.id),
                     "name": fleet.name,
                 },
-                "submitted_at": run2_submitted_at.isoformat(),
-                "last_processed_at": run2_submitted_at.isoformat(),
+                "submitted_at": render_datetime_as_api(run2_submitted_at),
+                "last_processed_at": render_datetime_as_api(run2_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
-                "run_spec": run2_spec.dict(),
+                "run_spec": run2_spec.model_dump(),
                 "jobs": [],
                 "latest_job_submission": None,
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -895,7 +896,7 @@ class TestListRuns:
             user=user,
             submitted_at=run_submitted_at,
         )
-        run_spec = RunSpec.parse_raw(run.run_spec)
+        run_spec = RunSpec.model_validate_json(run.run_spec)
         await create_job(
             session=session,
             run=run,
@@ -909,7 +910,7 @@ class TestListRuns:
             submitted_at=run_submitted_at,
             last_processed_at=run_submitted_at,
         )
-        job2_spec = JobSpec.parse_raw(job2.job_spec_data)
+        job2_spec = JobSpec.model_validate_json(job2.job_spec_data)
         response = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
@@ -922,21 +923,21 @@ class TestListRuns:
                 "project_name": project.name,
                 "user": user.name,
                 "fleet": None,
-                "submitted_at": run_submitted_at.isoformat(),
-                "last_processed_at": run_submitted_at.isoformat(),
+                "submitted_at": render_datetime_as_api(run_submitted_at),
+                "last_processed_at": render_datetime_as_api(run_submitted_at),
                 "status": "submitted",
                 "status_message": "submitted",
-                "run_spec": run_spec.dict(),
+                "run_spec": run_spec.model_dump(),
                 "jobs": [
                     {
-                        "job_spec": job2_spec.dict(),
+                        "job_spec": job2_spec.model_dump(),
                         "job_submissions": [
                             {
                                 "id": str(job2.id),
                                 "submission_num": 1,
                                 "deployment_num": 0,
-                                "submitted_at": run_submitted_at.isoformat(),
-                                "last_processed_at": run_submitted_at.isoformat(),
+                                "submitted_at": render_datetime_as_api(run_submitted_at),
+                                "last_processed_at": render_datetime_as_api(run_submitted_at),
                                 "finished_at": None,
                                 "inactivity_secs": None,
                                 "status": "submitted",
@@ -958,8 +959,8 @@ class TestListRuns:
                     "id": str(job2.id),
                     "submission_num": 1,
                     "deployment_num": 0,
-                    "submitted_at": run_submitted_at.isoformat(),
-                    "last_processed_at": run_submitted_at.isoformat(),
+                    "submitted_at": render_datetime_as_api(run_submitted_at),
+                    "last_processed_at": render_datetime_as_api(run_submitted_at),
                     "finished_at": None,
                     "inactivity_secs": None,
                     "status": "submitted",
@@ -973,7 +974,7 @@ class TestListRuns:
                     "probes": [],
                     "image_pull_progress": None,
                 },
-                "cost": 0,
+                "cost": 0.0,
                 "service": None,
                 "deployment_num": 0,
                 "termination_reason": None,
@@ -1603,7 +1604,7 @@ class TestGetRunPlan:
             repo_id=repo.name,
             configuration=DevEnvironmentConfiguration(ide="vscode"),
         )
-        body: dict = {"run_spec": json.loads(run_spec.json())}
+        body: dict = {"run_spec": json.loads(run_spec.model_dump_json())}
         if body_full_offers is not None:
             body["full_offers"] = body_full_offers
 
@@ -1658,7 +1659,7 @@ class TestGetRunPlan:
             repo_id=repo.name,
             configuration=DevEnvironmentConfiguration(ide="vscode"),
         )
-        body: dict = {"run_spec": json.loads(run_spec.json())}
+        body: dict = {"run_spec": json.loads(run_spec.model_dump_json())}
         if body_unallocated_resources is not None:
             body["unallocated_resources"] = body_unallocated_resources
 
@@ -1774,7 +1775,7 @@ class TestGetRunPlan:
             repo_id=repo.name,
             configuration=TaskConfiguration(commands=["echo hi"], nodes=2),
         )
-        body = {"run_spec": json.loads(run_spec.json())}
+        body = {"run_spec": json.loads(run_spec.model_dump_json())}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1853,7 +1854,7 @@ class TestGetRunPlan:
                 ],
             ),
         )
-        body = {"run_spec": json.loads(run_spec.json())}
+        body = {"run_spec": json.loads(run_spec.model_dump_json())}
 
         def offers_by_requirements(
             requirements: Requirements, full_offers: bool, unallocated_resources: bool
@@ -1914,7 +1915,7 @@ class TestGetRunPlan:
                 ],
             ),
         )
-        body = {"run_spec": json.loads(run_spec.json())}
+        body = {"run_spec": json.loads(run_spec.model_dump_json())}
 
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             aws_backend_mock = Mock()
@@ -2371,7 +2372,7 @@ class TestGetRunPlan:
         run_spec = get_run_spec(
             repo_id=repo.name, configuration=parse_run_configuration(configuration)
         )
-        body = {"run_spec": run_spec.dict()}
+        body = {"run_spec": run_spec.model_dump()}
 
         backend_mock_aws = Mock()
         backend_mock_aws.TYPE = BackendType.AWS
@@ -2442,7 +2443,7 @@ class TestGetRunPlan:
                 fleets=["fleet-aws", "fleet-vastai"],
             ),
         )
-        body = {"run_spec": run_spec.dict()}
+        body = {"run_spec": run_spec.model_dump()}
 
         backend_mock_aws = Mock()
         backend_mock_aws.TYPE = BackendType.AWS
@@ -2543,7 +2544,7 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict()},
+            json={"run_spec": run_spec.model_dump()},
         )
 
         assert response.status_code == 200, response.json()
@@ -2590,7 +2591,7 @@ class TestGetRunPlan:
                 fleets=["fleet-a", "fleet-b"],
             ),
         )
-        body = {"run_spec": run_spec.dict()}
+        body = {"run_spec": run_spec.model_dump()}
 
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
@@ -2678,7 +2679,7 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict()},
+            json={"run_spec": run_spec.model_dump()},
         )
 
         assert response.status_code == 200, response.json()
@@ -2712,7 +2713,7 @@ class TestGetRunPlan:
                 user="root",
             ),
         )
-        body = {"run_spec": run_spec.dict()}
+        body = {"run_spec": run_spec.model_dump()}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
@@ -2804,7 +2805,7 @@ class TestGetRunPlan:
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict()},
+                json={"run_spec": run_spec.model_dump()},
             )
 
         assert response.status_code == 200, response.json()
@@ -2867,7 +2868,7 @@ class TestGetRunPlan:
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict()},
+                json={"run_spec": run_spec.model_dump()},
             )
 
         assert response.status_code == 200, response.json()
@@ -2931,7 +2932,7 @@ class TestGetRunPlan:
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.dict()},
+                json={"run_spec": run_spec.model_dump()},
             )
 
         assert response.status_code == 200, response.json()
@@ -3110,12 +3111,12 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict()},
+            json={"run_spec": run_spec.model_dump()},
         )
         assert response.status_code == 200
         response_json = response.json()
         assert response_json["action"] == action
-        assert response_json["current_resource"] == json.loads(run.json())
+        assert response_json["current_resource"] == json.loads(run.model_dump_json())
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("test_db")
@@ -3133,7 +3134,7 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.dict()},
+            json={"run_spec": run_spec.model_dump()},
         )
 
         assert response.status_code == 200, response.json()
@@ -3184,7 +3185,7 @@ class TestGetRunPlan:
             run_name="test-service",
         )
 
-        body = {"run_spec": run_spec.dict()}
+        body = {"run_spec": run_spec.model_dump()}
         headers = get_auth_headers(user.token)
         if client_version is not None:
             headers["X-API-Version"] = client_version
@@ -3228,7 +3229,7 @@ class TestApplyPlan:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
@@ -3296,7 +3297,7 @@ class TestApplyPlan:
         )
         run = run_model_to_run(run_model)
         run_spec.configuration_path = "new.dstack.yml"
-        run_spec.configuration.replicas = Range(min=2, max=2)
+        run_spec.configuration.replicas = Range[int](min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
             headers=get_auth_headers(user.token),
@@ -3308,7 +3309,7 @@ class TestApplyPlan:
                         current_resource=run,
                     ),
                     force=False,
-                ).json()
+                ).model_dump_json()
             ),
         )
         assert response.status_code == 200, response.json()
@@ -3348,7 +3349,7 @@ class TestApplyPlan:
                 headers=get_auth_headers(user.token),
                 json={
                     "plan": {
-                        "run_spec": json.loads(run_spec.json()),
+                        "run_spec": json.loads(run_spec.model_dump_json()),
                         "current_resource": None,
                     },
                     "force": False,
@@ -3379,7 +3380,7 @@ class TestApplyPlan:
             headers=get_auth_headers(user.token),
             json={
                 "plan": {
-                    "run_spec": run_spec.dict(),
+                    "run_spec": run_spec.model_dump(),
                     "current_resource": None,
                 },
                 "force": False,
@@ -3434,7 +3435,7 @@ class TestApplyPlan:
             headers=headers,
             json={
                 "plan": {
-                    "run_spec": run_spec.dict(),
+                    "run_spec": run_spec.model_dump(),
                     "current_resource": None,
                 },
                 "force": False,
@@ -3471,7 +3472,7 @@ class TestSubmitRun:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
@@ -3517,7 +3518,7 @@ class TestSubmitRun:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        submitted_at_formatted = "2023-01-02T03:04:00Z"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(

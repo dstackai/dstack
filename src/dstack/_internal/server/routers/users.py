@@ -18,7 +18,7 @@ from dstack._internal.server.schemas.users import (
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import events, users
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -46,7 +46,7 @@ async def list_users(
     if body is None:
         # For backward compatibility
         body = ListUsersRequest()
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await users.list_users_for_user(
             session=session,
             user=user,
@@ -68,7 +68,7 @@ async def get_my_user(
     if user.ssh_private_key is None or user.ssh_public_key is None:
         # Generate keys for pre-0.19.33 users
         await users.refresh_ssh_key(session=session, actor=user)
-    return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
+    return CustomJSONResponse(users.user_model_to_user_with_creds(user))
 
 
 @router.post("/get_user", summary="Get user", response_model=UserWithCreds)
@@ -82,7 +82,7 @@ async def get_user(
     )
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(res)
+    return CustomJSONResponse(res)
 
 
 @router.post("/create", summary="Create user", response_model=User)
@@ -99,7 +99,7 @@ async def create_user(
         active=body.active,
         creator=user,
     )
-    return CustomORJSONResponse(users.user_model_to_user(res))
+    return CustomJSONResponse(users.user_model_to_user(res))
 
 
 @router.post("/update", summary="Update user", response_model=User)
@@ -118,7 +118,7 @@ async def update_user(
     )
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(users.user_model_to_user(res))
+    return CustomJSONResponse(users.user_model_to_user(res))
 
 
 @router.post("/refresh_ssh_key", summary="Refresh SSH key", response_model=UserWithCreds)
@@ -130,7 +130,7 @@ async def refresh_ssh_key(
     res = await users.refresh_ssh_key(session=session, actor=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
+    return CustomJSONResponse(users.user_model_to_user_with_creds(res))
 
 
 @router.post("/refresh_token", summary="Refresh token", response_model=UserWithCreds)
@@ -142,7 +142,7 @@ async def refresh_token(
     res = await users.refresh_user_token(session=session, actor=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
+    return CustomJSONResponse(users.user_model_to_user_with_creds(res))
 
 
 @router.post("/delete", summary="Delete users")

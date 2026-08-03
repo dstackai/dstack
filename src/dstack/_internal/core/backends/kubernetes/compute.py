@@ -77,7 +77,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -128,7 +128,7 @@ class KubernetesBackendData(CoreModel):
 
     @classmethod
     def load(cls, raw: str) -> Self:
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class KubernetesCompute(
@@ -349,7 +349,7 @@ class KubernetesCompute(
             instance_type=instance_offer.instance,
             internal_ip=None,
             ssh_proxy=None,
-            backend_data=backend_data.json(),
+            backend_data=backend_data.model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -825,7 +825,7 @@ def _get_amd_gpu_node_affinity(
 def _offer_modifier(
     resource_requests: ResourceRequests, offer: InstanceOfferWithAvailability
 ) -> InstanceOfferWithAvailability:
-    offer_copy = offer.copy(deep=True)
+    offer_copy = offer.model_copy(deep=True)
     adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
     return offer_copy
 

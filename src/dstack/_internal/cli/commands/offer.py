@@ -252,4 +252,4 @@ def _print_offers_json(run_plan: RunPlan):
         offers=job_plan.offers,
         total_offers=job_plan.total_offers,
     )
-    print(output.json())
+    print(output.model_dump_json())

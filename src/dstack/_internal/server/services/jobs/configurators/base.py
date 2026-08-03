@@ -1,3 +1,4 @@
+import json
 import shlex
 import sys
 import threading
@@ -5,7 +6,6 @@ from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional
 
-import orjson
 from cachetools import TTLCache, cached
 
 from dstack._internal import settings
@@ -446,7 +446,7 @@ def interpolate_job_volumes(
     job_volumes = []
     for mount_point in run_volumes:
         if not isinstance(mount_point, VolumeMountPoint):
-            job_volumes.append(mount_point.copy())
+            job_volumes.append(mount_point.model_copy())
             continue
         if isinstance(mount_point.name, str):
             names = [mount_point.name]
@@ -480,13 +480,13 @@ def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
 
 
 def _openai_model_probe_spec(model_name: str, prefix: str) -> ProbeSpec:
-    body = orjson.dumps(
+    body = json.dumps(
         {
             "model": model_name,
             "messages": [{"role": "user", "content": "hi"}],
             "max_tokens": 1,
         }
-    ).decode("utf-8")
+    )
     return ProbeSpec(
         type="http",
         method="post",

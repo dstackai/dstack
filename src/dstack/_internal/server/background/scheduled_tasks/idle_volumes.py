@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.profiles import parse_duration
+from dstack._internal.core.models.duration import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel

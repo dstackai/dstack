@@ -443,7 +443,7 @@ async def _migrate_cors_enabled(repo: GatewayProxyRepo) -> None:
             not service.cors_enabled
             and (service.project_name, service.run_name) in openai_run_names
         ):
-            updated = models.Service(**{**service.dict(), "cors_enabled": True})
+            updated = models.Service(**{**service.model_dump(), "cors_enabled": True})
             await repo.set_service(updated)
 
 

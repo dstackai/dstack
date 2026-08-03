@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Iterable, Iterator, List, Mapping, NamedTuple, Tuple, Union, cast
 
-from pydantic import BaseModel, Field, validator
+from pydantic import ConfigDict, Field, RootModel, field_validator
 from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.common import CoreModel
@@ -39,25 +39,34 @@ class EnvVarTuple(NamedTuple):
         return cls(key, value)
 
 
-class Env(BaseModel):
+# Accepted either as a list of `VAR=value`/`VAR` strings or as a mapping. `validate_root` below
+# normalizes the list form into the mapping form, so the runtime value is always a dict.
+_EnvRoot = Union[
+    List[Annotated[str, Field(pattern=_ENV_STRING_REGEX)]],
+    Dict[str, Union[str, EnvSentinel]],
+]
+
+
+class Env(RootModel[_EnvRoot]):
     """
     Env represents a mapping of process environment variables, as in environ(7).
     Environment values may be omitted, in that case the :class:`EnvSentinel`
     object is used as a placeholder.
 
     To create an instance from a `dict[str, str]` or a `list[str]` use pydantic's
-    :meth:`BaseModel.parse_obj(dict | list)` method.
+    :meth:`BaseModel.model_validate(dict | list)` method.
 
-    NB: this is *NOT* a CoreModel, pydantic-duality, which is used as a base
-    for the CoreModel, doesn't play well with custom root models.
+    NB: this is *NOT* a CoreModel. `extra` is meaningless on a root model, but
+    `coerce_numbers_to_str` is not: without it `env: {PORT: 8080}` stops parsing, since
+    pydantic v2 does not coerce a YAML number to a str implicitly.
     """
 
-    __root__: Union[
-        List[Annotated[str, Field(regex=_ENV_STRING_REGEX)]],
-        Dict[str, Union[str, EnvSentinel]],
-    ] = {}
+    model_config = ConfigDict(coerce_numbers_to_str=True)
 
-    @validator("__root__")
+    root: _EnvRoot = {}
+
+    @field_validator("root")
+    @classmethod
     def validate_root(cls, v: Union[List[str], Dict[str, str]]) -> Dict[str, str]:
         if isinstance(v, list):
             d = {}
@@ -99,13 +108,13 @@ class Env(BaseModel):
     def __setitem__(self, item, value):
         self._dict[item] = value
 
-    def copy(self, **kwargs) -> Self:
-        # Env.copy() is tricky because it copies only the hidden top-level {"__root__": {...}}
+    def model_copy(self, **kwargs) -> Self:
+        # Env.model_copy() is tricky because it copies only the hidden top-level {"root": {...}}
         # structure, not the actual nested dict representing the env itself.
-        # So we copy __root__ explicitly in case of a shallow copy.
-        new_copy = super().copy(**kwargs)
+        # So we copy root explicitly in case of a shallow copy.
+        new_copy = super().model_copy(**kwargs)
         if not kwargs.get("deep", False):
-            new_copy.__root__ = new_copy.__root__.copy()
+            new_copy.root = new_copy.root.copy()
         return new_copy
 
     def as_dict(self) -> Dict[str, str]:
@@ -146,4 +155,4 @@ class Env(BaseModel):
     @property
     def _dict(self) -> Dict[str, Union[str, EnvSentinel]]:
         # this property is redundant for runtime and used for _proper_ type signature only
-        return cast(Dict, self.__root__)
+        return cast(Dict, self.root)

@@ -24,7 +24,7 @@ from dstack._internal.core.backends.crusoe.models import CrusoeConfig
 from dstack._internal.core.backends.crusoe.resources import CrusoeClient
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -291,7 +291,7 @@ class CrusoeCompute(
             ssh_port=22,
             username="ubuntu",
             dockerized=True,
-            backend_data=CrusoeInstanceBackendData(data_disk_id=data_disk_id).json(),
+            backend_data=CrusoeInstanceBackendData(data_disk_id=data_disk_id).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -356,7 +356,7 @@ class CrusoeCompute(
                 backend=BackendType.CRUSOE,
                 backend_data=CrusoePlacementGroupBackendData(
                     ib_partition_id=None, ib_network_id=None
-                ).json(),
+                ).model_dump_json(),
             )
 
         ib_networks = self._client.list_ib_networks()
@@ -385,7 +385,7 @@ class CrusoeCompute(
             backend_data=CrusoePlacementGroupBackendData(
                 ib_partition_id=partition["id"],
                 ib_network_id=target_network["id"],
-            ).json(),
+            ).model_dump_json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:
@@ -422,7 +422,7 @@ class CrusoeInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "CrusoeInstanceBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class CrusoePlacementGroupBackendData(CoreModel):
@@ -433,4 +433,4 @@ class CrusoePlacementGroupBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "CrusoePlacementGroupBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)

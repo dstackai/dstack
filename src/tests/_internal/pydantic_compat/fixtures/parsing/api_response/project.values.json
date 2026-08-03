@@ -44,7 +44,7 @@
   ],
   "owner": {
     "active": true,
-    "created_at": "2025-01-08T11:02:41+00:00",
+    "created_at": "2025-01-08T11:02:41Z",
     "email": "alice@example.com",
     "global_role": "admin",
     "id": "9c2f7b31-5e4a-4d8c-9f01-2b3c4d5e6f70",

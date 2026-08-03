@@ -5,8 +5,8 @@ Each model is serialized through the *production* path — there are four distin
 each registry below — and compared against a fixture generated under pydantic v1. On v1 these are
 regression tests; on the v2 branch they are the compat assertion.
 
-Nothing here may reference the duality API (`__request__` / `__response__`): these tests have to
-run unchanged on both versions, and duality is gone in v2.
+Nothing here may reference the duality request/response variants directly: these tests have to run
+unchanged on both versions, and duality is gone in v2. See `compat.py`.
 
 Disposable: this package is deleted once the v2 release is verified in prod, except for a curated
 subset of the `db/` fixtures, which outlive it because stored rows do.
@@ -28,7 +28,7 @@ from dstack._internal.core.models.fleets import FleetConfiguration, FleetNodesSp
 from dstack._internal.core.models.repos.remote import RemoteRunRepoData
 from dstack._internal.core.models.resources import CPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.volumes import RunpodVolumeConfiguration, VolumeSpec
-from dstack._internal.server.utils.routers import CustomORJSONResponse
+from dstack._internal.server.utils.routers import CustomJSONResponse
 from tests._internal.pydantic_compat import backend_factories, factories
 from tests._internal.pydantic_compat.compare import assert_matches_fixture, canonicalize
 
@@ -75,7 +75,7 @@ API_REQUESTS: dict[str, Callable[[], CoreModel]] = {
     "save_repo_creds_request": factories.save_repo_creds_request,
 }
 
-# Returned from a router via `CustomORJSONResponse` — orjson with a `default=` hook rather than
+# Returned from a router via `CustomJSONResponse` — orjson with a `default=` hook rather than
 # `.json()`, so this path can drift away from the one above.
 API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "fleet": factories.fleet,
@@ -89,7 +89,8 @@ API_RESPONSES: dict[str, Callable[[], CoreModel]] = {
     "volume": factories.volume,
 }
 
-# Sent by the server to the runner (shim) as a request body, via `.json()`.
+# Sent by the server to the runner (shim) as a request body. `SubmitBody` restricts what it
+# sends via `json_for_runner()`; the rest go out as plain `.json()`.
 RUNNER_REQUESTS: dict[str, Callable[[], CoreModel]] = {
     "component_install_request": factories.component_install_request,
     "legacy_submit_body": factories.legacy_submit_body,
@@ -127,16 +128,21 @@ PROXY_REQUESTS: dict[str, Callable[[], CoreModel]] = {
 # unknown-field tolerance: it has to use the identical path, or it compares orjson output against
 # `.json()` output and fails for reasons that have nothing to do with parsing.
 SURFACES: dict[str, tuple[dict[str, Callable[[], Any]], Callable[[Any], Union[bytes, str]]]] = {
-    "db": (DB_BLOBS, lambda model: model.json()),
-    "backend_config": (BACKEND_STORED_CONFIGS, lambda model: model.json()),
-    "backend_creds": (BACKEND_CREDS, lambda model: model.json()),
-    "backend_data": (BACKEND_DATA, lambda model: model.json()),
-    "api_request": (API_REQUESTS, lambda model: model.json()),
-    "api_response": (API_RESPONSES, lambda model: bytes(CustomORJSONResponse(model).body)),
-    "runner": (RUNNER_REQUESTS, lambda model: model.json()),
-    "gateway": (GATEWAY_RESPONSES, lambda model: model.json()),
-    "proxy": (PROXY_REQUESTS, lambda model: json.dumps(model.dict(exclude_unset=True))),
-    "proxy_response": (PROXY_RESPONSES, lambda model: model.json()),
+    "db": (DB_BLOBS, lambda model: model.model_dump_json()),
+    "backend_config": (BACKEND_STORED_CONFIGS, lambda model: model.model_dump_json()),
+    "backend_creds": (BACKEND_CREDS, lambda model: model.model_dump_json()),
+    "backend_data": (BACKEND_DATA, lambda model: model.model_dump_json()),
+    "api_request": (API_REQUESTS, lambda model: model.model_dump_json()),
+    "api_response": (API_RESPONSES, lambda model: bytes(CustomJSONResponse(model).body)),
+    "runner": (
+        RUNNER_REQUESTS,
+        lambda model: model.json_for_runner()
+        if hasattr(model, "json_for_runner")
+        else model.model_dump_json(),
+    ),
+    "gateway": (GATEWAY_RESPONSES, lambda model: model.model_dump_json()),
+    "proxy": (PROXY_REQUESTS, lambda model: json.dumps(model.model_dump(exclude_unset=True))),
+    "proxy_response": (PROXY_RESPONSES, lambda model: model.model_dump_json()),
 }
 
 _CASES = [(surface, name) for surface, (reg, _) in SURFACES.items() for name in sorted(reg)]
@@ -160,7 +166,7 @@ class TestFleetNodesTargetCompatHack:
     """
     Pins the #3066 old-client hack explicitly, not just via the fixture bytes.
 
-    `FleetNodesSpec.dict()` drops `target` when it equals `min`. A fixture would catch the change
+    `FleetNodesSpec.model_dump()` drops `target` when it equals `min`. A fixture would catch the change
     but not explain it; naming the invariant gives the v2 `@model_serializer` rewrite something
     unambiguous to satisfy.
 
@@ -170,10 +176,10 @@ class TestFleetNodesTargetCompatHack:
     """
 
     def test_target_is_omitted_when_it_equals_min(self):
-        assert "target" not in FleetNodesSpec(min=1, target=1, max=1).dict()
+        assert "target" not in FleetNodesSpec(min=1, target=1, max=1).model_dump()
 
     def test_target_is_kept_when_it_differs_from_min(self):
-        assert FleetNodesSpec(min=1, target=5, max=5).dict()["target"] == 5
+        assert FleetNodesSpec(min=1, target=5, max=5).model_dump()["target"] == 5
 
     @pytest.mark.parametrize(
         ("nodes", "expected"),
@@ -191,8 +197,8 @@ class TestFleetNodesTargetCompatHack:
         ],
     )
     def test_dict_and_json_apply_the_same_override(self, nodes, expected):
-        assert nodes.dict() == expected
-        assert json.loads(nodes.json()) == expected
+        assert nodes.model_dump() == expected
+        assert json.loads(nodes.model_dump_json()) == expected
 
     @pytest.mark.parametrize(
         ("nodes", "expected"),
@@ -212,8 +218,8 @@ class TestFleetNodesTargetCompatHack:
     def test_override_is_applied_when_nested(self, nodes, expected):
         configuration = FleetConfiguration(nodes=nodes)
 
-        assert configuration.dict()["nodes"] == expected
-        assert json.loads(configuration.json())["nodes"] == expected
+        assert configuration.model_dump()["nodes"] == expected
+        assert json.loads(configuration.model_dump_json())["nodes"] == expected
 
     def test_the_api_fixture_exercises_the_hack(self):
         nodes = factories.fleet().spec.configuration.nodes
@@ -243,10 +249,10 @@ class TestResourcesSpecCPUCompatHack:
             cpu=CPUSpec(arch=arch, count=Range[int](min=2, max=8)),
         )
 
-        assert json.loads(resources.json())["cpu"] == expected
+        assert json.loads(resources.model_dump_json())["cpu"] == expected
         # CoreModel.json() must call the overridden dict(); this assertion would expose a drift
         # even if only one of the two methods retained the compatibility rewrite.
-        assert canonicalize(json.dumps(resources.dict()["cpu"])) == canonicalize(
+        assert canonicalize(json.dumps(resources.model_dump()["cpu"])) == canonicalize(
             json.dumps(expected)
         )
 
@@ -269,15 +275,15 @@ class TestResourcesSpecCPUCompatHack:
             ),
         )
 
-        assert json.loads(configuration.json())["resources"]["cpu"] == expected
-        assert canonicalize(json.dumps(configuration.dict()["resources"]["cpu"])) == canonicalize(
-            json.dumps(expected)
-        )
+        assert json.loads(configuration.model_dump_json())["resources"]["cpu"] == expected
+        assert canonicalize(
+            json.dumps(configuration.model_dump()["resources"]["cpu"])
+        ) == canonicalize(json.dumps(expected))
 
 
 class TestFieldSerializationFilters:
     def test_submit_body_nested_field_includes_are_preserved(self):
-        body = factories.submit_body().dict()
+        body = json.loads(factories.submit_body().json_for_runner())
 
         assert set(body["run"]) == {"id", "run_spec"}
         assert set(body["run"]["run_spec"]) == {
@@ -309,15 +315,15 @@ class TestFieldSerializationFilters:
         spec = factories.run_spec()
         assert spec.merged_profile is not None
 
-        assert "merged_profile" not in spec.dict()
-        assert "merged_profile" not in json.loads(spec.json())
+        assert "merged_profile" not in spec.model_dump()
+        assert "merged_profile" not in json.loads(spec.model_dump_json())
 
     def test_remote_repo_diff_bytes_are_excluded_from_dict_and_json(self):
         repo = RemoteRunRepoData(repo_name="dstack", repo_diff=b"secret diff")
         assert repo.repo_diff == b"secret diff"
 
-        assert "repo_diff" not in repo.dict()
-        assert "repo_diff" not in json.loads(repo.json())
+        assert "repo_diff" not in repo.model_dump()
+        assert "repo_diff" not in json.loads(repo.model_dump_json())
 
     def test_runpod_compatibility_availability_zone_is_excluded_directly_and_nested(self):
         configuration = RunpodVolumeConfiguration(
@@ -328,19 +334,19 @@ class TestFieldSerializationFilters:
         )
         assert configuration.availability_zone == "legacy-zone"
 
-        assert "availability_zone" not in configuration.dict()
-        assert "availability_zone" not in json.loads(configuration.json())
+        assert "availability_zone" not in configuration.model_dump()
+        assert "availability_zone" not in json.loads(configuration.model_dump_json())
 
         spec = VolumeSpec(configuration=configuration)
-        assert "availability_zone" not in spec.dict()["configuration"]
-        assert "availability_zone" not in json.loads(spec.json())["configuration"]
+        assert "availability_zone" not in spec.model_dump()["configuration"]
+        assert "availability_zone" not in json.loads(spec.model_dump_json())["configuration"]
 
 
-class TestCustomORJSONResponseCompat:
+class TestCustomJSONResponseCompat:
     def test_response_uses_the_same_nested_serializer_overrides_as_model_json(self):
         configuration = FleetConfiguration(nodes=FleetNodesSpec(min=1, target=1, max=1))
 
-        response_body = bytes(CustomORJSONResponse(configuration).body)
+        response_body = bytes(CustomJSONResponse(configuration).body)
 
-        assert canonicalize(response_body) == canonicalize(configuration.json())
+        assert canonicalize(response_body) == canonicalize(configuration.model_dump_json())
         assert "target" not in json.loads(response_body)["nodes"]

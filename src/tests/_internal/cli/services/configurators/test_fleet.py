@@ -29,7 +29,7 @@ from dstack._internal.core.models.profiles import Profile
 
 
 def create_conf() -> FleetConfiguration:
-    return FleetConfiguration.parse_obj({"ssh_config": {"hosts": ["1.2.3.4"]}})
+    return FleetConfiguration.model_validate({"ssh_config": {"hosts": ["1.2.3.4"]}})
 
 
 def apply_args(
@@ -38,7 +38,7 @@ def apply_args(
     parser = argparse.ArgumentParser()
     configurator = FleetConfigurator(Mock())
     configurator.register_args(parser)
-    conf = conf.copy(deep=True)
+    conf = conf.model_copy(deep=True)
     configurator_args = parser.parse_args(args)
     configurator.apply_args(conf, configurator_args)
     return conf, configurator_args
@@ -71,7 +71,7 @@ def get_ssh_fleet_spec(
     if hosts is None:
         hosts = ["10.0.0.100"]
     return FleetSpec(
-        configuration=FleetConfiguration.parse_obj(
+        configuration=FleetConfiguration.model_validate(
             {
                 "name": name,
                 "ssh_config": {"hosts": hosts},
@@ -130,23 +130,23 @@ class TestFleetConfigurator:
     def test_env(self):
         conf = create_conf()
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_override(self):
         conf = create_conf()
-        conf.env = Env.parse_obj({"A": "0"})
+        conf.env = Env.model_validate({"A": "0"})
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_value_from_environ(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("FROM_ENV", "2")
         conf = create_conf()
-        conf.env = Env.parse_obj({"FROM_CONF": "1"})
+        conf.env = Env.model_validate({"FROM_CONF": "1"})
         modified, args = apply_args(conf, ["--env", "FROM_ENV"])
-        conf.env = Env.parse_obj({"FROM_CONF": "1", "FROM_ENV": "2"})
-        assert modified.dict() == conf.dict()
+        conf.env = Env.model_validate({"FROM_CONF": "1", "FROM_ENV": "2"})
+        assert modified.model_dump() == conf.model_dump()
 
     def test_env_value_from_environ_not_set(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv("FROM_ENV", raising=False)
@@ -199,7 +199,7 @@ class TestApplyPlanMessages:
         spec = get_cloud_fleet_spec()
         plan = create_fleet_plan(
             current_spec=spec,
-            spec=spec.copy(deep=True),
+            spec=spec.model_copy(deep=True),
             action=ApplyAction.UPDATE,
         )
 
@@ -244,4 +244,4 @@ class TestRenderFleetSpecDiff:
     def test_no_diff(self):
         spec = get_cloud_fleet_spec()
 
-        assert _render_fleet_spec_diff(spec, spec.copy(deep=True)) is None
+        assert _render_fleet_spec_diff(spec, spec.model_copy(deep=True)) is None

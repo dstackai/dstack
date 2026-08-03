@@ -6,7 +6,6 @@ from uuid import UUID
 
 import gpuhunt
 from cachetools import TTLCache
-from pydantic import parse_obj_as
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -106,17 +105,17 @@ def catalog_item_to_offer(
     )
     if disk_size_mib is None:
         return None
-    resources = Resources.construct(
+    resources = Resources.model_construct(
         cpu_arch=item.cpu_arch,
         cpus=item.cpu,
         memory_mib=round(item.memory * 1024),
         gpus=gpus,
         spot=item.spot,
-        disk=Disk.construct(size_mib=disk_size_mib),
+        disk=Disk.model_construct(size_mib=disk_size_mib),
     )
-    return InstanceOffer.construct(
+    return InstanceOffer.model_construct(
         backend=backend,
-        instance=InstanceType.construct(
+        instance=InstanceType.model_construct(
             name=item.instance_name,
             resources=resources,
         ),
@@ -172,7 +171,7 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     res = req.resources
     if res.cpu:
         # TODO: Remove in 0.20. Use res.cpu directly
-        cpu = parse_obj_as(CPUSpec, res.cpu)
+        cpu = CPUSpec.model_validate(res.cpu)
         q.cpu_arch = cpu.arch
         q.min_cpu = cpu.count.min
         q.max_cpu = cpu.count.max
@@ -250,7 +249,7 @@ def get_offers_disk_modifier(
         disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
         if disk_size_range is None:
             return None
-        offer_copy = offer.copy(deep=True)
+        offer_copy = offer.model_copy(deep=True)
         offer_copy.instance.resources.disk = Disk(
             size_mib=get_or_error(disk_size_range.min) * 1024
         )

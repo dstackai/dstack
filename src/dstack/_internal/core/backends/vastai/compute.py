@@ -28,7 +28,7 @@ from dstack._internal.core.backends.vastai.profile_options import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -131,8 +131,8 @@ class VastAICompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        offer_backend_data: VastAIOfferBackendData = VastAIOfferBackendData.__response__.parse_obj(
-            instance_offer.backend_data
+        offer_backend_data: VastAIOfferBackendData = validate_extra_ignore(
+            VastAIOfferBackendData, instance_offer.backend_data
         )
         bid = None
         if instance_offer.instance.resources.spot:

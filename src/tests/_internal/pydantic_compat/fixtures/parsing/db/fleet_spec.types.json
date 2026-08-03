@@ -3,7 +3,6 @@
   "/configuration": "FleetConfiguration",
   "/configuration/backends/0": "BackendType",
   "/configuration/env": "Env",
-  "/configuration/idle_duration": "Duration",
   "/configuration/nodes": "FleetNodesSpec",
   "/configuration/placement": "InstanceGroupPlacement",
   "/configuration/resources": "ResourcesSpec",
@@ -19,9 +18,7 @@
   "/configuration/spot_policy": "SpotPolicy",
   "/merged_profile": "Profile",
   "/merged_profile/backends/0": "BackendType",
-  "/merged_profile/idle_duration": "Duration",
   "/merged_profile/spot_policy": "SpotPolicy",
   "/profile": "Profile",
-  "/profile/idle_duration": "Duration",
   "/profile/spot_policy": "SpotPolicy"
 }

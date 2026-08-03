@@ -30,11 +30,11 @@ pytestmark = pytest.mark.windows
 class TestBuildVerifiedPreset:
     def test_successful_report_requires_benchmark(self):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data.pop("benchmark")
 
         with pytest.raises(ValidationError, match="benchmark"):
-            AgentFinalReport.parse_obj(data)
+            AgentFinalReport.model_validate(data)
 
     def test_builds_portable_self_contained_preset(self):
         run = get_running_service_run()
@@ -62,7 +62,7 @@ class TestBuildVerifiedPreset:
         assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
-        assert all(getattr(preset.service, field) is None for field in ProfileParams.__fields__)
+        assert all(getattr(preset.service, field) is None for field in ProfileParams.model_fields)
         assert isinstance(preset.service.env["LICENSE"], EnvSentinel)
         assert preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert preset.service.resources.gpu.vendor.value == "nvidia"
@@ -73,7 +73,7 @@ class TestBuildVerifiedPreset:
 
     def test_rejects_variant_for_exact_model_request(self):
         run = get_running_service_run()
-        report = get_successful_preset_report(run).copy(update={"model": "other/model"})
+        report = get_successful_preset_report(run).model_copy(update={"model": "other/model"})
 
         with pytest.raises(CLIError, match="changed an exact model request"):
             build_verified_preset(
@@ -99,7 +99,7 @@ class TestLoadPresetAgentReport:
 
     def test_redacts_known_secret_in_benchmark_command_instead_of_failing(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
@@ -113,7 +113,7 @@ class TestLoadPresetAgentReport:
 
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
@@ -126,7 +126,7 @@ class TestLoadPresetAgentReport:
         # Regression: "(auth via DSTACK_TOKEN bearer header from env)" failed
         # two live sessions — the word after "bearer" is prose, not a token.
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"

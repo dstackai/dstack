@@ -53,7 +53,7 @@ def print_gateways_json(gateways: List[Gateway], project: str) -> None:
         project=project,
         gateways=gateways,
     )
-    print(output.json())
+    print(output.model_dump_json())
 
 
 def get_gateways_table(

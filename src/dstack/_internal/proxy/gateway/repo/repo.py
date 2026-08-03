@@ -119,11 +119,11 @@ class GatewayProxyRepo(BaseProxyRepo):
     @staticmethod
     def load(state_file: Path) -> "GatewayProxyRepo":
         if state_file.exists():
-            state = State.parse_file(state_file)
+            state = State.model_validate_json(state_file.read_text())
         else:
             state = None
         return GatewayProxyRepo(state=state, file=state_file)
 
     def save(self) -> None:
         if self._file is not None:
-            self._file.write_text(self._state.json())
+            self._file.write_text(self._state.model_dump_json())

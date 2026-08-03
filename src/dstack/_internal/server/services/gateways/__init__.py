@@ -29,7 +29,11 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, EntityReference
+from dstack._internal.core.models.common import (
+    ApplyAction,
+    EntityReference,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayRouterConfig,
@@ -216,7 +220,7 @@ def create_gateway_compute_model(
         gateway_id=gateway_id,
         backend_id=backend_id,
         replica_num=replica_num,
-        configuration=compute_configuration.json(),
+        configuration=compute_configuration.model_dump_json(),
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
         status=GatewayReplicaStatus.SUBMITTED,
@@ -270,7 +274,7 @@ async def create_gateway(
             project_id=project.id,
             backend_id=backend_model.id,
             wildcard_domain=configuration.domain,
-            configuration=configuration.json(),
+            configuration=configuration.model_dump_json(),
             status=GatewayStatus.SUBMITTED,
             desired_replica_count=(
                 configuration.replicas
@@ -416,7 +420,7 @@ async def set_gateway_wildcard_domain(
             if gateway.configuration is not None:
                 conf = get_gateway_configuration(gateway)
                 conf.domain = wildcard_domain
-                gateway.configuration = conf.json()
+                gateway.configuration = conf.model_dump_json()
             events.emit(
                 session,
                 f"Gateway wildcard domain changed {old_domain!r} -> {gateway.wildcard_domain!r}",
@@ -808,8 +812,8 @@ def _get_gateway_compute_router_config(
 ) -> Optional[AnyGatewayRouterConfig]:
     if compute.configuration is None:  # pre-0.18.2 gateway
         return None  # gateway routers introduced in 0.19.38
-    compute_config: GatewayComputeConfiguration = (
-        GatewayComputeConfiguration.__response__.parse_raw(compute.configuration)
+    compute_config: GatewayComputeConfiguration = validate_json_extra_ignore(
+        GatewayComputeConfiguration, compute.configuration
     )
     return compute_config.router
 
@@ -855,7 +859,7 @@ def get_gateway_compute_models(gateway_model: GatewayModel) -> List[GatewayCompu
 
 def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
     if gateway_model.configuration is not None:
-        return GatewayConfiguration.__response__.parse_raw(gateway_model.configuration)
+        return validate_json_extra_ignore(GatewayConfiguration, gateway_model.configuration)
     # Handle gateways created before GatewayConfiguration was introduced
     return GatewayConfiguration(
         name=gateway_model.name,
@@ -871,7 +875,9 @@ def get_gateway_compute_configuration(
     gateway_model: GatewayModel,
 ) -> GatewayComputeConfiguration:
     if gateway_compute.configuration is not None:
-        return GatewayComputeConfiguration.__response__.parse_raw(gateway_compute.configuration)
+        return validate_json_extra_ignore(
+            GatewayComputeConfiguration, gateway_compute.configuration
+        )
     # Handle gateways created before GatewayComputeConfiguration was introduced
     gateway_configuration = get_gateway_configuration(gateway_model)
     return GatewayComputeConfiguration(
@@ -1079,7 +1085,7 @@ async def apply_plan(
                 if new_configuration.replicas is not None
                 else GATEWAY_REPLICAS_DEFAULT
             )
-        gateway_model.configuration = new_configuration.json()
+        gateway_model.configuration = new_configuration.model_dump_json()
         gateway_model.last_update_at = get_current_datetime()
         events.emit(
             session,

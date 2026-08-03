@@ -780,7 +780,7 @@ class TestLoadResumableSession:
                 "status": "interrupted",
                 "claude_session_id": "sid-1",
                 "debug": True,
-                "created_at": "2026-07-20T10:00:00+00:00",
+                "created_at": "2026-07-20T10:00:00Z",
             },
         )
 

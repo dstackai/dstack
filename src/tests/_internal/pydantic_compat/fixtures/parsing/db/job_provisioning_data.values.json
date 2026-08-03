@@ -4,6 +4,7 @@
   "backend_data": "{\"boot_disk_id\": \"vol-0fe1a2b3c4d5e6f78\"}",
   "base_backend": null,
   "dockerized": true,
+  "gpu_driver": null,
   "hostname": "54.221.13.207",
   "instance_id": "i-0abc123def4567890",
   "instance_network": null,

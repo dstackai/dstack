@@ -8,7 +8,7 @@ from dstack._internal.core.backends.oci.models import AnyOCICreds, OCIDefaultCre
 def get_client_config(creds: AnyOCICreds) -> Mapping[str, Any]:
     if isinstance(creds, OCIDefaultCreds):
         return oci.config.from_file(file_location=creds.file, profile_name=creds.profile)
-    return creds.dict(exclude={"type"})
+    return creds.model_dump(exclude={"type"})
 
 
 def creds_valid(creds: AnyOCICreds) -> bool:

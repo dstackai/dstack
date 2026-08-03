@@ -1,6 +1,6 @@
 from typing import Annotated, Union
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from dstack._internal.core.backends.aws.models import (
     AWSBackendConfig,
@@ -142,42 +142,22 @@ AnyBackendConfigWithCreds = Union[
     DstackBackendConfig,
 ]
 
-# Permissive counterpart of `AnyBackendConfigWithCreds` for parsing server responses.
-# A newer server may add config fields that an older client's models don't know about;
-# parsing with the strict variant would reject the response outright.
+# The same union tagged for validation. Without the discriminator, arm selection would depend on
+# trying each of the 20 arms in order and reporting 20 errors when none match.
 #
-# Discriminated on `type`: without it, arm selection would depend on trying each of the 20
-# arms in order, which only works because every arm happens to declare a `Literal` type.
-# `AnyBackendConfigWithCreds` above stays a bare `Union` on purpose. Its two server-side users apply
-# `Field(discriminator="type")` at the point of use, which is fine against a bare alias.
-# Baking the discriminator into the alias would turn those into doubled `Annotated` `Field`s and
-# fail with `ValueError: cannot specify multiple 'Annotated' 'Field's`.
-# Discriminating here is because nothing else wraps this alias.
-AnyBackendConfigWithCredsResponse = Annotated[
-    Union[
-        AWSBackendConfigWithCreds.__response__,
-        AzureBackendConfigWithCreds.__response__,
-        CloudRiftBackendConfigWithCreds.__response__,
-        CrusoeBackendConfigWithCreds.__response__,
-        CudoBackendConfigWithCreds.__response__,
-        VerdaBackendConfigWithCreds.__response__,
-        BaseDigitalOceanBackendConfigWithCreds.__response__,
-        GCPBackendConfigWithCreds.__response__,
-        HotAisleBackendConfigWithCreds.__response__,
-        JarvisLabsBackendConfigWithCreds.__response__,
-        KubernetesBackendConfigWithCreds.__response__,
-        LambdaBackendConfigWithCreds.__response__,
-        OCIBackendConfigWithCreds.__response__,
-        NebiusBackendConfigWithCreds.__response__,
-        RunpodBackendConfigWithCreds.__response__,
-        TensorDockBackendConfigWithCreds.__response__,
-        VastAIBackendConfigWithCreds.__response__,
-        VultrBackendConfigWithCreds.__response__,
-        SlurmBackendConfigWithCreds.__response__,
-        DstackBackendConfig.__response__,
-    ],
+# `AnyBackendConfigWithCreds` above stays a bare `Union` because it is also used as a plain type
+# annotation and as the bound of `BackendConfigWithCredsT` in `base/configurator.py`. Every site
+# that *validates* the union should use this alias instead of wrapping it again locally: two
+# `Annotated` `Field`s on the same type fail with "cannot specify multiple 'Annotated' 'Field's".
+AnyBackendConfigWithCredsTagged = Annotated[
+    AnyBackendConfigWithCreds,
     Field(discriminator="type"),
 ]
+
+
+class BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
+    pass
+
 
 # Backend config accepted in server/config.yaml.
 # This can be different from the API config.

@@ -3,8 +3,6 @@
   "/backends/0": "BackendType",
   "/backends/1": "BackendType",
   "/creation_policy": "CreationPolicy",
-  "/idle_duration": "Duration",
-  "/max_duration": "Duration",
   "/retry": "ProfileRetry",
   "/retry/duration": "Duration",
   "/retry/on_events/0": "RetryEvent",

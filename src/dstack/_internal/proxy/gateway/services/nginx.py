@@ -37,7 +37,7 @@ class SiteConfig(BaseModel):
 
     def render(self) -> str:
         template = read_package_resource(f"{self.type}.jinja2")
-        render_dict = self.dict()
+        render_dict = self.model_dump()
         render_dict["proxy_port"] = PROXY_PORT_ON_GATEWAY
         return jinja2.Template(template).render(**render_dict)
 

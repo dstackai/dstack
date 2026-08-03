@@ -171,7 +171,7 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
             instance_id=instance_model.id,
             collected_at=get_current_datetime(),
             status=health_status,
-            response=instance_check.health_response.json(),
+            response=instance_check.health_response.model_dump_json(),
         )
 
     set_health_update(
@@ -357,7 +357,9 @@ async def _process_wait_for_instance_provisioning_data(
             instance_model.project.ssh_public_key,
             instance_model.project.ssh_private_key,
         )
-        result.instance_update_map["job_provisioning_data"] = job_provisioning_data.json()
+        result.instance_update_map["job_provisioning_data"] = (
+            job_provisioning_data.model_dump_json()
+        )
     except ProvisioningError as exc:
         logger.warning(
             "Error while waiting for instance %s to become running: %s",

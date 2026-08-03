@@ -366,7 +366,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
     return _ProcessResult(
         update_map={
             "status": VolumeStatus.ACTIVE,
-            "volume_provisioning_data": vpd.json(),
+            "volume_provisioning_data": vpd.model_dump_json(),
         }
     )
 

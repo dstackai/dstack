@@ -12,6 +12,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     Profile,
@@ -185,7 +186,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.ERROR]),
             ),
         )
         run = await create_run(
@@ -227,7 +228,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.INTERRUPTION]),
             ),
             configuration=ServiceConfiguration(
                 port=8080,
@@ -306,7 +307,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.INTERRUPTION]),
             ),
             configuration=ServiceConfiguration(
                 port=8080,
@@ -386,7 +387,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.NO_CAPACITY]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.NO_CAPACITY]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -435,7 +436,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=600, on_events=[RetryEvent.NO_CAPACITY]),
+                retry=ProfileRetry(duration=Duration(600), on_events=[RetryEvent.NO_CAPACITY]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -484,7 +485,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.ERROR]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -548,7 +549,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=60, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(60), on_events=[RetryEvent.ERROR]),
             ),
         )
         run = await create_run(
@@ -984,7 +985,7 @@ class TestRunActiveWorker:
         # cannot be applied and rolling deployment is triggered instead.
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1053,7 +1054,7 @@ class TestRunActiveWorker:
         )
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1111,7 +1112,7 @@ class TestRunActiveWorker:
         # Patch the job spec to have replica_group="old"
         old_spec = get_job_spec(old_group_job)
         old_spec.replica_group = "old"
-        old_group_job.job_spec_data = old_spec.json()
+        old_group_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)

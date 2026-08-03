@@ -7,6 +7,7 @@ from sqlalchemy.orm import contains_eager, joinedload
 
 import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import (
@@ -33,6 +34,8 @@ from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 from dstack._internal.utils.common import get_or_error
+
+_ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
 
 
 class ServerProxyRepo(BaseProxyRepo):
@@ -78,8 +81,8 @@ class ServerProxyRepo(BaseProxyRepo):
         router = run_spec.configuration.router
         replicas = []
         for job in jobs:
-            jpd: JobProvisioningData = JobProvisioningData.__response__.parse_raw(
-                job.job_provisioning_data
+            jpd: JobProvisioningData = validate_json_extra_ignore(
+                JobProvisioningData, get_or_error(job.job_provisioning_data)
             )
             assert jpd.hostname is not None
             assert jpd.ssh_port is not None
@@ -153,12 +156,14 @@ class ServerProxyRepo(BaseProxyRepo):
         )
         models = []
         for run in res.scalars().all():
-            service_spec: ServiceSpec = ServiceSpec.__response__.parse_raw(run.service_spec)
+            service_spec: ServiceSpec = validate_json_extra_ignore(
+                ServiceSpec, get_or_error(run.service_spec)
+            )
             model_spec = service_spec.model
             model_options_obj = service_spec.options.get("openai", {}).get("model")
             if model_spec is None or model_options_obj is None:
                 continue
-            model_options = pydantic.parse_obj_as(AnyModel, model_options_obj)  # type: ignore[arg-type]
+            model_options = _ANY_MODEL_ADAPTER.validate_python(model_options_obj)
             model = ChatModel(
                 project_name=project_name,
                 name=model_spec.name,

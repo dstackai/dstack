@@ -1,6 +1,6 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -20,8 +20,8 @@ class AzureDefaultCreds(CoreModel):
 AnyAzureCreds = Union[AzureClientCreds, AzureDefaultCreds]
 
 
-class AzureCreds(CoreModel):
-    __root__: AnyAzureCreds = Field(..., discriminator="type")
+class AzureCreds(RootModel[Annotated[AnyAzureCreds, Field(discriminator="type")]]):
+    pass
 
 
 class AzureBackendConfig(CoreModel):

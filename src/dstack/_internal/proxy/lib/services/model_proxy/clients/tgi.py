@@ -79,7 +79,7 @@ class TGIChatCompletions(ChatCompletionsClient):
         return ChatCompletionsResponse(
             id=uuid.uuid4().hex,
             choices=choices,
-            created=int(datetime.datetime.utcnow().timestamp()),
+            created=int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
             model=request.model,
             system_fingerprint=f"fp_{data['details']['seed']}",
             usage=ChatCompletionsUsage(
@@ -91,7 +91,7 @@ class TGIChatCompletions(ChatCompletionsClient):
 
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
         completion_id = uuid.uuid4().hex
-        created = int(datetime.datetime.utcnow().timestamp())
+        created = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 
         payload = self.get_payload(request)
         try:

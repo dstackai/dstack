@@ -31,7 +31,7 @@ def print_gpu_json(
         gpus=gpus,
     )
 
-    print(output.json())
+    print(output.model_dump_json())
 
 
 def print_gpu_table(gpus: List[GpuGroup], run_spec: RunSpec, group_by: List[str], project: str):

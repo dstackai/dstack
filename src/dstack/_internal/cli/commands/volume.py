@@ -13,7 +13,6 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.volume import get_volumes_table, print_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
 class VolumeCommand(APIBaseCommand):
@@ -114,4 +113,4 @@ class VolumeCommand(APIBaseCommand):
             console.print("Volume not found")
             exit(1)
 
-        print(pydantic_orjson_dumps_with_indent(volume.dict(), default=None))
+        print(volume.model_dump_json(indent=2))

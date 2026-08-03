@@ -193,8 +193,8 @@ def set_gpu_driver_update(
     if gpu_driver is None:
         return False
     current = job_provisioning_data.gpu_driver
-    if current is not None and current.dict() == gpu_driver.dict():
+    if current == gpu_driver:
         return False
     job_provisioning_data.gpu_driver = gpu_driver
-    update_map["job_provisioning_data"] = job_provisioning_data.json()
+    update_map["job_provisioning_data"] = job_provisioning_data.model_dump_json()
     return True

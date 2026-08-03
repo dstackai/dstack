@@ -13,7 +13,7 @@ from typing_extensions import Self
 
 from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.common import CoreModel, NetworkMode
+from dstack._internal.core.models.common import CoreModel, NetworkMode, validate_extra_ignore
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
@@ -112,7 +112,7 @@ class RunnerClient:
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
-        return MetricsResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(MetricsResponse, resp.json())
 
     def submit_job(
         self,
@@ -142,7 +142,7 @@ class RunnerClient:
                 merged_env.update(router_env)
             if server_access:
                 merged_env.setdefault(DSTACK_PROJECT_ENV, run.project_name)
-            job_spec = job_spec.copy(deep=True)
+            job_spec = job_spec.model_copy(deep=True)
             job_spec.env = merged_env
         quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR
         body = SubmitBody(
@@ -156,9 +156,8 @@ class RunnerClient:
             run_spec=run.run_spec,
         )
         resp = self._session.post(
-            # use .json() to encode enums
             self._url("/api/submit"),
-            data=body.json(),
+            data=body.json_for_runner(),
             headers={"Content-Type": "application/json"},
             timeout=REQUEST_TIMEOUT,
         )
@@ -184,14 +183,14 @@ class RunnerClient:
         if not _is_json_response(resp):
             # Old runner or runner failed to get job info
             return None
-        return JobInfoResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(JobInfoResponse, resp.json())
 
     def pull(self, timestamp: int) -> PullResponse:
         resp = self._session.get(
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
         resp.raise_for_status()
-        return PullResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(PullResponse, resp.json())
 
     def stop(self):
         resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
@@ -203,7 +202,7 @@ class RunnerClient:
     def _healthcheck(self) -> HealthcheckResponse:
         resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
-        return HealthcheckResponse.__response__.parse_obj(resp.json())
+        return validate_extra_ignore(HealthcheckResponse, resp.json())
 
     def _negotiate(self, healthcheck_response: Optional[HealthcheckResponse] = None) -> None:
         if healthcheck_response is None:
@@ -638,7 +637,7 @@ class ShimClient:
     ) -> requests.Response:
         url = f"{self._base_url}/{path.lstrip('/')}"
         if body is not None:
-            json = body.dict()
+            json = body.model_dump()
         else:
             json = None
         resp = self._session.request(method, url, json=json, timeout=REQUEST_TIMEOUT)
@@ -649,7 +648,7 @@ class ShimClient:
     _M = TypeVar("_M", bound=CoreModel)
 
     def _response(self, model_cls: type[_M], response: requests.Response) -> _M:
-        return model_cls.__response__.parse_obj(response.json())
+        return validate_extra_ignore(model_cls, response.json())
 
     def _raise_for_status(self, response: requests.Response) -> None:
         try:
@@ -728,7 +727,7 @@ def instance_info_response_to_gpu_driver(
 ) -> Optional[GpuDriverInfo]:
     if response is None or not response.gpu_driver_version:
         return None
-    return GpuDriverInfo.parse_obj(
+    return GpuDriverInfo.model_validate(
         {"vendor": response.gpu_vendor, "version": response.gpu_driver_version}
     )
 

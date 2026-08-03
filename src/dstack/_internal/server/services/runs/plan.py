@@ -968,7 +968,7 @@ def _get_backend_offer_identity(offer: InstanceOfferWithAvailability) -> Hashabl
     Needed to deduplicate identical backend offers when merging offers from multiple fleets for
     `dstack offer --fleet ...`.
     """
-    return _freeze_offer_identity_value(offer.dict())
+    return _freeze_offer_identity_value(offer.model_dump())
 
 
 def _freeze_offer_identity_value(value: object) -> Hashable:

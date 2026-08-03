@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import Optional
+from typing import Optional, Union
 
 import requests
 from typing_extensions import Protocol
@@ -9,7 +9,7 @@ class APIRequest(Protocol):
     def __call__(
         self,
         path: str,
-        body: Optional[str] = None,
+        body: Optional[Union[str, bytes]] = None,
         raise_for_status: bool = True,
         method: str = "POST",
         **kwargs,

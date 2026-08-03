@@ -40,7 +40,11 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import (
+    CoreModel,
+    validate_extra_ignore,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -240,7 +244,9 @@ class NebiusCompute(
             ssh_port=22,
             username="ubuntu",
             dockerized=True,
-            backend_data=NebiusInstanceBackendData(boot_disk_id=create_disk_op.resource_id).json(),
+            backend_data=NebiusInstanceBackendData(
+                boot_disk_id=create_disk_op.resource_id
+            ).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -285,8 +291,8 @@ class NebiusCompute(
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         assert placement_group.configuration.placement_strategy == PlacementStrategy.CLUSTER
-        master_instance_offer_backend_data: NebiusOfferBackendData = (
-            NebiusOfferBackendData.__response__.parse_obj(master_instance_offer.backend_data)
+        master_instance_offer_backend_data: NebiusOfferBackendData = validate_extra_ignore(
+            NebiusOfferBackendData, master_instance_offer.backend_data
         )
         fabrics = list(master_instance_offer_backend_data.fabrics)
         if self.config.fabrics is not None:
@@ -308,7 +314,7 @@ class NebiusCompute(
             )
         return PlacementGroupProvisioningData(
             backend=BackendType.NEBIUS,
-            backend_data=placement_group_backend_data.json(),
+            backend_data=placement_group_backend_data.model_dump_json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:
@@ -331,8 +337,8 @@ class NebiusCompute(
         placement_group_backend_data = NebiusPlacementGroupBackendData.load(
             placement_group.provisioning_data.backend_data
         )
-        instance_offer_backend_data: NebiusOfferBackendData = (
-            NebiusOfferBackendData.__response__.parse_obj(instance_offer.backend_data)
+        instance_offer_backend_data: NebiusOfferBackendData = validate_extra_ignore(
+            NebiusOfferBackendData, instance_offer.backend_data
         )
         return (
             placement_group_backend_data.cluster is None
@@ -346,7 +352,7 @@ class NebiusInstanceBackendData(CoreModel):
     @classmethod
     def load(cls, raw: Optional[str]) -> "NebiusInstanceBackendData":
         assert raw is not None
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class NebiusClusterBackendData(CoreModel):
@@ -360,7 +366,7 @@ class NebiusPlacementGroupBackendData(CoreModel):
     @classmethod
     def load(cls, raw: Optional[str]) -> "NebiusPlacementGroupBackendData":
         assert raw is not None
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:

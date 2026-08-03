@@ -10,6 +10,7 @@ from gpuhunt import AcceleratorVendor
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
@@ -201,7 +202,7 @@ class TestCheckInstance:
 
         assert check_instance_inner_mock.call_args.kwargs["check_instance_info"]
         assert instance.job_provisioning_data is not None
-        jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+        jpd = validate_json_extra_ignore(JobProvisioningData, instance.job_provisioning_data)
         assert jpd.gpu_driver is not None
         assert jpd.gpu_driver.vendor == AcceleratorVendor.NVIDIA
         assert jpd.gpu_driver.version == "570.86.15"
@@ -481,7 +482,7 @@ class TestCheckInstance:
         res = await session.execute(select(InstanceHealthCheckModel))
         health_check = res.scalars().one()
         assert health_check.status == HealthStatus.WARNING
-        assert health_check.response == health_response.json()
+        assert health_check.response == health_response.model_dump_json()
 
 
 @pytest.mark.asyncio
@@ -1063,7 +1064,9 @@ class TestSetGpuDriverUpdate:
             gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
         )
         assert "job_provisioning_data" in update_map
-        parsed = JobProvisioningData.__response__.parse_raw(update_map["job_provisioning_data"])
+        parsed = validate_json_extra_ignore(
+            JobProvisioningData, update_map["job_provisioning_data"]
+        )
         assert parsed.gpu_driver is not None
         assert parsed.gpu_driver.version == "570.86.15"
 

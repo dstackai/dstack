@@ -1,7 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "additionalProperties": false,
-  "definitions": {
+  "$defs": {
     "BackendType": {
       "description": "Attributes:\n    AMDDEVCLOUD (BackendType): AMD Developer Cloud\n    AWS (BackendType): Amazon Web Services\n    AZURE (BackendType): Microsoft Azure\n    CLOUDRIFT (BackendType): CloudRift\n    CRUSOE (BackendType): Crusoe\n    CUDO (BackendType): Cudo\n    DATACRUNCH (BackendType): DataCrunch (for backward compatibility)\n    DIGITALOCEAN (BackendType): DigitalOcean\n    DSTACK (BackendType): dstack Sky\n    GCP (BackendType): Google Cloud Platform\n    HOTAISLE (BackendType): Hot Aisle\n    JARVISLABS (BackendType): JarvisLabs\n    KUBERNETES (BackendType): Kubernetes\n    LAMBDA (BackendType): Lambda Cloud\n    NEBIUS (BackendType): Nebius AI Cloud\n    OCI (BackendType): Oracle Cloud Infrastructure\n    RUNPOD (BackendType): Runpod Cloud\n    TENSORDOCK (BackendType): TensorDock Marketplace\n    VASTAI (BackendType): Vast.ai Marketplace\n    VERDA (BackendType): Verda Cloud\n    VULTR (BackendType): Vultr\n    SLURM (BackendType): Slurm",
       "enum": [
@@ -33,7 +31,6 @@
       "type": "string"
     },
     "CreationPolicy": {
-      "description": "An enumeration.",
       "enum": [
         "reuse",
         "reuse-or-create"
@@ -41,7 +38,7 @@
       "title": "CreationPolicy",
       "type": "string"
     },
-    "EntityReferenceRequest": {
+    "EntityReference": {
       "additionalProperties": false,
       "description": "Cross-project entity reference.",
       "properties": {
@@ -51,32 +48,38 @@
           "type": "string"
         },
         "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The project name. If unspecified, refers to the current project",
-          "title": "Project",
-          "type": "string"
+          "title": "Project"
         }
       },
       "required": [
         "name"
       ],
-      "title": "EntityReferenceRequest",
+      "title": "EntityReference",
       "type": "object"
     },
-    "FleetInstanceSelectorRequest": {
+    "FleetInstanceSelector": {
       "additionalProperties": false,
       "properties": {
         "fleet": {
           "anyOf": [
             {
-              "$ref": "#/definitions/EntityReferenceRequest"
+              "$ref": "#/$defs/EntityReference"
             },
             {
-              "minLength": 1,
               "type": "string"
             }
           ],
-          "description": "The fleet reference. For fleets owned by the current project, specify the fleet name. For a fleet from another project, specify `<project name>/<fleet name>` or an object with `project` and `name`.",
-          "title": "Fleet"
+          "description": "The fleet reference. For fleets owned by the current project, specify the fleet name. For a fleet from another project, specify `<project name>/<fleet name>` or an object with `project` and `name`."
         },
         "instance": {
           "description": "The fleet instance number",
@@ -89,10 +92,10 @@
         "fleet",
         "instance"
       ],
-      "title": "FleetInstanceSelectorRequest",
+      "title": "FleetInstanceSelector",
       "type": "object"
     },
-    "InstanceHostnameSelectorRequest": {
+    "InstanceHostnameSelector": {
       "additionalProperties": false,
       "properties": {
         "hostname": {
@@ -105,10 +108,10 @@
       "required": [
         "hostname"
       ],
-      "title": "InstanceHostnameSelectorRequest",
+      "title": "InstanceHostnameSelector",
       "type": "object"
     },
-    "InstanceNameSelectorRequest": {
+    "InstanceNameSelector": {
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -121,41 +124,70 @@
       "required": [
         "name"
       ],
-      "title": "InstanceNameSelectorRequest",
+      "title": "InstanceNameSelector",
       "type": "object"
     },
-    "ProfileRequest": {
+    "Profile": {
       "additionalProperties": false,
       "properties": {
         "availability_zones": {
-          "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Availability Zones",
-          "type": "array"
-        },
-        "backend_options": {
-          "description": "Backend-specific options, applied only to offers from that backend",
-          "items": {
-            "$ref": "#/definitions/VastAIProfileOptions"
-          },
-          "title": "Backend Options",
-          "type": "array"
-        },
-        "backends": {
-          "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
-          "items": {
-            "$ref": "#/definitions/BackendType"
-          },
-          "type": "array"
-        },
-        "creation_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/CreationPolicy"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
+          "title": "Availability Zones"
+        },
+        "backend_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VastAIProfileOptions"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Backend-specific options, applied only to offers from that backend",
+          "title": "Backend Options"
+        },
+        "backends": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BackendType"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
+          "title": "Backends"
+        },
+        "creation_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The policy for using instances from fleets: `reuse`, `reuse-or-create`. Defaults to `reuse-or-create`"
         },
         "default": {
@@ -165,89 +197,129 @@
           "type": "boolean"
         },
         "fleets": {
-          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/EntityReferenceRequest"
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EntityReference"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "title": "Fleets",
-          "type": "array"
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
+          "title": "Fleets"
         },
         "idle_duration": {
           "anyOf": [
             {
-              "type": "integer"
-            },
-            {
-              "type": "string"
-            }
-          ],
-          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
-          "title": "Idle Duration"
-        },
-        "instance_types": {
-          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Instance Types",
-          "type": "array"
-        },
-        "instances": {
-          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/InstanceNameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/InstanceHostnameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/FleetInstanceSelectorRequest"
-              },
-              {
-                "minLength": 1,
-                "type": "string"
-              }
-            ]
-          },
-          "minItems": 1,
-          "title": "Instances",
-          "type": "array"
-        },
-        "max_duration": {
-          "anyOf": [
-            {
-              "enum": [
-                "off"
-              ],
+              "const": "off",
               "type": "string"
             },
             {
               "type": "integer"
+            },
+            {
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
+          "title": "Idle Duration"
+        },
+        "instance_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
+          "title": "Instance Types"
+        },
+        "instances": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/InstanceNameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/InstanceHostnameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/FleetInstanceSelector"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
+          "title": "Instances"
+        },
+        "max_duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum duration of a run (e.g., `2h`, `1d`, etc) in a running state, excluding provisioning and pulling. After it elapses, the run is automatically stopped. Use `off` for unlimited duration. Defaults to `off`",
           "title": "Max Duration"
         },
         "max_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum instance price per hour, in dollars",
-          "exclusiveMinimum": 0.0,
-          "title": "Max Price",
-          "type": "number"
+          "title": "Max Price"
         },
         "name": {
           "default": "",
@@ -256,106 +328,150 @@
           "type": "string"
         },
         "regions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Regions",
-          "type": "array"
+          "title": "Regions"
         },
         "reservation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
+          "title": "Reservation"
         },
         "retry": {
           "anyOf": [
             {
-              "$ref": "#/definitions/ProfileRetryRequest"
+              "$ref": "#/$defs/ProfileRetry"
             },
             {
               "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for resubmitting the run. Defaults to `false`",
           "title": "Retry"
         },
         "schedule": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScheduleRequest"
+              "$ref": "#/$defs/Schedule"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The schedule for starting the run at specified time",
-          "title": "Schedule"
+          "default": null,
+          "description": "The schedule for starting the run at specified time"
         },
         "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, `auto`. Defaults to `on-demand`"
         },
         "startup_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StartupOrder"
+              "$ref": "#/$defs/StartupOrder"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The order in which master and workers jobs are started: `any`, `master-first`, `workers-first`. Defaults to `any`"
         },
         "stop_criteria": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StopCriteria"
+              "$ref": "#/$defs/StopCriteria"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The criteria determining when a multi-node run should be considered finished: `all-done`, `master-done`. Defaults to `all-done`"
         },
         "stop_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
-              "type": "string"
+              "type": "integer"
             },
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum duration of a run graceful stopping. After it elapses, the run is automatically forced stopped. This includes force detaching volumes used by the run. Use `off` for unlimited duration. Defaults to `5m`",
           "title": "Stop Duration"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
-        },
-        "utilization_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/UtilizationPolicyRequest"
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Run termination policy based on utilization",
-          "title": "Utilization Policy"
+          "default": null,
+          "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
+          "title": "Tags"
+        },
+        "utilization_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UtilizationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run termination policy based on utilization"
         }
       },
-      "title": "ProfileRequest",
+      "title": "Profile",
       "type": "object"
     },
-    "ProfileRetryRequest": {
+    "ProfileRetry": {
       "additionalProperties": false,
       "properties": {
         "duration": {
@@ -365,24 +481,36 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum period of retrying the run, e.g., `4h` or `1d`. The period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.",
           "title": "Duration"
         },
         "on_events": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/RetryEvent"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The list of events that should be handled with retry. Supported events are `no-capacity`, `interruption`, `error`. Omit to retry on all events",
-          "items": {
-            "$ref": "#/definitions/RetryEvent"
-          },
-          "type": "array"
+          "title": "On Events"
         }
       },
-      "title": "ProfileRetryRequest",
+      "title": "ProfileRetry",
       "type": "object"
     },
     "RetryEvent": {
-      "description": "An enumeration.",
       "enum": [
         "no-capacity",
         "interruption",
@@ -391,7 +519,7 @@
       "title": "RetryEvent",
       "type": "string"
     },
-    "ScheduleRequest": {
+    "Schedule": {
       "additionalProperties": false,
       "properties": {
         "cron": {
@@ -413,11 +541,10 @@
       "required": [
         "cron"
       ],
-      "title": "ScheduleRequest",
+      "title": "Schedule",
       "type": "object"
     },
     "SpotPolicy": {
-      "description": "An enumeration.",
       "enum": [
         "spot",
         "on-demand",
@@ -427,7 +554,6 @@
       "type": "string"
     },
     "StartupOrder": {
-      "description": "An enumeration.",
       "enum": [
         "any",
         "master-first",
@@ -437,7 +563,6 @@
       "type": "string"
     },
     "StopCriteria": {
-      "description": "An enumeration.",
       "enum": [
         "all-done",
         "master-done"
@@ -445,7 +570,7 @@
       "title": "StopCriteria",
       "type": "string"
     },
-    "UtilizationPolicyRequest": {
+    "UtilizationPolicy": {
       "additionalProperties": false,
       "properties": {
         "min_gpu_utilization": {
@@ -472,11 +597,10 @@
         "min_gpu_utilization",
         "time_window"
       ],
-      "title": "UtilizationPolicyRequest",
+      "title": "UtilizationPolicy",
       "type": "object"
     },
     "VastAIOfferOrder": {
-      "description": "An enumeration.",
       "enum": [
         "score",
         "price"
@@ -488,31 +612,49 @@
       "additionalProperties": false,
       "properties": {
         "min_reliability": {
-          "description": "The minimum reliability threshold for offers, on a scale from `0` to `1`. Defaults to `0.9`",
-          "maximum": 1,
-          "minimum": 0,
-          "title": "Min Reliability",
-          "type": "number"
-        },
-        "min_score": {
-          "description": "The minimum overall score required for offers to be considered. The scoring scale varies and may require experimentation. Starting with a value in the low hundreds is generally recommended",
-          "minimum": 0,
-          "title": "Min Score",
-          "type": "integer"
-        },
-        "offer_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/VastAIOfferOrder"
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The minimum reliability threshold for offers, on a scale from `0` to `1`. Defaults to `0.9`",
+          "title": "Min Reliability"
+        },
+        "min_score": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The minimum overall score required for offers to be considered. The scoring scale varies and may require experimentation. Starting with a value in the low hundreds is generally recommended",
+          "title": "Min Score"
+        },
+        "offer_order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VastAIOfferOrder"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Controls the order in which offers are considered for provisioning. Use `score` to prioritize the highest overall score first (the default order in the Vast.ai console), or `price` to prioritize the lowest-cost offers first. Lower-cost offers are often less reliable, so consider applying stricter filters when using `price`. Defaults to `score`"
         },
         "type": {
+          "const": "vastai",
           "default": "vastai",
-          "enum": [
-            "vastai"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -521,10 +663,12 @@
       "type": "object"
     }
   },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "properties": {
     "profiles": {
       "items": {
-        "$ref": "#/definitions/ProfileRequest"
+        "$ref": "#/$defs/Profile"
       },
       "title": "Profiles",
       "type": "array"
@@ -533,6 +677,6 @@
   "required": [
     "profiles"
   ],
-  "title": "ProfilesConfigRequest",
+  "title": "ProfilesConfig",
   "type": "object"
 }

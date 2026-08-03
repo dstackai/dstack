@@ -7,7 +7,9 @@ from dstack._internal.server.services.docker import ImageConfig, ImageConfigObje
 
 @pytest.fixture
 def image_config_mock(monkeypatch: pytest.MonkeyPatch) -> ImageConfig:
-    image_config = ImageConfig.parse_obj({"User": None, "Entrypoint": None, "Cmd": ["/bin/bash"]})
+    image_config = ImageConfig.model_validate(
+        {"User": None, "Entrypoint": None, "Cmd": ["/bin/bash"]}
+    )
     monkeypatch.setattr(
         "dstack._internal.server.services.jobs.configurators.base._get_image_config",
         Mock(return_value=image_config),

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -43,7 +44,7 @@ class TestListUserRuns:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.NO_CAPACITY]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.NO_CAPACITY]),
             ),
         )
         run = await create_run(
@@ -152,7 +153,7 @@ class TestListUserRuns:
         repo = await create_repo(session=session, project_id=project.id)
         retry_profile = Profile(
             name="default",
-            retry=ProfileRetry(duration=3600, on_events=[RetryEvent.NO_CAPACITY]),
+            retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.NO_CAPACITY]),
         )
         no_retry_profile = Profile(name="default")
 

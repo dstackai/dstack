@@ -8,7 +8,7 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import logs
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -32,4 +32,4 @@ async def poll_logs(
     # The runner guarantees logs have different timestamps if throughput < 1k logs / sec.
     # Otherwise, some logs with duplicated timestamps may be filtered out.
     # This limitation is imposed by cloud log services that support up to millisecond timestamp resolution.
-    return CustomORJSONResponse(await logs.poll_logs_async(project=project, request=body))
+    return CustomJSONResponse(await logs.poll_logs_async(project=project, request=body))

@@ -1,3 +1,4 @@
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.server.models import ComputeGroupModel
 
@@ -17,6 +18,6 @@ def compute_group_model_to_compute_group(compute_group_model: ComputeGroupModel)
 def get_compute_group_provisioning_data(
     compute_group_model: ComputeGroupModel,
 ) -> ComputeGroupProvisioningData:
-    return ComputeGroupProvisioningData.__response__.parse_raw(
-        compute_group_model.provisioning_data
+    return validate_json_extra_ignore(
+        ComputeGroupProvisioningData, compute_group_model.provisioning_data
     )

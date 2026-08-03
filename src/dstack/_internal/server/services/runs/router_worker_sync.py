@@ -23,6 +23,7 @@ from smg_grpc_proto import (
 from typing_extensions import NotRequired
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import ReplicaGroup, ServiceConfiguration
 from dstack._internal.core.models.runs import JobStatus, RunSpec, get_service_port
 from dstack._internal.server.models import JobModel, RunModel
@@ -125,7 +126,7 @@ _GRPC_RUNTIME_TYPES: tuple[_RuntimeType, ...] = ("sglang", "vllm")
 
 
 def run_model_has_sglang_router_replica_group(run_model: RunModel) -> bool:
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = validate_json_extra_ignore(RunSpec, run_model.run_spec)
     return run_spec_has_sglang_router_replica_group(run_spec)
 
 
@@ -626,7 +627,7 @@ async def _build_target_workers(
 
 
 async def sync_router_workers_for_run_model(run_model: RunModel) -> None:
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = validate_json_extra_ignore(RunSpec, run_model.run_spec)
     config = run_spec.configuration
     if not isinstance(config, ServiceConfiguration):
         return

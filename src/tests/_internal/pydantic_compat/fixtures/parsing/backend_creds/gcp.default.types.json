@@ -1,4 +1,4 @@
 {
   "/": "GCPCreds",
-  "/__root__": "GCPDefaultCreds"
+  "/root": "GCPDefaultCreds"
 }

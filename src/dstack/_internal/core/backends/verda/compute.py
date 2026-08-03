@@ -27,7 +27,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -193,7 +193,7 @@ class VerdaCompute(
             backend_data=VerdaInstanceBackendData(
                 startup_script_id=startup_script_id,
                 ssh_key_ids=ssh_ids,
-            ).json(),
+            ).model_dump_json(),
         )
 
     def terminate_instance(
@@ -330,4 +330,4 @@ class VerdaInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "VerdaInstanceBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)

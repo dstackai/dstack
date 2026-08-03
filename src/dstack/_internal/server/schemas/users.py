@@ -16,7 +16,7 @@ class ListUsersRequest(CoreModel):
         Optional[str],
         Field(
             description="Include only users with the name containing `name_pattern`.",
-            regex="^[a-zA-Z0-9-_]*$",
+            pattern="^[a-zA-Z0-9-_]*$",
         ),
     ] = None
     prev_created_at: Annotated[

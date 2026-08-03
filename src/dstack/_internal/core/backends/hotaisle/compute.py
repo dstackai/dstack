@@ -19,7 +19,11 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.hotaisle.api_client import HotAisleAPIClient
 from dstack._internal.core.backends.hotaisle.models import HotAisleConfig
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import (
+    CoreModel,
+    validate_extra_ignore,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -74,8 +78,8 @@ class HotAisleCompute(
     ) -> JobProvisioningData:
         project_ssh_key = instance_config.ssh_keys[0]
         self.api_client.upload_ssh_key(project_ssh_key.public)
-        offer_backend_data: HotAisleOfferBackendData = (
-            HotAisleOfferBackendData.__response__.parse_obj(instance_offer.backend_data)
+        offer_backend_data: HotAisleOfferBackendData = validate_extra_ignore(
+            HotAisleOfferBackendData, instance_offer.backend_data
         )
         vm_data = self.api_client.create_virtual_machine(offer_backend_data.vm_specs)
         return JobProvisioningData(
@@ -90,7 +94,9 @@ class HotAisleCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=HotAisleInstanceBackendData(ip_address=vm_data["ip_address"]).json(),
+            backend_data=HotAisleInstanceBackendData(
+                ip_address=vm_data["ip_address"]
+            ).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -182,7 +188,7 @@ class HotAisleInstanceBackendData(CoreModel):
     @classmethod
     def load(cls, raw: Optional[str]) -> "HotAisleInstanceBackendData":
         assert raw is not None
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class HotAisleOfferBackendData(CoreModel):

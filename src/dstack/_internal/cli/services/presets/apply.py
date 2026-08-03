@@ -75,11 +75,11 @@ def _build_service(
     configuration: PresetConfiguration,
     preset: Preset,
 ) -> ServiceConfiguration:
-    service = preset.service.copy(deep=True)
+    service = preset.service.model_copy(deep=True)
     service.name = configuration.name
     service.gateway = configuration.gateway
     service.env.update(configuration.env)
-    for field in ProfileParams.__fields__:
+    for field in ProfileParams.model_fields:
         value = getattr(configuration, field)
         if value is not None:
             setattr(service, field, value)

@@ -1,6 +1,6 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -9,7 +9,7 @@ class AWSOSImage(CoreModel):
     name: Annotated[str, Field(description="The AMI name")]
     owner: Annotated[
         str,
-        Field(regex=r"^(\d{12}|self)$", description="The AMI owner, account ID or `self`"),
+        Field(pattern=r"^(\d{12}|self)$", description="The AMI owner, account ID or `self`"),
     ] = "self"
     user: Annotated[str, Field(description="The OS user for provisioning")]
 
@@ -38,8 +38,8 @@ class AWSDefaultCreds(CoreModel):
 AnyAWSCreds = Union[AWSAccessKeyCreds, AWSDefaultCreds]
 
 
-class AWSCreds(CoreModel):
-    __root__: AnyAWSCreds = Field(..., discriminator="type")
+class AWSCreds(RootModel[Annotated[AnyAWSCreds, Field(discriminator="type")]]):
+    pass
 
 
 class AWSBackendConfig(CoreModel):

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Dict, Literal, Optional, Union
 
-from pydantic import Field, root_validator
+from pydantic import Field, field_serializer, model_validator
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -76,7 +76,8 @@ class NebiusServiceAccountFileCreds(CoreModel):
         Optional[str], Field(description="The path to the service account credentials file")
     ] = None
 
-    @root_validator
+    @model_validator(mode="before")
+    @classmethod
     def fill_data(cls, values):
         if filename := values.get("filename"):
             try:
@@ -183,3 +184,7 @@ class NebiusConfig(NebiusStoredConfig):
 
 class NebiusOfferBackendData(CoreModel):
     fabrics: set[str] = set()
+
+    @field_serializer("fabrics")
+    def _serialize_fabrics(self, value: set[str]) -> list[str]:
+        return sorted(value)

@@ -1,123 +1,118 @@
-import re
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional, Union
+from typing import Any, Optional, TypeVar, Union, overload
 
-import orjson
-from pydantic import Field
-from pydantic_duality import generate_dual_base_model
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+)
 from typing_extensions import Annotated
 
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps
+# pydantic v2 generates draft 2020-12. The published `configuration.json` / `profiles.json`
+# advertise the dialect they were generated for, so this has to move with pydantic.
+JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema"
 
+
+def drop_merged_profile(schema: dict[str, Any]) -> None:
+    """
+    `json_schema_extra` hook for the specs carrying a `merged_profile`.
+
+    It is an internal field computed from the configuration and the profile, never written by a
+    user, so it must not appear in the published schema.
+    """
+    schema.get("properties", {}).pop("merged_profile", None)
+
+
+# Mirrors pydantic v2's `IncEx`, so these can be passed straight to `model_dump`/`model_copy`.
+# v2 keys a mapping by int or str but not both, and its values are `IncEx | bool`.
 IncludeExcludeFieldType = Union[int, str]
-IncludeExcludeSetType = set[IncludeExcludeFieldType]
-IncludeExcludeDictType = dict[
-    IncludeExcludeFieldType, Union[bool, IncludeExcludeSetType, "IncludeExcludeDictType"]
+IncludeExcludeSetType = Union[set[int], set[str]]
+# `dict` rather than `Mapping`, so these stay assignable both *to* pydantic's `IncEx` and to the
+# plain `Dict` parameters the plugin API declares. Keyed by int or str but not both, like `IncEx`.
+IncludeExcludeDictType = Union[
+    dict[int, Union["IncludeExcludeType", bool]],
+    dict[str, Union["IncludeExcludeType", bool]],
 ]
 IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
 
 
-class CoreConfig:
-    json_loads = orjson.loads
-    json_dumps = pydantic_orjson_dumps
-
-
-# All dstack models inherit from pydantic-duality's DualBaseModel.
-# DualBaseModel creates two classes for the model:
-# one with extra = "forbid" (CoreModel/CoreModel.__request__),
-# and another with extra = "ignore" (CoreModel.__response__).
-# This allows to use the same model both for strict parsing of the user input and
-# for permissive parsing of the server responses.
-#
-# We define a func to generate CoreModel dynamically that can be used
-# to define custom Config for both __request__ and __response__ models.
-# Note: Defining config in the model class directly overrides
-# pydantic-duality's base config, breaking __response__.
-def generate_dual_core_model(
-    custom_config: Union[type, Mapping],
-) -> "type[CoreModel]":
-    class CoreModel(generate_dual_base_model(custom_config)):
-        def json(
-            self,
-            *,
-            include: Optional[IncludeExcludeType] = None,
-            exclude: Optional[IncludeExcludeType] = None,
-            by_alias: bool = False,
-            skip_defaults: Optional[bool] = None,  # ignore as it's deprecated
-            exclude_unset: bool = False,
-            exclude_defaults: bool = False,
-            exclude_none: bool = False,
-            encoder: Optional[Callable[[Any], Any]] = None,
-            models_as_dict: bool = True,  # does not seems to be needed by dstack or dependencies
-            **dumps_kwargs: Any,
-        ) -> str:
-            """
-            Override `json()` method so that it calls `dict()`.
-            Allows changing how models are serialized by overriding `dict()` only.
-            By default, `json()` won't call `dict()`, so changes applied in `dict()` won't take place.
-            """
-            data = self.dict(
-                by_alias=by_alias,
-                include=include,
-                exclude=exclude,
-                exclude_unset=exclude_unset,
-                exclude_defaults=exclude_defaults,
-                exclude_none=exclude_none,
-            )
-            if self.__custom_root_type__:
-                data = data["__root__"]
-            return self.__config__.json_dumps(data, default=encoder, **dumps_kwargs)
-
-    return CoreModel
-
-
-if TYPE_CHECKING:
-
-    class CoreModel(generate_dual_base_model(CoreConfig)):
-        pass
-else:
-    CoreModel = generate_dual_core_model(CoreConfig)
-
-
-class FrozenConfig(CoreConfig):
-    frozen = True
-
-
-FrozenCoreModel = generate_dual_core_model(FrozenConfig)
-
-
-class Duration(int):
+class CoreModel(BaseModel):
     """
-    Duration in seconds.
+    The base class for all dstack models.
+
+    Unknown fields are rejected, which is what makes `dstack apply` report a typo'd key in a
+    user's YAML and what makes the API reject an unexpected request body. Reading a stored blob
+    or a peer's response needs the opposite — see `validate_extra_ignore` below.
     """
 
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.parse
+    model_config = ConfigDict(
+        extra="forbid",
+        # YAML numbers reach str fields as int/float, e.g. a `python: 3.10` style shorthand.
+        coerce_numbers_to_str=True,
+    )
 
-    @classmethod
-    def parse(cls, v: Union[int, str]) -> "Duration":
-        if isinstance(v, (int, float)):
-            return cls(v)
-        if isinstance(v, str):
-            try:
-                return cls(int(v))
-            except ValueError:
-                pass
-            regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
-            re_match = regex.match(v)
-            if not re_match:
-                raise ValueError(f"Cannot parse the duration {v}")
-            amount, unit = int(re_match.group("amount")), re_match.group("unit")
-            multiplier = {
-                "s": 1,
-                "m": 60,
-                "h": 3600,
-                "d": 24 * 3600,
-                "w": 7 * 24 * 3600,
-            }[unit]
-            return cls(amount * multiplier)
-        raise ValueError(f"Cannot parse the duration {v}")
+
+class FrozenCoreModel(CoreModel):
+    model_config = ConfigDict(frozen=True)
+
+
+T = TypeVar("T")
+
+_type_adapters: dict[Any, TypeAdapter] = {}
+
+
+@overload
+def validate_extra_ignore(tp: type[T], obj: Any) -> T: ...
+
+
+@overload
+def validate_extra_ignore(tp: Any, obj: Any) -> Any: ...
+
+
+def validate_extra_ignore(tp: Any, obj: Any) -> Any:
+    """
+    Validate `obj` against `tp` with `extra="ignore"`, dropping unknown fields at every level.
+
+    This is the read path: anything decoded from a stored blob or from a peer's response goes
+    through here, so that a newer writer adding a field does not break an older reader.
+
+    `obj` may be an instance of a *different* model class, which is how the backend configurators
+    re-read an `AWSBackendConfigWithCreds` as an `AWSConfig`. v1's `parse_obj` accepted that
+    directly; v2 needs a dict, so dump first.
+    """
+    if isinstance(obj, BaseModel):
+        obj = obj.model_dump()
+    return _get_type_adapter(tp).validate_python(obj, extra="ignore")
+
+
+@overload
+def validate_json_extra_ignore(tp: type[T], data: Union[str, bytes]) -> T: ...
+
+
+@overload
+def validate_json_extra_ignore(tp: Any, data: Union[str, bytes]) -> Any: ...
+
+
+def validate_json_extra_ignore(tp: Any, data: Union[str, bytes]) -> Any:
+    """
+    The JSON-input counterpart of `validate_extra_ignore`, keeping native JSON parsing rather
+    than going through `json.loads` and then validating in Python mode.
+    """
+    return _get_type_adapter(tp).validate_json(data, extra="ignore")
+
+
+def _get_type_adapter(tp: Any) -> TypeAdapter:
+    # Constructing a TypeAdapter builds a schema and a validator, so reuse them per type.
+    try:
+        adapter = _type_adapters.get(tp)
+    except TypeError:
+        # An unhashable annotation cannot be cached. Rare enough not to matter.
+        return TypeAdapter(tp)
+    if adapter is None:
+        adapter = TypeAdapter(tp)
+        _type_adapters[tp] = adapter
+    return adapter
 
 
 class RegistryAuth(FrozenCoreModel):

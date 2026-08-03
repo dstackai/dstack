@@ -1,8 +1,7 @@
 {
   "/": "TaskConfiguration",
   "/env": "Env",
-  "/env/__root__/B": "EnvSentinel",
-  "/max_duration": "Duration",
+  "/env/root/B": "EnvSentinel",
   "/python": "PythonVersion",
   "/resources": "ResourcesSpec",
   "/resources/cpu": "CPUSpec",

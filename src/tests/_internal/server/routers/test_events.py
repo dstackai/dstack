@@ -71,7 +71,7 @@ class TestListEventsGeneral:
             {
                 "id": str(event_ids[1]),
                 "message": "Project updated",
-                "recorded_at": "2026-01-01T12:00:01+00:00",
+                "recorded_at": "2026-01-01T12:00:01Z",
                 "actor_user_id": None,
                 "actor_user": None,
                 "is_actor_user_deleted": None,
@@ -89,7 +89,7 @@ class TestListEventsGeneral:
             {
                 "id": str(event_ids[0]),
                 "message": "User added to project",
-                "recorded_at": "2026-01-01T12:00:00+00:00",
+                "recorded_at": "2026-01-01T12:00:00Z",
                 "actor_user_id": str(user.id),
                 "actor_user": "test_user",
                 "is_actor_user_deleted": False,

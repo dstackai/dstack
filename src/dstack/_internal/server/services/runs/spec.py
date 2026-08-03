@@ -73,6 +73,12 @@ def validate_run_spec_and_set_defaults(
     # If a property is stored in job_spec - resolve the default there.
     # Server defaults are preferable over client defaults so that
     # the defaults depend on the server version, not the client version.
+    #
+    # Callers do not reparse afterwards, so the defaults set here must not touch any field that
+    # `ProfileParams` also declares — `run_spec.merged_profile` is computed at parse time and would
+    # silently keep the pre-default value. The fields written here (`repo_id`, `repo_data`,
+    # `ssh_key_pub`, `configuration.priority`, `configuration.resources`,
+    # `configuration.working_dir`) are none of them declared by `ProfileParams`.
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     _validate_retry_duration(run_spec)

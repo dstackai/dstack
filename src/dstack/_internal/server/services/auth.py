@@ -35,7 +35,7 @@ def list_providers() -> list[OAuthProviderInfo]:
 def generate_oauth_state(local_port: Optional[int] = None) -> str:
     value = str(secrets.token_hex(16))
     state = OAuthState(value=value, local_port=local_port)
-    return b64encode(state.json().encode()).decode()
+    return b64encode(state.model_dump_json().encode()).decode()
 
 
 def set_state_cookie(response: Response, state: str):
@@ -71,7 +71,7 @@ def get_next_redirect_url(code: str, state: str) -> Optional[str]:
 
 def _decode_state(state: str) -> Optional[OAuthState]:
     try:
-        return OAuthState.parse_raw(b64decode(state, validate=True).decode())
+        return OAuthState.model_validate_json(b64decode(state, validate=True).decode())
     except Exception as e:
         logger.debug("Exception when decoding OAuth2 state parameter: %s", repr(e))
         return None

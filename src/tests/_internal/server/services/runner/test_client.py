@@ -84,11 +84,11 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
         run_spec = get_run_spec(
             repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
-        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
-        job = Job.construct(
-            job_spec=JobSpec.construct(env={"DSTACK_TOKEN": "token"}),
+        run = Run.model_construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.model_construct(
+            job_spec=JobSpec.model_construct(env={"DSTACK_TOKEN": "token"}),
             job_submissions=[
-                JobSubmission.construct(
+                JobSubmission.model_construct(
                     id=uuid.uuid4(),
                     submitted_at=datetime.now(timezone.utc),
                 )
@@ -116,11 +116,11 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
         run_spec = get_run_spec(
             repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
-        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
-        job = Job.construct(
-            job_spec=JobSpec.construct(env={"DSTACK_PROJECT": "other"}),
+        run = Run.model_construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.model_construct(
+            job_spec=JobSpec.model_construct(env={"DSTACK_PROJECT": "other"}),
             job_submissions=[
-                JobSubmission.construct(
+                JobSubmission.model_construct(
                     id=uuid.uuid4(),
                     submitted_at=datetime.now(timezone.utc),
                 )

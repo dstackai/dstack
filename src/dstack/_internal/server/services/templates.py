@@ -91,7 +91,7 @@ def _parse_templates(repo_path: Path) -> List[UITemplate]:
             if data.get("type") != "template":
                 logger.debug("Skipping %s: type is not 'template'", entry.name)
                 continue
-            template = UITemplate.parse_obj(data)
+            template = UITemplate.model_validate(data)
             templates.append(template)
         except Exception:
             logger.warning("Skipping invalid template %s", entry.name, exc_info=True)

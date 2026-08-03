@@ -90,7 +90,7 @@ def _load_profile_from_path(profiles_path: Path, profile_name: Optional[str]) ->
 
     try:
         with profiles_path.open("r") as f:
-            config = ProfilesConfig.parse_obj(yaml.safe_load(f))
+            config = ProfilesConfig.model_validate(yaml.safe_load(f))
     except FileNotFoundError:
         return None
     except ValidationError as e:

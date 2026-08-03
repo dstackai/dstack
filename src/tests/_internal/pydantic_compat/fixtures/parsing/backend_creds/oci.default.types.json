@@ -1,4 +1,4 @@
 {
   "/": "OCICreds",
-  "/__root__": "OCIDefaultCreds"
+  "/root": "OCIDefaultCreds"
 }

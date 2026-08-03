@@ -4,6 +4,7 @@
   "backend_data": null,
   "base_backend": null,
   "dockerized": true,
+  "gpu_driver": null,
   "hostname": "127.0.0.4",
   "instance_id": "instance_id",
   "instance_network": null,

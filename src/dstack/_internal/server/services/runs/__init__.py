@@ -18,7 +18,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import ApplyAction, validate_json_extra_ignore
 from dstack._internal.core.models.profiles import (
     RetryEvent,
 )
@@ -153,7 +153,7 @@ def get_run_status_change_message(
 
 
 def get_run_spec(run_model: RunModel) -> RunSpec:
-    return RunSpec.__response__.parse_raw(run_model.run_spec)
+    return validate_json_extra_ignore(RunSpec, run_model.run_spec)
 
 
 async def list_user_runs(
@@ -536,14 +536,14 @@ async def get_plan(
     unallocated_resources: bool,
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
-    # Spec must be copied by parsing to calculate merged_profile
-    effective_run_spec = RunSpec.parse_obj(run_spec.dict())
+    effective_run_spec = RunSpec.model_validate(run_spec.model_dump())
     effective_run_spec = await apply_plugin_policies(
         user=user.name,
         project=project.name,
         spec=effective_run_spec,
     )
-    effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
+    # Spec must be copied by parsing to calculate merged_profile
+    effective_run_spec = RunSpec.model_validate(effective_run_spec.model_dump())
     validate_run_spec_and_set_defaults(
         user=user,
         run_spec=effective_run_spec,
@@ -603,7 +603,7 @@ async def apply_plan(
         spec=run_spec,
     )
     # Spec must be copied by parsing to calculate merged_profile
-    run_spec = RunSpec.parse_obj(run_spec.dict())
+    run_spec = RunSpec.model_validate(run_spec.model_dump())
     validate_run_spec_and_set_defaults(
         user=user, run_spec=run_spec, legacy_repo_dir=legacy_repo_dir
     )
@@ -658,7 +658,7 @@ async def apply_plan(
         update(RunModel)
         .where(RunModel.id == current_resource.id)
         .values(
-            run_spec=run_spec.json(),
+            run_spec=run_spec.model_dump_json(),
             priority=run_spec.configuration.priority,
             deployment_num=new_deployment_num,
         )
@@ -743,7 +743,7 @@ async def submit_run(
             run_name=run_spec.run_name,
             submitted_at=submitted_at,
             status=initial_status,
-            run_spec=run_spec.json(),
+            run_spec=run_spec.model_dump_json(),
             last_processed_at=submitted_at,
             priority=run_spec.configuration.priority,
             deployment_num=0,
@@ -859,7 +859,7 @@ def create_job_model_for_new_submission(
         last_processed_at=now,
         status=status,
         termination_reason=None,
-        job_spec_data=job.job_spec.json(),
+        job_spec_data=job.job_spec.model_dump_json(),
         job_provisioning_data=None,
         probes=[],
         waiting_master_job=job.job_spec.job_num != 0,
@@ -982,7 +982,7 @@ def run_model_to_run(
 
     service_spec = None
     if run_model.service_spec is not None:
-        service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
+        service_spec = validate_json_extra_ignore(ServiceSpec, run_model.service_spec)
 
     status_message = _get_run_status_message(run_model, job_models=job_models)
     error = _get_run_error(run_model)

@@ -1,7 +1,5 @@
 {
   "/": "ProfilesConfig",
   "/profiles/0": "Profile",
-  "/profiles/0/idle_duration": "Duration",
-  "/profiles/0/max_duration": "Duration",
   "/profiles/0/spot_policy": "SpotPolicy"
 }

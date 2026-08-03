@@ -17,6 +17,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.errors import SSHProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -52,7 +53,7 @@ from dstack._internal.server.services.ssh_fleets.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addresses
 
@@ -194,8 +195,8 @@ async def add_ssh_instance(instance_model: InstanceModel) -> ProcessResult:
     )
     result.instance_update_map["backend"] = BackendType.REMOTE
     result.instance_update_map["price"] = 0
-    result.instance_update_map["offer"] = instance_offer.json()
-    result.instance_update_map["job_provisioning_data"] = job_provisioning_data.json()
+    result.instance_update_map["offer"] = instance_offer.model_dump_json()
+    result.instance_update_map["job_provisioning_data"] = job_provisioning_data.model_dump_json()
     result.instance_update_map["started_at"] = NOW_PLACEHOLDER
     result.instance_update_map["total_blocks"] = blocks
     return result
@@ -212,8 +213,8 @@ def _resolve_ssh_instance_network(
     instance_network = None
     internal_ip = None
     try:
-        default_job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-            instance_model.job_provisioning_data
+        default_job_provisioning_data = validate_json_extra_ignore(
+            JobProvisioningData, get_or_error(instance_model.job_provisioning_data)
         )
         instance_network = default_job_provisioning_data.instance_network
         internal_ip = default_job_provisioning_data.internal_ip
@@ -295,7 +296,7 @@ def _deploy_instance(
 
         healthcheck_out = get_shim_healthcheck(client)
         try:
-            healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
+            healthcheck = validate_json_extra_ignore(HealthcheckResponse, healthcheck_out)
         except ValueError as exc:
             raise SSHProvisioningError(f"Cannot parse HealthcheckResponse: {exc}") from exc
         instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)

@@ -36,8 +36,8 @@ class TestSlurmConfiguratorCreds:
         cluster = config.clusters[0]
         # The credentialless cluster config exposes only non-sensitive fields; connection
         # details and the private key must not be present at all.
-        assert set(cluster.__fields__) == {"name", "gpu_partitions", "cpu_partitions"}
-        rendered = config.json()
+        assert set(type(cluster).model_fields) == {"name", "gpu_partitions", "cpu_partitions"}
+        rendered = config.model_dump_json()
         for secret in (PRIVATE_KEY, HOSTNAME, str(PORT), USER):
             assert secret not in rendered
 

@@ -62,7 +62,7 @@ async def test_get_job_specs_from_run_spec_image_config_calls(
         profile=Profile(name="default"),
         ssh_key_pub="user_ssh_key",
     )
-    fake_image_config = ImageConfig.parse_obj({"Entrypoint": ["/bin/bash"]})
+    fake_image_config = ImageConfig.model_validate({"Entrypoint": ["/bin/bash"]})
     with patch(
         "dstack._internal.server.services.jobs.configurators.base._get_image_config",
         return_value=fake_image_config,
@@ -83,7 +83,7 @@ async def test_get_image_config_uses_server_default_registry(monkeypatch) -> Non
         profile=Profile(name="default"),
         ssh_key_pub="user_ssh_key",
     )
-    fake_image_config = ImageConfig.parse_obj({"Entrypoint": ["/bin/bash"]})
+    fake_image_config = ImageConfig.model_validate({"Entrypoint": ["/bin/bash"]})
     with patch(
         "dstack._internal.server.services.jobs.configurators.base._get_image_config",
         return_value=fake_image_config,

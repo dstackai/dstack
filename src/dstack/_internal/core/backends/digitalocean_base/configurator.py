@@ -14,6 +14,7 @@ from dstack._internal.core.backends.digitalocean_base.models import (
     BaseDigitalOceanCreds,
     BaseDigitalOceanStoredConfig,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class BaseDigitalOceanConfigurator(Configurator):
@@ -27,30 +28,33 @@ class BaseDigitalOceanConfigurator(Configurator):
     ) -> BackendRecord:
         return BackendRecord(
             config=BaseDigitalOceanStoredConfig(
-                **BaseDigitalOceanBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=BaseDigitalOceanCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(BaseDigitalOceanBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=BaseDigitalOceanCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(
         self, record: BackendRecord
     ) -> BaseDigitalOceanBackendConfigWithCreds:
         config = self._get_config(record)
-        return BaseDigitalOceanBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(BaseDigitalOceanBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(
         self, record: BackendRecord
     ) -> BaseDigitalOceanBackendConfig:
         config = self._get_config(record)
-        return BaseDigitalOceanBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(BaseDigitalOceanBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> BaseDigitalOceanBackend:
         raise NotImplementedError("Subclasses must implement get_backend")
 
     def _get_config(self, record: BackendRecord) -> BaseDigitalOceanConfig:
-        return BaseDigitalOceanConfig.__response__(
-            **json.loads(record.config),
-            creds=BaseDigitalOceanCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            BaseDigitalOceanConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(BaseDigitalOceanCreds, record.auth),
+            },
         )
 
     def _validate_creds(self, creds: AnyBaseDigitalOceanCreds, project_name: Optional[str] = None):

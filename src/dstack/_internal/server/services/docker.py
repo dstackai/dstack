@@ -5,11 +5,11 @@ from typing import List, Optional
 import requests
 from dxf import DXF
 from dxf.exceptions import DXFError
-from pydantic import Field, ValidationError, validator
+from pydantic import Field, ValidationError, field_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_json_extra_ignore
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.utils.common import join_byte_stream_checked
 from dstack._internal.utils.docker import (
@@ -40,7 +40,8 @@ class ImageConfig(CoreModel):
     entrypoint: Annotated[Optional[List[str]], Field(alias="Entrypoint")] = None
     cmd: Annotated[Optional[List[str]], Field(alias="Cmd")] = None
 
-    @validator("user")
+    @field_validator("user")
+    @classmethod
     def normalize_user(cls, v: Optional[str]) -> Optional[str]:
         # If USER is not set, the corresponding field may be missing or set to an empty string
         if v == "":
@@ -51,7 +52,8 @@ class ImageConfig(CoreModel):
 class ImageConfigObject(CoreModel):
     config: ImageConfig = ImageConfig()
 
-    @validator("config", pre=True)
+    @field_validator("config", mode="before")
+    @classmethod
     def config_set_default_if_null(cls, value):
         return ImageConfig() if value is None else value
 
@@ -83,14 +85,17 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
             manifest_resp = registry_client.get_manifest(
                 alias=image.digest or image.tag, platform=DEFAULT_PLATFORM
             )
-            manifest = ImageManifest.__response__.parse_raw(manifest_resp)
+            assert isinstance(manifest_resp, str), (
+                "get_manifest() returns the manifest JSON when `platform` is given"
+            )
+            manifest = validate_json_extra_ignore(ImageManifest, manifest_resp)
             config_stream = registry_client.pull_blob(manifest.config.digest)
             config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)  # type: ignore[arg-type]
             if config_resp is None:
                 raise DockerRegistryError(
                     f"Image config object exceeds the size limit of {MAX_CONFIG_OBJECT_SIZE} bytes"
                 )
-            return ImageConfigObject.__response__.parse_raw(config_resp)
+            return validate_json_extra_ignore(ImageConfigObject, config_resp)
 
         except (DXFError, requests.RequestException, ValidationError) as e:
             raise DockerRegistryError(e)

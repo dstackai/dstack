@@ -6,10 +6,10 @@ from pydantic import (
     Field,
     PositiveFloat,
     PositiveInt,
-    parse_obj_as,
-    root_validator,
-    validator,
+    field_validator,
+    model_validator,
 )
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
@@ -58,13 +58,15 @@ class PresetBenchmark(CoreModel):
     target: Optional[PresetBenchmarkTarget] = None
     client: Optional[PresetBenchmarkClient] = None
 
-    @validator("tool", "tool_version", "command")
+    @field_validator("tool", "tool_version", "command")
+    @classmethod
     def validate_non_empty(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("value must be non-empty")
         return value
 
-    @validator("command")
+    @field_validator("command")
+    @classmethod
     def validate_command_has_no_bearer_token(cls, value: str) -> str:
         for match in re.finditer(r"(?i)\bbearer\s+([^\s\"']+)", value):
             token = match.group(1)
@@ -77,16 +79,16 @@ class PresetBenchmark(CoreModel):
             raise ValueError("command must not contain a bearer token value")
         return value
 
-    @root_validator(skip_on_failure=True)
-    def validate_metrics(cls, values: dict) -> dict:
-        metrics = values.get("metrics")
-        workload = values.get("workload")
+    @model_validator(mode="after")
+    def validate_metrics(self) -> Self:
+        metrics = self.metrics
+        workload = self.workload
         assert metrics is not None and workload is not None
         if metrics.failed_requests != 0:
             raise ValueError("benchmark must not include failed requests")
         if metrics.successful_requests != workload.num_requests:
             raise ValueError("benchmark request count must match workload.num_requests")
-        return values
+        return self
 
 
 class PresetValidationReplica(CoreModel):
@@ -114,25 +116,26 @@ class Preset(CoreModel):
     service: ServiceConfiguration
     validations: list[PresetValidation]
 
-    @validator("base", "id", "model")
+    @field_validator("base", "id", "model")
+    @classmethod
     def validate_non_empty(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("value must be non-empty")
         return value
 
-    @root_validator
-    def validate_preset(cls, values: dict) -> dict:
-        service = values.get("service")
-        validations = values.get("validations")
+    @model_validator(mode="after")
+    def validate_preset(self) -> Self:
+        service = self.service
+        validations = self.validations
         if service is None or validations is None:
-            return values
+            return self
         if service.model is None:
             raise ValueError("preset service must specify model")
         if any(group.resources is None for group in service.replica_groups):
             raise ValueError("preset service must specify resources")
         if service.name is not None or service.gateway is not None:
             raise ValueError("preset service must not specify name or gateway")
-        if any(getattr(service, field) is not None for field in ProfileParams.__fields__):
+        if any(getattr(service, field) is not None for field in ProfileParams.model_fields):
             raise ValueError("preset service must not specify placement constraints")
         if not validations:
             raise ValueError("preset must include validation evidence")
@@ -148,7 +151,7 @@ class Preset(CoreModel):
                     raise ValueError("preset validation replicas must specify resources")
                 for resources in replica_group.resources:
                     _validate_exact_resources(resources)
-        return values
+        return self
 
 
 class PresetListOutput(CoreModel):
@@ -156,7 +159,7 @@ class PresetListOutput(CoreModel):
 
 
 def _validate_exact_resources(resources: ResourcesSpec) -> None:
-    cpu = parse_obj_as(CPUSpec, resources.cpu)
+    cpu = CPUSpec.model_validate(resources.cpu)
     if not _is_exact(cpu.count) or not _is_exact(resources.memory):
         raise ValueError("preset validation resources must be exact")
     if resources.disk is None or not _is_exact(resources.disk.size):

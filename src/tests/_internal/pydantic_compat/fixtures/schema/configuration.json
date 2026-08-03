@@ -1,8 +1,6 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "additionalProperties": true,
-  "definitions": {
-    "ACMGatewayCertificateRequest": {
+  "$defs": {
+    "ACMGatewayCertificate": {
       "additionalProperties": false,
       "properties": {
         "arn": {
@@ -11,11 +9,9 @@
           "type": "string"
         },
         "type": {
+          "const": "acm",
           "default": "acm",
           "description": "Certificates by AWS Certificate Manager (ACM)",
-          "enum": [
-            "acm"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -23,42 +19,67 @@
       "required": [
         "arn"
       ],
-      "title": "ACMGatewayCertificateRequest",
+      "title": "ACMGatewayCertificate",
       "type": "object"
     },
-    "AWSVolumeConfigurationRequest": {
+    "AWSVolumeConfiguration": {
       "additionalProperties": false,
       "properties": {
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait after volume is no longer used by any job before deleting it. Defaults to keep the volume indefinitely. Use the value `off` or `-1` to disable auto-cleanup",
           "title": "Auto Cleanup Duration"
         },
         "availability_zone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume availability zone",
-          "title": "Availability Zone",
-          "type": "string"
+          "title": "Availability Zone"
         },
         "backend": {
+          "const": "aws",
           "default": "aws",
           "description": "The volume backend",
-          "enum": [
-            "aws"
-          ],
           "title": "Backend",
           "type": "string"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "region": {
           "description": "The volume region",
@@ -66,40 +87,67 @@
           "type": "string"
         },
         "size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume size. Must be specified when creating new volumes",
-          "title": "Size",
-          "type": "number"
+          "title": "Size"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the volume. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "volume",
           "default": "volume",
-          "enum": [
-            "volume"
-          ],
           "title": "Type",
           "type": "string"
         },
         "volume_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume ID. Must be specified when registering external volumes",
-          "title": "Volume Id",
-          "type": "string"
+          "title": "Volume Id"
         }
       },
       "required": [
         "region"
       ],
-      "title": "AWSVolumeConfigurationRequest",
+      "title": "AWSVolumeConfiguration",
       "type": "object"
     },
     "AcceleratorVendor": {
-      "description": "An enumeration.",
       "enum": [
         "nvidia",
         "amd",
@@ -141,7 +189,6 @@
       "type": "string"
     },
     "CPUArchitecture": {
-      "description": "An enumeration.",
       "enum": [
         "x86",
         "arm"
@@ -149,21 +196,25 @@
       "title": "CPUArchitecture",
       "type": "string"
     },
-    "CPUSpecRequest": {
+    "CPUSpec": {
       "additionalProperties": false,
       "properties": {
         "arch": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/CPUArchitecture"
+              "$ref": "#/$defs/CPUArchitecture"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The CPU architecture, one of: `x86`, `arm`"
         },
         "count": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_int_"
+              "$ref": "#/$defs/Range_int_"
             },
             {
               "type": "integer"
@@ -176,15 +227,13 @@
             "max": null,
             "min": 2
           },
-          "description": "The number of CPU cores",
-          "title": "Count"
+          "description": "The number of CPU cores"
         }
       },
-      "title": "CPUSpecRequest",
+      "title": "CPUSpec",
       "type": "object"
     },
     "CreationPolicy": {
-      "description": "An enumeration.",
       "enum": [
         "reuse",
         "reuse-or-create"
@@ -192,44 +241,81 @@
       "title": "CreationPolicy",
       "type": "string"
     },
-    "DevEnvironmentConfigurationRequest": {
+    "DevEnvironmentConfiguration": {
       "additionalProperties": false,
       "properties": {
         "availability_zones": {
-          "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Availability Zones",
-          "type": "array"
-        },
-        "backend_options": {
-          "description": "Backend-specific options, applied only to offers from that backend",
-          "items": {
-            "$ref": "#/definitions/VastAIProfileOptions"
-          },
-          "title": "Backend Options",
-          "type": "array"
-        },
-        "backends": {
-          "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
-          "items": {
-            "$ref": "#/definitions/BackendType"
-          },
-          "type": "array"
-        },
-        "creation_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/CreationPolicy"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
+          "title": "Availability Zones"
+        },
+        "backend_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VastAIProfileOptions"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Backend-specific options, applied only to offers from that backend",
+          "title": "Backend Options"
+        },
+        "backends": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BackendType"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
+          "title": "Backends"
+        },
+        "creation_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CreationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The policy for using instances from fleets: `reuse`, `reuse-or-create`. Defaults to `reuse-or-create`"
         },
         "docker": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`",
-          "title": "Docker",
-          "type": "boolean"
+          "title": "Docker"
         },
         "dstack": {
           "default": false,
@@ -238,21 +324,21 @@
           "type": "boolean"
         },
         "entrypoint": {
-          "description": "The Docker entrypoint",
-          "title": "Entrypoint",
-          "type": "string"
-        },
-        "env": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/Env"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "default": {
-            "__root__": {}
-          },
-          "description": "The mapping or the list of environment variables",
-          "title": "Env"
+          "default": null,
+          "description": "The Docker entrypoint",
+          "title": "Entrypoint"
+        },
+        "env": {
+          "$ref": "#/$defs/Env",
+          "description": "The mapping or the list of environment variables"
         },
         "files": {
           "default": [],
@@ -260,7 +346,7 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/FilePathMappingRequest"
+                "$ref": "#/$defs/FilePathMapping"
               },
               {
                 "type": "string"
@@ -271,19 +357,27 @@
           "type": "array"
         },
         "fleets": {
-          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/EntityReferenceRequest"
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EntityReference"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "title": "Fleets",
-          "type": "array"
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
+          "title": "Fleets"
         },
         "home_dir": {
           "default": "/root",
@@ -293,56 +387,69 @@
         "ide": {
           "anyOf": [
             {
-              "enum": [
-                "vscode"
-              ],
+              "const": "vscode",
               "type": "string"
             },
             {
-              "enum": [
-                "cursor"
-              ],
+              "const": "cursor",
               "type": "string"
             },
             {
-              "enum": [
-                "windsurf"
-              ],
+              "const": "windsurf",
               "type": "string"
             },
             {
-              "enum": [
-                "zed"
-              ],
+              "const": "zed",
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The IDE to pre-install. Supported values include `vscode`, `cursor`, `windsurf`, and `zed`. Defaults to no IDE (SSH only)",
           "title": "Ide"
         },
         "idle_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
           "title": "Idle Duration"
         },
         "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The name of the Docker image to run. If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests. It may also include provider-specific components such as EFA support on AWS. For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image.",
-          "title": "Image",
-          "type": "string"
+          "title": "Image"
         },
         "inactivity_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
+              "const": "off",
               "type": "string"
             },
             {
@@ -353,8 +460,12 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum amount of time the dev environment can be inactive (e.g., `2h`, `1d`, etc). After it elapses, the dev environment is automatically stopped. Inactivity is defined as the absence of SSH connections to the dev environment, including VS Code connections, `ssh <run name>` shells, and attached `dstack apply` or `dstack attach` commands. Use `off` for unlimited duration. Can be updated in-place. Defaults to `off`",
           "title": "Inactivity Duration"
         },
@@ -368,72 +479,109 @@
           "type": "array"
         },
         "instance_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Instance Types",
-          "type": "array"
+          "title": "Instance Types"
         },
         "instances": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/InstanceNameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/InstanceHostnameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/FleetInstanceSelector"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/InstanceNameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/InstanceHostnameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/FleetInstanceSelectorRequest"
-              },
-              {
-                "minLength": 1,
-                "type": "string"
-              }
-            ]
-          },
-          "minItems": 1,
-          "title": "Instances",
-          "type": "array"
+          "title": "Instances"
         },
         "max_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
-              "type": "string"
+              "type": "integer"
             },
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum duration of a run (e.g., `2h`, `1d`, etc) in a running state, excluding provisioning and pulling. After it elapses, the run is automatically stopped. Use `off` for unlimited duration. Defaults to `off`",
           "title": "Max Duration"
         },
         "max_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum instance price per hour, in dollars",
-          "exclusiveMinimum": 0.0,
-          "title": "Max Price",
-          "type": "number"
+          "title": "Max Price"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The run name. If not specified, a random name is generated",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "nvcc": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`",
-          "title": "Nvcc",
-          "type": "boolean"
+          "title": "Nvcc"
         },
         "ports": {
           "default": [],
@@ -450,7 +598,7 @@
                 "type": "string"
               },
               {
-                "$ref": "#/definitions/PortMappingRequest"
+                "$ref": "#/$defs/PortMapping"
               }
             ]
           },
@@ -458,11 +606,19 @@
           "type": "array"
         },
         "priority": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The priority of the run, an integer between `0` and `100`. `dstack` tries to provision runs with higher priority first. Defaults to `0`",
-          "maximum": 100,
-          "minimum": 0,
-          "title": "Priority",
-          "type": "integer"
+          "title": "Priority"
         },
         "privileged": {
           "default": false,
@@ -471,50 +627,76 @@
           "type": "boolean"
         },
         "python": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/$defs/PythonVersion"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The major version of Python. Mutually exclusive with `image` and `docker`"
         },
         "regions": {
-          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Regions",
-          "type": "array"
-        },
-        "registry_auth": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/RegistryAuthRequest"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Credentials for pulling a private Docker image",
-          "title": "Registry Auth"
+          "default": null,
+          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
+          "title": "Regions"
+        },
+        "registry_auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RegistryAuth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Credentials for pulling a private Docker image"
         },
         "repos": {
           "default": [],
           "description": "The list of Git repos",
           "items": {
-            "$ref": "#/definitions/RepoSpecRequest"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RepoSpec"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "title": "Repos",
           "type": "array"
         },
         "reservation": {
-          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
-        },
-        "resources": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ResourcesSpecRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
+          "title": "Reservation"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
               "max": null,
@@ -543,29 +725,35 @@
             },
             "shm_size": null
           },
-          "description": "The resources requirements to run the configuration",
-          "title": "Resources"
+          "description": "The resources requirements to run the configuration"
         },
         "retry": {
           "anyOf": [
             {
-              "$ref": "#/definitions/ProfileRetryRequest"
+              "$ref": "#/$defs/ProfileRetry"
             },
             {
               "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for resubmitting the run. Defaults to `false`",
           "title": "Retry"
         },
         "schedule": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScheduleRequest"
+              "$ref": "#/$defs/Schedule"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The schedule for starting the run at specified time",
-          "title": "Schedule"
+          "default": null,
+          "description": "The schedule for starting the run at specified time"
         },
         "setup": {
           "default": [],
@@ -576,94 +764,145 @@
           "type": "array"
         },
         "shell": {
-          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
-          "title": "Shell",
-          "type": "string"
-        },
-        "single_branch": {
-          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
-          "title": "Single Branch",
-          "type": "boolean"
-        },
-        "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
+          "title": "Shell"
+        },
+        "single_branch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
+          "title": "Single Branch"
+        },
+        "spot_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, `auto`. Defaults to `on-demand`"
         },
         "startup_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StartupOrder"
+              "$ref": "#/$defs/StartupOrder"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The order in which master and workers jobs are started: `any`, `master-first`, `workers-first`. Defaults to `any`"
         },
         "stop_criteria": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StopCriteria"
+              "$ref": "#/$defs/StopCriteria"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The criteria determining when a multi-node run should be considered finished: `all-done`, `master-done`. Defaults to `all-done`"
         },
         "stop_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
-              "type": "string"
+              "type": "integer"
             },
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum duration of a run graceful stopping. After it elapses, the run is automatically forced stopped. This includes force detaching volumes used by the run. Use `off` for unlimited duration. Defaults to `5m`",
           "title": "Stop Duration"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "dev-environment",
           "default": "dev-environment",
-          "enum": [
-            "dev-environment"
-          ],
           "title": "Type",
           "type": "string"
         },
         "user": {
-          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
-          "title": "User",
-          "type": "string"
-        },
-        "utilization_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/UtilizationPolicyRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Run termination policy based on utilization",
-          "title": "Utilization Policy"
+          "default": null,
+          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
+          "title": "User"
+        },
+        "utilization_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UtilizationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run termination policy based on utilization"
         },
         "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The version of the IDE. For `windsurf`, the version is in the format `version@commit`",
-          "title": "Version",
-          "type": "string"
+          "title": "Version"
         },
         "volumes": {
           "default": [],
@@ -671,10 +910,10 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/VolumeMountPointRequest"
+                "$ref": "#/$defs/VolumeMountPoint"
               },
               {
-                "$ref": "#/definitions/InstanceMountPointRequest"
+                "$ref": "#/$defs/InstanceMountPoint"
               },
               {
                 "type": "string"
@@ -685,21 +924,29 @@
           "type": "array"
         },
         "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The absolute path to the working directory inside the container. Defaults to the `image`'s default working directory",
-          "title": "Working Dir",
-          "type": "string"
+          "title": "Working Dir"
         }
       },
-      "title": "DevEnvironmentConfigurationRequest",
+      "title": "DevEnvironmentConfiguration",
       "type": "object"
     },
-    "DiskSpecRequest": {
+    "DiskSpec": {
       "additionalProperties": false,
       "properties": {
         "size": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_Memory_"
+              "$ref": "#/$defs/Range_Memory_"
             },
             {
               "type": "integer"
@@ -708,17 +955,16 @@
               "type": "string"
             }
           ],
-          "description": "Disk size",
-          "title": "Size"
+          "description": "Disk size"
         }
       },
       "required": [
         "size"
       ],
-      "title": "DiskSpecRequest",
+      "title": "DiskSpec",
       "type": "object"
     },
-    "EntityReferenceRequest": {
+    "EntityReference": {
       "additionalProperties": false,
       "description": "Cross-project entity reference.",
       "properties": {
@@ -728,21 +974,30 @@
           "type": "string"
         },
         "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The project name. If unspecified, refers to the current project",
-          "title": "Project",
-          "type": "string"
+          "title": "Project"
         }
       },
       "required": [
         "name"
       ],
-      "title": "EntityReferenceRequest",
+      "title": "EntityReference",
       "type": "object"
     },
     "Env": {
       "anyOf": [
         {
           "items": {
+            "pattern": "^([a-zA-Z_][a-zA-Z0-9_]*)(=.*$|$)",
             "type": "string"
           },
           "type": "array"
@@ -754,7 +1009,7 @@
                 "type": "string"
               },
               {
-                "$ref": "#/definitions/EnvSentinelRequest"
+                "$ref": "#/$defs/EnvSentinel"
               }
             ]
           },
@@ -762,10 +1017,10 @@
         }
       ],
       "default": {},
-      "description": "Env represents a mapping of process environment variables, as in environ(7).\nEnvironment values may be omitted, in that case the :class:`EnvSentinel`\nobject is used as a placeholder.\n\nTo create an instance from a `dict[str, str]` or a `list[str]` use pydantic's\n:meth:`BaseModel.parse_obj(dict | list)` method.\n\nNB: this is *NOT* a CoreModel, pydantic-duality, which is used as a base\nfor the CoreModel, doesn't play well with custom root models.",
+      "description": "Env represents a mapping of process environment variables, as in environ(7).\nEnvironment values may be omitted, in that case the :class:`EnvSentinel`\nobject is used as a placeholder.\n\nTo create an instance from a `dict[str, str]` or a `list[str]` use pydantic's\n:meth:`BaseModel.model_validate(dict | list)` method.\n\nNB: this is *NOT* a CoreModel. `extra` is meaningless on a root model, but\n`coerce_numbers_to_str` is not: without it `env: {PORT: 8080}` stops parsing, since\npydantic v2 does not coerce a YAML number to a str implicitly.",
       "title": "Env"
     },
-    "EnvSentinelRequest": {
+    "EnvSentinel": {
       "additionalProperties": false,
       "properties": {
         "key": {
@@ -776,10 +1031,10 @@
       "required": [
         "key"
       ],
-      "title": "EnvSentinelRequest",
+      "title": "EnvSentinel",
       "type": "object"
     },
-    "FilePathMappingRequest": {
+    "FilePathMapping": {
       "additionalProperties": false,
       "properties": {
         "local_path": {
@@ -797,41 +1052,64 @@
         "local_path",
         "path"
       ],
-      "title": "FilePathMappingRequest",
+      "title": "FilePathMapping",
       "type": "object"
     },
-    "FleetConfigurationRequest": {
+    "FleetConfiguration": {
       "additionalProperties": false,
       "properties": {
         "availability_zones": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Availability Zones",
-          "type": "array"
+          "title": "Availability Zones"
         },
         "backend_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VastAIProfileOptions"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Backend-specific options, applied only to offers from that backend",
-          "items": {
-            "$ref": "#/definitions/VastAIProfileOptions"
-          },
-          "title": "Backend Options",
-          "type": "array"
+          "title": "Backend Options"
         },
         "backends": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BackendType"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
-          "items": {
-            "$ref": "#/definitions/BackendType"
-          },
-          "type": "array"
+          "title": "Backends"
         },
         "blocks": {
           "anyOf": [
             {
-              "enum": [
-                "auto"
-              ],
+              "const": "auto",
               "type": "string"
             },
             {
@@ -844,157 +1122,225 @@
           "title": "Blocks"
         },
         "env": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/Env"
-            }
-          ],
-          "default": {
-            "__root__": {}
-          },
-          "description": "The mapping or the list of environment variables",
-          "title": "Env"
+          "$ref": "#/$defs/Env",
+          "description": "The mapping or the list of environment variables"
         },
         "idle_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait before terminating idle instances. Instances are not terminated if the fleet is already at `nodes.min`. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration",
           "title": "Idle Duration"
         },
         "instance_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Instance Types",
-          "type": "array"
+          "title": "Instance Types"
         },
         "max_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum instance price per hour, in dollars",
-          "exclusiveMinimum": 0.0,
-          "title": "Max Price",
-          "type": "number"
+          "title": "Max Price"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The fleet name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "nodes": {
           "anyOf": [
             {
-              "$ref": "#/definitions/FleetNodesSpecRequest"
+              "$ref": "#/$defs/FleetNodesSpec"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The number of instances",
-          "title": "Nodes"
+          "default": null,
+          "description": "The number of instances"
         },
         "placement": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/InstanceGroupPlacement"
+              "$ref": "#/$defs/InstanceGroupPlacement"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The placement of instances: `any` or `cluster`"
         },
         "regions": {
-          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Regions",
-          "type": "array"
-        },
-        "reservation": {
-          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
-        },
-        "resources": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ResourcesSpecRequest"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The resources requirements",
-          "title": "Resources"
+          "default": null,
+          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
+          "title": "Regions"
+        },
+        "reservation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
+          "title": "Reservation"
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourcesSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The resources requirements"
         },
         "retry": {
           "anyOf": [
             {
-              "$ref": "#/definitions/ProfileRetryRequest"
+              "$ref": "#/$defs/ProfileRetry"
             },
             {
               "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for provisioning retry. Defaults to `false`",
           "title": "Retry"
         },
         "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, `auto`. Defaults to `on-demand`"
         },
         "ssh_config": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SSHParamsRequest"
+              "$ref": "#/$defs/SSHParams"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The parameters for adding instances via SSH",
-          "title": "Ssh Config"
+          "default": null,
+          "description": "The parameters for adding instances via SSH"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "fleet",
           "default": "fleet",
-          "enum": [
-            "fleet"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "FleetConfigurationRequest",
+      "title": "FleetConfiguration",
       "type": "object"
     },
-    "FleetInstanceSelectorRequest": {
+    "FleetInstanceSelector": {
       "additionalProperties": false,
       "properties": {
         "fleet": {
           "anyOf": [
             {
-              "$ref": "#/definitions/EntityReferenceRequest"
+              "$ref": "#/$defs/EntityReference"
             },
             {
-              "minLength": 1,
               "type": "string"
             }
           ],
-          "description": "The fleet reference. For fleets owned by the current project, specify the fleet name. For a fleet from another project, specify `<project name>/<fleet name>` or an object with `project` and `name`.",
-          "title": "Fleet"
+          "description": "The fleet reference. For fleets owned by the current project, specify the fleet name. For a fleet from another project, specify `<project name>/<fleet name>` or an object with `project` and `name`."
         },
         "instance": {
           "description": "The fleet instance number",
@@ -1007,16 +1353,24 @@
         "fleet",
         "instance"
       ],
-      "title": "FleetInstanceSelectorRequest",
+      "title": "FleetInstanceSelector",
       "type": "object"
     },
-    "FleetNodesSpecRequest": {
+    "FleetNodesSpec": {
       "additionalProperties": false,
       "properties": {
         "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum number of instances allowed in the fleet. Unlimited if not specified",
-          "title": "Max",
-          "type": "integer"
+          "title": "Max"
         },
         "min": {
           "description": "The minimum number of instances to maintain in the fleet",
@@ -1033,42 +1387,67 @@
         "min",
         "target"
       ],
-      "title": "FleetNodesSpecRequest",
+      "title": "FleetNodesSpec",
       "type": "object"
     },
-    "GCPVolumeConfigurationRequest": {
+    "GCPVolumeConfiguration": {
       "additionalProperties": false,
       "properties": {
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait after volume is no longer used by any job before deleting it. Defaults to keep the volume indefinitely. Use the value `off` or `-1` to disable auto-cleanup",
           "title": "Auto Cleanup Duration"
         },
         "availability_zone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume availability zone",
-          "title": "Availability Zone",
-          "type": "string"
+          "title": "Availability Zone"
         },
         "backend": {
+          "const": "gcp",
           "default": "gcp",
           "description": "The volume backend",
-          "enum": [
-            "gcp"
-          ],
           "title": "Backend",
           "type": "string"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "region": {
           "description": "The volume region",
@@ -1076,51 +1455,95 @@
           "type": "string"
         },
         "size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume size. Must be specified when creating new volumes",
-          "title": "Size",
-          "type": "number"
+          "title": "Size"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the volume. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "volume",
           "default": "volume",
-          "enum": [
-            "volume"
-          ],
           "title": "Type",
           "type": "string"
         },
         "volume_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume ID. Must be specified when registering external volumes",
-          "title": "Volume Id",
-          "type": "string"
+          "title": "Volume Id"
         }
       },
       "required": [
         "region"
       ],
-      "title": "GCPVolumeConfigurationRequest",
+      "title": "GCPVolumeConfiguration",
       "type": "object"
     },
-    "GPUSpecRequest": {
+    "GPUSpec": {
       "additionalProperties": false,
       "properties": {
         "compute_capability": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The minimum compute capability of the GPU (e.g., `7.5`)",
-          "items": {},
-          "title": "Compute Capability",
-          "type": "array"
+          "title": "Compute Capability"
         },
         "count": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_int_"
+              "$ref": "#/$defs/Range_int_"
             },
             {
               "type": "integer"
@@ -1133,97 +1556,113 @@
             "max": null,
             "min": 1
           },
-          "description": "The number of GPUs",
-          "title": "Count"
+          "description": "The number of GPUs"
         },
         "memory": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_Memory_"
+              "$ref": "#/$defs/Range_Memory_"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The RAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)",
-          "title": "Memory"
+          "default": null,
+          "description": "The RAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         },
         "name": {
           "anyOf": [
             {
+              "items": {
+                "type": "string"
+              },
               "type": "array"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The name of the GPU (e.g., `A100` or `H100`)",
-          "items": {
-            "type": "string"
-          },
           "title": "Name"
         },
         "total_memory": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_Memory_"
+              "$ref": "#/$defs/Range_Memory_"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The total RAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)",
-          "title": "Total Memory"
+          "default": null,
+          "description": "The total RAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         },
         "vendor": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/AcceleratorVendor"
+              "$ref": "#/$defs/AcceleratorVendor"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`), `intel`"
         }
       },
-      "title": "GPUSpecRequest",
+      "title": "GPUSpec",
       "type": "object"
     },
-    "GatewayConfigurationRequest": {
+    "GatewayConfiguration": {
       "additionalProperties": false,
       "properties": {
         "backend": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/BackendType"
-            }
-          ],
+          "$ref": "#/$defs/BackendType",
           "description": "The gateway backend"
         },
         "certificate": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "acm": "#/$defs/ACMGatewayCertificate",
+                  "lets-encrypt": "#/$defs/LetsEncryptGatewayCertificate"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/LetsEncryptGatewayCertificate"
+                },
+                {
+                  "$ref": "#/$defs/ACMGatewayCertificate"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": {
             "type": "lets-encrypt"
           },
           "description": "The SSL certificate configuration. Set to `null` to disable. Defaults to `type: lets-encrypt`",
-          "discriminator": {
-            "mapping": {
-              "acm": "#/definitions/ACMGatewayCertificateRequest",
-              "lets-encrypt": "#/definitions/LetsEncryptGatewayCertificateRequest"
-            },
-            "propertyName": "type"
-          },
-          "oneOf": [
-            {
-              "$ref": "#/definitions/LetsEncryptGatewayCertificateRequest"
-            },
-            {
-              "$ref": "#/definitions/ACMGatewayCertificateRequest"
-            }
-          ],
           "title": "Certificate"
         },
         "default": {
@@ -1233,20 +1672,44 @@
           "type": "boolean"
         },
         "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The gateway wildcard domain name, e.g. `example.com`. Service domain names are constructed as `<run name>.<gateway domain`. The domain name can use the `${{ run.project_name }}` variable to include the service\u2019s project name. Can be updated in-place. Updates do not affect existing services",
-          "title": "Domain",
-          "type": "string"
+          "title": "Domain"
         },
         "instance_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Backend-specific instance type to use for the gateway instance. Omit to use the backend's default, which is typically a small non-GPU instance",
-          "minLength": 1,
-          "title": "Instance Type",
-          "type": "string"
+          "title": "Instance Type"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The gateway name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "public_ip": {
           "default": true,
@@ -1260,33 +1723,50 @@
           "type": "string"
         },
         "replicas": {
-          "description": "The number of gateway replicas. Defaults to `1`",
-          "minimum": 1,
-          "title": "Replicas",
-          "type": "integer"
-        },
-        "router": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SGLangGatewayRouterConfigRequest"
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The router configuration for this gateway. E.g. `{ type: sglang, policy: round_robin }`.",
-          "title": "Router"
+          "default": null,
+          "description": "The number of gateway replicas. Defaults to `1`",
+          "title": "Replicas"
+        },
+        "router": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SGLangGatewayRouterConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The router configuration for this gateway. E.g. `{ type: sglang, policy: round_robin }`."
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the gateway. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "gateway",
           "default": "gateway",
-          "enum": [
-            "gateway"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1295,10 +1775,10 @@
         "backend",
         "region"
       ],
-      "title": "GatewayConfigurationRequest",
+      "title": "GatewayConfiguration",
       "type": "object"
     },
-    "HTTPHeaderSpecRequest": {
+    "HTTPHeaderSpec": {
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -1320,10 +1800,10 @@
         "name",
         "value"
       ],
-      "title": "HTTPHeaderSpecRequest",
+      "title": "HTTPHeaderSpec",
       "type": "object"
     },
-    "HeaderPartitioningKeyRequest": {
+    "HeaderPartitioningKey": {
       "additionalProperties": false,
       "properties": {
         "header": {
@@ -1334,11 +1814,9 @@
           "type": "string"
         },
         "type": {
+          "const": "header",
           "default": "header",
           "description": "Partitioning type",
-          "enum": [
-            "header"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1346,27 +1824,24 @@
       "required": [
         "header"
       ],
-      "title": "HeaderPartitioningKeyRequest",
+      "title": "HeaderPartitioningKey",
       "type": "object"
     },
-    "IPAddressPartitioningKeyRequest": {
+    "IPAddressPartitioningKey": {
       "additionalProperties": false,
       "properties": {
         "type": {
+          "const": "ip_address",
           "default": "ip_address",
           "description": "Partitioning type",
-          "enum": [
-            "ip_address"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "IPAddressPartitioningKeyRequest",
+      "title": "IPAddressPartitioningKey",
       "type": "object"
     },
     "InstanceGroupPlacement": {
-      "description": "An enumeration.",
       "enum": [
         "any",
         "cluster"
@@ -1374,7 +1849,7 @@
       "title": "InstanceGroupPlacement",
       "type": "string"
     },
-    "InstanceHostnameSelectorRequest": {
+    "InstanceHostnameSelector": {
       "additionalProperties": false,
       "properties": {
         "hostname": {
@@ -1387,10 +1862,10 @@
       "required": [
         "hostname"
       ],
-      "title": "InstanceHostnameSelectorRequest",
+      "title": "InstanceHostnameSelector",
       "type": "object"
     },
-    "InstanceMountPointRequest": {
+    "InstanceMountPoint": {
       "additionalProperties": false,
       "properties": {
         "instance_path": {
@@ -1414,10 +1889,10 @@
         "instance_path",
         "path"
       ],
-      "title": "InstanceMountPointRequest",
+      "title": "InstanceMountPoint",
       "type": "object"
     },
-    "InstanceNameSelectorRequest": {
+    "InstanceNameSelector": {
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -1430,10 +1905,10 @@
       "required": [
         "name"
       ],
-      "title": "InstanceNameSelectorRequest",
+      "title": "InstanceNameSelector",
       "type": "object"
     },
-    "KubernetesVolumeConfigurationRequest": {
+    "KubernetesVolumeConfiguration": {
       "additionalProperties": false,
       "properties": {
         "access_modes": {
@@ -1450,33 +1925,58 @@
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait after volume is no longer used by any job before deleting it. Defaults to keep the volume indefinitely. Use the value `off` or `-1` to disable auto-cleanup",
           "title": "Auto Cleanup Duration"
         },
         "backend": {
+          "const": "kubernetes",
           "default": "kubernetes",
           "description": "The volume backend",
-          "enum": [
-            "kubernetes"
-          ],
           "title": "Backend",
           "type": "string"
         },
         "claim_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The `PersistentVolumeClaim` name. Must be specified when registering the existing PVC instead of creating a new one",
-          "title": "Claim Name",
-          "type": "string"
+          "title": "Claim Name"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "read_only": {
           "default": false,
@@ -1491,60 +1991,84 @@
           "type": "string"
         },
         "size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The requested volume size. Must be specified when creating new PVCs. Ignored if `claim_name` is set",
-          "title": "Size",
-          "type": "number"
+          "title": "Size"
         },
         "storage_class_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The `StorageClass` name. Ignored if `claim_name` is set",
-          "title": "Storage Class Name",
-          "type": "string"
+          "title": "Storage Class Name"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the volume. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "volume",
           "default": "volume",
-          "enum": [
-            "volume"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "KubernetesVolumeConfigurationRequest",
+      "title": "KubernetesVolumeConfiguration",
       "type": "object"
     },
-    "LetsEncryptGatewayCertificateRequest": {
+    "LetsEncryptGatewayCertificate": {
       "additionalProperties": false,
       "properties": {
         "type": {
+          "const": "lets-encrypt",
           "default": "lets-encrypt",
           "description": "Automatic certificates by Let's Encrypt",
-          "enum": [
-            "lets-encrypt"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "LetsEncryptGatewayCertificateRequest",
+      "title": "LetsEncryptGatewayCertificate",
       "type": "object"
     },
-    "OpenAIChatModelRequest": {
+    "OpenAIChatModel": {
       "additionalProperties": false,
       "description": "Mapping of the model for the OpenAI-compatible endpoint.\n\nAttributes:\n    type (str): The type of the model, e.g. \"chat\"\n    name (str): The name of the model. This name will be used both to load model configuration from the HuggingFace Hub and in the OpenAI-compatible endpoint.\n    format (str): The format of the model, i.e. \"openai\".\n    prefix (str): The `base_url` prefix: `http://hostname/{prefix}/chat/completions`. Defaults to `/v1`.",
       "properties": {
         "format": {
+          "const": "openai",
           "description": "The serving format. Must be set to `openai`",
-          "enum": [
-            "openai"
-          ],
           "title": "Format",
           "type": "string"
         },
@@ -1560,11 +2084,9 @@
           "type": "string"
         },
         "type": {
+          "const": "chat",
           "default": "chat",
           "description": "The type of the model",
-          "enum": [
-            "chat"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -1573,10 +2095,10 @@
         "name",
         "format"
       ],
-      "title": "OpenAIChatModelRequest",
+      "title": "OpenAIChatModel",
       "type": "object"
     },
-    "PortMappingRequest": {
+    "PortMapping": {
       "additionalProperties": false,
       "properties": {
         "container_port": {
@@ -1586,33 +2108,49 @@
           "type": "integer"
         },
         "local_port": {
-          "exclusiveMinimum": 0,
-          "maximum": 65536,
-          "title": "Local Port",
-          "type": "integer"
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 65536,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Port"
         }
       },
       "required": [
         "container_port"
       ],
-      "title": "PortMappingRequest",
+      "title": "PortMapping",
       "type": "object"
     },
-    "ProbeConfigRequest": {
+    "ProbeConfig": {
       "additionalProperties": false,
       "properties": {
         "body": {
+          "anyOf": [
+            {
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The HTTP request body to send with the probe",
-          "maxLength": 2048,
-          "minLength": 1,
-          "title": "Body",
-          "type": "string"
+          "title": "Body"
         },
         "headers": {
           "default": [],
           "description": "A list of HTTP headers to include in the request",
           "items": {
-            "$ref": "#/definitions/HTTPHeaderSpecRequest"
+            "$ref": "#/$defs/HTTPHeaderSpec"
           },
           "maxItems": 16,
           "title": "Headers",
@@ -1625,29 +2163,49 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Minimum amount of time between the end of one probe execution and the start of the next. Defaults to `15s`",
           "title": "Interval"
         },
         "method": {
-          "description": "The HTTP method to use for the probe (e.g., `get`, `post`, etc.). Defaults to `get`",
-          "enum": [
-            "get",
-            "post",
-            "put",
-            "delete",
-            "patch",
-            "head"
+          "anyOf": [
+            {
+              "enum": [
+                "get",
+                "post",
+                "put",
+                "delete",
+                "patch",
+                "head"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "title": "Method",
-          "type": "string"
+          "default": null,
+          "description": "The HTTP method to use for the probe (e.g., `get`, `post`, etc.). Defaults to `get`",
+          "title": "Method"
         },
         "ready_after": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The number of consecutive successful probe executions required for the replica to be considered ready. Used during rolling deployments. Defaults to `1`",
-          "minimum": 1,
-          "title": "Ready After",
-          "type": "integer"
+          "title": "Ready After"
         },
         "timeout": {
           "anyOf": [
@@ -1656,37 +2214,55 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Maximum amount of time the HTTP request is allowed to take. Defaults to `10s`",
           "title": "Timeout"
         },
         "type": {
+          "const": "http",
           "description": "The probe type. Must be `http`",
-          "enum": [
-            "http"
-          ],
           "title": "Type",
           "type": "string"
         },
         "until_ready": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "If `true`, the probe will stop being executed as soon as it reaches the `ready_after` threshold of successful executions. Defaults to `false`",
-          "title": "Until Ready",
-          "type": "boolean"
+          "title": "Until Ready"
         },
         "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The URL to request. Defaults to `/`",
-          "title": "Url",
-          "type": "string"
+          "title": "Url"
         }
       },
       "required": [
         "type"
       ],
-      "title": "ProbeConfigRequest",
+      "title": "ProbeConfig",
       "type": "object"
     },
-    "ProfileRetryRequest": {
+    "ProfileRetry": {
       "additionalProperties": false,
       "properties": {
         "duration": {
@@ -1696,24 +2272,36 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum period of retrying the run, e.g., `4h` or `1d`. The period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.",
           "title": "Duration"
         },
         "on_events": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/RetryEvent"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The list of events that should be handled with retry. Supported events are `no-capacity`, `interruption`, `error`. Omit to retry on all events",
-          "items": {
-            "$ref": "#/definitions/RetryEvent"
-          },
-          "type": "array"
+          "title": "On Events"
         }
       },
-      "title": "ProfileRetryRequest",
+      "title": "ProfileRetry",
       "type": "object"
     },
     "PythonVersion": {
-      "description": "An enumeration.",
       "enum": [
         "3.9",
         "3.10",
@@ -1728,12 +2316,40 @@
       "additionalProperties": false,
       "properties": {
         "max": {
-          "title": "Max",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
         },
         "min": {
-          "title": "Min",
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
         }
       },
       "title": "Range[Memory]",
@@ -1743,18 +2359,34 @@
       "additionalProperties": false,
       "properties": {
         "max": {
-          "title": "Max",
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
         },
         "min": {
-          "title": "Min",
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
         }
       },
       "title": "Range[int]",
       "type": "object"
     },
-    "RateLimitRequest": {
+    "RateLimit": {
       "additionalProperties": false,
       "properties": {
         "burst": {
@@ -1772,17 +2404,17 @@
           "description": "The partitioning key. Each incoming request belongs to a partition and rate limits are applied per partition. Defaults to partitioning by client IP address",
           "discriminator": {
             "mapping": {
-              "header": "#/definitions/HeaderPartitioningKeyRequest",
-              "ip_address": "#/definitions/IPAddressPartitioningKeyRequest"
+              "header": "#/$defs/HeaderPartitioningKey",
+              "ip_address": "#/$defs/IPAddressPartitioningKey"
             },
             "propertyName": "type"
           },
           "oneOf": [
             {
-              "$ref": "#/definitions/IPAddressPartitioningKeyRequest"
+              "$ref": "#/$defs/IPAddressPartitioningKey"
             },
             {
-              "$ref": "#/definitions/HeaderPartitioningKeyRequest"
+              "$ref": "#/$defs/HeaderPartitioningKey"
             }
           ],
           "title": "Key"
@@ -1806,10 +2438,10 @@
       "required": [
         "rps"
       ],
-      "title": "RateLimitRequest",
+      "title": "RateLimit",
       "type": "object"
     },
-    "RegistryAuthRequest": {
+    "RegistryAuth": {
       "additionalProperties": false,
       "description": "Credentials for pulling a private Docker image.\n\nAttributes:\n    username (str): The username\n    password (str): The password or access token",
       "properties": {
@@ -1828,10 +2460,10 @@
         "username",
         "password"
       ],
-      "title": "RegistryAuthRequest",
+      "title": "RegistryAuth",
       "type": "object"
     },
-    "ReplicaGroupRequest": {
+    "ReplicaGroup": {
       "additionalProperties": false,
       "properties": {
         "commands": {
@@ -1844,58 +2476,111 @@
           "type": "array"
         },
         "count": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/Range_int_"
+              "$ref": "#/$defs/Range_int_"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
             }
           ],
-          "description": "The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). If it's a range, the `scaling` property is required",
-          "title": "Count"
+          "description": "The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). If it's a range, the `scaling` property is required"
         },
         "docker": {
-          "description": "Use the docker-in-docker image for this group (injects `start-dockerd` and runs privileged). Mutually exclusive with group-level `image`, `python`, and `nvcc`.",
-          "title": "Docker",
-          "type": "boolean"
-        },
-        "image": {
-          "description": "The name of the Docker image to run for replicas in this group. Mutually exclusive with group-level `docker` and `python`.",
-          "title": "Image",
-          "type": "string"
-        },
-        "name": {
-          "description": "The name of the replica group. If not provided, defaults to '0', '1', etc. based on position.",
-          "title": "Name",
-          "type": "string"
-        },
-        "nvcc": {
-          "description": "Use the image with NVIDIA CUDA Compiler (NVCC) included for replicas in this group. Mutually exclusive with group-level `docker`.",
-          "title": "Nvcc",
-          "type": "boolean"
-        },
-        "privileged": {
-          "description": "Run replicas in this group in privileged mode.",
-          "title": "Privileged",
-          "type": "boolean"
-        },
-        "python": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "Use the docker-in-docker image for this group (injects `start-dockerd` and runs privileged). Mutually exclusive with group-level `image`, `python`, and `nvcc`.",
+          "title": "Docker"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the Docker image to run for replicas in this group. Mutually exclusive with group-level `docker` and `python`.",
+          "title": "Image"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the replica group. If not provided, defaults to '0', '1', etc. based on position.",
+          "title": "Name"
+        },
+        "nvcc": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Use the image with NVIDIA CUDA Compiler (NVCC) included for replicas in this group. Mutually exclusive with group-level `docker`.",
+          "title": "Nvcc"
+        },
+        "privileged": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run replicas in this group in privileged mode.",
+          "title": "Privileged"
+        },
+        "python": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PythonVersion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The major version of Python for replicas in this group. Mutually exclusive with group-level `image` and `docker`."
         },
         "reservation": {
-          "description": "The existing reservation to use for replicas in this group. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
-        },
-        "resources": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ResourcesSpecRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The existing reservation to use for replicas in this group. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
+          "title": "Reservation"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
               "max": null,
@@ -1924,43 +2609,52 @@
             },
             "shm_size": null
           },
-          "description": "The resources requirements for replicas in this group",
-          "title": "Resources"
+          "description": "The resources requirements for replicas in this group"
         },
         "router": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ReplicaGroupRouterConfigRequest"
+              "$ref": "#/$defs/ReplicaGroupRouterConfig"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "When set, replicas in this group run the in-service HTTP router (e.g. SGLang).",
-          "title": "Router"
+          "default": null,
+          "description": "When set, replicas in this group run the in-service HTTP router (e.g. SGLang)."
         },
         "scaling": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScalingSpecRequest"
+              "$ref": "#/$defs/ScalingSpec"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The auto-scaling rules. Required if `count` is set to a range",
-          "title": "Scaling"
+          "default": null,
+          "description": "The auto-scaling rules. Required if `count` is set to a range"
         },
         "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances for replicas in this group: `spot`, `on-demand`, `auto`"
         }
       },
       "required": [
         "count"
       ],
-      "title": "ReplicaGroupRequest",
+      "title": "ReplicaGroup",
       "type": "object"
     },
-    "ReplicaGroupRouterConfigRequest": {
+    "ReplicaGroupRouterConfig": {
       "additionalProperties": false,
       "properties": {
         "type": {
@@ -1974,11 +2668,10 @@
           "type": "string"
         }
       },
-      "title": "ReplicaGroupRouterConfigRequest",
+      "title": "ReplicaGroupRouterConfig",
       "type": "object"
     },
     "RepoExistsAction": {
-      "description": "An enumeration.",
       "enum": [
         "error",
         "skip"
@@ -1986,32 +2679,52 @@
       "title": "RepoExistsAction",
       "type": "string"
     },
-    "RepoSpecRequest": {
+    "RepoSpec": {
       "additionalProperties": false,
       "properties": {
         "branch": {
-          "description": "The repo branch. Defaults to the active branch for local paths and the default branch for URLs",
-          "title": "Branch",
-          "type": "string"
-        },
-        "hash": {
-          "description": "The commit hash",
-          "title": "Hash",
-          "type": "string"
-        },
-        "if_exists": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/RepoExistsAction"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The repo branch. Defaults to the active branch for local paths and the default branch for URLs",
+          "title": "Branch"
+        },
+        "hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The commit hash",
+          "title": "Hash"
+        },
+        "if_exists": {
+          "$ref": "#/$defs/RepoExistsAction",
           "default": "error",
           "description": "The action to be taken if `path` exists and is not empty. One of: `error`, `skip`"
         },
         "local_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The path to the Git repo on the user's machine. Relative paths are resolved relative to the parent directory of the the configuration file. Mutually exclusive with `url`",
-          "title": "Local Path",
-          "type": "string"
+          "title": "Local Path"
         },
         "path": {
           "default": ".",
@@ -2020,30 +2733,38 @@
           "type": "string"
         },
         "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The Git repo URL. Mutually exclusive with `local_path`",
-          "title": "Url",
-          "type": "string"
+          "title": "Url"
         }
       },
-      "title": "RepoSpecRequest",
+      "title": "RepoSpec",
       "type": "object"
     },
-    "ResourcesSpecRequest": {
+    "ResourcesSpec": {
       "additionalProperties": false,
       "properties": {
         "cpu": {
           "anyOf": [
             {
-              "$ref": "#/definitions/CPUSpecRequest"
-            },
-            {
-              "$ref": "#/definitions/Range_int_"
+              "$ref": "#/$defs/CPUSpec"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Range_int_"
             }
           ],
           "default": {
@@ -2059,13 +2780,16 @@
         "disk": {
           "anyOf": [
             {
-              "$ref": "#/definitions/DiskSpecRequest"
+              "$ref": "#/$defs/DiskSpec"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
           "default": {
@@ -2074,19 +2798,21 @@
               "min": 100.0
             }
           },
-          "description": "The disk resources",
-          "title": "Disk"
+          "description": "The disk resources"
         },
         "gpu": {
           "anyOf": [
             {
-              "$ref": "#/definitions/GPUSpecRequest"
+              "$ref": "#/$defs/GPUSpec"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
           "default": {
@@ -2100,13 +2826,12 @@
             "total_memory": null,
             "vendor": null
           },
-          "description": "The GPU requirements",
-          "title": "Gpu"
+          "description": "The GPU requirements"
         },
         "memory": {
           "anyOf": [
             {
-              "$ref": "#/definitions/Range_Memory_"
+              "$ref": "#/$defs/Range_Memory_"
             },
             {
               "type": "integer"
@@ -2119,8 +2844,7 @@
             "max": null,
             "min": 8.0
           },
-          "description": "The RAM size (e.g., `8GB`)",
-          "title": "Memory"
+          "description": "The RAM size (e.g., `8GB`)"
         },
         "shm_size": {
           "anyOf": [
@@ -2132,17 +2856,20 @@
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The size of shared memory (e.g., `8GB`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this",
           "title": "Shm Size"
         }
       },
-      "title": "ResourcesSpecRequest",
+      "title": "ResourcesSpec",
       "type": "object"
     },
     "RetryEvent": {
-      "description": "An enumeration.",
       "enum": [
         "no-capacity",
         "interruption",
@@ -2151,38 +2878,63 @@
       "title": "RetryEvent",
       "type": "string"
     },
-    "RunpodVolumeConfigurationRequest": {
+    "RunpodVolumeConfiguration": {
       "additionalProperties": false,
       "properties": {
         "auto_cleanup_duration": {
           "anyOf": [
             {
+              "const": "off",
+              "type": "string"
+            },
+            {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Time to wait after volume is no longer used by any job before deleting it. Defaults to keep the volume indefinitely. Use the value `off` or `-1` to disable auto-cleanup",
           "title": "Auto Cleanup Duration"
         },
         "availability_zone": {
-          "title": "Availability Zone",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Availability Zone"
         },
         "backend": {
+          "const": "runpod",
           "default": "runpod",
           "description": "The volume backend",
-          "enum": [
-            "runpod"
-          ],
           "title": "Backend",
           "type": "string"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume name",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "region": {
           "description": "The volume region",
@@ -2190,39 +2942,67 @@
           "type": "string"
         },
         "size": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume size. Must be specified when creating new volumes",
-          "title": "Size",
-          "type": "number"
+          "title": "Size"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the volume. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "volume",
           "default": "volume",
-          "enum": [
-            "volume"
-          ],
           "title": "Type",
           "type": "string"
         },
         "volume_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The volume ID. Must be specified when registering external volumes",
-          "title": "Volume Id",
-          "type": "string"
+          "title": "Volume Id"
         }
       },
       "required": [
         "region"
       ],
-      "title": "RunpodVolumeConfigurationRequest",
+      "title": "RunpodVolumeConfiguration",
       "type": "object"
     },
-    "SGLangGatewayRouterConfigRequest": {
+    "SGLangGatewayRouterConfig": {
       "additionalProperties": false,
       "description": "Gateway-level router configuration. type and policy only. pd_disaggregation is service-level.",
       "properties": {
@@ -2239,19 +3019,17 @@
           "type": "string"
         },
         "type": {
+          "const": "sglang",
           "default": "sglang",
           "description": "The router type enabled on this gateway.",
-          "enum": [
-            "sglang"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "SGLangGatewayRouterConfigRequest",
+      "title": "SGLangGatewayRouterConfig",
       "type": "object"
     },
-    "SGLangServiceRouterConfigRequest": {
+    "SGLangServiceRouterConfig": {
       "additionalProperties": false,
       "properties": {
         "pd_disaggregation": {
@@ -2273,34 +3051,34 @@
           "type": "string"
         },
         "type": {
+          "const": "sglang",
           "default": "sglang",
           "description": "The router type",
-          "enum": [
-            "sglang"
-          ],
           "title": "Type",
           "type": "string"
         }
       },
-      "title": "SGLangServiceRouterConfigRequest",
+      "title": "SGLangServiceRouterConfig",
       "type": "object"
     },
-    "SSHHostParamsRequest": {
+    "SSHHostParams": {
       "additionalProperties": false,
       "properties": {
         "blocks": {
           "anyOf": [
             {
-              "enum": [
-                "auto"
-              ],
+              "const": "auto",
               "type": "string"
             },
             {
               "minimum": 1,
               "type": "integer"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The amount of blocks to split the instance into, a number or `auto`. `auto` means as many as possible. The number of GPUs and CPUs must be divisible by the number of blocks. Defaults to the top-level `blocks` value",
           "title": "Blocks"
         },
@@ -2310,50 +3088,101 @@
           "type": "string"
         },
         "identity_file": {
-          "description": "The private key to use for this host",
-          "title": "Identity File",
-          "type": "string"
-        },
-        "internal_ip": {
-          "description": "The internal IP of the host used for communication inside the cluster. If not specified, `dstack` will use the IP address from `network` or from the first found internal network.",
-          "title": "Internal Ip",
-          "type": "string"
-        },
-        "port": {
-          "description": "The SSH port to connect to for this host",
-          "title": "Port",
-          "type": "integer"
-        },
-        "proxy_jump": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SSHProxyParamsRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The SSH proxy configuration for this host",
-          "title": "Proxy Jump"
+          "default": null,
+          "description": "The private key to use for this host",
+          "title": "Identity File"
+        },
+        "internal_ip": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The internal IP of the host used for communication inside the cluster. If not specified, `dstack` will use the IP address from `network` or from the first found internal network.",
+          "title": "Internal Ip"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The SSH port to connect to for this host",
+          "title": "Port"
+        },
+        "proxy_jump": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHProxyParams"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The SSH proxy configuration for this host"
         },
         "ssh_key": {
-          "$ref": "#/definitions/SSHKeyRequest"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The user to log in with for this host",
-          "title": "User",
-          "type": "string"
+          "title": "User"
         }
       },
       "required": [
         "hostname"
       ],
-      "title": "SSHHostParamsRequest",
+      "title": "SSHHostParams",
       "type": "object"
     },
-    "SSHKeyRequest": {
+    "SSHKey": {
       "additionalProperties": false,
       "properties": {
         "private": {
-          "title": "Private",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Private"
         },
         "public": {
           "title": "Public",
@@ -2363,10 +3192,10 @@
       "required": [
         "public"
       ],
-      "title": "SSHKeyRequest",
+      "title": "SSHKey",
       "type": "object"
     },
-    "SSHParamsRequest": {
+    "SSHParams": {
       "additionalProperties": false,
       "properties": {
         "hosts": {
@@ -2374,7 +3203,7 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/SSHHostParamsRequest"
+                "$ref": "#/$defs/SSHHostParams"
               },
               {
                 "type": "string"
@@ -2385,45 +3214,88 @@
           "type": "array"
         },
         "identity_file": {
-          "description": "The private key to use for all hosts",
-          "title": "Identity File",
-          "type": "string"
-        },
-        "network": {
-          "description": "The network address for cluster setup in the format `<ip>/<netmask>`. `dstack` will use IP addresses from this network for communication between hosts. If not specified, `dstack` will use IPs from the first found internal network.",
-          "title": "Network",
-          "type": "string"
-        },
-        "port": {
-          "description": "The SSH port to connect to",
-          "title": "Port",
-          "type": "integer"
-        },
-        "proxy_jump": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SSHProxyParamsRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The SSH proxy configuration for all hosts",
-          "title": "Proxy Jump"
+          "default": null,
+          "description": "The private key to use for all hosts",
+          "title": "Identity File"
+        },
+        "network": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The network address for cluster setup in the format `<ip>/<netmask>`. `dstack` will use IP addresses from this network for communication between hosts. If not specified, `dstack` will use IPs from the first found internal network.",
+          "title": "Network"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The SSH port to connect to",
+          "title": "Port"
+        },
+        "proxy_jump": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHProxyParams"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The SSH proxy configuration for all hosts"
         },
         "ssh_key": {
-          "$ref": "#/definitions/SSHKeyRequest"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The user to log in with on all hosts",
-          "title": "User",
-          "type": "string"
+          "title": "User"
         }
       },
       "required": [
         "hosts"
       ],
-      "title": "SSHParamsRequest",
+      "title": "SSHParams",
       "type": "object"
     },
-    "SSHProxyParamsRequest": {
+    "SSHProxyParams": {
       "additionalProperties": false,
       "properties": {
         "hostname": {
@@ -2437,12 +3309,28 @@
           "type": "string"
         },
         "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The SSH port of proxy host",
-          "title": "Port",
-          "type": "integer"
+          "title": "Port"
         },
         "ssh_key": {
-          "$ref": "#/definitions/SSHKeyRequest"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SSHKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "user": {
           "description": "The user to log in with for proxy host",
@@ -2455,31 +3343,43 @@
         "user",
         "identity_file"
       ],
-      "title": "SSHProxyParamsRequest",
+      "title": "SSHProxyParams",
       "type": "object"
     },
-    "ScalingSpecRequest": {
+    "ScalingSpec": {
       "additionalProperties": false,
       "properties": {
         "metric": {
+          "const": "rps",
           "description": "The target metric to track. Currently, the only supported value is `rps` (meaning requests per second)",
-          "enum": [
-            "rps"
-          ],
           "title": "Metric",
           "type": "string"
         },
         "scale_down_delay": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
           "default": 600,
           "description": "The minimum time, in seconds, between a scaling event and the next scale-down decision. Used to prevent overly frequent scaling",
-          "title": "Scale Down Delay",
-          "type": "integer"
+          "title": "Scale Down Delay"
         },
         "scale_up_delay": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
           "default": 300,
           "description": "The minimum time, in seconds, between a scaling event and the next scale-up decision. Used to prevent overly frequent scaling",
-          "title": "Scale Up Delay",
-          "type": "integer"
+          "title": "Scale Up Delay"
         },
         "target": {
           "description": "The target value of the metric. The number of replicas is calculated based on this number and automatically adjusts (scales up or down) as this metric changes",
@@ -2488,19 +3388,30 @@
           "type": "number"
         },
         "window": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The time window used to calculate requests per second. Allowed values: `30s`, `60s`, `300s`. Defaults to `60s`",
-          "title": "Window",
-          "type": "integer"
+          "title": "Window"
         }
       },
       "required": [
         "metric",
         "target"
       ],
-      "title": "ScalingSpecRequest",
+      "title": "ScalingSpec",
       "type": "object"
     },
-    "ScheduleRequest": {
+    "Schedule": {
       "additionalProperties": false,
       "properties": {
         "cron": {
@@ -2522,10 +3433,10 @@
       "required": [
         "cron"
       ],
-      "title": "ScheduleRequest",
+      "title": "Schedule",
       "type": "object"
     },
-    "ServiceConfigurationRequest": {
+    "ServiceConfiguration": {
       "additionalProperties": false,
       "properties": {
         "auth": {
@@ -2535,27 +3446,52 @@
           "type": "boolean"
         },
         "availability_zones": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Availability Zones",
-          "type": "array"
+          "title": "Availability Zones"
         },
         "backend_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VastAIProfileOptions"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Backend-specific options, applied only to offers from that backend",
-          "items": {
-            "$ref": "#/definitions/VastAIProfileOptions"
-          },
-          "title": "Backend Options",
-          "type": "array"
+          "title": "Backend Options"
         },
         "backends": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BackendType"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
-          "items": {
-            "$ref": "#/definitions/BackendType"
-          },
-          "type": "array"
+          "title": "Backends"
         },
         "commands": {
           "default": [],
@@ -2567,17 +3503,29 @@
           "type": "array"
         },
         "creation_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/CreationPolicy"
+              "$ref": "#/$defs/CreationPolicy"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for using instances from fleets: `reuse`, `reuse-or-create`. Defaults to `reuse-or-create`"
         },
         "docker": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`",
-          "title": "Docker",
-          "type": "boolean"
+          "title": "Docker"
         },
         "dstack": {
           "default": false,
@@ -2586,21 +3534,21 @@
           "type": "boolean"
         },
         "entrypoint": {
-          "description": "The Docker entrypoint",
-          "title": "Entrypoint",
-          "type": "string"
-        },
-        "env": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/Env"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "default": {
-            "__root__": {}
-          },
-          "description": "The mapping or the list of environment variables",
-          "title": "Env"
+          "default": null,
+          "description": "The Docker entrypoint",
+          "title": "Entrypoint"
+        },
+        "env": {
+          "$ref": "#/$defs/Env",
+          "description": "The mapping or the list of environment variables"
         },
         "files": {
           "default": [],
@@ -2608,7 +3556,7 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/FilePathMappingRequest"
+                "$ref": "#/$defs/FilePathMapping"
               },
               {
                 "type": "string"
@@ -2619,19 +3567,27 @@
           "type": "array"
         },
         "fleets": {
-          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/EntityReferenceRequest"
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EntityReference"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "title": "Fleets",
-          "type": "array"
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
+          "title": "Fleets"
         },
         "gateway": {
           "anyOf": [
@@ -2639,12 +3595,16 @@
               "type": "boolean"
             },
             {
-              "$ref": "#/definitions/EntityReferenceRequest"
+              "$ref": "#/$defs/EntityReference"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The name of the gateway. Specify boolean `false` to run without a gateway. Specify boolean `true` to run with the default gateway. Omit to run with the default gateway if there is one, or without a gateway otherwise",
           "title": "Gateway"
         },
@@ -2659,125 +3619,187 @@
               "type": "boolean"
             },
             {
-              "enum": [
-                "auto"
-              ],
+              "const": "auto",
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Enable HTTPS if running with a gateway. Set to `auto` to determine automatically based on gateway configuration. Defaults to `true`",
           "title": "Https"
         },
         "idle_duration": {
           "anyOf": [
             {
-              "type": "integer"
-            },
-            {
-              "type": "string"
-            }
-          ],
-          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
-          "title": "Idle Duration"
-        },
-        "image": {
-          "description": "The name of the Docker image to run. If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests. It may also include provider-specific components such as EFA support on AWS. For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image.",
-          "title": "Image",
-          "type": "string"
-        },
-        "instance_types": {
-          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Instance Types",
-          "type": "array"
-        },
-        "instances": {
-          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/InstanceNameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/InstanceHostnameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/FleetInstanceSelectorRequest"
-              },
-              {
-                "minLength": 1,
-                "type": "string"
-              }
-            ]
-          },
-          "minItems": 1,
-          "title": "Instances",
-          "type": "array"
-        },
-        "max_duration": {
-          "anyOf": [
-            {
-              "enum": [
-                "off"
-              ],
+              "const": "off",
               "type": "string"
             },
             {
               "type": "integer"
+            },
+            {
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
+          "title": "Idle Duration"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the Docker image to run. If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests. It may also include provider-specific components such as EFA support on AWS. For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image.",
+          "title": "Image"
+        },
+        "instance_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
+          "title": "Instance Types"
+        },
+        "instances": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/InstanceNameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/InstanceHostnameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/FleetInstanceSelector"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
+          "title": "Instances"
+        },
+        "max_duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum duration of a run (e.g., `2h`, `1d`, etc) in a running state, excluding provisioning and pulling. After it elapses, the run is automatically stopped. Use `off` for unlimited duration. Defaults to `off`",
           "title": "Max Duration"
         },
         "max_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum instance price per hour, in dollars",
-          "exclusiveMinimum": 0.0,
-          "title": "Max Price",
-          "type": "number"
+          "title": "Max Price"
         },
         "model": {
           "anyOf": [
             {
               "discriminator": {
                 "mapping": {
-                  "openai": "#/definitions/OpenAIChatModelRequest",
-                  "tgi": "#/definitions/TGIChatModelRequest"
+                  "openai": "#/$defs/OpenAIChatModel",
+                  "tgi": "#/$defs/TGIChatModel"
                 },
                 "propertyName": "format"
               },
               "oneOf": [
                 {
-                  "$ref": "#/definitions/TGIChatModelRequest"
+                  "$ref": "#/$defs/TGIChatModel"
                 },
                 {
-                  "$ref": "#/definitions/OpenAIChatModelRequest"
+                  "$ref": "#/$defs/OpenAIChatModel"
                 }
               ]
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`. Can be a full model format definition or just a model name. If it's a name, the service is expected to expose an OpenAI-compatible API at the `/v1` path",
           "title": "Model"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The run name. If not specified, a random name is generated",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "nvcc": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`",
-          "title": "Nvcc",
-          "type": "boolean"
+          "title": "Nvcc"
         },
         "port": {
           "anyOf": [
@@ -2791,18 +3813,26 @@
               "type": "string"
             },
             {
-              "$ref": "#/definitions/PortMappingRequest"
+              "$ref": "#/$defs/PortMapping"
             }
           ],
           "description": "The port the application listens on",
           "title": "Port"
         },
         "priority": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The priority of the run, an integer between `0` and `100`. `dstack` tries to provision runs with higher priority first. Defaults to `0`",
-          "maximum": 100,
-          "minimum": 0,
-          "title": "Priority",
-          "type": "integer"
+          "title": "Priority"
         },
         "privileged": {
           "default": false,
@@ -2811,65 +3841,92 @@
           "type": "boolean"
         },
         "probes": {
-          "description": "The list of probes to determine service health. If `model` is set, defaults to a `/v1/chat/completions` probe. Set explicitly to override",
-          "items": {
-            "$ref": "#/definitions/ProbeConfigRequest"
-          },
-          "title": "Probes",
-          "type": "array"
-        },
-        "python": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "items": {
+                "$ref": "#/$defs/ProbeConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The list of probes to determine service health. If `model` is set, defaults to a `/v1/chat/completions` probe. Set explicitly to override",
+          "title": "Probes"
+        },
+        "python": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PythonVersion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The major version of Python. Mutually exclusive with `image` and `docker`"
         },
         "rate_limits": {
           "default": [],
           "description": "Rate limiting rules",
           "items": {
-            "$ref": "#/definitions/RateLimitRequest"
+            "$ref": "#/$defs/RateLimit"
           },
           "title": "Rate Limits",
           "type": "array"
         },
         "regions": {
-          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Regions",
-          "type": "array"
-        },
-        "registry_auth": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/RegistryAuthRequest"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Credentials for pulling a private Docker image",
-          "title": "Registry Auth"
+          "default": null,
+          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
+          "title": "Regions"
+        },
+        "registry_auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RegistryAuth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Credentials for pulling a private Docker image"
         },
         "replicas": {
           "anyOf": [
             {
               "items": {
-                "$ref": "#/definitions/ReplicaGroupRequest"
+                "$ref": "#/$defs/ReplicaGroup"
               },
               "type": "array"
             },
             {
-              "$ref": "#/definitions/Range_int_"
+              "$ref": "#/$defs/Range_int_"
             },
             {
               "type": "integer"
             },
             {
               "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The number of replicas or a list of replica groups. Can be an integer (e.g., `2`), a range (e.g., `0..4`), or a list of replica groups. Each replica group defines replicas with shared configuration (commands, resources, scaling). When `replicas` is a list of replica groups, top-level `scaling`, `commands`, and `resources` are not allowed and must be specified in each replica group instead. ",
           "title": "Replicas"
         },
@@ -2877,22 +3934,33 @@
           "default": [],
           "description": "The list of Git repos",
           "items": {
-            "$ref": "#/definitions/RepoSpecRequest"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RepoSpec"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "title": "Repos",
           "type": "array"
         },
         "reservation": {
-          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
-        },
-        "resources": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ResourcesSpecRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
+          "title": "Reservation"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
               "max": null,
@@ -2921,47 +3989,59 @@
             },
             "shm_size": null
           },
-          "description": "The resources requirements to run the configuration",
-          "title": "Resources"
+          "description": "The resources requirements to run the configuration"
         },
         "retry": {
           "anyOf": [
             {
-              "$ref": "#/definitions/ProfileRetryRequest"
+              "$ref": "#/$defs/ProfileRetry"
             },
             {
               "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for resubmitting the run. Defaults to `false`",
           "title": "Retry"
         },
         "router": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SGLangServiceRouterConfigRequest"
+              "$ref": "#/$defs/SGLangServiceRouterConfig"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Router configuration for the service. Requires a gateway with matching router enabled. ",
-          "title": "Router"
+          "default": null,
+          "description": "Router configuration for the service. Requires a gateway with matching router enabled. "
         },
         "scaling": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScalingSpecRequest"
+              "$ref": "#/$defs/ScalingSpec"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The auto-scaling rules. Required if `replicas` is set to a range",
-          "title": "Scaling"
+          "default": null,
+          "description": "The auto-scaling rules. Required if `replicas` is set to a range"
         },
         "schedule": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScheduleRequest"
+              "$ref": "#/$defs/Schedule"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The schedule for starting the run at specified time",
-          "title": "Schedule"
+          "default": null,
+          "description": "The schedule for starting the run at specified time"
         },
         "setup": {
           "default": [],
@@ -2972,57 +4052,83 @@
           "type": "array"
         },
         "shell": {
-          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
-          "title": "Shell",
-          "type": "string"
-        },
-        "single_branch": {
-          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
-          "title": "Single Branch",
-          "type": "boolean"
-        },
-        "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
+          "title": "Shell"
+        },
+        "single_branch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
+          "title": "Single Branch"
+        },
+        "spot_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, `auto`. Defaults to `on-demand`"
         },
         "startup_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StartupOrder"
+              "$ref": "#/$defs/StartupOrder"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The order in which master and workers jobs are started: `any`, `master-first`, `workers-first`. Defaults to `any`"
         },
         "stop_criteria": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StopCriteria"
+              "$ref": "#/$defs/StopCriteria"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The criteria determining when a multi-node run should be considered finished: `all-done`, `master-done`. Defaults to `all-done`"
         },
         "stop_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
-              "type": "string"
+              "type": "integer"
             },
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum duration of a run graceful stopping. After it elapses, the run is automatically forced stopped. This includes force detaching volumes used by the run. Use `off` for unlimited duration. Defaults to `5m`",
           "title": "Stop Duration"
         },
@@ -3033,34 +4139,51 @@
           "type": "boolean"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "service",
           "default": "service",
-          "enum": [
-            "service"
-          ],
           "title": "Type",
           "type": "string"
         },
         "user": {
-          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
-          "title": "User",
-          "type": "string"
-        },
-        "utilization_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/UtilizationPolicyRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Run termination policy based on utilization",
-          "title": "Utilization Policy"
+          "default": null,
+          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
+          "title": "User"
+        },
+        "utilization_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UtilizationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run termination policy based on utilization"
         },
         "volumes": {
           "default": [],
@@ -3068,10 +4191,10 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/VolumeMountPointRequest"
+                "$ref": "#/$defs/VolumeMountPoint"
               },
               {
-                "$ref": "#/definitions/InstanceMountPointRequest"
+                "$ref": "#/$defs/InstanceMountPoint"
               },
               {
                 "type": "string"
@@ -3082,19 +4205,26 @@
           "type": "array"
         },
         "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The absolute path to the working directory inside the container. Defaults to the `image`'s default working directory",
-          "title": "Working Dir",
-          "type": "string"
+          "title": "Working Dir"
         }
       },
       "required": [
         "port"
       ],
-      "title": "ServiceConfigurationRequest",
+      "title": "ServiceConfiguration",
       "type": "object"
     },
     "SpotPolicy": {
-      "description": "An enumeration.",
       "enum": [
         "spot",
         "on-demand",
@@ -3104,7 +4234,6 @@
       "type": "string"
     },
     "StartupOrder": {
-      "description": "An enumeration.",
       "enum": [
         "any",
         "master-first",
@@ -3114,7 +4243,6 @@
       "type": "string"
     },
     "StopCriteria": {
-      "description": "An enumeration.",
       "enum": [
         "all-done",
         "master-done"
@@ -3122,25 +4250,39 @@
       "title": "StopCriteria",
       "type": "string"
     },
-    "TGIChatModelRequest": {
+    "TGIChatModel": {
       "additionalProperties": false,
       "description": "Mapping of the model for the OpenAI-compatible endpoint.\n\nAttributes:\n    type (str): The type of the model, e.g. \"chat\"\n    name (str): The name of the model. This name will be used both to load model configuration from the HuggingFace Hub and in the OpenAI-compatible endpoint.\n    format (str): The format of the model, e.g. \"tgi\" if the model is served with HuggingFace's Text Generation Inference.\n    chat_template (Optional[str]): The custom prompt template for the model. If not specified, the default prompt template from the HuggingFace Hub configuration will be used.\n    eos_token (Optional[str]): The custom end of sentence token. If not specified, the default end of sentence token from the HuggingFace Hub configuration will be used.",
       "properties": {
         "chat_template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom prompt template for the model. If not specified, the default prompt template from the HuggingFace Hub configuration will be used",
-          "title": "Chat Template",
-          "type": "string"
+          "title": "Chat Template"
         },
         "eos_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom end of sentence token. If not specified, the default end of sentence token from the HuggingFace Hub configuration will be used",
-          "title": "Eos Token",
-          "type": "string"
+          "title": "Eos Token"
         },
         "format": {
+          "const": "tgi",
           "description": "The serving format. Must be set to `tgi`",
-          "enum": [
-            "tgi"
-          ],
           "title": "Format",
           "type": "string"
         },
@@ -3150,11 +4292,9 @@
           "type": "string"
         },
         "type": {
+          "const": "chat",
           "default": "chat",
           "description": "The type of the model",
-          "enum": [
-            "chat"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3163,34 +4303,59 @@
         "name",
         "format"
       ],
-      "title": "TGIChatModelRequest",
+      "title": "TGIChatModel",
       "type": "object"
     },
-    "TaskConfigurationRequest": {
+    "TaskConfiguration": {
       "additionalProperties": false,
       "properties": {
         "availability_zones": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The availability zones to consider for provisioning (e.g., `[eu-west-1a, us-west4-a]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Availability Zones",
-          "type": "array"
+          "title": "Availability Zones"
         },
         "backend_options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/VastAIProfileOptions"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Backend-specific options, applied only to offers from that backend",
-          "items": {
-            "$ref": "#/definitions/VastAIProfileOptions"
-          },
-          "title": "Backend Options",
-          "type": "array"
+          "title": "Backend Options"
         },
         "backends": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BackendType"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The backends to consider for provisioning (e.g., `[aws, gcp]`)",
-          "items": {
-            "$ref": "#/definitions/BackendType"
-          },
-          "type": "array"
+          "title": "Backends"
         },
         "commands": {
           "default": [],
@@ -3202,17 +4367,29 @@
           "type": "array"
         },
         "creation_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/CreationPolicy"
+              "$ref": "#/$defs/CreationPolicy"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for using instances from fleets: `reuse`, `reuse-or-create`. Defaults to `reuse-or-create`"
         },
         "docker": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use Docker inside the container. Mutually exclusive with `image`, `python`, and `nvcc`. Overrides `privileged`",
-          "title": "Docker",
-          "type": "boolean"
+          "title": "Docker"
         },
         "dstack": {
           "default": false,
@@ -3221,21 +4398,21 @@
           "type": "boolean"
         },
         "entrypoint": {
-          "description": "The Docker entrypoint",
-          "title": "Entrypoint",
-          "type": "string"
-        },
-        "env": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/Env"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "default": {
-            "__root__": {}
-          },
-          "description": "The mapping or the list of environment variables",
-          "title": "Env"
+          "default": null,
+          "description": "The Docker entrypoint",
+          "title": "Entrypoint"
+        },
+        "env": {
+          "$ref": "#/$defs/Env",
+          "description": "The mapping or the list of environment variables"
         },
         "files": {
           "default": [],
@@ -3243,7 +4420,7 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/FilePathMappingRequest"
+                "$ref": "#/$defs/FilePathMapping"
               },
               {
                 "type": "string"
@@ -3254,19 +4431,27 @@
           "type": "array"
         },
         "fleets": {
-          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/EntityReferenceRequest"
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EntityReference"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
               },
-              {
-                "type": "string"
-              }
-            ]
-          },
-          "title": "Fleets",
-          "type": "array"
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fleets considered for reuse. For fleets owned by the current project, specify fleet names. For imported fleets, specify `<project name>/<fleet name>`",
+          "title": "Fleets"
         },
         "home_dir": {
           "default": "/root",
@@ -3276,82 +4461,130 @@
         "idle_duration": {
           "anyOf": [
             {
-              "type": "integer"
-            },
-            {
-              "type": "string"
-            }
-          ],
-          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
-          "title": "Idle Duration"
-        },
-        "image": {
-          "description": "The name of the Docker image to run. If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests. It may also include provider-specific components such as EFA support on AWS. For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image.",
-          "title": "Image",
-          "type": "string"
-        },
-        "instance_types": {
-          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Instance Types",
-          "type": "array"
-        },
-        "instances": {
-          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/InstanceNameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/InstanceHostnameSelectorRequest"
-              },
-              {
-                "$ref": "#/definitions/FleetInstanceSelectorRequest"
-              },
-              {
-                "minLength": 1,
-                "type": "string"
-              }
-            ]
-          },
-          "minItems": 1,
-          "title": "Instances",
-          "type": "array"
-        },
-        "max_duration": {
-          "anyOf": [
-            {
-              "enum": [
-                "off"
-              ],
+              "const": "off",
               "type": "string"
             },
             {
               "type": "integer"
+            },
+            {
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "Time to wait before terminating idle instances. When the run reuses an existing fleet instance, the fleet's `idle_duration` applies. When the run provisions a new instance, the shorter of the fleet's and run's values is used. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration. Only applied for VM-based backends",
+          "title": "Idle Duration"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the Docker image to run. If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests. It may also include provider-specific components such as EFA support on AWS. For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image.",
+          "title": "Image"
+        },
+        "instance_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)",
+          "title": "Instance Types"
+        },
+        "instances": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/InstanceNameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/InstanceHostnameSelector"
+                  },
+                  {
+                    "$ref": "#/$defs/FleetInstanceSelector"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The specific fleet instances to consider for reuse. Each value can be an instance name string, or an object with `name`, `hostname`, or `fleet` and `instance`. When set, the run is only placed on matching existing instances.",
+          "title": "Instances"
+        },
+        "max_duration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum duration of a run (e.g., `2h`, `1d`, etc) in a running state, excluding provisioning and pulling. After it elapses, the run is automatically stopped. Use `off` for unlimited duration. Defaults to `off`",
           "title": "Max Duration"
         },
         "max_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The maximum instance price per hour, in dollars",
-          "exclusiveMinimum": 0.0,
-          "title": "Max Price",
-          "type": "number"
+          "title": "Max Price"
         },
         "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The run name. If not specified, a random name is generated",
-          "title": "Name",
-          "type": "string"
+          "title": "Name"
         },
         "nodes": {
           "default": 1,
@@ -3361,9 +4594,17 @@
           "type": "integer"
         },
         "nvcc": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image` and `docker`",
-          "title": "Nvcc",
-          "type": "boolean"
+          "title": "Nvcc"
         },
         "ports": {
           "default": [],
@@ -3380,7 +4621,7 @@
                 "type": "string"
               },
               {
-                "$ref": "#/definitions/PortMappingRequest"
+                "$ref": "#/$defs/PortMapping"
               }
             ]
           },
@@ -3388,11 +4629,19 @@
           "type": "array"
         },
         "priority": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The priority of the run, an integer between `0` and `100`. `dstack` tries to provision runs with higher priority first. Defaults to `0`",
-          "maximum": 100,
-          "minimum": 0,
-          "title": "Priority",
-          "type": "integer"
+          "title": "Priority"
         },
         "privileged": {
           "default": false,
@@ -3401,50 +4650,76 @@
           "type": "boolean"
         },
         "python": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/$defs/PythonVersion"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The major version of Python. Mutually exclusive with `image` and `docker`"
         },
         "regions": {
-          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
-          "items": {
-            "type": "string"
-          },
-          "title": "Regions",
-          "type": "array"
-        },
-        "registry_auth": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/RegistryAuthRequest"
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Credentials for pulling a private Docker image",
-          "title": "Registry Auth"
+          "default": null,
+          "description": "The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)",
+          "title": "Regions"
+        },
+        "registry_auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RegistryAuth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Credentials for pulling a private Docker image"
         },
         "repos": {
           "default": [],
           "description": "The list of Git repos",
           "items": {
-            "$ref": "#/definitions/RepoSpecRequest"
+            "anyOf": [
+              {
+                "$ref": "#/$defs/RepoSpec"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "title": "Repos",
           "type": "array"
         },
         "reservation": {
-          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
-          "title": "Reservation",
-          "type": "string"
-        },
-        "resources": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ResourcesSpecRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The existing reservation to use for instance provisioning. Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations",
+          "title": "Reservation"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
               "max": null,
@@ -3473,29 +4748,35 @@
             },
             "shm_size": null
           },
-          "description": "The resources requirements to run the configuration",
-          "title": "Resources"
+          "description": "The resources requirements to run the configuration"
         },
         "retry": {
           "anyOf": [
             {
-              "$ref": "#/definitions/ProfileRetryRequest"
+              "$ref": "#/$defs/ProfileRetry"
             },
             {
               "type": "boolean"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The policy for resubmitting the run. Defaults to `false`",
           "title": "Retry"
         },
         "schedule": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/ScheduleRequest"
+              "$ref": "#/$defs/Schedule"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "The schedule for starting the run at specified time",
-          "title": "Schedule"
+          "default": null,
+          "description": "The schedule for starting the run at specified time"
         },
         "setup": {
           "default": [],
@@ -3506,89 +4787,132 @@
           "type": "array"
         },
         "shell": {
-          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
-          "title": "Shell",
-          "type": "string"
-        },
-        "single_branch": {
-          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
-          "title": "Single Branch",
-          "type": "boolean"
-        },
-        "spot_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/SpotPolicy"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The shell used to run commands. Allowed values are `sh`, `bash`, or an absolute path, e.g., `/usr/bin/zsh`. Defaults to `/bin/sh` if the `image` is specified, `/bin/bash` otherwise",
+          "title": "Shell"
+        },
+        "single_branch": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether to clone and track only the current branch or all remote branches. Relevant only when using remote Git repos. Defaults to `false` for dev environments and to `true` for tasks and services",
+          "title": "Single Branch"
+        },
+        "spot_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpotPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, `auto`. Defaults to `on-demand`"
         },
         "startup_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StartupOrder"
+              "$ref": "#/$defs/StartupOrder"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The order in which master and workers jobs are started: `any`, `master-first`, `workers-first`. Defaults to `any`"
         },
         "stop_criteria": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/StopCriteria"
+              "$ref": "#/$defs/StopCriteria"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The criteria determining when a multi-node run should be considered finished: `all-done`, `master-done`. Defaults to `all-done`"
         },
         "stop_duration": {
           "anyOf": [
             {
-              "enum": [
-                "off"
-              ],
-              "type": "string"
+              "type": "integer"
             },
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "boolean"
             },
             {
-              "type": "string"
+              "type": "null"
             }
           ],
+          "default": null,
           "description": "The maximum duration of a run graceful stopping. After it elapses, the run is automatically forced stopped. This includes force detaching volumes used by the run. Use `off` for unlimited duration. Defaults to `5m`",
           "title": "Stop Duration"
         },
         "tags": {
-          "additionalProperties": {
-            "type": "string"
-          },
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The custom tags to associate with the resource. The tags are also propagated to the underlying backend resources. If there is a conflict with backend-level tags, does not override them",
-          "title": "Tags",
-          "type": "object"
+          "title": "Tags"
         },
         "type": {
+          "const": "task",
           "default": "task",
-          "enum": [
-            "task"
-          ],
           "title": "Type",
           "type": "string"
         },
         "user": {
-          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
-          "title": "User",
-          "type": "string"
-        },
-        "utilization_policy": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/UtilizationPolicyRequest"
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
           ],
-          "description": "Run termination policy based on utilization",
-          "title": "Utilization Policy"
+          "default": null,
+          "description": "The user inside the container, `user_name_or_id[:group_name_or_id]` (e.g., `ubuntu`, `1000:1000`). Defaults to the default user from the `image`",
+          "title": "User"
+        },
+        "utilization_policy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UtilizationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Run termination policy based on utilization"
         },
         "volumes": {
           "default": [],
@@ -3596,10 +4920,10 @@
           "items": {
             "anyOf": [
               {
-                "$ref": "#/definitions/VolumeMountPointRequest"
+                "$ref": "#/$defs/VolumeMountPoint"
               },
               {
-                "$ref": "#/definitions/InstanceMountPointRequest"
+                "$ref": "#/$defs/InstanceMountPoint"
               },
               {
                 "type": "string"
@@ -3610,15 +4934,23 @@
           "type": "array"
         },
         "working_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "The absolute path to the working directory inside the container. Defaults to the `image`'s default working directory",
-          "title": "Working Dir",
-          "type": "string"
+          "title": "Working Dir"
         }
       },
-      "title": "TaskConfigurationRequest",
+      "title": "TaskConfiguration",
       "type": "object"
     },
-    "UtilizationPolicyRequest": {
+    "UtilizationPolicy": {
       "additionalProperties": false,
       "properties": {
         "min_gpu_utilization": {
@@ -3645,11 +4977,10 @@
         "min_gpu_utilization",
         "time_window"
       ],
-      "title": "UtilizationPolicyRequest",
+      "title": "UtilizationPolicy",
       "type": "object"
     },
     "VastAIOfferOrder": {
-      "description": "An enumeration.",
       "enum": [
         "score",
         "price"
@@ -3661,31 +4992,49 @@
       "additionalProperties": false,
       "properties": {
         "min_reliability": {
-          "description": "The minimum reliability threshold for offers, on a scale from `0` to `1`. Defaults to `0.9`",
-          "maximum": 1,
-          "minimum": 0,
-          "title": "Min Reliability",
-          "type": "number"
-        },
-        "min_score": {
-          "description": "The minimum overall score required for offers to be considered. The scoring scale varies and may require experimentation. Starting with a value in the low hundreds is generally recommended",
-          "minimum": 0,
-          "title": "Min Score",
-          "type": "integer"
-        },
-        "offer_order": {
-          "allOf": [
+          "anyOf": [
             {
-              "$ref": "#/definitions/VastAIOfferOrder"
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
+          "description": "The minimum reliability threshold for offers, on a scale from `0` to `1`. Defaults to `0.9`",
+          "title": "Min Reliability"
+        },
+        "min_score": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The minimum overall score required for offers to be considered. The scoring scale varies and may require experimentation. Starting with a value in the low hundreds is generally recommended",
+          "title": "Min Score"
+        },
+        "offer_order": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VastAIOfferOrder"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
           "description": "Controls the order in which offers are considered for provisioning. Use `score` to prioritize the highest overall score first (the default order in the Vast.ai console), or `price` to prioritize the lowest-cost offers first. Lower-cost offers are often less reliable, so consider applying stricter filters when using `price`. Defaults to `score`"
         },
         "type": {
+          "const": "vastai",
           "default": "vastai",
-          "enum": [
-            "vastai"
-          ],
           "title": "Type",
           "type": "string"
         }
@@ -3693,34 +5042,33 @@
       "title": "VastAIProfileOptions",
       "type": "object"
     },
-    "VolumeConfigurationRequest": {
-      "additionalProperties": false,
+    "VolumeConfiguration": {
       "discriminator": {
         "mapping": {
-          "aws": "#/definitions/AWSVolumeConfigurationRequest",
-          "gcp": "#/definitions/GCPVolumeConfigurationRequest",
-          "kubernetes": "#/definitions/KubernetesVolumeConfigurationRequest",
-          "runpod": "#/definitions/RunpodVolumeConfigurationRequest"
+          "aws": "#/$defs/AWSVolumeConfiguration",
+          "gcp": "#/$defs/GCPVolumeConfiguration",
+          "kubernetes": "#/$defs/KubernetesVolumeConfiguration",
+          "runpod": "#/$defs/RunpodVolumeConfiguration"
         },
         "propertyName": "backend"
       },
       "oneOf": [
         {
-          "$ref": "#/definitions/AWSVolumeConfigurationRequest"
+          "$ref": "#/$defs/AWSVolumeConfiguration"
         },
         {
-          "$ref": "#/definitions/GCPVolumeConfigurationRequest"
+          "$ref": "#/$defs/GCPVolumeConfiguration"
         },
         {
-          "$ref": "#/definitions/RunpodVolumeConfigurationRequest"
+          "$ref": "#/$defs/RunpodVolumeConfiguration"
         },
         {
-          "$ref": "#/definitions/KubernetesVolumeConfigurationRequest"
+          "$ref": "#/$defs/KubernetesVolumeConfiguration"
         }
       ],
-      "title": "VolumeConfigurationRequest"
+      "title": "VolumeConfiguration"
     },
-    "VolumeMountPointRequest": {
+    "VolumeMountPoint": {
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -3748,40 +5096,42 @@
         "name",
         "path"
       ],
-      "title": "VolumeMountPointRequest",
+      "title": "VolumeMountPoint",
       "type": "object"
     }
   },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
   "discriminator": {
     "mapping": {
-      "dev-environment": "#/definitions/DevEnvironmentConfigurationRequest",
-      "fleet": "#/definitions/FleetConfigurationRequest",
-      "gateway": "#/definitions/GatewayConfigurationRequest",
-      "service": "#/definitions/ServiceConfigurationRequest",
-      "task": "#/definitions/TaskConfigurationRequest",
-      "volume": "#/definitions/VolumeConfigurationRequest"
+      "dev-environment": "#/$defs/DevEnvironmentConfiguration",
+      "fleet": "#/$defs/FleetConfiguration",
+      "gateway": "#/$defs/GatewayConfiguration",
+      "service": "#/$defs/ServiceConfiguration",
+      "task": "#/$defs/TaskConfiguration",
+      "volume": "#/$defs/VolumeConfiguration"
     },
     "propertyName": "type"
   },
   "oneOf": [
     {
-      "$ref": "#/definitions/DevEnvironmentConfigurationRequest"
+      "$ref": "#/$defs/DevEnvironmentConfiguration"
     },
     {
-      "$ref": "#/definitions/TaskConfigurationRequest"
+      "$ref": "#/$defs/TaskConfiguration"
     },
     {
-      "$ref": "#/definitions/ServiceConfigurationRequest"
+      "$ref": "#/$defs/ServiceConfiguration"
     },
     {
-      "$ref": "#/definitions/FleetConfigurationRequest"
+      "$ref": "#/$defs/FleetConfiguration"
     },
     {
-      "$ref": "#/definitions/GatewayConfigurationRequest"
+      "$ref": "#/$defs/GatewayConfiguration"
     },
     {
-      "$ref": "#/definitions/VolumeConfigurationRequest"
+      "$ref": "#/$defs/VolumeConfiguration"
     }
   ],
-  "title": "DstackConfigurationRequest"
+  "title": "DstackConfiguration"
 }

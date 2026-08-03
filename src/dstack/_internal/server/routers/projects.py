@@ -25,7 +25,7 @@ from dstack._internal.server.security.permissions import (
 )
 from dstack._internal.server.services import fleets, projects
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -53,7 +53,7 @@ async def list_projects(
     if body is None:
         # For backward compatibility
         body = ListProjectsRequest()
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await projects.list_user_accessible_projects(
             session=session,
             user=user,
@@ -86,7 +86,7 @@ async def list_only_no_fleets(
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await fleets.list_projects_with_no_active_fleets(session=session, user=user)
     )
 
@@ -97,7 +97,7 @@ async def create_project(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await projects.create_project(
             session=session,
             user=user,
@@ -127,7 +127,7 @@ async def get_project(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ):
     _, project = user_project
-    return CustomORJSONResponse(projects.project_model_to_project(project))
+    return CustomJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -148,7 +148,7 @@ async def set_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(projects.project_model_to_project(project))
+    return CustomJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -169,7 +169,7 @@ async def add_project_members(
         members=body.members,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(projects.project_model_to_project(project))
+    return CustomJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -190,7 +190,7 @@ async def remove_project_members(
         usernames=body.usernames,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(projects.project_model_to_project(project))
+    return CustomJSONResponse(projects.project_model_to_project(project))
 
 
 @router.post(
@@ -213,4 +213,4 @@ async def update_project(
         reset_templates_repo=body.reset_templates_repo,
     )
     await session.refresh(project)
-    return CustomORJSONResponse(projects.project_model_to_project(project))
+    return CustomJSONResponse(projects.project_model_to_project(project))

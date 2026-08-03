@@ -315,7 +315,9 @@ class TestCreatePreset:
             assert kwargs["agent_session"] is agent_session
             assert (session_path / "prompt.md").is_file()
             return PresetAgentProcessOutput(
-                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
             )
 
         monkeypatch.setattr(
@@ -574,7 +576,9 @@ class TestInterruptAndResume:
         async def run_agent(**kwargs):
             captured.update(kwargs)
             return PresetAgentProcessOutput(
-                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
             )
 
         monkeypatch.setattr(
@@ -608,7 +612,9 @@ class TestInterruptAndResume:
         async def run_agent(**kwargs):
             captured.update(kwargs)
             return PresetAgentProcessOutput(
-                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
             )
 
         monkeypatch.setattr(
@@ -649,7 +655,9 @@ class TestInterruptAndResume:
         async def run_agent(**kwargs):
             captured.update(kwargs)
             return PresetAgentProcessOutput(
-                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
             )
 
         monkeypatch.setattr(
@@ -756,7 +764,9 @@ class TestFollowPreset:
 
         async def fake_attach(**kwargs):
             return PresetAgentProcessOutput(
-                report_data=json.loads(get_successful_preset_report(creation_context.run).json())
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
             )
 
         monkeypatch.setattr(

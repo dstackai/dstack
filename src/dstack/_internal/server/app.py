@@ -71,7 +71,7 @@ from dstack._internal.server.settings import (
 from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     CustomStaticFiles,
     check_client_server_compatibility,
     error_detail,
@@ -270,14 +270,14 @@ def register_routes(app: FastAPI, ui: bool = True):
         msg = "Access denied"
         if len(exc.args) > 0:
             msg = exc.args[0]
-        return CustomORJSONResponse(
+        return CustomJSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content=error_detail(msg),
         )
 
     @app.exception_handler(ServerClientError)
     async def server_client_error_handler(request: Request, exc: ServerClientError):
-        return CustomORJSONResponse(
+        return CustomJSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": get_server_client_error_details(exc)},
         )
@@ -285,7 +285,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.exception_handler(OSError)
     async def os_error_handler(request, exc: OSError):
         if exc.errno in [36, 63]:
-            return CustomORJSONResponse(
+            return CustomJSONResponse(
                 {"detail": "Filename too long"},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
@@ -362,7 +362,7 @@ def register_routes(app: FastAPI, ui: bool = True):
 
     @app.get("/healthcheck")
     async def healthcheck():
-        return CustomORJSONResponse(content={"status": "running"})
+        return CustomJSONResponse(content={"status": "running"})
 
     if ui and Path(__file__).parent.joinpath("statics").exists():
         app.mount(
@@ -376,7 +376,7 @@ def register_routes(app: FastAPI, ui: bool = True):
                 or _is_proxy_request(request)
                 or _is_prometheus_request(request)
             ):
-                return CustomORJSONResponse(
+                return CustomJSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
                 )

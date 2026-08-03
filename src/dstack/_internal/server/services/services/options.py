@@ -49,5 +49,5 @@ def get_service_options(conf: ServiceConfiguration) -> dict:
     options = {}
     if conf.model is not None:
         complete_service_model(conf.model, env=conf.env.as_dict())
-        options["openai"] = {"model": conf.model.dict()}
+        options["openai"] = {"model": conf.model.model_dump()}
     return options

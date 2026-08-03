@@ -96,7 +96,7 @@ class PresetStore:
         preset = self.find_by_name(name)
         if preset is None:
             return None
-        detached = preset.copy(update={"name": None})
+        detached = preset.model_copy(update={"name": None})
         self.save(detached)
         return detached
 
@@ -138,7 +138,7 @@ class PresetStore:
     def _load(self, path: Path) -> Preset:
         try:
             with path.open(encoding="utf-8") as f:
-                return Preset.parse_obj(yaml.safe_load(f))
+                return Preset.model_validate(yaml.safe_load(f))
         except (OSError, ValidationError, yaml.YAMLError) as e:
             raise CLIError(f"Invalid preset file {path}: {e}") from e
 
@@ -167,7 +167,7 @@ def _parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ConfigurationError("Preset configuration must be a YAML object")
-        configuration = PresetConfiguration.parse_obj(data)
+        configuration = PresetConfiguration.model_validate(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
     except yaml.YAMLError as e:

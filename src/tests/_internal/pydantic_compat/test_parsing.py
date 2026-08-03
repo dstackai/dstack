@@ -78,7 +78,7 @@ BACKEND_DATA = _derived_registry("backend_data")
 
 # The `config` column is written as `XStoredConfig` but read back as `XConfig`, so this is the one
 # surface whose parse target is a different class from the one that produced the bytes. The read is
-# a splice of two columns — `XConfig(**json.loads(config), creds=XCreds.parse_raw(auth))` — and the
+# a splice of two columns — `XConfig(**json.loads(config), creds=XCreds.model_validate_json(auth))` — and the
 # inputs mirror that by carrying `creds` inline, which additionally makes the creds union resolve
 # here rather than arrive pre-resolved.
 BACKEND_CONFIGS = backend_factories.BACKEND_CONFIG_MODELS
@@ -93,7 +93,7 @@ CONFIG_PARSERS: dict[str, Callable[[Any], Any]] = {
     "dev_environment": parse_apply_configuration,
     "fleet": parse_apply_configuration,
     "gateway": parse_apply_configuration,
-    "profiles": ProfilesConfig.parse_obj,
+    "profiles": ProfilesConfig.model_validate,
     "service": parse_apply_configuration,
     "task": parse_apply_configuration,
     "volume": parse_apply_configuration,
@@ -167,7 +167,7 @@ class TestBackendCredsParsing:
         expected = class_name(backend_factories.CREDS_ARMS[name])
         # Compared by name rather than `isinstance`: the permissive read yields duality's
         # `...Response` variant on v1 and the plain class on v2, and `class_name` erases that.
-        assert class_name(creds.__root__) == expected
+        assert class_name(creds.root) == expected
 
 
 class TestBackendDataParsing:
@@ -179,7 +179,7 @@ class TestBackendDataParsing:
 
 class TestNebiusOfferBackendDataSetField:
     """
-    Excluded from `BACKEND_DATA` because `.json()` raises on its `set` field, so there is nothing
+    Excluded from `BACKEND_DATA` because `.model_dump_json()` raises on its `set` field, so there is nothing
     for `_assert_parses` to compare. The read path is real regardless, so assert on the value.
     """
 
@@ -234,7 +234,9 @@ class TestUnknownFieldTolerance:
         payload = _load_input(surface, name)
         baseline = parse_ignore_extra(model, payload)
         perturbed = parse_ignore_extra(model, {**payload, "unknown_from_a_newer_writer": {"x": 1}})
-        assert canonicalize(perturbed.json()) == canonicalize(baseline.json())
+        assert canonicalize(perturbed.model_dump_json()) == canonicalize(
+            baseline.model_dump_json()
+        )
 
 
 class TestUnknownFieldRejection:
@@ -311,7 +313,7 @@ class TestProxyPayloadParsing:
 
 def _assert_parses(surface: str, name: str, model, regen: bool) -> None:
     kind = f"parsing/{surface}"
-    assert_matches_fixture(kind, f"{name}.values", model.json(), regen=regen)
+    assert_matches_fixture(kind, f"{name}.values", model.model_dump_json(), regen=regen)
     assert_matches_fixture(kind, f"{name}.types", json.dumps(type_map(model)), regen=regen)
 
 

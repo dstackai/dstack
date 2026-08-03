@@ -38,7 +38,7 @@ class TestApplyArgs:
         configurator_class = get_run_configurator_class(conf.type)
         configurator = configurator_class(Mock())
         configurator.register_args(parser)
-        conf = conf.copy(deep=True)  # to avoid modifying the original configuration
+        conf = conf.model_copy(deep=True)  # to avoid modifying the original configuration
         parsed_args = parser.parse_args(args)
         configurator.apply_args(conf, parsed_args)
         return conf, parsed_args
@@ -46,8 +46,8 @@ class TestApplyArgs:
     def test_env(self):
         conf = TaskConfiguration(commands=["whoami"])
         modified, args = self.apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
+        assert modified.model_dump() == conf.model_dump()
 
     def test_ports(self):
         conf = TaskConfiguration(commands=["whoami"])
@@ -56,7 +56,7 @@ class TestApplyArgs:
             PortMapping(local_port=80, container_port=80),
             PortMapping(local_port=8080, container_port=8080),
         ]
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_container_ports_conflict(self):
         conf = TaskConfiguration(commands=["whoami"])
@@ -64,10 +64,10 @@ class TestApplyArgs:
             self.apply_args(conf, ["-p", "8000:80", "--port", "8001:80"])
 
     def test_env_override(self):
-        conf = TaskConfiguration(commands=["whoami"], env=Env.parse_obj({"A": "0"}))
+        conf = TaskConfiguration(commands=["whoami"], env=Env.model_validate({"A": "0"}))
         modified, args = self.apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = Env.parse_obj({"A": "1", "B": "2"})
-        assert modified.dict() == conf.dict()
+        conf.env = Env.model_validate({"A": "1", "B": "2"})
+        assert modified.model_dump() == conf.model_dump()
 
     def test_ports_override(self):
         conf = TaskConfiguration(commands=["whoami"], ports=["80"])
@@ -76,7 +76,7 @@ class TestApplyArgs:
             PortMapping(local_port=8000, container_port=80),
             PortMapping(local_port=8001, container_port=8000),
         ]
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_local_ports_conflict(self):
         conf = TaskConfiguration(commands=["whoami"], ports=["3000"])
@@ -87,7 +87,7 @@ class TestApplyArgs:
         conf = TaskConfiguration(commands=["whoami"], ports=["8000"])
         modified, args = self.apply_args(conf, ["-p", "*:8000"])
         conf.ports = [PortMapping(local_port=None, container_port=8000)]
-        assert modified.dict() == conf.dict()
+        assert modified.model_dump() == conf.model_dump()
 
     def test_interpolates_env(self):
         conf = TaskConfiguration(
@@ -96,7 +96,7 @@ class TestApplyArgs:
                 username="${{ env.REGISTRY_USERNAME }}",
                 password="${{ env.REGISTRY_PASSWORD }}",
             ),
-            env=Env.parse_obj(
+            env=Env.model_validate(
                 {
                     "REGISTRY_USERNAME": "test_user",
                     "REGISTRY_PASSWORD": "test_password",
@@ -129,7 +129,7 @@ class TestValidateGPUVendorAndImage:
             }
         if docker is not None:
             conf_dict["docker"] = docker
-        return BaseRunConfiguration.parse_obj(conf_dict)
+        return BaseRunConfiguration.model_validate(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
         BaseRunConfigurator(api_client=Mock()).validate_gpu_vendor_and_image(conf)
@@ -302,7 +302,7 @@ class TestValidateCPUArchAndImage:
             conf_dict["image"] = image
         if gpu_spec is not None:
             conf_dict["resources"]["gpu"] = gpu_spec
-        return BaseRunConfiguration.parse_obj(conf_dict)
+        return BaseRunConfiguration.model_validate(conf_dict)
 
     def validate(self, conf: BaseRunConfiguration) -> None:
         # validate_gpu_vendor_and_image sets GPU vendor if not set

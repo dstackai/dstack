@@ -277,7 +277,7 @@ class TestIntersectLists:
         assert result == ["a", "a", "c"]
 
 
-class TestCombineIdleDuration:
+class TestCombineOptionalIdleDuration:
     def test_both_none_returns_none(self):
         assert _combine_idle_duration_optional(None, None) is None
 

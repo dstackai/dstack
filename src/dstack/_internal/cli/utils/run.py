@@ -59,7 +59,7 @@ def print_runs_json(project: str, runs: List[Run]) -> None:
         project=project,
         runs=[r._run for r in runs],
     )
-    print(output.json())
+    print(output.model_dump_json())
 
 
 def print_run_plan(

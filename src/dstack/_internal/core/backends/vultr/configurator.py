@@ -19,6 +19,7 @@ from dstack._internal.core.backends.vultr.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 REGIONS = []
 
@@ -42,27 +43,30 @@ class VultrConfigurator(
             config.regions = REGIONS
         return BackendRecord(
             config=VultrStoredConfig(
-                **VultrBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=VultrCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(VultrBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=VultrCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> VultrBackendConfigWithCreds:
         config = self._get_config(record)
-        return VultrBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(VultrBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> VultrBackendConfig:
         config = self._get_config(record)
-        return VultrBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(VultrBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> VultrBackend:
         config = self._get_config(record)
         return VultrBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> VultrConfig:
-        return VultrConfig.__response__(
-            **json.loads(record.config),
-            creds=VultrCreds.__response__.parse_raw(record.auth),
+        return validate_extra_ignore(
+            VultrConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(VultrCreds, record.auth),
+            },
         )
 
     def _validate_vultr_api_key(self, api_key: str):

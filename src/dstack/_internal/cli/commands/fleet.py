@@ -15,7 +15,6 @@ from dstack._internal.cli.utils.common import (
 from dstack._internal.cli.utils.fleet import get_fleets_table, print_fleets_table
 from dstack._internal.core.errors import CLIError, ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
 class FleetCommand(APIBaseCommand):
@@ -176,4 +175,4 @@ class FleetCommand(APIBaseCommand):
             console.print(f"Fleet [code]{args.name or args.id}[/] not found")
             exit(1)
 
-        print(pydantic_orjson_dumps_with_indent(fleet.dict(), default=None))
+        print(fleet.model_dump_json(indent=2))

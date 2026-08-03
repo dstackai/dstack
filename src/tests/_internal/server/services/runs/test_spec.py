@@ -56,7 +56,7 @@ def _service_configuration(
         data["image"] = image
     if env is not None:
         data["env"] = env
-    return ServiceConfiguration.parse_obj(data)
+    return ServiceConfiguration.model_validate(data)
 
 
 def _run_spec(configuration: ServiceConfiguration, **kwargs):
@@ -77,7 +77,7 @@ def _run_spec_with_overrides(configuration: ServiceConfiguration, **overrides) -
     )
     if not run_spec_overrides:
         return run_spec
-    return RunSpec.parse_obj({**run_spec.dict(), **run_spec_overrides})
+    return RunSpec.model_validate({**run_spec.model_dump(), **run_spec_overrides})
 
 
 class TestValidateRunSpecRetryDuration:

@@ -3,18 +3,17 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
-from pydantic import UUID4, Field, root_validator
-from typing_extensions import Annotated
+from pydantic import UUID4, ConfigDict, Field, model_validator
+from typing_extensions import Annotated, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
-    CoreConfig,
     CoreModel,
     NetworkMode,
     RegistryAuth,
-    generate_dual_core_model,
+    drop_merged_profile,
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
@@ -519,14 +518,9 @@ class Job(CoreModel):
     job_connection_info: Optional[JobConnectionInfo] = None
 
 
-class RunSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        prop = schema.get("properties", {})
-        prop.pop("merged_profile", None)
+class RunSpec(CoreModel):
+    model_config = ConfigDict(json_schema_extra=drop_merged_profile)
 
-
-class RunSpec(generate_dual_core_model(RunSpecConfig)):
     # TODO: consider removing `run_name` here because it is already passed in `configuration`.
     run_name: Annotated[
         Optional[str],
@@ -588,23 +582,26 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
             " Can be empty only before the run is submitted."
         ),
     ] = None
-    # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
+    # TODO: consider a `property` or `cached_property` instead of an excluded field.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
     """`merged_profile` stores profile parameters merged from `profile` and `configuration`.
     Read profile parameters from `merged_profile` instead of `profile` directly.
     """
 
-    @root_validator
+    @model_validator(mode="before")
+    @classmethod
     def _merged_profile(cls, values) -> Dict:
         if values.get("profile") is None:
             merged_profile = Profile(name="default")
         else:
-            merged_profile = Profile.parse_obj(values["profile"])
+            # Copy first: `model_validate` returns the *same* instance for a same-class input, so
+            # the `setattr` loop below would otherwise mutate the caller's profile in place.
+            merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
         try:
-            conf = RunConfiguration.parse_obj(values["configuration"]).__root__
+            conf = RunConfiguration.model_validate(values["configuration"]).root
         except KeyError:
             raise ValueError("Missing configuration")
-        for key in ProfileParams.__fields__:
+        for key in ProfileParams.model_fields:
             conf_val = getattr(conf, key, None)
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)
@@ -613,19 +610,19 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
         values["merged_profile"] = merged_profile
         return values
 
-    @root_validator
-    def _validate_dynamo_no_retry(cls, values) -> Dict:
+    @model_validator(mode="after")
+    def _validate_dynamo_no_retry(self) -> Self:
         """Reject `retry` for services with a Dynamo router replica group.
         Dynamo workers cache the router's internal IP at provisioning time. A
         retry would produce a new router and likely a new internal_ip, leaving workers bound
         to a router that no longer exists.
         """
-        merged_profile = values.get("merged_profile")
-        cfg = values.get("configuration")
+        merged_profile = self.merged_profile
+        cfg = self.configuration
         if merged_profile is None or merged_profile.retry is None:
-            return values
+            return self
         if not isinstance(cfg, ServiceConfiguration):
-            return values
+            return self
         for g in cfg.replica_groups:
             if g.router is not None and g.router.type == RouterType.DYNAMO:
                 raise ValueError(
@@ -636,7 +633,7 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
                     "Remove `retry` from the profile/configuration and "
                     "re-apply."
                 )
-        return values
+        return self
 
 
 class ServiceModelSpec(CoreModel):
@@ -696,7 +693,7 @@ class Run(CoreModel):
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission] = None
-    cost: float = 0
+    cost: float = 0.0
     service: Optional[ServiceSpec] = None
     deployment_num: int = 0
     """`deployment_num` uses a default value for compatibility with pre-0.19.14 servers."""

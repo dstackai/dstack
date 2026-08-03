@@ -168,7 +168,7 @@ def _load_session_configuration(agent_session: PresetAgentSession) -> PresetConf
     # The session copy is canonical output, not user input: parse it without
     # the user-facing deprecation warnings.
     try:
-        return PresetConfiguration.parse_obj(
+        return PresetConfiguration.model_validate(
             yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
         )
     except (OSError, ValueError) as e:
@@ -346,7 +346,7 @@ def _resolve_preset_env(
     """Resolves `EnvSentinel` entries from the process environment. Non-strict
     drops unresolvable entries instead of raising — for attach, where env values
     only feed redaction and the agent already runs."""
-    configuration = configuration.copy(deep=True)
+    configuration = configuration.model_copy(deep=True)
     resolved: dict[str, str] = {}
     for key, value in configuration.env.items():
         if isinstance(value, EnvSentinel):
@@ -357,7 +357,7 @@ def _resolve_preset_env(
                     raise ConfigurationError(str(e)) from e
         else:
             resolved[key] = value
-    configuration.env = Env.parse_obj(resolved)
+    configuration.env = Env.model_validate(resolved)
     return configuration
 
 
@@ -845,10 +845,10 @@ def _build_constraints(
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
-    constraints = PresetConstraints.parse_obj(
+    constraints = PresetConstraints.model_validate(
         {
             "run_name_prefix": build_name,
-            "model": json.loads(configuration.model.json(exclude_none=True)),
+            "model": json.loads(configuration.model.model_dump_json(exclude_none=True)),
             "context_length": configuration.context_length,
             "max_trials": configuration.max_trials,
             "concurrency": configuration.effective_concurrency,
@@ -857,7 +857,7 @@ def _build_constraints(
         }
     )
     # All fields are always present; unset optional constraints render as null.
-    return json.dumps(json.loads(constraints.json()), indent=2) + "\n"
+    return json.dumps(json.loads(constraints.model_dump_json()), indent=2) + "\n"
 
 
 def _save_final_report_copy(
