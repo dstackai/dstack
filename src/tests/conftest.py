@@ -11,6 +11,7 @@ from dstack._internal.server.testing.conf import (  # noqa: F401
     test_db,
 )
 from dstack._internal.settings import FeatureFlags
+from dstack._internal.utils import crypto
 
 
 def pytest_configure(config):
@@ -62,6 +63,25 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_windows)
         if not for_windows and is_windows:
             item.add_marker(skip_posix)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def reuse_one_rsa_key_pair():
+    """
+    Hands the same RSA key pair to every caller for the whole test session.
+
+    Generating a 2048-bit key takes ~80ms and the server generates one per user, project,
+    gateway, and job. A test that needs two different keys has to generate its own.
+    """
+    private_bytes, public_bytes = crypto.generate_rsa_key_pair_bytes()
+    public_key = public_bytes.rsplit(b" ", 1)[0]  # drop the comment, callers pass their own
+
+    def generate_rsa_key_pair_bytes(comment: str = "dstack") -> tuple[bytes, bytes]:
+        return private_bytes, public_key + f" {comment}\n".encode()
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(crypto, "generate_rsa_key_pair_bytes", generate_rsa_key_pair_bytes)
+        yield
 
 
 @pytest.fixture(scope="session", autouse=True)

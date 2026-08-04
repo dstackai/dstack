@@ -84,12 +84,12 @@ from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.settings import FeatureFlags
+from dstack._internal.utils import crypto
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
     interpolate_gateway_domain,
 )
-from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -198,7 +198,7 @@ def create_gateway_compute_model(
 ) -> GatewayComputeModel:
     assert configuration.name is not None
 
-    private_bytes, public_bytes = generate_rsa_key_pair_bytes()
+    private_bytes, public_bytes = crypto.generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
 

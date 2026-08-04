@@ -50,8 +50,8 @@ from dstack._internal.server.services.locking import (
 )
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
+from dstack._internal.utils import crypto
 from dstack._internal.utils.common import get_current_datetime, run_async
-from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -628,7 +628,7 @@ async def create_project_model(
     validate_project_name(project_name)
     templates_repo = await _normalize_templates_repo_url(templates_repo)
     private_bytes, public_bytes = await run_async(
-        generate_rsa_key_pair_bytes, f"{project_name}@dstack"
+        crypto.generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
     project = ProjectModel(
         id=uuid.uuid4(),
