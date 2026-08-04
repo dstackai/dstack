@@ -76,54 +76,6 @@ You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends
     Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
     For self-hosted Kubernetes, you must provide a load balancer by yourself.
 
-### Router
-
-> In previous releases, `dstack` allowed configuring `router` the gateway, which was required for PD disaggregation. Since 0.20.17, the `router` configuration has moved to [services](services.md#pd-disaggregation), and the gateway no longer needs to configure router.
-
-<!-- ### Router
-
-By default, the gateway uses its own load balancer to route traffic between replicas. However, you can delegate this responsibility to a specific router by setting the `router` property. Currently, the only supported external router is `sglang`.
-
-#### SGLang
-
-The `sglang` router delegates routing logic to the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#).
-
-To enable it, set `type` field under `router` to `sglang`:
-
-<div editor-title="gateway.dstack.yml">
-
-```yaml
-type: gateway
-name: sglang-gateway
-
-backend: aws
-region: eu-west-1
-
-domain: example.com
-
-router:
-  type: sglang
-  policy: cache_aware
-```
-
-</div>
-
-If you configure the `sglang` router, [services](../concepts/services.md) can run either [standard SGLang workers](../examples/inference/sglang.md) or [Prefill-Decode workers](../examples/inference/sglang.md#pd-disaggregation) (aka PD disaggregation).
-
-!!! note "PD disaggregation"
-    To run services with PD disaggregation see [SGLang PD disaggregation](../examples/inference/sglang.md#pd-disaggregation).
-
-!!! note "Deprecation"
-    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release.
-
-??? info "Policy"
-    The `policy` property allows you to configure the routing policy:
-
-    * `cache_aware` &mdash; Default policy; combines cache locality with load balancing, falling back to shortest queue. 
-    * `power_of_two` &mdash; Samples two workers and picks the lighter one.                                               
-    * `random` &mdash; Uniform random selection.                                                                    
-    * `round_robin` &mdash; Cycles through workers in order.                                                              -->
-
 ### Certificate
 
 By default, when you run a service with a gateway, `dstack` provisions an SSL certificate via Let's Encrypt for the configured domain. This automatically enables HTTPS for the service endpoint.

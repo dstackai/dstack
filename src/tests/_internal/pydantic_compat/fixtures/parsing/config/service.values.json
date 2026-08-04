@@ -73,7 +73,6 @@
     "shm_size": null
   },
   "retry": null,
-  "router": null,
   "scaling": null,
   "schedule": null,
   "setup": [],

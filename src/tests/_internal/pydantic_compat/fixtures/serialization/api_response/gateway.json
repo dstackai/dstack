@@ -12,7 +12,6 @@
     "public_ip": true,
     "region": "us-east-1",
     "replicas": null,
-    "router": null,
     "tags": null,
     "type": "gateway"
   },

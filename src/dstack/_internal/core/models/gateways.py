@@ -8,7 +8,6 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
 GATEWAY_REPLICAS_DEFAULT = 1
@@ -67,15 +66,6 @@ class GatewayConfiguration(CoreModel):
                 " Omit to use the backend's default, which is typically a small non-GPU instance"
             ),
             min_length=1,
-        ),
-    ] = None
-    router: Annotated[
-        Optional[AnyGatewayRouterConfig],
-        Field(
-            description=(
-                "The router configuration for this gateway. "
-                "E.g. `{ type: sglang, policy: round_robin }`."
-            ),
         ),
     ] = None
     domain: Annotated[
@@ -203,7 +193,6 @@ class GatewayComputeConfiguration(CoreModel):
     ssh_key_pub: str
     certificate: Annotated[Optional[AnyGatewayCertificate], Field(discriminator="type")] = None
     tags: Optional[Dict[str, str]] = None
-    router: Optional[AnyGatewayRouterConfig] = None
 
 
 class GatewayProvisioningData(CoreModel):

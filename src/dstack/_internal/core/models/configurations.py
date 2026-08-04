@@ -39,7 +39,7 @@ from dstack._internal.core.models.profiles import (
     SpotPolicy,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import (
@@ -1058,14 +1058,6 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    router: Annotated[
-        Optional[AnyServiceRouterConfig],
-        Field(
-            description=(
-                "Router configuration for the service. Requires a gateway with matching router enabled. "
-            ),
-        ),
-    ] = None
 
     @field_validator("port")
     @classmethod
@@ -1364,23 +1356,6 @@ class ServiceConfigurationParams(CoreModel):
             router_group = router_groups[0]
             if router_group.count.min != 1 or router_group.count.max != 1:
                 raise ValueError("For now replica group with `router` must have `count: 1`.")
-        return self
-
-    @model_validator(mode="after")
-    def validate_replica_group_router_mutex(self) -> Self:
-        """
-        When a replica group sets `router:`, service-level `router` must be omitted.
-        (Gateway-level SGLang is rejected at service registration when a gateway is selected.)
-        """
-        replicas = self.replicas
-        if not isinstance(replicas, list):
-            return self
-        if not any(g.router is not None for g in replicas):
-            return self
-        if self.router is not None:
-            raise ValueError(
-                "Service-Level router configuration is not allowed together with replica-group `router`."
-            )
         return self
 
 
