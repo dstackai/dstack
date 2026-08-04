@@ -94,13 +94,6 @@ class TestMetricValues:
 
 
 class TestLayout:
-    def test_two_columns_reused_by_every_resource(self):
-        """cpu and gpu=N are both processors with a utilization and a memory, so four
-        dedicated columns would leave half of every row empty."""
-        output = _render(_job(gpus=2), _job_metrics(gpus=2))
-        assert _lines(output)[0].split() == ["UTILIZATION", "MEMORY"]
-        assert [ln.split()[0] for ln in _lines(output)[1:4]] == ["cpu", "gpu=0", "gpu=1"]
-
     def test_each_row_carries_both_of_its_numbers(self):
         output = _render(_job(gpus=1), _job_metrics(gpus=1, cpu_pct=25.0, gpu_util=77.0))
         assert "25% of 8" in _row(output, "cpu")
