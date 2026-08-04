@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from functools import cache
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -16,7 +15,6 @@ from dstack._internal.server.testing.conf import (  # noqa: F401
     session,
     test_db,
 )
-from dstack._internal.utils import ssh as ssh_utils
 
 
 def _warm_up_route_schemas() -> None:
@@ -44,19 +42,6 @@ def _warm_up_route_schemas() -> None:
 
 
 _warm_up_route_schemas()
-
-
-@pytest.fixture(scope="session", autouse=True)
-def cache_parsed_ssh_keys():
-    """
-    Parses each SSH key once per session instead of once per call.
-
-    Parsing an RSA key costs ~190ms because paramiko validates it, and fleet spec
-    validation parses the same handful of test keys over and over.
-    """
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(ssh_utils, "pkey_from_str", cache(ssh_utils.pkey_from_str))
-        yield
 
 
 @pytest.fixture

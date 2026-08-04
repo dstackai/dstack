@@ -1,5 +1,6 @@
 import inspect
 import os
+from functools import cache
 
 import pytest
 
@@ -12,6 +13,7 @@ from dstack._internal.server.testing.conf import (  # noqa: F401
 )
 from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import crypto
+from dstack._internal.utils import ssh as ssh_utils
 
 
 def pytest_configure(config):
@@ -81,6 +83,19 @@ def reuse_one_rsa_key_pair():
 
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(crypto, "generate_rsa_key_pair_bytes", generate_rsa_key_pair_bytes)
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cache_parsed_ssh_keys():
+    """
+    Parses each SSH key once per session instead of once per call.
+
+    Parsing an RSA key costs ~190ms because paramiko validates it, and fleet spec
+    validation parses the same handful of test keys over and over.
+    """
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(ssh_utils, "pkey_from_str", cache(ssh_utils.pkey_from_str))
         yield
 
 
