@@ -101,6 +101,10 @@ from dstack._internal.utils.ssh import pkey_from_str
 
 logger = get_logger(__name__)
 
+# How hard to retry row locks before reporting the fleet as busy.
+_LOCK_RETRY_ATTEMPTS = 10
+_LOCK_RETRY_INTERVAL = 0.5
+
 
 def switch_fleet_status(
     session: AsyncSession,
@@ -788,7 +792,7 @@ async def delete_fleets(
         # Retry locking fleets to increase lock acquisition chances.
         # This hack is needed until requests are queued.
         fleet_models = []
-        for i in range(10):
+        for attempt in range(_LOCK_RETRY_ATTEMPTS):
             res = await session.execute(
                 select(FleetModel)
                 .where(
@@ -814,7 +818,8 @@ async def delete_fleets(
             fleet_models = res.scalars().unique().all()
             if len(fleet_models) == len(fleets_ids):
                 break
-            await asyncio.sleep(0.5)
+            if attempt < _LOCK_RETRY_ATTEMPTS - 1:
+                await asyncio.sleep(_LOCK_RETRY_INTERVAL)
         if len(fleet_models) != len(fleets_ids):
             # TODO: Make the endpoint fully async so we don't need to lock and error.
             msg = (
@@ -826,7 +831,7 @@ async def delete_fleets(
         # Retry locking instances to increase lock acquisition chances.
         # This hack is needed until requests are queued.
         instances_left_to_lock = set(instances_ids)
-        for i in range(10):
+        for attempt in range(_LOCK_RETRY_ATTEMPTS):
             res = await session.execute(
                 select(InstanceModel.id)
                 .where(
@@ -841,7 +846,8 @@ async def delete_fleets(
             instances_left_to_lock.difference_update(res.scalars().unique().all())
             if len(instances_left_to_lock) == 0:
                 break
-            await asyncio.sleep(0.5)
+            if attempt < _LOCK_RETRY_ATTEMPTS - 1:
+                await asyncio.sleep(_LOCK_RETRY_INTERVAL)
         if len(instances_left_to_lock) > 0:
             msg = (
                 "Failed to delete fleets: fleet instances are being processed currently. Try again later."
