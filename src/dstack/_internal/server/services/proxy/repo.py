@@ -131,6 +131,7 @@ class ServerProxyRepo(BaseProxyRepo):
             )
             replicas.append(replica)
         return Service(
+            id=run.id.hex,
             project_name=project_name,
             run_name=run.run_name,
             domain=None,

@@ -1,4 +1,5 @@
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,7 @@ from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.testing.common import Mocks
 from dstack._internal.proxy.lib.models import ChatModel, OpenAIChatModelFormat
+from dstack._internal.proxy.lib.testing.common import make_project, make_service
 
 
 def make_client(
@@ -32,6 +34,7 @@ def register_service_payload(
     rate_limits: Optional[list[dict]] = None,
 ) -> dict:
     return {
+        "id": uuid.uuid4().hex,
         "run_name": run_name,
         "domain": domain,
         "https": https,
@@ -114,6 +117,17 @@ class TestRegisterService:
         # no replicas
         assert "upstream" not in conf
         assert "return 503;" in conf
+
+    async def test_legacy_register_without_id(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        repo = GatewayProxyRepo()
+        client = make_client(tmp_path, repo=repo)
+        payload = register_service_payload(run_name="test-run", domain="test-run.gtw.test")
+        del payload["id"]
+        resp = await client.post("/api/registry/test-proj/services/register", json=payload)
+        assert resp.status_code == 200
+        service = await repo.get_service("test-proj", "test-run")
+        assert service is not None
+        assert service.id is None
 
     async def test_register_with_https(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
@@ -375,6 +389,55 @@ class TestRegisterReplica:
         }
         conf_after = (tmp_path / "443-test-run.gtw.test.conf").read_text()
         assert conf_after == conf_before
+
+
+@pytest.mark.asyncio
+class TestSetServiceId:
+    async def test_set_id(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        repo = GatewayProxyRepo()
+        client = make_client(tmp_path, repo=repo)
+        # simulate a service registered before IDs were introduced
+        await repo.set_project(make_project("test-proj"))
+        await repo.set_service(
+            make_service("test-proj", "test-run", domain="test-run.gtw.test").model_copy(
+                update={"id": None}
+            )
+        )
+        new_id = uuid.uuid4().hex
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/set_id",
+            json={"id": new_id},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
+        service = await repo.get_service("test-proj", "test-run")
+        assert service is not None
+        assert service.id == new_id
+
+    async def test_set_id_no_service_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/set_id",
+            json={"id": uuid.uuid4().hex},
+        )
+        assert resp.status_code == 400
+        assert resp.json() == {
+            "detail": "Service test-proj/test-run does not exist, cannot set ID"
+        }
+
+    async def test_set_id_already_set_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
+        )
+        assert resp.status_code == 200
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/set_id",
+            json={"id": uuid.uuid4().hex},
+        )
+        assert resp.status_code == 400
+        assert resp.json() == {"detail": "Service test-proj/test-run already has an ID"}
 
 
 @pytest.mark.asyncio

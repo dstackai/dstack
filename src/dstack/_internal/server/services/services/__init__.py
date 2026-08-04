@@ -187,6 +187,7 @@ async def _register_service_in_gateway(
                 do_register = partial(
                     client.register_service,
                     project=run_model.project.name,
+                    run_id=run_model.id,
                     run_name=run_model.run_name,
                     domain=domain,
                     service_https=configure_service_https,
