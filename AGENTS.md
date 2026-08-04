@@ -39,6 +39,8 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Speed up large runs with `-n auto` (pytest-xdist), e.g. `uv run pytest -n auto`.
 - Group tests for the same unit (function/class) using `Test*` classes that mirror unit's name.
 - Keep tests hermetic (network disabled except localhost per `[tool.pytest.ini_options]` in `pyproject.toml`); stub cloud calls with mocks.
+- Keep the suite fast. Never let a test wait on real time.
+- Machinery that costs hundreds of milliseconds per test (spawning a subprocess, starting a container, generating a key, real HTTP) has to earn its place by covering something cheaper tests cannot. Say so in the test when it does. On the other hand, losing black-box coverage or making the test hard to follow is worse than the milliseconds it costs.
 
 ## Commit & Pull Request Guidelines
 - Name branches `issue_{issue_num}_{title}` when the work tracks an issue (e.g. `issue_3959_replicated_alb_gateways`), and `pr_{title}` otherwise.
