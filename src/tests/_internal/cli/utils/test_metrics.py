@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 from typing import List
 from unittest.mock import MagicMock
@@ -7,6 +8,7 @@ from rich.console import Console
 from rich.theme import Theme
 
 from dstack._internal.cli.utils.metrics import (
+    AXIS_RULE,
     MAX_SPARK_WIDTH,
     MIN_SPARK_WIDTH,
     _axis,
@@ -120,7 +122,19 @@ class TestTimeAxis:
         assert axis.index(axis.strip()[0]) == min(cpu_row.index(g) for g in SPARKS if g in cpu_row)
 
     def test_no_axis_when_there_are_no_samples(self):
-        assert "─" not in _render(_job(gpus=1), JobMetrics(metrics=[]))
+        assert AXIS_RULE not in _render(_job(gpus=1), JobMetrics(metrics=[]))
+
+    def test_axis_stops_where_a_young_run_stops(self):
+        """The sparkline draws one cell per sample and will not invent more, so a run
+        younger than the terminal is wide fills only part of the row. An axis drawn to the
+        requested width would claim a span nothing was measured over -- and Rich would
+        widen the column to fit it, pushing MEMORY sideways."""
+        output = _render(_job(gpus=1), _job_metrics(gpus=1, samples=12), width=200)
+        axis, cpu_row = _lines(output)[-1], _row(output, "cpu")
+        drawn = sum(1 for char in cpu_row if char in SPARKS) // 2  # two columns per row
+        assert drawn == 12  # one cell per sample, not the 80 cells 200 columns would allow
+        # the two columns print the same axis, separated by the table's own padding
+        assert [len(segment) for segment in re.split(r"\s{3,}", axis.strip())] == [drawn, drawn]
 
 
 class TestNoData:

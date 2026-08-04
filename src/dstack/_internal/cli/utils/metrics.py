@@ -39,6 +39,10 @@ guard, so a new point cannot arrive faster than this. Not `LIVE_TABLE_PROVISION_
 
 MIN_SPARK_WIDTH = 10
 MAX_SPARK_WIDTH = 80
+
+AXIS_RULE = "┄"
+"""Dotted, not solid: it only has to bind each pair of stamps, not compete with the
+sparklines above it. Not whitespace -- see `_axis`."""
 _FIXED_COLUMNS = 34
 """Columns the table needs besides the sparklines: labels, numbers and padding."""
 
@@ -89,7 +93,7 @@ def get_metrics_table(
         )
     window = _window(metrics)
     if window is not None:
-        axis = _axis(width, *window)
+        axis = _axis(min(width, _samples_num(metrics)), *window)
         table.add_row("", "", "")
         table.add_row("", axis, axis)
     return table
@@ -170,10 +174,16 @@ def _cell(spark: Text, label: str) -> Text:
 
 
 def _axis(width: int, first: datetime, last: datetime) -> Text:
-    """A labelled rule exactly as wide as the sparkline above it, so the two align."""
+    """A labelled rule exactly as wide as the sparkline above it, so the two align.
+
+    The rule earns its ink by grouping. Both columns print a pair of stamps, and past about
+    120 columns the whitespace inside a pair grows wider than the gap between the columns --
+    74 against 12 at width 200 -- so with nothing drawn the stamps pair up with the wrong
+    neighbour and the row reads as four unrelated times.
+    """
     left, right = _stamp(first), _stamp(last)
     fill = max(1, width - len(left) - len(right) - 2)
-    return Text(f"{left} " + "─" * fill + f" {right}", style="grey42")
+    return Text(f"{left} " + AXIS_RULE * fill + f" {right}", style="grey42")
 
 
 def _stamp(moment: datetime) -> str:
@@ -193,6 +203,17 @@ def _window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
     """Oldest and newest sample, or None if there are none."""
     stamps = [t for metric in job_metrics.metrics for t in metric.timestamps]
     return (min(stamps), max(stamps)) if stamps else None
+
+
+def _samples_num(job_metrics: JobMetrics) -> int:
+    """How many cells the sparklines will actually occupy.
+
+    `slices` never draws more cells than it has samples -- inventing the rest would be
+    fabricating data -- so a run younger than the terminal is wide fills only part of the
+    row. The axis has to stop where the data stops, or it claims a span nothing was
+    measured over and Rich widens the column to fit it.
+    """
+    return max((len(metric.timestamps) for metric in job_metrics.metrics), default=0)
 
 
 def _metric_values(job_metrics: JobMetrics, name: str) -> List[Any]:
