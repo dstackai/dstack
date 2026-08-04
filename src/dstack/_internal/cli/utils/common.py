@@ -24,16 +24,9 @@ _colors = {
     "code": "bold sea_green3",
 }
 
-console = Console(
-    theme=Theme(_colors),
-    force_terminal=settings.CLI_RICH_FORCE_TERMINAL,
-)
+console = Console(theme=Theme(_colors))
 
-error_console = Console(
-    theme=Theme(_colors),
-    force_terminal=settings.CLI_RICH_FORCE_TERMINAL,
-    stderr=True,
-)
+error_console = Console(theme=Theme(_colors), stderr=True)
 
 
 LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
