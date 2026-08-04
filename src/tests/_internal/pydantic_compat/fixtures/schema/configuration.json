@@ -590,7 +590,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0,
-                "maximum": 65536,
+                "maximum": 65535,
                 "type": "integer"
               },
               {
@@ -2103,7 +2103,7 @@
       "properties": {
         "container_port": {
           "exclusiveMinimum": 0,
-          "maximum": 65536,
+          "maximum": 65535,
           "title": "Container Port",
           "type": "integer"
         },
@@ -2111,7 +2111,7 @@
           "anyOf": [
             {
               "exclusiveMinimum": 0,
-              "maximum": 65536,
+              "maximum": 65535,
               "type": "integer"
             },
             {
@@ -2307,7 +2307,8 @@
         "3.10",
         "3.11",
         "3.12",
-        "3.13"
+        "3.13",
+        "3.14"
       ],
       "title": "PythonVersion",
       "type": "string"
@@ -3805,7 +3806,7 @@
           "anyOf": [
             {
               "exclusiveMinimum": 0,
-              "maximum": 65536,
+              "maximum": 65535,
               "type": "integer"
             },
             {
@@ -4613,7 +4614,7 @@
             "anyOf": [
               {
                 "exclusiveMinimum": 0,
-                "maximum": 65536,
+                "maximum": 65535,
                 "type": "integer"
               },
               {
