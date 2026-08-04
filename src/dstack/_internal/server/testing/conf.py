@@ -93,9 +93,6 @@ async def _clear_tables(db: Database):
     Deletes in reverse dependency order so foreign keys stay satisfied. `DELETE` rather
     than `TRUNCATE` because Postgres takes an exclusive lock and rewrites files per
     `TRUNCATE`, which costs ~90ms for these tables against ~2ms to delete the rows.
-
-    Both dialects send the deletes in one round trip, which is most of the remaining cost:
-    32 separate statements take ~3.4ms against ~0.8ms batched.
     """
     preparer = db.engine.sync_engine.dialect.identifier_preparer
     names = [preparer.format_table(table) for table in reversed(BaseModel.metadata.sorted_tables)]
