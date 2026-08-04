@@ -32,6 +32,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.services import fleets as fleets_services
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
@@ -1683,6 +1684,12 @@ class TestApplyFleetPlan:
         assert response.status_code == 403
 
 
+@pytest.fixture
+def no_lock_retry_wait(monkeypatch: pytest.MonkeyPatch):
+    """Makes tests asserting lock contention errors exhaust the retries without waiting."""
+    monkeypatch.setattr(fleets_services, "_LOCK_RETRY_INTERVAL", 0)
+
+
 class TestDeleteFleets:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
@@ -1794,7 +1801,7 @@ class TestDeleteFleets:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_fleet_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -2001,7 +2008,7 @@ class TestDeleteFleetInstances:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_selected_instance_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -2086,7 +2093,7 @@ class TestDeleteFleetInstances:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_fleet_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
