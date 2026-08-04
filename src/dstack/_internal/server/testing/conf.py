@@ -8,17 +8,18 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import Database, override_db
 from dstack._internal.server.models import BaseModel
 
-# Remember initialized URLs to create metadata once per session.
-_initialized_postgres_db_urls = set()
+SQLITE_URL = "sqlite+aiosqlite://"
 
 
 @pytest.fixture(scope="session")
 def postgres_container():
-    with PostgresContainer("postgres:16-alpine", driver="asyncpg") as postgres:
+    with PostgresContainer(
+        "postgres:16-alpine",
+        driver="asyncpg",
+        # A test database never has to survive a crash, and fsync dominates commit cost.
+        command="postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off",
+    ) as postgres:
         yield postgres.get_connection_url()
-
-
-SQLITE_URL = "sqlite+aiosqlite://"
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -44,28 +45,38 @@ async def sqlite_db():
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
-async def test_db(request, sqlite_db):
-    db_type = getattr(request, "param", "sqlite")
-    if db_type == "sqlite":
-        override_db(sqlite_db)
-        await _delete_all_rows(sqlite_db)
-        yield sqlite_db
-        return
-    if db_type != "postgres":
-        raise ValueError(f"Unknown db_type {db_type}")
+@pytest_asyncio.fixture(scope="session")
+async def postgres_db(request):
+    """
+    A Postgres database with the schema created once for the whole session.
+
+    Yields `None` without `--runpostgres` so that the container only starts when
+    Postgres tests actually run.
+    """
     if not request.config.getoption("--runpostgres"):
-        pytest.skip("Skipping Postgres tests as --runpostgres was not provided")
-    db_url = request.getfixturevalue("postgres_container")
-    db = Database(db_url)
-    override_db(db)
-    if db_url not in _initialized_postgres_db_urls:
-        async with db.engine.begin() as conn:
-            await conn.run_sync(BaseModel.metadata.create_all)
-        _initialized_postgres_db_urls.add(db_url)
-    await _truncate_postgres_db(db)
+        yield None
+        return
+    db = Database(request.getfixturevalue("postgres_container"))
+    async with db.engine.begin() as conn:
+        await conn.run_sync(BaseModel.metadata.create_all)
     yield db
     await db.engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def test_db(request, sqlite_db, postgres_db):
+    db_type = getattr(request, "param", "sqlite")
+    if db_type == "sqlite":
+        db = sqlite_db
+    elif db_type == "postgres":
+        if postgres_db is None:
+            pytest.skip("Skipping Postgres tests as --runpostgres was not provided")
+        db = postgres_db
+    else:
+        raise ValueError(f"Unknown db_type {db_type}")
+    override_db(db)
+    await _clear_tables(db)
+    yield db
 
 
 @pytest_asyncio.fixture
@@ -75,19 +86,21 @@ async def session(test_db):
         yield session
 
 
-async def _delete_all_rows(db: Database):
-    async with db.engine.begin() as conn:
-        for table in reversed(BaseModel.metadata.sorted_tables):
-            await conn.exec_driver_sql(f'DELETE FROM "{table.name}"')
+async def _clear_tables(db: Database):
+    """
+    Removes every row, leaving the schema in place.
 
-
-async def _truncate_postgres_db(db: Database):
+    Deletes in reverse dependency order so foreign keys stay satisfied. `DELETE` rather
+    than `TRUNCATE` because Postgres takes an exclusive lock and rewrites files per
+    `TRUNCATE`, which costs ~90ms for these tables against ~2ms to delete the rows.
+    """
     preparer = db.engine.sync_engine.dialect.identifier_preparer
-    table_names = ", ".join(
-        preparer.format_table(table) for table in BaseModel.metadata.sorted_tables
-    )
-    if not table_names:
-        return
-    truncate_statement = f"TRUNCATE {table_names} RESTART IDENTITY CASCADE"
+    names = [preparer.format_table(table) for table in reversed(BaseModel.metadata.sorted_tables)]
     async with db.engine.begin() as conn:
-        await conn.exec_driver_sql(truncate_statement)
+        if db.dialect_name == "postgresql":
+            # Batch into one statement: a round trip per table is most of the cost here.
+            statements = " ".join(f"DELETE FROM {name};" for name in names)
+            await conn.exec_driver_sql(f"DO $$ BEGIN {statements} END $$;")
+            return
+        for name in names:
+            await conn.exec_driver_sql(f"DELETE FROM {name}")

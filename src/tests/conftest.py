@@ -5,6 +5,7 @@ import pytest
 
 from dstack._internal.server.testing.conf import (  # noqa: F401
     postgres_container,
+    postgres_db,
     session,
     sqlite_db,
     test_db,
