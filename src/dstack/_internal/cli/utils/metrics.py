@@ -236,7 +236,6 @@ def _get_resources(job: Job) -> Optional[Resources]:
 
 
 def format_memory(memory_bytes: float, decimal_places: int) -> str:
-    """See test_format_memory in tests/_internal/cli/commands/test_metrics.py for examples."""
     memory_mb = memory_bytes / 1024 / 1024
     if memory_mb >= 1024:
         value = memory_mb / 1024
