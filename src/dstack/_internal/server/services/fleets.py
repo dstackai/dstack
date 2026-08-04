@@ -343,7 +343,12 @@ async def list_project_fleet_models(
     options = [joinedload(FleetModel.project).load_only(ProjectModel.name)]
     if include_instances:
         options.append(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
-    res = await session.execute(select(FleetModel).where(*filters).options(*options))
+    res = await session.execute(
+        select(FleetModel)
+        .where(*filters)
+        .order_by(FleetModel.created_at.desc(), FleetModel.id)
+        .options(*options)
+    )
     return list(res.unique().scalars().all())
 
 
