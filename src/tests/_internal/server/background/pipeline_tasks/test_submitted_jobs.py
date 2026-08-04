@@ -17,7 +17,11 @@ from dstack._internal.core.models.common import (
     RegistryAuth,
     validate_json_extra_ignore,
 )
-from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    NodeGroup,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
@@ -2692,13 +2696,15 @@ class TestLoadSubmittedJobContext:
         assert not context.multinode
         assert context.jobs_to_provision == [context.job]
 
-    async def test_non_master_loads_master_and_current_job(self, test_db, session: AsyncSession):
-        """Non-master: run_model.jobs should contain master job + current job (latest submissions)."""
+    async def test_non_master_multinode_loads_master_and_current_job(
+        self, test_db, session: AsyncSession
+    ):
+        """Homogeneous multinode workers: run_model.jobs should contain job 0 + current."""
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet = await create_fleet(session=session, project=project)
-        configuration = TaskConfiguration(image="debian", nodes=2)
+        configuration = TaskConfiguration(image="debian", nodes=3)
         run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
         run = await create_run(
             session=session,
@@ -2718,19 +2724,25 @@ class TestLoadSubmittedJobContext:
             job_provisioning_data=get_job_provisioning_data(),
             waiting_master_job=False,
         )
-        worker_job = await create_job(
+        worker_job_1 = await create_job(
             session=session,
             run=run,
             job_num=1,
             status=JobStatus.SUBMITTED,
             waiting_master_job=False,
         )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
         await session.commit()
 
-        context = await _load_submitted_job_context(session=session, job_model=worker_job)
-        # Only master (job_num=0) and current job (job_num=1) should be loaded.
+        context = await _load_submitted_job_context(session=session, job_model=worker_job_1)
         loaded_job_ids = {jm.id for jm in context.run_model.jobs}
-        assert loaded_job_ids == {master_job.id, worker_job.id}
+        assert loaded_job_ids == {master_job.id, worker_job_1.id}
         assert context.jobs_to_provision == [context.job]
 
     async def test_multinode_master_loads_all_replica_jobs(self, test_db, session: AsyncSession):
@@ -2773,6 +2785,87 @@ class TestLoadSubmittedJobContext:
         assert context.multinode
         assert len(context.jobs_to_provision) == 2
         assert len(context.replica_job_model_ids) == 2
+
+    async def test_node_group_master_provisions_only_its_group(
+        self, test_db, session: AsyncSession
+    ):
+        """Heterogeneous node groups: each group master batches only its own group."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(
+                    name="small",
+                    nodes=1,
+                    resources=ResourcesSpec(
+                        cpu=Range[int](min=2), memory=Range[Memory](min=Memory(4))
+                    ),
+                    commands=["echo small"],
+                ),
+                NodeGroup(
+                    name="large",
+                    nodes=2,
+                    resources=ResourcesSpec(
+                        cpu=Range[int](min=4), memory=Range[Memory](min=Memory(8))
+                    ),
+                    commands=["echo large"],
+                ),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        small_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_job_0 = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_job_1 = await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        await session.commit()
+
+        small_context = await _load_submitted_job_context(session=session, job_model=small_job)
+        # Multinode master: load all replica jobs.
+        assert {jm.job_num for jm in small_context.run_model.jobs} == {0, 1, 2}
+        assert [j.job_spec.job_num for j in small_context.jobs_to_provision] == [0]
+        assert small_context.jobs_to_provision[0].job_spec.node_group_name == "small"
+
+        large_context = await _load_submitted_job_context(session=session, job_model=large_job_0)
+        # Heterogeneous group master: job 0 + its node group.
+        assert {jm.job_num for jm in large_context.run_model.jobs} == {0, 1, 2}
+        assert sorted(j.job_spec.job_num for j in large_context.jobs_to_provision) == [1, 2]
+        assert {j.job_spec.node_group_name for j in large_context.jobs_to_provision} == {"large"}
+
+        large_worker_context = await _load_submitted_job_context(
+            session=session, job_model=large_job_1
+        )
+        # Non-master job in the group: job 0 + current.
+        assert {jm.job_num for jm in large_worker_context.run_model.jobs} == {0, 2}
+        assert [j.job_spec.job_num for j in large_worker_context.jobs_to_provision] == [2]
 
     async def test_loads_only_latest_submission(self, test_db, session: AsyncSession):
         """Only the latest submission per (replica_num, job_num) should be loaded, not historical ones."""

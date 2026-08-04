@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.configurations import NodeGroup, TaskConfiguration
+from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.core.models.runs import JobSSHKey
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
@@ -35,6 +36,65 @@ class TestSSHKey:
         assert len(job_specs) == 2
         assert job_specs[0].ssh_key == JobSSHKey(private="private1", public="public1")
         assert job_specs[1].ssh_key == JobSSHKey(private="private1", public="public1")
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("image_config_mock")
+class TestNodeGroups:
+    async def test_assigns_contiguous_ranks_and_metadata(self):
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(name="head", nodes=2, commands=["echo head"]),
+                NodeGroup(name="workers", nodes=2, commands=["echo worker"]),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_specs = await configurator.get_job_specs(replica_num=0)
+
+        assert len(job_specs) == 4
+        assert [j.job_num for j in job_specs] == [0, 1, 2, 3]
+        assert [j.jobs_per_replica for j in job_specs] == [4, 4, 4, 4]
+        assert [j.node_group_name for j in job_specs] == [
+            "head",
+            "head",
+            "workers",
+            "workers",
+        ]
+        assert [j.node_group_index for j in job_specs] == [0, 0, 1, 1]
+        assert [j.node_group_job_index for j in job_specs] == [0, 1, 0, 1]
+
+    async def test_uses_per_group_commands_and_resources(self):
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(
+                    name="head",
+                    nodes=1,
+                    commands=["echo head"],
+                    resources=ResourcesSpec(gpu=GPUSpec(name=["H100"], count=1)),
+                ),
+                NodeGroup(
+                    name="workers",
+                    nodes=1,
+                    commands=["echo worker"],
+                    resources=ResourcesSpec(gpu=GPUSpec(name=["A100"], count=2)),
+                ),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_specs = await configurator.get_job_specs(replica_num=0)
+
+        assert "echo head" in job_specs[0].commands[-1]
+        assert "echo worker" in job_specs[1].commands[-1]
+        assert job_specs[0].requirements.resources.gpu.name == ["H100"]
+        assert job_specs[0].requirements.resources.gpu.count.min == 1
+        assert job_specs[1].requirements.resources.gpu.name == ["A100"]
+        assert job_specs[1].requirements.resources.gpu.count.min == 2
 
 
 @pytest.mark.asyncio

@@ -708,6 +708,9 @@ class ConfigurationWithCommandsParams(CoreModel):
         replicas = getattr(self, "replicas", None)
         if isinstance(replicas, list):
             return self
+        # If groups is set, skip validation - commands come from node groups
+        if getattr(self, "groups", None) is not None:
+            return self
 
         if not self.commands and not getattr(self, "image", None):
             raise ValueError("Either `commands` or `image` must be set")
@@ -798,8 +801,85 @@ class DevEnvironmentConfiguration(
         return self
 
 
+class NodeGroup(CoreModel):
+    name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of the node group. If not provided, defaults to '0', '1', etc. "
+                "based on position."
+            )
+        ),
+    ] = None
+    nodes: Annotated[int, Field(description="The number of nodes in this group", ge=1)] = 1
+    resources: Annotated[
+        ResourcesSpec,
+        Field(description="The resources requirements for nodes in this group"),
+    ] = ResourcesSpec()
+    commands: Annotated[
+        CommandsList,
+        Field(description="The shell commands to run for nodes in this group"),
+    ] = []
+    ports: Annotated[
+        List[PortMappingOrShorthand],
+        Field(description="Port numbers/mapping to expose for nodes in this group"),
+    ] = []
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not is_valid_replica_group_name(v):
+                raise ValueError("Resource name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
+        return v
+
+
 class TaskConfigurationParams(CoreModel):
-    nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
+    nodes: Annotated[
+        int,
+        Field(description="The number of nodes for homogeneous multi-node tasks", ge=1),
+    ] = 1
+    groups: Annotated[
+        Optional[List[NodeGroup]],
+        Field(
+            description=(
+                "A list of node groups for heterogeneous multi-node tasks. "
+                "Mutually exclusive with `nodes`."
+            ),
+        ),
+    ] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_nodes_xor_groups(cls, data):
+        if not isinstance(data, dict):
+            return data
+        # Allow groups with default nodes: 1 (serialized configs always include it).
+        # Reject nodes: N (N != 1) together with groups.
+        if data.get("groups") is not None and "nodes" in data:
+            nodes = data.get("nodes")
+            if nodes is not None and nodes != 1:
+                raise ValueError("`nodes` and `groups` are mutually exclusive")
+        return data
+
+    @field_validator("groups")
+    @classmethod
+    def validate_groups(cls, v: Optional[List[NodeGroup]]) -> Optional[List[NodeGroup]]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("`groups` cannot be an empty list")
+        for index, group in enumerate(v):
+            if group.name is None:
+                group.name = str(index)
+        counts = Counter(group.name for group in v)
+        duplicates = [name for name, count in counts.items() if count > 1]
+        if duplicates:
+            raise ValueError(
+                f"Duplicate node group names found: {duplicates}. "
+                "Each node group must have a unique name."
+            )
+        return v
 
 
 class TaskConfiguration(
@@ -810,6 +890,24 @@ class TaskConfiguration(
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
+
+    @property
+    def node_groups(self) -> List[NodeGroup]:
+        if self.groups is not None:
+            return self.groups
+        return [
+            NodeGroup(
+                name=DEFAULT_REPLICA_GROUP_NAME,
+                nodes=self.nodes,
+                commands=self.commands,
+                resources=self.resources,
+                ports=self.ports,
+            )
+        ]
+
+    @property
+    def nodes_num(self) -> int:
+        return sum(group.nodes for group in self.node_groups)
 
 
 def _validate_replica_range(v: Range[int]) -> Range[int]:

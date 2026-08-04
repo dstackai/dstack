@@ -473,7 +473,15 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	nodeRank := ex.jobSpec.JobNum
 	nodesNum := ex.jobSpec.JobsPerReplica
 	gpusPerNodeNum := ex.clusterInfo.GPUSPerJob
-	gpusNum := nodesNum * gpusPerNodeNum
+	gpusNum := 0
+	if len(ex.clusterInfo.GPUSPerNode) > 0 {
+		for _, n := range ex.clusterInfo.GPUSPerNode {
+			gpusNum += n
+		}
+	} else {
+		// Old servers omit gpus_per_node; fall back to homogeneous math.
+		gpusNum = nodesNum * gpusPerNodeNum
+	}
 
 	mpiHostfilePath := filepath.Join(ex.dstackDir, "mpi/hostfile")
 
@@ -544,7 +552,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		log.Warning(ctx, "failed to include dstack_profile", "path", profilePath, "err", err)
 	}
 
-	if err := writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpusPerNodeNum, mpiHostfilePath); err != nil {
+	if err := writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, ex.clusterInfo.GPUSPerNode, gpusPerNodeNum, mpiHostfilePath); err != nil {
 		return fmt.Errorf("write MPI hostfile: %w", err)
 	}
 
@@ -759,7 +767,7 @@ func prepareUserSshDir(user *linuxuser.User) (string, error) {
 	return sshDir, nil
 }
 
-func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode int, path string) error {
+func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode []int, fallbackGpusPerJob int, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create MPI hostfile directory: %w", err)
 	}
@@ -775,16 +783,25 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode int, path s
 		}
 	}
 	if len(nonEmptyIps) == len(ips) {
-		var template string
-		if gpusPerNode == 0 {
-			// CPU node: the number of slots defaults to the number of processor cores on that host
-			// See: https://docs.open-mpi.org/en/main/launching-apps/scheduling.html#calculating-the-number-of-slots
-			template = "%s\n"
-		} else {
-			template = fmt.Sprintf("%%s slots=%d\n", gpusPerNode)
+		if len(gpusPerNode) > 0 && len(gpusPerNode) != len(ips) {
+			return fmt.Errorf(
+				"gpus_per_node length %d != job_ips length %d",
+				len(gpusPerNode), len(ips),
+			)
 		}
-		for _, ip := range nonEmptyIps {
-			if _, err = fmt.Fprintf(file, template, ip); err != nil {
+		for i, ip := range nonEmptyIps {
+			n := fallbackGpusPerJob
+			if len(gpusPerNode) > 0 {
+				n = gpusPerNode[i]
+			}
+			if n == 0 {
+				// CPU node: the number of slots defaults to the number of processor cores on that host
+				// See: https://docs.open-mpi.org/en/main/launching-apps/scheduling.html#calculating-the-number-of-slots
+				_, err = fmt.Fprintf(file, "%s\n", ip)
+			} else {
+				_, err = fmt.Fprintf(file, "%s slots=%d\n", ip, n)
+			}
+			if err != nil {
 				return fmt.Errorf("write MPI hostfile line: %w", err)
 			}
 		}

@@ -63,10 +63,15 @@ class VariablesInterpolator:
                 raise InterpolatorError(f"No pattern closing: {s[opening:]}")
 
             name = s[opening + len(Pattern.opening) : closing].strip()
-            if not self.validate_name(name):
-                raise InterpolatorError(f"Illegal reference name: {name}")
-            if name.split(".")[0] in self.skip:
+            # Skip before validate_name so non-standard refs (e.g. groups[0].nodes[0].IP_ADDRESS)
+            # can be left for later interpolators. Invalid skipped names without brackets
+            # (e.g. secrets.pass-word) still raise.
+            root = name.split(".")[0]
+            skip_ns = root.split("[")[0]
+            if skip_ns in self.skip and ("[" in root or self.validate_name(name)):
                 tokens.append(s[opening : closing + len(Pattern.closing)])
+            elif not self.validate_name(name):
+                raise InterpolatorError(f"Illegal reference name: {name}")
             elif name in self.variables:
                 tokens.append(self.variables[name])
             else:

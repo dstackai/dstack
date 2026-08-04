@@ -8,6 +8,7 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.models.routers import SGLangServiceRouterConfig
 from dstack._internal.core.models.runs import (
@@ -98,6 +99,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     if not run_spec.configuration.dstack:
         configuration_excludes["dstack"] = True
 
+    if isinstance(run_spec.configuration, TaskConfiguration):
+        if run_spec.configuration.groups is None:
+            configuration_excludes["groups"] = True
+
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.configuration.probes:
             probe_excludes: IncludeExcludeDictType = {}
@@ -160,6 +165,12 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     spec_excludes: IncludeExcludeDictType = {}
     if all(s.replica_group == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
         spec_excludes["replica_group"] = True
+    if all(s.node_group_index == 0 for s in job_specs):
+        spec_excludes["node_group_index"] = True
+    if all(s.node_group_name == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
+        spec_excludes["node_group_name"] = True
+    if all(s.node_group_job_index == 0 for s in job_specs):
+        spec_excludes["node_group_job_index"] = True
 
     probe_excludes: IncludeExcludeDictType = {}
     spec_excludes["probes"] = {"__all__": probe_excludes}

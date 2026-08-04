@@ -49,6 +49,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Requirements,
     Run,
+    RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
@@ -777,25 +778,45 @@ async def _fetch_run_model_for_submitted_job(
 ) -> RunModel:
     """Fetch run model with only the relevant latest-submission jobs.
 
+    Loading jobs is separate from provisioning them. job_num=0 may load all
+    siblings for coordination, but still provisions only its own node group.
+
     Only a small subset is needed depending on the job type:
-        * Master multinode: all same-replica jobs (for cluster provisioning and releasing sibling waits).
-        * Non-master: master job + current job (for master provisioning data lookup).
-        * Master single-node: current job only (no siblings needed).
+        * Multinode master (job_num=0): all same-replica jobs.
+        * First job in a node group (not job 0): job 0 + jobs in its group
+          (same shape batch).
+        * Other multinode jobs: job 0 + current job.
+        * Single-node master: current job only.
 
     Only the latest submission per (replica_num, job_num) is loaded since historical
     submissions are never accessed in submitted job processing.
     """
+    job_spec = get_job_spec(job_model)
     is_master = job_model.job_num == 0
-    is_multinode = get_job_spec(job_model).jobs_per_replica > 1
+    is_multinode = job_spec.jobs_per_replica > 1
 
     job_num_filters: list = []
-    if is_master and not is_multinode:
-        # Master single-node: only current job needed.
-        job_num_filters.append(JobModel.job_num == 0)
-    elif not is_master:
-        # Non-master: master job (for provisioning data) + current job.
+    if not is_multinode:
+        if is_master:
+            # Single-node master: only current job needed.
+            job_num_filters.append(JobModel.job_num == 0)
+        else:
+            # Non-master single-node should not happen; keep master + current for safety.
+            job_num_filters.append(JobModel.job_num.in_([0, job_model.job_num]))
+    elif is_master:
+        # Multinode master: load all jobs (fleet setup, release waiting_master_job).
+        # Provisioning still batches only this job's node group (same shape).
+        pass
+    elif job_spec.node_group_job_index == 0:
+        # First job in a node group (not job 0): job 0 + this group's jobs.
+        run_spec = await _get_run_spec(session, job_model.run_id)
+        group_job_nums = _job_nums_for_node_group(
+            run_spec.configuration, job_spec.node_group_index
+        )
+        job_num_filters.append(JobModel.job_num.in_(sorted({0, *group_job_nums})))
+    else:
+        # Other multinode jobs: job 0 + current job.
         job_num_filters.append(JobModel.job_num.in_([0, job_model.job_num]))
-    # else: master multinode — no job_num filter, load all jobs in replica.
 
     latest_submissions_sq = (
         select(
@@ -837,6 +858,21 @@ async def _fetch_run_model_for_submitted_job(
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one()
+
+
+async def _get_run_spec(session: AsyncSession, run_id: uuid.UUID) -> RunSpec:
+    res = await session.execute(select(RunModel.run_spec).where(RunModel.id == run_id))
+    return RunSpec.model_validate_json(res.scalar_one())
+
+
+def _job_nums_for_node_group(configuration, group_index: int) -> list[int]:
+    assert configuration.type == "task"
+    job_num = 0
+    for index, group in enumerate(configuration.node_groups):
+        if index == group_index:
+            return list(range(job_num, job_num + group.nodes))
+        job_num += group.nodes
+    raise ValueError(f"node_group_index {group_index} out of range")
 
 
 def _get_job_models_for_jobs(
@@ -2142,15 +2178,56 @@ def _hint_pipelines_fetch(
         pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
+def _is_node_group_master(job: Job, replica_jobs: list[Job]) -> bool:
+    """True if `job` has the lowest job_num among loaded jobs in its node group.
+
+    `job` must be in `replica_jobs`.
+    """
+    group_index = job.job_spec.node_group_index
+    group_job_nums = [
+        j.job_spec.job_num for j in replica_jobs if j.job_spec.node_group_index == group_index
+    ]
+    return job.job_spec.job_num == min(group_job_nums)
+
+
+def _job_needs_provisioning(job: Job) -> bool:
+    if not job.job_submissions:
+        return True
+    return job.job_submissions[-1].job_provisioning_data is None
+
+
 def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
-    jobs_to_provision = [job]
-    if is_multinode_job(job) and is_master_job(job) and job_model.waiting_master_job is not None:
-        jobs_to_provision = replica_jobs
-    return jobs_to_provision
+    """Select jobs to launch in this provision attempt.
+
+    Homogeneous multinode (`nodes: N` → one node group) still batches the whole
+    replica on the group master (rank 0).
+
+    Heterogeneous node groups batch only jobs that share `node_group_index`, so
+    ComputeGroup backends (`run_jobs`) receive a single-shape offer set.
+
+    Global `waiting_master_job` is unchanged: non-masters stay blocked until the
+    global master (job_num=0) finishes its provision attempt.
+    """
+    if not is_multinode_job(job):
+        return [job]
+    # Legacy rows without the master-wait protocol: provision one-by-one only.
+    if job_model.waiting_master_job is None:
+        return [job]
+    if not _is_node_group_master(job, replica_jobs):
+        return [job]
+
+    group_index = job.job_spec.node_group_index
+    group_jobs = [
+        j
+        for j in replica_jobs
+        if j.job_spec.node_group_index == group_index and _job_needs_provisioning(j)
+    ]
+    return group_jobs if group_jobs else [job]
 
 
 def _get_required_targeted_instance_offers(context: _SubmittedJobContext) -> int:
-    if is_multinode_job(context.job) and is_master_job(context.job):
+    # Node-group masters (including non-zero groups) may batch multiple jobs.
+    if is_multinode_job(context.job) and len(context.jobs_to_provision) > 1:
         return len(context.jobs_to_provision)
     return 1
 
@@ -2160,9 +2237,15 @@ def _release_replica_jobs_from_master_wait(
     replica_job_models: list[JobModel],
     jobs_to_provision: list[Job],
 ) -> None:
-    if len(jobs_to_provision) > 1:
-        logger.debug("%s: allow replica jobs to be provisioned one-by-one", fmt(job_model))
-        for replica_job_model in replica_job_models:
+    # Global master may only provision its own node group (len == 1). Still release
+    # waiting workers so other groups can provision on later ticks.
+    if job_model.job_num != 0:
+        return
+    if not any(m.waiting_master_job for m in replica_job_models):
+        return
+    logger.debug("%s: allow replica jobs to be provisioned one-by-one", fmt(job_model))
+    for replica_job_model in replica_job_models:
+        if replica_job_model.waiting_master_job:
             replica_job_model.waiting_master_job = False
 
 

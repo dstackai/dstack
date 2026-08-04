@@ -321,6 +321,9 @@ def get_dev_env_run_plan_dict(
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
+                    "node_group_index": 0,
+                    "node_group_name": "0",
+                    "node_group_job_index": 0,
                 },
                 "offers": [json.loads(o.model_dump_json()) for o in offers],
                 "total_offers": total_offers,
@@ -568,6 +571,9 @@ def get_dev_env_run_dict(
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
+                    "node_group_index": 0,
+                    "node_group_name": "0",
+                    "node_group_job_index": 0,
                 },
                 "job_submissions": [
                     {

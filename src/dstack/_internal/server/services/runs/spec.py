@@ -256,7 +256,7 @@ def can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> boo
 def get_nodes_required_num(run_spec: RunSpec) -> int:
     nodes_required_num = 1
     if run_spec.configuration.type == "task":
-        nodes_required_num = run_spec.configuration.nodes
+        nodes_required_num = run_spec.configuration.nodes_num
     elif run_spec.configuration.type == "service":
         nodes_required_num = sum(
             group.count.min or 0 for group in run_spec.configuration.replica_groups

@@ -299,6 +299,18 @@ class JobSpec(CoreModel):
     service_port: Optional[int] = None
     """`service_port` is `None` for non-services and pre-0.19.19 services. See `get_service_port`."""
     probes: list[ProbeSpec] = []
+    node_group_index: int = 0
+    """`node_group_index` uses a default value for backward compatibility."""
+    node_group_name: str = DEFAULT_REPLICA_GROUP_NAME
+    """`node_group_name` uses a default value for backward compatibility."""
+    node_group_job_index: int = 0
+    """That node's index inside its group (0 .. group.nodes-1).
+    Example:
+      groups:
+        - nodes: 2   # jobs get node_group_job_index 0 and 1
+        - nodes: 1   # job gets node_group_job_index 0
+    Default for backward compatibility.
+    """
 
 
 class JobProvisioningData(CoreModel):
@@ -391,6 +403,12 @@ class ClusterInfo(CoreModel):
     job_ips: List[str]
     master_job_ip: str
     gpus_per_job: int
+    """GPU count on this node only."""
+    gpus_per_node: List[int] = []
+    """GPU count for each node in the run, in `job_ips` order.
+    Used for heterogeneous node groups where nodes can have different GPU
+    counts (e.g. `[2, 8]`). `0` means CPU-only. Empty for older servers.
+    """
 
 
 class Probe(CoreModel):

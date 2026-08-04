@@ -447,10 +447,16 @@ async def create_job(
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = validate_json_extra_ignore(RunSpec, run.run_spec)
-    job_spec = (
-        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
-    )[0]
-    job_spec.job_num = job_num
+    job_specs = await get_job_specs_from_run_spec(
+        run_spec=run_spec, secrets={}, replica_num=replica_num
+    )
+    if 0 <= job_num < len(job_specs):
+        job_spec = job_specs[job_num]
+    else:
+        job_spec = job_specs[0].model_copy(deep=True)
+        job_spec.job_num = job_num
+        job_spec.job_name = f"{run_spec.run_name}-{job_num}-{replica_num}"
+
     job = JobModel(
         project_id=run.project_id,
         fleet=fleet,

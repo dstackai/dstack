@@ -49,3 +49,8 @@ class TestVariablesInterpolator:
             get_interpolator().interpolate("${{ secrets.password.hash }}")
         with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.007 }}")
+
+    def test_skips_groups_refs(self):
+        s = "ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379"
+        interpolator = VariablesInterpolator({"run": {"args": "x"}}, skip=["groups"])
+        assert interpolator.interpolate(s) == s

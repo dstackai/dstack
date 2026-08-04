@@ -692,19 +692,24 @@ class RunWithCommandsConfiguratorMixin:
             metavar="RUN_ARGS",
         )
 
-    def apply_commands_args(
-        self,
-        conf: ConfigurationWithCommandsParams,
-        args: argparse.Namespace,
-    ):
-        commands = conf.commands
+    def _interpolate_commands(self, commands: list[str], args: argparse.Namespace) -> None:
         run_args = shlex.join(args.run_args)
-        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
+        interpolator = VariablesInterpolator(
+            {"run": {"args": run_args}},
+            skip=["secrets", "groups"],
+        )
         try:
             for i, command in enumerate(commands):
                 commands[i] = interpolator.interpolate_or_error(command)
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
+
+    def apply_commands_args(
+        self,
+        conf: ConfigurationWithCommandsParams,
+        args: argparse.Namespace,
+    ):
+        self._interpolate_commands(conf.commands, args)
 
 
 class TaskConfigurator(
@@ -722,6 +727,9 @@ class TaskConfigurator(
         super().apply_args(conf, args)
         self.apply_ports_args(conf, args)
         self.apply_commands_args(conf, args)
+        if conf.groups is not None:
+            for group in conf.groups:
+                self._interpolate_commands(group.commands, args)
 
 
 class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigurator):

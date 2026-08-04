@@ -164,6 +164,7 @@ class SlurmCompute(
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
             requirements=requirements,
+            node_count=len(job_configurations),
         )
 
     def terminate_instance(
@@ -186,6 +187,7 @@ class SlurmCompute(
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         requirements: Requirements,
+        node_count: Optional[int] = None,
     ) -> ComputeGroupProvisioningData:
         if job.job_spec.registry_auth is not None:
             self._skip_offer_cache.add(run, job, instance_offer)
@@ -209,7 +211,11 @@ class SlurmCompute(
             assert run.run_spec.ssh_key_pub is not None
             authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
 
-            node_count = job.job_spec.jobs_per_replica
+            # Heterogeneous groups provision one shape at a time; Slurm allocation
+            # size must match that batch. Fall back to jobs_per_replica for
+            # run_job / homogeneous single-call paths.
+            if node_count is None:
+                node_count = job.job_spec.jobs_per_replica
             resources_spec = requirements.resources
             requested_resources = get_requested_resources_from_resources_spec(resources_spec)
 

@@ -916,3 +916,120 @@ class TestDevEnvironmentConfigurationParams:
     def test_version_requires_ide(self):
         with pytest.raises(ValueError, match="`version` requires `ide` to be set"):
             DevEnvironmentConfigurationParams(version="1.80.0")
+
+
+class TestNodeGroups:
+    def test_parses_int_nodes(self):
+        parsed = parse_run_configuration({"type": "task", "nodes": 2, "commands": ["true"]})
+        assert parsed.type == "task"
+        assert parsed.nodes == 2
+        assert parsed.groups is None
+        assert parsed.nodes_num == 2
+        assert len(parsed.node_groups) == 1
+        assert parsed.node_groups[0].nodes == 2
+        assert parsed.node_groups[0].name == "0"
+
+    def test_parses_groups_and_defaults_names(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "image": "debian",
+                "groups": [
+                    {"nodes": 2, "commands": ["echo head"]},
+                    {"name": "workers", "nodes": 1, "commands": ["echo worker"]},
+                ],
+            }
+        )
+        assert parsed.type == "task"
+        assert parsed.groups is not None
+        assert parsed.nodes_num == 3
+        assert parsed.node_groups[0].name == "0"
+        assert parsed.node_groups[1].name == "workers"
+        assert parsed.node_groups[0].commands == ["echo head"]
+        assert parsed.node_groups[1].commands == ["echo worker"]
+
+    def test_accepts_default_nodes_with_groups(self):
+        # Serialized TaskConfiguration always includes nodes=1 (the field default).
+        # The xor validator must allow that so model round-trips succeed.
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "image": "debian",
+                "nodes": 1,
+                "groups": [
+                    {"nodes": 2, "commands": ["echo head"]},
+                    {"name": "workers", "nodes": 1, "commands": ["echo worker"]},
+                ],
+            }
+        )
+        assert parsed.type == "task"
+        assert parsed.nodes == 1
+        assert parsed.groups is not None
+        assert parsed.nodes_num == 3
+
+    def test_groups_round_trip_via_model_dump(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "image": "debian",
+                "groups": [
+                    {"nodes": 2, "commands": ["echo head"], "ports": [8000]},
+                    {"name": "workers", "nodes": 1, "commands": ["echo worker"]},
+                ],
+            }
+        )
+        assert parsed.type == "task"
+        dumped = parsed.model_dump(mode="json")
+        assert dumped["nodes"] == 1
+        assert dumped["groups"] is not None
+
+        reparsed = parse_run_configuration(dumped)
+        assert reparsed.type == "task"
+        assert reparsed.nodes == 1
+        assert reparsed.nodes_num == 3
+        assert [g.name for g in reparsed.node_groups] == ["0", "workers"]
+        assert reparsed.node_groups[0].commands == ["echo head"]
+        assert reparsed.node_groups[0].ports[0].container_port == 8000
+        assert reparsed.node_groups[1].commands == ["echo worker"]
+
+    def test_rejects_auto_name_collision_with_explicit_name(self):
+        # Unnamed group at index 1 becomes "1", colliding with an explicit name "1".
+        with pytest.raises(ConfigurationError, match="Duplicate node group names"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "groups": [
+                        {"name": "1", "nodes": 1, "commands": ["true"]},
+                        {"nodes": 1, "commands": ["true"]},
+                    ],
+                }
+            )
+
+    def test_rejects_duplicate_group_names(self):
+        with pytest.raises(ConfigurationError, match="Duplicate node group names"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "groups": [
+                        {"name": "head", "nodes": 1, "commands": ["true"]},
+                        {"name": "head", "nodes": 1, "commands": ["true"]},
+                    ],
+                }
+            )
+
+    def test_rejects_empty_groups(self):
+        with pytest.raises(ConfigurationError, match="cannot be an empty list"):
+            parse_run_configuration({"type": "task", "image": "debian", "groups": []})
+
+    def test_rejects_nodes_and_groups_together(self):
+        with pytest.raises(ConfigurationError, match="mutually exclusive"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "nodes": 2,
+                    "groups": [{"nodes": 1, "commands": ["true"]}],
+                }
+            )
