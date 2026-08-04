@@ -89,6 +89,7 @@ from dstack._internal.server.services.projects import (
 )
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.utils import random_names
+from dstack._internal.utils import ssh as ssh_utils
 from dstack._internal.utils.common import (
     EntityID,
     EntityName,
@@ -97,7 +98,6 @@ from dstack._internal.utils.common import (
     get_lowest_unused_nums,
 )
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.ssh import pkey_from_str
 
 logger = get_logger(__name__)
 
@@ -1440,7 +1440,7 @@ def _validate_ssh_key(ssh_key: SSHKey):
     if ssh_key.private is None:
         raise ServerClientError("Private key not provided")
     try:
-        pkey_from_str(ssh_key.private)
+        ssh_utils.pkey_from_str(ssh_key.private)
     except ValueError:
         raise ServerClientError(
             "Unsupported key type. "
