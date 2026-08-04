@@ -423,6 +423,14 @@ async def _session_tailers(
             offset_key="trials",
             echo=agent_session.echo,
         ),
+        _RecordMirror(
+            source=workspace.verifications_path,
+            target=agent_session.verifications_path,
+            redacted_values=redacted_values,
+            offset_store=offset_store,
+            offset_key="verifications",
+            echo=agent_session.echo,
+        ),
     ]
     tailer_tasks = [
         asyncio.create_task(tailer.run()) for tailer in [progress_tailer, *record_mirrors]

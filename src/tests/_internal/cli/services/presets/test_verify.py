@@ -49,7 +49,7 @@ class TestBuildVerifiedPreset:
                 preset_configuration=PresetConfiguration(
                     name="qwen-build",
                     model={"base": "Qwen/Qwen3.5-27B"},
-                    context_length=8192,
+                    min_context_length=8192,
                     gateway="benchmark-gateway",
                     env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
                 ),

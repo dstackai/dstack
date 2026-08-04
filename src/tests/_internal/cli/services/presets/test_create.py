@@ -5,6 +5,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.services.presets.agent import (
@@ -88,16 +89,20 @@ def creation_context(tmp_path, monkeypatch):
     configuration = PresetConfiguration(
         name="qwen-build",
         model={"base": "Qwen/Qwen3.5-27B"},
-        context_length=8192,
-        max_trials=1,
+        min_context_length=8192,
+        max_ttft=5000,
+        concurrency=8,
+        trials=1,
         fleets=["gpu-fleet"],
         env={"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
     )
     source_configuration = PresetConfiguration(
         name="qwen-build",
         model={"base": "Qwen/Qwen3.5-27B"},
-        context_length=8192,
-        max_trials=1,
+        min_context_length=8192,
+        max_ttft=5000,
+        concurrency=8,
+        trials=1,
         fleets=["gpu-fleet"],
         env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
     )
@@ -429,12 +434,112 @@ class _FakeRunAPIs:
         self.run.status = RunStatus.TERMINATED
 
 
-class TestBuildConstraints:
-    def test_renders_all_fields_with_explicit_nulls_and_defaults(self):
+class TestFindingsInLogs:
+    def test_a_live_session_prints_the_log_alone(self, tmp_path, monkeypatch, capsys):
+        # Findings are written at the end, so there is nothing to append yet.
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        session = _agent_session(tmp_path)
+        print_preset_progress("provisioning", agent_session=session)
+
+        print_session_log(session)
+
+        out = capsys.readouterr().out
+        assert "provisioning" in out
+        assert "Findings" not in out
+
+
+class TestFindings:
+    def test_passes_through_to_constraints(self):
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3-32B"},
-            max_trials=3,
+            max_ttft=5000,
+            min_context_length=8192,
+            concurrency=8,
+            trials=1,
+            input_tokens=8192,
+            shared_prefix_tokens=7424,
+        )
+
+        data = json.loads(
+            _build_constraints(
+                configuration=configuration, build_name="qwen-abc123", allowed_fleets=("a",)
+            )
+        )
+
+        assert data["shared_prefix_tokens"] == 7424
+
+    def test_rejects_a_prefix_that_leaves_nothing_unique(self):
+        # Every request would be identical, which measures the cache rather than
+        # the configuration.
+        with pytest.raises(ValidationError, match="less than input_tokens"):
+            PresetConfiguration(
+                name="qwen",
+                model={"base": "Qwen/Qwen3-32B"},
+                max_ttft=5000,
+                min_context_length=8192,
+                concurrency=8,
+                trials=1,
+                input_tokens=8192,
+                shared_prefix_tokens=8192,
+            )
+
+    def test_checks_against_the_default_input_tokens(self):
+        # `input_tokens` unset means 1024, so a larger prefix is still rejected.
+        with pytest.raises(ValidationError, match="less than input_tokens"):
+            PresetConfiguration(
+                name="qwen",
+                model={"base": "Qwen/Qwen3-32B"},
+                max_ttft=5000,
+                min_context_length=8192,
+                concurrency=8,
+                trials=1,
+                shared_prefix_tokens=2048,
+            )
+
+
+class TestPerformanceConstraints:
+    def test_max_ttft_reaches_the_constraints(self):
+        configuration = PresetConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3-32B"},
+            min_context_length=8192,
+            concurrency=8,
+            trials=1,
+            max_ttft=10000,
+        )
+
+        data = json.loads(
+            _build_constraints(
+                configuration=configuration, build_name="qwen-abc123", allowed_fleets=("a",)
+            )
+        )
+
+        assert data["max_ttft"] == 10000
+
+    def test_throughput_is_derived_not_read(self):
+        # A miscomputed field must not become the number we rank on.
+        preset = get_preset()
+        benchmark = preset.validations[0].benchmark
+        benchmark.metrics.output_tok_per_s = 999999.0
+        benchmark.metrics.per_user_tok_per_s = 999999.0
+
+        expected = benchmark.metrics.total_output_tokens / benchmark.metrics.duration_seconds
+        assert benchmark.effective_output_tok_per_s == expected
+        # Per-user speed is the steady decode rate, not the aggregate over concurrency.
+        assert benchmark.effective_per_user_tok_per_s == 1000 / benchmark.metrics.tpot_ms.p50
+
+
+class TestBuildConstraints:
+    def test_renders_defaults_for_the_optional_fields(self):
+        configuration = PresetConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3-32B"},
+            concurrency=8,
+            trials=3,
+            max_ttft=5000,
+            min_context_length=32768,
             env=["HF_TOKEN"],
         )
 
@@ -448,9 +553,14 @@ class TestBuildConstraints:
         assert json.loads(text) == {
             "run_name_prefix": "qwen-abc123",
             "model": {"base": "Qwen/Qwen3-32B"},
-            "context_length": None,
-            "max_trials": 3,
+            "min_context_length": 32768,
+            "max_ttft": 5000,
+            "trials_num": 3,
             "concurrency": 8,
+            "input_tokens": 1024,
+            "output_tokens": 1024,
+            "shared_prefix_tokens": 0,
+            "baseline": False,
             "fleets": ["gpu-fleet"],
             "env": ["HF_TOKEN"],
         }
@@ -459,8 +569,9 @@ class TestBuildConstraints:
         configuration = PresetConfiguration(
             name="qwen",
             model={"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"},
-            context_length=32768,
-            max_trials=10,
+            min_context_length=32768,
+            max_ttft=5000,
+            trials=10,
             concurrency=16,
         )
 
@@ -473,8 +584,8 @@ class TestBuildConstraints:
         )
 
         assert data["model"] == {"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"}
-        assert data["context_length"] == 32768
-        assert data["max_trials"] == 10
+        assert data["min_context_length"] == 32768
+        assert data["trials_num"] == 10
         assert data["concurrency"] == 16
         assert data["fleets"] == ["a", "b"]
 
