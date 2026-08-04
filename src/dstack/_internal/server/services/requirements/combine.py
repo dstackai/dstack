@@ -171,7 +171,7 @@ def _combine_tags(value1: dict[str, str], value2: dict[str, str]) -> dict[str, s
 
 def _combine_resources(value1: ResourcesSpec, value2: ResourcesSpec) -> ResourcesSpec:
     return ResourcesSpec(
-        cpu=_combine_cpu(value1.cpu, value2.cpu),  # type: ignore[attr-defined]
+        cpu=_combine_cpu(value1.cpu, value2.cpu),
         memory=_combine_memory(value1.memory, value2.memory),
         shm_size=_combine_shm_size_optional(value1.shm_size, value2.shm_size),
         gpu=_combine_gpu_optional(value1.gpu, value2.gpu),

@@ -16,7 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import DEFAULT_DISK, CPUSpec, GPUSpec, Memory, Range
+from dstack._internal.core.models.resources import DEFAULT_DISK, GPUSpec, Memory, Range
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.common import get_or_error
 
@@ -170,8 +170,7 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
 
     res = req.resources
     if res.cpu:
-        # TODO: Remove in 0.20. Use res.cpu directly
-        cpu = CPUSpec.model_validate(res.cpu)
+        cpu = res.cpu
         q.cpu_arch = cpu.arch
         q.min_cpu = cpu.count.min
         q.max_cpu = cpu.count.max

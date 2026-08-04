@@ -59,7 +59,6 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.repos import RepoHeadWithCreds
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
-from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunPlan, RunSpec, RunStatus
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
@@ -533,8 +532,7 @@ class BaseRunConfigurator(
         """
         Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
         """
-        # TODO: Remove in 0.20. Use conf.resources.cpu directly
-        cpu_spec = CPUSpec.model_validate(conf.resources.cpu)
+        cpu_spec = conf.resources.cpu
         arch = cpu_spec.arch
         if arch is None:
             gpu_spec = conf.resources.gpu

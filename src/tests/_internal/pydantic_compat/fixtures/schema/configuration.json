@@ -699,8 +699,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -2584,8 +2587,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -2763,9 +2769,6 @@
             },
             {
               "type": "string"
-            },
-            {
-              "$ref": "#/$defs/Range_int_"
             }
           ],
           "default": {
@@ -2775,8 +2778,7 @@
               "min": 2
             }
           },
-          "description": "The CPU requirements",
-          "title": "Cpu"
+          "description": "The CPU requirements"
         },
         "disk": {
           "anyOf": [
@@ -3964,8 +3966,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -4723,8 +4728,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {

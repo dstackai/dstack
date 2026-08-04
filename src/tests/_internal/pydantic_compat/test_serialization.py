@@ -18,15 +18,12 @@ db, backend_config, backend_creds, backend_data, api_request, api_response, runn
 import json
 from typing import Any, Callable, Union
 
-import gpuhunt
 import pytest
 from pydantic import BaseModel
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetNodesSpec
 from dstack._internal.core.models.repos.remote import RemoteRunRepoData
-from dstack._internal.core.models.resources import CPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.volumes import RunpodVolumeConfiguration, VolumeSpec
 from dstack._internal.server.utils.routers import CustomJSONResponse
 from tests._internal.pydantic_compat import backend_factories, factories
@@ -225,60 +222,6 @@ class TestFleetNodesTargetCompatHack:
         nodes = factories.fleet().spec.configuration.nodes
         assert nodes is not None
         assert nodes.min == nodes.target, "fixture must hit the target == min branch"
-
-
-class TestResourcesSpecCPUCompatHack:
-    @pytest.mark.parametrize(
-        ("arch", "expected"),
-        [
-            pytest.param(None, {"min": 2, "max": 8}, id="unspecified-architecture"),
-            pytest.param(
-                gpuhunt.CPUArchitecture.X86,
-                {"min": 2, "max": 8},
-                id="x86-architecture",
-            ),
-            pytest.param(
-                gpuhunt.CPUArchitecture.ARM,
-                {"arch": "arm", "count": {"min": 2, "max": 8}},
-                id="arm-architecture",
-            ),
-        ],
-    )
-    def test_dict_and_json_apply_the_same_override(self, arch, expected):
-        resources = ResourcesSpec(
-            cpu=CPUSpec(arch=arch, count=Range[int](min=2, max=8)),
-        )
-
-        assert json.loads(resources.model_dump_json())["cpu"] == expected
-        # CoreModel.json() must call the overridden dict(); this assertion would expose a drift
-        # even if only one of the two methods retained the compatibility rewrite.
-        assert canonicalize(json.dumps(resources.model_dump()["cpu"])) == canonicalize(
-            json.dumps(expected)
-        )
-
-    @pytest.mark.parametrize(
-        ("arch", "expected"),
-        [
-            pytest.param(None, {"min": 2, "max": 8}, id="unspecified-architecture"),
-            pytest.param(
-                gpuhunt.CPUArchitecture.ARM,
-                {"arch": "arm", "count": {"min": 2, "max": 8}},
-                id="arm-architecture",
-            ),
-        ],
-    )
-    def test_override_is_applied_when_nested(self, arch, expected):
-        configuration = TaskConfiguration(
-            commands=["echo hi"],
-            resources=ResourcesSpec(
-                cpu=CPUSpec(arch=arch, count=Range[int](min=2, max=8)),
-            ),
-        )
-
-        assert json.loads(configuration.model_dump_json())["resources"]["cpu"] == expected
-        assert canonicalize(
-            json.dumps(configuration.model_dump()["resources"]["cpu"])
-        ) == canonicalize(json.dumps(expected))
 
 
 class TestFieldSerializationFilters:
