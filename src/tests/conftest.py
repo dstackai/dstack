@@ -6,6 +6,7 @@ import pytest
 from dstack._internal.server.testing.conf import (  # noqa: F401
     postgres_container,
     session,
+    sqlite_db,
     test_db,
 )
 from dstack._internal.settings import FeatureFlags
