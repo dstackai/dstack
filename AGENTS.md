@@ -34,11 +34,11 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Never edit a migration that has already been applied or released; add a new migration instead.
 
 ## Testing Guidelines
-- Default to `uv run pytest`. Use markers from `tests/conftest.py` like `--runpostgres` if need to include specific tests.
+- Default to `uv run pytest`. Use markers from `src/tests/conftest.py` like `--runpostgres` if need to include specific tests.
 - Scope the run to the change: for trivial or localized edits, run only the affected test modules, `Test*` classes, or `-k` selection instead of the whole suite. Reserve the full suite for broad or cross-cutting changes.
 - Speed up large runs with `-n auto` (pytest-xdist), e.g. `uv run pytest -n auto`.
 - Group tests for the same unit (function/class) using `Test*` classes that mirror unit's name.
-- Keep tests hermetic (network disabled except localhost per `pytest.ini`); stub cloud calls with mocks.
+- Keep tests hermetic (network disabled except localhost per `[tool.pytest.ini_options]` in `pyproject.toml`); stub cloud calls with mocks.
 
 ## Commit & Pull Request Guidelines
 - Name branches `issue_{issue_num}_{title}` when the work tracks an issue (e.g. `issue_3959_replicated_alb_gateways`), and `pr_{title}` otherwise.
