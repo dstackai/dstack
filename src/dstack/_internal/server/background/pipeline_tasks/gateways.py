@@ -189,7 +189,7 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                                             GatewayModel.replica_scale_attempt > 0,
                                         ),
                                     ),
-                                    # fetch pre-0.20.30 AWS ACM gateways to migrate their hostname
+                                    # fetch pre-0.21.0 AWS ACM gateways to migrate their hostname
                                     # and backend_data onto GatewayModel
                                     and_(
                                         GatewayModel.hostname.is_(None),
@@ -737,7 +737,7 @@ def _reconcile_gateway_replica_count(
     gateway_replicas: list[GatewayComputeModel],
 ) -> _ReplicaScalingResult:
     desired_replica_count = gateway_model.desired_replica_count
-    if desired_replica_count is None:  # pre-0.20.30 gateway
+    if desired_replica_count is None:  # pre-0.21.0 gateway
         if gateway_model.status != GatewayStatus.SUBMITTED:
             return _ReplicaScalingResult()
         desired_replica_count = gateways_services.get_gateway_configuration(gateway_model).replicas
@@ -891,7 +891,7 @@ def _migrate_hostname_and_backend_data_from_legacy_replica(
     gateway_computes: list[GatewayComputeModel],
 ) -> _GatewayUpdateMap:
     """
-    Move `hostname` and `backend_data` from pre-0.20.30 GatewayComputeModel onto GatewayModel.
+    Move `hostname` and `backend_data` from pre-0.21.0 GatewayComputeModel onto GatewayModel.
 
     Alembic migration ecc9e8a0bfac does the same thing. This function is a fallback in case any
     gateways are created by an older server replica after the migration passes.
@@ -902,7 +902,7 @@ def _migrate_hostname_and_backend_data_from_legacy_replica(
         if gateway_compute.hostname_deprecated_readonly is not None:
             update_map: _GatewayUpdateMap = {
                 "hostname": gateway_compute.hostname_deprecated_readonly,
-                # Pre-0.20.30 AWS ACM gateways used GatewayComputeModel.backend_data exclusively
+                # Pre-0.21.0 AWS ACM gateways used GatewayComputeModel.backend_data exclusively
                 # for load-balancer related fields, and not for gateway replica instance fields.
                 # So GatewayComputeModel.backend_data is copied entirely.
                 "backend_data": gateway_compute.backend_data,
