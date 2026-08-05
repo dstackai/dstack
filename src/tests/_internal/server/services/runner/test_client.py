@@ -638,7 +638,7 @@ class TestInstanceInfoResponseToGpuDriver:
 
 
 class TestShimClientGetInstanceInfo(BaseShimClientTest):
-    @pytest.mark.shim_version("0.20.30")
+    @pytest.mark.shim_version("0.21.0")
     def test_returns_instance_info(self, adapter: requests_mock.Adapter, client: ShimClient):
         adapter.register_uri(
             "GET",

@@ -835,8 +835,8 @@ def _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model: GatewayMode
         and gateway_model.hostname is None
     ):
         logger.warning(
-            "Found AWS ACM gateway %s without a hostname, which should indicate a pre-0.20.30"
-            " gateway not yet migrated to the 0.20.30 format. Waiting for the gateway pipeline to"
+            "Found AWS ACM gateway %s without a hostname, which should indicate a pre-0.21.0"
+            " gateway not yet migrated to the 0.21.0 format. Waiting for the gateway pipeline to"
             " perform the migration",
             gateway_model.id,
         )

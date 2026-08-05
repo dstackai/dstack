@@ -7,7 +7,6 @@ from typing_extensions import Self
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.core.models.resources import (
     DEFAULT_MEMORY_SIZE,
-    CPUSpec,
     Memory,
     ResourcesSpec,
 )
@@ -118,7 +117,6 @@ class RequestedResources:
 
 
 def get_requested_resources_from_resources_spec(spec: ResourcesSpec) -> RequestedResources:
-    assert isinstance(spec.cpu, CPUSpec)
     # 1 is the default value of --cpus-per-task
     cpu_count = spec.cpu.count.min or 1
 

@@ -18,6 +18,7 @@ from dstack._internal.core.models.fleets import (
     SSHHostParams,
     SSHParams,
 )
+from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -59,6 +60,14 @@ def get_table_cells(table: Table) -> list[dict[str, str]]:
         rows.append(row)
 
     return rows
+
+
+def get_table_cell_markup(table: Table, column_name: str, row_idx: int = 0) -> str:
+    """Returns the raw cell value, with rich markup intact."""
+    for col in table.columns:
+        if str(col.header) == column_name and row_idx < len(col._cells):
+            return str(col._cells[row_idx])
+    return ""
 
 
 def get_table_cell_style(table: Table, column_name: str, row_idx: int = 0) -> Optional[str]:
@@ -233,7 +242,7 @@ class TestGetFleetsTable:
         assert fleet_row["NODES"] == "0..4"
         assert fleet_row["BACKEND"] == "aws"
         assert fleet_row["SPOT"] == "auto"
-        assert fleet_row["PRICE"] == "-"  # no max_price set
+        assert fleet_row["PRICE"] == ""  # no max_price set
         assert fleet_row["STATUS"] == "active"
 
         instance_row = cells[1]
@@ -273,7 +282,7 @@ class TestGetFleetsTable:
         assert fleet_row["NODES"] == "1 (cluster)"
         assert fleet_row["BACKEND"] == "gcp"
         assert fleet_row["SPOT"] == "on-demand"
-        assert fleet_row["PRICE"] == "$0..$2"
+        assert fleet_row["PRICE"] == "$0..2"
         assert fleet_row["STATUS"] == "active"
 
         instance_row = cells[1]
@@ -320,15 +329,15 @@ class TestGetFleetsTable:
         assert fleet_row["NAME"] == "my-ssh"
         assert fleet_row["NODES"] == "2"
         assert fleet_row["BACKEND"] == "ssh"
-        assert fleet_row["SPOT"] == "-"
-        assert fleet_row["PRICE"] == "-"
+        assert fleet_row["SPOT"] == ""
+        assert fleet_row["PRICE"] == ""
         assert fleet_row["STATUS"] == "active"
 
         for i, instance_row in enumerate(cells[1:], start=0):
             assert f"instance={i}" in instance_row["NAME"]
             assert instance_row["BACKEND"] == "ssh"
-            assert instance_row["SPOT"] == "-"
-            assert instance_row["PRICE"] == "-"
+            assert instance_row["SPOT"] == ""
+            assert instance_row["PRICE"] == ""
 
     def test_ssh_fleet_with_verbose(self):
         instance = create_test_instance(
@@ -354,16 +363,16 @@ class TestGetFleetsTable:
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-ssh"
         assert fleet_row["NODES"] == "1 (cluster)"
-        assert fleet_row["RESOURCES"] == "-"
+        assert fleet_row["RESOURCES"] == ""
         assert fleet_row["BACKEND"] == "ssh"
-        assert fleet_row["SPOT"] == "-"
-        assert fleet_row["PRICE"] == "-"
+        assert fleet_row["SPOT"] == ""
+        assert fleet_row["PRICE"] == ""
 
         instance_row = cells[1]
         assert "instance=0" in instance_row["NAME"]
         assert instance_row["BACKEND"] == "ssh"
-        assert instance_row["SPOT"] == "-"
-        assert instance_row["PRICE"] == "-"
+        assert instance_row["SPOT"] == ""
+        assert instance_row["PRICE"] == ""
 
     def test_mixed_fleets(self):
         backend_instance = create_test_instance(
@@ -416,12 +425,12 @@ class TestGetFleetsTable:
         assert cells[2]["NAME"] == "ssh-fleet"
         assert cells[2]["NODES"] == "1"
         assert cells[2]["BACKEND"] == "ssh"
-        assert cells[2]["SPOT"] == "-"
-        assert cells[2]["PRICE"] == "-"
+        assert cells[2]["SPOT"] == ""
+        assert cells[2]["PRICE"] == ""
 
         assert "instance=0" in cells[3]["NAME"]
-        assert cells[3]["SPOT"] == "-"
-        assert cells[3]["PRICE"] == "-"
+        assert cells[3]["SPOT"] == ""
+        assert cells[3]["PRICE"] == ""
 
     def test_fleet_status_colors(self):
         # Add instances to avoid placeholder rows affecting row indices
@@ -441,8 +450,9 @@ class TestGetFleetsTable:
             [active_fleet, terminating_fleet], current_project="test-project", verbose=False
         )
 
+        # Settled states are dimmed, so a fleet row only draws the eye when something is wrong
         active_style = get_table_cell_style(table, "STATUS", 0)
-        assert active_style == "bold white"
+        assert active_style == "grey58"
 
         # Row 2 (after active fleet's instance)
         terminating_style = get_table_cell_style(table, "STATUS", 2)
@@ -463,7 +473,93 @@ class TestGetFleetsTable:
         assert idle_style == "bold sea_green3"
 
         busy_style = get_table_cell_style(table, "STATUS", 2)
-        assert busy_style == "bold white"
+        assert busy_style == "bold deep_sky_blue1"
+
+    def test_instance_status_blocks_keep_actual_status_color(self):
+        idle_instance = create_test_instance(instance_num=0, status=InstanceStatus.IDLE)
+        idle_instance.total_blocks = 4
+        idle_instance.busy_blocks = 0
+        busy_instance = create_test_instance(instance_num=1, status=InstanceStatus.BUSY)
+        busy_instance.total_blocks = 4
+        busy_instance.busy_blocks = 2
+
+        fleet = create_backend_fleet(name="test", instances=[idle_instance, busy_instance])
+
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
+        cells = get_table_cells(table)
+
+        # The fraction is dimmed, the word keeps the color of the instance's actual status
+        assert cells[1]["STATUS"] == "0/4 busy"
+        assert (
+            get_table_cell_markup(table, "STATUS", 1)
+            == "[secondary]0/4[/] [bold sea_green3]busy[/]"
+        )
+
+        assert cells[2]["STATUS"] == "2/4 busy"
+        assert (
+            get_table_cell_markup(table, "STATUS", 2)
+            == "[secondary]2/4[/] [bold deep_sky_blue1]busy[/]"
+        )
+
+    def test_instance_health_suffix(self):
+        unreachable = create_test_instance(instance_num=0, status=InstanceStatus.IDLE)
+        unreachable.unreachable = True
+        warning = create_test_instance(instance_num=1, status=InstanceStatus.BUSY)
+        warning.health_status = HealthStatus.WARNING
+        failure = create_test_instance(instance_num=2, status=InstanceStatus.BUSY)
+        failure.health_status = HealthStatus.FAILURE
+
+        fleet = create_backend_fleet(name="test", instances=[unreachable, warning, failure])
+
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
+        cells = get_table_cells(table)
+
+        assert cells[1]["STATUS"] == "idle (unreachable)"
+        assert "[bold indian_red1](unreachable)[/]" in get_table_cell_markup(table, "STATUS", 1)
+
+        assert cells[2]["STATUS"] == "busy (warning)"
+        assert "[bold gold1](warning)[/]" in get_table_cell_markup(table, "STATUS", 2)
+
+        assert cells[3]["STATUS"] == "busy (failure)"
+        assert "[bold indian_red1](failure)[/]" in get_table_cell_markup(table, "STATUS", 3)
+
+    def test_fleet_resources_dimmed_instance_resources_not(self):
+        instance = create_test_instance(instance_num=0, status=InstanceStatus.IDLE)
+        fleet = create_backend_fleet(
+            name="test", gpu_count_min=1, gpu_count_max=2, max_price=2.0, instances=[instance]
+        )
+
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
+
+        # The fleet row describes a requirement, so name, GPU and the price cap are dimmed
+        assert get_table_cell_markup(table, "NAME", 0) == "[secondary]test[/]"
+        assert get_table_cell_markup(table, "GPU", 0) == "[secondary]gpu:1..2[/]"
+        assert get_table_cell_markup(table, "PRICE", 0) == "[secondary]$0..2[/]"
+        # The instance shows what actually got provisioned and billed, so it stays bright
+        for column in ["NAME", "GPU", "PRICE"]:
+            assert "secondary" not in get_table_cell_markup(table, column, 1), column
+        # The backend and its region are both real values; only the parentheses are dimmed
+        assert (
+            get_table_cell_markup(table, "BACKEND", 1)
+            == "aws [secondary]([/]us-east-1[secondary])[/]"
+        )
+        # No row-level style dims the rest of the instance row
+        assert table.rows[1].style is None
+
+    def test_fleets_sorted_by_created_at_desc(self):
+        oldest = create_backend_fleet(name="oldest")
+        oldest.created_at = datetime(2023, 1, 1, tzinfo=timezone.utc)
+        newest = create_backend_fleet(name="newest")
+        newest.created_at = datetime(2023, 3, 1, tzinfo=timezone.utc)
+        middle = create_backend_fleet(name="middle")
+        middle.created_at = datetime(2023, 2, 1, tzinfo=timezone.utc)
+
+        table = get_fleets_table(
+            [oldest, newest, middle], current_project="test-project", verbose=False
+        )
+        cells = get_table_cells(table)
+
+        assert [c["NAME"] for c in cells] == ["newest", "middle", "oldest"]
 
     def test_empty_fleet(self):
         fleet = create_backend_fleet(name="empty-fleet", instances=[])
@@ -483,7 +579,7 @@ class TestGetFleetsTable:
         table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
-        assert cells[0]["PRICE"] == "$0..$5"
+        assert cells[0]["PRICE"] == "$0..5"
 
     def test_fleet_with_multiple_backends(self):
         fleet = create_backend_fleet(

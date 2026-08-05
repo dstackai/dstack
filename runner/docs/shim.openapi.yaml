@@ -2,7 +2,7 @@ openapi: 3.1.2
 
 info:
   title: dstack-shim API
-  version: v2/0.20.30
+  version: v2/0.21.0
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
   description: >
@@ -90,7 +90,7 @@ paths:
     get:
       summary: Get instance info
       description: >
-        (since [0.20.30](https://github.com/dstackai/dstack/releases/tag/0.20.30))
+        (since [0.21.0](https://github.com/dstackai/dstack/releases/tag/0.21.0))
         Returns facts about the host observed by shim, e.g., the GPU driver version.
         Unlike `/components`, the reported entities are not managed by shim.
       tags: [Instance]

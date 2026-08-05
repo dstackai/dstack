@@ -14,7 +14,7 @@ from typing_extensions import Self
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
+from dstack._internal.core.models.resources import ResourcesSpec
 
 
 class PresetBenchmarkWorkload(CoreModel):
@@ -159,7 +159,7 @@ class PresetListOutput(CoreModel):
 
 
 def _validate_exact_resources(resources: ResourcesSpec) -> None:
-    cpu = CPUSpec.model_validate(resources.cpu)
+    cpu = resources.cpu
     if not _is_exact(cpu.count) or not _is_exact(resources.memory):
         raise ValueError("preset validation resources must be exact")
     if resources.disk is None or not _is_exact(resources.disk.size):

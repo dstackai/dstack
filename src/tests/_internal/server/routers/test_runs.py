@@ -182,7 +182,7 @@ def get_dev_env_run_plan_dict(
             "type": "dev-environment",
             "name": None,
             "resources": {
-                "cpu": {"min": 2, "max": None},
+                "cpu": {"arch": "x86", "count": {"min": 2, "max": None}},
                 "memory": {"min": 8.0, "max": None},
                 "disk": None,
                 "gpu": None,
@@ -291,7 +291,7 @@ def get_dev_env_run_plan_dict(
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
-                            "cpu": {"min": 2, "max": None},
+                            "cpu": {"arch": "x86", "count": {"min": 2, "max": None}},
                             "memory": {"min": 8.0, "max": None},
                             "disk": None,
                             "gpu": None,
@@ -434,7 +434,7 @@ def get_dev_env_run_dict(
                 "name": None,
                 "type": "dev-environment",
                 "resources": {
-                    "cpu": {"min": 2, "max": None},
+                    "cpu": {"arch": "x86", "count": {"min": 2, "max": None}},
                     "memory": {"min": 8.0, "max": None},
                     "disk": None,
                     "gpu": None,
@@ -538,7 +538,7 @@ def get_dev_env_run_dict(
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
-                            "cpu": {"min": 2, "max": None},
+                            "cpu": {"arch": "x86", "count": {"min": 2, "max": None}},
                             "memory": {"min": 8.0, "max": None},
                             "disk": None,
                             "gpu": None,

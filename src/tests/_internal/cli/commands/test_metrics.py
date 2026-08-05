@@ -1,34 +1,47 @@
+from unittest.mock import MagicMock
+
 import pytest
 
-from dstack._internal.cli.commands.metrics import _format_memory
+from dstack._internal.cli.commands.metrics import _get_job, _get_job_metrics
+from dstack._internal.cli.utils.metrics import MAX_SAMPLES
+from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.metrics import JobMetrics
 
 
-@pytest.mark.parametrize(
-    "bytes_value,decimal_places,expected",
-    [
-        # Test MB values with different decimal places
-        (512 * 1024 * 1024, 0, "512MB"),  # exact MB, no decimals
-        (512 * 1024 * 1024, 2, "512MB"),  # exact MB, with decimals
-        (512.5 * 1024 * 1024, 0, "512MB"),  # decimal MB, no decimals
-        (512.5 * 1024 * 1024, 2, "512.5MB"),  # decimal MB, 2 decimals
-        (512.5 * 1024 * 1024, 3, "512.5MB"),  # decimal MB, 3 decimals
-        (999 * 1024 * 1024, 0, "999MB"),  # just under 1GB, no decimals
-        (999 * 1024 * 1024, 2, "999MB"),  # just under 1GB, with decimals
-        # Test GB values with different decimal places
-        (1.5 * 1024 * 1024 * 1024, 0, "2GB"),  # decimal GB, no decimals
-        (1.5 * 1024 * 1024 * 1024, 2, "1.5GB"),  # decimal GB, 2 decimals
-        (1.5 * 1024 * 1024 * 1024, 3, "1.5GB"),  # decimal GB, 3 decimals
-        (2 * 1024 * 1024 * 1024, 0, "2GB"),  # exact GB, no decimals
-        (2 * 1024 * 1024 * 1024, 2, "2GB"),  # exact GB, with decimals
-        # Test edge cases
-        (0, 0, "0MB"),  # zero bytes, no decimals
-        (0, 2, "0MB"),  # zero bytes, with decimals
-        (1023 * 1024, 0, "1MB"),  # just under 1MB, no decimals
-        (1023 * 1024, 2, "1MB"),  # just under 1MB, with decimals
-        (1024 * 1024 * 1024 - 1, 0, "1024MB"),  # just under 1GB, no decimals
-        (1024 * 1024 * 1024 - 1, 2, "1024MB"),  # just under 1GB, with decimals
-    ],
-)
-def test_format_memory(bytes_value: int, decimal_places: int, expected: str):
-    result = _format_memory(bytes_value, decimal_places)
-    assert result == expected
+def _run(replicas: int = 1, jobs_per_replica: int = 1):
+    run = MagicMock()
+    run.name = "my-run"
+    run._run.jobs = []
+    for replica in range(replicas):
+        for job_num in range(jobs_per_replica):
+            job = MagicMock()
+            job.job_spec.replica_num = replica
+            job.job_spec.job_num = job_num
+            run._run.jobs.append(job)
+    return run
+
+
+class TestJobSelection:
+    def test_defaults_to_the_first_job_of_the_first_replica(self):
+        job = _get_job(_run(replicas=3), replica_num=0, job_num=0)
+        assert (job.job_spec.replica_num, job.job_spec.job_num) == (0, 0)
+
+    def test_selects_by_replica_and_job(self):
+        job = _get_job(_run(replicas=3, jobs_per_replica=2), replica_num=2, job_num=1)
+        assert (job.job_spec.replica_num, job.job_spec.job_num) == (2, 1)
+
+    def test_unknown_job_is_an_error(self):
+        with pytest.raises(CLIError, match="replica=7"):
+            _get_job(_run(replicas=3), replica_num=7, job_num=0)
+
+
+class TestMetricsRequest:
+    def test_limit_is_sent_explicitly(self):
+        api = MagicMock()
+        api.project = "main"
+        api.client.metrics.get_job_metrics.return_value = JobMetrics(metrics=[])
+        run = _run()
+        _get_job_metrics(api, run, run._run.jobs[0])
+        kwargs = api.client.metrics.get_job_metrics.call_args.kwargs
+        assert kwargs["limit"] == MAX_SAMPLES
+        assert "after" not in kwargs and "before" not in kwargs

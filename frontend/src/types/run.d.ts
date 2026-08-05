@@ -49,7 +49,7 @@ declare type TRange = { min?: number; max?: number };
 
 declare type TResourceRequest = {
     gpu?: TGPUResources | string | number;
-    cpu?: string | number | TRange;
+    cpu?: string | number | ICPUSpecRequest;
     memory?: string | number | TRange;
     shm_size?: string | number;
     disk?:
