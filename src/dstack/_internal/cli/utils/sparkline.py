@@ -1,12 +1,10 @@
 from typing import List, Optional, Sequence
 
-from rich.console import Console
 from rich.text import Text
 
 SPARKS = "▁▂▃▄▅▆▇"
 """No full block: it fills the cell to the top edge, fusing consecutive rows into one mass."""
 
-ASCII_SPARKS = "_.:-=+*#%@"
 NO_DATA = "no data"
 
 Ramp = Sequence[tuple[float, str]]
@@ -27,14 +25,6 @@ def ramp_style(value: float, ramp: Ramp) -> str:
         if value < threshold:
             return style
     return ramp[-1][1]
-
-
-def supports_unicode(console: Console) -> bool:
-    try:
-        SPARKS.encode(console.encoding or "utf-8")
-    except (UnicodeEncodeError, LookupError):
-        return False
-    return True
 
 
 def slices(values: Sequence[float], width: int) -> List[tuple[float, float]]:
@@ -69,15 +59,13 @@ def sparkline(
     width: int,
     ramp: Optional[Ramp] = None,
     vmax: float = 100.0,
-    ascii_only: bool = False,
 ) -> Text:
     """Fixed 0..vmax scale, never autoscaled: height means the same thing on every row."""
     if not values:
         return no_data()
-    glyphs = ASCII_SPARKS if ascii_only else SPARKS
     text = Text()
     for peak, mean in slices(values, width):
-        index = int(max(0.0, min(vmax, peak)) / vmax * (len(glyphs) - 1))
+        index = int(max(0.0, min(vmax, peak)) / vmax * (len(SPARKS) - 1))
         shade = max(0.0, min(vmax, mean)) / vmax * 100
-        text.append(glyphs[index], style=ramp_style(shade, ramp) if ramp else "cyan")
+        text.append(SPARKS[index], style=ramp_style(shade, ramp) if ramp else "cyan")
     return text

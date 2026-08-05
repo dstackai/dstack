@@ -1,162 +1,188 @@
 import re
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Tuple
 from unittest.mock import MagicMock
 
 import pytest
 from rich.console import Console
 from rich.theme import Theme
 
-from dstack._internal.cli.utils.metrics import (
-    AXIS_RULE,
-    MAX_SPARK_WIDTH,
-    MIN_SPARK_WIDTH,
-    _axis,
-    _metric_values,
-    _spark_width,
-    format_memory,
-    get_metrics_table,
-)
+from dstack._internal.cli.utils.metrics import format_memory, get_metrics_table
 from dstack._internal.cli.utils.sparkline import SPARKS
 from dstack._internal.core.models.metrics import JobMetrics, Metric
 
 GIB = 1024**3
+CAPACITY_GB = 80
+
+# utilization percent, and memory as a fraction of capacity, over `t` in 0..1 oldest to newest
+SHAPES = {
+    "idle": (lambda t: 1.0, lambda t: 0.05),
+    "spike": (lambda t: 100.0 if 0.49 < t < 0.51 else 2.0, lambda t: 0.5),
+    "ramp": (lambda t: t * 100.0, lambda t: t * 0.5),
+    "saturated": (lambda t: 95.0, lambda t: 0.95),
+    "low": (lambda t: 19.0, lambda t: 0.19),
+}
 
 
-def _metric(name: str, values: List[float]) -> Metric:
-    """Values as the server returns them: latest first."""
-    now = datetime.now(timezone.utc)
-    return Metric(name=name, timestamps=[now] * len(values), values=list(reversed(values)))
-
-
-def _job_metrics(
-    gpus: int = 0,
+def make_run(
+    shape: str = "saturated",
+    samples: int = 360,
+    state: str = "running",
+    gpus: int = 1,
     cpus: int = 8,
-    cpu_pct: float = 50.0,
-    gpu_util: float = 80.0,
-    samples: int = 60,
-) -> JobMetrics:
+) -> Tuple[MagicMock, JobMetrics]:
+    """A job and its metrics. `state` decides whether the newest sample reads as `now`."""
+    newest = datetime.now(timezone.utc)
+    if state == "terminated":
+        newest -= timedelta(hours=2)
+    timestamps = [newest - timedelta(seconds=10 * i) for i in range(samples)]
+
+    def series(fn) -> List[float]:
+        oldest_first = [fn(i / max(1, samples - 1)) for i in range(samples)]
+        return list(reversed(oldest_first))  # the server returns points newest first
+
+    util, memory = SHAPES[shape]
     metrics = [
-        _metric("cpu_usage_percent", [cpu_pct * cpus] * samples),
-        _metric("memory_working_set_bytes", [4 * GIB] * samples),
+        Metric(
+            name="cpu_usage_percent",
+            timestamps=timestamps,
+            values=series(lambda t: util(t) * cpus),
+        ),
+        Metric(
+            name="memory_working_set_bytes",
+            timestamps=timestamps,
+            values=series(lambda t: memory(t) * 32 * GIB),
+        ),
     ]
     for index in range(gpus):
-        metrics.append(_metric(f"gpu_util_percent_gpu{index}", [gpu_util] * samples))
-        metrics.append(_metric(f"gpu_memory_usage_bytes_gpu{index}", [60 * GIB] * samples))
-    return JobMetrics(metrics=metrics)
+        metrics.append(
+            Metric(name=f"gpu_util_percent_gpu{index}", timestamps=timestamps, values=series(util))
+        )
+        metrics.append(
+            Metric(
+                name=f"gpu_memory_usage_bytes_gpu{index}",
+                timestamps=timestamps,
+                values=series(lambda t: memory(t) * CAPACITY_GB * GIB),
+            )
+        )
 
-
-def _job(gpus: int = 0, cpus: int = 8, with_resources: bool = True):
     job = MagicMock()
     submission = MagicMock()
-    if with_resources:
-        resources = MagicMock()
-        resources.cpus, resources.memory_mib = cpus, 32 * 1024
-        resources.gpus = [MagicMock(memory_mib=80 * 1024) for _ in range(gpus)]
-        submission.job_runtime_data.offer.instance.resources = resources
-    else:
-        submission.job_runtime_data = None
-        submission.job_provisioning_data = None
+    resources = MagicMock()
+    resources.cpus, resources.memory_mib = cpus, 32 * 1024
+    resources.gpus = [MagicMock(memory_mib=CAPACITY_GB * 1024) for _ in range(gpus)]
+    submission.job_runtime_data.offer.instance.resources = resources
     job.job_submissions = [submission]
-    return job
+    return job, JobMetrics(metrics=metrics)
 
 
-def _render(job, metrics: JobMetrics, width: int = 200) -> str:
-    console = Console(width=width, theme=Theme({"secondary": "grey58"}), no_color=True)
+def render(job, metrics: JobMetrics, width: int = 200, color: bool = False) -> str:
+    console = Console(
+        width=width,
+        theme=Theme({"secondary": "grey58"}),
+        no_color=not color,
+        force_terminal=color,
+        color_system="truecolor" if color else None,
+    )
     with console.capture() as capture:
         console.print(get_metrics_table(job, metrics, console_width=width))
     return capture.get()
 
 
-def _lines(output: str) -> List[str]:
+def lines(output: str) -> List[str]:
     return [line.rstrip() for line in output.splitlines() if line.strip()]
 
 
-def _row(output: str, label: str) -> str:
-    return next(line for line in _lines(output) if line.strip().startswith(label))
+def row(output: str, label: str) -> str:
+    return next(line for line in lines(output) if line.strip().startswith(label))
 
 
-class TestMetricValues:
-    def test_reverses_server_order_to_oldest_first(self):
-        job_metrics = JobMetrics(
-            metrics=[
-                Metric(
-                    name="gpu_util_percent_gpu0",
-                    timestamps=[datetime.now(timezone.utc)] * 3,
-                    values=[30, 20, 10],
-                )
-            ]
-        )
-        assert _metric_values(job_metrics, "gpu_util_percent_gpu0") == [10, 20, 30]
-
-    def test_missing_metric_is_empty(self):
-        assert _metric_values(JobMetrics(metrics=[]), "cpu_usage_percent") == []
+def bars(line: str) -> List[int]:
+    """Glyph heights of the first sparkline in `line`, left to right."""
+    return [SPARKS.index(glyph) for glyph in re.findall(rf"[{SPARKS}]+", line)[0]]
 
 
-class TestLayout:
-    def test_each_row_carries_both_of_its_numbers(self):
-        output = _render(_job(gpus=1), _job_metrics(gpus=1, cpu_pct=25.0, gpu_util=77.0))
-        assert "25% of 8" in _row(output, "cpu")
-        assert "77%" in _row(output, "gpu=0")
-        assert "60GB/80GB" in _row(output, "gpu=0")
+def colours(output: str, label: str) -> set:
+    """Distinct colours among the glyphs of `label`'s row."""
+    line = next(ln for ln in output.splitlines() if label in ln)
+    return {code for code, _ in re.findall(rf"\x1b\[([0-9;]+)m([{SPARKS}])", line)}
 
 
-class TestTimeAxis:
-    def test_ends_at_now_while_the_job_is_running(self):
-        assert _lines(_render(_job(gpus=1), _job_metrics(gpus=1)))[-1].endswith("now")
+class TestRendering:
+    def test_idle_draws_flat_and_low_in_one_colour(self):
+        """An idle GPU is a flat low line in a single colour, not a rainbow of bands."""
+        job, metrics = make_run("idle")
+        assert set(bars(row(render(job, metrics), "gpu=0"))) == {0}
+        assert len(colours(render(job, metrics, color=True), "gpu=0")) == 1
 
-    def test_older_samples_get_an_absolute_local_time(self):
-        now = datetime.now(timezone.utc)
-        assert _axis(40, now - timedelta(hours=2), now).plain.endswith("now")
-        stopped = _axis(40, now - timedelta(hours=2), now - timedelta(hours=1)).plain
-        assert "now" not in stopped
-        assert ":" in stopped  # a real clock time, not an age
+    def test_a_spike_survives_bucketing(self):
+        """One sample at 100% among 360 still draws tall; averaging would erase it."""
+        job, metrics = make_run("spike")
+        assert max(bars(row(render(job, metrics), "gpu=0"))) == len(SPARKS) - 1
 
-    def test_axis_aligns_with_the_sparklines(self):
-        output = _render(_job(gpus=1), _job_metrics(gpus=1))
-        axis, cpu_row = _lines(output)[-1], _row(output, "cpu")
-        assert axis.index(axis.strip()[0]) == min(cpu_row.index(g) for g in SPARKS if g in cpu_row)
+    def test_a_ramp_climbs_left_to_right(self):
+        """The server sends points newest first, so a missing reversal mirrors every chart
+        and nothing else on screen would give it away."""
+        job, metrics = make_run("ramp")
+        heights = bars(row(render(job, metrics), "gpu=0"))
+        assert heights == sorted(heights)
+        assert heights[0] < heights[-1]
 
-    def test_no_axis_when_there_are_no_samples(self):
-        assert AXIS_RULE not in _render(_job(gpus=1), JobMetrics(metrics=[]))
+    def test_height_is_a_fraction_of_capacity_not_of_the_window(self):
+        """19% of capacity looks nearly empty. Rescaling to the window's own maximum would
+        draw a steady 154GB of 800GB as a full bar."""
+        job, metrics = make_run("low")
+        assert max(bars(row(render(job, metrics), "gpu=0"))) <= 1
 
-    def test_axis_stops_where_a_young_run_stops(self):
-        """The sparkline draws one cell per sample and will not invent more, so a run
-        younger than the terminal is wide fills only part of the row. An axis drawn to the
-        requested width would claim a span nothing was measured over -- and Rich would
-        widen the column to fit it, pushing MEMORY sideways."""
-        output = _render(_job(gpus=1), _job_metrics(gpus=1, samples=12), width=200)
-        axis, cpu_row = _lines(output)[-1], _row(output, "cpu")
-        drawn = sum(1 for char in cpu_row if char in SPARKS) // 2  # two columns per row
-        assert drawn == 12  # one cell per sample, not the 80 cells 200 columns would allow
-        # the two columns print the same axis, separated by the table's own padding
+    def test_the_number_matches_the_last_bar(self):
+        """The printed value is the newest sample and the right-hand bar draws that same
+        sample, so a value that just dropped cannot show tall beside a 0."""
+        job, metrics = make_run("ramp")
+        gpu = row(render(job, metrics), "gpu=0")
+        assert "100%" in gpu
+        assert bars(gpu)[-1] == len(SPARKS) - 1
+
+    def test_no_data_is_not_zero(self):
+        """A device we have no metrics for reads differently from an idle one, and its row
+        is listed either way -- the device list comes from the offer."""
+        job, _ = make_run("idle", gpus=2)
+        missing = render(job, JobMetrics(metrics=[]))
+        assert "no data" in missing
+        assert not re.findall(rf"[{SPARKS}]", missing)
+        assert sum(1 for line in lines(missing) if "gpu=" in line) == 2
+        assert "1%" in render(*make_run("idle", gpus=2))
+
+
+class TestWindow:
+    @pytest.mark.parametrize("samples", [12, 360], ids=["two-minutes", "an-hour"])
+    @pytest.mark.parametrize("state", ["running", "terminated"])
+    def test_draws_only_what_was_measured(self, samples: int, state: str):
+        """A young run fills part of the row and the timeline stops with it. Drawn to the
+        full width it would claim a span nothing was measured over, and Rich would widen
+        the column to fit, pulling MEMORY out of line."""
+        job, metrics = make_run("ramp", samples=samples, state=state)
+        output = render(job, metrics, width=200)
+        drawn = len(bars(row(output, "cpu")))
+        assert drawn == min(samples, 80)  # 80 is MAX_SPARK_WIDTH
+        axis = lines(output)[-1]
         assert [len(segment) for segment in re.split(r"\s{3,}", axis.strip())] == [drawn, drawn]
 
-
-class TestNoData:
-    def test_devices_are_listed_even_with_no_samples(self):
-        output = _render(_job(gpus=4), JobMetrics(metrics=[]))
-        assert sum(1 for ln in _lines(output) if "gpu=" in ln) == 4
-        assert "no data" in output
-
-    def test_measured_zero_is_distinguishable_from_missing(self):
-        zeros = _render(_job(gpus=1), _job_metrics(gpus=1, gpu_util=0.0, cpu_pct=0.0))
-        assert "0%" in zeros
-        assert zeros != _render(_job(gpus=1), JobMetrics(metrics=[]))
-
-    def test_no_resources_and_no_metrics_renders_no_device_rows(self):
-        assert "gpu=" not in _render(_job(with_resources=False), JobMetrics(metrics=[]))
+    @pytest.mark.parametrize("state,live", [("running", True), ("terminated", False)])
+    def test_a_finished_run_cannot_look_live(self, state: str, live: bool):
+        job, metrics = make_run("saturated", state=state)
+        axis = lines(render(job, metrics))[-1]
+        assert axis.endswith("now") == live
+        if not live:
+            assert ":" in axis  # a real clock time, not an age
 
 
-class TestSparkWidth:
-    def test_clamped_at_both_ends(self):
-        assert _spark_width(20) == MIN_SPARK_WIDTH
-        assert _spark_width(10_000) == MAX_SPARK_WIDTH
-
-    def test_table_fits_the_terminal(self):
-        for width in (80, 100, 140, 190, 240):
-            output = _render(_job(gpus=8), _job_metrics(gpus=8), width=width)
-            assert max(len(ln.rstrip()) for ln in output.splitlines()) <= width
+@pytest.mark.parametrize("width", [80, 100, 140, 190, 240])
+def test_fits_every_terminal_width(width: int):
+    """Nothing wraps or gets truncated, on the widest realistic row: eight GPUs."""
+    job, metrics = make_run("saturated", gpus=8)
+    output = render(job, metrics, width=width)
+    assert max(len(line.rstrip()) for line in output.splitlines()) <= width
+    assert "…" not in output
 
 
 @pytest.mark.parametrize(

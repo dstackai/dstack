@@ -6,14 +6,7 @@ from rich.table import Table
 from rich.text import Text
 
 from dstack._internal.cli.utils.common import console
-from dstack._internal.cli.utils.sparkline import (
-    GPU_RAMP,
-    HOST_RAMP,
-    Ramp,
-    no_data,
-    sparkline,
-    supports_unicode,
-)
+from dstack._internal.cli.utils.sparkline import GPU_RAMP, HOST_RAMP, Ramp, no_data, sparkline
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack._internal.core.models.runs import Job
@@ -46,7 +39,6 @@ def _spark_width(console_width: int) -> int:
 def get_metrics_table(
     job: Job, metrics: JobMetrics, console_width: Optional[int] = None
 ) -> RenderableType:
-    ascii_only = not supports_unicode(console)
     resources = _get_resources(job)
     width = _spark_width(console_width or console.width)
 
@@ -58,15 +50,15 @@ def get_metrics_table(
 
     table.add_row(
         "cpu",
-        _cpu_cell(metrics, resources, width, ascii_only),
-        _memory_cell(metrics, resources, width, ascii_only),
+        _cpu_cell(metrics, resources, width),
+        _memory_cell(metrics, resources, width),
     )
     table.add_row("", "", "")  # host and devices are different things; separate them
     for index in range(_gpus_num(metrics, resources)):
         table.add_row(
             f"gpu={index}",
-            _gpu_util_cell(metrics, index, width, ascii_only),
-            _gpu_memory_cell(metrics, resources, index, width, ascii_only),
+            _gpu_util_cell(metrics, index, width),
+            _gpu_memory_cell(metrics, resources, index, width),
         )
     window = _window(metrics)
     if window is not None:
@@ -76,9 +68,7 @@ def get_metrics_table(
     return table
 
 
-def _cpu_cell(
-    job_metrics: JobMetrics, resources: Optional[Resources], width: int, ascii_only: bool
-) -> Text:
+def _cpu_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: int) -> Text:
     values = _metric_values(job_metrics, "cpu_usage_percent")
     if not values:
         return no_data()
@@ -88,17 +78,15 @@ def _cpu_cell(
     label = f"{values[-1]:.0f}%"
     if cpus:
         label += f" of {cpus}"
-    return _cell(sparkline(values, width, HOST_RAMP, ascii_only=ascii_only), label)
+    return _cell(sparkline(values, width, HOST_RAMP), label)
 
 
-def _memory_cell(
-    job_metrics: JobMetrics, resources: Optional[Resources], width: int, ascii_only: bool
-) -> Text:
+def _memory_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: int) -> Text:
     values = _metric_values(job_metrics, "memory_working_set_bytes")
     if not values:
         return no_data()
     total = resources.memory_mib * 1024 * 1024 if resources else None
-    return _level_cell(values, total, width, ascii_only, HOST_RAMP)
+    return _level_cell(values, total, width, HOST_RAMP)
 
 
 def _gpu_memory_cell(
@@ -106,7 +94,6 @@ def _gpu_memory_cell(
     resources: Optional[Resources],
     index: int,
     width: int,
-    ascii_only: bool,
 ) -> Text:
     values = _metric_values(job_metrics, f"gpu_memory_usage_bytes_gpu{index}")
     if not values:
@@ -114,24 +101,22 @@ def _gpu_memory_cell(
     total = None
     if resources and index < len(resources.gpus):
         total = resources.gpus[index].memory_mib * 1024 * 1024
-    return _level_cell(values, total, width, ascii_only, GPU_RAMP)
+    return _level_cell(values, total, width, GPU_RAMP)
 
 
-def _gpu_util_cell(job_metrics: JobMetrics, index: int, width: int, ascii_only: bool) -> Text:
+def _gpu_util_cell(job_metrics: JobMetrics, index: int, width: int) -> Text:
     values = _metric_values(job_metrics, f"gpu_util_percent_gpu{index}")
     if not values:
         return no_data()
-    return _cell(sparkline(values, width, GPU_RAMP, ascii_only=ascii_only), f"{values[-1]:.0f}%")
+    return _cell(sparkline(values, width, GPU_RAMP), f"{values[-1]:.0f}%")
 
 
-def _level_cell(
-    values: List[float], total: Optional[float], width: int, ascii_only: bool, ramp: Ramp
-) -> Text:
+def _level_cell(values: List[float], total: Optional[float], width: int, ramp: Ramp) -> Text:
     percents = [v / total * 100 for v in values] if total else values
     label = format_memory(values[-1], 0)
     if total:
         label += f"/{format_memory(total, 0)}"
-    return _cell(sparkline(percents, width, ramp, ascii_only=ascii_only), label)
+    return _cell(sparkline(percents, width, ramp), label)
 
 
 def _cell(spark: Text, label: str) -> Text:
@@ -139,24 +124,32 @@ def _cell(spark: Text, label: str) -> Text:
 
 
 def _axis(width: int, first: datetime, last: datetime) -> Text:
-    """`<oldest> ┄┄┄ <newest>`, as wide as the sparkline above it.
+    """`<oldest> ┄┄┄ <newest>`, never wider than the sparkline above it.
 
     The rule is what pairs the two stamps. UTILIZATION and MEMORY each print one, so the
     row ends up holding four times, and with the rule left blank the only cue is spacing --
     which points the wrong way above 88 columns: at 200 there are 66 blanks between a
     column's own two stamps but only 13 between the columns, so each column's newest time
     reads as belonging to the next column's oldest.
+
+    A run draws one cell per sample, so for its first few minutes there are fewer cells
+    than two dates need. Dropping the date keeps the axis inside its cell; overflowing
+    instead widens the column and pulls MEMORY out of line with the charts.
     """
     left, right = _stamp(first), _stamp(last)
-    fill = max(1, width - len(left) - len(right) - 2)
+    if len(left) + len(right) + 3 > width:
+        left, right = _stamp(first, clock_only=True), _stamp(last, clock_only=True)
+    if len(left) + len(right) + 2 > width:
+        return Text("")
+    fill = width - len(left) - len(right) - 2
     return Text(f"{left} " + AXIS_RULE * fill + f" {right}", style="grey42")
 
 
-def _stamp(moment: datetime) -> str:
+def _stamp(moment: datetime, clock_only: bool = False) -> str:
     if pretty_date(moment) == "now":
         return "now"
     local = moment.astimezone()
-    return f"{local.day} {local:%b %H:%M}"
+    return f"{local:%H:%M}" if clock_only else f"{local.day} {local:%b %H:%M}"
 
 
 def _window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
