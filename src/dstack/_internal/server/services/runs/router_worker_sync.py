@@ -1,4 +1,4 @@
-"""Reconcile SGLang router /workers with dstack's registered worker replicas (async, SSH-tunneled)."""
+"""Reconcile SGLang router /workers with dstack's ready worker replicas (async, SSH-tunneled)."""
 
 import json
 from typing import Any, List, Literal, Optional, TypedDict

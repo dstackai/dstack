@@ -233,13 +233,12 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
-                            JobModel.registered == True,
+                            JobModel.ready == True,
                         )
                     )
                     .load_only(
                         JobModel.id,
                         JobModel.status,
-                        JobModel.registered,
                         JobModel.job_spec_data,
                         JobModel.job_provisioning_data,
                         JobModel.job_runtime_data,

@@ -69,6 +69,7 @@ from dstack._internal.server.services.runner.client import RunnerClient, ShimCli
 from dstack._internal.server.services.runs.replicas import RouterEnvStatus
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
+    clear_events,
     create_backend,
     create_code,
     create_export,
@@ -1971,6 +1972,7 @@ class TestJobRunningWorker:
         events = await list_events(session)
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
+            "Service replica ready to receive requests",
             "Service replica registered to receive requests",
         }
 
@@ -2060,8 +2062,11 @@ class TestJobRunningWorker:
         events = await list_events(session)
         if expect_to_register:
             assert job.registered
-            assert len(events) == 1
-            assert events[0].message == "Service replica registered to receive requests"
+            assert len(events) == 2
+            assert {event.message for event in events} == {
+                "Service replica ready to receive requests",
+                "Service replica registered to receive requests",
+            }
         else:
             assert not job.registered
             assert not events
@@ -2132,6 +2137,7 @@ class TestJobRunningWorker:
         events = await list_events(session)
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
+            "Service replica ready to receive requests",
             "Service replica registered to receive requests",
         }
         mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
@@ -2218,6 +2224,7 @@ class TestJobRunningWorker:
         events = await list_events(session)
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
+            "Service replica ready to receive requests",
             "Service replica registered to receive requests",
         }
         mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
@@ -2458,13 +2465,167 @@ class TestJobRunningWorker:
         assert call_kwargs["registry_username"] == "server-user"
         assert call_kwargs["registry_password"] == "server-pass"
 
+    async def test_registers_router_replica_but_not_worker_replica_in_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="test-gateway",
+            wildcard_domain="example.com",
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=_router_service_configuration("sglang", gateway="test-gateway"),
+            ),
+            gateway=gateway,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        router_job = await create_job(
+            session=session,
+            run=run,
+            replica_num=0,
+            replica_group_name="router",
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            replica_num=1,
+            replica_group_name="worker",
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0
+        )
 
-def _router_service_configuration(router_type: str) -> ServiceConfiguration:
+        await _process_job(session, worker, router_job)
+
+        await session.refresh(router_job)
+        assert router_job.registered
+        assert router_job.ready
+        events = await list_events(session)
+        assert {event.message for event in events} == {
+            "Service replica ready to receive requests",
+            "Service replica registered to receive requests",
+        }
+
+        await clear_events(session)
+
+        await _process_job(session, worker, worker_job)
+
+        await session.refresh(worker_job)
+        assert not worker_job.registered
+        assert worker_job.ready
+        events = await list_events(session)
+        assert {event.message for event in events} == {
+            "Service replica ready to receive requests",
+        }
+
+    async def test_resets_stale_registered_flag_for_non_router_replica(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        """Migration edge case: a pre-0.21.0 server may have incorrectly marked
+        a non-router replica as registered. Should be corrected.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=_router_service_configuration(
+                    "sglang",
+                    probes=[ProbeConfig(type="http", url="/health", ready_after=1)],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            replica_num=1,
+            replica_group_name="worker",
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+            registered=True,
+        )
+        await create_probe(session=session, job=worker_job, probe_num=0, success_streak=0)
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0
+        )
+
+        await _process_job(session, worker, worker_job)
+
+        await session.refresh(worker_job)
+        assert worker_job.status == JobStatus.RUNNING
+        assert not worker_job.registered
+        events = await list_events(session)
+        assert events == []
+
+
+def _router_service_configuration(
+    router_type: str,
+    *,
+    gateway: Optional[str] = None,
+    probes: Optional[list[ProbeConfig]] = None,
+) -> ServiceConfiguration:
     return ServiceConfiguration.model_validate(
         {
             "type": "service",
             "port": 8000,
             "image": "ubuntu",
+            "gateway": gateway,
+            "probes": probes,
             "replicas": [
                 {"name": "worker", "commands": ["echo worker"], "count": 1},
                 {
