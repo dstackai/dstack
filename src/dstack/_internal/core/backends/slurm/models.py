@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, Optional, Union
 
 from pydantic import Field, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -104,10 +105,9 @@ class SlurmPrivateKeyFileConfig(CoreModel):
         ),
     ] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def fill_data(cls, values: dict) -> dict:
-        return fill_data(values, filename_field="path", data_field="content")
+    @model_validator(mode="after")
+    def fill_data(self) -> Self:
+        return fill_data(self, filename_field="path", data_field="content")
 
 
 class SlurmClusterFileConfig(BaseSlurmClusterConfigWithCreds):

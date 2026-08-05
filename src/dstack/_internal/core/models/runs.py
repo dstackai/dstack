@@ -24,7 +24,6 @@ from dstack._internal.core.models.configurations import (
     HTTPHeaderSpec,
     HTTPMethod,
     RepoExistsAction,
-    RunConfiguration,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
@@ -588,27 +587,20 @@ class RunSpec(CoreModel):
     Read profile parameters from `merged_profile` instead of `profile` directly.
     """
 
-    @model_validator(mode="before")
-    @classmethod
-    def _merged_profile(cls, values) -> Dict:
-        if values.get("profile") is None:
+    @model_validator(mode="after")
+    def _merged_profile(self) -> Self:
+        if self.profile is None:
             merged_profile = Profile(name="default")
         else:
-            # Copy first: `model_validate` returns the *same* instance for a same-class input, so
-            # the `setattr` loop below would otherwise mutate the caller's profile in place.
-            merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
-        try:
-            conf = RunConfiguration.model_validate(values["configuration"]).root
-        except KeyError:
-            raise ValueError("Missing configuration")
+            merged_profile = self.profile.model_copy(deep=True)
         for key in ProfileParams.model_fields:
-            conf_val = getattr(conf, key, None)
+            conf_val = getattr(self.configuration, key, None)
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
-        values["merged_profile"] = merged_profile
-        return values
+        self.merged_profile = merged_profile
+        return self
 
     @model_validator(mode="after")
     def _validate_dynamo_no_retry(self) -> Self:

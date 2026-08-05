@@ -2,12 +2,18 @@ import pytest
 from pydantic import ValidationError
 
 from dstack._internal.core.compatibility.runs import get_run_spec_excludes
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     ServiceConfiguration,
     TaskConfiguration,
 )
-from dstack._internal.core.models.profiles import RetryEvent
+from dstack._internal.core.models.profiles import (
+    CreationPolicy,
+    Profile,
+    RetryEvent,
+    SpotPolicy,
+)
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -185,3 +191,63 @@ class TestDynamoNoRetryValidator:
             "repo_data": {"repo_type": "virtual"},
         }
         RunSpec.model_validate(spec)
+
+
+class TestRunSpec:
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            pytest.param(
+                {"configuration": {"type": "dev-environment", "new_prop": 1}}, id="configuration"
+            ),
+            pytest.param(
+                {
+                    "configuration": {"type": "dev-environment"},
+                    "profile": {"name": "default", "new_prop": 1},
+                },
+                id="profile",
+            ),
+            pytest.param(
+                {
+                    "configuration": {
+                        "type": "dev-environment",
+                        "resources": {"gpu": {"name": ["A100"], "new_prop": 1}},
+                    }
+                },
+                id="nested-in-configuration",
+            ),
+            pytest.param(
+                {"configuration": {"type": "dev-environment"}, "new_prop": 1}, id="top-level"
+            ),
+        ],
+    )
+    def test_extra_ignored_on_read_path(self, spec: dict):
+        validate_extra_ignore(RunSpec, spec)
+        with pytest.raises(ValidationError, match="new_prop"):
+            RunSpec.model_validate(spec)
+
+    def test_configuration_profile_params_override_profile(self):
+        spec = RunSpec.model_validate(
+            {
+                "configuration": {"type": "dev-environment", "spot_policy": "spot"},
+                "profile": {"name": "default", "spot_policy": "on-demand", "max_price": 1.5},
+            }
+        )
+        assert spec.merged_profile.spot_policy == SpotPolicy.SPOT
+        assert spec.merged_profile.max_price == 1.5
+        assert spec.merged_profile.creation_policy == CreationPolicy.REUSE_OR_CREATE
+
+    def test_merging_does_not_mutate_the_passed_profile(self):
+        profile = Profile(name="default", spot_policy=SpotPolicy.ONDEMAND)
+        spec = RunSpec.model_validate(
+            {
+                "configuration": {"type": "dev-environment", "spot_policy": "spot"},
+                "profile": profile,
+            }
+        )
+        assert spec.merged_profile.spot_policy == SpotPolicy.SPOT
+        assert profile.spot_policy == SpotPolicy.ONDEMAND
+
+    def test_missing_configuration_rejected(self):
+        with pytest.raises(ValidationError, match="configuration"):
+            validate_extra_ignore(RunSpec, {})

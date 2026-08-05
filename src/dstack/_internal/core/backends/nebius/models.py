@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Annotated, Dict, Literal, Optional, Union
 
 from pydantic import Field, field_serializer, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -76,10 +77,9 @@ class NebiusServiceAccountFileCreds(CoreModel):
         Optional[str], Field(description="The path to the service account credentials file")
     ] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def fill_data(cls, values):
-        if filename := values.get("filename"):
+    @model_validator(mode="after")
+    def fill_data(self) -> Self:
+        if filename := self.filename:
             try:
                 with open(Path(filename).expanduser()) as f:
                     data = json.load(f)
@@ -89,18 +89,16 @@ class NebiusServiceAccountFileCreds(CoreModel):
 
                 credentials = ServiceAccountCredentials.from_json(data)
                 subject = credentials.subject_credentials
-                values["service_account_id"] = subject.sub
-                values["public_key_id"] = subject.kid
-                values["private_key_content"] = subject.private_key
+                self.service_account_id = subject.sub
+                self.public_key_id = subject.kid
+                self.private_key_content = subject.private_key
             except OSError:
                 raise ValueError(f"No such file {filename}")
             except Exception as e:
                 raise ValueError(f"Failed to parse credentials file {filename}: {e}")
-            return values
+            return self
 
-        return fill_data(
-            values, filename_field="private_key_file", data_field="private_key_content"
-        )
+        return fill_data(self, filename_field="private_key_file", data_field="private_key_content")
 
 
 AnyNebiusCreds = NebiusServiceAccountCreds

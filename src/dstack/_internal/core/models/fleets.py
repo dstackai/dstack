@@ -384,26 +384,19 @@ class FleetSpec(CoreModel):
     Read profile parameters from `merged_profile` instead of `profile` directly.
     """
 
-    @model_validator(mode="before")
-    @classmethod
-    def _merged_profile(cls, values) -> Dict:
-        try:
-            # Copy first: `model_validate` returns the *same* instance for a same-class input, so
-            # the `setattr` loop below would otherwise mutate the caller's profile in place.
-            merged_profile = Profile.model_validate(values["profile"]).model_copy(deep=True)
-            conf = FleetConfiguration.model_validate(values["configuration"])
-        except KeyError:
-            raise ValueError("Missing profile or configuration")
+    @model_validator(mode="after")
+    def _merged_profile(self) -> Self:
+        merged_profile = self.profile.model_copy(deep=True)
         for key in ProfileParams.model_fields:
-            conf_val = getattr(conf, key, None)
+            conf_val = getattr(self.configuration, key, None)
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)
         if merged_profile.spot_policy is None:
             merged_profile.spot_policy = SpotPolicy.ONDEMAND
         if merged_profile.retry is None:
             merged_profile.retry = False
-        values["merged_profile"] = merged_profile
-        return values
+        self.merged_profile = merged_profile
+        return self
 
 
 class Fleet(CoreModel):
