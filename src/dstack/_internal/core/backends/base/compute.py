@@ -41,7 +41,6 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -1089,9 +1088,7 @@ def get_run_shim_script(
     ]
 
 
-def get_gateway_user_data(
-    authorized_key: str, router: Optional[AnyGatewayRouterConfig] = None
-) -> str:
+def get_gateway_user_data(authorized_key: str) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -1107,7 +1104,7 @@ def get_gateway_user_data(
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router))],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -1207,22 +1204,19 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str, router: Optional[AnyGatewayRouterConfig] = None) -> str:
+def get_dstack_gateway_wheel(build: str) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
         build = _fetch_version(f"{base_url}/latest-version") or "latest"
         logger.debug("Found the latest gateway build: %s", build)
     wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
-    # Build package spec with extras if router is specified
-    if router:
-        return f"dstack-gateway[{router.type}] @ {wheel}"
     return f"dstack-gateway @ {wheel}"
 
 
-def get_dstack_gateway_commands(router: Optional[AnyGatewayRouterConfig] = None) -> List[str]:
+def get_dstack_gateway_commands() -> List[str]:
     build = get_dstack_runner_version() or "latest"
-    gateway_package = get_dstack_gateway_wheel(build, router)
+    gateway_package = get_dstack_gateway_wheel(build)
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",

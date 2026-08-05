@@ -15,7 +15,6 @@
         "public_ip": true,
         "region": "eu-west-1",
         "replicas": null,
-        "router": null,
         "tags": null,
         "type": "gateway"
       },

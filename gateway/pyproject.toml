@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# TODO: drop, unused by the server since 0.21.0
 sglang = ["sglang-router==0.3.2"]
 
 [tool.setuptools.package-data]

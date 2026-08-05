@@ -340,7 +340,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 ### PD disaggregation
 
-<!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
+<!-- NOTE: this section is referenced from pre-0.21.0 CLIs. Prefer to keep the URL unchanged -->
 
 Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
 

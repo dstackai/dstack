@@ -10,7 +10,6 @@ from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import RateLimit
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
@@ -50,7 +49,6 @@ class GatewayClient:
         rate_limits: list[RateLimit],
         ssh_private_key: str,
         has_router_replica: bool = False,
-        router: Optional[AnyServiceRouterConfig] = None,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
@@ -67,7 +65,6 @@ class GatewayClient:
             "rate_limits": [limit.model_dump() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
             "has_router_replica": has_router_replica,
-            "router": router.model_dump() if router is not None else None,
         }
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/services/register"), json=payload

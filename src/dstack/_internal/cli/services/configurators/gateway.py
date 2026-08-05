@@ -49,13 +49,6 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             configuration=conf,
             configuration_path=configuration_path,
         )
-        if spec.configuration.router is not None:
-            logger.warning(
-                "Specifying `router` in gateway configurations is deprecated"
-                " and will be disallowed in a future release."
-                " Please migrate to replica-based routers:"
-                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
-            )
         with console.status("Getting apply plan..."):
             try:
                 plan = self.api.client.gateways.get_plan(project_name=self.api.project, spec=spec)

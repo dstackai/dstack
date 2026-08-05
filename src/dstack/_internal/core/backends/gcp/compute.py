@@ -606,9 +606,7 @@ class GCPCompute(
             machine_type=configuration.instance_type or DEFAULT_GATEWAY_INSTANCE_TYPE,
             accelerators=[],
             spot=False,
-            user_data=get_gateway_user_data(
-                configuration.ssh_key_pub, router=configuration.router
-            ),
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
             authorized_keys=[configuration.ssh_key_pub],
             labels=labels,
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
