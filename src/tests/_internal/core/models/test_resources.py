@@ -158,18 +158,37 @@ class TestCPU:
             "count": {"min": 1, "max": 2},
         }
 
-    def test_range_dict(self):
-        assert CPUSpec.model_validate({"min": 1, "max": 2}).model_dump() == {
+    @pytest.mark.parametrize(
+        ["value", "expected_min", "expected_max"],
+        [
+            pytest.param({"min": 1, "max": 2}, 1, 2, id="closed"),
+            pytest.param({"min": 1}, 1, None, id="min-only"),
+            pytest.param({"max": 2}, None, 2, id="max-only"),
+            # An empty mapping is not a range: it falls through to the `CPUSpec` defaults instead
+            # of an empty `count` range, which `Range` rejects.
+            pytest.param({}, DEFAULT_CPU_COUNT.min, DEFAULT_CPU_COUNT.max, id="empty"),
+        ],
+    )
+    def test_range_dict(
+        self, value: dict, expected_min: Optional[int], expected_max: Optional[int]
+    ):
+        assert CPUSpec.model_validate(value).model_dump() == {
             "arch": None,
-            "count": {"min": 1, "max": 2},
+            "count": {"min": expected_min, "max": expected_max},
         }
 
-    def test_valid_dict(self):
+    def test_valid_dict_with_all_fields(self):
         assert CPUSpec.model_validate(
             {"arch": "ARM", "count": {"min": 1, "max": 2}}
         ).model_dump() == {
             "arch": CPUArchitecture.ARM,
             "count": {"min": 1, "max": 2},
+        }
+
+    def test_valid_dict_no_arch_half_open_count_range(self):
+        assert CPUSpec.model_validate({"count": {"max": 2}}).model_dump() == {
+            "arch": None,
+            "count": {"min": None, "max": 2},
         }
 
     def test_invalid_dict(self):

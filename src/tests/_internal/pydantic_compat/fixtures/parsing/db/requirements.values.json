@@ -5,8 +5,11 @@
   "reservation": "cr-0abc123def4567890",
   "resources": {
     "cpu": {
-      "max": 64,
-      "min": 8
+      "arch": null,
+      "count": {
+        "max": 64,
+        "min": 8
+      }
     },
     "disk": {
       "size": {
