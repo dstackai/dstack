@@ -83,11 +83,8 @@ def _get_job(run: Run, replica_num: int, job_num: int) -> Job:
 
 
 def _get_job_metrics(api: Client, run: Run, job: Job) -> JobMetrics:
-    """Ask for everything retained, as the UI does.
-
-    `limit` must be sent explicitly: the endpoint declares it as `limit: int = 1`, not
-    Optional, so omitting it caps the response at a single sample.
-    """
+    """`limit` must be sent explicitly: the endpoint declares it `limit: int = 1`, not
+    Optional, so omitting it caps the response at one sample."""
     return api.client.metrics.get_job_metrics(
         project_name=api.project,
         run_name=run.name,

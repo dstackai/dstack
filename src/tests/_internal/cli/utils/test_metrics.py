@@ -78,8 +78,6 @@ def _row(output: str, label: str) -> str:
 
 class TestMetricValues:
     def test_reverses_server_order_to_oldest_first(self):
-        """The service returns points latest to earliest; everything downstream assumes
-        the opposite, so this is the one place the series is flipped."""
         job_metrics = JobMetrics(
             metrics=[
                 Metric(
@@ -105,8 +103,6 @@ class TestLayout:
 
 class TestTimeAxis:
     def test_ends_at_now_while_the_job_is_running(self):
-        """Collection is every ~10s, so a running job's newest sample is always `now` --
-        and a finished run's is not, which stops a stale table reading as live."""
         assert _lines(_render(_job(gpus=1), _job_metrics(gpus=1)))[-1].endswith("now")
 
     def test_older_samples_get_an_absolute_local_time(self):
@@ -139,8 +135,6 @@ class TestTimeAxis:
 
 class TestNoData:
     def test_devices_are_listed_even_with_no_samples(self):
-        """The device list comes from the offer, so the shape of the run is known even
-        when none of its numbers are."""
         output = _render(_job(gpus=4), JobMetrics(metrics=[]))
         assert sum(1 for ln in _lines(output) if "gpu=" in ln) == 4
         assert "no data" in output

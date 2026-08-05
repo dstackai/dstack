@@ -24,8 +24,6 @@ class TestSlices:
         assert slices([79.0] * 997 + [0.0, 0.0, 0.0], 10)[-1] == (0.0, 0.0)
 
     def test_height_is_the_peak_and_colour_is_the_mean(self):
-        """Height alone cannot separate a card that touched 100% briefly from one that
-        held it -- both draw full."""
         peak, mean = slices([0.0] * 17 + [100.0, 0.0], 2)[0]
         assert peak == 100.0
         assert mean < 10.0
@@ -40,8 +38,6 @@ class TestSparkline:
         assert sparkline([100] * 60, 10, GPU_RAMP).plain == SPARKS[-1] * 10
 
     def test_never_fills_the_cell_to_the_top(self):
-        """A full block touches the cell's top edge, so a column of them in consecutive
-        rows fuses into one mass and eight GPU rows stop reading as separate series."""
         assert "█" not in SPARKS
         assert "█" not in sparkline([100] * 60, 10, GPU_RAMP).plain
 
@@ -62,7 +58,6 @@ class TestSparkline:
 
 class TestRamps:
     def test_scope_is_never_ambiguous(self):
-        """Colour marks scope, so a job row must not share a colour with a device row."""
         for value in (0, 10, 30, 60, 85, 100):
             assert ramp_style(value, GPU_RAMP) != ramp_style(value, HOST_RAMP)
 

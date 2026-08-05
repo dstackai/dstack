@@ -23,7 +23,6 @@ def _run(replicas: int = 1, jobs_per_replica: int = 1):
 
 class TestJobSelection:
     def test_defaults_to_the_first_job_of_the_first_replica(self):
-        """Same shape as `dstack logs`: one job, --replica/--job to pick another."""
         job = _get_job(_run(replicas=3), replica_num=0, job_num=0)
         assert (job.job_spec.replica_num, job.job_spec.job_num) == (0, 0)
 
@@ -38,9 +37,6 @@ class TestJobSelection:
 
 class TestMetricsRequest:
     def test_limit_is_sent_explicitly(self):
-        """The endpoint declares `limit: int = 1`, not Optional, so omitting it caps the
-        response at a single sample -- which renders as one glyph however long the run has
-        been up, and looks plausible rather than broken."""
         api = MagicMock()
         api.project = "main"
         api.client.metrics.get_job_metrics.return_value = JobMetrics(metrics=[])

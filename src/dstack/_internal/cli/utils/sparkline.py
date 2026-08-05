@@ -1,24 +1,18 @@
-"""Sparklines for CLI tables."""
-
 from typing import List, Optional, Sequence
 
 from rich.console import Console
 from rich.text import Text
 
 SPARKS = "▁▂▃▄▅▆▇"
-"""Stops at 7/8 height on purpose: a full block fills its cell to the top edge, so a column
-of them in consecutive rows fuses into one mass and the rows stop reading as separate
-series."""
+"""No full block: it fills the cell to the top edge, fusing consecutive rows into one mass."""
 
 ASCII_SPARKS = "_.:-=+*#%@"
 NO_DATA = "no data"
 
 Ramp = Sequence[tuple[float, str]]
 
-# Colour encodes scope. Device metrics share one ramp because GPU utilization and GPU memory
-# are two views of the same question; host metrics get a cool one so a job row is never
-# mistaken for a device row, and because the economics differ -- a host CPU at 10% is normal,
-# not wasted money.
+# Colour encodes scope: device metrics share one ramp, host metrics another, so a job row is
+# never mistaken for a device row.
 GPU_RAMP: Ramp = ((25, "grey42"), (50, "chartreuse4"), (75, "chartreuse3"), (101, "green1"))
 HOST_RAMP: Ramp = (
     (50, "steel_blue3"),
@@ -36,7 +30,6 @@ def ramp_style(value: float, ramp: Ramp) -> str:
 
 
 def supports_unicode(console: Console) -> bool:
-    """Whether block glyphs will survive the console's encoding."""
     try:
         SPARKS.encode(console.encoding or "utf-8")
     except (UnicodeEncodeError, LookupError):
@@ -45,16 +38,11 @@ def supports_unicode(console: Console) -> bool:
 
 
 def slices(values: Sequence[float], width: int) -> List[tuple[float, float]]:
-    """`(peak, mean)` per cell, oldest first.
+    """`(peak, mean)` per cell, oldest first -- height is the peak, colour the mean, so a
+    card that *touched* 100% reads differently from one that *held* it.
 
-    Two numbers because a cell draws both: glyph height is the peak, colour is the mean.
-    Height alone cannot separate a card that *touched* 100% for a few seconds from one that
-    *held* it for minutes -- both draw full.
-
-    Cells cover the whole series rather than its tail: metrics arrive about every 10s, so
-    taking the last `width` samples would cover a couple of minutes instead of the hour the
-    caller asked for. The last cell is the latest sample, since the number printed beside
-    the sparkline is that reading and the two must not contradict each other.
+    Cells span the whole series, not its tail. The last cell is the latest sample, so it
+    cannot contradict the number printed beside the sparkline.
     """
     vals = list(values)
     if width < 1:
@@ -72,9 +60,7 @@ def slices(values: Sequence[float], width: int) -> List[tuple[float, float]]:
 
 
 def no_data() -> Text:
-    """Spelled out rather than the `-` used elsewhere in the CLI: next to sparklines a bare
-    dash reads as a stray character, and "n/a" would be wrong -- the metric applies, it just
-    has not arrived yet."""
+    """Spelled out: next to sparklines a bare `-` reads as a stray glyph."""
     return Text(NO_DATA, style="grey58")
 
 
@@ -85,8 +71,7 @@ def sparkline(
     vmax: float = 100.0,
     ascii_only: bool = False,
 ) -> Text:
-    """A sparkline on a fixed 0..vmax scale, so glyph height always means the same thing as
-    the number beside it and rows stay comparable with each other."""
+    """Fixed 0..vmax scale, never autoscaled: height means the same thing on every row."""
     if not values:
         return no_data()
     glyphs = ASCII_SPARKS if ascii_only else SPARKS
