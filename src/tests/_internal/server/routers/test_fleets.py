@@ -402,6 +402,30 @@ class TestListProjectFleets:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_fleets_newest_first(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        for name, day in [("oldest", 1), ("newest", 3), ("middle", 2)]:
+            await create_fleet(
+                session=session,
+                project=project,
+                name=name,
+                created_at=datetime(2023, 1, day, tzinfo=timezone.utc),
+            )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert [f["name"] for f in response.json()] == ["newest", "middle", "oldest"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_imported_fleet_with_include_imported(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
