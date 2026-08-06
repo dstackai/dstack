@@ -78,7 +78,7 @@ class TestListAndGetGateways:
             {
                 "id": SomeUUID4Str(),
                 "project_name": project.name,
-                "backend": backend.type.value,
+                "backend": None,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
                 "status": "submitted",
@@ -98,7 +98,7 @@ class TestListAndGetGateways:
                 "ip_address": None,
                 "hostname": None,
                 "name": gateway.name,
-                "region": gateway.region,
+                "region": None,
                 "wildcard_domain": gateway.wildcard_domain,
                 "configuration": {
                     "type": "gateway",
@@ -164,7 +164,7 @@ class TestListAndGetGateways:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "default": False,
             "status": "submitted",
@@ -184,7 +184,7 @@ class TestListAndGetGateways:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -516,8 +516,8 @@ class TestCreateGateway:
             "id": SomeUUID4Str(),
             "project_name": project.name,
             "name": "test",
-            "backend": "aws",
-            "region": "us",
+            "backend": None,
+            "region": None,
             "status": "submitted",
             "status_message": None,
             "replicas": [],
@@ -606,8 +606,8 @@ class TestCreateGateway:
             "id": SomeUUID4Str(),
             "project_name": project.name,
             "name": "random-name",
-            "backend": "aws",
-            "region": "us",
+            "backend": None,
+            "region": None,
             "status": "submitted",
             "status_message": None,
             "replicas": [],
@@ -840,7 +840,7 @@ class TestDefaultGateway:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "default": True,
             "status": "submitted",
@@ -860,7 +860,7 @@ class TestDefaultGateway:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -1236,7 +1236,7 @@ class TestUpdateGateway:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "status": "submitted",
             "status_message": None,
@@ -1256,7 +1256,7 @@ class TestUpdateGateway:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": "new.example",
             "configuration": {
                 "type": "gateway",

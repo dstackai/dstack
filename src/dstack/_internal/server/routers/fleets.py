@@ -13,7 +13,6 @@ from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
-    CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
     GetFleetPlanRequest,
@@ -166,29 +165,6 @@ async def apply_plan(
         project=project,
         plan=body.plan,
         force=body.force,
-        pipeline_hinter=pipeline_hinter,
-    )
-    patch_fleet(fleet, client_version)
-    return CustomJSONResponse(fleet)
-
-
-@project_router.post("/create", summary="Create fleet", response_model=Fleet, deprecated=True)
-async def create_fleet(
-    body: CreateFleetRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
-    client_version: Optional[Version] = Depends(get_client_version),
-):
-    """
-    Creates a fleet given a fleet configuration.
-    """
-    user, project = user_project
-    fleet = await fleets_services.create_fleet(
-        session=session,
-        project=project,
-        user=user,
-        spec=body.spec,
         pipeline_hinter=pipeline_hinter,
     )
     patch_fleet(fleet, client_version)

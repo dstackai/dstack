@@ -1,17 +1,11 @@
 from typing import Optional
 
-from dstack._internal.core.compatibility.common import get_profile_excludes, patch_profile_params
+from dstack._internal.core.compatibility.common import get_profile_excludes
 from dstack._internal.core.models.common import (
-    EntityReference,
     IncludeExcludeDictType,
     IncludeExcludeSetType,
 )
-from dstack._internal.core.models.configurations import (
-    ServiceConfiguration,
-)
 from dstack._internal.core.models.runs import (
-    DEFAULT_PROBE_UNTIL_READY,
-    DEFAULT_REPLICA_GROUP_NAME,
     ApplyRunPlanInput,
     JobSpec,
     JobSubmission,
@@ -69,10 +63,6 @@ def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExclude
     clients backward-compatibility with older servers.
     """
     get_plan_excludes: IncludeExcludeDictType = {}
-    if not request.full_offers:
-        get_plan_excludes["full_offers"] = True
-    if not request.unallocated_resources:
-        get_plan_excludes["unallocated_resources"] = True
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
     if run_spec_excludes is not None:
         get_plan_excludes["run_spec"] = run_spec_excludes
@@ -90,54 +80,6 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     profile_excludes = get_profile_excludes(run_spec.profile)
     for field in get_profile_excludes(run_spec.configuration):
         configuration_excludes[field] = True
-
-    if run_spec.configuration.backend_options is None:
-        configuration_excludes["backend_options"] = True
-
-    if not run_spec.configuration.dstack:
-        configuration_excludes["dstack"] = True
-
-    if isinstance(run_spec.configuration, ServiceConfiguration):
-        if run_spec.configuration.probes:
-            probe_excludes: IncludeExcludeDictType = {}
-            configuration_excludes["probes"] = {"__all__": probe_excludes}
-            if all(p.until_ready is None for p in run_spec.configuration.probes):
-                probe_excludes["until_ready"] = True
-        elif run_spec.configuration.probes is None:
-            # Servers prior to 0.20.8 do not support probes=None
-            configuration_excludes["probes"] = True
-
-        if run_spec.configuration.https is None:
-            configuration_excludes["https"] = True
-
-        replicas = run_spec.configuration.replicas
-        if isinstance(replicas, list):
-            replica_group_excludes: IncludeExcludeDictType = {}
-            if all(g.router is None for g in replicas):
-                replica_group_excludes["router"] = True
-            if all(g.scaling is None or g.scaling.window is None for g in replicas):
-                replica_group_excludes["scaling"] = {"window": True}
-            if all(g.image is None for g in replicas):
-                replica_group_excludes["image"] = True
-            if all(g.docker is None for g in replicas):
-                replica_group_excludes["docker"] = True
-            if all(g.python is None for g in replicas):
-                replica_group_excludes["python"] = True
-            if all(g.nvcc is None for g in replicas):
-                replica_group_excludes["nvcc"] = True
-            if all(g.privileged is None for g in replicas):
-                replica_group_excludes["privileged"] = True
-            if all(g.spot_policy is None for g in replicas):
-                replica_group_excludes["spot_policy"] = True
-            if all(g.reservation is None for g in replicas):
-                replica_group_excludes["reservation"] = True
-            if replica_group_excludes:
-                configuration_excludes["replicas"] = {"__all__": replica_group_excludes}
-
-        scaling = run_spec.configuration.scaling
-        if scaling is not None and scaling.window is None:
-            configuration_excludes["scaling"] = {"window": True}
-
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
@@ -152,48 +94,14 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     clients backward-compatibility with older servers.
     """
     spec_excludes: IncludeExcludeDictType = {}
-    if all(s.replica_group == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
-        spec_excludes["replica_group"] = True
-
-    probe_excludes: IncludeExcludeDictType = {}
-    spec_excludes["probes"] = {"__all__": probe_excludes}
-    if all(all(p.until_ready == DEFAULT_PROBE_UNTIL_READY for p in s.probes) for s in job_specs):
-        probe_excludes["until_ready"] = True
-
-    if all(s.requirements.backend_options is None for s in job_specs):
-        spec_excludes["requirements"] = {"backend_options": True}
-
     return spec_excludes
 
 
 def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> IncludeExcludeDictType:
     submission_excludes: IncludeExcludeDictType = {}
-
-    if any(s.job_runtime_data is not None for s in job_submissions):
-        jrd_excludes = {}
-        if all(
-            s.job_runtime_data is None or s.job_runtime_data.username is None
-            for s in job_submissions
-        ):
-            jrd_excludes["username"] = True
-        if all(
-            s.job_runtime_data is None or s.job_runtime_data.working_dir is None
-            for s in job_submissions
-        ):
-            jrd_excludes["working_dir"] = True
-        submission_excludes["job_runtime_data"] = jrd_excludes
-
-    if all(s.image_pull_progress is None for s in job_submissions):
-        submission_excludes["image_pull_progress"] = True
-
+    # `Resources.description` is deprecated and never set since 0.21. Not sending it lets 0.22
+    # drop the field without breaking 0.21 clients.
+    submission_excludes["job_provisioning_data"] = {
+        "instance_type": {"resources": {"description": True}}
+    }
     return submission_excludes
-
-
-def patch_run_spec(run_spec: RunSpec) -> None:
-    patch_profile_params(run_spec.configuration)
-    if run_spec.profile is not None:
-        patch_profile_params(run_spec.profile)
-    if isinstance(run_spec.configuration, ServiceConfiguration):
-        if isinstance(run_spec.configuration.gateway, EntityReference):
-            # Pre-0.20.20 servers do not support `EntityReference` in `gateway`
-            run_spec.configuration.gateway = run_spec.configuration.gateway.format()

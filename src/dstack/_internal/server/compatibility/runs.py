@@ -5,7 +5,7 @@ from packaging.version import Version
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
-from dstack._internal.server.compatibility.common import patch_offers_list, patch_profile_params
+from dstack._internal.server.compatibility.common import patch_profile_params
 
 
 def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None:
@@ -16,8 +16,6 @@ def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None
         patch_run_spec(run_plan.effective_run_spec, client_version)
     if run_plan.current_resource is not None:
         patch_run(run_plan.current_resource, client_version)
-    for job_plan in run_plan.job_plans:
-        patch_offers_list(job_plan.offers, client_version)
 
 
 def patch_run(run: Run, client_version: Optional[Version]) -> None:

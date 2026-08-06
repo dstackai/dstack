@@ -11,7 +11,6 @@ from dstack._internal.cli.services.events import (
 from dstack._internal.cli.utils.common import (
     get_start_time,
 )
-from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.server.schemas.events import LIST_EVENTS_DEFAULT_LIMIT
@@ -159,12 +158,6 @@ def _build_filters(args: argparse.Namespace, api: Client) -> EventListFilters:
         filters.target_gateways = []
         for name in args.target_gateways:
             id = api.client.gateways.get(api.project, name).id
-            if id is None:
-                # TODO(0.21): Remove this check once `Gateway.id` is required.
-                raise CLIError(
-                    "Cannot determine gateway ID, most likely due to an outdated dstack server."
-                    " Update the server to 0.20.7 or higher or remove --target-gateway."
-                )
             filters.target_gateways.append(id)
     elif args.target_secrets:
         filters.target_secrets = [
