@@ -13,7 +13,8 @@ class TestSystemPrompt:
 
         assert text == get_preset_agent_system_prompt(None) == get_preset_agent_system_prompt("")
         assert "## Additional instructions" not in text
-        assert "<!--?" not in text
+        assert "<!--" not in text
+        assert "TODO" not in text
         assert "{prompt}" not in text
 
     def test_injects_user_prompt_with_escape_clause(self):
@@ -34,6 +35,22 @@ class TestSystemPrompt:
         assert "directives" in get_preset_agent_system_prompt()
         with pytest.raises(CLIError, match="no place for the user prompt"):
             get_preset_agent_system_prompt("anything")
+        # A document that lost the baseline block must fail just as loudly.
+        with pytest.raises(CLIError, match="no place for 'baseline'"):
+            get_preset_agent_system_prompt(baseline=True)
+
+    def test_drops_maintainer_notes_but_keeps_every_other_comment(self, tmp_path, monkeypatch):
+        noted = tmp_path / "system_prompt.md"
+        noted.write_text(
+            "Kept.\n<!--!TODO: not for the agent.-->\n"
+            "Plain <!-- comment --> and <!--?typo--> stay.\n"
+        )
+        monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", noted)
+
+        text = get_preset_agent_system_prompt()
+
+        assert "TODO" not in text
+        assert text == "Kept.\nPlain <!-- comment --> and <!--?typo--> stay."
 
     def test_rejects_unknown_directive_variables(self, tmp_path, monkeypatch):
         broken = tmp_path / "system_prompt.md"

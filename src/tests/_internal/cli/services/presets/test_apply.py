@@ -22,7 +22,7 @@ class TestValidatePresetMatches:
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
-            context_length=8192,
+            min_context_length=8192,
         )
 
         _validate_preset_matches(preset, configuration=configuration)
@@ -32,7 +32,7 @@ class TestValidatePresetMatches:
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
-            context_length=8192,
+            min_context_length=8192,
         )
 
         with pytest.raises(CLIError, match="context length"):
@@ -124,7 +124,7 @@ class TestApplyPreset:
             configurator_args=service_args,
             plan_properties={
                 "Model": "Qwen/Qwen3.5-27B ([secondary]base[/])",
-                "Preset": "8f3a12c4 ([secondary]ctx=32K con=1 42.1 tok/s TTFT 108ms[/])",
+                "Preset": "8f3a12c4 ([secondary]io=1K/128 prefix=0% conc=1[/] tok/s/user=135 tok/s=42.1 ttft=108ms ctx=32K)",
             },
         )
 

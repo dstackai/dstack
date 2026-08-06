@@ -23,6 +23,9 @@ class PresetBenchmarkWorkload(CoreModel):
     input_tokens: PositiveInt
     output_tokens: Annotated[int, Field(ge=2)]
     concurrency: PositiveInt
+    # Defaulted rather than required: presets saved before this field existed
+    # must still load, and for them the benchmark was fully unique.
+    shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
 
 
 class PresetBenchmarkLatency(CoreModel):
@@ -37,6 +40,10 @@ class PresetBenchmarkMetrics(CoreModel):
     duration_seconds: PositiveFloat
     total_input_tokens: Annotated[int, Field(ge=0)]
     total_output_tokens: Annotated[int, Field(ge=0)]
+    # Defaulted rather than required: presets saved before these fields existed
+    # must still load. The `effective_*` properties derive them when absent.
+    output_tok_per_s: Optional[PositiveFloat] = None
+    per_user_tok_per_s: Optional[PositiveFloat] = None
     ttft_ms: PresetBenchmarkLatency
     tpot_ms: PresetBenchmarkLatency
 
@@ -57,6 +64,19 @@ class PresetBenchmark(CoreModel):
     metrics: PresetBenchmarkMetrics
     target: Optional[PresetBenchmarkTarget] = None
     client: Optional[PresetBenchmarkClient] = None
+
+    @property
+    def effective_output_tok_per_s(self) -> float:
+        """Performance as defined in the agent prompt's `## Performance`. Derived
+        rather than read, so a miscomputed field cannot become the displayed truth."""
+        return self.metrics.total_output_tokens / self.metrics.duration_seconds
+
+    @property
+    def effective_per_user_tok_per_s(self) -> float:
+        """Per-user output speed as the serving literature defines it: the steady
+        decode rate, `1/TPOT`, which excludes time to first token. Dividing the
+        aggregate by concurrency instead folds TTFT and the ramp into it."""
+        return 1000 / self.metrics.tpot_ms.p50
 
     @field_validator("tool", "tool_version", "command")
     @classmethod

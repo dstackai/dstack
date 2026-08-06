@@ -18,6 +18,7 @@ from dstack._internal.cli.services.presets.session import (
     _PROGRESS_FILENAME,
     _RUNS_FILENAME,
     _TRIALS_FILENAME,
+    _VERIFICATIONS_FILENAME,
     PresetAgentSession,
 )
 from dstack._internal.compat import IS_WINDOWS
@@ -53,6 +54,10 @@ class PresetAgentWorkspace:
     @property
     def trials_path(self) -> Path:
         return self.path / _TRIALS_FILENAME
+
+    @property
+    def verifications_path(self) -> Path:
+        return self.path / _VERIFICATIONS_FILENAME
 
     @property
     def constraints_path(self) -> Path:
@@ -170,6 +175,7 @@ def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
         workspace.progress_path,
         workspace.runs_path,
         workspace.trials_path,
+        workspace.verifications_path,
     ]:
         path.touch()
     workspace.bin_path.mkdir()

@@ -5,7 +5,7 @@ description: Creating and reusing optimized model inference configurations
 
 # Presets
 
-A preset configuration lets you use an agent to create a preset: a validated and optimized model inference configuration. Once created, the preset can be reused to deploy model inference on validated hardware without an agent.
+A preset configuration lets you use an agent to create a preset: a verified and optimized model inference configuration. Once created, the preset can be reused to deploy model inference on verified hardware without an agent.
 
 The value of presets comes from combining two fundamental features: agent-driven model inference optimization and the `dstack` [service](services.md) primitive, which can deploy model inference to any cloud, Kubernetes, or on-prem cluster.
 
@@ -25,14 +25,26 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `preset.dstack.y
 
 ```yaml
 type: preset
-name: qwen25-7b
+name: dsv4-flash
 
 # The agent picks a compatible variant of the base model
-base: Qwen/Qwen2.5-7B-Instruct
+base: deepseek-ai/DeepSeek-V4-Flash
 
 # The number of benchmarked trials
-max_trials: 3
+trials: 5
 
+# The requirements the preset must meet (time to first token is in milliseconds)
+min_context_length: 1048576
+max_ttft: 675
+
+# The number of simultaneous requests every benchmark uses
+concurrency: 1
+
+# The request shape every benchmark uses (defaults to 1024 and 1024)
+input_tokens: 10000
+output_tokens: 1500
+
+# The environment variables the agent may pass to runs
 env:
   - HF_TOKEN
 ```
@@ -44,19 +56,23 @@ To create the preset, pass the configuration to the `dstack preset create` comma
 <div class="termy">
 
 ```shell
-$ dstack preset create -f preset.dstack.yml
-Create the preset qwen25-7b? [y/n]: y
-[2026-07-15 11:32:01] Starting preset creation for Qwen/Qwen2.5-7B-Instruct. Allowed fleets: gpu-fleet.
-[2026-07-15 11:41:06] Prototype task qwen25-7b-a1b2c3-2 verified vLLM on an L4:24GB.
-[2026-07-15 11:52:06] Final service qwen25-7b-a1b2c3-3 verified with context length 32768.
-[2026-07-15 11:52:18] Benchmark via guidellm 0.7.1: 32/32 requests succeeded.
+$ dstack preset create -f preset.dstack.yml --fleet b200-fleet
+Create the preset dsv4-flash? [y/n]: y
+[2026-08-04 11:38:34] Starting preset creation for deepseek-ai/DeepSeek-V4-Flash. Allowed fleets: b200-fleet.
+[2026-08-04 12:31:19] Trial 3 switched from vLLM to SGLang: 319 tok/s per user, 2.2x the baseline.
+[2026-08-04 13:04:52] Final service dsv4-flash-c83375b4-4 verified with context length 1048576.
+[2026-08-04 13:12:07] Benchmark via sglang.bench_serving: 32/32 requests succeeded.
 ```
 
 </div>
 
-The command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark. The validated preset is saved locally under `~/.dstack/presets`.
+> It's highly recommended to specify the exact hardware you want the preset to use, so that the
+> optimization is done against that hardware. Point `dstack preset create` to a fleet configured
+> correspondingly, via `fleets` inside the preset configuration or via `--fleet` in the CLI.
 
-You can stop watching with <kbd>Ctrl+C</kbd> at any time. The agent keeps running, and `dstack preset logs -f` follows it again. Resume an interrupted creation with `dstack preset create --resume`:
+The command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark.
+
+You can stop watching with `Ctrl`+`C` at any time. The agent keeps running, and `dstack preset logs -f` follows it again. Resume an interrupted creation with `dstack preset create --resume`:
 
 <div class="termy">
 
@@ -66,25 +82,39 @@ $ dstack preset create -f preset.dstack.yml --resume a1b2c3d4
 
 </div>
 
+When resuming, the constraints are read from the original session, not from the configuration file. Editing them and resuming has no effect. To change any of them, create a new preset.
+
 To stop a creation and its runs, use `dstack preset stop`.
 
-!!! info "Claude configuration"
+??? info "Claude configuration"
     By default, preset creation uses the existing `claude` login. To use an Anthropic API key instead, set:
 
     ```shell
     export DSTACK_AGENT_ANTHROPIC_API_KEY=...
     ```
 
-    By default, the agent uses `claude-opus-4-8` and the default `claude` CLI effort. To override them, set:
+    By default, the agent uses `claude-opus-4-8`. It doesn't set an effort level, so the `claude` CLI default applies. To override them, set:
 
     ```shell
-    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-fable-5
-    export DSTACK_AGENT_CLAUDE_EFFORT=high
+    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-opus-5
+    export DSTACK_AGENT_CLAUDE_EFFORT=max
     ```
 
     Supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`.
 
+??? info "Presets directory"
+    The verified presets are saved locally under `~/.dstack/presets`, and `dstack preset` reads them from there. Presets aren't stored on the server.
+
 ## Configuration options
+
+### Fleets
+
+Set `fleets` to restrict creation and reuse to specific [fleets](fleets.md). It's highly recommended to specify a fleet with exactly the hardware that you'd like the preset to use.
+
+Alternatively, pass `--fleet` to `dstack preset create` or `dstack preset apply`.
+
+> Profile settings such as `spot_policy`, `max_price`, and `backends` are ignored during preset
+> creation. Configure them on the fleet instead.
 
 ### Model
 
@@ -104,21 +134,27 @@ To stop a creation and its runs, use `dstack preset stop`.
     repo: Qwen/Qwen2.5-7B-Instruct
     ```
 
-### Trials
+### Shared prefix
 
-`max_trials` is required and sets how many benchmarked trials the agent runs before promoting the best one. Set `concurrency` to control the benchmark concurrency.
+By default every request is unique, so the cache hit rate is near zero. Set `shared_prefix_tokens` to control how much of each request the serving framework can serve from its prefix cache.
 
-### Context length
+<div editor-title="preset.dstack.yml">
 
-Set `context_length` to require a minimum supported context length.
+```yaml
+input_tokens: 8192
+output_tokens: 1024
 
-### Fleets
+# Roughly 90% of prompt tokens can be served from cache
+shared_prefix_tokens: 7360
+```
 
-Set `fleets` to restrict creation and reuse to specific [fleets](fleets.md). Placement properties such as `backends`, `max_price`, and `spot_policy` constrain both creation and reuse too.
+</div>
+
+The `shared_prefix_tokens` value is the part of `input_tokens` that is identical across requests, such as a system prompt or conversation history, and must be less than `input_tokens`.
 
 ### Prompt
 
-Set `prompt` to guide the agent with custom objectives, target metrics, or an experimentation approach. It accepts inline text or a file `path`.
+The `prompt` property is optional. Set it to guide the agent with custom objectives, target metrics, or an experimentation approach. It accepts inline text or a file `path`.
 
 <div editor-title="preset.dstack.yml">
 
@@ -128,6 +164,10 @@ prompt: |
 ```
 
 </div>
+
+### Baseline
+
+Set `baseline: true` to make the first trial a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts.
 
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
@@ -139,20 +179,23 @@ To deploy a preset as a service, pass the preset configuration and the preset ID
 <div class="termy">
 
 ```shell
-$ dstack preset apply -f preset.dstack.yml --id 532f3f4b
+$ dstack preset apply -f preset.dstack.yml --id c83375b4
  Project        main
  User           admin
  Type           service
- Resources      cpu=2.. mem=8GB.. disk=100GB.. gpu=RTXPRO4500:32GB:1..
+ Resources      cpu=8.. mem=64GB.. disk=500GB gpu=B200:180GB:2
  Spot policy    on-demand
  Max price      off
- Model          Qwen/Qwen3.5-27B (base)
- Preset         532f3f4b (ctx=8K con=8 387 tok/s TTFT 582ms)
+ Retry policy   off
+ Idle duration  5m
+ Max duration   off
+ Model          deepseek-ai/DeepSeek-V4-Flash (base)
+ Preset         c83375b4 (io=10000/1500 conc=1 tok/s/user=309 tok/s=296 ttft=213ms ctx=1M)
 
- #  BACKEND           RESOURCES                                         INSTANCE TYPE                  PRICE
- 1  runpod (EU-RO-1)  cpu=12 mem=54GB disk=100GB gpu=RTXPRO4500:32GB:1  NVIDIA RTX PRO 4500 Blackwell  $0.74
+ #  BACKEND           RESOURCES                                    INSTANCE TYPE  PRICE
+ 1  runpod (US-CA-2)  cpu=48 mem=502GB disk=500GB gpu=B200:180GB:2  NVIDIA B200    $11.78
 
-Submit the run qwen35-27b? [y/n]: y
+Submit the run dsv4-flash? [y/n]: y
 ```
 
 </div>
@@ -167,20 +210,32 @@ Use `dstack preset` to list presets:
 
 ```shell
 $ dstack preset list
- BASE               ID        GPU                  BENCHMARK                    STATUS              SUBMITTED     NAME
- Qwen/Qwen2.5-0.5B
-                    bc592b38                                                    clauding (0/3)      23 sec ago    qwen05
- Qwen/Qwen3-32B
-                    f91d6b60  RTX5090:32GB:1       con=8 576 tok/s TTFT 368ms   verified (10/10)    2 days ago    qwen3-32b
- Qwen/Qwen3.5-27B
-                    3c4d5e6f                                                    verifying (3/3)     2 min ago     qwen35-27b-2
-                    532f3f4b  RTXPRO4500:32GB:1..  con=8 387 tok/s TTFT 582ms   verified (4/4)      yesterday     qwen35-27b
-                    d1c2e12b  RTX5090:32GB:1       con=8 266 tok/s TTFT 2.15s   verified (7/10)     yesterday
+ ID        BASE                           GPU           CONSTRAINTS           BENCHMARK                                STATUS          SUBMITTED
+ c83375b4  deepseek-ai/DeepSeek-V4-Flash  B200:180GB:2  io=10000/1500 conc=1  tok/s/user=309 ttft=213ms ctx=1M  ▂▁██▇  trialing (5/5)  2 min ago
 ```
 
 </div>
 
-Presets are grouped by base model. In-progress creations appear too, with a live status like `clauding` or `verifying`. Pass `-w` to watch in realtime. Pass `-v` to include validation resources and all benchmark metrics, or `--json` for complete preset objects. Filter with `--base` or `--repo`.
+By default, `dstack preset` shows creations that are still running, or the most recent one if none are. Pass `-a` to show every preset, or `-n` to show the last N:
+
+<div class="termy">
+
+```shell
+$ dstack preset list -a
+ ID        BASE                            GPU              CONSTRAINTS           BENCHMARK                                     STATUS          SUBMITTED
+ c83375b4  deepseek-ai/DeepSeek-V4-Flash   B200:180GB:2     io=10000/1500 conc=1  tok/s/user=309 ttft=213ms ctx=1M   ▂▁██▇     trialing (5/5)  2 min ago
+ 092c792b  Qwen/Qwen3.5-397B-A17B          RTXPRO6000:4     io=8K/1K conc=64      tok/s/user=19.6 ttft=3.43s ctx=32K ▁▂▅▇█··   verified (7)    3 days ago
+ 9ab0fa65  Qwen/Qwen3.6-27B                RTXPRO4500:1     io=1K/1K conc=8       tok/s/user=57.1 ttft=499ms ctx=128K ▁▄██▆·█  verified (7)    4 days ago
+ f91d6b60  Qwen/Qwen3-32B                  RTX5090:32GB:1   io=1K/512 conc=8      tok/s/user=85.8 ttft=368ms ctx=32K ▁▁▅▅▄▅▇▄▇█ verified (10)  2 weeks ago
+```
+
+</div>
+
+The `CONSTRAINTS` column is what the creation was asked for, and `BENCHMARK` is the best trial so far. `tok/s/user` is the steady decode rate, measured as one second divided by the median time per output token, so it excludes the time to the first token.
+
+The glyphs after the benchmark are one per trial: height is throughput, a yellow bar is a trial whose benchmark broke a constraint, and a red `·` is one that produced no benchmark at all. The shape shows whether a run converged or wandered.
+
+Pass `-w` to watch in realtime, `-v` for more detail, or `--json` for complete preset objects. Filter with `--base` or `--repo`.
 
 ### Delete presets
 
@@ -189,14 +244,22 @@ Delete a preset by ID or name, or all presets for a base model with `--base`:
 <div class="termy">
 
 ```shell
-$ dstack preset delete 8f3a12c4
+$ dstack preset delete c83375b4
 ```
 
 </div>
 
 For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
-> Presets are experimental, and we’d love your feedback. Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
+!!! info "Roadmap and feedback"
+    Here's what is coming soon:
+
+    * Allow the agent to change the source code, compile binaries, etc.
+    * Support for PD disaggregation
+    * Allow passing multiple `--previous <preset ID>` to `dstack preset create` to reuse the insights from previous sessions
+    * Allow passing ranges to `concurrency`
+
+    Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 
 !!! info "What's next?"
     1. Learn how dstack [services](services.md) work

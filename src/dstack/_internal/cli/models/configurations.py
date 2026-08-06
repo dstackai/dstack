@@ -6,6 +6,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import (
     CoreModel,
@@ -14,7 +15,9 @@ from dstack._internal.core.models.common import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import ProfileParams
 
-DEFAULT_CONCURRENCY = 8
+DEFAULT_INPUT_TOKENS = 1024
+DEFAULT_OUTPUT_TOKENS = 1024
+DEFAULT_BASELINE = False
 
 
 class PresetModelRepo(CoreModel):
@@ -130,14 +133,23 @@ class PresetConfiguration(
             )
         ),
     ] = None
-    context_length: Annotated[
+    min_context_length: Annotated[
         Optional[PositiveInt], Field(description="The minimum required context length")
     ] = None
-    max_trials: Annotated[
+    max_ttft: Annotated[
         Optional[PositiveInt],
         Field(
             description=(
-                "The maximum number of benchmarked trials during preset creation"
+                "The maximum p50 time to first token, in milliseconds, that any benchmark"
+                " may report"
+            )
+        ),
+    ] = None
+    trials: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of benchmarked trials during preset creation"
                 " before the best one is promoted"
             )
         ),
@@ -146,8 +158,45 @@ class PresetConfiguration(
         Optional[PositiveInt],
         Field(
             description=(
-                "The number of simultaneous requests used for benchmarks during"
-                f" preset creation. Defaults to `{DEFAULT_CONCURRENCY}`"
+                "The number of simultaneous requests used for benchmarks during preset creation"
+            )
+        ),
+    ] = None
+    input_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of input tokens per request used for benchmarks during"
+                f" preset creation. Defaults to `{DEFAULT_INPUT_TOKENS}`"
+            )
+        ),
+    ] = None
+    output_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of output tokens per request used for benchmarks during"
+                f" preset creation. Defaults to `{DEFAULT_OUTPUT_TOKENS}`"
+            )
+        ),
+    ] = None
+    shared_prefix_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "How many of `input_tokens` are a prefix identical in every benchmark request,"
+                " as a repeated system prompt or conversation history would be. Defaults to `0`,"
+                " meaning every request is fully unique"
+            )
+        ),
+    ] = None
+    baseline: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether the first trial must be a baseline that serves the model with the"
+                " serving framework's recommended defaults instead of an optimization attempt."
+                " Defaults to `false`"
             )
         ),
     ] = None
@@ -167,8 +216,29 @@ class PresetConfiguration(
     )
 
     @property
-    def effective_concurrency(self) -> int:
-        return self.concurrency if self.concurrency is not None else DEFAULT_CONCURRENCY
+    def effective_input_tokens(self) -> int:
+        return self.input_tokens if self.input_tokens is not None else DEFAULT_INPUT_TOKENS
+
+    @property
+    def effective_output_tokens(self) -> int:
+        return self.output_tokens if self.output_tokens is not None else DEFAULT_OUTPUT_TOKENS
+
+    @property
+    def effective_baseline(self) -> bool:
+        return self.baseline if self.baseline is not None else DEFAULT_BASELINE
+
+    @model_validator(mode="after")
+    def validate_shared_prefix_tokens(self) -> Self:
+        # The prefix is carved out of the request, so something has to be left
+        # to differ between requests.
+        if self.shared_prefix_tokens is None:
+            return self
+        input_tokens = self.input_tokens or DEFAULT_INPUT_TOKENS
+        if self.shared_prefix_tokens >= input_tokens:
+            raise ValueError(
+                f"shared_prefix_tokens must be less than input_tokens ({input_tokens})"
+            )
+        return self
 
     @model_validator(mode="before")
     @classmethod
@@ -211,9 +281,14 @@ class PresetConstraints(CoreModel):
 
     run_name_prefix: str
     model: PresetModelSpec
-    context_length: Optional[PositiveInt] = None
-    max_trials: PositiveInt
+    min_context_length: PositiveInt
+    max_ttft: PositiveInt
+    trials_num: PositiveInt
     concurrency: PositiveInt
+    input_tokens: PositiveInt
+    output_tokens: PositiveInt
+    shared_prefix_tokens: int = 0
+    baseline: bool = False
     fleets: list[str] = Field(min_length=1)
     env: list[str] = []
 

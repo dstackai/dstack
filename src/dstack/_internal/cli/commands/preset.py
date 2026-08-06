@@ -104,10 +104,10 @@ class PresetCommand(BaseCommand):
             help="Leave the verified service running",
         )
         create_parser.add_argument(
-            "--max-trials",
+            "--trials",
             type=int,
             metavar="N",
-            help="The maximum number of benchmarked trials before the best one is promoted",
+            help="The number of benchmarked trials before the best one is promoted",
         )
         create_parser.add_argument(
             "--debug",
@@ -235,12 +235,26 @@ class PresetCommand(BaseCommand):
         verbose = args.verbose
         if not getattr(args, "watch", False):
             presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
-            print_presets(presets, sessions=sessions, verbose=verbose)
+            print_presets(
+                presets,
+                sessions=sessions,
+                verbose=verbose,
+                all_presets=args.all_presets,
+                limit=args.limit,
+            )
             return
         with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
             while True:
                 presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
-                live.update(get_presets_table(presets, sessions=sessions, verbose=verbose))
+                live.update(
+                    get_presets_table(
+                        presets,
+                        sessions=sessions,
+                        verbose=verbose,
+                        all_presets=args.all_presets,
+                        limit=args.limit,
+                    )
+                )
                 time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
 
     def _list_presets_and_sessions(
@@ -267,18 +281,21 @@ class PresetCommand(BaseCommand):
         resume_session = None
         if getattr(args, "resume", None):
             resume_session = load_resumable_agent_session(args.resume)
-            if getattr(args, "max_trials", None) is not None:
+            if getattr(args, "trials", None) is not None:
                 console.print(
-                    "[warning]--max-trials is ignored when resuming: "
+                    "[warning]--trials is ignored when resuming: "
                     "the constraints are fixed at creation[/]"
                 )
         api = Client.from_config(project_name=args.project)
         allowed_fleets = None
         if resume_session is None:
-            if configuration.max_trials is None:
+            if configuration.trials is None:
                 raise ConfigurationError(
-                    "max_trials is required. Set it in the configuration or pass --max-trials"
+                    "trials is required. Set it in the configuration or pass --trials"
                 )
+            for field in ("max_ttft", "min_context_length", "concurrency"):
+                if getattr(configuration, field) is None:
+                    raise ConfigurationError(f"{field} is required")
             allowed_fleets = plan_preset(api=api, configuration=configuration)
             if not _confirm_preset_creation(store, configuration.name, assume_yes=args.yes):
                 console.print("\nExiting...")
@@ -408,6 +425,21 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Output in JSON format",
     )
+    parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        dest="all_presets",
+        help="Show all presets. By default, it only shows unfinished creations or the last one.",
+    )
+    parser.add_argument(
+        "-n",
+        "--last",
+        metavar="COUNT",
+        type=int,
+        dest="limit",
+        help="Show only the last N presets. Implies --all",
+    )
     model_filter = parser.add_mutually_exclusive_group()
     model_filter.add_argument(
         "--base",
@@ -490,8 +522,8 @@ def _get_effective_configuration(
     require_name: bool = True,
 ) -> PresetConfiguration:
     _apply_name(configuration, args.name, required=require_name)
-    if getattr(args, "max_trials", None) is not None:
-        configuration.max_trials = args.max_trials
+    if getattr(args, "trials", None) is not None:
+        configuration.trials = args.trials
     profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
     for field in ProfileParams.model_fields:
         if getattr(configuration, field) is None:
