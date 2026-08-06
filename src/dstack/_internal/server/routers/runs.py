@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.runs import Run, RunPlan
-from dstack._internal.server.compatibility.runs import patch_run, patch_run_plan
+from dstack._internal.server.compatibility.runs import (
+    is_run_plan_for_offers_only,
+    patch_run,
+    patch_run_plan,
+)
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
@@ -132,6 +136,10 @@ async def get_plan(
     user, project = user_project
     if not user.ssh_public_key and not body.run_spec.ssh_key_pub:
         await users.refresh_ssh_key(session=session, actor=user)
+    # TODO: Use body.for_offers_only directly once clients < 0.21.0 are no longer supported
+    for_offers_only = is_run_plan_for_offers_only(
+        run_spec=body.run_spec, for_offers_only=body.for_offers_only, client_version=client_version
+    )
     run_plan = await runs.get_plan(
         session=session,
         project=project,
@@ -141,6 +149,7 @@ async def get_plan(
         full_offers=body.full_offers,
         unallocated_resources=body.unallocated_resources,
         legacy_repo_dir=legacy_repo_dir,
+        for_offers_only=for_offers_only,
     )
     patch_run_plan(run_plan, client_version)
     return CustomJSONResponse(run_plan)

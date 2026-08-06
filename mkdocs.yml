@@ -103,6 +103,8 @@ plugins:
         "docs/tasks.md": "docs/concepts/tasks.md"
         "docs/services.md": "docs/concepts/services.md"
         "docs/fleets.md": "docs/concepts/fleets.md"
+        "docs/concepts/endpoints.md": "docs/concepts/presets.md"
+        "docs/reference/cli/dstack/endpoint.md": "docs/reference/cli/dstack/preset.md"
         "docs/examples/llms/llama31.md": "docs/examples/inference/vllm.md"
         "docs/examples/llms/llama32.md": "docs/examples/inference/vllm.md"
         "docs/examples/llms/qwen36.md": "docs/examples/models/qwen36.md"

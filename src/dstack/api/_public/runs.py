@@ -478,6 +478,7 @@ class RunCollection:
         max_offers: Optional[int] = None,
         full_offers: bool = False,
         unallocated_resources: bool = False,
+        for_offers_only: bool = False,
     ) -> RunPlan:
         """
         Get a run plan.
@@ -498,6 +499,8 @@ class RunCollection:
             full_offers: Return full offers not adjusted by requirements.
             unallocated_resources: Subtract allocated resources to return only unallocated
                 resources.
+            for_offers_only: Set to True if the run plan is requested for offer collection only,
+                not a real run submission.
 
         Returns:
             Run plan.
@@ -554,6 +557,7 @@ class RunCollection:
             max_offers=max_offers,
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,
+            for_offers_only=for_offers_only,
         )
         return run_plan
 

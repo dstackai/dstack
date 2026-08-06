@@ -2075,13 +2075,10 @@ class TestGetRunPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
-        "configuration",
+        "for_offers_only",
         [
-            pytest.param({"type": "dev-environment", "ide": "vscode"}, id="regular-configuration"),
-            pytest.param(
-                {"type": "task", "commands": [":"], "image": "scratch"},
-                id="special-configuration-used-by-dstack-offer-cli-command",
-            ),
+            pytest.param(False, id="run-plan"),
+            pytest.param(True, id="offer-collection"),
         ],
     )
     async def test_returns_run_plan_with_offer_from_imported_fleet(
@@ -2089,7 +2086,7 @@ class TestGetRunPlan:
         test_db,
         session: AsyncSession,
         client: AsyncClient,
-        configuration: dict,
+        for_offers_only: bool,
     ) -> None:
         importer_user = await create_user(session, global_role=GlobalRole.USER)
         exporter_project = await create_project(session, name="exporter-project")
@@ -2121,8 +2118,8 @@ class TestGetRunPlan:
             exported_fleets=[fleet],
         )
 
-        run_spec = {"configuration": configuration}
-        body = {"run_spec": run_spec}
+        run_spec = {"configuration": {"type": "dev-environment", "ide": "vscode"}}
+        body = {"run_spec": run_spec, "for_offers_only": for_offers_only}
         response = await client.post(
             "/api/project/importer-project/runs/get_plan",
             headers=get_auth_headers(importer_user.token),
@@ -2334,16 +2331,14 @@ class TestGetRunPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
-        "configuration",
+        ("configuration", "for_offers_only"),
         [
-            pytest.param({"type": "dev-environment"}, id="regular-configuration"),
+            pytest.param({"type": "dev-environment"}, False, id="run-plan"),
+            pytest.param({"type": "dev-environment"}, True, id="offer-collection"),
             pytest.param(
-                {"type": "task", "commands": [":"], "image": "scratch"},
-                id="special-configuration-used-by-dstack-offer-cli-command",
-            ),
-            pytest.param(
-                {"type": "task", "commands": [":"], "image": "scratch", "fleets": ["test-fleet"]},
-                id="special-configuration-used-by-dstack-offer-cli-command-with-fleets",  # --fleet
+                {"type": "dev-environment", "fleets": ["test-fleet"]},
+                True,
+                id="offer-collection-with-fleets",  # `dstack offer --fleet`
             ),
         ],
     )
@@ -2353,6 +2348,7 @@ class TestGetRunPlan:
         session: AsyncSession,
         client: AsyncClient,
         configuration: dict,
+        for_offers_only: bool,
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -2372,7 +2368,7 @@ class TestGetRunPlan:
         run_spec = get_run_spec(
             repo_id=repo.name, configuration=parse_run_configuration(configuration)
         )
-        body = {"run_spec": run_spec.model_dump()}
+        body = {"run_spec": run_spec.model_dump(), "for_offers_only": for_offers_only}
 
         backend_mock_aws = Mock()
         backend_mock_aws.TYPE = BackendType.AWS
@@ -2443,7 +2439,7 @@ class TestGetRunPlan:
                 fleets=["fleet-aws", "fleet-vastai"],
             ),
         )
-        body = {"run_spec": run_spec.model_dump()}
+        body = {"run_spec": run_spec.model_dump(), "for_offers_only": True}
 
         backend_mock_aws = Mock()
         backend_mock_aws.TYPE = BackendType.AWS
@@ -2544,7 +2540,7 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.model_dump()},
+            json={"run_spec": run_spec.model_dump(), "for_offers_only": True},
         )
 
         assert response.status_code == 200, response.json()
@@ -2591,7 +2587,7 @@ class TestGetRunPlan:
                 fleets=["fleet-a", "fleet-b"],
             ),
         )
-        body = {"run_spec": run_spec.model_dump()}
+        body = {"run_spec": run_spec.model_dump(), "for_offers_only": True}
 
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
@@ -2679,7 +2675,7 @@ class TestGetRunPlan:
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
-            json={"run_spec": run_spec.model_dump()},
+            json={"run_spec": run_spec.model_dump(), "for_offers_only": True},
         )
 
         assert response.status_code == 200, response.json()
@@ -2713,7 +2709,7 @@ class TestGetRunPlan:
                 user="root",
             ),
         )
-        body = {"run_spec": run_spec.model_dump()}
+        body = {"run_spec": run_spec.model_dump(), "for_offers_only": True}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
@@ -2805,7 +2801,7 @@ class TestGetRunPlan:
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.model_dump()},
+                json={"run_spec": run_spec.model_dump(), "for_offers_only": True},
             )
 
         assert response.status_code == 200, response.json()
@@ -2868,7 +2864,7 @@ class TestGetRunPlan:
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"run_spec": run_spec.model_dump()},
+                json={"run_spec": run_spec.model_dump(), "for_offers_only": True},
             )
 
         assert response.status_code == 200, response.json()
@@ -2943,6 +2939,83 @@ class TestGetRunPlan:
         job_plan = response.json()["job_plans"][0]
         assert job_plan["total_offers"] == 1
         assert job_plan["offers"][0]["price"] == 3.0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("client_version", "for_offers_only", "expected_offer_collection"),
+        [
+            pytest.param(None, True, True, id="dev-client-with-flag"),
+            pytest.param("0.21.0", True, True, id="new-client-with-flag"),
+            pytest.param("0.20.30", None, True, id="old-client-without-flag"),
+            pytest.param("0.21.0", None, False, id="new-client-without-flag"),
+            pytest.param(None, None, False, id="dev-client-without-flag"),
+        ],
+    )
+    async def test_collects_offers_only_if_requested_by_for_offers_only(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        for_offers_only: Optional[bool],
+        expected_offer_collection: bool,
+    ) -> None:
+        """
+        Clients prior to 0.21.0 don't send `for_offers_only`, so the synthetic run spec that
+        `dstack offer` sends still triggers offer collection. For newer clients, the same run
+        spec is planned as a regular run unless `for_offers_only` is set.
+        """
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+            ),
+        )
+        body: dict = {"run_spec": run_spec.model_dump()}
+        if for_offers_only is not None:
+            body["for_offers_only"] = for_offers_only
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        offer = get_instance_offer_with_availability(price=1.0)
+        with (
+            patch(
+                "dstack._internal.server.services.runs.plan.get_non_fleet_offers",
+                new=AsyncMock(return_value=([(Mock(), offer)], [])),
+            ) as get_non_fleet_offers_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+                new=AsyncMock(return_value=[Mock()]),
+            ) as select_candidate_fleet_models_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+                new=AsyncMock(return_value=(Mock(), [(Mock(), offer)], [])),
+            ) as find_optimal_fleet_with_offers_mock,
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=headers,
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        assert get_non_fleet_offers_mock.await_count == int(expected_offer_collection)
+        assert select_candidate_fleet_models_mock.await_count == int(not expected_offer_collection)
+        assert find_optimal_fleet_with_offers_mock.await_count == int(
+            not expected_offer_collection
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

@@ -89,14 +89,14 @@ async def get_job_plans(
     max_offers: Optional[int],
     full_offers: bool,
     unallocated_resources: bool,
+    for_offers_only: bool,
 ) -> list[JobPlan]:
     """
     Returns job plans for the given run spec.
 
     Normal run planning (`dstack apply`) selects the best fleet candidate for each planned job
     and builds offers from that path. `dstack offer` without `--group-by` uses the same
-    `/runs/get_plan` API, but its synthetic run spec is detected by
-    `_should_select_best_fleet_candidate()`. In that case, planning skips
+    `/runs/get_plan` API but with `for_offers_only=True`. In that case, planning skips
     best-fleet-candidate selection and collects offers directly: global offers when no fleets
     are specified, or offers from the selected fleets when `--fleet` is used.
 
@@ -119,7 +119,7 @@ async def get_job_plans(
         job_num=0,
     )
 
-    if _should_select_best_fleet_candidate(run_spec) and run_spec.merged_profile.instances is None:
+    if not for_offers_only and run_spec.merged_profile.instances is None:
         candidate_fleet_models = await _select_candidate_fleet_models(
             session=session,
             project=project,
@@ -1014,27 +1014,6 @@ def _get_job_plan(
         total_offers=len(job_offers),
         max_price=max((offer.price for offer in job_offers), default=None),
     )
-
-
-def _should_select_best_fleet_candidate(run_spec: RunSpec) -> bool:
-    """
-    Returns ``True`` for normal run planning and ``False`` for `dstack offer` without
-    `--group-by`.
-
-    Both `dstack apply` and `dstack offer` without `--group-by` call `/runs/get_plan`. The
-    current way to recognize `dstack offer` without `--group-by` is the synthetic task spec
-    that the CLI sends with `type == "task"` and `commands == [":"]`.
-    TODO: Replace this command-shape hack with an explicit request/API signal for
-    `dstack offer` without `--group-by`.
-
-    When this function returns ``False``, the planner skips best-fleet-candidate selection
-    and goes directly to the special `dstack offer` collection path:
-    global offers when no fleets are specified, or offers from the selected fleets when
-    `--fleet` is used.
-
-    A real task with `commands == [":"]` would also match this special `dstack offer` path.
-    """
-    return not (run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"])
 
 
 def _get_offers_from_instances(

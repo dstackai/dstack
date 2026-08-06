@@ -50,3 +50,21 @@ def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None
         and isinstance(run_spec.configuration.gateway, EntityReference)
     ):
         run_spec.configuration.gateway = run_spec.configuration.gateway.format()
+
+
+def is_run_plan_for_offers_only(
+    run_spec: RunSpec, for_offers_only: bool, client_version: Optional[Version]
+) -> bool:
+    """
+    Clients < 0.21.0 don't support `for_offers_only` argument and rely on a magic configuration
+    that triggers "offer collection only" path.
+
+    TODO: Drop once clients < 0.21.0 are no longer supported.
+
+    NOTE: A real task with `commands == [":"]` would also match this special `dstack offer` path.
+    """
+    if for_offers_only:
+        return True
+    if client_version is not None and client_version < Version("0.21.0"):
+        return run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"]
+    return False
