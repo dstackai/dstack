@@ -44,6 +44,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 
 ## Commit & Pull Request Guidelines
 - Name branches `issue_{issue_num}_{title}` when the work tracks an issue (e.g. `issue_3959_replicated_alb_gateways`), and `pr_{title}` otherwise.
+- Never create git tags. Tags are reserved for releases and are created only by the release process described in `contributing/RELEASE.md`. To mark or share a commit, push an appropriately named branch instead.
 - Commit messages follow the existing style: short, imperative summaries (e.g., “Fix exclude_not_available ignored”); include rationale in the body if needed.
 - For PRs, describe behavior changes and link related issues.
 - Include screenshots or terminal output when touching UX/CLI messages or frontend flows.
