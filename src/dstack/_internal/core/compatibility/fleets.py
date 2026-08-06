@@ -28,14 +28,6 @@ def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDi
     return {"plan": apply_plan_excludes}
 
 
-def get_create_fleet_excludes(fleet_spec: FleetSpec) -> IncludeExcludeDictType:
-    create_fleet_excludes: IncludeExcludeDictType = {}
-    spec_excludes = get_fleet_spec_excludes(fleet_spec)
-    if spec_excludes:
-        create_fleet_excludes["spec"] = spec_excludes
-    return create_fleet_excludes
-
-
 def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDictType]:
     """
     Returns `fleet_spec` exclude mapping to exclude certain fields from the request.
