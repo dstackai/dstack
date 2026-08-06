@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.server.compatibility.gpus import patch_list_gpus_response
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.gpus import ListGpusRequest, ListGpusResponse
@@ -40,5 +39,4 @@ async def list_gpus(
         full_offers=body.full_offers,
         unallocated_resources=body.unallocated_resources,
     )
-    patch_list_gpus_response(resp, client_version)
     return resp
