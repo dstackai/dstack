@@ -137,7 +137,6 @@ async def call_gpus_api(
     user_token: str,
     run_spec: RunSpec,
     group_by: Optional[List[str]] = None,
-    client_version: Optional[str] = None,
     full_offers: Optional[bool] = None,
     unallocated_resources: Optional[bool] = None,
 ):
@@ -149,13 +148,10 @@ async def call_gpus_api(
         json_data["full_offers"] = full_offers
     if unallocated_resources is not None:
         json_data["unallocated_resources"] = unallocated_resources
-    headers = get_auth_headers(user_token)
-    if client_version is not None:
-        headers["X-API-Version"] = client_version
 
     return await client.post(
         f"/api/project/{project_name}/gpus/list",
-        headers=headers,
+        headers=get_auth_headers(user_token),
         json=json_data,
     )
 
@@ -783,44 +779,3 @@ class TestListGpus:
             assert rtx_runpod_euwest1["region"] == "eu-west-1"
             assert rtx_runpod_euwest1["price"]["min"] == 0.65
             assert rtx_runpod_euwest1["price"]["max"] == 0.65
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize(
-        ("client_version", "expected_availability"),
-        [
-            ("0.20.3", InstanceAvailability.NOT_AVAILABLE),
-            ("0.20.4", InstanceAvailability.NO_BALANCE),
-            (None, InstanceAvailability.NO_BALANCE),
-        ],
-    )
-    async def test_replaces_no_balance_with_not_available_for_old_clients(
-        self,
-        test_db,
-        session: AsyncSession,
-        client: AsyncClient,
-        client_version: Optional[str],
-        expected_availability: InstanceAvailability,
-    ):
-        user, project, repo, run_spec = await gpu_test_setup(session)
-
-        available_offer = create_gpu_offer(
-            BackendType.AWS, "T4", 16384, 0.50, availability=InstanceAvailability.AVAILABLE
-        )
-        no_balance_offer = create_gpu_offer(
-            BackendType.AWS, "L4", 24 * 1024, 1.0, availability=InstanceAvailability.NO_BALANCE
-        )
-        offers_by_backend = {BackendType.AWS: [available_offer, no_balance_offer]}
-        mocked_backends = create_mock_backends_with_offers(offers_by_backend)
-
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
-            response = await call_gpus_api(
-                client, project.name, user.token, run_spec, client_version=client_version
-            )
-
-        assert response.status_code == 200
-        response_data = response.json()
-        assert len(response_data["gpus"]) == 2
-        assert response_data["gpus"][0]["availability"] == [InstanceAvailability.AVAILABLE.value]
-        assert response_data["gpus"][1]["availability"] == [expected_availability.value]

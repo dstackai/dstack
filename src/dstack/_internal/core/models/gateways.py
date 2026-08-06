@@ -141,6 +141,13 @@ class Gateway(CoreModel):
     wildcard_domain: Optional[str] = None
     default: bool
     replicas: list[GatewayReplica] = []
+    # TODO: remove `backend` and `region` in 0.22.
+    backend: Optional[BackendType] = None
+    """Never set since 0.21, use `configuration.backend`. Kept because pre-0.21 clients echo it
+    back inside `current_resource` on apply, and requests reject extra fields.
+    """
+    region: Optional[str] = None
+    """Never set since 0.21, use `configuration.region`. See `backend`."""
     ip_address: Optional[str] = None
     """Deprecated in favor of `replicas[i].hostname`, only set for pre-0.20.25 clients."""
     instance_id: Optional[str] = None

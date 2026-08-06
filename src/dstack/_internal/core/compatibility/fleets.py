@@ -20,10 +20,15 @@ def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDi
         apply_plan_excludes["spec"] = spec_excludes
     current_resource = plan_input.current_resource
     if current_resource is not None:
-        current_resource_excludes = {}
+        current_resource_excludes: IncludeExcludeDictType = {}
         current_resource_spec_excludes = get_fleet_spec_excludes(current_resource.spec)
         if current_resource_spec_excludes:
             current_resource_excludes["spec"] = current_resource_spec_excludes
+        # `Resources.description` is deprecated and never set since 0.21. Not sending it lets 0.22
+        # drop the field without breaking 0.21 clients.
+        current_resource_excludes["instances"] = {
+            "__all__": {"instance_type": {"resources": {"description": True}}}
+        }
         apply_plan_excludes["current_resource"] = current_resource_excludes
     return {"plan": apply_plan_excludes}
 
@@ -35,15 +40,9 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDic
     clients backward-compatibility with older servers.
     """
     spec_excludes: IncludeExcludeDictType = {}
-    configuration_excludes: IncludeExcludeDictType = {}
     profile_excludes = get_profile_excludes(fleet_spec.profile)
 
     spec_excludes["autocreated"] = True
-    if fleet_spec.configuration.backend_options is None:
-        configuration_excludes["backend_options"] = True
-
-    if configuration_excludes:
-        spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
         spec_excludes["profile"] = profile_excludes
     if spec_excludes:

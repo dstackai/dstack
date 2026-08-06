@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from dstack._internal.core.compatibility.gateways import (
+    get_apply_plan_excludes,
     get_create_gateway_excludes,
     get_set_default_gateway_excludes,
 )
@@ -54,7 +55,8 @@ class GatewaysAPIClient(APIClientGroup):
     ) -> Gateway:
         body = ApplyGatewayPlanRequest(plan=plan, force=force)
         resp = self._request(
-            f"/api/project/{project_name}/gateways/apply", body=body.model_dump_json()
+            f"/api/project/{project_name}/gateways/apply",
+            body=body.model_dump_json(exclude=get_apply_plan_excludes(plan)),
         )
         return validate_extra_ignore(Gateway, resp.json())
 

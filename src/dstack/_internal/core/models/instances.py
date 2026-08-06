@@ -66,6 +66,11 @@ class Resources(CoreModel):
     disk: Disk = Disk(size_mib=102400)
     """`disk` defaults to 100GB for backward compatibility."""
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
+    # TODO: remove `description` in 0.22.
+    description: str = ""
+    """Never set by the server since 0.21. Kept because pre-0.21 clients echo it back inside
+    `current_resource` on apply, and requests reject extra fields.
+    """
 
     def pretty_format(self, include_spot: bool = False, gpu_only: bool = False) -> str:
         return Resources._pretty_format(

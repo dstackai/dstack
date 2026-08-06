@@ -54,10 +54,6 @@ class GetRunPlanRequest(CoreModel):
     ] = False
 
 
-class SubmitRunRequest(CoreModel):
-    run_spec: RunSpec
-
-
 class ApplyRunPlanRequest(CoreModel):
     plan: ApplyRunPlanInput
     force: Annotated[

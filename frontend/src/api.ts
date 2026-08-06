@@ -87,7 +87,6 @@ export const API = {
         RUN_GET_PLAN: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/get_plan`,
         RUNS_DELETE: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/delete`,
         RUNS_STOP: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/stop`,
-        RUNS_SUBMIT: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/submit`,
         RUNS_APPLY: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/apply`,
 
         // Logs

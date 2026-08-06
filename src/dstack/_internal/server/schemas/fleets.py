@@ -51,10 +51,6 @@ class ApplyFleetPlanRequest(CoreModel):
     ]
 
 
-class CreateFleetRequest(CoreModel):
-    spec: FleetSpec
-
-
 class DeleteFleetsRequest(CoreModel):
     names: List[str]
 

@@ -336,6 +336,7 @@ def resources() -> Resources:
         gpus=[Gpu(name="A100", memory_mib=40960)],
         spot=False,
         disk=Disk(size_mib=102400),
+        description="8xCPU, 16GB, 1xA100",
     )
 
 
@@ -518,6 +519,8 @@ def gateway() -> Gateway:
         id=_ID,
         name="test-gateway",
         project_name="test-project",
+        backend=BackendType.AWS,
+        region="us-east-1",
         created_at=_CREATED_AT,
         status=GatewayStatus.RUNNING,
         status_message=None,

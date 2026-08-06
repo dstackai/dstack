@@ -1,7 +1,6 @@
-from typing import Annotated, Optional, Tuple
+from typing import Annotated, Tuple
 
 from fastapi import APIRouter, Depends
-from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server.db import get_session
@@ -11,7 +10,6 @@ from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services.gpus import list_gpus_grouped
 from dstack._internal.server.utils.routers import (
     get_base_api_additional_responses,
-    get_client_version,
 )
 
 project_router = APIRouter(
@@ -27,7 +25,6 @@ project_router = APIRouter(
 async def list_gpus(
     body: ListGpusRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    client_version: Annotated[Optional[Version], Depends(get_client_version)],
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> ListGpusResponse:
     _, project = user_project
