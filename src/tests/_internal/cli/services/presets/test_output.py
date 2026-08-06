@@ -160,12 +160,12 @@ class TestSessionRow:
     def test_omits_progress_without_trials_data(self):
         row = _session_row({"id": "ab12cd34", "status": "interrupted"})
 
-        assert row["STATUS"] == "[bold gold1]interrupted[/]"
+        assert row["STATUS"] == "[secondary]interrupted[/]"
 
     def test_counts_without_trials_num(self):
         row = _session_row({"id": "ab12cd34", "status": "interrupted", "trials": {"count": 2}})
 
-        assert row["STATUS"] == "[bold gold1]interrupted[/] [secondary](2)[/]"
+        assert row["STATUS"] == "[secondary]interrupted[/] [secondary](2)[/]"
 
 
 class TestOrdering:
