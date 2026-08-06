@@ -29,8 +29,6 @@ def get_create_gateway_excludes(configuration: GatewayConfiguration) -> IncludeE
 
 def get_set_default_gateway_excludes(request: SetDefaultGatewayRequest) -> IncludeExcludeDictType:
     excludes: IncludeExcludeDictType = {}
-    if request.gateway_project is None:
-        excludes["gateway_project"] = True
     return excludes
 
 
@@ -38,8 +36,4 @@ def _get_gateway_configuration_excludes(
     configuration: GatewayConfiguration,
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
-
-    if configuration.replicas is None:
-        configuration_excludes["replicas"] = True
-
     return configuration_excludes

@@ -5,7 +5,6 @@ from uuid import UUID
 from dstack._internal.core.compatibility.fleets import (
     get_apply_plan_excludes,
     get_get_plan_excludes,
-    patch_fleet_spec,
 )
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, Fleet, FleetPlan, FleetSpec
@@ -49,7 +48,6 @@ class FleetsAPIClient(APIClientGroup):
     ) -> FleetPlan:
         body = GetFleetPlanRequest(spec=spec)
         body = copy.deepcopy(body)
-        patch_fleet_spec(body.spec)
         body_json = body.model_dump_json(exclude=get_get_plan_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
         return validate_extra_ignore(FleetPlan, resp.json())
@@ -63,9 +61,6 @@ class FleetsAPIClient(APIClientGroup):
         plan_input = validate_extra_ignore(ApplyFleetPlanInput, plan)
         body = ApplyFleetPlanRequest(plan=plan_input, force=force)
         body = copy.deepcopy(body)
-        patch_fleet_spec(body.plan.spec)
-        if body.plan.current_resource is not None:
-            patch_fleet_spec(body.plan.current_resource.spec)
         body_json = body.model_dump_json(exclude=get_apply_plan_excludes(plan_input))
         resp = self._request(f"/api/project/{project_name}/fleets/apply", body=body_json)
         return validate_extra_ignore(Fleet, resp.json())

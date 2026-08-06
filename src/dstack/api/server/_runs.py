@@ -7,7 +7,6 @@ from dstack._internal.core.compatibility.runs import (
     get_apply_plan_excludes,
     get_get_plan_excludes,
     get_list_runs_excludes,
-    patch_run_spec,
 )
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.runs import (
@@ -85,7 +84,6 @@ class RunsAPIClient(APIClientGroup):
             unallocated_resources=unallocated_resources,
         )
         body = copy.deepcopy(body)
-        patch_run_spec(body.run_spec)
         resp = self._request(
             f"/api/project/{project_name}/runs/get_plan",
             body=body.model_dump_json(exclude=get_get_plan_excludes(body)),
@@ -101,9 +99,6 @@ class RunsAPIClient(APIClientGroup):
         plan_input = validate_extra_ignore(ApplyRunPlanInput, plan)
         body = ApplyRunPlanRequest(plan=plan_input, force=force)
         body = copy.deepcopy(body)
-        patch_run_spec(body.plan.run_spec)
-        if body.plan.current_resource is not None:
-            patch_run_spec(body.plan.current_resource.run_spec)
         resp = self._request(
             f"/api/project/{project_name}/runs/apply",
             body=body.model_dump_json(exclude=get_apply_plan_excludes(plan_input)),
