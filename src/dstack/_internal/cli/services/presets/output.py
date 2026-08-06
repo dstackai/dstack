@@ -14,7 +14,7 @@ _STATUS_DISPLAY = {
     "ready": ("verified", "grey"),
     "running": ("trialing", "bold sea_green3"),
     "verifying": ("verifying", "bold deep_sky_blue1"),
-    "interrupted": ("interrupted", "bold gold1"),
+    "interrupted": ("interrupted", "secondary"),
     "failed": ("failed", "indian_red1"),
 }
 
