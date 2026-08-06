@@ -336,7 +336,6 @@ def resources() -> Resources:
         gpus=[Gpu(name="A100", memory_mib=40960)],
         spot=False,
         disk=Disk(size_mib=102400),
-        description="8xCPU, 16GB, 1xA100",
     )
 
 

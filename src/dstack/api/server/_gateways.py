@@ -77,8 +77,6 @@ class GatewaysAPIClient(APIClientGroup):
     def set_default(
         self, project_name: str, gateway_name: str, *, gateway_project: Optional[str] = None
     ) -> None:
-        if gateway_project == project_name:
-            gateway_project = None  # omit for compatibility with pre-0.20.20 servers
         body = SetDefaultGatewayRequest(name=gateway_name, gateway_project=gateway_project)
         self._request(
             f"/api/project/{project_name}/gateways/set_default",

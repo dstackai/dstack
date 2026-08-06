@@ -164,7 +164,6 @@ def generate_shared_offer(
         gpus=full_resources.gpus[: len(full_resources.gpus) // total_blocks * blocks],
         spot=full_resources.spot,
         disk=full_resources.disk,
-        description=full_resources.description,
     )
     return InstanceOfferWithAvailability(
         backend=offer.backend,

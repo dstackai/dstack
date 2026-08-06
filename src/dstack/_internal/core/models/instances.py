@@ -1,10 +1,10 @@
 import datetime
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -66,11 +66,6 @@ class Resources(CoreModel):
     disk: Disk = Disk(size_mib=102400)
     """`disk` defaults to 100GB for backward compatibility."""
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
-    # TODO: remove `description` in 0.21.
-    description: Annotated[
-        str,
-        Field(description="Deprecated: generated client-side. Will be removed in 0.21."),
-    ] = ""
 
     def pretty_format(self, include_spot: bool = False, gpu_only: bool = False) -> str:
         return Resources._pretty_format(
