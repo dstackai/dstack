@@ -534,6 +534,7 @@ async def get_plan(
     max_offers: Optional[int],
     full_offers: bool,
     unallocated_resources: bool,
+    for_offers_only: bool,
     legacy_repo_dir: bool = False,
 ) -> RunPlan:
     effective_run_spec = RunSpec.model_validate(run_spec.model_dump())
@@ -574,6 +575,7 @@ async def get_plan(
         max_offers=max_offers,
         full_offers=full_offers,
         unallocated_resources=unallocated_resources,
+        for_offers_only=for_offers_only,
     )
     run_plan = RunPlan(
         project_name=project.name,

@@ -808,7 +808,9 @@ def _print_fleet_offers(api: Client, allowed_fleets: tuple[str, ...]) -> None:
         offer_configuration.fleets = list(allowed_fleets)
         run_spec = RunSpec(configuration=offer_configuration, profile=None)
         with console.status("Getting offers..."):
-            run_plan = api.client.runs.get_plan(api.project, run_spec, max_offers=10)
+            run_plan = api.client.runs.get_plan(
+                api.project, run_spec, max_offers=10, for_offers_only=True
+            )
         props = Table(box=None, show_header=False)
         props.add_column(no_wrap=True)
         props.add_column()
