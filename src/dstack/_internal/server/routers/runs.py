@@ -17,7 +17,6 @@ from dstack._internal.server.schemas.runs import (
     GetRunRequest,
     ListRunsRequest,
     StopRunsRequest,
-    SubmitRunRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs, users
@@ -210,21 +209,3 @@ async def delete_runs(
     """
     user, project = user_project
     await runs.delete_runs(session=session, user=user, project=project, runs_names=body.runs_names)
-
-
-# apply_plan replaces submit_run since it can create new runs.
-@project_router.post("/submit", deprecated=True)
-async def submit_run(
-    body: SubmitRunRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
-) -> Run:
-    user, project = user_project
-    return await runs.submit_run(
-        session=session,
-        user=user,
-        project=project,
-        run_spec=body.run_spec,
-        pipeline_hinter=pipeline_hinter,
-    )
