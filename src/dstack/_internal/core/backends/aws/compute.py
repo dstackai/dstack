@@ -1369,6 +1369,7 @@ def _supported_instances(
         "p6-b200.",
         "p5.",
         "p5e.",
+        "p5en.",
         "p4d.",
         "p4de.",
         "g7.",
