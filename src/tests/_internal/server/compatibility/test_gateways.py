@@ -34,8 +34,6 @@ def _make_gateway(replicas=None, hostname=None) -> Gateway:
         id=uuid.uuid4(),
         name="test",
         project_name="proj",
-        backend=BackendType.AWS,
-        region="us",
         created_at=_CREATED_AT,
         status=GatewayStatus.RUNNING,
         status_message=None,

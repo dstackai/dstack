@@ -519,8 +519,6 @@ def gateway() -> Gateway:
         id=_ID,
         name="test-gateway",
         project_name="test-project",
-        backend=BackendType.AWS,
-        region="us-east-1",
         created_at=_CREATED_AT,
         status=GatewayStatus.RUNNING,
         status_message=None,

@@ -121,18 +121,14 @@ class GatewayReplica(CoreModel):
     backend: Optional[BackendType] = None
     region: Optional[str] = None
     created_at: datetime.datetime
-    status: Optional[GatewayReplicaStatus] = None
-    """`status` is only optional on the client side for compatibility with 0.20.25 and 0.20.26 servers"""
+    status: GatewayReplicaStatus
     status_message: Optional[str] = None
 
 
 class Gateway(CoreModel):
-    # TODO(0.21): Make `id` required.
-    id: Optional[uuid.UUID] = None
-    """`id` is only optional on the client side for compatibility with pre-0.20.7 servers."""
+    id: uuid.UUID
     name: str
-    project_name: Optional[str] = None
-    """`project_name` is only optional on the client side for compatibility with pre-0.20.20 servers."""
+    project_name: str
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus
@@ -145,16 +141,6 @@ class Gateway(CoreModel):
     wildcard_domain: Optional[str] = None
     default: bool
     replicas: list[GatewayReplica] = []
-    backend: Optional[BackendType] = None
-    """`backend` duplicates a configuration field on the top level for backward compatibility
-    with 0.19.x clients that expect it to be required.
-    Remove after 0.21.
-    """
-    region: Optional[str] = None
-    """`region` duplicates a configuration field on the top level for backward compatibility
-    with 0.19.x clients that expect it to be required.
-    Remove after 0.21.
-    """
     ip_address: Optional[str] = None
     """Deprecated in favor of `replicas[i].hostname`, only set for pre-0.20.25 clients."""
     instance_id: Optional[str] = None
