@@ -156,7 +156,7 @@ but then produce the following output:
 
 ```shell
 wet-mangust-1 provisioning completed (failed)
-No offers
+No capacity
 Failed to provision in fleet 'aws-main': tried 5 of 12 offers (attempt limit reached), all failed.
 Errors: g5.xlarge in aws/us-east-1: InsufficientInstanceCapacity; g5.xlarge in aws/eu-west-1: RequestLimitExceeded
 ```
@@ -170,7 +170,7 @@ for the full list.
 
 If some runs fail to provision, it may be due to an insufficient service quota. For cloud providers like AWS, GCP,
 Azure, and OCI, you often need to request an increased [service quota](protips.md#service-quotas) before you can use
-specific instances. Quota errors returned by the backend are reported in the run's error message.
+specific instances.
 
 ### Run starts but fails
 

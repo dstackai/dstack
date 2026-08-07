@@ -255,7 +255,7 @@ class TestGetRunsTable:
                 JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 None,
                 None,
-                "no offers",
+                "no capacity",
                 "gold1",
             ),
             (
