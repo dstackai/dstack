@@ -11,6 +11,7 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     RootModel,
+    Tag,
     ValidationError,
     ValidationInfo,
     conint,
@@ -1046,7 +1047,16 @@ class ServiceConfigurationParams(CoreModel):
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
-        Optional[Union[List[ReplicaGroup], Range[int]]],
+        Optional[
+            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad
+            # `replicas` spells out the whole wrapped schema —
+            # `service.replicas.list[function-after[validate_scaling(), ReplicaGroup]].0` — which
+            # is what `dstack apply` shows the user.
+            Union[
+                Annotated[list[ReplicaGroup], Tag("ReplicaGroup")],
+                Annotated[Range[int], Tag("Range[int]")],
+            ]
+        ],
         Field(
             description=(
                 "The number of replicas or a list of replica groups. "
