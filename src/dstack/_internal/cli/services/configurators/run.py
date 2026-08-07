@@ -59,7 +59,14 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.repos import RepoHeadWithCreds
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunPlan, RunSpec, RunStatus
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobSubmission,
+    JobTerminationReason,
+    RunPlan,
+    RunSpec,
+    RunStatus,
+)
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
@@ -947,7 +954,11 @@ def print_finished_message(run: Run):
             # which rich would otherwise parse as markup or repaint.
             console.print(termination_reason_message, style="error", markup=False, highlight=False)
 
-        if termination_reason:
+        if (
+            termination_reason
+            # A run that never started has no runner logs to read.
+            and termination_reason != JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY.value
+        ):
             console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
 
 
