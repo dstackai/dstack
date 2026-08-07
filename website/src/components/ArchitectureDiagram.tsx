@@ -7,10 +7,11 @@ import { DashedBorder } from './DashedBorder';
 // lives in CSS (.arch-logo--<key>); only the mask image URL is set inline, since it must carry
 // the runtime base path (asset()).
 //
-// NOTE: This diagram is mirrored in the docs: mkdocs/docs/index.md ("How does it work?") embeds the
-// same markup, with the styles ported to mkdocs/assets/stylesheets/cloudscape-docs.css (.arch-*)
-// and the logos copied to mkdocs/assets/images/arch-logos/. If you change this component (markup,
-// logos, or sizing), update the docs copy too so the two stay in sync.
+// NOTE: This component is the SOURCE for the static SVG pair published in
+// https://github.com/dstackai/static-assets (static-assets/images/dstack-architecture-diagram*.svg,
+// served via https://dstack.ai/static-assets/static-assets/images/) and embedded by the docs
+// index ("How does it work?") and the README. If you change this component (markup, logos, or
+// sizing), regenerate the SVGs from it and overwrite them in place — the URLs stay stable.
 
 type Logo = { key: string; label: string; src?: string; initials?: string };
 

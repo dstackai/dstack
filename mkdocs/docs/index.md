@@ -14,10 +14,13 @@ It streamlines development, training, and inference, and is compatible with any 
 
 ## How does it work?
 
-<!-- Architecture diagram — ported from the new landing's <ArchitectureDiagram> component.
-     Styles live in mkdocs/assets/stylesheets/cloudscape-docs.css (.arch-*). If the landing
-     diagram changes (website/src/components/ArchitectureDiagram.tsx), update this markup + CSS. -->
-<div class="arch-diagram-wrap"><div class="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below."><div class="arch-row"><div class="arch-cell"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-cell__label">Any framework</span><span class="arch-logos"><span class="arch-logo arch-logo--pytorch" role="img" aria-label="PyTorch"></span><span class="arch-logo arch-logo--vllm" role="img" aria-label="vLLM"></span><span class="arch-logo arch-logo--sglang" role="img" aria-label="SGLang"></span><span class="arch-logo arch-logo--meta" role="img" aria-label="Meta"></span><span class="arch-logo arch-logo--huggingface" role="img" aria-label="Hugging Face"></span></span></div><div class="arch-cell arch-cell--model"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-cell__label">Any model</span><span class="arch-logos"><span class="arch-logo arch-logo--glm" role="img" aria-label="GLM"></span><span class="arch-logo arch-logo--deepseek" role="img" aria-label="DeepSeek"></span><span class="arch-logo arch-logo--qwen" role="img" aria-label="Qwen"></span><span class="arch-logo arch-logo--kimi" role="img" aria-label="Kimi"></span></span></div></div><div class="arch-orchestration"><div class="arch-orchestration__title"><span>dstack orchestration</span><span class="arch-logo arch-logo--docker" role="img" aria-label="Docker"></span></div><div class="arch-orchestration__cells"><div class="arch-subcell"><svg class="arch-dash" aria-hidden="true"><rect/></svg>Fleets</div><div class="arch-subcell"><svg class="arch-dash" aria-hidden="true"><rect/></svg>Dev environments</div><div class="arch-subcell"><svg class="arch-dash" aria-hidden="true"><rect/></svg>Tasks</div><div class="arch-subcell"><svg class="arch-dash" aria-hidden="true"><rect/></svg>Services</div><div class="arch-subcell"><svg class="arch-dash" aria-hidden="true"><rect/></svg>Volumes</div></div></div><div class="arch-row"><div class="arch-cell arch-cell--gpu"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-logos"><span class="arch-logo arch-logo--aws" role="img" aria-label="AWS"></span><span class="arch-logo arch-logo--gcp" role="img" aria-label="Google Cloud"></span><span class="arch-logo arch-logo--lambda" role="img" aria-label="Lambda"></span><span class="arch-logo arch-logo--nebius" role="img" aria-label="Nebius"></span><span class="arch-logo arch-logo--runpod" role="img" aria-label="RunPod"></span></span><span class="arch-cell__label">Any cloud</span></div><div class="arch-cell"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-logos"><span class="arch-logo arch-logo--kubernetes" role="img" aria-label="Kubernetes"></span></span><span class="arch-cell__label">Kubernetes</span></div><div class="arch-cell arch-cell--center"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-cell__label">On-prem clusters</span></div></div><div class="arch-cell arch-cell--full arch-cell--hw"><svg class="arch-dash" aria-hidden="true"><rect/></svg><span class="arch-cell__label">Any hardware</span><span class="arch-logos"><span class="arch-logo arch-logo--nvidia" role="img" aria-label="NVIDIA"></span><span class="arch-logo arch-logo--amd" role="img" aria-label="AMD"></span><span class="arch-logo arch-logo--tenstorrent" role="img" aria-label="Tenstorrent"></span><span class="arch-logo arch-logo--tpu" role="img" aria-label="Google TPU"></span></span></div></div></div>
+<!-- Architecture diagram — prebuilt light/dark SVG pair shared with the landing
+     (website/src/components/ArchitectureDiagram.tsx) and the README, served from the
+     dstackai/static-assets repo. The files are self-contained (embedded fonts + logos);
+     the pair swaps with the docs theme via .arch-svg in
+     mkdocs/assets/stylesheets/cloudscape-docs.css. -->
+<img class="arch-svg arch-svg--light" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
+<img class="arch-svg arch-svg--dark" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-dark.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
 
 ### Set up the server
 
@@ -27,11 +30,12 @@ It streamlines development, training, and inference, and is compatible with any 
 
 `dstack` supports the following configurations:
    
-* [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
-* [Dev environments](concepts/dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](concepts/tasks.md) &mdash; for scheduling jobs, incl. distributed ones (or running web apps)
-* [Services](concepts/services.md) &mdash; for deploying models (or web apps)
-* [Volumes](concepts/volumes.md) &mdash; for managing network volumes (to persist data)
+* [Fleets](concepts/fleets.md) &mdash; Provision and manage clusters across clouds, Kubernetes, and on-prem
+* [Dev environments](concepts/dev-environments.md) &mdash; Launch dev environments to be accessed by agents or from your IDE
+* [Tasks](concepts/tasks.md) &mdash; Run training, batch or other jobs across a single node or clusters
+* [Services](concepts/services.md) &mdash; Deploy model inference as secure and scalable endpoints
+* [Presets](concepts/presets.md) &mdash; Agent-driven inference optimization (experimental)
+* [Volumes](concepts/volumes.md) &mdash; Managing instance and network volumes for persisting data
 
 Configuration can be defined as YAML files within your repo.
 
