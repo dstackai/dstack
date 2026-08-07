@@ -7,9 +7,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set, TypeVar
-
-import gpuhunt
+from typing import Dict, List, Optional, TypeVar
 
 from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.services.configurators.base import (
@@ -78,10 +76,6 @@ from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.runs import Run
 
-_KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
-_KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
-_KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
-_KNOWN_TENSTORRENT_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TENSTORRENT_ACCELERATORS}
 _BIND_ADDRESS_ARG = "bind_address"
 
 logger = get_logger(__name__)
@@ -123,8 +117,6 @@ class BaseRunConfigurator(
             raise CLIError("Either --repo or --no-repo can be specified")
 
         self.apply_args(conf, configurator_args)
-        self.validate_gpu_vendor_and_image(conf)
-        self.validate_cpu_arch_and_image(conf)
 
         if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
             raise ConfigurationError("working_dir must be absolute")
@@ -452,102 +444,6 @@ class BaseRunConfigurator(
                         probe.body = interpolator.interpolate_or_error(probe.body)
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
-
-    def validate_gpu_vendor_and_image(self, conf: RunConfigurationT) -> None:
-        """
-        Infers GPU vendor if not set. Defaults to Nvidia when using the default
-        CUDA image. Requires explicit `image` if the vendor is AMD or Tenstorrent.
-
-        When vendor is inferred from GPU name (e.g. A100 -> nvidia), it is written to
-        gpu_spec. When vendor is inferred from image context (no name, no vendor, default
-        CUDA image -> nvidia), it is NOT written to gpu_spec because 0.19.x servers
-        (gpuhunt <0.1.12) break on vendor=nvidia + min_gpu_count=0. The server applies
-        the same default in set_gpu_vendor_default().
-
-        TODO: This entire method should move to the server (set_resources_defaults)
-        so that defaults and validation are equal for CLI and API users.
-        """
-        gpu_spec = conf.resources.gpu
-        if gpu_spec is None:
-            return
-        if gpu_spec.count.max == 0:
-            return
-        has_amd_gpu: bool
-        has_tt_gpu: bool
-        vendor = gpu_spec.vendor
-        if vendor is None:
-            names = gpu_spec.name
-            if names:
-                # None is a placeholder for an unknown vendor.
-                vendors: Set[Optional[gpuhunt.AcceleratorVendor]] = set()
-                for name in names:
-                    name = name.lower()
-                    if name in _KNOWN_NVIDIA_GPUS:
-                        vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
-                    elif name in _KNOWN_AMD_GPUS:
-                        vendors.add(gpuhunt.AcceleratorVendor.AMD)
-                    elif name in _KNOWN_TENSTORRENT_GPUS:
-                        vendors.add(gpuhunt.AcceleratorVendor.TENSTORRENT)
-                    else:
-                        maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
-                        if maybe_tpu_version in _KNOWN_TPU_VERSIONS and maybe_tpu_cores.isdigit():
-                            vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
-                        else:
-                            vendors.add(None)
-                if len(vendors) == 1:
-                    # Only one vendor or all names are not known.
-                    vendor = next(iter(vendors))
-                else:
-                    # More than one vendor or some names are not known; in either case, we
-                    # cannot set the vendor to a specific value, will use only names for matching.
-                    vendor = None
-                # If some names are unknown, let's assume they are _not_ AMD products, otherwise
-                # ConfigurationError message may be confusing. In worst-case scenario we'll try
-                # to execute a run on an instance with an AMD accelerator with a default
-                # CUDA image, not a big deal.
-                has_amd_gpu = gpuhunt.AcceleratorVendor.AMD in vendors
-                has_tt_gpu = gpuhunt.AcceleratorVendor.TENSTORRENT in vendors
-                # Set vendor inferred from name on the spec (server needs it for filtering).
-                gpu_spec.vendor = vendor
-            else:
-                # No vendor or name specified. Default to Nvidia if using the
-                # default CUDA image, since it's only compatible with Nvidia GPUs.
-                if conf.image is None and conf.docker is not True:
-                    vendor = gpuhunt.AcceleratorVendor.NVIDIA
-                has_amd_gpu = False
-                has_tt_gpu = False
-        else:
-            has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
-            has_tt_gpu = vendor == gpuhunt.AcceleratorVendor.TENSTORRENT
-        # When docker=True, the system uses Docker-in-Docker image, so no custom image is required
-        if has_amd_gpu and conf.image is None and conf.docker is not True:
-            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is `amd`")
-        if has_tt_gpu and conf.image is None and conf.docker is not True:
-            raise ConfigurationError(
-                "`image` is required if `resources.gpu.vendor` is `tenstorrent`"
-            )
-
-    def validate_cpu_arch_and_image(self, conf: RunConfigurationT) -> None:
-        """
-        Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
-        """
-        cpu_spec = conf.resources.cpu
-        arch = cpu_spec.arch
-        if arch is None:
-            gpu_spec = conf.resources.gpu
-            if (
-                gpu_spec is not None
-                and gpu_spec.vendor in [None, gpuhunt.AcceleratorVendor.NVIDIA]
-                and gpu_spec.name
-                and any(map(gpuhunt.is_nvidia_superchip, gpu_spec.name))
-            ):
-                arch = gpuhunt.CPUArchitecture.ARM
-            else:
-                arch = gpuhunt.CPUArchitecture.X86
-        # NOTE: We don't set the inferred resources.cpu.arch for compatibility with older servers.
-        # Servers with ARM support set the arch using the same logic.
-        if arch == gpuhunt.CPUArchitecture.ARM and conf.image is None:
-            raise ConfigurationError("`image` is required if `resources.cpu.arch` is `arm`")
 
     def get_repo(
         self,
