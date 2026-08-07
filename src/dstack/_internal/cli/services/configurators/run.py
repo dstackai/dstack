@@ -943,7 +943,9 @@ def print_finished_message(run: Run):
         console.print(str)
 
         if termination_reason_message:
-            console.print(f"[error]{termination_reason_message}[/error]")
+            # Backend errors reported in the message contain square brackets and numbers,
+            # which rich would otherwise parse as markup or repaint.
+            console.print(termination_reason_message, style="error", markup=False, highlight=False)
 
         if termination_reason:
             console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
