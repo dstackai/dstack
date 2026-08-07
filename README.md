@@ -23,18 +23,20 @@ It streamlines development, training, and inference, and is compatible with any 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
-- [2026/04] [dstack 0.20.17: PD disaggregation, Kubernetes volumes](https://github.com/dstackai/dstack/releases/tag/0.20.17)
-- [2026/04] [dstack 0.20.16: Performance, SSH proxy](https://github.com/dstackai/dstack/releases/tag/0.20.16)
-- [2026/03] [dstack 0.20.13: Exports, Templates](https://github.com/dstackai/dstack/releases/tag/0.20.13)
-- [2026/02] [dstack 0.20.12: Crusoe](https://github.com/dstackai/dstack/releases/tag/0.20.12)
-- [2026/02] [dstack 0.20.8: Skills](https://github.com/dstackai/dstack/releases/tag/0.20.8)
-- [2025/12] [dstack 0.20.0: Fleet-first UX, Events, and more](https://github.com/dstackai/dstack/releases/tag/0.20.0)
+- [2026/08] [dstack 0.21.0: Pydantic v2, Gateway replicas](https://github.com/dstackai/dstack/releases/tag/0.21.0)
+- [2026/07] [dstack 0.20.29: Presets — agent-driven inference optimization (experimental)](https://dstack.ai/docs/concepts/presets/)
+- [2026/07] [dstack 0.20.27: Slurm backend](https://github.com/dstackai/dstack/releases/tag/0.20.27)
+- [2026/05] [dstack 0.20.21: Kubernetes multiple clusters](https://github.com/dstackai/dstack/releases/tag/0.20.21)
+- [2026/05] [dstack 0.20.20: NVIDIA Dynamo integration](https://github.com/dstackai/dstack/releases/tag/0.20.20)
+- [2026/04] [dstack 0.20.17: Kubernetes volumes](https://github.com/dstackai/dstack/releases/tag/0.20.17)
+- [2026/02] [dstack 0.20.10: PD disaggregation support](https://github.com/dstackai/dstack/releases/tag/0.20.10)
+- [2026/01] [dstack 0.20.7: Replica groups](https://github.com/dstackai/dstack/releases/tag/0.20.7)
 
 ## How does it work?
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11-dark.svg"/>
-  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" width="750" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-dark.svg"/>
+  <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram.svg" width="750" />
 </picture>
 
 ### Launch the server
@@ -101,11 +103,12 @@ AI agents like Claude, Codex, and Cursor can now create and manage fleets and su
 
 `dstack` supports the following configurations:
    
-* [Fleets](https://dstack.ai/docs/concepts/fleets) &mdash; for managing cloud and on-prem clusters
-* [Dev environments](https://dstack.ai/docs/concepts/dev-environments) &mdash; for interactive development using a desktop IDE
-* [Tasks](https://dstack.ai/docs/concepts/tasks) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
-* [Services](https://dstack.ai/docs/concepts/services) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
-* [Volumes](https://dstack.ai/docs/concepts/volumes) &mdash; for managing persisted volumes
+* [Fleets](https://dstack.ai/docs/concepts/fleets) &mdash; Provision and manage clusters across clouds, Kubernetes, and on-prem
+* [Dev environments](https://dstack.ai/docs/concepts/dev-environments) &mdash; Launch dev environments to be accessed by agents or from your IDE
+* [Tasks](https://dstack.ai/docs/concepts/tasks) &mdash; Run training, batch or other jobs across a single node or clusters
+* [Services](https://dstack.ai/docs/concepts/services) &mdash; Deploy model inference as secure and scalable endpoints
+* [Presets](https://dstack.ai/docs/concepts/presets) &mdash; Agent-driven inference optimization (experimental)
+* [Volumes](https://dstack.ai/docs/concepts/volumes) &mdash; Managing instance and network volumes for persisting data
 
 Configuration can be defined as YAML files within your repo.
 
