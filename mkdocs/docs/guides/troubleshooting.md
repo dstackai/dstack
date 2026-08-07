@@ -148,15 +148,23 @@ Alternatively, you can configure your own cloud accounts
 on the [project settings page](../concepts/projects.md#backends)
 or use [SSH fleets](../concepts/fleets.md#ssh-fleets).
 
-### Provisioning fails
+### Provisioning fails { #provisioning-fails }
+[//]: # (NOTE: This section is referenced in the CLI. Do not change its URL.)
 
 In certain cases, running `dstack apply` may show instance offers,
 but then produce the following output:
 
 ```shell
 wet-mangust-1 provisioning completed (failed)
-All provisioning attempts failed. This is likely due to cloud providers not having enough capacity. Check CLI and server logs for more details.
+No capacity
+Failed to provision in fleet 'aws-main': tried 5 of 12 offers (attempt limit reached), all failed.
+Errors: g5.xlarge in aws/us-east-1: InsufficientInstanceCapacity; g5.xlarge in aws/eu-west-1: RequestLimitExceeded
 ```
+
+`dstack` only tries offers from the fleet it selected for the run, so the message names that
+fleet, how many of its offers were tried, and what each attempt returned. Repeated errors are
+reported once; every attempt is logged by the server, so check the [server logs](#server-logs)
+for the full list.
 
 #### Cause 1: Insufficient service quotas
 
