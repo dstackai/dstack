@@ -334,6 +334,57 @@ print(json.dumps({
         assert capsys.readouterr().out == ""
 
     @pytest.mark.asyncio
+    async def test_mirrors_trial_and_service_records_into_the_session(self, tmp_path, monkeypatch):
+        script = tmp_path / "fake_claude.py"
+        script.write_text(
+            """import json
+import os
+import sys
+
+sys.stdin.read()
+os.makedirs("trials/1")
+with open("trials/1/task.dstack.yml", "w") as f:
+    f.write("env:\\n  - TOKEN=secret-token\\n")
+with open("trials/1/trial.json", "w") as f:
+    json.dump({"learned": "uses secret-token"}, f)
+os.makedirs("service/1")
+with open("service/1/verification.json", "w") as f:
+    json.dump({"trial": 1, "status": "verified"}, f)
+print(json.dumps({"type": "result", "structured_output": {"ok": True}}))
+"""
+        )
+        (tmp_path / "progress.jsonl").touch()
+        (tmp_path / "trials").mkdir()
+        (tmp_path / "service").mkdir()
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
+            lambda **_: [sys.executable, str(script)],
+        )
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        session_path = tmp_path / "session"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        agent_session = PresetAgentSession(path=session_path, debug=False)
+
+        output = await run_preset_agent(
+            prompt="p",
+            env=os.environ.copy(),
+            workspace=workspace,
+            auth=_claude_auth(),
+            redacted_values=("secret-token",),
+            agent_session=agent_session,
+        )
+
+        assert output.report_data == {"ok": True}
+        trial_dir = session_path / "trials" / "1"
+        assert (trial_dir / "task.dstack.yml").read_text() == "env:\n  - TOKEN=[redacted]\n"
+        assert json.loads((trial_dir / "trial.json").read_text()) == {"learned": "uses [redacted]"}
+        assert json.loads((session_path / "service" / "1" / "verification.json").read_text()) == {
+            "trial": 1,
+            "status": "verified",
+        }
+
+    @pytest.mark.asyncio
     async def test_accepts_stream_event_larger_than_64_kib(self, tmp_path, monkeypatch):
         script = tmp_path / "fake_claude.py"
         script.write_text(
@@ -450,6 +501,79 @@ class TestRecordMirror:
         mirror.flush()
 
         assert not (tmp_path / "target.jsonl").exists()
+
+
+class TestDirectoryMirror:
+    def _mirror(self, tmp_path, **kwargs):
+        from dstack._internal.cli.services.presets.tail import _DirectoryMirror
+
+        return _DirectoryMirror(
+            source=tmp_path / "w" / "trials",
+            target=tmp_path / "session" / "trials",
+            **{"redacted_values": ["dstack-secret"], **kwargs},
+        )
+
+    def test_copies_the_tree_redacted(self, tmp_path):
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "task.dstack.yml").write_text("env:\n  - TOKEN=dstack-secret\n")
+        (source / "trial.json").write_text('{"learned": "x"}')
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1"
+        assert (target / "task.dstack.yml").read_text() == "env:\n  - TOKEN=[redacted]\n"
+        assert (target / "trial.json").read_text() == '{"learned": "x"}'
+
+    def test_a_rewritten_source_converges_instead_of_corrupting(self, tmp_path):
+        # The failure mode this mirror exists to remove: a source rewritten
+        # under a byte-offset tailer used to commit a torn record forever.
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "first"}')
+        mirror = self._mirror(tmp_path)
+        mirror.flush()
+
+        (source / "trial.json").write_text('{"learned": "rewritten"}')
+        os.utime(source / "trial.json", ns=(1, 1))  # force a distinct signature
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1" / "trial.json"
+        assert json.loads(target.read_text()) == {"learned": "rewritten"}
+
+    def test_an_unchanged_file_is_not_rewritten(self, tmp_path):
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "x"}')
+        mirror = self._mirror(tmp_path)
+        mirror.flush()
+        target = tmp_path / "session" / "trials" / "1" / "trial.json"
+        first_stat = target.stat().st_mtime_ns
+
+        mirror.flush()
+
+        assert target.stat().st_mtime_ns == first_stat
+
+    def test_missing_source_is_no_op(self, tmp_path):
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        assert not (tmp_path / "session").exists()
+
+    def test_skips_files_above_the_size_limit(self, tmp_path, monkeypatch):
+        from dstack._internal.cli.services.presets.tail import _DirectoryMirror
+
+        monkeypatch.setattr(_DirectoryMirror, "_MAX_FILE_BYTES", 8)
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "far larger than eight bytes"}')
+        mirror = self._mirror(tmp_path, echo=False)
+
+        mirror.flush()
+
+        assert not (tmp_path / "session" / "trials" / "1" / "trial.json").exists()
 
 
 class TestWriteAgentInfo:
@@ -848,10 +972,17 @@ class TestLoadResumableSession:
             load_resumable_agent_session(preset_id)
 
 
+def _write_trials(tmp_path, records):
+    trials_dir = tmp_path / "trials"
+    for number, record in enumerate(records, 1):
+        (trials_dir / str(number)).mkdir(parents=True)
+        (trials_dir / str(number) / "trial.json").write_text(json.dumps(record))
+    return trials_dir
+
+
 class TestSummarizeSessionTrials:
     def test_counts_records_even_when_trials_share_a_task(self, tmp_path):
         record = {
-            "task": {"name": "qwen-ab12cd34-1"},
             "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
             "benchmark": {
                 "workload": {"concurrency": 8},
@@ -860,18 +991,13 @@ class TestSummarizeSessionTrials:
         }
         rerun = json.loads(json.dumps(record))
         rerun["benchmark"]["metrics"]["total_output_tokens"] = 23000
-        second_trial = json.loads(json.dumps(record))
-        second_trial["task"]["name"] = "qwen-ab12cd34-2"
         nameless = {"benchmark": {"workload": {}, "metrics": {}}}
-        path = tmp_path / "trials.jsonl"
-        path.write_text(
-            "\n".join(json.dumps(entry) for entry in [record, rerun, second_trial, nameless])
-        )
+        trials_dir = _write_trials(tmp_path, [record, rerun, record, nameless])
 
-        summary = _summarize_session_trials(path)
+        summary = _summarize_session_trials(trials_dir)
 
         # 4 records = 4 trials: one long-lived task commonly hosts several
-        # trials, so shared task names must not collapse the count.
+        # trials, so identical records must not collapse the count.
         assert summary["count"] == 4
         assert summary["best"] == {
             "tok_s": 2300.0,
@@ -882,41 +1008,91 @@ class TestSummarizeSessionTrials:
             "gpu": "A40:48GB:1",
         }
 
+    def test_trials_are_ordered_numerically_beyond_nine(self, tmp_path):
+        # Twelve trials: a string sort would chart 1, 10, 11, 12, 2, ...
+        records = [
+            {
+                "benchmark": {
+                    "metrics": {"total_output_tokens": float(i * 100), "duration_seconds": 1.0},
+                    "workload": {"concurrency": 1},
+                }
+            }
+            for i in range(1, 13)
+        ]
+        trials_dir = _write_trials(tmp_path, records)
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["series"] == [float(i * 100) for i in range(1, 13)]
+
+    def test_a_trial_still_in_flight_is_not_counted(self, tmp_path):
+        record = {
+            "resources": {},
+            "benchmark": {
+                "workload": {"concurrency": 8},
+                "metrics": {"duration_seconds": 10.0, "total_output_tokens": 20000},
+            },
+        }
+        trials_dir = _write_trials(tmp_path, [record])
+        # Trial 2 has started but has no result yet.
+        (trials_dir / "2").mkdir()
+        (trials_dir / "2" / "task.dstack.yml").write_text("type: task\n")
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["count"] == 1
+        assert summary["series"] == [2000.0]
+
+    def test_a_torn_result_copy_reads_as_still_in_flight(self, tmp_path):
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text('{"benchmark": {"met')
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["count"] == 0
+
 
 class TestReadLastSessionVerification:
-    def test_last_record_wins_and_a_missing_file_is_not_verifying(self, tmp_path):
-        path = tmp_path / "verifications.jsonl"
+    def test_newest_attempt_wins_and_a_missing_directory_is_not_verifying(self, tmp_path):
+        service_dir = tmp_path / "service"
 
-        assert _read_last_session_verification(path) is None
+        assert _read_last_session_verification(service_dir) is None
 
-        path.write_text(
-            "\n".join(
-                json.dumps(entry)
-                for entry in [
-                    {"trial": 3, "run_name": "p-2", "status": "verifying"},
-                    {"trial": 3, "run_name": "p-2", "status": "failed", "reason": "probe"},
-                    {"trial": 2, "run_name": "p-3", "status": "verifying"},
-                ]
-            )
-            + "\n"
+        (service_dir / "1").mkdir(parents=True)
+        (service_dir / "1" / "service.dstack.yml").write_text("type: service\n")
+        (service_dir / "1" / "verification.json").write_text(
+            json.dumps({"trial": 3, "run_name": "p-2", "status": "failed", "reason": "probe"})
         )
+        (service_dir / "2").mkdir()
+        (service_dir / "2" / "service.dstack.yml").write_text("type: service\n")
 
-        assert _read_last_session_verification(path) == {
-            "trial": 2,
-            "run_name": "p-3",
-            "status": "verifying",
+        # Attempt 2 has no result yet, so it is the one in flight.
+        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
+
+    def test_the_newest_result_is_returned(self, tmp_path):
+        # Attempts 9 and 10: a string sort would pick "9" as the newest.
+        service_dir = tmp_path / "service"
+        for number, status in ((1, "failed"), (9, "failed"), (10, "verified")):
+            (service_dir / str(number)).mkdir(parents=True)
+            (service_dir / str(number) / "verification.json").write_text(
+                json.dumps({"trial": number, "run_name": f"p-{number}", "status": status})
+            )
+
+        assert _read_last_session_verification(service_dir) == {
+            "trial": 10,
+            "run_name": "p-10",
+            "status": "verified",
         }
 
-    def test_skips_partial_trailing_lines(self, tmp_path):
-        # The mirror appends as the agent writes, so the file can be read
-        # mid-line.
-        path = tmp_path / "verifications.jsonl"
-        path.write_text(
-            json.dumps({"trial": 1, "run_name": "p-2", "status": "verifying"})
-            + '\n{"trial": 1, "run_na'
-        )
+    def test_a_torn_result_copy_reads_as_verifying(self, tmp_path):
+        # The mirror copies whole files, but a reader can still catch one
+        # mid-replace; the next pass converges.
+        service_dir = tmp_path / "service"
+        (service_dir / "1").mkdir(parents=True)
+        (service_dir / "1" / "verification.json").write_text('{"trial": 1, "run_na')
 
-        assert _read_last_session_verification(path)["status"] == "verifying"
+        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
 
 
 class TestFileLineReader:

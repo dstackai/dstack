@@ -23,6 +23,7 @@ from dstack._internal.cli.services.presets.session import (
     print_preset_progress,
 )
 from dstack._internal.cli.services.presets.tail import (
+    _DirectoryMirror,
     _FileLineReader,
     _OffsetStore,
     _ProgressTailer,
@@ -415,20 +416,16 @@ async def _session_tailers(
             offset_key="runs",
             echo=agent_session.echo,
         ),
-        _RecordMirror(
-            source=workspace.trials_path,
-            target=agent_session.trials_path,
+        _DirectoryMirror(
+            source=workspace.trials_dir,
+            target=agent_session.trials_dir,
             redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="trials",
             echo=agent_session.echo,
         ),
-        _RecordMirror(
-            source=workspace.verifications_path,
-            target=agent_session.verifications_path,
+        _DirectoryMirror(
+            source=workspace.service_dir,
+            target=agent_session.service_dir,
             redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="verifications",
             echo=agent_session.echo,
         ),
     ]

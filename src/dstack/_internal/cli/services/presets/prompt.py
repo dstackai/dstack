@@ -18,7 +18,7 @@ _NOTE_PATTERN = re.compile(r"<!--!.*?-->\n?", re.DOTALL)
 
 
 # TODO: reintroduce a `# Resume` section in system_prompt.md once session resume
-# (seeded from `runs.jsonl` and `trials.jsonl`) is designed.
+# (seeded from `runs.jsonl` and the trial records) is designed.
 def get_preset_agent_system_prompt(
     user_prompt: Optional[str] = None,
     baseline: bool = False,

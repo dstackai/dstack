@@ -75,16 +75,20 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
     return "".join(out)
 
 
-def _format_trial_progress(session: Optional[dict[str, Any]]) -> str:
+def _format_trial_progress(session: Optional[dict[str, Any]], *, in_flight: bool = False) -> str:
     """The ` (N/M)` suffix; stays outside the status markup to render in the
-    default color."""
+    default color. While trialing, `N` is the trial being worked on rather than
+    the completed count, so `trialing (2/3)` cannot read as two finished."""
     if not isinstance(session, dict):
         return ""
     trials = session.get("trials")
     trials_num = session.get("trials_num")
     if not isinstance(trials, dict) or not (trials.get("count") or isinstance(trials_num, int)):
         return ""
-    progress = str(trials.get("count") or 0)
+    count = trials.get("count") or 0
+    if in_flight:
+        count = min(count + 1, trials_num) if isinstance(trials_num, int) else count + 1
+    progress = str(count)
     if isinstance(trials_num, int):
         progress += f"/{trials_num}"
     return f" [secondary]({progress})[/]"
@@ -180,7 +184,9 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
     status_key = str(session.get("status", ""))
     if status_key == "running" and _verifying(session):
         status_key = "verifying"
-    status = _format_status(status_key) + _format_trial_progress(session)
+    status = _format_status(status_key) + _format_trial_progress(
+        session, in_flight=status_key == "running"
+    )
     trials = session.get("trials")
     best = trials.get("best") if isinstance(trials, dict) else None
     # Nothing passed: fall back to the fastest attempt that did not.

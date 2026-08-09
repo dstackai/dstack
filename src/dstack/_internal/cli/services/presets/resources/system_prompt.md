@@ -44,7 +44,7 @@ concurrencies instead of one.-->
 - `shared_prefix_tokens`: how many of `input_tokens` are identical in every
   request. `0` means every request is fully unique.
 - `baseline`: whether the first trial must be a baseline rather than an
-  optimization attempt; see `# Trials`.
+  optimization attempt; see `# Trials (Main Section)`.
 - `fleets`: use these existing `dstack` fleets only. Do not create, delete,
   apply, or edit fleets.
 - `env`: the environment variable names available to runs; the values are
@@ -95,17 +95,13 @@ Files you are expected to maintain in the workspace root:
   `# Runs`.
 - `progress.jsonl`: progress messages, written through the `progress` helper;
   see `# Progress`.
-- `trials.jsonl`: the append-only record of completed trials; see `# Trials`.
-- `verifications.jsonl`: the append-only record of final service attempts;
-  see `# Final Service`.
+- `trials/`: one directory per trial; see `# Trials (Main Section)`.
+- `service/`: one directory per final service attempt; see `# Final Service`.
 - `final_report.json`: the final report; see `# Final Report`.
 
-You may create any other working files (run YAML files, benchmark output,
-notes) in the workspace, and only there: do not deliberately save files
-elsewhere on this machine. Incidental writes made by the tools you run
-(caches, temporary files, SSH configuration) are fine wherever those tools
-keep them. Files inside running `dstack` tasks or services are not subject
-to this rule.
+On this machine, do not deliberately create, change, or delete files
+outside the workspace. Inside running `dstack` tasks and services, write
+whatever the work needs.
 
 # Runs
 
@@ -165,7 +161,7 @@ how to get better performance than the previous trials. Sometimes it is worth
 continuing to improve a previous trial's idea, but when that risks settling
 into a local optimum, search for a substantially different approach rather than
 tweaking parameters further.
-<!--!TODO: give earlier sessions' `trials.jsonl` here, from the preset IDs
+<!--!TODO: give earlier sessions' trial records here, from the preset IDs
 passed with `--previous`, so that what they already tried informs this session.-->
 
 <!--?baseline:
@@ -196,6 +192,9 @@ trial and whenever a benchmark exposes a bottleneck.
 Don't skip profiling the serving engine, especially if it could help you find
 an idea for significantly improving the current numbers.
 
+When a trial starts, create its directory `trials/<n>/`, where `<n>` is the
+trial number: trials are numbered from 1 in the order they start.
+
 For each trial, use `dstack` tasks (see `# Task Usage`). During a trial, run
 commands interactively inside the task (over SSH) and measure the
 performance when needed, following `## Benchmark` below.
@@ -209,24 +208,29 @@ trial are exhausted.
 
 Once a trial is completed, compile the interactive commands that produced
 the final performance into a complete `dstack` task configuration with exact
-commands, and log it together with the corresponding benchmark results (see
-`## Benchmark` for the structure) to `trials.jsonl`. The benchmark may
-be skipped in one case only: you failed to make the configuration run at
-all — a failed trial. A trial is also failed when its benchmark does not meet
-the constraints (see `# Constraints`). When a trial that changed several things
-fails, be mindful of which specific change was the root cause.
+commands, and write it to `trials/<n>/task.dstack.yml` (do not create this
+file until the trial is completed). Its `name` is the
+run name of the trial's task, and its `commands` are the exact final
+commands that led to the benchmark results — the commands that are supposed
+to replicate the benchmark results exactly when `trials/<n>/task.dstack.yml`
+is applied (not `sleep infinity`). Then write the corresponding benchmark
+results (see `## Benchmark` for the structure) to `trials/<n>/trial.json`,
+always after
+`trials/<n>/task.dstack.yml`: the presence of `trials/<n>/trial.json` is
+what marks trial `<n>` completed. The benchmark may be skipped in one case
+only: you failed to make the configuration run at all — a failed trial. A
+trial is also failed when its benchmark does not meet the constraints (see
+`# Constraints`). For a trial that failed to run,
+`trials/<n>/task.dstack.yml` is the configuration that failed. When a
+trial that changed several things fails, be mindful of which specific
+change was the root cause.
 
-Each `trials.jsonl` record is one JSON line with exactly four fields:
+`trials/<n>/trial.json` is one JSON object with these fields and no others:
 
 ```
-{"task": {...}, "resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
+{"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
-- `task`: the compiled `dstack` task configuration described above, as JSON.
-  Its `name` is the run name of the trial's task, and its `commands` are the
-  exact final commands that led to the benchmark results — the commands that
-  are supposed to replicate the benchmark results exactly if the task is
-  submitted (not `sleep infinity`).
 - `resources`: the exact resources of the instance the task ran on, in
   `dstack` resources syntax, e.g. `{"cpu": "9", "memory": "50GB", "disk":
   "200GB", "gpu": {"name": "A40", "memory": "48GB", "count": 1}}`. Read the
@@ -242,8 +246,8 @@ Each `trials.jsonl` record is one JSON line with exactly four fields:
   `null` only when the benchmark couldn't be done at all.
 - `learned`: the major things this trial taught you that you did not know
   before it ran. Required for every trial, including a failed one.
-- `failed`: `true` if the benchmark broke a constraint such as `max_ttft` or
-  `min_context_length`, absent otherwise.
+- `failed`: `true` if the configuration never ran or the benchmark broke a
+  constraint such as `max_ttft` or `min_context_length`, absent otherwise.
 
 You're expected to do exactly `trials_num` trials (see `# Constraints`).
 
@@ -290,7 +294,7 @@ never part of the measured metrics.
 All verification and benchmark requests must succeed.
 
 Record every benchmark using the following structure and field names —
-trial benchmarks in `trials.jsonl`, the final benchmark as
+trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 `final_report.json.benchmark` (values are illustrative):
 
 ```json
@@ -323,7 +327,7 @@ warmup requests. Never invent missing values.
 
 After each benchmark, find the largest context the configuration handles by
 sending real requests, and record it: for a trial, as the `context_length`
-field of its `trials.jsonl` record; for the final benchmark, as
+field of `trials/<n>/trial.json`; for the final benchmark, as
 `final_report.json.context_length`. Stopping at the required minimum is not
 enough.
 
@@ -379,19 +383,32 @@ the trial. Set the service `model` name to the client-facing model name from
 serve requests. If the service never passes the probe, treat that as a real
 failure of the configuration, not something to work around by removing `model`.
 
-Record every attempt in `verifications.jsonl`, append-only: one line
-immediately after submitting the service, one when the attempt ends (values
-are illustrative):
+Record every attempt in its own directory `service/<k>/`, where `<k>` is
+the attempt number: attempts are numbered from 1 in the order they are
+submitted. Immediately after submitting the service, create `service/<k>/`
+and write the submitted service YAML to `service/<k>/service.dstack.yml`.
+When the attempt ends, write `service/<k>/verification.json`, one JSON
+object with these fields and no others (values are illustrative):
 
 ```json
-{"trial": 3, "run_name": "qwen-preset-2", "status": "verifying"}
-{"trial": 3, "run_name": "qwen-preset-2", "status": "failed", "reason": "..."}
-{"trial": 2, "run_name": "qwen-preset-3", "status": "verifying"}
-{"trial": 2, "run_name": "qwen-preset-3", "status": "verified"}
+{"trial": 3, "run_name": "qwen-preset-2", "status": "verified"}
 ```
 
-`trial` is the 1-based line number of that trial in `trials.jsonl`. Keep
-`reason` to one sentence.
+or
+
+```json
+{"trial": 2, "run_name": "qwen-preset-3", "status": "failed", "reason": "..."}
+```
+
+- `trial`: the `<n>` of the trial being verified.
+- `run_name`: the run name of the attempt's `dstack` service.
+- `status`: `verified`, or `failed` when the attempt ended without a
+  verified service.
+- `reason`: required when `status` is `failed`, absent otherwise: the
+  reason of the failure.
+
+The presence of `service/<k>/verification.json` is what marks attempt
+`<k>` finished.
 
 Before the final benchmark, verify the model through the service: send real
 requests using the client-facing model name and check that the model works
@@ -471,7 +488,7 @@ Verify that `final_report.json` is correct and matches the required schema.
 Stop only after `final_report.json` is written, and the
 report submitted: either one final `dstack` service was verified and
 benchmarked, or the trials and unverified candidates were exhausted (see
-`# Trials` and `# Final Service`).
+`# Trials (Main Section)` and `# Final Service`).
 
 Ending your turn stops the session even while background commands are still
 running. Wait for long-running work — weight downloads, engine startup,

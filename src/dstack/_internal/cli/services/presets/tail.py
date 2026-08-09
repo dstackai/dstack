@@ -202,6 +202,73 @@ class _RecordMirror:
                 console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
 
 
+class _DirectoryMirror:
+    """Mirrors a workspace record directory into the persistent session
+    directory, redacted.
+
+    Stateless where it matters: every flush re-lists the source and copies any
+    file whose size or mtime changed, whole and atomically. A torn read can
+    never be committed — the next flush re-copies the complete file — which is
+    the property byte-offset mirroring of a shared append-only file lacked."""
+
+    _MAX_FILE_BYTES = 8 * 1024 * 1024
+
+    def __init__(
+        self,
+        *,
+        source: Path,
+        target: Path,
+        redacted_values: Sequence[str],
+        echo: bool = True,
+    ) -> None:
+        self._source = source
+        self._target = target
+        self._redacted_values = redacted_values
+        self._echo = echo
+        self._copied: dict[Path, tuple[int, int]] = {}
+        self._warned: set[Path] = set()
+
+    async def run(self) -> None:
+        while True:
+            # File IO runs off the event loop; see _FileLineReader.readline.
+            await asyncio.to_thread(self.flush)
+            await asyncio.sleep(1)
+
+    def flush(self) -> None:
+        if not self._source.is_dir():
+            return
+        for source_file in sorted(self._source.rglob("*")):
+            try:
+                if not source_file.is_file():
+                    continue
+                stat = source_file.stat()
+            except OSError:
+                continue
+            relative = source_file.relative_to(self._source)
+            if stat.st_size > self._MAX_FILE_BYTES:
+                if self._echo and relative not in self._warned:
+                    self._warned.add(relative)
+                    console.print(
+                        f"[warning]Not mirroring {relative}: "
+                        f"larger than {self._MAX_FILE_BYTES // (1024 * 1024)} MiB[/]"
+                    )
+                continue
+            signature = (stat.st_size, stat.st_mtime_ns)
+            if self._copied.get(relative) == signature:
+                continue
+            try:
+                content = source_file.read_text(encoding="utf-8", errors="replace")
+                target = self._target / relative
+                target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                _write_private_text(target, redact(content, self._redacted_values))
+            except OSError as e:
+                if self._echo and relative not in self._warned:
+                    self._warned.add(relative)
+                    console.print(f"[warning]Could not mirror {relative}: {e}[/]")
+                continue
+            self._copied[relative] = signature
+
+
 def _parse_progress(line: str) -> Optional[str]:
     try:
         value = json.loads(line)

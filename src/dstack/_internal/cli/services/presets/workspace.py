@@ -17,8 +17,8 @@ from dstack._internal.cli.services.presets.session import (
     _FINAL_REPORT_FILENAME,
     _PROGRESS_FILENAME,
     _RUNS_FILENAME,
-    _TRIALS_FILENAME,
-    _VERIFICATIONS_FILENAME,
+    _SERVICE_DIRNAME,
+    _TRIALS_DIRNAME,
     PresetAgentSession,
 )
 from dstack._internal.compat import IS_WINDOWS
@@ -52,12 +52,12 @@ class PresetAgentWorkspace:
         return self.path / _RUNS_FILENAME
 
     @property
-    def trials_path(self) -> Path:
-        return self.path / _TRIALS_FILENAME
+    def trials_dir(self) -> Path:
+        return self.path / _TRIALS_DIRNAME
 
     @property
-    def verifications_path(self) -> Path:
-        return self.path / _VERIFICATIONS_FILENAME
+    def service_dir(self) -> Path:
+        return self.path / _SERVICE_DIRNAME
 
     @property
     def constraints_path(self) -> Path:
@@ -171,13 +171,10 @@ def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
     workspace.path.mkdir(mode=0o700, parents=True, exist_ok=False)
     workspace.dstack_home.mkdir(mode=0o700)
     workspace.temp_path.mkdir(mode=0o700)
-    for path in [
-        workspace.progress_path,
-        workspace.runs_path,
-        workspace.trials_path,
-        workspace.verifications_path,
-    ]:
+    for path in [workspace.progress_path, workspace.runs_path]:
         path.touch()
+    workspace.trials_dir.mkdir()
+    workspace.service_dir.mkdir()
     workspace.bin_path.mkdir()
     _install_python_command(workspace.bin_path, "progress", _get_progress_script())
     (workspace.dstack_home / ".ssh").mkdir(mode=0o700)

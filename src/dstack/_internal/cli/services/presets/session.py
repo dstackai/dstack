@@ -29,8 +29,10 @@ if TYPE_CHECKING:
 
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
-_TRIALS_FILENAME = "trials.jsonl"
-_VERIFICATIONS_FILENAME = "verifications.jsonl"
+_TRIALS_DIRNAME = "trials"
+_SERVICE_DIRNAME = "service"
+_TRIAL_RESULT_FILENAME = "trial.json"
+_VERIFICATION_RESULT_FILENAME = "verification.json"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
@@ -66,12 +68,12 @@ class PresetAgentSession:
         return self.path / _RUNS_FILENAME
 
     @property
-    def trials_path(self) -> Path:
-        return self.path / _TRIALS_FILENAME
+    def trials_dir(self) -> Path:
+        return self.path / _TRIALS_DIRNAME
 
     @property
-    def verifications_path(self) -> Path:
-        return self.path / _VERIFICATIONS_FILENAME
+    def service_dir(self) -> Path:
+        return self.path / _SERVICE_DIRNAME
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
@@ -432,8 +434,8 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         entry["id"] = path.name
         entry["name"] = claimed_session_name(manifest)
         entry["status"] = status
-        entry["trials"] = _summarize_session_trials(path / _TRIALS_FILENAME)
-        entry["verification"] = _read_last_session_verification(path / _VERIFICATIONS_FILENAME)
+        entry["trials"] = _summarize_session_trials(path / _TRIALS_DIRNAME)
+        entry["verification"] = _read_last_session_verification(path / _SERVICE_DIRNAME)
         entry["constraints"] = _read_session_constraints(path)
         entries.append(entry)
     return entries
@@ -457,30 +459,47 @@ def _read_session_constraints(path: Path) -> dict[str, Any]:
     return {}
 
 
-def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
-    """The final service attempt in flight or last finished, from the session's
-    mirrored verification records. The last line wins: the agent appends one when
-    an attempt starts and another when it ends."""
+def _numbered_subdirs(path: Path) -> list[Path]:
+    """The record directories under `path`, in numeric order."""
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        entries = [entry for entry in path.iterdir() if entry.is_dir() and entry.name.isdigit()]
     except OSError:
+        return []
+    return sorted(entries, key=lambda entry: int(entry.name))
+
+
+def _read_record(path: Path) -> Optional[dict[str, Any]]:
+    """A record file, or `None` while it does not exist or is a torn copy in
+    flight; the mirror converges on the next pass, so absence is transient."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
         return None
-    for line in reversed(lines):
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(record, dict) and isinstance(record.get("status"), str):
-            return record
-    return None
+    return record if isinstance(record, dict) else None
+
+
+def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
+    """The newest final service attempt, from the session's mirrored `service/`
+    directory. An attempt whose result file has not appeared yet is in flight."""
+    attempts = _numbered_subdirs(path)
+    if not attempts:
+        return None
+    last = attempts[-1]
+    record = _read_record(last / _VERIFICATION_RESULT_FILENAME)
+    if record is not None and isinstance(record.get("status"), str):
+        return record
+    return {"status": "verifying"}
 
 
 def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
-    """Best-so-far summary from a session's mirrored trial records."""
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        lines = []
+    """Best-so-far summary from a session's mirrored trial records. A trial
+    directory without `trial.json` is a trial still in flight and is not
+    counted."""
+    records = []
+    for trial_dir in _numbered_subdirs(path):
+        record = _read_record(trial_dir / _TRIAL_RESULT_FILENAME)
+        if record is not None:
+            records.append(record)
     count = 0
     best: Optional[dict[str, Any]] = None
     # The fastest trial that broke a constraint, shown only when nothing passed.
@@ -491,13 +510,7 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
     failed: list[bool] = []
     # Kept outside `best` so a run where nothing passed still shows what it ran on.
     gpu: Optional[str] = None
-    for line in lines:
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(record, dict):
-            continue
+    for record in records:
         # One record per trial (the agent contract); trials may share a task,
         # so task names must not be deduplicated.
         count += 1
