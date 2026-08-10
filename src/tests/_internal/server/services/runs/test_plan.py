@@ -249,6 +249,7 @@ class TestGetJobPlansNodeGroups:
             max_offers=None,
             full_offers=False,
             unallocated_resources=False,
+            for_offers_only=False,
         )
 
         assert find_optimal_mock.await_count == 2
@@ -327,6 +328,7 @@ class TestGetJobPlansReplicaGroups:
             max_offers=None,
             full_offers=False,
             unallocated_resources=False,
+            for_offers_only=False,
         )
 
         assert find_optimal_mock.await_count == 2
