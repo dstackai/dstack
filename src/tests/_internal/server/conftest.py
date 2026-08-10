@@ -12,6 +12,7 @@ from dstack._internal.server.services.docker import ImageConfig, ImageConfigObje
 from dstack._internal.server.services.logs.filelog import FileLogStorage
 from dstack._internal.server.testing.conf import (  # noqa: F401
     postgres_container,
+    server_dir,
     session,
     test_db,
 )

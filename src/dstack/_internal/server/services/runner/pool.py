@@ -19,10 +19,7 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.server.settings import (
-    SERVER_DIR_PATH,
-    SERVER_SSH_CONNECT_TIMEOUT,
-)
+from dstack._internal.server import settings
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 
@@ -31,10 +28,12 @@ logger = get_logger(__name__)
 PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 """A host private key or pair of (host private key, optional proxy jump private key)"""
 
-CONNECTIONS_DIR = SERVER_DIR_PATH / "instance-connections"
-
 MIN_ALIVE_CHECK_INTERVAL = 30
 """How often (at most) `InstanceConnection.is_alive()` runs `ssh -O check`, in seconds."""
+
+
+def get_connections_dir() -> Path:
+    return settings.SERVER_DIR_PATH / "instance-connections"
 
 
 @dataclass(frozen=True)
@@ -142,7 +141,7 @@ class InstanceConnectionPool:
         Must be called on server startup before the pool is used.
         Leftover live masters are reaped by `ControlPersist`.
         """
-        shutil.rmtree(CONNECTIONS_DIR, ignore_errors=True)
+        shutil.rmtree(get_connections_dir(), ignore_errors=True)
 
     def close_all(self) -> None:
         """
@@ -218,7 +217,7 @@ class InstanceConnection:
             ssh_proxies=InstanceConnection._get_proxies(ssh_private_key, jpd),
             options={
                 **SSH_DEFAULT_OPTIONS,
-                "ConnectTimeout": str(SERVER_SSH_CONNECT_TIMEOUT),
+                "ConnectTimeout": str(settings.SERVER_SSH_CONNECT_TIMEOUT),
                 # Auto-close half-opened connections (the instance not responding).
                 "ServerAliveInterval": "10",
                 "ServerAliveCountMax": "3",
@@ -276,7 +275,7 @@ class InstanceConnection:
         self._tunnel.close()
         # Remove a stale control.sock left by a killed master, forwarded UDS files
         # (ssh does not unlink them on exit), and the dir itself, so that
-        # CONNECTIONS_DIR does not accumulate dirs of gone instances.
+        # the connections dir does not accumulate dirs of gone instances.
         # A master that survives close() because it is unreachable via a deleted
         # symlink is reaped by ControlPersist.
         shutil.rmtree(self._real_conn_dir, ignore_errors=True)
@@ -311,7 +310,7 @@ class InstanceConnection:
             return temp_dir, path, path
 
         conn_dir = (
-            CONNECTIONS_DIR
+            get_connections_dir()
             / f"{key.hostname}:{key.port},{','.join(map(str, key.ports_to_forward))}"
         )
         conn_dir.mkdir(parents=True, exist_ok=True)

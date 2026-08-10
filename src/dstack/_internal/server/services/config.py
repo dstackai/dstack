@@ -217,7 +217,7 @@ class ServerConfigManager:
 
     def _load_config(self) -> Optional[ServerConfig]:
         try:
-            with open(settings.SERVER_CONFIG_FILE_PATH) as f:
+            with open(settings.get_server_config_file_path()) as f:
                 content = f.read()
         except OSError:
             return
@@ -225,7 +225,7 @@ class ServerConfigManager:
         return ServerConfig.model_validate(config_dict)
 
     def _save_config(self, config: ServerConfig):
-        with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
+        with open(settings.get_server_config_file_path(), "w+") as f:
             f.write(config_to_yaml(config))
 
 
