@@ -569,9 +569,7 @@ class AWSCompute(
             image_id=aws_resources.get_gateway_image_id(ec2_client),
             instance_type=configuration.instance_type or DEFAULT_GATEWAY_INSTANCE_TYPE,
             iam_instance_profile=None,
-            user_data=get_gateway_user_data(
-                configuration.ssh_key_pub, router=configuration.router
-            ),
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
             tags=tags,
             security_group_id=security_group_id,
             spot=False,
@@ -1371,6 +1369,7 @@ def _supported_instances(
         "p6-b200.",
         "p5.",
         "p5e.",
+        "p5en.",
         "p4d.",
         "p4de.",
         "g7.",

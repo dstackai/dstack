@@ -8,7 +8,6 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, CoreModel
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
 GATEWAY_REPLICAS_DEFAULT = 1
@@ -69,15 +68,6 @@ class GatewayConfiguration(CoreModel):
             min_length=1,
         ),
     ] = None
-    router: Annotated[
-        Optional[AnyGatewayRouterConfig],
-        Field(
-            description=(
-                "The router configuration for this gateway. "
-                "E.g. `{ type: sglang, policy: round_robin }`."
-            ),
-        ),
-    ] = None
     domain: Annotated[
         Optional[str],
         Field(
@@ -131,18 +121,14 @@ class GatewayReplica(CoreModel):
     backend: Optional[BackendType] = None
     region: Optional[str] = None
     created_at: datetime.datetime
-    status: Optional[GatewayReplicaStatus] = None
-    """`status` is only optional on the client side for compatibility with 0.20.25 and 0.20.26 servers"""
+    status: GatewayReplicaStatus
     status_message: Optional[str] = None
 
 
 class Gateway(CoreModel):
-    # TODO(0.21): Make `id` required.
-    id: Optional[uuid.UUID] = None
-    """`id` is only optional on the client side for compatibility with pre-0.20.7 servers."""
+    id: uuid.UUID
     name: str
-    project_name: Optional[str] = None
-    """`project_name` is only optional on the client side for compatibility with pre-0.20.20 servers."""
+    project_name: str
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus
@@ -155,16 +141,13 @@ class Gateway(CoreModel):
     wildcard_domain: Optional[str] = None
     default: bool
     replicas: list[GatewayReplica] = []
+    # TODO: remove `backend` and `region` in 0.22.
     backend: Optional[BackendType] = None
-    """`backend` duplicates a configuration field on the top level for backward compatibility
-    with 0.19.x clients that expect it to be required.
-    Remove after 0.21.
+    """Never set since 0.21, use `configuration.backend`. Kept because pre-0.21 clients echo it
+    back inside `current_resource` on apply, and requests reject extra fields.
     """
     region: Optional[str] = None
-    """`region` duplicates a configuration field on the top level for backward compatibility
-    with 0.19.x clients that expect it to be required.
-    Remove after 0.21.
-    """
+    """Never set since 0.21, use `configuration.region`. See `backend`."""
     ip_address: Optional[str] = None
     """Deprecated in favor of `replicas[i].hostname`, only set for pre-0.20.25 clients."""
     instance_id: Optional[str] = None
@@ -203,7 +186,6 @@ class GatewayComputeConfiguration(CoreModel):
     ssh_key_pub: str
     certificate: Annotated[Optional[AnyGatewayCertificate], Field(discriminator="type")] = None
     tags: Optional[Dict[str, str]] = None
-    router: Optional[AnyGatewayRouterConfig] = None
 
 
 class GatewayProvisioningData(CoreModel):

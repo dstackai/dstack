@@ -46,8 +46,11 @@
   "reservation": null,
   "resources": {
     "cpu": {
-      "max": null,
-      "min": 2
+      "arch": null,
+      "count": {
+        "max": null,
+        "min": 2
+      }
     },
     "disk": {
       "size": {
@@ -73,7 +76,6 @@
     "shm_size": null
   },
   "retry": null,
-  "router": null,
   "scaling": null,
   "schedule": null,
   "setup": [],

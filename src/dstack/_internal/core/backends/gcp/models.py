@@ -1,6 +1,7 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import Field, RootModel, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -121,10 +122,9 @@ class GCPServiceAccountFileCreds(CoreModel):
         ),
     ] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def fill_data(cls, values):
-        return fill_data(values)
+    @model_validator(mode="after")
+    def fill_data(self) -> Self:
+        return fill_data(self)
 
 
 AnyGCPFileCreds = Union[GCPServiceAccountFileCreds, GCPDefaultCreds]

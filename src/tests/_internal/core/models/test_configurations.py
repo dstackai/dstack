@@ -162,27 +162,6 @@ class TestParseConfiguration:
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
         assert router_g.router.type == "sglang"
 
-    def test_replica_group_router_forbids_service_level_router(self):
-        conf = {
-            "type": "service",
-            "port": 8000,
-            "router": {"type": "sglang"},
-            "replicas": [
-                {
-                    "name": "router",
-                    "count": 1,
-                    "commands": ["sglang serve"],
-                    "router": {"type": "sglang"},
-                },
-                {"name": "worker", "count": 2, "commands": ["worker"]},
-            ],
-        }
-        with pytest.raises(
-            ConfigurationError,
-            match="Service-Level router configuration is not allowed together with replica-group",
-        ):
-            parse_run_configuration(conf)
-
     def test_spot_policy_set_at_both_service_and_group_rejected(self):
         with pytest.raises(
             ConfigurationError,

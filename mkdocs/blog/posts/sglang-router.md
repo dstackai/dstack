@@ -125,6 +125,9 @@ After that, if you configure [replicas and scaling](../../docs/concepts/services
 
 ### Router
 
+!!! note "Deprecation notice"
+    The router configuration approach described in this section is no longer supported. For the modern approach, see [SGLang PD disaggregation (router as replica group)](../../docs/examples/inference/sglang.md#pd-disaggregation).
+
 By default, the gateway uses its built-in load balancer to route traffic across replicas. With the latest release, you can instead delegate traffic routing to the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html) by setting the `router` property to `sglang`:
 
 <div editor-title="gateway.dstack.yml">

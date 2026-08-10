@@ -52,10 +52,12 @@ class GetRunPlanRequest(CoreModel):
         bool,
         Field(description="Subtract allocated resources to return only unallocated resources"),
     ] = False
-
-
-class SubmitRunRequest(CoreModel):
-    run_spec: RunSpec
+    for_offers_only: Annotated[
+        bool,
+        Field(
+            description="Set to True if the run plan is requested for offer collection only, not a real run submission"
+        ),
+    ] = False
 
 
 class ApplyRunPlanRequest(CoreModel):

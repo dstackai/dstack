@@ -12,7 +12,6 @@ from dstack._internal.cli.utils.common import (
 from dstack._internal.cli.utils.gateway import get_gateways_table
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import (
-    MethodNotAllowedError,
     ResourceNotExistsError,
 )
 from dstack._internal.core.models.common import ApplyAction
@@ -29,7 +28,6 @@ from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
-from dstack.api._public import Client
 
 logger = get_logger(__name__)
 
@@ -49,21 +47,8 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             configuration=conf,
             configuration_path=configuration_path,
         )
-        if spec.configuration.router is not None:
-            logger.warning(
-                "Specifying `router` in gateway configurations is deprecated"
-                " and will be disallowed in a future release."
-                " Please migrate to replica-based routers:"
-                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
-            )
         with console.status("Getting apply plan..."):
-            try:
-                plan = self.api.client.gateways.get_plan(project_name=self.api.project, spec=spec)
-                use_legacy_api = False
-            except MethodNotAllowedError:
-                # pre-0.20.27 server
-                plan = _get_plan_legacy(self.api, spec)
-                use_legacy_api = True
+            plan = self.api.client.gateways.get_plan(project_name=self.api.project, spec=spec)
         _print_plan_header(plan)
 
         action_message = ""
@@ -130,19 +115,13 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
                         time.sleep(1)
 
         with console.status("Applying plan..."):
-            if use_legacy_api:
-                gateway = self.api.client.gateways.create(
-                    project_name=self.api.project,
-                    configuration=conf,
-                )
-            else:
-                gateway = self.api.client.gateways.apply_plan(
-                    project_name=self.api.project,
-                    plan=ApplyGatewayPlanInput(
-                        spec=spec,
-                        current_resource=plan.current_resource,
-                    ),
-                )
+            gateway = self.api.client.gateways.apply_plan(
+                project_name=self.api.project,
+                plan=ApplyGatewayPlanInput(
+                    spec=spec,
+                    current_resource=plan.current_resource,
+                ),
+            )
 
         if plan.action == ApplyAction.UPDATE and delete_gateway_name is None:
             console.print(get_gateways_table([gateway], current_project=self.api.project))
@@ -227,27 +206,6 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
     def apply_args(self, conf: GatewayConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
-
-
-def _get_plan_legacy(api: Client, spec: GatewaySpec) -> GatewayPlan:
-    user = api.client.users.get_my_user()
-    current_resource = None
-    if spec.configuration.name is not None:
-        try:
-            current_resource = api.client.gateways.get(
-                project_name=api.project,
-                gateway_name=spec.configuration.name,
-            )
-        except ResourceNotExistsError:
-            pass
-    return GatewayPlan(
-        project_name=api.project,
-        user=user.username,
-        spec=spec,
-        effective_spec=spec,
-        current_resource=current_resource,
-        action=ApplyAction.CREATE,
-    )
 
 
 def _print_plan_header(plan: GatewayPlan):

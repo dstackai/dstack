@@ -25,8 +25,11 @@
     "reservation": null,
     "resources": {
       "cpu": {
-        "max": null,
-        "min": 8
+        "arch": null,
+        "count": {
+          "max": null,
+          "min": 8
+        }
       },
       "disk": {
         "size": {

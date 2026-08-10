@@ -36,7 +36,6 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
-    AnyGatewayRouterConfig,
     ApplyGatewayPlanInput,
     Gateway,
     GatewayComputeConfiguration,
@@ -212,7 +211,6 @@ def create_gateway_compute_model(
         ssh_key_pub=gateway_ssh_public_key,
         certificate=configuration.certificate,
         tags=configuration.tags,
-        router=configuration.router,
     )
 
     now = get_current_datetime()
@@ -784,10 +782,9 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.ssh_private_key,
     )
     logger.debug("Updating gateway %s", connection.ip_address)
-    router = _get_gateway_compute_router_config(gateway_compute_model)
 
     # Build package spec with extras and wheel URL
-    gateway_package = get_dstack_gateway_wheel(build, router)
+    gateway_package = get_dstack_gateway_wheel(build)
     commands = [
         # prevent update.sh from overwriting itself during execution
         "cp dstack/update.sh dstack/_update.sh",
@@ -805,15 +802,6 @@ def _recently_updated(gateway_compute_model: GatewayComputeModel) -> bool:
     return gateway_compute_model.app_updated_at.replace(
         tzinfo=datetime.timezone.utc
     ) > get_current_datetime() - timedelta(seconds=60)
-
-
-def _get_gateway_compute_router_config(
-    compute: GatewayComputeModel,
-) -> Optional[AnyGatewayRouterConfig]:
-    if compute.configuration is None:  # pre-0.18.2 gateway
-        return None  # gateway routers introduced in 0.19.38
-    compute_config = validate_json_extra_ignore(GatewayComputeConfiguration, compute.configuration)
-    return compute_config.router
 
 
 async def configure_gateway(
@@ -943,8 +931,6 @@ def gateway_model_to_gateway(
         name=gateway_model.name,
         project_name=gateway_model.project.name,
         hostname=gateway_model.hostname,
-        backend=gateway_model.backend.type,
-        region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=is_default,
         created_at=gateway_model.created_at,
@@ -1156,8 +1142,3 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             if configuration.backend == BackendType.AWS:
                 err += " or `certificate: { type: acm, arn: <arn> }` (AWS ACM)"
             raise ServerClientError(err)
-
-    if configuration.router is not None and replicas > 1:
-        raise ServerClientError(
-            "The deprecated `router` property is not supported for multi-replica gateways"
-        )

@@ -699,8 +699,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -1736,18 +1739,6 @@
           "description": "The number of gateway replicas. Defaults to `1`",
           "title": "Replicas"
         },
-        "router": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SGLangGatewayRouterConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The router configuration for this gateway. E.g. `{ type: sglang, policy: round_robin }`."
-        },
         "tags": {
           "anyOf": [
             {
@@ -2584,8 +2575,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -2763,9 +2757,6 @@
             },
             {
               "type": "string"
-            },
-            {
-              "$ref": "#/$defs/Range_int_"
             }
           ],
           "default": {
@@ -2775,8 +2766,7 @@
               "min": 2
             }
           },
-          "description": "The CPU requirements",
-          "title": "Cpu"
+          "description": "The CPU requirements"
         },
         "disk": {
           "anyOf": [
@@ -3001,65 +2991,6 @@
         "region"
       ],
       "title": "RunpodVolumeConfiguration",
-      "type": "object"
-    },
-    "SGLangGatewayRouterConfig": {
-      "additionalProperties": false,
-      "description": "Gateway-level router configuration. type and policy only. pd_disaggregation is service-level.",
-      "properties": {
-        "policy": {
-          "default": "cache_aware",
-          "description": "The routing policy. Deprecated: prefer setting policy in the service's router config. Options: `random`, `round_robin`, `cache_aware`, `power_of_two`",
-          "enum": [
-            "random",
-            "round_robin",
-            "cache_aware",
-            "power_of_two"
-          ],
-          "title": "Policy",
-          "type": "string"
-        },
-        "type": {
-          "const": "sglang",
-          "default": "sglang",
-          "description": "The router type enabled on this gateway.",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "SGLangGatewayRouterConfig",
-      "type": "object"
-    },
-    "SGLangServiceRouterConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "pd_disaggregation": {
-          "default": false,
-          "description": "Enable PD disaggregation mode for the SGLang router",
-          "title": "Pd Disaggregation",
-          "type": "boolean"
-        },
-        "policy": {
-          "default": "cache_aware",
-          "description": "The routing policy. Options: `random`, `round_robin`, `cache_aware`, `power_of_two`",
-          "enum": [
-            "random",
-            "round_robin",
-            "cache_aware",
-            "power_of_two"
-          ],
-          "title": "Policy",
-          "type": "string"
-        },
-        "type": {
-          "const": "sglang",
-          "default": "sglang",
-          "description": "The router type",
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "title": "SGLangServiceRouterConfig",
       "type": "object"
     },
     "SSHHostParams": {
@@ -3964,8 +3895,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {
@@ -4007,18 +3941,6 @@
           "default": null,
           "description": "The policy for resubmitting the run. Defaults to `false`",
           "title": "Retry"
-        },
-        "router": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SGLangServiceRouterConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Router configuration for the service. Requires a gateway with matching router enabled. "
         },
         "scaling": {
           "anyOf": [
@@ -4723,8 +4645,11 @@
           "$ref": "#/$defs/ResourcesSpec",
           "default": {
             "cpu": {
-              "max": null,
-              "min": 2
+              "arch": null,
+              "count": {
+                "max": null,
+                "min": 2
+              }
             },
             "disk": {
               "size": {

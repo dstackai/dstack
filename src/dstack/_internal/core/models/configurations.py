@@ -11,6 +11,7 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     RootModel,
+    Tag,
     ValidationError,
     ValidationInfo,
     conint,
@@ -39,7 +40,7 @@ from dstack._internal.core.models.profiles import (
     SpotPolicy,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import (
@@ -1203,7 +1204,16 @@ class ServiceConfigurationParams(CoreModel):
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
-        Optional[Union[List[ReplicaGroup], Range[int]]],
+        Optional[
+            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad
+            # `replicas` spells out the whole wrapped schema —
+            # `service.replicas.list[function-after[validate_scaling(), ReplicaGroup]].0` — which
+            # is what `dstack apply` shows the user.
+            Union[
+                Annotated[list[ReplicaGroup], Tag("ReplicaGroup")],
+                Annotated[Range[int], Tag("Range[int]")],
+            ]
+        ],
         Field(
             description=(
                 "The number of replicas or a list of replica groups. "
@@ -1213,14 +1223,6 @@ class ServiceConfigurationParams(CoreModel):
                 "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
                 "and `resources` are not allowed and must be specified in each replica group instead. "
             )
-        ),
-    ] = None
-    router: Annotated[
-        Optional[AnyServiceRouterConfig],
-        Field(
-            description=(
-                "Router configuration for the service. Requires a gateway with matching router enabled. "
-            ),
         ),
     ] = None
 
@@ -1521,23 +1523,6 @@ class ServiceConfigurationParams(CoreModel):
             router_group = router_groups[0]
             if router_group.count.min != 1 or router_group.count.max != 1:
                 raise ValueError("For now replica group with `router` must have `count: 1`.")
-        return self
-
-    @model_validator(mode="after")
-    def validate_replica_group_router_mutex(self) -> Self:
-        """
-        When a replica group sets `router:`, service-level `router` must be omitted.
-        (Gateway-level SGLang is rejected at service registration when a gateway is selected.)
-        """
-        replicas = self.replicas
-        if not isinstance(replicas, list):
-            return self
-        if not any(g.router is not None for g in replicas):
-            return self
-        if self.router is not None:
-            raise ValueError(
-                "Service-Level router configuration is not allowed together with replica-group `router`."
-            )
         return self
 
 

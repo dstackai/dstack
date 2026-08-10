@@ -78,7 +78,6 @@ class ServerProxyRepo(BaseProxyRepo):
             None,
         )
         has_router_replica = router_group is not None
-        router = run_spec.configuration.router
         replicas = []
         for job in jobs:
             jpd = validate_json_extra_ignore(
@@ -131,6 +130,7 @@ class ServerProxyRepo(BaseProxyRepo):
             )
             replicas.append(replica)
         return Service(
+            id=run.id.hex,
             project_name=project_name,
             run_name=run.run_name,
             domain=None,
@@ -140,7 +140,6 @@ class ServerProxyRepo(BaseProxyRepo):
             strip_prefix=run_spec.configuration.strip_prefix,
             replicas=tuple(replicas),
             has_router_replica=has_router_replica,
-            router=router,
         )
 
     async def list_models(self, project_name: str) -> List[ChatModel]:

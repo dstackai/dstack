@@ -3,7 +3,6 @@ Application logic related to `type: service` runs.
 """
 
 from functools import partial
-from typing import Optional
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,11 +19,6 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
-from dstack._internal.core.models.routers import (
-    AnyServiceRouterConfig,
-    RouterType,
-    SGLangServiceRouterConfig,
-)
 from dstack._internal.core.models.runs import RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
@@ -115,21 +109,6 @@ async def _register_service_in_gateway(
     has_replica_group_router = any(
         g.router is not None for g in run_spec.configuration.replica_groups
     )
-    if has_replica_group_router and _gateway_has_sglang_router(gateway_configuration):
-        raise ServerClientError(
-            "A replica-group `router:` cannot be used with a gateway that has router configuration."
-        )
-
-    # Check: service specifies SGLang router but gateway does not have it
-    service_router = run_spec.configuration.router
-    service_wants_sglang = service_router is not None and isinstance(
-        service_router, SGLangServiceRouterConfig
-    )
-    if service_wants_sglang and not _gateway_has_sglang_router(gateway_configuration):
-        raise ServerClientError(
-            "Service requires gateway with SGLang router but gateway "
-            f"'{gateway.name}' does not have the SGLang router configured."
-        )
 
     configure_service_https = _should_configure_service_https_on_gateway(
         run_spec, gateway_configuration
@@ -151,8 +130,6 @@ async def _register_service_in_gateway(
         raise ServerClientError(
             "Cannot run HTTPS service on gateway with no SSL certificates configured"
         )
-
-    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
 
     gateway_https = _get_gateway_https(gateway_configuration)
     gateway_protocol = "https" if gateway_https else "http"
@@ -187,6 +164,7 @@ async def _register_service_in_gateway(
                 do_register = partial(
                     client.register_service,
                     project=run_model.project.name,
+                    run_id=run_model.id,
                     run_name=run_model.run_name,
                     domain=domain,
                     service_https=configure_service_https,
@@ -197,7 +175,6 @@ async def _register_service_in_gateway(
                     rate_limits=run_spec.configuration.rate_limits,
                     ssh_private_key=run_model.project.ssh_private_key,
                     has_router_replica=has_replica_group_router,
-                    router=router,
                 )
                 try:
                     await do_register()
@@ -239,14 +216,6 @@ async def _register_service_in_gateway(
 
 def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
-    if (
-        run_spec.configuration.router is not None
-        and run_spec.configuration.router.type == RouterType.SGLANG
-    ):
-        raise ServerClientError(
-            "Service with SGLang router configuration requires a gateway. "
-            "Please configure a gateway with the SGLang router enabled."
-        )
     if run_spec.configuration.https not in (
         None,
         "auto",
@@ -279,41 +248,6 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         configuration=run_spec.configuration,
         service_url=service_url,
         model_url=model_url,
-    )
-
-
-def _gateway_has_sglang_router(config: GatewayConfiguration) -> bool:
-    return config.router is not None and config.router.type == RouterType.SGLANG.value
-
-
-def _build_service_router_config(
-    gateway_configuration: GatewayConfiguration,
-    service_configuration: ServiceConfiguration,
-) -> Optional[AnyServiceRouterConfig]:
-    """
-    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
-    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
-    automatically when gateway has it configured.
-    """
-    if not _gateway_has_sglang_router(gateway_configuration):
-        return None
-
-    gateway_router = gateway_configuration.router
-    assert gateway_router is not None  # ensured by _gateway_has_sglang_router
-    router_type = gateway_router.type
-    policy = gateway_router.policy
-
-    service_router = service_configuration.router
-    if service_router is not None and isinstance(service_router, SGLangServiceRouterConfig):
-        policy = service_router.policy
-        pd_disaggregation = service_router.pd_disaggregation
-    else:
-        pd_disaggregation = False
-
-    return SGLangServiceRouterConfig(
-        type=router_type,
-        policy=policy,
-        pd_disaggregation=pd_disaggregation,
     )
 
 

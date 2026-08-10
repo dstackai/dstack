@@ -11,10 +11,6 @@
   "public_ip": false,
   "region": "us-east-1",
   "replicas": 2,
-  "router": {
-    "policy": "round_robin",
-    "type": "sglang"
-  },
   "tags": {
     "env": "prod"
   },

@@ -67,6 +67,7 @@ class TestResolveProvisioningImageName:
         [
             "p5.48xlarge",
             "p5e.48xlarge",
+            "p5en.48xlarge",
             "p4d.24xlarge",
             "p4de.24xlarge",
             "g6.8xlarge",

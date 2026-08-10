@@ -26,7 +26,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import CPUSpec, Memory, ResourcesSpec
+from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.utils import docker as docker_utils
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
@@ -179,7 +179,6 @@ class ResourceRequests(ResourceRequestsLimits):
 
     @classmethod
     def from_resources_spec(cls, spec: ResourcesSpec) -> Self:
-        assert isinstance(spec.cpu, CPUSpec)
         cpu = spec.cpu.count.min or 0
         memory_mib: int = 0
         if spec.memory.min is not None:
@@ -223,7 +222,6 @@ class ResourceRequests(ResourceRequestsLimits):
 class ResourceLimits(ResourceRequestsLimits):
     @classmethod
     def from_resources_spec(cls, spec: ResourcesSpec) -> Self:
-        assert isinstance(spec.cpu, CPUSpec)
         cpu = spec.cpu.count.max
         memory_mib: Optional[int] = None
         if spec.memory.max is not None:
@@ -236,7 +234,6 @@ class ResourceLimits(ResourceRequestsLimits):
         if spec.gpu is not None:
             # GPU resources cannot be overcommitted, limit must be equal to request
             gpu = spec.gpu.count.min or 0
-        assert isinstance(spec.cpu, CPUSpec)
         return cls(
             cpu=cpu,
             memory_mib=memory_mib,

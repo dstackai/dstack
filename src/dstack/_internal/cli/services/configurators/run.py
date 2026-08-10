@@ -59,8 +59,14 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.repos import RepoHeadWithCreds
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
-from dstack._internal.core.models.resources import CPUSpec
-from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunPlan, RunSpec, RunStatus
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobSubmission,
+    JobTerminationReason,
+    RunPlan,
+    RunSpec,
+    RunStatus,
+)
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
@@ -123,14 +129,6 @@ class BaseRunConfigurator(
 
         if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
             raise ConfigurationError("working_dir must be absolute")
-
-        if isinstance(conf, ServiceConfiguration) and conf.router is not None:
-            logger.warning(
-                "Specifying `router` in service configurations is deprecated"
-                " and will be disallowed in a future release."
-                " Please migrate to replica-based routers:"
-                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
-            )
 
         repo = self.get_repo(conf, configuration_path, configurator_args)
         if repo is None:
@@ -534,8 +532,7 @@ class BaseRunConfigurator(
         """
         Infers `resources.cpu.arch` if not set, requires `image` if the architecture is ARM.
         """
-        # TODO: Remove in 0.20. Use conf.resources.cpu directly
-        cpu_spec = CPUSpec.model_validate(conf.resources.cpu)
+        cpu_spec = conf.resources.cpu
         arch = cpu_spec.arch
         if arch is None:
             gpu_spec = conf.resources.gpu
@@ -965,9 +962,15 @@ def print_finished_message(run: Run):
         console.print(str)
 
         if termination_reason_message:
-            console.print(f"[error]{termination_reason_message}[/error]")
+            # Backend errors reported in the message contain square brackets and numbers,
+            # which rich would otherwise parse as markup or repaint.
+            console.print(termination_reason_message, style="error", markup=False, highlight=False)
 
-        if termination_reason:
+        if (
+            termination_reason
+            # A run that never started has no runner logs to read.
+            and termination_reason != JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY.value
+        ):
             console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
 
 

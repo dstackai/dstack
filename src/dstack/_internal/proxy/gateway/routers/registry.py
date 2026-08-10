@@ -9,6 +9,7 @@ from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterEntrypointRequest,
     RegisterReplicaRequest,
     RegisterServiceRequest,
+    SetServiceIdRequest,
 )
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.lib.deps import get_service_connection_pool
@@ -27,6 +28,7 @@ async def register_service(
 ) -> OkResponse:
     await registry_services.register_service(
         project_name=project_name.lower(),
+        run_id=body.id,
         run_name=body.run_name.lower(),
         domain=body.domain.lower(),
         https=body.https,
@@ -58,6 +60,23 @@ async def unregister_service(
         repo=repo,
         nginx=nginx,
         service_conn_pool=service_conn_pool,
+    )
+    return OkResponse()
+
+
+@router.post("/services/{run_name}/set_id")
+async def set_service_id(
+    project_name: str,
+    run_name: str,
+    body: SetServiceIdRequest,
+    repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+) -> OkResponse:
+    """Populate a missing ID for a service registered before 0.21.0"""
+    await registry_services.set_service_id(
+        project_name=project_name.lower(),
+        run_name=run_name.lower(),
+        run_id=body.id,
+        repo=repo,
     )
     return OkResponse()
 

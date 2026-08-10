@@ -236,10 +236,6 @@ def job_model_to_job_submission(
 ) -> JobSubmission:
     job_provisioning_data = get_job_provisioning_data(job_model)
     if job_provisioning_data is not None:
-        # TODO remove after transitioning to computed fields
-        job_provisioning_data.instance_type.resources.description = (
-            job_provisioning_data.instance_type.resources.pretty_format()
-        )
         # TODO do we really still need this magic? See https://github.com/dstackai/dstack/pull/1682
         # i.e., replacing `jpd.backend` with `jpd.get_base_backend()` should give the same result
         if (
@@ -601,7 +597,7 @@ def _get_job_status_message(job_model: JobModel) -> str:
                 and "No matching fleet found" in job_model.termination_reason_message
             ):
                 return "no fleets"
-            return "no offers"
+            return "no capacity"
         elif job_model.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
             return "interrupted"
         else:

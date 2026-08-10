@@ -48,7 +48,10 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedPipeline,
     JobSubmittedPipelineItem,
     JobSubmittedWorker,
+    _get_new_capacity_failure_message,
     _load_submitted_job_context,
+    _NewCapacityAttempts,
+    _OfferAttemptError,
     _release_replica_jobs_from_master_wait,
 )
 from dstack._internal.server.models import (
@@ -1973,6 +1976,39 @@ class TestJobSubmittedWorker:
         assert not placeholder.deleted
         assert placeholder.status == InstanceStatus.PENDING
 
+    async def test_reports_tried_offers_when_new_capacity_provisioning_fails(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.side_effect = BackendError("InsufficientInstanceCapacity")
+
+            # The first pass assigns the job to the fleet, the second one provisions.
+            await _process_job(session=session, worker=worker, job_model=job)
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert f"Failed to provision in fleet '{fleet.name}'" in job.termination_reason_message
+        assert "tried 1 of 1 offers, all failed" in job.termination_reason_message
+        assert "us-east-1: InsufficientInstanceCapacity" in job.termination_reason_message
+
     async def test_provisions_compute_group(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
@@ -3154,3 +3190,81 @@ class TestLoadSubmittedJobContext:
         # Only the latest submission should be loaded.
         assert len(context.run_model.jobs) == 1
         assert context.run_model.jobs[0].id == latest_job.id
+
+
+class TestGetNewCapacityFailureMessage:
+    def _get_offer_attempt_error(self, region: str, error: str) -> _OfferAttemptError:
+        return _OfferAttemptError(backend="aws", region=region, instance="g5.xlarge", error=error)
+
+    def test_reports_no_offers(self):
+        attempts = _NewCapacityAttempts(
+            total=0, tried=0, skip_reasons=[], errors=[], limit_reached=False
+        )
+
+        message = _get_new_capacity_failure_message(fleet_name="my-fleet", attempts=attempts)
+
+        assert "No offers matching the run requirements in fleet 'my-fleet'" in message
+
+    def test_reports_skip_reasons_when_no_offer_was_tried(self):
+        attempts = _NewCapacityAttempts(
+            total=3,
+            tried=0,
+            skip_reasons=["no compatible placement group", "no compatible placement group"],
+            errors=[],
+            limit_reached=False,
+        )
+
+        message = _get_new_capacity_failure_message(fleet_name="my-fleet", attempts=attempts)
+
+        assert "None of the 3 offers in fleet 'my-fleet' could be tried" in message
+        # Repeated reasons are reported once.
+        assert message.count("no compatible placement group") == 1
+
+    def test_reports_tried_offers_and_errors(self):
+        attempts = _NewCapacityAttempts(
+            total=12,
+            tried=5,
+            skip_reasons=[],
+            errors=[
+                self._get_offer_attempt_error("us-east-1", "InsufficientInstanceCapacity"),
+                self._get_offer_attempt_error("us-west-2", "InsufficientInstanceCapacity"),
+                self._get_offer_attempt_error("eu-west-1", "RequestLimitExceeded"),
+            ],
+            limit_reached=True,
+        )
+
+        message = _get_new_capacity_failure_message(fleet_name="my-fleet", attempts=attempts)
+
+        assert (
+            "Failed to provision in fleet 'my-fleet':"
+            " tried 5 of 12 offers (attempt limit reached), all failed." in message
+        )
+        # The same error is reported once, for the first offer that hit it.
+        assert message.count("InsufficientInstanceCapacity") == 1
+        assert "g5.xlarge in aws/us-east-1: InsufficientInstanceCapacity" in message
+        assert "g5.xlarge in aws/eu-west-1: RequestLimitExceeded" in message
+        assert "us-west-2" not in message
+
+    def test_does_not_report_the_attempt_limit_when_all_offers_were_tried(self):
+        attempts = _NewCapacityAttempts(
+            total=5, tried=5, skip_reasons=[], errors=[], limit_reached=False
+        )
+
+        message = _get_new_capacity_failure_message(fleet_name="my-fleet", attempts=attempts)
+
+        assert "tried 5 of 5 offers, all failed" in message
+        assert "attempt limit" not in message
+
+    def test_truncates_reported_errors(self):
+        attempts = _NewCapacityAttempts(
+            total=5,
+            tried=5,
+            skip_reasons=[],
+            errors=[self._get_offer_attempt_error(f"region-{i}", f"error-{i}") for i in range(5)],
+            limit_reached=False,
+        )
+
+        message = _get_new_capacity_failure_message(fleet_name="my-fleet", attempts=attempts)
+
+        assert "and 2 more" in message
+        assert "error-3" not in message

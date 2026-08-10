@@ -9,10 +9,7 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
-    SerializerFunctionWrapHandler,
-    Tag,
     field_validator,
-    model_serializer,
     model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
@@ -227,11 +224,9 @@ class CPUSpec(CoreModel):
         # Range and min/max dict - for backward compatibility
         if isinstance(v, Range):
             return {"arch": None, "count": v}
-        # A subset rather than exactly {"min", "max"}: `ResourcesSpec` serializes `cpu` down to its
-        # count for old clients, and under `exclude_none=True` that leaves just `{"min": ...}`.
-        # Requiring both keys made the round trip land on the `Range[int]` arm of `ResourcesSpec.cpu`
-        # instead of coming back as a `CPUSpec`. `arch`/`count` are the only `CPUSpec` fields, so a
-        # mapping of min/max is unambiguously a range.
+        # `arch` and `count` are the only `CPUSpec` fields, so a mapping of `min`/`max` is
+        # unambiguously a count range. A subset rather than exactly `{"min", "max"}`, because a
+        # half-open range may omit the other key.
         if isinstance(v, Mapping) and v and v.keys() <= {"min", "max"}:
             return {"arch": None, "count": v}
         return v
@@ -395,20 +390,7 @@ DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
 class ResourcesSpec(CoreModel):
-    # TODO: remove `Range[int]` in 0.20. It is kept only for backward compatibility.
-    cpu: Annotated[
-        Union[
-            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad `cpu`
-            # spells out the whole wrapped schema —
-            # `cpu.function-before[parse(), function-before[parse(), ... CPUSpec]].count` — which
-            # is what `dstack apply` shows the user.
-            Annotated[CPUSpec, Tag("CPUSpec")],
-            Annotated[Range[int], Tag("Range[int]")],
-        ],
-        # `CPUSpec` and `Range[int]` both accept a bare int/str, so the arm has to be picked by
-        # declaration order rather than by pydantic v2's "smart" union resolution.
-        Field(description="The CPU requirements", union_mode="left_to_right"),
-    ] = CPUSpec()
+    cpu: Annotated[CPUSpec, Field(description="The CPU requirements")] = CPUSpec()
     memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
         DEFAULT_MEMORY_SIZE
     )
@@ -435,8 +417,7 @@ class ResourcesSpec(CoreModel):
         )
 
     def pretty_format(self) -> str:
-        # TODO: Remove in 0.20. Use self.cpu directly
-        cpu = CPUSpec.model_validate(self.cpu)
+        cpu = self.cpu
         resources: Dict[str, Any] = dict(cpu_arch=cpu.arch, cpus=cpu.count, memory=self.memory)
         if self.gpu:
             gpu = self.gpu
@@ -452,18 +433,3 @@ class ResourcesSpec(CoreModel):
             resources.update(disk_size=self.disk.size)
         res = pretty_resources(**resources)
         return res
-
-    @model_serializer(mode="wrap")
-    def _serialize(self, handler: SerializerFunctionWrapHandler) -> Dict[str, Any]:
-        res = handler(self)
-        self._update_serialized_cpu(res)
-        return res
-
-    # TODO: Remove in 0.20. Added for backward compatibility.
-    def _update_serialized_cpu(self, values: Dict):
-        cpu = values.get("cpu")
-        if cpu:
-            arch = cpu.get("arch")
-            count = cpu.get("count")
-            if count and arch in [None, gpuhunt.CPUArchitecture.X86.value]:
-                values["cpu"] = count

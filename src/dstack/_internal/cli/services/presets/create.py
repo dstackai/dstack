@@ -554,7 +554,10 @@ async def _create_preset(
             workspace=setup.workspace,
             token=token,
         )
-    prompt = get_preset_agent_system_prompt(user_prompt=setup.user_prompt)
+    prompt = get_preset_agent_system_prompt(
+        user_prompt=setup.user_prompt,
+        baseline=configuration.effective_baseline,
+    )
     if setup.write_constraints:
         if setup.user_prompt:
             agent_session.write_user_prompt(setup.user_prompt)
@@ -805,7 +808,9 @@ def _print_fleet_offers(api: Client, allowed_fleets: tuple[str, ...]) -> None:
         offer_configuration.fleets = list(allowed_fleets)
         run_spec = RunSpec(configuration=offer_configuration, profile=None)
         with console.status("Getting offers..."):
-            run_plan = api.client.runs.get_plan(api.project, run_spec, max_offers=10)
+            run_plan = api.client.runs.get_plan(
+                api.project, run_spec, max_offers=10, for_offers_only=True
+            )
         props = Table(box=None, show_header=False)
         props.add_column(no_wrap=True)
         props.add_column()
@@ -849,9 +854,14 @@ def _build_constraints(
         {
             "run_name_prefix": build_name,
             "model": json.loads(configuration.model.model_dump_json(exclude_none=True)),
-            "context_length": configuration.context_length,
-            "max_trials": configuration.max_trials,
-            "concurrency": configuration.effective_concurrency,
+            "min_context_length": configuration.min_context_length,
+            "max_ttft": configuration.max_ttft,
+            "trials_num": configuration.trials,
+            "concurrency": configuration.concurrency,
+            "input_tokens": configuration.effective_input_tokens,
+            "output_tokens": configuration.effective_output_tokens,
+            "shared_prefix_tokens": configuration.shared_prefix_tokens or 0,
+            "baseline": configuration.effective_baseline,
             "fleets": list(allowed_fleets),
             "env": list(configuration.env),
         }

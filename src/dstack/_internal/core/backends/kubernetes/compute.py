@@ -88,7 +88,6 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import GPUSpec
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -502,9 +501,7 @@ class KubernetesCompute(
         )
         labels = filter_invalid_labels(labels)
 
-        commands = _get_gateway_commands(
-            authorized_keys=[configuration.ssh_key_pub], router=configuration.router
-        )
+        commands = _get_gateway_commands(authorized_keys=[configuration.ssh_key_pub])
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=instance_name,
@@ -1375,11 +1372,9 @@ def _wait_for_load_balancer_address(
         time.sleep(1)
 
 
-def _get_gateway_commands(
-    authorized_keys: List[str], router: Optional[AnyGatewayRouterConfig] = None
-) -> List[str]:
+def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
-    gateway_commands = " && ".join(get_dstack_gateway_commands(router=router))
+    gateway_commands = " && ".join(get_dstack_gateway_commands())
     quoted_gateway_commands = shlex.quote(gateway_commands)
 
     commands = [

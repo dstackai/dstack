@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
 _TRIALS_FILENAME = "trials.jsonl"
+_VERIFICATIONS_FILENAME = "verifications.jsonl"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
@@ -67,6 +68,10 @@ class PresetAgentSession:
     @property
     def trials_path(self) -> Path:
         return self.path / _TRIALS_FILENAME
+
+    @property
+    def verifications_path(self) -> Path:
+        return self.path / _VERIFICATIONS_FILENAME
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
@@ -173,7 +178,7 @@ def create_preset_agent_session(
             "name": configuration.name,
             "model": getattr(configuration.model, "base", None)
             or getattr(configuration.model, "repo", None),
-            "max_trials": configuration.max_trials,
+            "trials_num": configuration.trials,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "debug": debug,
         }
@@ -285,7 +290,7 @@ def load_agent_session(preset_id: str) -> PresetAgentSession:
 
 
 def print_session_log(session: PresetAgentSession) -> None:
-    """Prints the session's redacted progress log verbatim (no markup)."""
+    """Prints the session's redacted progress log verbatim, no markup."""
     try:
         content = session.log_path.read_text(encoding="utf-8")
     except OSError:
@@ -428,8 +433,46 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         entry["name"] = claimed_session_name(manifest)
         entry["status"] = status
         entry["trials"] = _summarize_session_trials(path / _TRIALS_FILENAME)
+        entry["verification"] = _read_last_session_verification(path / _VERIFICATIONS_FILENAME)
+        entry["constraints"] = _read_session_constraints(path)
         entries.append(entry)
     return entries
+
+
+def _read_session_constraints(path: Path) -> dict[str, Any]:
+    """The objective the session was given. The session's own copy is read first: it
+    is written at creation and outlives the agent workspace, which is removed once
+    the session finishes. The workspace copy is the fallback, for sessions recorded
+    before the session-level copy existed."""
+    for candidate in (
+        path / _CONSTRAINTS_FILENAME,
+        path / "workspace" / "w" / _CONSTRAINTS_FILENAME,
+    ):
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
+    """The final service attempt in flight or last finished, from the session's
+    mirrored verification records. The last line wins: the agent appends one when
+    an attempt starts and another when it ends."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict) and isinstance(record.get("status"), str):
+            return record
+    return None
 
 
 def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
@@ -440,6 +483,14 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
         lines = []
     count = 0
     best: Optional[dict[str, Any]] = None
+    # The fastest trial that broke a constraint, shown only when nothing passed.
+    best_failed: Optional[dict[str, Any]] = None
+    # One entry per trial in order, `None` for a trial that produced no benchmark.
+    series: list[Optional[float]] = []
+    # Parallel to `series`: a trial that measured but broke a constraint.
+    failed: list[bool] = []
+    # Kept outside `best` so a run where nothing passed still shows what it ran on.
+    gpu: Optional[str] = None
     for line in lines:
         try:
             record = json.loads(line)
@@ -451,33 +502,75 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
         # so task names must not be deduplicated.
         count += 1
         benchmark = record.get("benchmark")
+        failed.append(bool(record.get("failed")))
+        record_gpu = _format_trial_gpu(record)
+        if record_gpu:
+            gpu = record_gpu
         if not isinstance(benchmark, dict):
+            series.append(None)
             continue
         metrics = benchmark.get("metrics") or {}
         workload = benchmark.get("workload") or {}
         duration = metrics.get("duration_seconds")
         tokens = metrics.get("total_output_tokens")
         if not isinstance(duration, (int, float)) or duration <= 0:
+            series.append(None)
             continue
         if not isinstance(tokens, (int, float)):
+            series.append(None)
             continue
         tok_s = tokens / duration
+        series.append(tok_s)
+        # A failed trial keeps its benchmark — it is what the next trial learns
+        # from — but it is not a candidate for best, and promoting one would put
+        # a configuration that broke a constraint at the top of the listing.
+        if record.get("failed"):
+            if best_failed is None or tok_s > best_failed["tok_s"]:
+                best_failed = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+            continue
         if best is None or tok_s > best["tok_s"]:
-            resources = record.get("resources") or {}
-            gpu = resources.get("gpu") if isinstance(resources, dict) else None
-            gpu_text = None
-            if isinstance(gpu, dict) and gpu.get("name"):
-                gpu_text = str(gpu["name"])
-                if gpu.get("memory"):
-                    gpu_text += f":{gpu['memory']}"
-                if gpu.get("count"):
-                    gpu_text += f":{gpu['count']}"
-            best = {
-                "tok_s": tok_s,
-                "concurrency": workload.get("concurrency"),
-                "gpu": gpu_text,
-            }
-    return {"count": count, "best": best}
+            best = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+    return {
+        "count": count,
+        "best": best,
+        "best_failed": best_failed,
+        "series": series,
+        "failed": failed,
+        "gpu": gpu,
+    }
+
+
+def _trial_entry(
+    tok_s: float,
+    record: dict[str, Any],
+    metrics: dict[str, Any],
+    workload: dict[str, Any],
+    gpu: Optional[str],
+) -> dict[str, Any]:
+    ttft = (metrics.get("ttft_ms") or {}).get("p50")
+    tpot = (metrics.get("tpot_ms") or {}).get("p50")
+    context_length = record.get("context_length")
+    return {
+        "tok_s": tok_s,
+        "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
+        "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
+        "context_length": context_length if isinstance(context_length, int) else None,
+        "concurrency": workload.get("concurrency"),
+        "gpu": gpu,
+    }
+
+
+def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+    resources = record.get("resources")
+    gpu = resources.get("gpu") if isinstance(resources, dict) else None
+    if not isinstance(gpu, dict) or not gpu.get("name"):
+        return None
+    text = str(gpu["name"])
+    if gpu.get("memory"):
+        text += f":{gpu['memory']}"
+    if gpu.get("count"):
+        text += f":{gpu['count']}"
+    return text
 
 
 def print_preset_progress(message: str, *, agent_session: PresetAgentSession) -> None:

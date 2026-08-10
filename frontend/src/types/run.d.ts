@@ -49,7 +49,7 @@ declare type TRange = { min?: number; max?: number };
 
 declare type TResourceRequest = {
     gpu?: TGPUResources | string | number;
-    cpu?: string | number | TRange;
+    cpu?: string | number | ICPUSpecRequest;
     memory?: string | number | TRange;
     shm_size?: string | number;
     disk?:
@@ -270,9 +270,6 @@ declare interface IResources {
 
     disk?: IDisk;
     cpu_arch?: string | null;
-
-    /** @deprecated Use formatResources() from libs/resources instead. Remove in 0.21. */
-    description?: string;
 }
 
 declare interface InstanceType {

@@ -1,6 +1,7 @@
 from typing import Annotated, Literal, Optional, Union
 
 from pydantic import Field, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
@@ -89,12 +90,9 @@ class KubeconfigFileConfig(CoreModel):
         ),
     ] = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def fill_data(cls, values: dict) -> dict:
-        if values.get("filename") == "" and values.get("data") is None:
-            raise ValueError("filename or data must be specified")
-        return fill_data(values)
+    @model_validator(mode="after")
+    def fill_data(self) -> Self:
+        return fill_data(self)
 
 
 class KubernetesBackendFileConfigWithCreds(KubernetesBackendConfig):

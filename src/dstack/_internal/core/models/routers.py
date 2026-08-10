@@ -12,25 +12,7 @@ class RouterType(str, Enum):
     DYNAMO = "dynamo"
 
 
-class SGLangGatewayRouterConfig(CoreModel):
-    """Gateway-level router configuration. type and policy only. pd_disaggregation is service-level."""
-
-    type: Annotated[
-        Literal["sglang"],
-        Field(description="The router type enabled on this gateway."),
-    ] = "sglang"
-    policy: Annotated[
-        Literal["random", "round_robin", "cache_aware", "power_of_two"],
-        Field(
-            description=(
-                "The routing policy. Deprecated: prefer setting policy in the service's router config. "
-                "Options: `random`, `round_robin`, `cache_aware`, `power_of_two`"
-            ),
-        ),
-    ] = "cache_aware"
-
-
-class SGLangServiceRouterConfig(CoreModel):
+class SGLangServiceRouterConfig(CoreModel):  # TODO: drop, unused by the server since 0.21.0
     type: Annotated[Literal["sglang"], Field(description="The router type")] = "sglang"
     policy: Annotated[
         Literal["random", "round_robin", "cache_aware", "power_of_two"],
@@ -59,4 +41,3 @@ class ReplicaGroupRouterConfig(CoreModel):
 
 
 AnyServiceRouterConfig = SGLangServiceRouterConfig
-AnyGatewayRouterConfig = SGLangGatewayRouterConfig

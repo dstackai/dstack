@@ -51,6 +51,8 @@ class RateLimit(ImmutableModel):
 
 
 class Service(ImmutableModel):
+    id: Optional[str] = None
+    """Can temporarily be `None` for services registered before 0.21.0"""
     project_name: str
     run_name: str
     domain: Optional[str] = None  # only used on gateways
@@ -62,6 +64,7 @@ class Service(ImmutableModel):
     replicas: tuple[Replica, ...]
     has_router_replica: bool = False
     router: Optional[AnyServiceRouterConfig] = None
+    """TODO: drop `router`, unused by the server since 0.21.0"""
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
 
     @property
@@ -78,6 +81,9 @@ class Service(ImmutableModel):
 
     def with_replicas(self, new_replicas: Iterable[Replica]) -> "Service":
         return Service(**{**self.model_dump(), "replicas": tuple(new_replicas)})
+
+    def with_id(self, new_id: str) -> "Service":
+        return Service(**{**self.model_dump(), "id": new_id})
 
     def find_replica(self, replica_id: str) -> Optional[Replica]:
         for replica in self.replicas:

@@ -22,6 +22,7 @@ from dstack._internal.proxy.gateway.repo.state_v1 import migrate_from_state_v1
 from dstack._internal.proxy.gateway.routers.auth import router as auth_router
 from dstack._internal.proxy.gateway.routers.config import router as config_router
 from dstack._internal.proxy.gateway.routers.registry import router as registry_router
+from dstack._internal.proxy.gateway.routers.services import router as services_router
 from dstack._internal.proxy.gateway.routers.stats import router as stats_router
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.gateway.services.registry import ACCESS_LOG_PATH, apply_all
@@ -80,6 +81,7 @@ def make_app(repo: Optional[GatewayProxyRepo] = None, nginx: Optional[Nginx] = N
     app.include_router(config_router, prefix="/api/config")
     app.include_router(model_proxy_router, prefix="/api/models")
     app.include_router(registry_router, prefix="/api/registry")
+    app.include_router(services_router, prefix="/api/services")
     app.include_router(stats_router, prefix="/api/stats")
 
     @app.get("/")

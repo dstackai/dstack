@@ -31,7 +31,7 @@ class UsersAPIClient(APIClientGroup):
         limit: Optional[int] = None,
         ascending: Optional[bool] = None,
     ) -> UsersInfoListOrUsersList:
-        # Passing only non-None fields for backward compatibility with 0.20 servers.
+        # `None` means "use the server default", so unset fields are omitted from the request.
         body: dict[str, Any] = {}
         if return_total_count is not None:
             body["return_total_count"] = return_total_count
@@ -45,10 +45,7 @@ class UsersAPIClient(APIClientGroup):
             body["limit"] = limit
         if ascending is not None:
             body["ascending"] = ascending
-        if body:
-            resp = self._request("/api/users/list", body=to_json(body))
-        else:
-            resp = self._request("/api/users/list")
+        resp = self._request("/api/users/list", body=to_json(body))
         resp_json = resp.json()
         if isinstance(resp_json, list):
             return validate_extra_ignore(List[User], resp_json)

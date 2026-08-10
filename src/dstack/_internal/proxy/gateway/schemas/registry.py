@@ -37,6 +37,8 @@ class Options(BaseModel):
 
 
 class RegisterServiceRequest(BaseModel):
+    id: Optional[str] = None
+    """Only optional for compatibility with pre-0.21.0 callers"""
     run_name: str
     domain: str
     https: bool
@@ -47,6 +49,10 @@ class RegisterServiceRequest(BaseModel):
     rate_limits: tuple[RateLimit, ...] = ()
     has_router_replica: bool = False
     router: Optional[AnyServiceRouterConfig] = None
+
+
+class SetServiceIdRequest(BaseModel):
+    id: str
 
 
 class RegisterReplicaRequest(BaseModel):

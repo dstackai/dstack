@@ -6,7 +6,6 @@
   "project_name": "test-project",
   "public_ip": true,
   "region": "us",
-  "router": null,
   "ssh_key_pub": "",
   "tags": null
 }

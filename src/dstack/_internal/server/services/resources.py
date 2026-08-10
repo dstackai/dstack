@@ -2,12 +2,11 @@ from typing import Optional
 
 import gpuhunt
 
-from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
+from dstack._internal.core.models.resources import ResourcesSpec
 
 
 def set_resources_defaults(resources: ResourcesSpec) -> None:
-    # TODO: Remove in 0.20. Use resources.cpu directly
-    cpu = CPUSpec.model_validate(resources.cpu)
+    cpu = resources.cpu
     if cpu.arch is None:
         gpu = resources.gpu
         if (
@@ -19,7 +18,6 @@ def set_resources_defaults(resources: ResourcesSpec) -> None:
             cpu.arch = gpuhunt.CPUArchitecture.ARM
         else:
             cpu.arch = gpuhunt.CPUArchitecture.X86
-        resources.cpu = cpu
 
 
 def set_gpu_vendor_default(

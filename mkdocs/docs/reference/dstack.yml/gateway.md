@@ -10,16 +10,6 @@ The `gateway` configuration type allows creating and updating [gateways](../../c
       type:
         required: true
 
-### `router`
-
-=== "SGLang Model Gateway"
-
-    #SCHEMA# dstack._internal.core.models.routers.SGLangGatewayRouterConfig
-        overrides:
-          show_root_heading: false
-          type:
-            required: true
-
 ### `certificate`
 
 Set to `null` to disable certificates (e.g. for [private gateways](../../concepts/gateways.md#public-ip)).

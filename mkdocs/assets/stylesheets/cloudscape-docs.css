@@ -2058,163 +2058,23 @@
 }
 
 /* ===== Architecture diagram (docs index) =====================================
-   Ported 1:1 from the new landing's <ArchitectureDiagram> (website/src/components/
-   ArchitectureDiagram.tsx + .arch-* in website/src/styles.css). Keep the two in sync — if the
-   landing diagram changes, update this block AND the HTML in mkdocs/docs/index.md.
-   Everything is in cqw (resolved against .arch-diagram-wrap) so it scales like the old SVG.
-   Logos are source SVG/webp used as a currentColor mask → monochrome + theme-adaptive. */
-.arch-diagram-wrap {
-    container-type: inline-size;
+   Prebuilt light/dark SVG pair served from the dstackai/static-assets repo
+   (static-assets/images/dstack-architecture-diagram*.svg), shared with the landing
+   and the README. The pair swaps with the docs theme. */
+/* `.md-typeset img` (0,1,1) beats a bare `.arch-svg` (0,1,0), so qualify the selectors
+   to out-specify Material's `img { height: auto; max-width: 100% }`. */
+.md-typeset img.arch-svg {
+    display: block;
     width: 100%;
     max-width: 700px;
     margin: 1em 0;
 }
-/* The cells' dotted outline is an <svg>; Material's `.md-typeset svg { height:auto; max-width:100% }`
-   would collapse it, so force it to fill the cell (it's position:absolute inset:0). */
-.md-typeset .arch-dash {
-    width: 100% !important;
-    height: 100% !important;
-    max-width: none !important;
+.md-typeset img.arch-svg--dark {
+    display: none;
 }
-.arch-diagram {
-    display: flex;
-    flex-direction: column;
-    gap: 2.66cqw;
-    width: 100%;
-    color: var(--cs-text);
-    --arch-border-width: max(1px, 0.22cqw);
-    --arch-gradient: var(--cs-text);
+[data-md-color-scheme="slate"] .md-typeset img.arch-svg--light {
+    display: none;
 }
-.arch-dash {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    pointer-events: none;
-}
-.arch-dash rect {
-    x: 0.25px;
-    y: 0.25px;
-    width: calc(100% - 0.5px);
-    height: calc(100% - 0.5px);
-    rx: 12px;
-    fill: none;
-    stroke: var(--arch-dash-stroke, var(--cs-text));
-    stroke-width: 0.5px;
-    stroke-dasharray: 1 0;
-    stroke-linecap: butt;
-}
-.arch-row {
-    display: grid;
-    grid-template-columns: 2.54fr 1fr 1fr;
-    gap: 1.72cqw;
-}
-.arch-cell {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 1.55cqw;
-    min-height: 9.83cqw;
-    padding: 0 2cqw;
-    border-radius: 12px;
-}
-.arch-cell--center { justify-content: center; }
-.arch-cell--center .arch-cell__label { white-space: normal; text-align: center; }
-.arch-cell--full { min-height: 9.83cqw; }
-.arch-cell--gpu { justify-content: space-between; }
-.arch-cell--model { grid-column: span 2; justify-content: space-between; }
-.arch-cell--hw { justify-content: center; }
-.arch-cell--hw > .arch-cell__label { position: absolute; left: 2cqw; }
-.arch-cell__label {
-    font-size: 16px;   /* fixed (not cqw-scaled) to match the body text */
-    font-weight: 500;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-.arch-orchestration {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3cqw;
-    padding: 3.2cqw 3.2cqw 3.48cqw;
-    border-radius: 1.6cqw;
-    background: var(--arch-gradient);
-    color: var(--cs-bg);
-}
-.arch-orchestration__title { display: flex; align-items: center; justify-content: space-between; gap: 2cqw; width: 100%; font-size: 16px; font-weight: 500; }
-.arch-orchestration__cells {
-    display: grid;
-    grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
-    gap: 1.26cqw;
-    width: 100%;
-}
-.arch-subcell {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 5.54cqw;
-    padding: 0 0.8cqw;
-    border-radius: 12px;
-    text-align: center;
-    font-size: 2.25cqw;
-    font-weight: 500;
-    line-height: 1.2;
-    --arch-dash-stroke: var(--cs-bg);
-}
-.arch-logos {
-    display: inline-flex;
-    align-items: center;
-    gap: 1.15cqw;
-    flex-wrap: nowrap;
-}
-.arch-logo {
-    display: inline-block;
-    background-color: currentColor;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-/* Per-logo height + aspect (from each source's viewBox) + the mask image (relative to this
-   stylesheet → /assets/images/arch-logos/). */
-.arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; -webkit-mask-image: url(../images/arch-logos/aws.svg); mask-image: url(../images/arch-logos/aws.svg); }
-.arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
-.arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/lambda.svg); mask-image: url(../images/arch-logos/lambda.svg); }
-.arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/nebius.svg); mask-image: url(../images/arch-logos/nebius.svg); }
-.arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; -webkit-mask-image: url(../images/arch-logos/runpod.svg); mask-image: url(../images/arch-logos/runpod.svg); }
-.arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/kubernetes.svg); mask-image: url(../images/arch-logos/kubernetes.svg); }
-.arch-logo--pytorch { height: 5.2cqw; aspect-ratio: 90.3 / 109.1; -webkit-mask-image: url(../images/arch-logos/pytorch.svg); mask-image: url(../images/arch-logos/pytorch.svg); }
-.arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/vllm.svg); mask-image: url(../images/arch-logos/vllm.svg); }
-.arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; -webkit-mask-image: url(../images/arch-logos/sglang.svg); mask-image: url(../images/arch-logos/sglang.svg); }
-.arch-logo--meta { height: 3.7cqw; aspect-ratio: 287.56 / 191; -webkit-mask-image: url(../images/arch-logos/meta.svg); mask-image: url(../images/arch-logos/meta.svg); }
-.arch-logo--huggingface { height: 5.1cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/huggingface.svg); mask-image: url(../images/arch-logos/huggingface.svg); }
-.arch-logo--nvidia { height: 3.7cqw; aspect-ratio: 271.7 / 179.7; -webkit-mask-image: url(../images/arch-logos/nvidia.svg); mask-image: url(../images/arch-logos/nvidia.svg); }
-.arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; -webkit-mask-image: url(../images/arch-logos/amd.webp); mask-image: url(../images/arch-logos/amd.webp); }
-.arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; -webkit-mask-image: url(../images/arch-logos/tenstorrent.svg); mask-image: url(../images/arch-logos/tenstorrent.svg); }
-.arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
-.arch-logo--glm { height: 3.4cqw; aspect-ratio: 19 / 16; -webkit-mask-image: url(../images/arch-logos/glm.svg); mask-image: url(../images/arch-logos/glm.svg); }
-.arch-logo--deepseek { height: 4.8cqw; aspect-ratio: 1; transform: translateY(-1px); -webkit-mask-image: url(../images/arch-logos/deepseek.svg); mask-image: url(../images/arch-logos/deepseek.svg); }
-.arch-logo--qwen { height: 4.9cqw; aspect-ratio: 1; transform: translateY(1px); -webkit-mask-image: url(../images/arch-logos/qwen.svg); mask-image: url(../images/arch-logos/qwen.svg); }
-.arch-logo--kimi { height: 4.3cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/kimi.svg); mask-image: url(../images/arch-logos/kimi.svg); }
-.arch-logo--docker { height: 2.8cqw; aspect-ratio: 122.88 / 88.17; -webkit-mask-image: url(../images/arch-logos/docker.svg); mask-image: url(../images/arch-logos/docker.svg); }
-/* Reflow to 2-up below ~480px (was 360px): the cell labels are a fixed 16px, so on a narrow
-   phone the 3-up grid can't shrink them and they overflow — switch to 2-up sooner. */
-@container (max-width: 480px) {
-    .arch-diagram { gap: 12px; }
-    .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .arch-row > :first-child { grid-column: 1 / -1; }
-    .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-radius: 8px; }
-    .arch-cell__label { font-size: 16px; white-space: normal; }
-    .arch-cell--hw { justify-content: space-between; }
-    .arch-cell--hw > .arch-cell__label { position: static; }
-    .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
-    .arch-orchestration__title { font-size: 15px; }
-    .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .arch-subcell { min-height: 44px; font-size: 13px; border-radius: 7px; }
-    .arch-logos { gap: 12px; }
-    .arch-logo { height: 22px !important; }
+[data-md-color-scheme="slate"] .md-typeset img.arch-svg--dark {
+    display: block;
 }
