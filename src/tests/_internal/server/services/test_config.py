@@ -63,7 +63,7 @@ class TestServerConfigManager:
                 yaml.dump(config, f)
             with (
                 patch("boto3.session.Session"),
-                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
                     "dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"
                 ),
@@ -105,7 +105,7 @@ class TestServerConfigManager:
             with open(config_filepath, "w+") as f:
                 yaml.dump(config, f)
             with (
-                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
                     "dstack._internal.server.services.backends.update_backend",
                     new_callable=AsyncMock,
@@ -143,7 +143,7 @@ class TestServerConfigManager:
             mock_session = Mock()
             mock_session.client.return_value = Mock()
             with (
-                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
                     "dstack._internal.core.backends.aws.auth.authenticate",
                     return_value=mock_session,
@@ -161,7 +161,7 @@ class TestServerConfigManager:
             assert json.loads(backend.source_config)["regions"] is None
             assert json.loads(backend.source_auth.get_plaintext_or_error()) == creds
             with (
-                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
                     "dstack._internal.server.services.backends.update_backend",
                     new_callable=AsyncMock,
@@ -199,7 +199,7 @@ class TestServerConfigManager:
             with open(config_filepath, "w+") as f:
                 yaml.dump(config, f)
             with (
-                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
                     "dstack._internal.server.services.backends.get_backend_config",
                     new_callable=AsyncMock,
@@ -234,7 +234,7 @@ class TestServerConfigManager:
             config = {"projects": [{"name": "new-project"}]}
             with open(config_filepath, "w+") as f:
                 yaml.dump(config, f)
-            with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath):
+            with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
                 manager = ServerConfigManager()
                 manager.load_config()
                 await manager.apply_config(session, owner)

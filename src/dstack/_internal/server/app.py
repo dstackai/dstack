@@ -64,9 +64,10 @@ from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
     DEFAULT_PROJECT_NAME,
     DO_NOT_UPDATE_DEFAULT_PROJECT,
-    SERVER_CONFIG_FILE_PATH,
     SERVER_URL,
     UPDATE_DEFAULT_PROJECT,
+    get_server_config_file_path,
+    init_server_data_dir,
 )
 from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
@@ -118,6 +119,7 @@ async def lifespan(app: FastAPI):
         )
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
     asyncio.get_running_loop().set_default_executor(server_executor)
+    init_server_data_dir()
     await migrate()
     _print_dstack_logo()
     if not check_required_ssh_version():
@@ -141,17 +143,18 @@ async def lifespan(app: FastAPI):
                 user=admin,
             )
             if server_config_manager is not None:
+                server_config_file_path = get_server_config_file_path()
                 server_config_dir = _get_server_config_dir()
                 if not server_config_loaded:
                     logger.info("Initializing the default configuration...", {"show_path": False})
                     await server_config_manager.init_config(session=session)
                     logger.info(
-                        f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
+                        f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
                         {"show_path": False},
                     )
                 else:
                     logger.info(
-                        f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
+                        f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
                         {"show_path": False},
                     )
                     await server_config_manager.apply_config(session=session, owner=admin)
@@ -435,4 +438,4 @@ def _print_dstack_logo():
 
 
 def _get_server_config_dir() -> str:
-    return str(SERVER_CONFIG_FILE_PATH).replace(os.path.expanduser("~"), "~", 1)
+    return str(get_server_config_file_path()).replace(os.path.expanduser("~"), "~", 1)

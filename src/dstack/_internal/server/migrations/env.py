@@ -7,6 +7,7 @@ from sqlalchemy import Connection, MetaData, text
 
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import BaseModel, EnumAsString
+from dstack._internal.server.settings import init_server_data_dir
 
 config = context.config
 
@@ -94,6 +95,7 @@ def run_migrations(connection: Connection):
 
 
 async def run_async_migrations():
+    init_server_data_dir()
     engine = get_db().engine
     async with engine.connect() as connection:
         await connection.run_sync(run_migrations)

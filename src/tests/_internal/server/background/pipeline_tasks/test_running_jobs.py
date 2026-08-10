@@ -1073,7 +1073,6 @@ class TestJobRunningWorker:
         test_db,
         session: AsyncSession,
         worker: JobRunningWorker,
-        tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
     ):
         project = await create_project(session=session)
@@ -1107,7 +1106,6 @@ class TestJobRunningWorker:
             instance_assigned=True,
         )
         last_processed_at = job.last_processed_at
-        monkeypatch.setattr(server_connection, "CONNECTIONS_DIR", tmp_path)
         failing_connection = MagicMock()
         failing_connection.job_id = job.id
         failing_connection.open = AsyncMock(side_effect=SSHError("cannot open tunnel"))

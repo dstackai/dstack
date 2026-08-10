@@ -48,7 +48,7 @@ def _list_templates_sync(repo_key: str, repo_url: str) -> List[UITemplate]:
 
 
 def _fetch_templates_repo(repo_key: str, repo_url: str) -> Path:
-    repo_dir = settings.SERVER_DATA_DIR_PATH / "templates-repos" / repo_key
+    repo_dir = settings.get_server_data_dir_path() / "templates-repos" / repo_key
     if repo_dir.exists():
         try:
             repo = git.Repo(str(repo_dir))
