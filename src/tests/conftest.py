@@ -4,6 +4,7 @@ from functools import cache
 
 import pytest
 
+from dstack._internal.server.services.runner import pool as runner_pool
 from dstack._internal.server.testing.conf import (  # noqa: F401
     postgres_container,
     postgres_db,
@@ -111,3 +112,12 @@ def disable_feature_flags():
             if not isinstance(value, bool):
                 raise RuntimeError(f"FeatureFlags.{name}: only bool values are supported")
             setattr(FeatureFlags, name, False)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_instance_connections_dir(tmp_path_factory: pytest.TempPathFactory):
+    """Give each pytest worker its own instance SSH connection directory."""
+    connections_dir = tmp_path_factory.mktemp("instance-connections")
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(runner_pool, "CONNECTIONS_DIR", connections_dir)
+        yield

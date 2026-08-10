@@ -36,6 +36,8 @@ CONNECTIONS_DIR = SERVER_DIR_PATH / "instance-connections"
 MIN_ALIVE_CHECK_INTERVAL = 30
 """How often (at most) `InstanceConnection.is_alive()` runs `ssh -O check`, in seconds."""
 
+_CONN_DIR_CREATE_ATTEMPTS = 3
+
 
 @dataclass(frozen=True)
 class InstanceConnectionKey:
@@ -299,6 +301,22 @@ class InstanceConnection:
         return port_map
 
     @staticmethod
+    def _create_conn_dir(conn_dir: Path) -> None:
+        for attempt in range(_CONN_DIR_CREATE_ATTEMPTS):
+            try:
+                conn_dir.mkdir(parents=True, exist_ok=True)
+                return
+            except FileExistsError:
+                # Even with exist_ok=True, pathlib raises if the directory disappears
+                # between mkdir reporting EEXIST and pathlib checking that it is a directory.
+                if conn_dir.is_dir():
+                    return
+                if conn_dir.exists() or conn_dir.is_symlink():
+                    raise
+                if attempt == _CONN_DIR_CREATE_ATTEMPTS - 1:
+                    raise
+
+    @staticmethod
     def _resolve_conn_dir(
         key: InstanceConnectionKey, ephemeral: bool
     ) -> tuple[TemporaryDirectory, Path, Path]:
@@ -314,7 +332,7 @@ class InstanceConnection:
             CONNECTIONS_DIR
             / f"{key.hostname}:{key.port},{','.join(map(str, key.ports_to_forward))}"
         )
-        conn_dir.mkdir(parents=True, exist_ok=True)
+        InstanceConnection._create_conn_dir(conn_dir)
         # Connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink.
         # The symlink may be removed by age-based /tmp cleanup while the connection is still alive.
