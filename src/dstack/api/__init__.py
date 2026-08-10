@@ -23,7 +23,7 @@ from dstack._internal.core.models.services import OpenAIChatModel, TGIChatModel
 from dstack._internal.core.services.ssh.ports import PortUsedError
 from dstack.api._public import BackendCollection, Client, RepoCollection, RunCollection
 from dstack.api._public.backends import Backend
-from dstack.api._public.runs import Run, RunStatus
+from dstack.api._public.runs import Run, RunDirectConnection, RunStatus
 
 Service = _ServiceConfiguration
 Task = _TaskConfiguration

@@ -360,6 +360,7 @@ nav:
               - dstack ps: docs/reference/cli/dstack/ps.md
               - dstack stop: docs/reference/cli/dstack/stop.md
               - dstack attach: docs/reference/cli/dstack/attach.md
+              - dstack connect: docs/reference/cli/dstack/connect.md
               - dstack login: docs/reference/cli/dstack/login.md
               - dstack logs: docs/reference/cli/dstack/logs.md
               - dstack metrics: docs/reference/cli/dstack/metrics.md

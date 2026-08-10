@@ -7,6 +7,7 @@ from rich_argparse import RichHelpFormatter
 from dstack._internal.cli.commands.apply import ApplyCommand
 from dstack._internal.cli.commands.attach import AttachCommand
 from dstack._internal.cli.commands.completion import CompletionCommand
+from dstack._internal.cli.commands.connect import ConnectCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.event import EventCommand
 from dstack._internal.cli.commands.export import ExportCommand
@@ -67,6 +68,7 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
     ApplyCommand.register(subparsers)
     AttachCommand.register(subparsers)
+    ConnectCommand.register(subparsers)
     DeleteCommand.register(subparsers)
     EventCommand.register(subparsers)
     ExportCommand.register(subparsers)

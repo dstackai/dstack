@@ -372,7 +372,19 @@ This lets you:
 - Reach runs on SSH fleets with a head node without giving users the head node's SSH key.
 - Let users connect to runs without `dstack attach`. This requires uploading their public SSH key(s) to the `dstack` server.
 
-<!-- TODO: once connecting through the proxy without `dstack attach` is exposed in the UI/CLI, document the steps in this section. -->
+After the proxy is deployed and configured, the owner of a running dev
+environment can open a direct SSH or IDE session without keeping `dstack
+attach` running:
+
+```shell
+dstack connect &lt;run name&gt;
+dstack connect --ide &lt;run name&gt;
+```
+
+The command uses the current user's built-in SSH key and fails if the server
+does not return a valid proxy connection. It does not forward ports or stream
+logs. See the [`dstack connect` reference](../reference/cli/dstack/connect.md)
+for the supported IDEs and security checks.
 
 ### Deployment
 

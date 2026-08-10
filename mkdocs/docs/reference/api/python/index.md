@@ -128,6 +128,14 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
+### `dstack.api.RunDirectConnection` { #dstack.api.RunDirectConnection data-toc-label="RunDirectConnection" }
+
+::: dstack.api.RunDirectConnection
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
 ### `dstack.api.Resources` { #dstack.api.Resources data-toc-label="Resources" }
 
 #SCHEMA# dstack.api.Resources

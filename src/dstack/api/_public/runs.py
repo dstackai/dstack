@@ -1,5 +1,8 @@
 import base64
+import hashlib
+import ipaddress
 import queue
+import re
 import tempfile
 import threading
 import time
@@ -7,10 +10,11 @@ from abc import ABC
 from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import copy
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, Dict, Iterable, List, Optional, Union
-from urllib.parse import urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 from websocket import WebSocketApp
 
@@ -32,6 +36,7 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.runs import (
     Job,
+    JobConnectionInfo,
     JobSpec,
     JobStatus,
     RunPlan,
@@ -49,10 +54,49 @@ from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
 from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.path import FilePath, PathLike
+from dstack._internal.utils.ssh import (
+    build_ssh_command,
+    build_ssh_url_authority,
+    include_ssh_config,
+    update_ssh_config,
+)
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class RunDirectConnection:
+    """A validated, proxy-only connection to a running dev environment.
+
+    The command values are argument vectors and are safe to pass directly to
+    :mod:`subprocess` without invoking a shell. The local SSH alias is refreshed
+    for every resolution, so a retried job uses the current proxy upstream ID.
+    """
+
+    run_name: str
+    replica_num: int
+    job_num: int
+    upstream_id: str
+    sshproxy_hostname: str
+    sshproxy_port: int
+    ssh_alias: str
+    ssh_command: tuple[str, ...]
+    ide: Optional[str]
+    ide_name: Optional[str]
+    ide_command: Optional[tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class ValidatedDirectConnectionInfo:
+    """Server-provided direct connection data validated without local side effects."""
+
+    hostname: str
+    port: int
+    upstream_id: str
+    ide_name: Optional[str]
+    ide_command: Optional[tuple[str, ...]]
 
 
 class Run(ABC):
@@ -408,6 +452,99 @@ class Run(ABC):
 
         return True
 
+    def get_direct_connection(
+        self,
+        replica_num: Optional[int] = None,
+        job_num: int = 0,
+        expected_sshproxy_hostname: Optional[str] = None,
+        expected_sshproxy_port: Optional[int] = None,
+    ) -> RunDirectConnection:
+        """Prepare a direct SSH-proxy connection to a running dev environment.
+
+        The run is refreshed on every call. Direct connections are owner-only,
+        require a running dev environment, and never fall back to legacy host SSH.
+        The returned commands are argument vectors; callers must not join them
+        into a shell command.
+
+        Args:
+            replica_num: Replica number, or ``None`` for any running replica.
+            job_num: Job number inside the replica.
+            expected_sshproxy_hostname: Require this exact SSH proxy hostname when set.
+            expected_sshproxy_port: Require this SSH proxy port. Defaults to 22 when an expected
+                hostname is set.
+
+        Returns:
+            A validated connection with SSH and, when configured, IDE commands.
+
+        Raises:
+            dstack.api.ClientError: If the run cannot be connected to safely.
+        """
+        self.refresh()
+        if self.status != RunStatus.RUNNING:
+            raise ClientError(
+                f"Direct connection requires a running run; {self.name} is {self.status.value}"
+            )
+        if self._run.run_spec.configuration.type != "dev-environment":
+            raise ClientError("Direct connection is only supported for dev environments")
+
+        current_user = self._api_client.users.get_my_user()
+        if self._run.user != current_user.username:
+            raise ClientError("Direct connection is only available to the run owner")
+
+        job = self._find_job(replica_num=replica_num, job_num=job_num)
+        if job is None or not job.job_submissions:
+            replica_repr = replica_num if replica_num is not None else "<any running>"
+            raise ClientError(f"Failed to find running replica={replica_repr} job={job_num}")
+        if job.job_submissions[-1].status != JobStatus.RUNNING:
+            replica_repr = replica_num if replica_num is not None else "<any running>"
+            raise ClientError(f"Failed to find running replica={replica_repr} job={job_num}")
+
+        ssh_alias = _get_direct_connection_alias(
+            server_url=self._api_client.base_url,
+            project=self._project,
+            token_hash=self._api_client.get_token_hash(),
+            run_name=self.name,
+        )
+        ide = getattr(self._run.run_spec.configuration, "ide", None)
+        validated = validate_direct_connection_info(
+            job=job,
+            ssh_alias=ssh_alias,
+            ide=ide,
+            expected_sshproxy_hostname=expected_sshproxy_hostname,
+            expected_sshproxy_port=expected_sshproxy_port,
+        )
+
+        # Do not modify local SSH state until all server-provided connection
+        # fields, including the optional IDE URL, have been validated.
+        config_manager = ConfigManager()
+        user_key = UserSSHKeyManager(
+            self._api_client, config_manager.dstack_ssh_dir
+        ).get_user_key()
+        include_ssh_config(config_manager.dstack_ssh_config_path)
+        update_ssh_config(
+            config_manager.dstack_ssh_config_path,
+            ssh_alias,
+            {
+                "HostName": validated.hostname,
+                "Port": validated.port,
+                "IdentityFile": FilePath(user_key.private_key_path),
+                "IdentitiesOnly": "yes",
+            },
+        )
+        return RunDirectConnection(
+            run_name=self.name,
+            replica_num=job.job_spec.replica_num,
+            job_num=job.job_spec.job_num,
+            upstream_id=validated.upstream_id,
+            sshproxy_hostname=validated.hostname,
+            sshproxy_port=validated.port,
+            ssh_alias=ssh_alias,
+            ssh_command=("ssh", f"{validated.upstream_id}@{ssh_alias}"),
+            ide=ide,
+            ide_name=validated.ide_name,
+            ide_command=validated.ide_command,
+        )
+
     def detach(self):
         """
         Stop the SSH tunnel to the instance and update SSH config
@@ -744,6 +881,162 @@ def _reserve_ports(
         ports[port_override.container_port] = port_override.local_port or 0
     logger.debug("Reserving ports: %s", ports)
     return PortsLock(ports).acquire()
+
+
+_HOSTNAME_RE = re.compile(
+    r"(?=.{1,253}\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?"
+)
+
+
+def _validate_sshproxy_hostname(hostname: Optional[str]) -> str:
+    if hostname is None or "%" in hostname:
+        raise ClientError("The server returned an invalid SSH proxy hostname")
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        if _HOSTNAME_RE.fullmatch(hostname) is None:
+            raise ClientError("The server returned an invalid SSH proxy hostname")
+    return hostname
+
+
+def _validate_sshproxy_port(port: Optional[int]) -> int:
+    if port is None:
+        return 22
+    if isinstance(port, bool) or not 1 <= port <= 65535:
+        raise ClientError("The server returned an invalid SSH proxy port")
+    return port
+
+
+def _validate_sshproxy_upstream_id(upstream_id: Optional[str]) -> str:
+    # The server contract deliberately treats this value as an extensible string.
+    # Keep the accepted subset safe for both OpenSSH's `user@host` syntax and URL userinfo.
+    if (
+        upstream_id is None
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", upstream_id) is None
+    ):
+        raise ClientError("The server returned an invalid SSH proxy upstream ID")
+    return upstream_id
+
+
+def _get_direct_connection_alias(
+    *, server_url: str, project: str, token_hash: str, run_name: str
+) -> str:
+    target = f"{server_url}\0{project}\0{token_hash}\0{run_name}".encode()
+    digest = hashlib.sha256(target).hexdigest()[:24]
+    return f"dstack-direct-{digest}"
+
+
+def validate_direct_connection_info(
+    *,
+    job: Job,
+    ssh_alias: str,
+    ide: Optional[str],
+    expected_sshproxy_hostname: Optional[str] = None,
+    expected_sshproxy_port: Optional[int] = None,
+) -> ValidatedDirectConnectionInfo:
+    """Validate direct connection metadata without API calls or local state changes."""
+    if not job.job_submissions or job.job_submissions[-1].status != JobStatus.RUNNING:
+        raise ClientError("Direct connection requires a running job")
+    connection_info = job.job_connection_info
+    if connection_info is None:
+        raise ClientError("The server did not provide SSH proxy connection information")
+    hostname = _validate_sshproxy_hostname(connection_info.sshproxy_hostname)
+    port = _validate_sshproxy_port(connection_info.sshproxy_port)
+    if expected_sshproxy_hostname is None and expected_sshproxy_port is not None:
+        raise ClientError("An expected SSH proxy port requires an expected hostname")
+    if expected_sshproxy_hostname is not None:
+        expected_hostname = _validate_sshproxy_hostname(expected_sshproxy_hostname)
+        expected_port = _validate_sshproxy_port(expected_sshproxy_port)
+        if hostname != expected_hostname or port != expected_port:
+            raise ClientError("The run SSH proxy does not match the expected endpoint")
+    upstream_id = _validate_sshproxy_upstream_id(connection_info.sshproxy_upstream_id)
+    expected_proxy_command = build_ssh_command(
+        username=upstream_id,
+        hostname=hostname,
+        port=connection_info.sshproxy_port,
+    )
+    if connection_info.proxied_ssh_command != expected_proxy_command:
+        raise ClientError("The server returned inconsistent SSH proxy connection information")
+    ide_name, ide_command = _get_ide_connection(
+        job=job,
+        connection_info=connection_info,
+        hostname=hostname,
+        port=connection_info.sshproxy_port,
+        upstream_id=upstream_id,
+        ssh_alias=ssh_alias,
+        ide=ide,
+    )
+    return ValidatedDirectConnectionInfo(
+        hostname=hostname,
+        port=port,
+        upstream_id=upstream_id,
+        ide_name=ide_name,
+        ide_command=ide_command,
+    )
+
+
+_IDE_NAMES = {
+    "vscode": "VS Code",
+    "cursor": "Cursor",
+    "windsurf": "Windsurf",
+    "zed": "Zed",
+}
+
+_IDE_EXECUTABLES = {
+    "vscode": "code",
+    "cursor": "cursor",
+    "windsurf": "windsurf",
+    "zed": "zed",
+}
+
+
+def _get_ide_connection(
+    *,
+    job: Job,
+    connection_info: JobConnectionInfo,
+    hostname: str,
+    port: Optional[int],
+    upstream_id: str,
+    ssh_alias: str,
+    ide: Optional[str],
+) -> tuple[Optional[str], Optional[tuple[str, ...]]]:
+    if ide is None:
+        if connection_info.ide_name is not None or connection_info.proxied_ide_url is not None:
+            raise ClientError("The server returned unexpected IDE connection information")
+        return None, None
+    ide_name = _IDE_NAMES.get(ide)
+    executable = _IDE_EXECUTABLES.get(ide)
+    if ide_name is None or executable is None:
+        raise ClientError(f"Direct connection does not support the configured IDE: {ide}")
+
+    submission = job.job_submissions[-1]
+    runtime_data = submission.job_runtime_data
+    if runtime_data is None or runtime_data.working_dir is None:
+        raise ClientError("The server did not provide the dev environment working directory")
+    working_dir = runtime_data.working_dir
+    if not working_dir.startswith("/") or any(c in working_dir for c in ("\0", "\r", "\n")):
+        raise ClientError("The server returned an invalid dev environment working directory")
+    authority = build_ssh_url_authority(
+        username=upstream_id,
+        hostname=hostname,
+        port=port,
+    )
+    if ide == "zed":
+        expected_url = f"zed://ssh/{authority}{working_dir}"
+    else:
+        expected_url = f"{ide}://vscode-remote/ssh-remote+{authority}{working_dir}"
+    if connection_info.ide_name != ide_name or connection_info.proxied_ide_url != expected_url:
+        raise ClientError(f"The server returned inconsistent {ide_name} connection information")
+
+    # Keep the dynamic upstream ID in the local URL so a retried job cannot
+    # reuse a stale remote session keyed only by the stable SSH host alias.
+    encoded_working_dir = quote(working_dir, safe="/~:@-._")
+    alias_authority = build_ssh_url_authority(username=upstream_id, hostname=ssh_alias)
+    if ide == "zed":
+        return ide_name, (executable, f"ssh://{alias_authority}{encoded_working_dir}")
+    folder_uri = f"vscode-remote://ssh-remote+{alias_authority}{encoded_working_dir}"
+    return ide_name, (executable, "--folder-uri", folder_uri)
 
 
 @contextmanager

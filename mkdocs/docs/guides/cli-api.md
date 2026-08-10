@@ -215,6 +215,33 @@ $ dstack attach &lt;run name&gt;
 Use `--job JOB_NUMBER` with `dstack attach` to attach to another job. Ports
 declared in the run configuration are forwarded while attached.
 
+### Connect without attaching
+
+When the server has the [SSH proxy](server-deployment.md#ssh-proxy) enabled,
+the owner of a running dev environment can connect without keeping an attach
+process running:
+
+<div class="termy">
+
+```shell
+$ dstack connect &lt;run name&gt;
+```
+
+</div>
+
+Interactive SSH is the default. Use `--ide` to open the IDE configured by the
+dev environment, or `--vscode`, `--cursor`, `--windsurf`, or `--zed` to require
+a specific configured IDE.
+
+`dstack connect` refreshes the run, validates the complete proxy connection
+record, and updates a local SSH alias using the current user's built-in key. It
+does not fall back to direct host SSH. Use `--expect-sshproxy HOST[:PORT]` to
+require a particular proxy endpoint.
+
+Unlike `dstack attach`, this command does not forward ports or stream logs. See
+the [`dstack connect` reference](../reference/cli/dstack/connect.md) for the
+connection and validation details.
+
 ??? info "User SSH keys"
     The server stores a built-in SSH key pair for each user.
 
@@ -269,7 +296,6 @@ available in the CLI or for integrations that need to call the server directly.
 Out of scope for this guide:
 - Git repo workflows
 - File upload workflows
-- Direct SSH/sshproxy workflows
 - Backward compatibility between older clients and servers
 -->
 
