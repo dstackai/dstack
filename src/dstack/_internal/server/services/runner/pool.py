@@ -32,7 +32,7 @@ MIN_ALIVE_CHECK_INTERVAL = 30
 """How often (at most) `InstanceConnection.is_alive()` runs `ssh -O check`, in seconds."""
 
 
-def get_connections_dir() -> Path:
+def _get_connections_dir() -> Path:
     return settings.SERVER_DIR_PATH / "instance-connections"
 
 
@@ -141,7 +141,7 @@ class InstanceConnectionPool:
         Must be called on server startup before the pool is used.
         Leftover live masters are reaped by `ControlPersist`.
         """
-        shutil.rmtree(get_connections_dir(), ignore_errors=True)
+        shutil.rmtree(_get_connections_dir(), ignore_errors=True)
 
     def close_all(self) -> None:
         """
@@ -310,7 +310,7 @@ class InstanceConnection:
             return temp_dir, path, path
 
         conn_dir = (
-            get_connections_dir()
+            _get_connections_dir()
             / f"{key.hostname}:{key.port},{','.join(map(str, key.ports_to_forward))}"
         )
         conn_dir.mkdir(parents=True, exist_ok=True)

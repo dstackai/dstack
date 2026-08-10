@@ -26,7 +26,7 @@ from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 logger = get_logger(__name__)
 
 
-def get_connections_dir() -> Path:
+def _get_connections_dir() -> Path:
     return settings.SERVER_DIR_PATH / "gateway-connections"
 
 
@@ -46,7 +46,7 @@ class GatewayConnection:
         self.server_port = server_port
         # a persistent connection_dir is needed to discover and close leftover connections
         # in case of server restarts w/o graceful shutdown
-        self.connection_dir = get_connections_dir() / ip_address
+        self.connection_dir = _get_connections_dir() / ip_address
         # connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink
         self.temp_dir, self.connection_symlink_dir = make_tmp_symlink_to_dir(
