@@ -2900,7 +2900,8 @@ class TestLoadSubmittedJobContext:
                     name="small",
                     nodes=1,
                     resources=ResourcesSpec(
-                        cpu=Range[int](min=2), memory=Range[Memory](min=Memory(4))
+                        cpu=CPUSpec(count=Range[int](min=2)),
+                        memory=Range[Memory](min=Memory(4)),
                     ),
                     commands=["echo small"],
                 ),
@@ -2908,7 +2909,8 @@ class TestLoadSubmittedJobContext:
                     name="large",
                     nodes=2,
                     resources=ResourcesSpec(
-                        cpu=Range[int](min=4), memory=Range[Memory](min=Memory(8))
+                        cpu=CPUSpec(count=Range[int](min=4)),
+                        memory=Range[Memory](min=Memory(8)),
                     ),
                     commands=["echo large"],
                 ),
