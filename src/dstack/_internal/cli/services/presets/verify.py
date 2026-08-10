@@ -65,11 +65,37 @@ def load_preset_agent_report(
     return report
 
 
+def _rewrite_workspace_file_paths(
+    service: ServiceConfiguration, *, workspace_path: Path, session_path: Path
+) -> None:
+    """Re-roots `files` local paths onto the session's mirrored record copies.
+    At submission they were resolved into the agent workspace, which is deleted
+    when the session ends; only `trials/` and `service/` are mirrored, so a
+    path outside them cannot outlive the workspace and fails the save."""
+    workspace_root = workspace_path.resolve()
+    for mapping in service.files:
+        try:
+            relative = Path(mapping.local_path).resolve().relative_to(workspace_root)
+        except ValueError:
+            raise CLIError(
+                f"Claude final service file '{mapping.local_path}' is outside the agent workspace"
+            )
+        target = session_path / relative
+        if relative.parts[:1] not in (("trials",), ("service",)) or not target.exists():
+            raise CLIError(
+                f"Claude final service file '{mapping.local_path}' has no mirrored copy"
+                f" at '{target}'"
+            )
+        mapping.local_path = str(target)
+
+
 def build_verified_preset(
     *,
     run: Run,
     preset_configuration: PresetConfiguration,
     report: AgentFinalReport,
+    workspace_path: Optional[Path] = None,
+    session_path: Optional[Path] = None,
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
 ) -> Preset:
@@ -91,11 +117,6 @@ def build_verified_preset(
             raise CLIError("Claude final report base does not match the requested model")
     elif report.model != preset_configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
-    if (
-        preset_configuration.min_context_length is not None
-        and report.context_length < preset_configuration.min_context_length
-    ):
-        raise CLIError("Claude final service does not meet the requested context length")
 
     target_type = (
         "gateway" if urlparse(run.service.url).scheme in {"http", "https"} else "server-proxy"
@@ -111,6 +132,12 @@ def build_verified_preset(
     for key, value in preset_configuration.env.items():
         if isinstance(value, EnvSentinel) and key in portable_service.env:
             portable_service.env[key] = value
+    if portable_service.files:
+        if workspace_path is None or session_path is None:
+            raise CLIError("Claude final service uses files but no workspace is attached")
+        _rewrite_workspace_file_paths(
+            portable_service, workspace_path=workspace_path, session_path=session_path
+        )
     return build_preset(
         name=name,
         service=portable_service,
@@ -119,6 +146,9 @@ def build_verified_preset(
         model=report.model,
         context_length=report.context_length,
         benchmark=benchmark,
+        trial=report.trial,
+        min_context_length=preset_configuration.min_context_length,
+        max_ttft=preset_configuration.max_ttft,
         preset_id=preset_id,
     )
 

@@ -18,7 +18,7 @@ headroom: while the gap is large, assume a better configuration exists.
 # Constraints
 
 `constraints.json` in the workspace root contains the effective constraints
-for this session. No submitted run or final service may conflict with them.
+for this session.
 
 Field semantics:
 
@@ -53,14 +53,13 @@ concurrencies instead of one.-->
 During the trials and experimentation aimed at the best performance, you may
 pick the hardware (the best available within the allowed `dstack` fleets),
 the model variant (only if `model` has `base`), the serving framework, the
-Docker image and dependencies, the serving framework parameters, and
-anything else within these constraints — except generating custom kernels,
-patching drivers, patching serving framework source code, or P/D
-disaggregation setups<!--?prompt:,
+Docker image and dependencies, the serving framework parameters, patch the
+serving framework source code, generate custom kernels, and patch drivers.
+
+Do not use P/D disaggregation setups<!--?prompt:,
 unless `## Additional instructions` explicitly allows it-->.
-<!--!TODO: allow more here — patching the serving framework and keeping the
-patch, custom kernels, multi-node, and P/D disaggregation once tasks support
-node groups.-->
+<!--!TODO: allow P/D disaggregation and multi-node once tasks support node
+groups.-->
 
 <!--?prompt:## Additional instructions
 
@@ -207,23 +206,29 @@ trial is complete: better performance was achieved, or the ideas within this
 trial are exhausted.
 
 Once a trial is completed, compile the interactive commands that produced
-the final performance into a complete `dstack` task configuration with exact
-commands, and write it to `trials/<n>/task.dstack.yml` (do not create this
-file until the trial is completed). Its `name` is the
-run name of the trial's task, and its `commands` are the exact final
-commands that led to the benchmark results — the commands that are supposed
-to replicate the benchmark results exactly when `trials/<n>/task.dstack.yml`
-is applied (not `sleep infinity`). Then write the corresponding benchmark
-results (see `## Benchmark` for the structure) to `trials/<n>/trial.json`,
-always after
-`trials/<n>/task.dstack.yml`: the presence of `trials/<n>/trial.json` is
-what marks trial `<n>` completed. The benchmark may be skipped in one case
-only: you failed to make the configuration run at all — a failed trial. A
-trial is also failed when its benchmark does not meet the constraints (see
-`# Constraints`). For a trial that failed to run,
-`trials/<n>/task.dstack.yml` is the configuration that failed. When a
-trial that changed several things fails, be mindful of which specific
-change was the root cause.
+the final performance into a complete `dstack` task configuration with
+exact commands, and write it to `trials/<n>/task.dstack.yml` (do not
+create this file until the trial is completed). Its `name` is the run name
+of the trial's task, and its `commands` are the exact final commands that
+led to the benchmark results — the commands that are supposed to replicate
+the benchmark results exactly when `trials/<n>/task.dstack.yml` is applied
+(not `sleep infinity`). If the trial required patching the serving
+framework source code, generating custom kernels, or patching drivers,
+make sure to include the required exact patches into
+`trials/<n>/task.dstack.yml` via `files` (see `## Patching Framework`).
+<!--!TODO: require `.dstack.yml` to use specific versions/snapshots of
+Docker images and other dependencies.-->
+
+Once `trials/<n>/task.dstack.yml` is written, write the corresponding
+benchmark results (see `## Benchmark` for the structure) to
+`trials/<n>/trial.json`: the presence of `trials/<n>/trial.json` is what
+marks trial `<n>` completed. The benchmark
+may be skipped in one case only: you failed to make the configuration run
+at all — a failed trial. `trials/<n>/task.dstack.yml` may be skipped in
+one case only: you failed to get benchmark results at all. A trial is
+also failed when its benchmark does not meet the constraints (see
+`# Constraints`). When a trial that changed several things fails, be
+mindful of which specific change was the root cause.
 
 `trials/<n>/trial.json` is one JSON object with these fields and no others:
 
@@ -332,6 +337,40 @@ field of `trials/<n>/trial.json`; for the final benchmark, as
 enough.
 
 
+## Patching Framework
+
+If the trial required patching the serving framework source code,
+generating custom kernels, or patching drivers (see `# Constraints`),
+when you save `trials/<n>/task.dstack.yml`, you must replicate these
+exact patches.
+
+To do this, you must save the required patches in the
+`trials/<n>/patches` directory (next to `trials/<n>/task.dstack.yml`),
+and refer to them from `trials/<n>/task.dstack.yml` in the `files`
+property. This will mount them inside the container.
+
+A patch is a unified diff against the file it changes.
+
+Example:
+
+```yaml
+files:
+  - patches/vllm/model_executor/layers/fused_moe/fused_moe.py.patch:/patches/vllm/model_executor/layers/fused_moe/fused_moe.py.patch
+```
+
+Then, patches can be applied with `patch` (exactly when needed) from the
+`commands`.
+
+Make sure to include only the patches that are required, and avoid
+including unnecessary ones.
+
+This "patching framework" will allow you to replicate the fixes made
+during the interactive SSH session via `trials/<n>/task.dstack.yml`.
+
+And, since writing `trials/<n>/task.dstack.yml` is done after the
+interactive trial is completed, it's especially important to review that
+patches are correct (and will exactly replicate the result).
+
 # Task Usage
 
 Trials are done entirely using `dstack` tasks. For maximum efficiency, it is a
@@ -375,7 +414,9 @@ SSH fleets can be treated as VM-based backends as they support both idle instanc
 # Final Service
 
 Once the trials are over, pick the best trial that has not been verified yet
-and submit its configuration as a `dstack` service. Make it work with only
+and submit its configuration as a `dstack` service. If there is no remaining
+non-failed trial, pick the best failed trial that has a benchmark and has not
+been verified yet. Make it work with only
 minor tweaks if needed; do not change the important decisions made during
 the trial. Set the service `model` name to the client-facing model name from
 `constraints.json` (see `# Constraints`). `model` is required: it also enables
@@ -387,6 +428,10 @@ Record every attempt in its own directory `service/<k>/`, where `<k>` is
 the attempt number: attempts are numbered from 1 in the order they are
 submitted. Immediately after submitting the service, create `service/<k>/`
 and write the submitted service YAML to `service/<k>/service.dstack.yml`.
+If the service is based on a trial that required patches (see
+`## Patching Framework`), save the required patches in
+`service/<k>/patches` and refer to them from
+`service/<k>/service.dstack.yml` in the `files` property.
 When the attempt ends, write `service/<k>/verification.json`, one JSON
 object with these fields and no others (values are illustrative):
 
@@ -449,15 +494,17 @@ references in `final_report.json.service_yaml`; use environment variable names o
 # Final Report
 
 `final_report.json` may contain only `success`, `run_id`, `run_name`,
-`service_yaml`, `base`, `model`, `context_length`, `benchmark`, and
-`failure_summary`.
+`service_yaml`, `trial`, `base`, `model`, `context_length`, `benchmark`,
+and `failure_summary`.
 
-On success, include exactly:
+On success (even if you had to pick a failed trial because no non-failed
+trial remained), include exactly:
 
 - `success`: `true`
 - `run_id`: the final verified service run ID
 - `run_name`: the final verified service run name
 - `service_yaml`: the full YAML of the verified final service
+- `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
 - `context_length`: the largest context verified for the final service, as
@@ -474,7 +521,7 @@ Set `final_report.json.base` as follows:
   to `model.repo`.
 - Do not infer `final_report.json.base` only from the repo name.
 
-On failure, include exactly:
+On failure (no trial verification was successful), include exactly:
 
 - `success`: `false`
 - `failure_summary`: the reason a preset could not be created and any change

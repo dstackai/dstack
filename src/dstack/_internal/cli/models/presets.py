@@ -132,6 +132,14 @@ class Preset(CoreModel):
     """Exact repo/path loaded by the service command."""
     context_length: PositiveInt
     """Token context length this preset was verified to support."""
+    trial: Optional[PositiveInt] = None
+    """Trial this preset was promoted from, within its creation session."""
+    min_context_length: Optional[PositiveInt] = None
+    """Context length asked for at creation. `context_length` may be below it: a
+    session that found no compliant trial verifies its best failed one."""
+    max_ttft: Optional[PositiveInt] = None
+    """Maximum p50 TTFT asked for at creation, in ms. The benchmark may exceed it,
+    for the same reason."""
     created_at: datetime
     service: ServiceConfiguration
     validations: list[PresetValidation]

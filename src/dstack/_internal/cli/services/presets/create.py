@@ -607,6 +607,8 @@ async def _create_preset(
             run=run,
             preset_configuration=source_configuration,
             report=report,
+            workspace_path=setup.workspace.path,
+            session_path=agent_session.path,
             preset_id=agent_session.preset_id or None,
             name=claimed_session_name(agent_session.read_manifest()),
         )

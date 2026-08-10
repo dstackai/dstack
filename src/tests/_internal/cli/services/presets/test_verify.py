@@ -18,6 +18,7 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.profiles import ProfileParams
 from tests._internal.cli.preset_factories import (
     get_running_service_run,
@@ -70,6 +71,74 @@ class TestBuildVerifiedPreset:
         assert validation.replicas[0].resources[0].gpu.name == ["A6000"]
         assert validation.benchmark.target.type == "server-proxy"
         assert validation.benchmark.client.type == "local"
+
+    def test_rewrites_file_paths_onto_the_mirrored_session_copies(self, tmp_path):
+        # `files` local paths resolve into the agent workspace at submission, and
+        # the workspace is deleted when the session ends; the preset must point at
+        # the session's mirrored copies or it cannot be applied later.
+        workspace = tmp_path / "session" / "workspace" / "w"
+        (workspace / "service" / "1" / "patches").mkdir(parents=True)
+        (workspace / "service" / "1" / "patches" / "moe.py.patch").write_text("--- a\n+++ b\n")
+        session = tmp_path / "session"
+        (session / "service" / "1" / "patches").mkdir(parents=True)
+        (session / "service" / "1" / "patches" / "moe.py.patch").write_text("--- a\n+++ b\n")
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(
+                local_path=str(workspace / "service" / "1" / "patches"), path="/patches"
+            )
+        ]
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=PresetConfiguration(
+                name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+            ),
+            report=get_successful_preset_report(run),
+            workspace_path=workspace,
+            session_path=session,
+        )
+
+        assert preset.service.files[0].local_path == str(session / "service" / "1" / "patches")
+        # The run spec itself is untouched: only the preset copy is re-rooted.
+        assert run.run_spec.configuration.files[0].local_path == str(
+            workspace / "service" / "1" / "patches"
+        )
+
+    def test_rejects_a_file_without_a_mirrored_copy(self, tmp_path):
+        workspace = tmp_path / "session" / "workspace" / "w"
+        (workspace / "patches").mkdir(parents=True)  # workspace root: not mirrored
+        session = tmp_path / "session"
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(local_path=str(workspace / "patches"), path="/patches")
+        ]
+
+        with pytest.raises(CLIError, match="no mirrored copy"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+                ),
+                report=get_successful_preset_report(run),
+                workspace_path=workspace,
+                session_path=session,
+            )
+
+    def test_rejects_files_when_no_workspace_is_attached(self, tmp_path):
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(local_path=str(tmp_path / "patches"), path="/patches")
+        ]
+
+        with pytest.raises(CLIError, match="no workspace is attached"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+                ),
+                report=get_successful_preset_report(run),
+            )
 
     def test_rejects_variant_for_exact_model_request(self):
         run = get_running_service_run()

@@ -11,6 +11,7 @@ from dstack._internal.cli.services.presets.output import (
     format_preset_objective,
 )
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
@@ -54,15 +55,19 @@ def apply_preset(
 
 
 def _validate_preset_matches(preset: Preset, *, configuration: PresetConfiguration) -> None:
-    """The referenced preset must serve what the configuration asks for."""
+    """The referenced preset must serve the model the configuration asks for.
+    A context length below the requested one warns instead of failing: the
+    preset is explicitly chosen by ID, and it may be the best a session could
+    verify (see `Preset.min_context_length`); the plan confirmation decides."""
     model_name = configuration.model.api_model_name
     service_model = preset.service.model
     if service_model is None or service_model.name.lower() != model_name.lower():
         raise CLIError(f"Preset {preset.id} does not serve {model_name}")
     if configuration.min_context_length is not None:
         if preset.context_length < configuration.min_context_length:
-            raise CLIError(
-                f"Preset {preset.id} does not support context length"
+            warn(
+                f"Preset {preset.id} is verified for context length"
+                f" {preset.context_length}, below the requested"
                 f" {configuration.min_context_length}"
             )
     if configuration.model.allows_variant_selection:
