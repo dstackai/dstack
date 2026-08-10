@@ -95,8 +95,6 @@ def run_migrations(connection: Connection):
 
 
 async def run_async_migrations():
-    # Alembic is also invoked directly (see contributing/MIGRATIONS.md), without the server
-    # startup that would otherwise create the dir the default SQLite database lives in.
     init_server_data_dir()
     engine = get_db().engine
     async with engine.connect() as connection:
