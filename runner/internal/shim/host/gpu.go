@@ -49,7 +49,7 @@ type GpuInfo struct {
 }
 
 func GetGpuInfo(ctx context.Context) []GpuInfo {
-	switch gpuVendor := gpu.GetGpuVendor(); gpuVendor {
+	switch gpuVendor := gpu.GetGpuVendor(ctx); gpuVendor {
 	case gpu.GpuVendorNvidia:
 		return getNvidiaGpuInfo(ctx)
 	case gpu.GpuVendorAmd:
