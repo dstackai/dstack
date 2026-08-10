@@ -1,6 +1,8 @@
 import string
 from collections.abc import Mapping
-from typing import Iterable, List, Literal, Optional, Tuple, Union, overload
+from typing import Callable, Iterable, List, Literal, Optional, Tuple, Union, overload
+
+NameValidator = Callable[[str], bool]
 
 
 class Pattern:
@@ -24,11 +26,26 @@ class InterpolatorError(ValueError):
     pass
 
 
+def namespace_root(name: str) -> str:
+    """Return the namespace of a ref name, e.g. groups[0].nodes[0].IP_ADDRESS -> groups."""
+    return name.split(".")[0].split("[")[0]
+
+
 class VariablesInterpolator:
     def __init__(
-        self, namespaces: Mapping[str, Mapping[str, str]], *, skip: Optional[Iterable[str]] = None
+        self,
+        namespaces: Mapping[str, Mapping[str, str]],
+        *,
+        skip: Optional[Union[Iterable[str], Mapping[str, NameValidator]]] = None,
     ):
-        self.skip = set(skip) if skip is not None else set()
+        # Iterable[str] keeps old callers working and uses validate_name.
+        # Mapping[str, validator] lets callers plug feature-specific rules.
+        if skip is None:
+            self.skip_validators: dict[str, NameValidator] = {}
+        elif isinstance(skip, Mapping):
+            self.skip_validators = dict(skip)
+        else:
+            self.skip_validators = {ns: self.validate_name for ns in skip}
         self.variables = {f"{ns}.{k}": v for ns in namespaces for k, v in namespaces[ns].items()}
 
     @overload
@@ -63,12 +80,12 @@ class VariablesInterpolator:
                 raise InterpolatorError(f"No pattern closing: {s[opening:]}")
 
             name = s[opening + len(Pattern.opening) : closing].strip()
-            # Skip before validate_name so non-standard refs (e.g. groups[0].nodes[0].IP_ADDRESS)
-            # can be left for later interpolators. Invalid skipped names without brackets
-            # (e.g. secrets.pass-word) still raise.
-            root = name.split(".")[0]
-            skip_ns = root.split("[")[0]
-            if skip_ns in self.skip and ("[" in root or self.validate_name(name)):
+            # Skip before validate_name so deferred refs can be left for later
+            # interpolators. Invalid skipped names still raise.
+            skip_ns = namespace_root(name)
+            if skip_ns in self.skip_validators:
+                if not self.skip_validators[skip_ns](name):
+                    raise InterpolatorError(f"Illegal reference name: {name}")
                 tokens.append(s[opening : closing + len(Pattern.closing)])
             elif not self.validate_name(name):
                 raise InterpolatorError(f"Illegal reference name: {name}")

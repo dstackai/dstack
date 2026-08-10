@@ -1,3 +1,4 @@
+import itertools
 import math
 import uuid
 from collections.abc import Hashable, Mapping
@@ -100,8 +101,9 @@ async def get_job_plans(
     best-fleet-candidate selection and collects offers directly: global offers when no fleets
     are specified, or offers from the selected fleets when `--fleet` is used.
 
-    Services are planned per replica group. Other run types are planned once and then expanded
-    into per-job `JobPlan` results.
+    Services are planned per replica group. Tasks are planned per node group so each
+    group's requirements get their own offers (heterogeneous `groups:`). Other run types
+    are planned once and then expanded into per-job `JobPlan` results.
     """
     run_name = run_spec.run_name
     if run_spec.run_name is None:
@@ -134,18 +136,13 @@ async def get_job_plans(
         or run_spec.merged_profile.instances is not None
     )
 
-    if run_spec.configuration.type == "service":
-        replica_group_names = [g.name for g in run_spec.configuration.replica_groups]
-    else:
-        replica_group_names = [None]
+    job_batches = await _get_job_batches_for_planning(
+        run_spec=run_spec,
+        secrets=secrets,
+    )
 
-    for replica_group_name in replica_group_names:
-        jobs = await get_jobs_from_run_spec(
-            run_spec=run_spec,
-            secrets=secrets,
-            replica_num=0,
-            replica_group_name=replica_group_name,
-        )
+    for jobs in job_batches:
+        plan_job = jobs[0]
         if candidate_fleet_models is not None:
             # Regular job planning
             fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
@@ -153,7 +150,7 @@ async def get_job_plans(
                 fleet_models=candidate_fleet_models,
                 run_model=None,
                 run_spec=run_spec,
-                job=jobs[0],
+                job=plan_job,
                 master_job_provisioning_data=None,
                 volumes=volumes,
                 exclude_not_available=False,
@@ -167,7 +164,7 @@ async def get_job_plans(
                 session=session,
                 project=project,
                 run_spec=run_spec,
-                job=jobs[0],
+                job=plan_job,
                 volumes=volumes,
             )
             backend_offers = []
@@ -177,7 +174,7 @@ async def get_job_plans(
                 session=session,
                 project=project,
                 run_spec=run_spec,
-                job=jobs[0],
+                job=plan_job,
                 volumes=volumes,
                 skip_backend_offers=skip_backend_offers,
                 full_offers=full_offers,
@@ -189,7 +186,7 @@ async def get_job_plans(
                 session=session,
                 project=project,
                 run_spec=run_spec,
-                job=jobs[0],
+                job=plan_job,
                 volumes=volumes,
                 skip_backend_offers=skip_backend_offers,
                 full_offers=full_offers,
@@ -207,6 +204,43 @@ async def get_job_plans(
 
     run_spec.run_name = run_name
     return job_plans
+
+
+async def _get_job_batches_for_planning(
+    run_spec: RunSpec,
+    secrets: dict[str, str],
+) -> list[list[Job]]:
+    """Split jobs into batches that share the same offer/fleet planning pass.
+
+    Each batch is planned from its first job (group master / only job). Services
+    use one batch per replica group; tasks use one batch per node group.
+    """
+    if run_spec.configuration.type == "service":
+        batches: list[list[Job]] = []
+        for replica_group_name in [g.name for g in run_spec.configuration.replica_groups]:
+            jobs = await get_jobs_from_run_spec(
+                run_spec=run_spec,
+                secrets=secrets,
+                replica_num=0,
+                replica_group_name=replica_group_name,
+            )
+            if jobs:
+                batches.append(jobs)
+        return batches
+
+    jobs = await get_jobs_from_run_spec(
+        run_spec=run_spec,
+        secrets=secrets,
+        replica_num=0,
+    )
+    if run_spec.configuration.type != "task" or not jobs:
+        return [jobs] if jobs else []
+
+    # Jobs are emitted in node-group order; group consecutive same index.
+    return [
+        list(group_jobs)
+        for _, group_jobs in itertools.groupby(jobs, key=lambda j: j.job_spec.node_group_index)
+    ]
 
 
 async def get_run_candidate_fleet_models_filters(

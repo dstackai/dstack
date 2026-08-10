@@ -102,6 +102,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     if isinstance(run_spec.configuration, TaskConfiguration):
         if run_spec.configuration.groups is None:
             configuration_excludes["groups"] = True
+        if run_spec.configuration.nodes is None:
+            configuration_excludes["nodes"] = True
 
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.configuration.probes:

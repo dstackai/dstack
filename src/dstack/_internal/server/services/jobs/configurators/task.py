@@ -40,10 +40,8 @@ class TaskJobConfigurator(JobConfigurator):
         return job_specs
 
     def _shell_commands(self, node_group: Optional[NodeGroup] = None) -> List[str]:
-        assert self.run_spec.configuration.type == "task"
-        if node_group is not None and node_group.commands:
-            return node_group.commands
-        return self.run_spec.configuration.commands
+        assert node_group is not None
+        return node_group.commands
 
     def _default_single_branch(self) -> bool:
         return True
@@ -55,7 +53,5 @@ class TaskJobConfigurator(JobConfigurator):
         return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self, node_group: Optional[NodeGroup] = None) -> List[PortMapping]:
-        assert self.run_spec.configuration.type == "task"
-        if node_group is not None and node_group.ports:
-            return node_group.ports
-        return self.run_spec.configuration.ports
+        assert node_group is not None
+        return node_group.ports

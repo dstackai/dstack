@@ -69,6 +69,7 @@ from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
+from dstack._internal.utils.nodes_interpolator import is_valid_groups_ip_ref
 from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.runs import Run
 
@@ -696,7 +697,10 @@ class RunWithCommandsConfiguratorMixin:
         run_args = shlex.join(args.run_args)
         interpolator = VariablesInterpolator(
             {"run": {"args": run_args}},
-            skip=["secrets", "groups"],
+            skip={
+                "secrets": VariablesInterpolator.validate_name,
+                "groups": is_valid_groups_ip_ref,
+            },
         )
         try:
             for i, command in enumerate(commands):

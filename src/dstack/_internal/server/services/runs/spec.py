@@ -3,6 +3,7 @@ from dstack._internal.core.models.configurations import (
     RUN_PRIORITY_DEFAULT,
     SERVICE_HTTPS_DEFAULT,
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.models.profiles import ProfileRetry
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
@@ -18,7 +19,13 @@ from dstack._internal.server.services.resources import (
     set_gpu_vendor_default,
     set_resources_defaults,
 )
+from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.nodes_interpolator import (
+    contains_groups_ref,
+    validate_groups_ref_bounds,
+    validate_groups_refs,
+)
 
 logger = get_logger(__name__)
 
@@ -82,6 +89,7 @@ def validate_run_spec_and_set_defaults(
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     _validate_retry_duration(run_spec)
+    _validate_groups_ip_refs(run_spec)
     for mount_point in run_spec.configuration.volumes:
         if not is_valid_docker_volume_target(mount_point.path):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
@@ -125,6 +133,7 @@ def validate_run_spec_and_set_defaults(
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
     # would be fragile because the spec may be changed later (for example by plugins).
+    # Same for task `groups`: provisioning uses each group's resources; top-level is not banned.
     set_resources_defaults(run_spec.configuration.resources)
     set_gpu_vendor_default(
         run_spec.configuration.resources,
@@ -144,6 +153,39 @@ def _validate_retry_duration(run_spec: RunSpec) -> None:
     retry = run_spec.merged_profile.retry
     if isinstance(retry, ProfileRetry) and retry.duration is not None and retry.duration < 0:
         raise ServerClientError("retry.duration cannot be negative")
+
+
+def _validate_groups_ip_refs(run_spec: RunSpec) -> None:
+    """Validate groups IP refs at submit time (CLI and API).
+
+    Refs are only supported in commands. Typo'd and out-of-range refs are rejected.
+    """
+    for value in run_spec.configuration.env.values():
+        if isinstance(value, str) and contains_groups_ref(value):
+            raise ServerClientError(
+                "groups IP references are only supported in commands, not in `env`"
+            )
+    try:
+        for command in _iter_configuration_commands(run_spec.configuration):
+            validate_groups_refs(command)
+        if isinstance(run_spec.configuration, TaskConfiguration):
+            group_sizes = [g.nodes for g in run_spec.configuration.node_groups]
+            for command in _iter_configuration_commands(run_spec.configuration):
+                validate_groups_ref_bounds(command, group_sizes)
+    except InterpolatorError as e:
+        raise ServerClientError(e.args[0]) from e
+
+
+def _iter_configuration_commands(configuration: AnyRunConfiguration):
+    if isinstance(configuration, TaskConfiguration):
+        for group in configuration.node_groups:
+            yield from group.commands
+        return
+    yield from getattr(configuration, "commands", None) or []
+    yield from getattr(configuration, "init", None) or []
+    if isinstance(configuration, ServiceConfiguration):
+        for group in configuration.replica_groups:
+            yield from group.commands
 
 
 def _check_dynamo_in_place_update_compatibility(

@@ -211,9 +211,7 @@ class JobConfigurator(ABC):
                 node_group_context.group_index if node_group_context is not None else 0
             ),
             node_group_name=(
-                node_group.name
-                if node_group is not None and node_group.name is not None
-                else DEFAULT_REPLICA_GROUP_NAME
+                node_group.required_name if node_group is not None else DEFAULT_REPLICA_GROUP_NAME
             ),
             node_group_job_index=(
                 node_group_context.job_index if node_group_context is not None else 0

@@ -552,7 +552,15 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		log.Warning(ctx, "failed to include dstack_profile", "path", profilePath, "err", err)
 	}
 
-	if err := writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, ex.clusterInfo.GPUSPerNode, gpusPerNodeNum, mpiHostfilePath); err != nil {
+	slots := ex.clusterInfo.GPUSPerNode
+	if len(slots) == 0 {
+		// Old servers omit gpus_per_node; fall back to homogeneous per-node GPU count.
+		slots = make([]int, len(ex.clusterInfo.JobIPs))
+		for i := range slots {
+			slots[i] = gpusPerNodeNum
+		}
+	}
+	if err := writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, slots, mpiHostfilePath); err != nil {
 		return fmt.Errorf("write MPI hostfile: %w", err)
 	}
 
@@ -767,7 +775,7 @@ func prepareUserSshDir(user *linuxuser.User) (string, error) {
 	return sshDir, nil
 }
 
-func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode []int, fallbackGpusPerJob int, path string) error {
+func writeMpiHostfile(ctx context.Context, ips []string, slots []int, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create MPI hostfile directory: %w", err)
 	}
@@ -783,23 +791,19 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode []int, fall
 		}
 	}
 	if len(nonEmptyIps) == len(ips) {
-		if len(gpusPerNode) > 0 && len(gpusPerNode) != len(ips) {
+		if len(slots) != len(ips) {
 			return fmt.Errorf(
 				"gpus_per_node length %d != job_ips length %d",
-				len(gpusPerNode), len(ips),
+				len(slots), len(ips),
 			)
 		}
 		for i, ip := range nonEmptyIps {
-			n := fallbackGpusPerJob
-			if len(gpusPerNode) > 0 {
-				n = gpusPerNode[i]
-			}
-			if n == 0 {
+			if slots[i] == 0 {
 				// CPU node: the number of slots defaults to the number of processor cores on that host
 				// See: https://docs.open-mpi.org/en/main/launching-apps/scheduling.html#calculating-the-number-of-slots
 				_, err = fmt.Fprintf(file, "%s\n", ip)
 			} else {
-				_, err = fmt.Fprintf(file, "%s slots=%d\n", ip, n)
+				_, err = fmt.Fprintf(file, "%s slots=%d\n", ip, slots[i])
 			}
 			if err != nil {
 				return fmt.Errorf("write MPI hostfile line: %w", err)

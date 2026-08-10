@@ -814,7 +814,12 @@ class NodeGroup(CoreModel):
     nodes: Annotated[int, Field(description="The number of nodes in this group", ge=1)] = 1
     resources: Annotated[
         ResourcesSpec,
-        Field(description="The resources requirements for nodes in this group"),
+        Field(
+            description=(
+                "The resources requirements for nodes in this group. "
+                "Does not inherit top-level `resources` (same as replica groups)"
+            )
+        ),
     ] = ResourcesSpec()
     commands: Annotated[
         CommandsList,
@@ -830,21 +835,37 @@ class NodeGroup(CoreModel):
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             if not is_valid_replica_group_name(v):
-                raise ValueError("Resource name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
+                raise ValueError("Node group name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
         return v
+
+    @property
+    def required_name(self) -> str:
+        """Name after normalization.
+
+        Omitted names are filled by TaskConfiguration.validate_groups; directly
+        constructed groups must set `name` explicitly.
+        """
+        if self.name is None:
+            raise ValueError("NodeGroup.name must be set before use")
+        return self.name
 
 
 class TaskConfigurationParams(CoreModel):
     nodes: Annotated[
-        int,
+        Optional[int],
         Field(description="The number of nodes for homogeneous multi-node tasks", ge=1),
-    ] = 1
+    ] = None
     groups: Annotated[
         Optional[List[NodeGroup]],
         Field(
             description=(
                 "A list of node groups for heterogeneous multi-node tasks. "
-                "Mutually exclusive with `nodes`."
+                "Mutually exclusive with `nodes`. "
+                "When `groups` is set, top-level `commands`, `ports`, and `entrypoint` are "
+                "not allowed; specify `commands` and `ports` in each node group instead. "
+                "Top-level `resources` is not rejected (same as replica groups; see server "
+                "defaults), but each group's `resources` is used for provisioning — omit "
+                "means default empty resources, not inheritance from the top level."
             ),
         ),
     ] = None
@@ -854,12 +875,8 @@ class TaskConfigurationParams(CoreModel):
     def validate_nodes_xor_groups(cls, data):
         if not isinstance(data, dict):
             return data
-        # Allow groups with default nodes: 1 (serialized configs always include it).
-        # Reject nodes: N (N != 1) together with groups.
-        if data.get("groups") is not None and "nodes" in data:
-            nodes = data.get("nodes")
-            if nodes is not None and nodes != 1:
-                raise ValueError("`nodes` and `groups` are mutually exclusive")
+        if data.get("groups") is not None and data.get("nodes") is not None:
+            raise ValueError("`nodes` and `groups` are mutually exclusive")
         return data
 
     @field_validator("groups")
@@ -891,6 +908,48 @@ class TaskConfiguration(
 ):
     type: Literal["task"] = "task"
 
+    @model_validator(mode="after")
+    def validate_top_level_properties_with_node_groups(self) -> Self:
+        """When groups is set, forbid top-level commands, ports, and entrypoint.
+
+        Top-level `resources` is not rejected: the server may mutate it later
+        (defaults/plugins), and strict parse-time checks would break round-trips.
+        Provisioning still uses each group's `resources` (default ResourcesSpec()),
+        not top-level — same as replica groups.
+        """
+        if self.groups is None:
+            return self
+        if self.commands:
+            raise ValueError(
+                "Top-level `commands` is not allowed when `groups` is set. "
+                "Specify `commands` in each node group instead."
+            )
+        if self.ports:
+            raise ValueError(
+                "Top-level `ports` is not allowed when `groups` is set. "
+                "Specify `ports` in each node group instead."
+            )
+        if self.entrypoint is not None:
+            raise ValueError(
+                "Top-level `entrypoint` is not allowed when `groups` is set. "
+                "Specify `commands` in each node group instead."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_node_groups_have_commands_or_image(self) -> Self:
+        """When groups is set, each group needs commands or a task-level image."""
+        if self.groups is None:
+            return self
+        task_has_image = self.image is not None
+        for group in self.groups:
+            if not group.commands and not task_has_image:
+                raise ValueError(
+                    f"Node group '{group.name}': either `commands` must be set in the group, "
+                    "or `image` at the task level."
+                )
+        return self
+
     @property
     def node_groups(self) -> List[NodeGroup]:
         if self.groups is not None:
@@ -898,7 +957,7 @@ class TaskConfiguration(
         return [
             NodeGroup(
                 name=DEFAULT_REPLICA_GROUP_NAME,
-                nodes=self.nodes,
+                nodes=self.nodes if self.nodes is not None else 1,
                 commands=self.commands,
                 resources=self.resources,
                 ports=self.ports,

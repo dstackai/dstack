@@ -287,6 +287,64 @@ func TestWriteDstackProfile(t *testing.T) {
 	}
 }
 
+func TestWriteMpiHostfile(t *testing.T) {
+	tmp := t.TempDir()
+
+	t.Run("heterogeneous_slots", func(t *testing.T) {
+		path := filepath.Join(tmp, "hostfile_hetero")
+		err := writeMpiHostfile(
+			t.Context(),
+			[]string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+			[]int{8, 4, 0},
+			path,
+		)
+		require.NoError(t, err)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "10.0.0.1 slots=8\n10.0.0.2 slots=4\n10.0.0.3\n", string(content))
+	})
+
+	t.Run("homogeneous_slots", func(t *testing.T) {
+		path := filepath.Join(tmp, "hostfile_homo")
+		err := writeMpiHostfile(
+			t.Context(),
+			[]string{"10.0.0.1", "10.0.0.2"},
+			[]int{4, 4},
+			path,
+		)
+		require.NoError(t, err)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "10.0.0.1 slots=4\n10.0.0.2 slots=4\n", string(content))
+	})
+
+	t.Run("slots_length_mismatch", func(t *testing.T) {
+		path := filepath.Join(tmp, "hostfile_mismatch")
+		err := writeMpiHostfile(
+			t.Context(),
+			[]string{"10.0.0.1", "10.0.0.2"},
+			[]int{8},
+			path,
+		)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "gpus_per_node length 1 != job_ips length 2")
+	})
+
+	t.Run("empty_ip_writes_empty_hostfile", func(t *testing.T) {
+		path := filepath.Join(tmp, "hostfile_empty_ip")
+		err := writeMpiHostfile(
+			t.Context(),
+			[]string{"10.0.0.1", ""},
+			[]int{8, 4},
+			path,
+		)
+		require.NoError(t, err)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "", string(content))
+	})
+}
+
 func TestExecutor_Logs(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)

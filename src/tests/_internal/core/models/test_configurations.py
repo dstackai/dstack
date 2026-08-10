@@ -11,7 +11,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     parse_run_configuration,
 )
-from dstack._internal.core.models.resources import Range
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 
 
@@ -948,24 +948,27 @@ class TestNodeGroups:
         assert parsed.node_groups[0].commands == ["echo head"]
         assert parsed.node_groups[1].commands == ["echo worker"]
 
-    def test_accepts_default_nodes_with_groups(self):
-        # Serialized TaskConfiguration always includes nodes=1 (the field default).
-        # The xor validator must allow that so model round-trips succeed.
-        parsed = parse_run_configuration(
-            {
-                "type": "task",
-                "image": "debian",
-                "nodes": 1,
-                "groups": [
-                    {"nodes": 2, "commands": ["echo head"]},
-                    {"name": "workers", "nodes": 1, "commands": ["echo worker"]},
-                ],
-            }
-        )
-        assert parsed.type == "task"
-        assert parsed.nodes == 1
-        assert parsed.groups is not None
-        assert parsed.nodes_num == 3
+    def test_rejects_nodes_with_groups(self):
+        with pytest.raises(
+            ConfigurationError, match="`nodes` and `groups` are mutually exclusive"
+        ):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "nodes": 1,
+                    "groups": [
+                        {"nodes": 2, "commands": ["echo head"]},
+                        {"name": "workers", "nodes": 1, "commands": ["echo worker"]},
+                    ],
+                }
+            )
+
+    def test_omitted_nodes_defaults_to_one_node_group(self):
+        parsed = parse_run_configuration({"type": "task", "commands": ["true"]})
+        assert parsed.nodes is None
+        assert parsed.nodes_num == 1
+        assert parsed.node_groups[0].nodes == 1
 
     def test_groups_round_trip_via_model_dump(self):
         parsed = parse_run_configuration(
@@ -980,12 +983,12 @@ class TestNodeGroups:
         )
         assert parsed.type == "task"
         dumped = parsed.model_dump(mode="json")
-        assert dumped["nodes"] == 1
+        assert dumped["nodes"] is None
         assert dumped["groups"] is not None
 
         reparsed = parse_run_configuration(dumped)
         assert reparsed.type == "task"
-        assert reparsed.nodes == 1
+        assert reparsed.nodes is None
         assert reparsed.nodes_num == 3
         assert [g.name for g in reparsed.node_groups] == ["0", "workers"]
         assert reparsed.node_groups[0].commands == ["echo head"]
@@ -1019,6 +1022,16 @@ class TestNodeGroups:
                 }
             )
 
+    def test_rejects_invalid_group_name(self):
+        with pytest.raises(ConfigurationError, match="Node group name should match regex"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "groups": [{"name": "Bad_Name", "nodes": 1, "commands": ["true"]}],
+                }
+            )
+
     def test_rejects_empty_groups(self):
         with pytest.raises(ConfigurationError, match="cannot be an empty list"):
             parse_run_configuration({"type": "task", "image": "debian", "groups": []})
@@ -1033,3 +1046,60 @@ class TestNodeGroups:
                     "groups": [{"nodes": 1, "commands": ["true"]}],
                 }
             )
+
+    def test_rejects_top_level_commands_with_groups(self):
+        with pytest.raises(ConfigurationError, match="Top-level `commands` is not allowed"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "commands": ["echo top"],
+                    "groups": [{"nodes": 1, "commands": ["echo group"]}],
+                }
+            )
+
+    def test_rejects_top_level_ports_with_groups(self):
+        with pytest.raises(ConfigurationError, match="Top-level `ports` is not allowed"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "ports": [8000],
+                    "groups": [{"nodes": 1, "commands": ["true"]}],
+                }
+            )
+
+    def test_rejects_top_level_entrypoint_with_groups(self):
+        with pytest.raises(ConfigurationError, match="Top-level `entrypoint` is not allowed"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "image": "debian",
+                    "entrypoint": "python",
+                    "groups": [{"nodes": 1, "commands": ["echo ok"]}],
+                }
+            )
+
+    def test_rejects_group_without_commands_or_image(self):
+        with pytest.raises(ConfigurationError, match="either `commands` must be set"):
+            parse_run_configuration(
+                {
+                    "type": "task",
+                    "groups": [{"name": "head", "nodes": 1}],
+                }
+            )
+
+    def test_accepts_top_level_resources_with_groups(self):
+        """Top-level resources is allowed (not rejected) but not used for group jobs."""
+        parsed = parse_run_configuration(
+            {
+                "type": "task",
+                "image": "debian",
+                "resources": {"gpu": "H100"},
+                "groups": [{"nodes": 1, "commands": ["true"]}],
+            }
+        )
+        assert parsed.groups is not None
+        assert parsed.groups[0].resources == ResourcesSpec()
+        assert parsed.resources.gpu is not None
+        assert parsed.resources.gpu.name == ["H100"]

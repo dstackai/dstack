@@ -96,6 +96,22 @@ class TestNodeGroups:
         assert job_specs[1].requirements.resources.gpu.name == ["A100"]
         assert job_specs[1].requirements.resources.gpu.count.min == 2
 
+    async def test_group_without_resources_does_not_inherit_top_level(self):
+        """Same as replica groups: omitted group resources → ResourcesSpec(), not top-level."""
+        configuration = TaskConfiguration(
+            image="debian",
+            resources=ResourcesSpec(gpu=GPUSpec(name=["H100"], count=1)),
+            groups=[
+                NodeGroup(name="head", nodes=1, commands=["echo head"]),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+        configurator = TaskJobConfigurator(run_spec)
+
+        job_specs = await configurator.get_job_specs(replica_num=0)
+
+        assert job_specs[0].requirements.resources.gpu.name is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("image_config_mock")

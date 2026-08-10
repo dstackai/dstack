@@ -124,6 +124,8 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nodes_interpolator import (
     find_groups_ip_refs,
     interpolate_groups_ip_address,
+    validate_groups_ref_bounds,
+    validate_groups_refs,
 )
 
 logger = get_logger(__name__)
@@ -519,6 +521,9 @@ async def _prepare_startup_context(
             other_job.job_spec.replica_num == context.job.job_spec.replica_num
             and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
         ):
+            # Wait until all jobs in the replica leave SUBMITTED before starting.
+            # No hard timeout: TERMINATED_BY_SERVER is not retryable and would
+            # regress multinode retry-on-no-capacity. Follow-up: bound by retry.
             logger.debug(
                 "%s: waiting for all jobs in the replica to be provisioned",
                 fmt(context.job_model),
@@ -616,10 +621,24 @@ async def _prepare_startup_context(
         return None
 
     commands = context.job.job_spec.commands
+    try:
+        for c in commands:
+            validate_groups_refs(c)
+    except InterpolatorError as e:
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
+        )
+        return None
+
     if any(find_groups_ip_refs(c) for c in commands):
         nodes_view = _build_nodes_ip_view(context.run.jobs, context.job.job_spec.replica_num)
         try:
             if not _referenced_ips_ready(commands, nodes_view):
+                # Wait for referenced internal_ips. No hard timeout for now
+                # (same rationale as the replica SUBMITTED wait above).
                 logger.debug(
                     "%s: waiting for referenced node group IPs",
                     fmt(context.job_model),
@@ -1809,13 +1828,10 @@ def _build_nodes_ip_view(jobs: list[Job], replica_num: int) -> list[list[str]]:
 
 
 def _referenced_ips_ready(commands: list[str], nodes_view: list[list[str]]) -> bool:
+    group_sizes = [len(g) for g in nodes_view]
     for command in commands:
+        validate_groups_ref_bounds(command, group_sizes)
         for group_index, node_index in find_groups_ip_refs(command):
-            if group_index >= len(nodes_view) or node_index >= len(nodes_view[group_index]):
-                raise InterpolatorError(
-                    f"Invalid reference groups[{group_index}].nodes[{node_index}].IP_ADDRESS: "
-                    "out of range"
-                )
             # Wait until every referenced slot has a non-empty internal IP.
             if not nodes_view[group_index][node_index]:
                 return False
@@ -1848,7 +1864,7 @@ def _get_cluster_info(
         gpus_per_job = len(job_runtime_data.offer.instance.resources.gpus)
     return ClusterInfo(
         job_ips=job_ips,
-        master_job_ip=job_ips[0] if job_ips else "",
+        master_job_ip=job_ips[0],
         gpus_per_job=gpus_per_job,
         gpus_per_node=gpus_per_node,
     )

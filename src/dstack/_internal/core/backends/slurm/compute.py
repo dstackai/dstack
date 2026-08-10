@@ -138,12 +138,15 @@ class SlurmCompute(
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
     ) -> JobProvisioningData:
+        # run_job provisions a single dstack job → one Slurm node. Do not fall
+        # back to jobs_per_replica (total across hetero groups).
         compute_provisioning_data = self._run_slurm_job(
             run=run,
             job=job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
             requirements=requirements,
+            node_count=1,
         )
         return compute_provisioning_data.job_provisioning_datas[0]
 
@@ -211,11 +214,11 @@ class SlurmCompute(
             assert run.run_spec.ssh_key_pub is not None
             authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
 
-            # Heterogeneous groups provision one shape at a time; Slurm allocation
-            # size must match that batch. Fall back to jobs_per_replica for
-            # run_job / homogeneous single-call paths.
+            # Allocation size must match the provision batch (run_jobs passes
+            # len(job_configurations)). Default to 1 for any caller that omits it
+            # — never jobs_per_replica (that is the replica total, not batch size).
             if node_count is None:
-                node_count = job.job_spec.jobs_per_replica
+                node_count = 1
             resources_spec = requirements.resources
             requested_resources = get_requested_resources_from_resources_spec(resources_spec)
 

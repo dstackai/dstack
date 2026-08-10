@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    NodeGroup,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -93,6 +97,102 @@ class TestValidateRunSpecRetryDuration:
         )
 
         with pytest.raises(ServerClientError, match="retry.duration cannot be negative"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+
+class TestValidateRunSpecGroupsIpRefs:
+    def test_rejects_typo_groups_ref_in_node_group_commands(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[0].nodes[0].IP }}"],
+                    ),
+                ],
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="Illegal reference name"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_accepts_valid_groups_ref(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"],
+                    ),
+                ],
+            ),
+        )
+
+        validate_run_spec_and_set_defaults(
+            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+        )
+
+    def test_rejects_groups_ref_in_env(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo ok"],
+                env={"PREFILL_URL": "http://${{ groups[1].nodes[0].IP_ADDRESS }}"},
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_rejects_out_of_range_group_index(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[1].nodes[0].IP_ADDRESS }}"],
+                    ),
+                ],
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="out of range"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_rejects_out_of_range_node_index(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[0].nodes[1].IP_ADDRESS }}"],
+                    ),
+                ],
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="out of range"):
             validate_run_spec_and_set_defaults(
                 SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
             )

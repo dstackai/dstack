@@ -46,6 +46,17 @@ def test_server_access_run_spec_compatibility(configuration_type: str, dstack: b
     assert ("dstack" in configuration_excludes) is not dstack
 
 
+def test_unset_task_nodes_are_excluded_for_compatibility():
+    configuration = TaskConfiguration(commands=["true"])
+
+    configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
+        "configuration"
+    )
+
+    assert isinstance(configuration_excludes, dict)
+    assert configuration_excludes["nodes"] is True
+
+
 def test_job_termination_reason_to_status_works_with_all_enum_variants():
     for job_termination_reason in JobTerminationReason:
         job_status = job_termination_reason.to_status()
