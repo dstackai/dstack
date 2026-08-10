@@ -1,5 +1,6 @@
 import argparse
 import time
+from typing import Optional
 
 from rich.live import Live
 
@@ -36,50 +37,45 @@ class MetricsCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--replica",
-            help="The replica number. Defaults to 0.",
+            help="Show only this replica. By default, all jobs are shown.",
             type=int,
-            default=0,
         )
         self._parser.add_argument(
             "--job",
-            help="The job number inside the replica. Defaults to 0.",
+            help="Show only this job number. By default, all jobs are shown.",
             type=int,
-            default=0,
         )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        job, metrics = self._fetch(args)
+        jobs, metrics = self._fetch(args)
 
         if not args.watch:
-            console.print(get_metrics_table(job, metrics))
+            console.print(get_metrics_table(jobs, metrics))
             return
 
         try:
             with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
                 while True:
-                    live.update(get_metrics_table(job, metrics))
+                    live.update(get_metrics_table(jobs, metrics))
                     time.sleep(WATCH_INTERVAL_SECONDS)
-                    job, metrics = self._fetch(args)
+                    jobs, metrics = self._fetch(args)
         except KeyboardInterrupt:
             pass
 
-    def _fetch(self, args: argparse.Namespace) -> tuple[Job, JobMetrics]:
+    def _fetch(self, args: argparse.Namespace) -> tuple[list[Job], list[JobMetrics]]:
         run = self.api.runs.get(run_name=args.run_name)
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
-        job = _get_job(run, args.replica, args.job)
-        return job, _get_job_metrics(self.api, run, job)
-
-
-def _get_job(run: Run, replica_num: int, job_num: int) -> Job:
-    for job in run._run.jobs:
-        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
-            return job
-    raise CLIError(
-        f"Run {run.name} has no replica={replica_num} job={job_num}."
-        " Use --replica and --job to select one."
-    )
+        jobs = select_jobs(run._run.jobs, args.replica, args.job)
+        if not jobs:
+            wanted = " ".join(
+                f"{name}={value}"
+                for name, value in (("replica", args.replica), ("job", args.job))
+                if value is not None
+            )
+            raise CLIError(f"Run {args.run_name} has no job matching {wanted}")
+        return jobs, [_get_job_metrics(self.api, run, job) for job in jobs]
 
 
 def _get_job_metrics(api: Client, run: Run, job: Job) -> JobMetrics:
@@ -92,3 +88,12 @@ def _get_job_metrics(api: Client, run: Run, job: Job) -> JobMetrics:
         job_num=job.job_spec.job_num,
         limit=MAX_SAMPLES,
     )
+
+
+def select_jobs(jobs: list[Job], replica: Optional[int], job_num: Optional[int]) -> list[Job]:
+    return [
+        job
+        for job in jobs
+        if (replica is None or job.job_spec.replica_num == replica)
+        and (job_num is None or job.job_spec.job_num == job_num)
+    ]
