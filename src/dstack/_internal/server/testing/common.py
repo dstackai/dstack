@@ -446,6 +446,7 @@ async def create_job(
     waiting_master_job: Optional[bool] = None,
     replica_group_name: Optional[str] = None,
 ) -> JobModel:
+    assert not (registered and not ready), "registered=True with ready=False is invalid"
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = validate_json_extra_ignore(RunSpec, run.run_spec)

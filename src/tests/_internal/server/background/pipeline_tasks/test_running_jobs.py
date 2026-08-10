@@ -2598,6 +2598,7 @@ class TestJobRunningWorker:
             instance=instance,
             instance_assigned=True,
             registered=True,
+            ready=True,
         )
         await create_probe(session=session, job=worker_job, probe_num=0, success_streak=0)
         runner_client_mock.pull.return_value = PullResponse(

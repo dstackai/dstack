@@ -686,11 +686,11 @@ async def _build_rolling_deployment_maps(
                 max_new = max(j.replica_num for j in new_jobs)
                 next_replica_num = max(next_replica_num, max_new + 1)
 
-        # Scale down: terminate unregistered out-of-date + excess registered replicas
-        replicas_to_stop = state.unregistered_out_of_date_replica_count
+        # Scale down: terminate unready out-of-date + excess ready replicas
+        replicas_to_stop = state.unready_out_of_date_replica_count
         replicas_to_stop += max(
             0,
-            state.registered_non_terminating_replica_count - group_desired,
+            state.ready_non_terminating_replica_count - group_desired,
         )
         if replicas_to_stop > 0:
             scale_down_maps = _build_scale_down_job_update_maps(
