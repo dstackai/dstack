@@ -49,11 +49,8 @@ from dstack._internal.core.models.gateways import (
     LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.core.services.diff import (
-    ModelDiff,
-    diff_models,
-    format_diff_fields_for_event,
-)
+from dstack._internal.core.services.diff import ModelDiff, format_diff_fields_for_event
+from dstack._internal.core.services.gateways import diff_gateway_configurations
 from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server import settings
@@ -92,7 +89,7 @@ from dstack._internal.utils.common import (
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-_CONF_UPDATABLE_FIELDS = frozenset({"domain"})
+_CONF_UPDATABLE_FIELDS = frozenset({"domain", "default"})
 if FeatureFlags.GATEWAY_SCALING:
     _CONF_UPDATABLE_FIELDS |= {"replicas"}
 
@@ -292,7 +289,7 @@ async def create_gateway(
         await session.commit()
 
         default_gateway = await get_project_default_gateway_model(session=session, project=project)
-        if default_gateway is None or configuration.default:
+        if default_gateway is None and configuration.default is None or configuration.default:
             await set_default_gateway(
                 session=session,
                 project=project,
@@ -309,7 +306,9 @@ async def create_gateway(
             load_backend_type=True,
         )
         assert gateway is not None
-        return gateway_model_to_gateway(gateway, default_gateway_id=default_gateway.id)
+        return gateway_model_to_gateway(
+            gateway, default_gateway_id=default_gateway.id if default_gateway is not None else None
+        )
 
 
 async def connect_to_gateway_with_retry(
@@ -430,7 +429,11 @@ async def set_gateway_wildcard_domain(
 
 
 async def set_default_gateway(
-    session: AsyncSession, project: ProjectModel, ref: EntityReference, user: Optional[UserModel]
+    session: AsyncSession,
+    project: ProjectModel,
+    ref: EntityReference,
+    user: Optional[UserModel],
+    commit: bool = True,
 ):
     gateway = await get_project_gateway_model_by_reference(
         session=session, project=project, ref=ref
@@ -470,7 +473,28 @@ async def set_default_gateway(
             events.Target.from_model(project),
         ],
     )
-    await session.commit()
+    if commit:
+        await session.commit()
+
+
+async def unset_default_gateway(
+    session: AsyncSession, project: ProjectModel, expect_gateway_id: uuid.UUID, user: UserModel
+) -> None:
+    gateway = await get_project_default_gateway_model(session, project)
+    if gateway is None or gateway.id != expect_gateway_id:
+        return
+    await session.execute(
+        update(ProjectModel).where(ProjectModel.id == project.id).values(default_gateway_id=None)
+    )
+    events.emit(
+        session,
+        "Gateway unset as project default",
+        actor=events.UserActor.from_user(user),
+        targets=[
+            events.Target.from_model(gateway),
+            events.Target.from_model(project),
+        ],
+    )
 
 
 async def list_project_gateway_models(
@@ -849,7 +873,6 @@ def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfigurati
     # Handle gateways created before GatewayConfiguration was introduced
     return GatewayConfiguration(
         name=gateway_model.name,
-        default=False,
         backend=gateway_model.backend.type,
         region=gateway_model.region,
         domain=gateway_model.wildcard_domain,
@@ -979,7 +1002,10 @@ async def get_plan(
                 current_gateway_model, default_gateway_id=project.default_gateway_id
             )
             if _can_update_gateway_in_place(
-                diff_models(current_gateway.configuration, effective_spec.configuration)
+                diff_gateway_configurations(
+                    current_gateway.configuration,
+                    effective_spec.configuration,
+                )
             ):
                 action = ApplyAction.UPDATE
 
@@ -1055,7 +1081,10 @@ async def apply_plan(
                     "Failed to apply plan. Resource has been changed. Try again or use force apply."
                 )
 
-        diff = diff_models(current_configuration, new_configuration)
+        diff = diff_gateway_configurations(
+            current_configuration,
+            new_configuration,
+        )
         if not _can_update_gateway_in_place(diff):
             raise ServerClientError(
                 f"Gateway {new_configuration.name!r} cannot be updated in-place."
@@ -1068,6 +1097,21 @@ async def apply_plan(
                 new_configuration.replicas
                 if new_configuration.replicas is not None
                 else GATEWAY_REPLICAS_DEFAULT
+            )
+        if new_configuration.default is True:
+            await set_default_gateway(
+                session=session,
+                project=project,
+                ref=EntityReference(name=gateway_model.name, project=None),
+                user=user,
+                commit=False,
+            )
+        elif new_configuration.default is False:
+            await unset_default_gateway(
+                session=session,
+                project=project,
+                expect_gateway_id=gateway_model.id,
+                user=user,
             )
         gateway_model.configuration = new_configuration.model_dump_json()
         gateway_model.last_update_at = get_current_datetime()

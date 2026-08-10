@@ -9,7 +9,11 @@ import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.server.compatibility.gateways import patch_gateway, patch_gateway_plan
+from dstack._internal.server.compatibility.gateways import (
+    patch_gateway,
+    patch_gateway_plan,
+    patch_gateway_spec_in_request,
+)
 from dstack._internal.server.db import get_session
 from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -83,6 +87,7 @@ async def get_plan(
     This is an optional step before calling `/apply`.
     """
     user, project = user_project
+    patch_gateway_spec_in_request(body.spec, client_version)
     plan = await gateways.get_plan(
         session=session,
         project=project,
@@ -105,6 +110,7 @@ async def apply_plan(
     Creates a new gateway or updates an existing gateway in-place.
     """
     user, project = user_project
+    patch_gateway_spec_in_request(body.plan.spec, client_version)
     gateway = await gateways.apply_plan(
         session=session,
         user=user,
