@@ -20,6 +20,9 @@ SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server"
 # Paths under `SERVER_DIR_PATH` are derived on access rather than at import time, so that
 # patching `SERVER_DIR_PATH` redirects all of them. Tests rely on this to keep each worker's
 # server state out of the real `~/.dstack`.
+#
+# TODO: Turn module level-constants into a ServerSettings class instance so that
+# all settings can be properties and there is no constant/function distinction.
 
 
 def get_server_config_file_path() -> Path:
