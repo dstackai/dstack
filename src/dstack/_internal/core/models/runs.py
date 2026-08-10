@@ -94,6 +94,7 @@ class RunTerminationReason(str, Enum):
     STOPPED_BY_USER = "stopped_by_user"
     ABORTED_BY_USER = "aborted_by_user"
     SERVER_ERROR = "server_error"
+    GATEWAY_ERROR = "gateway_error"
 
     def to_job_termination_reason(self) -> "JobTerminationReason":
         """
@@ -107,6 +108,7 @@ class RunTerminationReason(str, Enum):
             self.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
             self.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
             self.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.GATEWAY_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
         }
         return mapping[self]
 
@@ -118,6 +120,7 @@ class RunTerminationReason(str, Enum):
             self.STOPPED_BY_USER: RunStatus.TERMINATED,
             self.ABORTED_BY_USER: RunStatus.TERMINATED,
             self.SERVER_ERROR: RunStatus.FAILED,
+            self.GATEWAY_ERROR: RunStatus.FAILED,
         }
         return mapping[self]
 
@@ -126,6 +129,8 @@ class RunTerminationReason(str, Enum):
             return "retry limit exceeded"
         elif self == RunTerminationReason.SERVER_ERROR:
             return "server error"
+        elif self == RunTerminationReason.GATEWAY_ERROR:
+            return "gateway error"
         else:
             return None
 

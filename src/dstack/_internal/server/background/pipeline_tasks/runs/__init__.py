@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
 
 import dstack._internal.server.background.pipeline_tasks.runs.active as active
 import dstack._internal.server.background.pipeline_tasks.runs.pending as pending
@@ -29,7 +29,14 @@ from dstack._internal.server.background.pipeline_tasks.runs.common import (
     delete_superseded_no_capacity_job_submissions,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import (
+    GatewayComputeModel,
+    GatewayModel,
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import get_combined_gateway_stats
 from dstack._internal.server.services.jobs import emit_job_status_change_event
@@ -547,6 +554,22 @@ async def _refetch_locked_run_for_active(
             .joinedload(JobModel.instance)
             .load_only(InstanceModel.fleet_id),
         )
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias).selectinload(
+                JobModel.service_replica_registrations
+            ),
+        )
+        .options(selectinload(RunModel.service_registrations))
+        .options(
+            joinedload(RunModel.gateway)
+            .selectinload(GatewayModel.gateway_computes)
+            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+        )
+        .options(
+            joinedload(RunModel.gateway)
+            .joinedload(GatewayModel.gateway_compute)
+            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+        )
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -851,7 +874,6 @@ async def _apply_terminating_result(
     context: terminating.TerminatingContext,
     result: terminating.TerminatingResult,
 ) -> None:
-    run_model = context.run_model
     set_processed_update_map_fields(result.run_update_map)
     set_unlock_update_map_fields(result.run_update_map)
 
@@ -888,17 +910,6 @@ async def _apply_terminating_result(
 
         if job_update_rows:
             await session.execute(update(JobModel), job_update_rows)
-
-        if result.service_unregistration is not None:
-            targets = [events.Target.from_model(run_model)]
-            if result.service_unregistration.gateway_target is not None:
-                targets.append(result.service_unregistration.gateway_target)
-            events.emit(
-                session,
-                result.service_unregistration.event_message,
-                actor=events.SystemActor(),
-                targets=targets,
-            )
 
         _emit_terminating_job_status_change_events(
             session=session,

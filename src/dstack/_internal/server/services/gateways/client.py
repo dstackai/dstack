@@ -8,9 +8,9 @@ from pydantic import TypeAdapter
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.common import validate_json_extra_ignore
-from dstack._internal.core.models.configurations import RateLimit
+from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
+from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
@@ -85,17 +85,18 @@ class GatewayClient:
 
     async def register_replica(
         self,
-        run: Run,
+        project: str,
+        run_name: str,
+        configuration: ServiceConfiguration,
         job_spec: JobSpec,
         job_submission: JobSubmission,
         instance_project_ssh_private_key: Optional[str],
         ssh_head_proxy: Optional[SSHConnectionParams],
         ssh_head_proxy_private_key: Optional[str],
     ):
-        assert run.run_spec.configuration.type == "service"
         payload = {
             "job_id": job_submission.id.hex,
-            "app_port": get_service_port(job_spec, run.run_spec.configuration),
+            "app_port": get_service_port(job_spec, configuration),
             "ssh_head_proxy": ssh_head_proxy.model_dump() if ssh_head_proxy is not None else None,
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }
@@ -130,9 +131,7 @@ class GatewayClient:
                 }
             )
         resp = await self._client.post(
-            self._url(
-                f"/api/registry/{run.project_name}/services/{run.run_spec.run_name}/replicas/register"
-            ),
+            self._url(f"/api/registry/{project}/services/{run_name}/replicas/register"),
             json=payload,
         )
         if resp.status_code == 400:

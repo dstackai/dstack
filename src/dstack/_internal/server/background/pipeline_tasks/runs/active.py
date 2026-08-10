@@ -9,6 +9,7 @@ from sqlalchemy.orm import load_only
 
 from dstack._internal.core.errors import ServerError
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.gateways import GatewayReplicaStatus
 from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     JobStatus,
@@ -26,6 +27,7 @@ from dstack._internal.server.background.pipeline_tasks.runs.common import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.services.gateways import get_gateway_compute_models
 from dstack._internal.server.services.jobs import (
     get_job_spec,
     get_job_specs_from_run_spec,
@@ -366,6 +368,28 @@ def _should_stop_on_master_done(run_spec: RunSpec, run_model: RunModel) -> bool:
     return False
 
 
+def _gateway_registration_failed(run_model: RunModel) -> bool:
+    if run_model.gateway is None:
+        return False
+    running_replica_ids = {
+        replica.id
+        for replica in get_gateway_compute_models(run_model.gateway)
+        if replica.status == GatewayReplicaStatus.RUNNING
+    }
+    if not running_replica_ids:
+        return False
+    registration_by_replica_id = {r.gateway_replica_id: r for r in run_model.service_registrations}
+    for replica_id in running_replica_ids:
+        registration = registration_by_replica_id.get(replica_id)
+        if (
+            registration is None
+            or registration.is_registered
+            or registration.register_attempt == 0
+        ):
+            return False
+    return True
+
+
 def _get_active_run_transition(
     run_spec: RunSpec,
     run_model: RunModel,
@@ -382,6 +406,12 @@ def _get_active_run_transition(
         return _ActiveRunTransition(
             new_status=RunStatus.TERMINATING,
             termination_reason=termination_reason,
+        )
+
+    if _gateway_registration_failed(run_model):
+        return _ActiveRunTransition(
+            new_status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.GATEWAY_ERROR,
         )
 
     if _should_stop_on_master_done(run_spec, run_model):
@@ -686,11 +716,11 @@ async def _build_rolling_deployment_maps(
                 max_new = max(j.replica_num for j in new_jobs)
                 next_replica_num = max(next_replica_num, max_new + 1)
 
-        # Scale down: terminate unready out-of-date + excess ready replicas
-        replicas_to_stop = state.unready_out_of_date_replica_count
+        # Scale down: terminate not-receiving-traffic out-of-date + excess receiving-traffic replicas
+        replicas_to_stop = state.not_receiving_traffic_out_of_date_replica_count
         replicas_to_stop += max(
             0,
-            state.ready_non_terminating_replica_count - group_desired,
+            state.receiving_traffic_non_terminating_replica_count - group_desired,
         )
         if replicas_to_stop > 0:
             scale_down_maps = _build_scale_down_job_update_maps(

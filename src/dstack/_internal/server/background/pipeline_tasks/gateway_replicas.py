@@ -1,19 +1,25 @@
 import asyncio
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Optional, Sequence
 
-from sqlalchemy import and_, or_, select, update
-from sqlalchemy.orm import InstrumentedAttribute, joinedload, load_only
+from httpx import HTTPStatusError
+from sqlalchemy import and_, delete, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute, joinedload, load_only, with_loader_criteria
 from sqlalchemy.sql.base import ExecutableOption
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
 )
-from dstack._internal.core.errors import BackendError, BackendNotAvailable
+from dstack._internal.core.errors import BackendError, BackendNotAvailable, GatewayError
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
+from dstack._internal.core.models.runs import JobSpec, JobStatus, RunStatus, ServiceSpec
+from dstack._internal.proxy.gateway.schemas.services import ServiceListItem
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
@@ -32,21 +38,36 @@ from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceModel,
+    JobModel,
     ProjectModel,
+    RunModel,
+    ServiceRegistrationModel,
+    ServiceReplicaRegistrationModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
     get_gateway_compute_configuration,
     get_gateway_configuration,
     get_gateway_lb_configuration,
 )
+from dstack._internal.server.services.gateways.client import GatewayClient
+from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.services.instances import get_instance_remote_connection_info
+from dstack._internal.server.services.jobs import job_model_to_job_submission
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
+from dstack._internal.server.services.runs import get_run_spec
+from dstack._internal.server.services.services import (
+    get_gateway_https,
+    should_configure_service_https_on_gateway,
+)
 from dstack._internal.server.utils import tracing
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -158,18 +179,9 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                                 [
                                     GatewayReplicaStatus.SUBMITTED,
                                     GatewayReplicaStatus.PROVISIONING,
+                                    GatewayReplicaStatus.RUNNING,
                                     GatewayReplicaStatus.TERMINATING,
                                 ]
-                            ),
-                            and_(
-                                GatewayComputeModel.status == GatewayReplicaStatus.RUNNING,
-                                or_(
-                                    GatewayComputeModel.scale_in == True,
-                                    GatewayModel.to_be_deleted == True,
-                                    GatewayModel.status == GatewayStatus.FAILED,
-                                    # Gateway was hard-deleted (unexpected, fetch to log an error)
-                                    GatewayModel.id.is_(None),
-                                ),
                             ),
                         ),
                         or_(
@@ -352,28 +364,52 @@ def _mark_terminating_if_needed(
     return update_map
 
 
+# TODO: Consider refactoring the pipeline for consistency with other pipelines - split into process
+# and apply phases instead of calling the `_commit_update()` helper from everywhere
 async def _commit_update(
     item: GatewayReplicaPipelineItem,
     replica_model: GatewayComputeModel,
     update_map: _GatewayReplicaUpdateMap,
 ) -> None:
+    async with get_session_ctx() as session:
+        await _apply_update(session, item, replica_model, update_map)
+
+
+async def _apply_update(
+    session: AsyncSession,
+    item: GatewayReplicaPipelineItem,
+    replica_model: GatewayComputeModel,
+    update_map: _GatewayReplicaUpdateMap,
+) -> bool:
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
-    async with get_session_ctx() as session:
-        now = get_current_datetime()
-        resolve_now_placeholders(update_map, now=now)
-        res = await session.execute(
-            update(GatewayComputeModel)
-            .where(
-                GatewayComputeModel.id == replica_model.id,
-                GatewayComputeModel.lock_token == replica_model.lock_token,
-            )
-            .values(**update_map)
-            .returning(GatewayComputeModel.id)
+    now = get_current_datetime()
+    resolve_now_placeholders(update_map, now=now)
+    res = await session.execute(
+        update(GatewayComputeModel)
+        .where(
+            GatewayComputeModel.id == replica_model.id,
+            GatewayComputeModel.lock_token == replica_model.lock_token,
         )
-        updated_ids = list(res.scalars().all())
-        if len(updated_ids) == 0:
-            log_lock_token_changed_after_processing(logger, item)
+        .values(**update_map)
+        .returning(GatewayComputeModel.id)
+    )
+    updated_ids = list(res.scalars().all())
+    if len(updated_ids) == 0:
+        log_lock_token_changed_after_processing(logger, item)
+        return False
+    if update_map.get("deleted"):
+        await session.execute(
+            delete(ServiceRegistrationModel).where(
+                ServiceRegistrationModel.gateway_replica_id == replica_model.id
+            )
+        )
+        await session.execute(
+            delete(ServiceReplicaRegistrationModel).where(
+                ServiceReplicaRegistrationModel.gateway_replica_id == replica_model.id
+            )
+        )
+    return True
 
 
 async def _process_submitted_item(item: GatewayReplicaPipelineItem):
@@ -654,8 +690,17 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         replica_fields=_REPLICA_FIELDS_MIN
         + [
             GatewayComputeModel.scale_in,
+            GatewayComputeModel.ip_address,
+            GatewayComputeModel.ssh_private_key,
         ],
-        gateway_fields=_GATEWAY_FIELDS_MIN,
+        gateway_fields=_GATEWAY_FIELDS_MIN
+        + [
+            GatewayModel.project_id,
+            GatewayModel.configuration,
+            GatewayModel.region,
+            GatewayModel.wildcard_domain,
+        ],
+        load_gateway_backend_type=True,
     )
     if replica_model is None:
         return
@@ -666,12 +711,814 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
     if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
         await _commit_update(item, replica_model, update_map=update_map)
         return
-    logger.warning(
-        "%s replica %d: nothing to do in this pipeline tick",
+    try:
+        connection = await gateway_connections_pool.get_or_add(
+            hostname=get_or_error(replica_model.ip_address),
+            id_rsa=replica_model.ssh_private_key,
+        )
+    except Exception as e:
+        logger.warning(
+            "%s replica %d: failed to connect to gateway: %s",
+            fmt(gateway_model),
+            replica_model.replica_num,
+            e,
+        )
+        await _commit_update(item, replica_model, update_map={})
+        return
+    async with connection.client() as client:
+        try:
+            currently_registered_services = await client.list_services()
+        except Exception as e:
+            if isinstance(e, HTTPStatusError) and e.response.status_code == 404:
+                logger.warning(
+                    (
+                        "%s replica %d: got error 404 when listing services, which indicates a"
+                        " pre-0.21.0 gateway. Skipping state sync until the gateway is updated"
+                    ),
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                )
+            else:
+                logger.warning(
+                    "%s replica %d: failed to list services: %r",
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                    e,
+                )
+            await _commit_update(item, replica_model, update_map={})
+            return
+    stmt = (
+        select(RunModel)
+        .where(
+            RunModel.gateway_id == gateway_model.id,
+            RunModel.deleted == False,
+            RunModel.status.not_in(RunStatus.finished_statuses() + [RunStatus.TERMINATING]),
+        )
+        .options(
+            load_only(RunModel.id),
+            joinedload(RunModel.jobs).load_only(JobModel.id),
+            with_loader_criteria(
+                JobModel,
+                and_(
+                    JobModel.status == JobStatus.RUNNING,
+                    JobModel.registered == True,
+                ),
+            ),
+        )
+    )
+    async with get_session_ctx() as session:
+        res = await session.execute(stmt)
+        expected_runs = res.scalars().unique().all()
+        plan = _plan_state_sync(
+            currently_registered=currently_registered_services,
+            expected=expected_runs,
+        )
+        run_models_by_id, job_models_by_id = await _load_runs_and_jobs_for_state_sync(
+            session, plan
+        )
+
+    sync_result = await _perform_state_sync(
+        connection, gateway_model, replica_model, run_models_by_id, job_models_by_id, plan
+    )
+
+    async with get_session_ctx() as session:
+        if not await _apply_update(session, item, replica_model, update_map={}):
+            return
+        reconcile_records_result = await _reconcile_registration_records(
+            session, replica_model, currently_registered_services, sync_result
+        )
+        await _emit_state_sync_events(
+            session,
+            gateway_model,
+            replica_model,
+            run_models_by_id,
+            job_models_by_id,
+            sync_result,
+            reconcile_records_result,
+        )
+
+
+async def _perform_state_sync(
+    connection: GatewayConnection,
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+    run_models_by_id: dict[uuid.UUID, RunModel],
+    job_models_by_id: dict[uuid.UUID, JobModel],
+    plan: "_StateSyncPlan",
+) -> "_StateSyncResult":
+    result = _StateSyncResult()
+    for service_ref, run_id in plan.set_run_ids.items():
+        logger.debug(
+            "%s replica %d: setting id %s for service %s/%s",
+            fmt(gateway_model),
+            replica_model.replica_num,
+            run_id,
+            service_ref.project_name,
+            service_ref.run_name,
+        )
+        try:
+            async with connection.client() as client:
+                await client.set_service_id(
+                    project=service_ref.project_name,
+                    run_name=service_ref.run_name,
+                    run_id=run_id,
+                )
+        except Exception:
+            logger.exception(
+                "%s replica %d: failed to set id %s for service %s/%s",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+                service_ref.project_name,
+                service_ref.run_name,
+            )
+            continue
+        logger.info(
+            "%s replica %d: id %s set for service %s/%s",
+            fmt(gateway_model),
+            replica_model.replica_num,
+            run_id,
+            service_ref.project_name,
+            service_ref.run_name,
+        )
+    for service_ref in plan.unregister_services:
+        logger.debug(
+            "%s replica %d: unregistering service %s/%s",
+            fmt(gateway_model),
+            replica_model.replica_num,
+            service_ref.project_name,
+            service_ref.run_name,
+        )
+        try:
+            async with connection.client() as client:
+                await client.unregister_service(
+                    project=service_ref.project_name,
+                    run_name=service_ref.run_name,
+                )
+        except GatewayError as e:
+            if service_ref.id is not None:
+                result.failed_service_unregistrations[service_ref.id] = e.msg
+            else:
+                logger.warning(
+                    "%s replica %d: failed to unregister legacy service %s/%s with unknown ID: %s",
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                    service_ref.project_name,
+                    service_ref.run_name,
+                    e.msg,
+                )
+            continue
+        except Exception:
+            logger.exception(
+                "%s replica %d: failed to unregister service %s/%s",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                service_ref.project_name,
+                service_ref.run_name,
+            )
+            if service_ref.id is not None:
+                result.failed_service_unregistrations[service_ref.id] = "Unexpected error"
+            continue
+        if service_ref.id is not None:
+            result.unregistered_services.add(service_ref.id)
+        else:
+            logger.warning(
+                "%s replica %d: unregistered legacy service %s/%s with unknown ID",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                service_ref.project_name,
+                service_ref.run_name,
+            )
+    for service_ref, replica_ids in plan.unregister_replicas.items():
+        for replica_id in replica_ids:
+            logger.debug(
+                "%s replica %d: unregistering replica %s for service %s/%s",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                replica_id,
+                service_ref.project_name,
+                service_ref.run_name,
+            )
+            try:
+                async with connection.client() as client:
+                    await client.unregister_replica(
+                        project=service_ref.project_name,
+                        run_name=service_ref.run_name,
+                        job_id=replica_id,
+                    )
+            except GatewayError as e:
+                result.failed_replica_unregistrations[replica_id] = e.msg
+                continue
+            except Exception:
+                logger.exception(
+                    "%s replica %d: failed to unregister replica %s for service %s/%s",
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                    replica_id,
+                    service_ref.project_name,
+                    service_ref.run_name,
+                )
+                result.failed_replica_unregistrations[replica_id] = "Unexpected error"
+                continue
+            result.unregistered_replicas.add(replica_id)
+    for run_id in plan.register_services:
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            error_message = "Run not found"
+            logger.error(
+                "%s replica %d: run %s not found, cannot register service",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            result.failed_service_registrations[run_id] = error_message
+            continue
+        try:
+            async with connection.client() as client:
+                await _register_service(client, gateway_model, replica_model, run_model)
+        except GatewayError as e:
+            result.failed_service_registrations[run_id] = e.msg
+            continue
+        except Exception:
+            logger.exception(
+                "%s replica %d: failed to register service for run %s",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            result.failed_service_registrations[run_id] = "Unexpected error"
+            continue
+        result.registered_services.add(run_id)
+    for run_id, replica_ids in plan.register_replicas.items():
+        if run_id in result.failed_service_registrations:
+            continue
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            logger.error(
+                "%s replica %d: run %s not found, cannot register replicas",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            for replica_id in replica_ids:
+                result.failed_replica_registrations[replica_id] = "Run not found"
+            continue
+        for replica_id in replica_ids:
+            job_model = job_models_by_id.get(replica_id)
+            if job_model is None:
+                logger.error(
+                    "%s replica %d: job %s not found, cannot register replica",
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                    replica_id,
+                )
+                result.failed_replica_registrations[replica_id] = "Job not found"
+                continue
+            try:
+                async with connection.client() as client:
+                    await _register_replica(
+                        client, gateway_model, replica_model, run_model, job_model
+                    )
+            except GatewayError as e:
+                result.failed_replica_registrations[replica_id] = e.msg
+                continue
+            except Exception:
+                logger.exception(
+                    "%s replica %d: failed to register replica %s",
+                    fmt(gateway_model),
+                    replica_model.replica_num,
+                    replica_id,
+                )
+                result.failed_replica_registrations[replica_id] = "Unexpected error"
+                continue
+            result.registered_replicas.add(replica_id)
+    return result
+
+
+def _get_or_create_service_registration(
+    session: AsyncSession,
+    existing_by_id: dict[uuid.UUID, ServiceRegistrationModel],
+    run_id: uuid.UUID,
+    gateway_replica_id: uuid.UUID,
+) -> ServiceRegistrationModel:
+    if registration := existing_by_id.get(run_id):
+        return registration
+    registration = ServiceRegistrationModel(
+        run_id=run_id,
+        gateway_replica_id=gateway_replica_id,
+        register_attempt=0,
+        register_status_message=None,
+        unregister_attempt=0,
+        unregister_status_message=None,
+    )
+    session.add(registration)
+    return registration
+
+
+def _get_or_create_service_replica_registration(
+    session: AsyncSession,
+    existing_by_id: dict[uuid.UUID, ServiceReplicaRegistrationModel],
+    job_id: uuid.UUID,
+    gateway_replica_id: uuid.UUID,
+) -> ServiceReplicaRegistrationModel:
+    if registration := existing_by_id.get(job_id):
+        return registration
+    registration = ServiceReplicaRegistrationModel(
+        job_id=job_id,
+        gateway_replica_id=gateway_replica_id,
+        register_attempt=0,
+        register_status_message=None,
+        unregister_attempt=0,
+        unregister_status_message=None,
+    )
+    session.add(registration)
+    return registration
+
+
+@dataclass
+class _ReconcileRegistrationRecordsResult:
+    services_with_new_registration_error: set[uuid.UUID] = field(default_factory=set)
+    replicas_with_new_registration_error: set[uuid.UUID] = field(default_factory=set)
+    services_with_new_unregistration_error: set[uuid.UUID] = field(default_factory=set)
+    replicas_with_new_unregistration_error: set[uuid.UUID] = field(default_factory=set)
+
+
+async def _reconcile_registration_records(
+    session: AsyncSession,
+    replica_model: GatewayComputeModel,
+    initially_registered: list[ServiceListItem],
+    sync_result: "_StateSyncResult",
+) -> _ReconcileRegistrationRecordsResult:
+    result = _ReconcileRegistrationRecordsResult()
+    initially_registered_run_ids = {
+        uuid.UUID(s.id) for s in initially_registered if s.id is not None
+    }
+    initially_registered_replica_ids = {
+        uuid.UUID(r.id) for s in initially_registered for r in s.replicas
+    }
+    registered_run_ids = (
+        initially_registered_run_ids - sync_result.unregistered_services
+    ) | sync_result.registered_services
+    registered_replica_ids = (
+        initially_registered_replica_ids - sync_result.unregistered_replicas
+    ) | sync_result.registered_replicas
+
+    keep_run_ids = registered_run_ids | sync_result.failed_service_registrations.keys()
+    keep_replica_ids = registered_replica_ids | sync_result.failed_replica_registrations.keys()
+
+    await session.execute(
+        delete(ServiceRegistrationModel).where(
+            ServiceRegistrationModel.gateway_replica_id == replica_model.id,
+            ServiceRegistrationModel.run_id.not_in(keep_run_ids),
+        )
+    )
+    await session.execute(
+        delete(ServiceReplicaRegistrationModel).where(
+            ServiceReplicaRegistrationModel.gateway_replica_id == replica_model.id,
+            ServiceReplicaRegistrationModel.job_id.not_in(keep_replica_ids),
+        )
+    )
+
+    service_registrations_by_run_id: dict[uuid.UUID, ServiceRegistrationModel] = {}
+    if keep_run_ids:
+        res = await session.execute(
+            select(ServiceRegistrationModel).where(
+                ServiceRegistrationModel.gateway_replica_id == replica_model.id,
+            )
+        )
+        service_registrations_by_run_id = {r.run_id: r for r in res.scalars().all()}
+    replica_registrations_by_job_id: dict[uuid.UUID, ServiceReplicaRegistrationModel] = {}
+    if keep_replica_ids:
+        res = await session.execute(
+            select(ServiceReplicaRegistrationModel).where(
+                ServiceReplicaRegistrationModel.gateway_replica_id == replica_model.id,
+            )
+        )
+        replica_registrations_by_job_id = {r.job_id: r for r in res.scalars().all()}
+
+    for run_id in registered_run_ids:
+        registration = _get_or_create_service_registration(
+            session=session,
+            existing_by_id=service_registrations_by_run_id,
+            run_id=run_id,
+            gateway_replica_id=replica_model.id,
+        )
+        registration.is_registered = True
+        registration.register_attempt = 0
+        registration.register_status_message = None
+        unregister_error_message = sync_result.failed_service_unregistrations.get(run_id)
+        if unregister_error_message is None:
+            registration.unregister_attempt = 0
+            registration.unregister_status_message = None
+        else:
+            registration.unregister_attempt += 1
+            if unregister_error_message != registration.unregister_status_message:
+                registration.unregister_status_message = unregister_error_message
+                result.services_with_new_unregistration_error.add(run_id)
+    for job_id in registered_replica_ids:
+        registration = _get_or_create_service_replica_registration(
+            session=session,
+            existing_by_id=replica_registrations_by_job_id,
+            job_id=job_id,
+            gateway_replica_id=replica_model.id,
+        )
+        registration.is_registered = True
+        registration.register_attempt = 0
+        registration.register_status_message = None
+        unregister_error_message = sync_result.failed_replica_unregistrations.get(job_id)
+        if unregister_error_message is None:
+            registration.unregister_attempt = 0
+            registration.unregister_status_message = None
+        else:
+            registration.unregister_attempt += 1
+            if unregister_error_message != registration.unregister_status_message:
+                registration.unregister_status_message = unregister_error_message
+                result.replicas_with_new_unregistration_error.add(job_id)
+    for run_id, error_message in sync_result.failed_service_registrations.items():
+        registration = _get_or_create_service_registration(
+            session=session,
+            existing_by_id=service_registrations_by_run_id,
+            run_id=run_id,
+            gateway_replica_id=replica_model.id,
+        )
+        registration.is_registered = False
+        registration.register_attempt += 1
+        if error_message != registration.register_status_message:
+            registration.register_status_message = error_message
+            result.services_with_new_registration_error.add(run_id)
+    for job_id, error_message in sync_result.failed_replica_registrations.items():
+        registration = _get_or_create_service_replica_registration(
+            session=session,
+            existing_by_id=replica_registrations_by_job_id,
+            job_id=job_id,
+            gateway_replica_id=replica_model.id,
+        )
+        registration.is_registered = False
+        registration.register_attempt += 1
+        if error_message != registration.register_status_message:
+            registration.register_status_message = error_message
+            result.replicas_with_new_registration_error.add(job_id)
+    return result
+
+
+async def _emit_state_sync_events(
+    session,
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+    run_models_by_id: dict[uuid.UUID, RunModel],
+    job_models_by_id: dict[uuid.UUID, JobModel],
+    sync_result: "_StateSyncResult",
+    reconcile_records_result: _ReconcileRegistrationRecordsResult,
+) -> None:
+    # TODO: once gateway replica event targets are supported, link events to gateway replicas
+    # instead of gateways, and remove gateway replica nums from messages.
+    for run_id in sync_result.unregistered_services:
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            logger.error(
+                "%s replica %d: run %s not found, cannot emit service unregistration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Service unregistered from gateway replica {replica_model.replica_num}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(run_model), events.Target.from_model(gateway_model)],
+        )
+    for job_id in sync_result.unregistered_replicas:
+        job_model = job_models_by_id.get(job_id)
+        if job_model is None:
+            logger.error(
+                "%s replica %d: job %s not found, cannot emit replica unregistration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                job_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Service replica unregistered from gateway replica {replica_model.replica_num}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model), events.Target.from_model(gateway_model)],
+        )
+    for run_id in sync_result.registered_services:
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            logger.error(
+                "%s replica %d: run %s not found, cannot emit service registration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Service registered on gateway replica {replica_model.replica_num}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(run_model), events.Target.from_model(gateway_model)],
+        )
+    for job_id in sync_result.registered_replicas:
+        job_model = job_models_by_id.get(job_id)
+        if job_model is None:
+            logger.error(
+                "%s replica %d: job %s not found, cannot emit replica registration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                job_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Service replica registered on gateway replica {replica_model.replica_num}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model), events.Target.from_model(gateway_model)],
+        )
+    for run_id, error_message in sync_result.failed_service_registrations.items():
+        if run_id not in reconcile_records_result.services_with_new_registration_error:
+            continue  # same error as before, do not emit duplicate event
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            logger.error(
+                "%s replica %d: run %s not found, cannot emit service registration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Encountered service registration error on gateway replica {replica_model.replica_num}: {error_message}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(run_model), events.Target.from_model(gateway_model)],
+        )
+    for job_id, error_message in sync_result.failed_replica_registrations.items():
+        if job_id not in reconcile_records_result.replicas_with_new_registration_error:
+            continue  # same error as before, do not emit duplicate event
+        job_model = job_models_by_id.get(job_id)
+        if job_model is None:
+            logger.error(
+                "%s replica %d: job %s not found, cannot emit replica registration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                job_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Encountered service replica registration error on gateway replica {replica_model.replica_num}: {error_message}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model), events.Target.from_model(gateway_model)],
+        )
+    for run_id, error_message in sync_result.failed_service_unregistrations.items():
+        if run_id not in reconcile_records_result.services_with_new_unregistration_error:
+            continue  # same error as before, do not emit duplicate event
+        run_model = run_models_by_id.get(run_id)
+        if run_model is None:
+            logger.error(
+                "%s replica %d: run %s not found, cannot emit service unregistration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                run_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Encountered service unregistration error on gateway replica {replica_model.replica_num}: {error_message}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(run_model), events.Target.from_model(gateway_model)],
+        )
+    for job_id, error_message in sync_result.failed_replica_unregistrations.items():
+        if job_id not in reconcile_records_result.replicas_with_new_unregistration_error:
+            continue  # same error as before, do not emit duplicate event
+        job_model = job_models_by_id.get(job_id)
+        if job_model is None:
+            logger.error(
+                "%s replica %d: job %s not found, cannot emit replica unregistration event",
+                fmt(gateway_model),
+                replica_model.replica_num,
+                job_id,
+            )
+            continue
+        events.emit(
+            session,
+            f"Encountered service replica unregistration error on gateway replica {replica_model.replica_num}: {error_message}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model), events.Target.from_model(gateway_model)],
+        )
+
+
+async def _load_runs_and_jobs_for_state_sync(
+    session: AsyncSession,
+    plan: "_StateSyncPlan",
+) -> tuple[dict[uuid.UUID, RunModel], dict[uuid.UUID, JobModel]]:
+    run_ids = (
+        plan.register_services
+        | plan.register_replicas.keys()
+        | {s.id for s in plan.unregister_services if s.id is not None}
+    )
+    run_models_by_id: dict[uuid.UUID, RunModel] = {}
+    if run_ids:
+        res = await session.execute(
+            select(RunModel).where(RunModel.id.in_(run_ids)).options(joinedload(RunModel.project))
+        )
+        run_models_by_id = {run.id: run for run in res.unique().scalars().all()}
+
+    job_ids: set[uuid.UUID] = set()
+    for replica_ids in plan.register_replicas.values():
+        job_ids |= replica_ids
+    for replica_ids in plan.unregister_replicas.values():
+        job_ids |= replica_ids
+    job_models_by_id: dict[uuid.UUID, JobModel] = {}
+    if job_ids:
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.id.in_(job_ids))
+            .options(
+                joinedload(JobModel.instance).joinedload(InstanceModel.project),
+                joinedload(JobModel.project).load_only(ProjectModel.id, ProjectModel.name),
+            )
+        )
+        job_models_by_id = {job.id: job for job in res.unique().scalars().all()}
+
+    return run_models_by_id, job_models_by_id
+
+
+async def _register_service(
+    client: GatewayClient,
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+    run_model: RunModel,
+) -> None:
+    run_spec = get_run_spec(run_model)
+    if run_spec.configuration.type != "service":
+        message = f"Run {run_model.id} is not a service, cannot register"
+        logger.error("%s replica %d: %s", fmt(gateway_model), replica_model.replica_num, message)
+        raise RuntimeError(message)
+    if run_model.service_spec is None:
+        message = f"Run {run_model.id} has no service spec, cannot register"
+        logger.error("%s replica %d: %s", fmt(gateway_model), replica_model.replica_num, message)
+        raise RuntimeError(message)
+    service_spec = validate_json_extra_ignore(ServiceSpec, run_model.service_spec)
+    domain = service_spec.get_domain()
+    if domain is None:
+        message = f"Run {run_model.id} service spec has no domain, cannot register"
+        logger.error("%s replica %d: %s", fmt(gateway_model), replica_model.replica_num, message)
+        raise RuntimeError(message)
+
+    gateway_configuration = get_gateway_configuration(gateway_model)
+    has_replica_group_router = any(
+        g.router is not None for g in run_spec.configuration.replica_groups
+    )
+    logger.debug(
+        "%s replica %d: registering service %s/%s",
         fmt(gateway_model),
         replica_model.replica_num,
+        run_model.project.name,
+        run_model.run_name,
     )
-    await _commit_update(item, replica_model, update_map={})
+    await client.register_service(
+        project=run_model.project.name,
+        run_id=run_model.id,
+        run_name=run_model.run_name,
+        domain=domain,
+        service_https=should_configure_service_https_on_gateway(run_spec, gateway_configuration),
+        gateway_https=get_gateway_https(gateway_configuration),
+        auth=run_spec.configuration.auth,
+        client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+        options=service_spec.options,
+        rate_limits=run_spec.configuration.rate_limits,
+        ssh_private_key=run_model.project.ssh_private_key,
+        has_router_replica=has_replica_group_router,
+    )
+
+
+async def _register_replica(
+    client: GatewayClient,
+    gateway_model: GatewayModel,
+    replica_model: GatewayComputeModel,
+    run_model: RunModel,
+    job_model: JobModel,
+) -> None:
+    run_spec = get_run_spec(run_model)
+    if run_spec.configuration.type != "service":
+        message = f"Run {run_model.id} is not a service, cannot register replica"
+        logger.error("%s replica %d: %s", fmt(gateway_model), replica_model.replica_num, message)
+        raise RuntimeError(message)
+    instance = job_model.instance
+    if instance is None:
+        message = f"Job {job_model.id} has no instance, cannot register replica"
+        logger.error("%s replica %d: %s", fmt(gateway_model), replica_model.replica_num, message)
+        raise RuntimeError(message)
+    job_spec = validate_json_extra_ignore(JobSpec, job_model.job_spec_data)
+    job_submission = job_model_to_job_submission(job_model)
+
+    instance_project_ssh_private_key = None
+    if job_model.project_id != instance.project_id:
+        instance_project_ssh_private_key = instance.project.ssh_private_key
+    ssh_head_proxy = None
+    ssh_head_proxy_private_key = None
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None and rci.ssh_proxy is not None:
+        ssh_head_proxy = rci.ssh_proxy
+        ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
+
+    logger.debug(
+        "%s replica %d: registering replica %s for service %s/%s",
+        fmt(gateway_model),
+        replica_model.replica_num,
+        job_model.id,
+        run_model.project.name,
+        run_model.run_name,
+    )
+    await client.register_replica(
+        project=run_model.project.name,
+        run_name=run_model.run_name,
+        configuration=run_spec.configuration,
+        job_spec=job_spec,
+        job_submission=job_submission,
+        instance_project_ssh_private_key=instance_project_ssh_private_key,
+        ssh_head_proxy=ssh_head_proxy,
+        ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+    )
+
+
+@dataclass(frozen=True)
+class _ServiceRef:
+    id: uuid.UUID | None
+    project_name: str
+    run_name: str
+
+
+@dataclass
+class _StateSyncPlan:
+    register_services: set[uuid.UUID] = field(default_factory=set)
+    unregister_services: set[_ServiceRef] = field(default_factory=set)
+    # run ID -> set[job ID]
+    register_replicas: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
+    unregister_replicas: dict[_ServiceRef, set[uuid.UUID]] = field(default_factory=dict)
+    set_run_ids: dict[_ServiceRef, uuid.UUID] = field(default_factory=dict)
+
+
+@dataclass
+class _StateSyncResult:
+    registered_services: set[uuid.UUID] = field(default_factory=set)
+    registered_replicas: set[uuid.UUID] = field(default_factory=set)
+    unregistered_services: set[uuid.UUID] = field(default_factory=set)
+    unregistered_replicas: set[uuid.UUID] = field(default_factory=set)
+
+    # run ID -> error message
+    failed_service_registrations: dict[uuid.UUID, str] = field(default_factory=dict)
+    failed_replica_registrations: dict[uuid.UUID, str] = field(default_factory=dict)
+    failed_service_unregistrations: dict[uuid.UUID, str] = field(default_factory=dict)
+    failed_replica_unregistrations: dict[uuid.UUID, str] = field(default_factory=dict)
+
+
+def _plan_state_sync(
+    currently_registered: list[ServiceListItem], expected: Sequence[RunModel]
+) -> _StateSyncPlan:
+    plan = _StateSyncPlan()
+    expected_run_id_to_run = {run.id: run for run in expected}
+    expected_job_id_to_run = {job.id: run for run in expected for job in run.jobs}
+    expected_run_ids = {run.id for run in expected}
+    currently_registered_run_ids: set[uuid.UUID] = set()
+
+    for service in currently_registered:
+        service_ref = _ServiceRef(
+            id=uuid.UUID(service.id) if service.id is not None else None,
+            project_name=service.project_name,
+            run_name=service.run_name,
+        )
+        if service.id is not None:
+            run_id = uuid.UUID(service.id)
+        else:
+            # Try to recover ID for legacy pre-0.21.0 service
+            for replica in service.replicas:
+                if run := expected_job_id_to_run.get(uuid.UUID(replica.id)):
+                    run_id = run.id
+                    plan.set_run_ids[service_ref] = run_id
+                    break
+            else:
+                # Could not recover ID, and none of the current replicas are relevant - unregister.
+                # If the service is relevant, we'll re-register it with ID.
+                plan.unregister_services.add(service_ref)
+                continue
+        currently_registered_run_ids.add(run_id)
+        if run := expected_run_id_to_run.get(run_id):
+            currently_registered_job_ids = {uuid.UUID(replica.id) for replica in service.replicas}
+            expected_job_ids = {job.id for job in run.jobs}
+            plan.register_replicas[run.id] = expected_job_ids - currently_registered_job_ids
+            plan.unregister_replicas[service_ref] = currently_registered_job_ids - expected_job_ids
+        else:
+            plan.unregister_services.add(service_ref)
+
+    for run_id in expected_run_ids - currently_registered_run_ids:
+        plan.register_services.add(run_id)
+        plan.register_replicas[run_id] = {job.id for job in expected_run_id_to_run[run_id].jobs}
+
+    return plan
 
 
 async def _process_terminating_item(item: GatewayReplicaPipelineItem):

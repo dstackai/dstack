@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
 
-import httpx
 from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
@@ -13,7 +12,7 @@ from sqlalchemy.orm import joinedload, load_only
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
-from dstack._internal.core.errors import BackendError, GatewayError, SSHError
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
@@ -51,7 +50,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_or_add_gateway_connections
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     get_instance_ssh_private_keys,
@@ -324,11 +322,6 @@ class _VolumeUpdateRow(TypedDict):
 
 
 @dataclass
-class _UnregisterReplicaResult:
-    gateway_target: Optional[events.Target]  # None = no gateway
-
-
-@dataclass
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
     instance_update_map: Optional[_InstanceUpdateMap] = None
@@ -337,9 +330,6 @@ class _ProcessResult:
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     unassign_event_message: Optional[str] = None
     graceful_stop_event_message: Optional[str] = None
-    replica_unregistration: Optional[_UnregisterReplicaResult] = (
-        None  # None = not unregistered yet
-    )
 
 
 @dataclass
@@ -618,17 +608,6 @@ async def _apply_process_result(
                 targets=[events.Target.from_model(job_model)],
             )
 
-        if result.replica_unregistration is not None:
-            targets = [events.Target.from_model(job_model)]
-            if result.replica_unregistration.gateway_target is not None:
-                targets.append(result.replica_unregistration.gateway_target)
-            events.emit(
-                session,
-                "Service replica unregistered from receiving requests",
-                actor=events.SystemActor(),
-                targets=targets,
-            )
-
 
 async def _unlock_related_instance(
     session: AsyncSession,
@@ -665,7 +644,7 @@ async def _process_terminating_job(
     result = _ProcessResult(instance_update_map=instance_update_map)
 
     if instance_model is None:
-        await _unregister_replica_and_update_result(result=result, job_model=job_model)
+        await _unset_registered(result=result, job_model=job_model)
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
@@ -676,7 +655,7 @@ async def _process_terminating_job(
         result.instance_update_map = None
         result.delete_instance = True
         result.job_update_map["instance_id"] = None
-        await _unregister_replica_and_update_result(result=result, job_model=job_model)
+        await _unset_registered(result=result, job_model=job_model)
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
@@ -733,7 +712,7 @@ async def _process_terminating_job(
         f" Instance blocks: {busy_blocks}/{instance_model.total_blocks} busy"
     )
 
-    await _unregister_replica_and_update_result(result=result, job_model=job_model)
+    await _unset_registered(result=result, job_model=job_model)
     if detach_result.all_detached:
         result.job_update_map["status"] = _get_job_termination_status(job_model)
     return result
@@ -804,55 +783,9 @@ async def _detach_job_volumes(
     return volume_update_rows, detach_result
 
 
-async def _unregister_replica_and_update_result(
-    result: _ProcessResult, job_model: JobModel
-) -> None:
-    gateway_target = await _unregister_replica(job_model=job_model)
+async def _unset_registered(result: _ProcessResult, job_model: JobModel) -> None:
     if job_model.registered:
         result.job_update_map["registered"] = False
-        result.replica_unregistration = _UnregisterReplicaResult(gateway_target=gateway_target)
-
-
-async def _unregister_replica(
-    job_model: JobModel,
-) -> Optional[events.Target]:
-    if not job_model.registered:
-        return None
-    gateway_target = None
-    run_model = job_model.run
-    if run_model.gateway_id is not None:
-        async with get_session_ctx() as session:
-            gateway, connections = await get_or_add_gateway_connections(
-                session, run_model.gateway_id
-            )
-            gateway_target = events.Target.from_model(gateway)
-        for conn in connections:
-            try:
-                logger.debug(
-                    "%s: unregistering replica from service %s on gateway replica %s",
-                    fmt(job_model),
-                    job_model.run_id.hex,
-                    conn.ip_address,
-                )
-                async with conn.client() as client:
-                    await client.unregister_replica(
-                        project=run_model.project.name,
-                        run_name=run_model.run_name,
-                        job_id=job_model.id,
-                    )
-            except GatewayError as e:
-                logger.warning(
-                    "%s: unregistering replica from service on gateway replica %s: %s",
-                    fmt(job_model),
-                    conn.ip_address,
-                    e,
-                )
-            except (httpx.RequestError, SSHError) as e:
-                logger.debug("Gateway request failed", exc_info=True)
-                # FIXME: Unhandled exception raised.
-                # Handle and retry unregister with timeout.
-                raise GatewayError(repr(e))
-    return gateway_target
 
 
 def _get_job_termination_status(job_model: JobModel) -> JobStatus:
