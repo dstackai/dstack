@@ -7,9 +7,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
-from dstack._internal.cli.services.presets.redaction import redact
+from dstack._internal.cli.services.presets.redaction import redact, redact_bytes
 from dstack._internal.cli.services.presets.session import (
     PresetAgentSession,
+    _write_private_bytes,
     _write_private_text,
     print_preset_progress,
 )
@@ -257,10 +258,10 @@ class _DirectoryMirror:
             if self._copied.get(relative) == signature:
                 continue
             try:
-                content = source_file.read_text(encoding="utf-8", errors="replace")
+                content = source_file.read_bytes()
                 target = self._target / relative
                 target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                _write_private_text(target, redact(content, self._redacted_values))
+                _write_private_bytes(target, redact_bytes(content, self._redacted_values))
             except OSError as e:
                 if self._echo and relative not in self._warned:
                     self._warned.add(relative)

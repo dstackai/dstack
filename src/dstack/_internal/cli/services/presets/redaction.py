@@ -4,6 +4,7 @@ import os
 from typing import Any, Sequence
 
 _REDACTION = "[redacted]"
+_REDACTION_BYTES = _REDACTION.encode("utf-8")
 # Replacing shorter values such as "1" or "false" corrupts unrelated diagnostics.
 _MIN_REDACTED_SUBSTRING_LENGTH = 8
 _SENSITIVE_INHERITED_ENV_NAMES = (
@@ -44,6 +45,20 @@ def redact(value: str, redacted_values: Sequence[str]) -> str:
             return _REDACTION
         if len(redacted_value) >= _MIN_REDACTED_SUBSTRING_LENGTH:
             value = value.replace(redacted_value, _REDACTION)
+    return value
+
+
+def redact_bytes(value: bytes, redacted_values: Sequence[str]) -> bytes:
+    """As `redact`, on bytes. A copied file must keep its exact bytes, and
+    decoding it to text rewrites newlines and replaces non-UTF-8 bytes."""
+    for redacted_value in redacted_values:
+        # Environment values decode with surrogateescape, so encoding them back
+        # the same way is what returns their original bytes.
+        encoded = redacted_value.encode("utf-8", errors="surrogateescape")
+        if value == encoded:
+            return _REDACTION_BYTES
+        if len(redacted_value) >= _MIN_REDACTED_SUBSTRING_LENGTH:
+            value = value.replace(encoded, _REDACTION_BYTES)
     return value
 
 

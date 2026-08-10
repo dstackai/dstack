@@ -526,6 +526,21 @@ class TestDirectoryMirror:
         assert (target / "task.dstack.yml").read_text() == "env:\n  - TOKEN=[redacted]\n"
         assert (target / "trial.json").read_text() == '{"learned": "x"}'
 
+    def test_copies_bytes_verbatim(self, tmp_path):
+        # Patches must replicate the trial exactly, and text mode rewrites
+        # newlines and replaces bytes that are not valid UTF-8.
+        source = tmp_path / "w" / "trials" / "1" / "patches"
+        source.mkdir(parents=True)
+        (source / "tuned.csv").write_bytes(b"m,n,k\r\n8,1536,4096\r\n")
+        (source / "weights.bin").write_bytes(b"\x00\xff\xfe binary")
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1" / "patches"
+        assert (target / "tuned.csv").read_bytes() == b"m,n,k\r\n8,1536,4096\r\n"
+        assert (target / "weights.bin").read_bytes() == b"\x00\xff\xfe binary"
+
     def test_a_rewritten_source_converges_instead_of_corrupting(self, tmp_path):
         # The failure mode this mirror exists to remove: a source rewritten
         # under a byte-offset tailer used to commit a torn record forever.

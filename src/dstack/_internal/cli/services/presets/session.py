@@ -613,12 +613,13 @@ def _process_started_at(pid: int) -> Optional[float]:
         return None
 
 
-def _write_private_text(path: Path, content: str) -> None:
+def _write_private_bytes(path: Path, content: bytes) -> None:
     # Atomic tmp + fsync + replace (mkstemp already creates the file 0600), so
     # a crash mid-write cannot leave a truncated manifest or offsets file.
+    # Binary mode: mirrored files are copies, and text mode rewrites newlines.
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "wb") as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
@@ -635,7 +636,11 @@ def _write_private_text(path: Path, content: str) -> None:
                 with suppress(PermissionError):
                     os.replace(temporary, path)
                     return
-            path.write_text(content, encoding="utf-8")
+            path.write_bytes(content)
     finally:
         with suppress(FileNotFoundError):
             os.unlink(temporary)
+
+
+def _write_private_text(path: Path, content: str) -> None:
+    _write_private_bytes(path, content.encode("utf-8"))
