@@ -393,9 +393,9 @@ class TestFailedTrials:
 
 
 class TestFailedTrialSpark:
-    def test_a_trial_that_broke_a_constraint_is_yellow_but_still_charted(self):
-        # Its number is real, so it earns a bar; the breach makes it yellow, not
-        # red — red is reserved for a trial that produced nothing.
+    def test_a_trial_that_broke_a_constraint_is_charted_but_not_the_best(self):
+        # Its number is real, so it earns a bar rather than a `·`, and green goes
+        # to the best trial that meets the constraints even on a lower number.
         session = {
             "id": "ab12cd34",
             "status": "running",
@@ -408,8 +408,26 @@ class TestFailedTrialSpark:
 
         spark = output_module._format_trial_spark(session)
 
-        assert spark.count("gold1") == 1
-        assert "indian_red1" not in spark
+        assert spark.count("indian_red1") == 1
+        assert spark.count("sea_green3") == 1
+        assert "gold1" not in spark
         assert "·" not in spark
-        # The failed trial is the highest number and must not be styled as best.
+
+    def test_the_best_failed_trial_is_gold_while_none_passes(self):
+        # With nothing meeting the constraints, the best result so far is still
+        # what the run has to show; the rest are context.
+        session = {
+            "id": "ab12cd34",
+            "status": "running",
+            "trials": {
+                "count": 3,
+                "series": [100.0, 900.0, 300.0],
+                "failed": [True, True, True],
+            },
+        }
+
+        spark = output_module._format_trial_spark(session)
+
+        assert spark.count("gold1") == 1
+        assert spark.count("indian_red1") == 2
         assert "sea_green3" not in spark

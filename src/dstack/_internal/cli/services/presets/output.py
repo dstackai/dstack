@@ -36,9 +36,11 @@ _SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
 
 
 def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
-    """One glyph per trial, scaled within the run: the shape of the search.
-    A red `·` marks a trial that produced no benchmark at all; a yellow bar marks
-    one that measured but broke a constraint, since its number is real."""
+    """One glyph per trial, scaled from zero: bar heights compare as the
+    numbers do, so the size of a gain is visible. A red `·` marks a trial
+    that produced no benchmark at all, and a red bar one that measured but
+    broke a constraint. Gold marks the best result while no trial meets the
+    constraints; green takes over once one does."""
     if not isinstance(session, dict):
         return ""
     trials = session.get("trials")
@@ -51,8 +53,12 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
     values = [v for v in series if isinstance(v, (int, float))]
     if not values:
         return "·" * len(series)
-    low, high = min(values), max(values)
-    span = high - low
+    high = max(values)
+    passed = [v for v, f in zip(series, failed) if isinstance(v, (int, float)) and not f]
+    # The best trial is the answer the run found; everything else is context. Gold
+    # is that answer while none meets the constraints, so it gives way to green as
+    # soon as one does.
+    best = max(passed) if passed else max(values)
     out = []
     for value, is_failed in zip(series, failed):
         if not isinstance(value, (int, float)):
@@ -60,17 +66,13 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
             continue
         glyph = (
             _SPARK_BLOCKS[-1]
-            if span <= 0
-            else _SPARK_BLOCKS[round((value - low) / span * (len(_SPARK_BLOCKS) - 1))]
+            if high <= 0
+            else _SPARK_BLOCKS[round(max(value, 0) / high * (len(_SPARK_BLOCKS) - 1))]
         )
-        # The best trial is the answer the run found; everything else is context.
-        # Yellow, not red: the trial measured, its number is real, and only the
-        # constraint breach makes it unusable. Red is reserved for `·`, where
-        # nothing came back at all.
         if is_failed:
-            style = "gold1"
+            style = "gold1" if not passed and value >= best else "indian_red1"
         else:
-            style = "bold sea_green3" if value >= high else "secondary"
+            style = "bold sea_green3" if value >= best else "secondary"
         out.append(f"[{style}]{glyph}[/]")
     return "".join(out)
 
@@ -285,8 +287,11 @@ def _add_preset(
         "": _format_trial_spark(creation),
         "CONSTRAINTS": format_preset_objective(
             preset,
-            min_context_length=(creation or {}).get("constraints", {}).get("min_context_length"),
-            max_ttft=(creation or {}).get("constraints", {}).get("max_ttft"),
+            # The preset carries what it was asked for; the creation record is the
+            # fallback for presets saved before it did.
+            min_context_length=preset.min_context_length
+            or (creation or {}).get("constraints", {}).get("min_context_length"),
+            max_ttft=preset.max_ttft or (creation or {}).get("constraints", {}).get("max_ttft"),
             verbose=verbose,
         ),
         "BENCHMARK": format_preset_benchmark(preset, verbose=verbose),
@@ -336,6 +341,18 @@ def format_preset_objective(
     return f"[secondary]{' '.join(parts)}[/]"
 
 
+def _breaches_constraints(preset: Preset) -> bool:
+    """Whether the verified benchmark misses what was asked for. A session that
+    found no compliant trial verifies its best failed one, so a preset can be
+    real, reproducible, and still fall short."""
+    metrics = preset.validations[0].benchmark.metrics
+    if preset.max_ttft is not None and metrics.ttft_ms.p50 > preset.max_ttft:
+        return True
+    return preset.min_context_length is not None and (
+        preset.context_length < preset.min_context_length
+    )
+
+
 def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
     benchmark = preset.validations[0].benchmark
     metrics = benchmark.metrics
@@ -350,7 +367,12 @@ def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
         f"ttft={_format_duration_ms(metrics.ttft_ms.p50)}",
         f"ctx={_format_token_count(preset.context_length)}",
     ]
-    return " ".join(parts)
+    text = " ".join(parts)
+    if _breaches_constraints(preset):
+        # Marked, not only dimmed: colour alone is not a signal. Same `*` a
+        # session row uses when it has nothing but failed trials to show.
+        return f"[secondary]*{text}[/]"
+    return text
 
 
 def _format_duration_ms(value: float) -> str:
