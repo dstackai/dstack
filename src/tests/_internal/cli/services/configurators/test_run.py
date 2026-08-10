@@ -113,15 +113,16 @@ class TestApplyConfiguration:
     def test_composes_get_plan_and_apply_plan(self, monkeypatch):
         run_plan, repo = Mock(), Mock()
         get_plan = Mock(return_value=(run_plan, repo))
-        apply_plan = Mock()
+        apply_plan = Mock(return_value=object())
         monkeypatch.setattr(ServiceConfigurator, "get_plan", get_plan)
         monkeypatch.setattr(ServiceConfigurator, "apply_plan", apply_plan)
         conf, command_args, configurator_args = Mock(), Mock(), Mock()
 
-        ServiceConfigurator(api_client=Mock()).apply_configuration(
+        result = ServiceConfigurator(api_client=Mock()).apply_configuration(
             conf, "svc.dstack.yml", command_args, configurator_args
         )
 
+        assert result is None
         get_plan.assert_called_once_with(
             conf=conf,
             configuration_path="svc.dstack.yml",

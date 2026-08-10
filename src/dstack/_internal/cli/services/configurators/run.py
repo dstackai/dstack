@@ -6,6 +6,8 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, TypeVar
 
@@ -65,6 +67,9 @@ from dstack._internal.core.models.runs import (
     RunSpec,
     RunStatus,
 )
+from dstack._internal.core.models.runs import (
+    Run as RunModel,
+)
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
@@ -77,10 +82,68 @@ from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.runs import Run
 
 _BIND_ADDRESS_ARG = "bind_address"
+_NO_RECREATE_NOOP_STATUSES = {
+    RunStatus.SUBMITTED,
+    RunStatus.PROVISIONING,
+    RunStatus.RUNNING,
+}
 
 logger = get_logger(__name__)
 
 RunConfigurationT = TypeVar("RunConfigurationT", bound=AnyRunConfiguration)
+
+
+class ApplyPlanResult(str, Enum):
+    """Outcome of the non-streaming part of applying a run plan."""
+
+    CANCELLED = "cancelled"
+    NOOP = "noop"
+    SUBMITTED = "submitted"
+
+
+@dataclass(frozen=True)
+class RunApplyFence:
+    run_id: str
+    deployment_num: int
+    user: str
+
+
+@dataclass(frozen=True)
+class ApplyPlanOutcome:
+    result: ApplyPlanResult
+    fence: Optional[RunApplyFence] = None
+
+
+def get_run_apply_fence(run: RunModel) -> RunApplyFence:
+    return RunApplyFence(
+        run_id=str(run.id),
+        deployment_num=run.deployment_num,
+        user=run.user,
+    )
+
+
+def validate_no_recreate_plan(run_plan: RunPlan) -> Optional[RunApplyFence]:
+    """Validate an active plan using the fail-closed no-recreate contract."""
+    current = run_plan.current_resource
+    if current is None or current.status.is_finished():
+        return None
+    run_name = run_plan.run_spec.run_name
+    if current.user != run_plan.user:
+        raise CLIError(
+            f"Refusing to use active run {run_name} with --no-recreate;"
+            " the run is owned by another user"
+        )
+    diff = render_run_spec_diff(run_plan.get_effective_run_spec(), current.run_spec)
+    if (
+        run_plan.action == ApplyAction.UPDATE
+        and diff is None
+        and current.status in _NO_RECREATE_NOOP_STATUSES
+    ):
+        return get_run_apply_fence(current)
+    raise CLIError(
+        f"Refusing to change active run {run_name} with --no-recreate;"
+        " stop it explicitly before applying this configuration"
+    )
 
 
 class BaseRunConfigurator(
@@ -99,12 +162,15 @@ class BaseRunConfigurator(
             configuration_path=configuration_path,
             configurator_args=configurator_args,
         )
-        return self.apply_plan(
+        self.apply_plan(
             run_plan=run_plan,
             repo=repo,
             command_args=command_args,
             configurator_args=configurator_args,
         )
+        # Preserve the historical apply_configuration() return contract. Callers that need a
+        # structured outcome can invoke apply_plan() directly.
+        return None
 
     def get_plan(
         self,
@@ -145,9 +211,16 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         plan_properties: Optional[Dict[str, str]] = None,
-    ):
-        """Apply a run plan using the standard CLI behavior."""
+    ) -> Optional[ApplyPlanOutcome]:
+        """Apply a run plan using the standard CLI behavior.
+
+        A structured outcome is returned for cancellation, no-op, and detached submission.
+        Foreground apply retains its existing attach and interrupt behavior and may return ``None``.
+        """
         run_name = run_plan.run_spec.run_name
+        no_recreate = getattr(command_args, "no_recreate", False)
+        if no_recreate and run_name is None:
+            raise CLIError("--no-recreate requires a named run")
 
         no_fleets = False
         if len(run_plan.job_plans[0].offers) == 0:
@@ -171,6 +244,14 @@ class BaseRunConfigurator(
                 run_plan.get_effective_run_spec(),
                 run_plan.current_resource.run_spec,
             )
+            if no_recreate and not run_plan.current_resource.status.is_finished():
+                fence = validate_no_recreate_plan(run_plan)
+                assert fence is not None
+                console.print(f"Run [code]{run_name}[/] is already up to date.")
+                return ApplyPlanOutcome(
+                    result=ApplyPlanResult.NOOP,
+                    fence=fence,
+                )
             if run_plan.action == ApplyAction.UPDATE and diff is not None:
                 console.print(
                     f"Active run [code]{run_name}[/] already exists."
@@ -184,7 +265,10 @@ class BaseRunConfigurator(
                 )
                 if command_args.yes and not command_args.force:
                     console.print("Use --force to apply anyway.")
-                    return
+                    return ApplyPlanOutcome(
+                        result=ApplyPlanResult.NOOP,
+                        fence=get_run_apply_fence(run_plan.current_resource),
+                    )
                 confirm_message = "Stop and override the run?"
             elif not run_plan.current_resource.status.is_finished():
                 stop_run_name = run_plan.current_resource.run_spec.run_name
@@ -198,7 +282,7 @@ class BaseRunConfigurator(
 
         if not command_args.yes and not confirm_ask(confirm_message):
             console.print("\nExiting...")
-            return
+            return ApplyPlanOutcome(result=ApplyPlanResult.CANCELLED)
 
         if stop_run_name is not None:
             with console.status("Stopping run..."):
@@ -229,7 +313,10 @@ class BaseRunConfigurator(
             if run_plan.action == ApplyAction.UPDATE:
                 detach_message = f"Run [code]{run.name}[/] updated, detaching..."
             console.print(detach_message)
-            return
+            return ApplyPlanOutcome(
+                result=ApplyPlanResult.SUBMITTED,
+                fence=get_run_apply_fence(run._run),
+            )
 
         abort_at_exit = False
         try:

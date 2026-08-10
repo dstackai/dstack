@@ -11,9 +11,25 @@ from dstack._internal.cli.services.configurators import (
 )
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.configurations import ApplyConfigurationType
+from dstack._internal.core.models.configurations import (
+    AnyApplyConfiguration,
+    ApplyConfigurationType,
+)
 
 NOTSET = object()
+_RUN_CONFIGURATION_TYPES = {
+    ApplyConfigurationType.DEV_ENVIRONMENT,
+    ApplyConfigurationType.TASK,
+    ApplyConfigurationType.SERVICE,
+}
+
+
+def validate_no_recreate_configuration(configuration: AnyApplyConfiguration) -> None:
+    configuration_type = ApplyConfigurationType(configuration.type)
+    if configuration_type not in _RUN_CONFIGURATION_TYPES:
+        raise CLIError("--no-recreate is only supported for run configurations")
+    if configuration.name is None:
+        raise CLIError("--no-recreate requires a named run")
 
 
 class ApplyCommand(APIBaseCommand):
@@ -51,9 +67,15 @@ class ApplyCommand(APIBaseCommand):
             help="Do not ask for confirmation",
             action="store_true",
         )
-        self._parser.add_argument(
+        apply_safety = self._parser.add_mutually_exclusive_group()
+        apply_safety.add_argument(
             "--force",
             help="Force apply when no changes detected",
+            action="store_true",
+        )
+        apply_safety.add_argument(
+            "--no-recreate",
+            help="Fail instead of changing an active run; unchanged active runs are no-op",
             action="store_true",
         )
         self._parser.add_argument(
@@ -89,6 +111,8 @@ class ApplyCommand(APIBaseCommand):
             if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
                 raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
             configuration_path, configuration = load_apply_configuration(args.configuration_file)
+            if args.no_recreate:
+                validate_no_recreate_configuration(configuration)
             configurator_class = get_apply_configurator_class(configuration.type)
             configurator = configurator_class(api_client=self.api)
             configurator_parser = configurator.get_parser()

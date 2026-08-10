@@ -3295,6 +3295,59 @@ class TestApplyPlan:
         assert job is not None
 
     @pytest.mark.asyncio
+    async def test_rejects_apply_when_active_run_appears_after_absent_plan(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        validate_run_spec_and_set_defaults(user, run_spec)
+        active_run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        original_id = active_run.id
+        original_deployment_num = active_run.deployment_num
+
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+            json=json.loads(
+                ApplyRunPlanRequest(
+                    plan=ApplyRunPlanInput(
+                        run_spec=run_spec,
+                        # The plan was computed while the named run was absent.
+                        current_resource=None,
+                    ),
+                    force=False,
+                ).model_dump_json()
+            ),
+        )
+
+        assert response.status_code == 400
+        assert "Resource has been changed" in response.text
+        runs = (await session.execute(select(RunModel))).scalars().all()
+        assert len(runs) == 1
+        assert runs[0].id == original_id
+        assert runs[0].deployment_num == original_deployment_num
+        assert runs[0].status == RunStatus.RUNNING
+        assert not runs[0].deleted
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_submits_new_run_docker_true(
         self, test_db, session: AsyncSession, client: AsyncClient
