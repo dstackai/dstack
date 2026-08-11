@@ -578,9 +578,14 @@ class JobModel(PipelineModelMixin, BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
+    ready: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    """Whether the replica is ready to receive service requests based on probe statuses.
+    Always `False` for non-service runs.
+    """
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    """`registered` shows whether the replica is registered to receive service requests.
-    It is always `False` for non-service runs.
+    """Whether the replica is registered to receive service requests from dstack-proxy.
+    Always `False` for non-service runs or jobs that shouldn't be registered
+    (e.g., non-router replicas for services with routers).
     """
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
     """`waiting_master_job` is `True` for non-master jobs that have to wait for master processing before

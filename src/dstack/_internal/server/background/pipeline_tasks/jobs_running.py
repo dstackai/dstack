@@ -20,7 +20,6 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
-    ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import InstanceStatus, SSHConnectionParams
@@ -34,7 +33,6 @@ from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
     JobRuntimeData,
-    JobSpec,
     JobStatus,
     JobSubmission,
     JobTerminationReason,
@@ -366,6 +364,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     disconnected_at: Optional[datetime]
     inactivity_secs: Optional[int]
     exit_status: Optional[int]
+    ready: bool
     registered: bool
     image_pull_progress: Optional[str]
     skip_min_processing_interval: bool
@@ -1083,6 +1082,12 @@ def _emit_result_events(
             job_model.disconnected_at,
         ),
     )
+    _emit_readiness_change_event(
+        session=session,
+        job_model=job_model,
+        old_ready=job_model.ready,
+        new_ready=result.job_update_map.get("ready", job_model.ready),
+    )
     if result.replica_registration is not None:
         targets = [events.Target.from_model(job_model)]
         if result.replica_registration.gateway_target is not None:
@@ -1175,11 +1180,30 @@ async def _maybe_register_replica(
 ) -> None:
     if (
         context.run.run_spec.configuration.type != "service"
-        or _get_result_registered(context.job_model, result)
         or context.job_model.job_num != 0
         or result.new_probe_models
-        or not is_job_ready(context.job_model.probes, context.job.job_spec.probes)
     ):
+        return
+
+    is_ready = is_job_ready(context.job_model.probes, context.job.job_spec.probes)
+    if is_ready and not context.job_model.ready:
+        result.job_update_map["ready"] = True
+
+    router_group = next(
+        (g for g in context.run.run_spec.configuration.replica_groups if g.router is not None),
+        None,
+    )
+    is_router_replica = (
+        router_group is not None and context.job.job_spec.replica_group == router_group.name
+    )
+    # non-router replicas aren't registered if the service has a router
+    if router_group is not None and not is_router_replica:
+        if context.job_model.registered:
+            # migration edge case: a pre-0.21.1 server replica incorrectly set registered=True
+            result.job_update_map["registered"] = False
+        return
+
+    if not is_ready or _get_result_registered(context.job_model, result):
         return
 
     ssh_head_proxy: Optional[SSHConnectionParams] = None
@@ -1220,23 +1244,6 @@ async def _register_service_replica(
 ) -> Optional[events.Target]:
     if context.run_model.gateway_id is None:
         return None
-
-    job_spec = validate_json_extra_ignore(JobSpec, context.job_model.job_spec_data)
-
-    # For router-based services (e.g. PD disaggregation), only router replicas should be
-    # registered with the gateway. Worker replicas are discovered by the router-worker
-    # sync pipeline and should not be routed to directly by the gateway.
-    config = context.run.run_spec.configuration
-    assert isinstance(config, ServiceConfiguration)
-    router_group = next((g for g in config.replica_groups if g.router is not None), None)
-    is_router_replica = router_group is not None and job_spec.replica_group == router_group.name
-    if router_group is not None and not is_router_replica:
-        logger.debug(
-            "%s: skipping gateway replica registration (non-router replica)",
-            fmt(context.job_model),
-        )
-        return None
-
     async with get_session_ctx() as session:
         gateway_model, connections = await get_or_add_gateway_connections(
             session, context.run_model.gateway_id
@@ -1261,7 +1268,7 @@ async def _register_service_replica(
             async with conn.client() as gateway_client:
                 await gateway_client.register_replica(
                     run=context.run,
-                    job_spec=job_spec,
+                    job_spec=context.job.job_spec,
                     job_submission=job_submission,
                     instance_project_ssh_private_key=instance_project_ssh_private_key,
                     ssh_head_proxy=ssh_head_proxy,
@@ -1875,6 +1882,23 @@ def _emit_reachability_change_event(
             actor=events.SystemActor(),
             targets=[events.Target.from_model(job_model)],
         )
+
+
+def _emit_readiness_change_event(
+    session: AsyncSession,
+    job_model: JobModel,
+    old_ready: bool,
+    new_ready: bool,
+) -> None:
+    # ready: False -> True
+    if not old_ready and new_ready:
+        events.emit(
+            session,
+            "Service replica ready to receive requests",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model)],
+        )
+    # ready: True -> False is not possible as of this writing
 
 
 def _terminate_job(
