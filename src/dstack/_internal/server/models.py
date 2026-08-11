@@ -564,7 +564,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     If `instance_assigned` is `True` and `instance` is `None`, no instance was assigned.
     """
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("instances.id", ondelete="CASCADE")
+        ForeignKey("instances.id", ondelete="CASCADE"), index=True
     )
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
