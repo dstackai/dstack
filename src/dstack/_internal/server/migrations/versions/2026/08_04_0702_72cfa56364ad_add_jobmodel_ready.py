@@ -36,11 +36,7 @@ runs_table = sa.Table(
     sa.MetaData(),
     sa.Column("id", UUIDType(binary=False), primary_key=True, default=uuid.uuid4),
     sa.Column("run_spec", sa.Text()),
-)
-service_router_worker_sync_table = sa.Table(
-    "service_router_worker_sync",
-    sa.MetaData(),
-    sa.Column("run_id", UUIDType(binary=False)),
+    sa.Column("service_spec", sa.Text(), nullable=True),
 )
 
 
@@ -78,12 +74,17 @@ def upgrade() -> None:
 
     # set registered=False for non-router replicas in services with a router
 
-    router_run_ids_subq = sa.select(service_router_worker_sync_table.c.run_id)
     candidate_jobs = bind.execute(
-        sa.select(jobs_table.c.id, jobs_table.c.run_id, jobs_table.c.job_spec_data).where(
+        sa.select(jobs_table.c.id, jobs_table.c.run_id, jobs_table.c.job_spec_data)
+        .select_from(jobs_table.join(runs_table, jobs_table.c.run_id == runs_table.c.id))
+        .where(
             jobs_table.c.registered == True,
             jobs_table.c.status == "RUNNING",
-            jobs_table.c.run_id.in_(router_run_ids_subq),
+            runs_table.c.service_spec.is_not(None),
+            sa.or_(
+                runs_table.c.run_spec.like('%"sglang"%'),
+                runs_table.c.run_spec.like('%"dynamo"%'),
+            ),
         )
     ).all()
 
