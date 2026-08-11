@@ -10,7 +10,7 @@ import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from dstack._internal.cli.services.presets.session import (
     _CONSTRAINTS_FILENAME,
@@ -21,6 +21,7 @@ from dstack._internal.cli.services.presets.session import (
     _TRIALS_DIRNAME,
     PresetAgentSession,
 )
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 
@@ -263,6 +264,56 @@ path = Path(os.environ.get("{_PROGRESS_ENV}", "{_PROGRESS_FILENAME}"))
 with path.open("a", encoding="utf-8") as f:
     f.write(json.dumps({{"message": message}}, ensure_ascii=False) + "\\n")
 """
+
+
+_PREVIOUS_DIRNAME = "previous"
+_PATCHES_DIRNAME = "patches"
+_PREVIOUS_TRIAL_FILENAMES = ("trial.json", "task.dstack.yml")
+_PREVIOUS_SERVICE_FILENAMES = ("service.dstack.yml", "verification.json")
+
+
+def install_previous_records(
+    workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetAgentSession]
+) -> None:
+    """Copies each previous session's records into `previous/<id>/` in the
+    workspace, so the agent can read what earlier sessions tried and how it
+    worked. Remove-then-recopy, so a crashed copy heals on the next run. Only
+    the records travel: logs, traces, and the manifest stay out."""
+    for session in previous_sessions:
+        target_root = workspace.path / _PREVIOUS_DIRNAME / session.preset_id
+        shutil.rmtree(target_root, ignore_errors=True)
+        if not _copy_session_records(session.path, target_root):
+            warn(f"Previous session {session.preset_id} has no records")
+
+
+def _copy_session_records(source_root: Path, target_root: Path) -> bool:
+    copied = False
+    for name in (_CONSTRAINTS_FILENAME, _FINAL_REPORT_FILENAME):
+        if (source_root / name).is_file():
+            target_root.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_root / name, target_root / name)
+            copied = True
+    for group, filenames in (
+        (_TRIALS_DIRNAME, _PREVIOUS_TRIAL_FILENAMES),
+        (_SERVICE_DIRNAME, _PREVIOUS_SERVICE_FILENAMES),
+    ):
+        source_group = source_root / group
+        if not source_group.is_dir():
+            continue
+        for record_dir in sorted(source_group.iterdir()):
+            if not record_dir.is_dir() or not record_dir.name.isdigit():
+                continue
+            target_dir = target_root / group / record_dir.name
+            for name in filenames:
+                if (record_dir / name).is_file():
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(record_dir / name, target_dir / name)
+                    copied = True
+            patches = record_dir / _PATCHES_DIRNAME
+            if group == _TRIALS_DIRNAME and patches.is_dir():
+                shutil.copytree(patches, target_dir / _PATCHES_DIRNAME, dirs_exist_ok=True)
+                copied = True
+    return copied
 
 
 def _install_skills(workspace: Path) -> None:

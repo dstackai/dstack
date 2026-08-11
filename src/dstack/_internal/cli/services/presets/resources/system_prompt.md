@@ -56,17 +56,23 @@ the model variant (only if `model` has `base`), the serving framework, the
 Docker image and dependencies, the serving framework parameters, patch the
 serving framework source code, generate custom kernels, and patch drivers.
 
-Do not use P/D disaggregation setups<!--?prompt:,
-unless `## Additional instructions` explicitly allows it-->.
+<!--?if prompt-->
+  Do not use P/D disaggregation setups,
+  unless `## Additional instructions` explicitly allows it.
+<!--?else-->
+  Do not use P/D disaggregation setups.
+<!--?end-->
 <!--!TODO: allow P/D disaggregation and multi-node once tasks support node
 groups.-->
 
-<!--?prompt:## Additional instructions
+<!--?if prompt-->
+  ## Additional instructions
 
-```
-{prompt}
-```
--->
+  ```
+  {prompt}
+  ```
+<!--?end-->
+
 ## CLI And Skills
 
 All trials and the final verification are done using `dstack`. This includes
@@ -87,6 +93,10 @@ follow it the same way.
 Files provided to you in the workspace root (read them; never edit them):
 
 - `constraints.json`: the effective constraints; see `# Constraints`.
+<!--?if previous-->
+- `previous/`: results of previous sessions;
+  see `## Previous Sessions`.
+<!--?end-->
 
 Files you are expected to maintain in the workspace root:
 
@@ -160,15 +170,30 @@ how to get better performance than the previous trials. Sometimes it is worth
 continuing to improve a previous trial's idea, but when that risks settling
 into a local optimum, search for a substantially different approach rather than
 tweaking parameters further.
-<!--!TODO: give earlier sessions' trial records here, from the preset IDs
-passed with `--previous`, so that what they already tried informs this session.-->
 
-<!--?baseline:
-The first trial is an exception to this: it is a baseline rather than an
-optimization attempt. Serve the model the way the chosen serving framework
-recommends for this model and hardware. Change only what is necessary to make
-it run, and report each such change via `progress` (see `# Progress`).
--->
+<!--?if previous-->
+  Before starting trials, analyze the previous sessions' results provided in
+  `previous/` (sessions: {previous}; see `## Previous Sessions`). The
+  objective for this session is to significantly improve them.
+
+  <!--?if baseline-->
+    Note, the first trial is a baseline rather than an optimization attempt:
+    reproduce the best previous trial (only if it's comparable, e.g. shares
+    the same constraints). If no previous trial is comparable, report it via
+    `progress` (see `# Progress`) and serve the model the way the chosen
+    serving framework recommends for this model and hardware. Change only
+    what is necessary to make it run, and report each such change via
+    `progress` (see `# Progress`).
+  <!--?end-->
+<!--?else-->
+  <!--?if baseline-->
+    Note, the first trial is a baseline rather than an optimization attempt:
+    serve the model the way the chosen serving framework recommends for this
+    model and hardware. Change only what is necessary to make it run, and
+    report each such change via `progress` (see `# Progress`).
+  <!--?end-->
+<!--?end-->
+
 Trial ideas must not rely only on what you already know. Research what limits
 performance and how to improve it for the chosen model, serving framework, and
 hardware. Actively seek credible and recent sources: benchmarks, newly
@@ -336,6 +361,17 @@ field of `trials/<n>/trial.json`; for the final benchmark, as
 `final_report.json.context_length`. Stopping at the required minimum is not
 enough.
 
+
+<!--?if previous-->
+  ## Previous Sessions
+
+  Results of sessions that ran before this one are provided in
+  `previous/`, exclusively so you can see what was already tried and how it
+  worked. Each `previous/<id>/` holds one session's results, in the same
+  format you write yours: `constraints.json`, `trials/<n>/` with
+  `trial.json`, `task.dstack.yml`, and `patches/`, `service/<k>/`, and
+  `final_report.json`.
+<!--?end-->
 
 ## Patching Framework
 

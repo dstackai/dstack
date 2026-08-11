@@ -50,6 +50,7 @@ from dstack._internal.cli.services.presets.session import (
     print_preset_progress,
     print_session_log,
     release_session_claim,
+    resolve_session_ref,
     session_process_alive,
     session_report_exists,
     try_claim_session,
@@ -63,6 +64,7 @@ from dstack._internal.cli.services.presets.workspace import (
     PresetAgentWorkspace,
     attach_agent_workspace,
     create_agent_workspace,
+    install_previous_records,
     remove_agent_workspace,
     scrub_workspace_token,
 )
@@ -361,6 +363,49 @@ def _resolve_preset_env(
     return configuration
 
 
+def resolve_previous_sessions(refs: Sequence[str]) -> tuple[PresetAgentSession, ...]:
+    """Resolves `--previous` references to sessions, deduplicated in order. A
+    reference may be a preset ID or a claimed name. A still-running session is
+    rejected: its records are a partial snapshot. A session that chains to
+    sessions not included only warns; nothing is followed for the user."""
+    sessions: list[PresetAgentSession] = []
+    for ref in refs:
+        try:
+            session = load_agent_session(resolve_session_ref(ref))
+        except CLIError:
+            raise CLIError(f"Previous session {ref!r} does not exist")
+        if all(existing.preset_id != session.preset_id for existing in sessions):
+            sessions.append(session)
+    included = {session.preset_id for session in sessions}
+    for session in sessions:
+        manifest = session.read_manifest()
+        if manifest.get("status") == "running" and session_process_alive(manifest):
+            raise CLIError(
+                f"Previous session {session.preset_id} is still running;"
+                " wait for it to finish or stop it"
+            )
+        for parent in manifest.get("previous") or []:
+            if parent not in included:
+                warn(
+                    f"{session.preset_id} was created with --previous {parent},"
+                    " which is not included"
+                )
+    return tuple(sessions)
+
+
+def _load_pinned_previous_sessions(ids: Sequence[str]) -> tuple[PresetAgentSession, ...]:
+    """The pinned previous sessions that still exist. A deleted one only
+    warns: its records were copied into the workspace at creation and the
+    copies are kept."""
+    sessions = []
+    for preset_id in ids:
+        try:
+            sessions.append(load_agent_session(preset_id))
+        except CLIError:
+            warn(f"Previous session {preset_id} no longer exists; keeping its copied records")
+    return tuple(sessions)
+
+
 def create_preset(
     *,
     api: Client,
@@ -372,6 +417,7 @@ def create_preset(
     resume_session: Optional[PresetAgentSession] = None,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
+    previous: Sequence[PresetAgentSession] = (),
 ) -> PresetCreateResult:
     agent_session = resume_session or create_preset_agent_session(configuration, debug=debug)
     try:
@@ -388,6 +434,7 @@ def create_preset(
                 resume=resume_session is not None,
                 user_prompt=user_prompt,
                 allowed_fleets=allowed_fleets,
+                previous=previous,
             )
         )
     except KeyboardInterrupt:
@@ -415,6 +462,7 @@ class _CreationSetup:
     user_prompt: Optional[str]
     initial_resume_session_id: Optional[str]
     write_constraints: bool  # True only for fresh creations
+    previous: tuple[str, ...] = ()  # previous session IDs, pinned at creation
 
 
 def _fresh_setup(
@@ -424,6 +472,7 @@ def _fresh_setup(
     build_name: Optional[str],
     allowed_fleets: Optional[tuple[str, ...]],
     user_prompt: Optional[str],
+    previous: Sequence[PresetAgentSession] = (),
 ) -> _CreationSetup:
     if allowed_fleets is None:
         allowed_fleets = _get_allowed_fleets(api, configuration)
@@ -431,6 +480,12 @@ def _fresh_setup(
         raise CLIError(_NO_FLEETS_ERROR)
     auth = get_claude_auth()
     workspace = create_agent_workspace(agent_session)
+    previous_ids = tuple(session.preset_id for session in previous)
+    if previous_ids:
+        # Pinned like the prompt and the constraints, so resume keeps the
+        # same context and the lineage stays inspectable.
+        agent_session.update_manifest(previous=list(previous_ids))
+        install_previous_records(workspace, previous)
     build_name = build_name or _get_build_name(
         configuration.name, configuration.model.api_model_name, agent_session.preset_id
     )
@@ -442,6 +497,7 @@ def _fresh_setup(
         user_prompt=user_prompt,
         initial_resume_session_id=None,
         write_constraints=True,
+        previous=previous_ids,
     )
 
 
@@ -467,6 +523,11 @@ def _resume_setup(
     claude_session_id = manifest.get("claude_session_id")
     if isinstance(claude_session_id, str) and claude_session_id:
         initial_resume_session_id = claude_session_id
+    previous_ids = tuple(manifest.get("previous") or [])
+    if previous_ids:
+        # Heal a partial copy; a source deleted since creation keeps its
+        # already-copied records in the workspace.
+        install_previous_records(workspace, _load_pinned_previous_sessions(previous_ids))
     return _CreationSetup(
         auth=auth,
         workspace=workspace,
@@ -475,6 +536,7 @@ def _resume_setup(
         user_prompt=user_prompt,
         initial_resume_session_id=initial_resume_session_id,
         write_constraints=False,
+        previous=previous_ids,
     )
 
 
@@ -491,6 +553,7 @@ def _attach_setup(
         user_prompt=None,
         initial_resume_session_id=None,
         write_constraints=False,
+        previous=tuple(agent_session.read_manifest().get("previous") or []),
     )
 
 
@@ -508,6 +571,7 @@ async def _create_preset(
     wait_for_run_stop: bool = True,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
+    previous: Sequence[PresetAgentSession] = (),
 ) -> PresetCreateResult:
     source_configuration = source_configuration or configuration
     if attach:
@@ -516,7 +580,7 @@ async def _create_preset(
         setup = _resume_setup(agent_session, build_name, user_prompt)
     else:
         setup = _fresh_setup(
-            api, configuration, agent_session, build_name, allowed_fleets, user_prompt
+            api, configuration, agent_session, build_name, allowed_fleets, user_prompt, previous
         )
     # Record ownership + the finalize context (project, keep-service) so a later
     # detached reconcile can complete this session from disk alone.
@@ -557,6 +621,7 @@ async def _create_preset(
     prompt = get_preset_agent_system_prompt(
         user_prompt=setup.user_prompt,
         baseline=configuration.effective_baseline,
+        previous=", ".join(setup.previous) if setup.previous else None,
     )
     if setup.write_constraints:
         if setup.user_prompt:
@@ -567,9 +632,11 @@ async def _create_preset(
             allowed_fleets=setup.allowed_fleets,
         )
         setup.workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
+        # A session record, not a debug artifact: the listing and `--previous`
+        # both need the constraints after the workspace is deleted.
+        agent_session.write_constraints(constraints_text)
         if agent_session.debug:
             agent_session.write_prompt(prompt)
-            agent_session.write_constraints(constraints_text)
             if setup.auth is not None:
                 agent_session.write_agent_info(setup.auth)
     try:

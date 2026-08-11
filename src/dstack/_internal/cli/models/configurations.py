@@ -154,6 +154,15 @@ class PresetConfiguration(
             )
         ),
     ] = None
+    previous: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The IDs of previous presets whose creation results the agent"
+                " analyzes and improves on"
+            )
+        ),
+    ] = None
     concurrency: Annotated[
         Optional[PositiveInt],
         Field(
