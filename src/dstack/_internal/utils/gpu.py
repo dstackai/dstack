@@ -1,5 +1,7 @@
 import re
 
+import gpuhunt
+
 
 def convert_nvidia_gpu_name(name: str) -> str:
     """Convert gpu_name from nvidia-smi to short version"""
@@ -58,3 +60,29 @@ _INTEL_GAUDI_MODELS = {
     "HL-325": "Gaudi3",  # OAM
     "HL-338": "Gaudi3",  # PCIe
 }
+
+
+def detect_gpu_vendors_by_gpu_name(name: str) -> set[gpuhunt.AcceleratorVendor]:
+    vendors: set[gpuhunt.AcceleratorVendor] = set()
+    name = name.lower()
+    if name in _KNOWN_NVIDIA_GPUS:
+        vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
+    if name in _KNOWN_AMD_GPUS:
+        vendors.add(gpuhunt.AcceleratorVendor.AMD)
+    if name in _KNOWN_INTEL_ACCELERATORS:
+        vendors.add(gpuhunt.AcceleratorVendor.INTEL)
+    if name in _KNOWN_TENSTORRENT_ACCELERATORS:
+        vendors.add(gpuhunt.AcceleratorVendor.TENSTORRENT)
+    maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
+    if maybe_tpu_cores.isdigit() and maybe_tpu_version in _KNOWN_TPU_VERSIONS:
+        vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
+    return vendors
+
+
+_KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
+_KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
+_KNOWN_INTEL_ACCELERATORS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_INTEL_ACCELERATORS}
+_KNOWN_TENSTORRENT_ACCELERATORS = {
+    gpu.name.lower() for gpu in gpuhunt.KNOWN_TENSTORRENT_ACCELERATORS
+}
+_KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}

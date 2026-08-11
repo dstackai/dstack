@@ -62,7 +62,7 @@ class ProjectsAPIClient(APIClientGroup):
         limit: Optional[int] = None,
         ascending: Optional[bool] = None,
     ) -> ProjectsInfoListOrProjectsList:
-        # Passing only non-None fields for backward compatibility with 0.20 servers.
+        # `None` means "use the server default", so unset fields are omitted from the request.
         body: dict[str, Any] = {
             "include_not_joined": include_not_joined,
         }

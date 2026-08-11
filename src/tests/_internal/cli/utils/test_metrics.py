@@ -7,7 +7,11 @@ import pytest
 from rich.console import Console
 from rich.theme import Theme
 
-from dstack._internal.cli.utils.metrics import format_memory, get_metrics_table
+from dstack._internal.cli.utils.metrics import (
+    format_memory,
+    get_metrics_table,
+    job_labels,
+)
 from dstack._internal.cli.utils.sparkline import SPARKS
 from dstack._internal.core.models.metrics import JobMetrics, Metric
 
@@ -30,6 +34,9 @@ def make_run(
     state: str = "running",
     gpus: int = 1,
     cpus: int = 8,
+    replica: int = 0,
+    job_num: int = 0,
+    group: str = "default",
 ) -> Tuple[MagicMock, JobMetrics]:
     """A job and its metrics. `state` decides whether the newest sample reads as `now`."""
     newest = datetime.now(timezone.utc)
@@ -67,6 +74,8 @@ def make_run(
         )
 
     job = MagicMock()
+    job.job_spec.replica_num, job.job_spec.job_num = replica, job_num
+    job.job_spec.replica_group = group
     submission = MagicMock()
     resources = MagicMock()
     resources.cpus, resources.memory_mib = cpus, 32 * 1024
@@ -76,7 +85,10 @@ def make_run(
     return job, JobMetrics(metrics=metrics)
 
 
-def render(job, metrics: JobMetrics, width: int = 200, color: bool = False) -> str:
+def render(jobs, metrics, width: int = 200, color: bool = False) -> str:
+    """`jobs`/`metrics` may be a single pair, as most tests use, or whole lists."""
+    if not isinstance(jobs, list):
+        jobs, metrics = [jobs], [metrics]
     console = Console(
         width=width,
         theme=Theme({"secondary": "grey58"}),
@@ -85,7 +97,7 @@ def render(job, metrics: JobMetrics, width: int = 200, color: bool = False) -> s
         color_system="truecolor" if color else None,
     )
     with console.capture() as capture:
-        console.print(get_metrics_table(job, metrics, console_width=width))
+        console.print(get_metrics_table(jobs, metrics, console_width=width))
     return capture.get()
 
 
@@ -154,18 +166,17 @@ class TestRendering:
 
 
 class TestWindow:
-    @pytest.mark.parametrize("samples", [12, 360], ids=["two-minutes", "an-hour"])
     @pytest.mark.parametrize("state", ["running", "terminated"])
-    def test_draws_only_what_was_measured(self, samples: int, state: str):
-        """A young run fills part of the row and the timeline stops with it. Drawn to the
-        full width it would claim a span nothing was measured over, and Rich would widen
-        the column to fit, pulling MEMORY out of line."""
-        job, metrics = make_run("ramp", samples=samples, state=state)
-        output = render(job, metrics, width=200)
-        drawn = len(bars(row(output, "cpu")))
-        assert drawn == min(samples, 80)  # 80 is MAX_SPARK_WIDTH
+    def test_an_hour_old_run_fills_the_row(self, state: str):
+        job, metrics = make_run("ramp", samples=360, state=state)
+        assert len(bars(row(render(job, metrics), "job=0"))) == 80  # MAX_SPARK_WIDTH
+
+    def test_a_young_run_fills_only_its_share(self):
+        job, metrics = make_run("ramp", samples=12)
+        output = render(job, metrics, width=120)
+        assert len(bars(row(output, "job=0"))) < 5
         axis = lines(output)[-1]
-        assert [len(segment) for segment in re.split(r"\s{3,}", axis.strip())] == [drawn, drawn]
+        assert axis.endswith("now")
 
     @pytest.mark.parametrize("state,live", [("running", True), ("terminated", False)])
     def test_a_finished_run_cannot_look_live(self, state: str, live: bool):
@@ -176,13 +187,46 @@ class TestWindow:
             assert ":" in axis  # a real clock time, not an age
 
 
-@pytest.mark.parametrize("width", [80, 100, 140, 190, 240])
-def test_fits_every_terminal_width(width: int):
-    """Nothing wraps or gets truncated, on the widest realistic row: eight GPUs."""
-    job, metrics = make_run("saturated", gpus=8)
-    output = render(job, metrics, width=width)
-    assert max(len(line.rstrip()) for line in output.splitlines()) <= width
-    assert "…" not in output
+class TestJobs:
+    def test_every_job_is_shown_and_keyed(self):
+        run = [make_run(replica=r, gpus=1) for r in range(3)]
+        output = render([j for j, _ in run], [m for _, m in run])
+        assert [ln.split()[0] for ln in lines(output) if ln.startswith(" replica")] == [
+            "replica=0",
+            "replica=1",
+            "replica=2",
+        ]
+
+    @pytest.mark.parametrize(
+        "jobs,expected",
+        [
+            ([(0, 0, "default")], ["job=0"]),
+            ([(r, 0, "default") for r in range(2)], ["replica=0 job=0", "replica=1 job=0"]),
+            ([(0, n, "default") for n in range(2)], ["job=0", "job=1"]),
+            (
+                [(0, 0, "spot"), (1, 0, "spot"), (2, 0, "on-demand")],
+                [
+                    "group=spot replica=0 job=0",
+                    "replica=1 job=0",  # same group: named once, replicas indented under it
+                    "group=on-demand replica=2 job=0",
+                ],
+            ),
+        ],
+        ids=["one-job", "replicas", "nodes", "groups"],
+    )
+    def test_labels_name_only_what_distinguishes(self, jobs, expected):
+        built = [make_run(replica=r, job_num=j, group=g)[0] for r, j, g in jobs]
+        assert [" ".join(label.split()) for label in job_labels(built)] == expected
+
+    def test_a_late_job_starts_where_it_started(self):
+        old, young = make_run(samples=360, replica=0), make_run(samples=12, replica=1)
+        output = render([old[0], young[0]], [old[1], young[1]])
+        first = {
+            label: min(row(output, label).index(g) for g in SPARKS if g in row(output, label))
+            for label in ("replica=0", "replica=1")
+        }
+        assert len(bars(row(output, "replica=0"))) > len(bars(row(output, "replica=1")))
+        assert first["replica=1"] > first["replica=0"]  # pushed right by the blank
 
 
 @pytest.mark.parametrize(

@@ -92,8 +92,8 @@ def build_verified_preset(
     elif report.model != preset_configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
     if (
-        preset_configuration.context_length is not None
-        and report.context_length < preset_configuration.context_length
+        preset_configuration.min_context_length is not None
+        and report.context_length < preset_configuration.min_context_length
     ):
         raise CLIError("Claude final service does not meet the requested context length")
 

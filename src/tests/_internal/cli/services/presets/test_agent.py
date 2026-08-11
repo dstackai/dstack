@@ -29,6 +29,7 @@ from dstack._internal.cli.services.presets.redaction import (
 )
 from dstack._internal.cli.services.presets.session import (
     PresetAgentSession,
+    _read_last_session_verification,
     _summarize_session_trials,
     create_preset_agent_session,
     load_resumable_agent_session,
@@ -872,7 +873,50 @@ class TestSummarizeSessionTrials:
         # 4 records = 4 trials: one long-lived task commonly hosts several
         # trials, so shared task names must not collapse the count.
         assert summary["count"] == 4
-        assert summary["best"] == {"tok_s": 2300.0, "concurrency": 8, "gpu": "A40:48GB:1"}
+        assert summary["best"] == {
+            "tok_s": 2300.0,
+            "tpot_ms": None,
+            "ttft_ms": None,
+            "context_length": None,
+            "concurrency": 8,
+            "gpu": "A40:48GB:1",
+        }
+
+
+class TestReadLastSessionVerification:
+    def test_last_record_wins_and_a_missing_file_is_not_verifying(self, tmp_path):
+        path = tmp_path / "verifications.jsonl"
+
+        assert _read_last_session_verification(path) is None
+
+        path.write_text(
+            "\n".join(
+                json.dumps(entry)
+                for entry in [
+                    {"trial": 3, "run_name": "p-2", "status": "verifying"},
+                    {"trial": 3, "run_name": "p-2", "status": "failed", "reason": "probe"},
+                    {"trial": 2, "run_name": "p-3", "status": "verifying"},
+                ]
+            )
+            + "\n"
+        )
+
+        assert _read_last_session_verification(path) == {
+            "trial": 2,
+            "run_name": "p-3",
+            "status": "verifying",
+        }
+
+    def test_skips_partial_trailing_lines(self, tmp_path):
+        # The mirror appends as the agent writes, so the file can be read
+        # mid-line.
+        path = tmp_path / "verifications.jsonl"
+        path.write_text(
+            json.dumps({"trial": 1, "run_name": "p-2", "status": "verifying"})
+            + '\n{"trial": 1, "run_na'
+        )
+
+        assert _read_last_session_verification(path)["status"] == "verifying"
 
 
 class TestFileLineReader:

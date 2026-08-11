@@ -21,15 +21,14 @@ for monitoring container metrics, including GPU usage for `NVIDIA`, `AMD`, and o
 ```shell
 $ dstack metrics llama-70b-sft
 
-        UTILIZATION                            MEMORY
- cpu    ▅▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▅▅▄▂▃▃▃▃▃▃▃ 39% of 64  ▃▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 297GB/480GB
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂ 33%  ▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 296GB/480GB
+        gpu=0  ▁▄▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=1  ▂▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=2  ▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=3  ▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
 
- gpu=0  ▁▂▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 89%        ▄▅▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
- gpu=1  ▁▂▆▆▆▅▆▆▆▆▆▆▆▆▆▆▁▁▅▆▆▅▆▆▆▆▆ 84%        ▄▅▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
- gpu=2  ▁▂▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 87%        ▄▅▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
- gpu=3  ▂▃▆▅▅▅▅▅▅▆▅▅▆▆▆▆▁▅▅▅▅▅▆▅▅▅▅ 82%        ▄▅▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
-
-        4 Aug 14:10 ┄┄┄┄┄┄┄┄┄┄┄ now            4 Aug 14:10 ┄┄┄┄┄┄┄┄┄┄┄ now
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
 ```
 
 </div>
@@ -46,9 +45,6 @@ difference is that `dstack stats` includes GPU VRAM usage and GPU utilization pe
 
 Similar to `kubectl top`, if a run consists of multiple jobs (such as distributed training or an auto-scalable service),
 `dstack stats` will display metrics per job.
-
-> Note, `dstack metrics` now shows one job at a time, like `dstack logs`. Use `--replica` and `--job` to
-> choose it; both default to `0`.
 
 !!! info "HTTP API"
     In addition to the `dstack stats` CLI commands, metrics can be obtained via the

@@ -931,8 +931,6 @@ def gateway_model_to_gateway(
         name=gateway_model.name,
         project_name=gateway_model.project.name,
         hostname=gateway_model.hostname,
-        backend=gateway_model.backend.type,
-        region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=is_default,
         created_at=gateway_model.created_at,

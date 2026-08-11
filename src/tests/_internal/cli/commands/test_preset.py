@@ -40,7 +40,7 @@ class TestPresetLocalCommands:
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=KeyboardInterrupt):
@@ -59,7 +59,7 @@ class TestPresetLocalCommands:
 
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=CreationStopped):
@@ -72,7 +72,7 @@ class TestPresetLocalCommands:
         assert exit_code == 0
         assert "Traceback" not in capsys.readouterr().err
 
-    def test_create_requires_max_trials(self, tmp_path, capsys):
+    def test_create_requires_trials(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
 
@@ -85,7 +85,7 @@ class TestPresetLocalCommands:
 
         assert exit_code == 1
         captured = capsys.readouterr()
-        assert "max_trials is required" in captured.out + captured.err
+        assert "trials is required" in captured.out + captured.err
         create.assert_not_called()
 
     def _list_output(self, tmp_path, args, *, created_at):
@@ -110,18 +110,24 @@ class TestPresetLocalCommands:
         assert "8f3a12c4" in output
         # The repo row is shown only in verbose mode.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" not in output
-        # The context column is shown only in verbose mode.
+        # The benchmark always carries the context and workload that define its
+        # number. The context that was *required* waits for `-v`, and comes from
+        # the creation record, which a preset saved on its own does not have.
         assert "CONTEXT" not in output
+        assert "CONSTRAINTS" in output
         assert "BENCHMARK" in output
-        assert "32K" not in output
-        assert "42.1" in output
-        assert "con=1" in "".join(output.split())
-        assert "tok/s" in output
-        assert "TTFT" in output
-        assert "108ms" in output
+        assert "ctx=32K" in "".join(output.split())
+        assert "ctx>=" not in "".join(output.split())
+        assert "io=1K/128" in "".join(output.split())
+        # 42.1 is the aggregate, verbose-only; the default row shows per-user 1/TPOT.
+        assert "135" in output
+        assert "conc=1" in "".join(output.split())
+        assert "tok/s/user=" in "".join(output.split())
+        assert "ttft=" in "".join(output.split())
+        assert "ttft=[/]108" in "".join(output.split()) or "ttft=108" in "".join(output.split())
         assert "A6000:48GB:1" not in output
 
-    def test_verbose_list_adds_repo_and_context(self, tmp_path):
+    def test_verbose_list_adds_repo(self, tmp_path):
         preset = get_preset()
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
@@ -131,10 +137,10 @@ class TestPresetLocalCommands:
             ).split()
         )
 
-        # Verbose adds only the repo and the ctx= benchmark prefix.
+        # Verbose adds only the repo row.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in joined_verbose
         assert "ctx=32K" in joined_verbose
-        assert "con=1" in joined_verbose
+        assert "conc=1" in joined_verbose
         assert "hardware=" not in joined_verbose
 
     def test_deletes_preset_without_api_client(self, tmp_path):
@@ -274,7 +280,10 @@ model:
   base: Qwen/Qwen3.5-27B
 regions: [file-region]
 max_price: 0.5
-max_trials: 1
+trials: 1
+concurrency: 8
+max_ttft: 5000
+min_context_length: 8192
 env:
   - HF_TOKEN
 """
@@ -378,7 +387,7 @@ class TestPresetNameClaims:
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
         result = SimpleNamespace(
             preset=preset, path=tmp_path / "preset.yaml", final_run_name="qwen-1"
@@ -401,7 +410,7 @@ class TestPresetNameClaims:
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with (
@@ -430,7 +439,9 @@ class TestPresetNameClaims:
 
     def test_create_always_asks_even_without_a_name_conflict(self, tmp_path):
         configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text("type: preset\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n")
+        configuration_path.write_text(
+            "type: preset\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
+        )
 
         with (
             _patched_create_preset() as create,

@@ -30,12 +30,7 @@ def get_gateway_relative_to_project(
     # `get` would resolve `Gateway.default` relative to the gateway's host project
     gateways = client.list(project, include_imported=True)
     for gateway in gateways:
-        if gateway.name == gateway_name and (
-            gateway_project == gateway.project_name
-            # Compatibility with pre-0.20.20 servers:
-            # gateway.project_name is None means the gateway is in the current `project`
-            or (gateway.project_name is None and gateway_project == project)
-        ):
+        if gateway.name == gateway_name and gateway_project == gateway.project_name:
             return gateway
     ref = EntityReference(name=gateway_name, project=gateway_project)
     raise ResourceNotExistsError(msg=f"Gateway {ref.format()!r} not found in project {project!r}")
@@ -78,17 +73,11 @@ def get_gateways_table(
     for gateway in gateways:
         name = format_entity_reference(
             gateway.name,
-            # project_name == None means pre-0.20.20 server, which means no gateway exports support,
-            # which means the gateway is from the current project
-            gateway.project_name if gateway.project_name is not None else current_project,
+            gateway.project_name,
             current_project,
         )
         domain = gateway.wildcard_domain
-        if (
-            gateway.project_name is not None
-            and gateway.project_name != current_project
-            and domain is not None
-        ):
+        if gateway.project_name != current_project and domain is not None:
             domain = interpolate_gateway_domain(
                 domain=domain,
                 run_project_name=current_project,

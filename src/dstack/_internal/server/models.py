@@ -260,7 +260,7 @@ class ProjectModel(BaseModel):
     """
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    owner: Mapped[UserModel] = relationship(lazy="joined")
+    owner: Mapped[UserModel] = relationship()
     members: Mapped[List["MemberModel"]] = relationship(
         back_populates="project", order_by="MemberModel.member_num"
     )
@@ -296,7 +296,9 @@ class MemberModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
@@ -311,7 +313,9 @@ class BackendModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     type: Mapped[BackendType] = mapped_column(EnumAsString(BackendType, 100))
 
@@ -418,7 +422,7 @@ class RunModel(PipelineModelMixin, BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
 
-    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"), index=True)
     """`fleet_id` keeps runs attached to fleets so the fleets cannot be deleted while they are used.
     A fleet can have no busy instances but still be used by a run, for example a service with
     zero replicas.
@@ -564,7 +568,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     If `instance_assigned` is `True` and `instance` is `None`, no instance was assigned.
     """
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("instances.id", ondelete="CASCADE")
+        ForeignKey("instances.id", ondelete="CASCADE"), index=True
     )
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
@@ -858,7 +862,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     )
     """`fleet` can be `None` only for legacy instances created before fleets."""
 
-    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
+    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("compute_groups.id"), index=True
+    )
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)

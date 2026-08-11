@@ -270,9 +270,6 @@ declare interface IResources {
 
     disk?: IDisk;
     cpu_arch?: string | null;
-
-    /** @deprecated Use formatResources() from libs/resources instead. Remove in 0.21. */
-    description?: string;
 }
 
 declare interface InstanceType {

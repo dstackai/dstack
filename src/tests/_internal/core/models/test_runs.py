@@ -1,13 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.core.compatibility.runs import get_run_spec_excludes
 from dstack._internal.core.models.common import validate_extra_ignore
-from dstack._internal.core.models.configurations import (
-    DevEnvironmentConfiguration,
-    ServiceConfiguration,
-    TaskConfiguration,
-)
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -33,23 +27,6 @@ def test_run_termination_reason_to_status_works_with_all_enum_variants():
     for run_termination_reason in RunTerminationReason:
         run_status = run_termination_reason.to_status()
         assert isinstance(run_status, RunStatus)
-
-
-@pytest.mark.parametrize("configuration_type", ["task", "dev-environment", "service"])
-@pytest.mark.parametrize("dstack", [False, True])
-def test_server_access_run_spec_compatibility(configuration_type: str, dstack: bool):
-    if configuration_type == "task":
-        configuration = TaskConfiguration(commands=["true"], dstack=dstack)
-    elif configuration_type == "service":
-        configuration = ServiceConfiguration(commands=["true"], port=8000, dstack=dstack)
-    else:
-        configuration = DevEnvironmentConfiguration(dstack=dstack)
-    configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
-        "configuration"
-    )
-
-    assert isinstance(configuration_excludes, dict)
-    assert ("dstack" in configuration_excludes) is not dstack
 
 
 def test_job_termination_reason_to_status_works_with_all_enum_variants():

@@ -1028,7 +1028,6 @@ def get_instance_offer_with_availability(
                 gpus=gpus,
                 spot=spot,
                 disk=Disk(size_mib=int(disk_gib * 1024)),
-                description="",
             ),
         ),
         region=region,

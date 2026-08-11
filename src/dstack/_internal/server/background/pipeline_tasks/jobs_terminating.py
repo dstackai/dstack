@@ -411,6 +411,7 @@ async def _lock_related_instance(
         instance_model.lock_expires_at = item.lock_expires_at
         instance_model.lock_token = item.lock_token
         instance_model.lock_owner = lock_owner
+        await session.commit()
         return instance_model
 
 

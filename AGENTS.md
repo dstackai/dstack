@@ -32,6 +32,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Never make network calls inside a DB session or transaction. Fetch what you need before opening the session, or commit and close it before the call.
 - Don't use function-level (inner) imports to break circular imports. Inject the dependency or move the shared code to a lower-level module instead.
 - Never edit a migration that has already been applied or released; add a new migration instead.
+- Derive paths under `SERVER_DIR_PATH` on access (a `get_*` function), not as module-level constants, so that patching `settings.SERVER_DIR_PATH` redirects all of them. Tests rely on this to keep server state out of the real `~/.dstack`.
 
 ## Testing Guidelines
 - Default to `uv run pytest`. Use markers from `src/tests/conftest.py` like `--runpostgres` if need to include specific tests.
@@ -44,6 +45,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 
 ## Commit & Pull Request Guidelines
 - Name branches `issue_{issue_num}_{title}` when the work tracks an issue (e.g. `issue_3959_replicated_alb_gateways`), and `pr_{title}` otherwise.
+- Never create git tags. Tags are reserved for releases and are created only by the release process described in `contributing/RELEASE.md`. To mark or share a commit, push an appropriately named branch instead.
 - Commit messages follow the existing style: short, imperative summaries (e.g., “Fix exclude_not_available ignored”); include rationale in the body if needed.
 - For PRs, describe behavior changes and link related issues.
 - Include screenshots or terminal output when touching UX/CLI messages or frontend flows.
