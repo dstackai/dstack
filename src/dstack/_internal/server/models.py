@@ -260,7 +260,7 @@ class ProjectModel(BaseModel):
     """
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    owner: Mapped[UserModel] = relationship(lazy="joined")
+    owner: Mapped[UserModel] = relationship()
     members: Mapped[List["MemberModel"]] = relationship(
         back_populates="project", order_by="MemberModel.member_num"
     )
@@ -296,7 +296,9 @@ class MemberModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
@@ -311,7 +313,9 @@ class BackendModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     type: Mapped[BackendType] = mapped_column(EnumAsString(BackendType, 100))
 
@@ -418,7 +422,7 @@ class RunModel(PipelineModelMixin, BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
 
-    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"), index=True)
     """`fleet_id` keeps runs attached to fleets so the fleets cannot be deleted while they are used.
     A fleet can have no busy instances but still be used by a run, for example a service with
     zero replicas.
@@ -564,7 +568,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     If `instance_assigned` is `True` and `instance` is `None`, no instance was assigned.
     """
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("instances.id", ondelete="CASCADE")
+        ForeignKey("instances.id", ondelete="CASCADE"), index=True
     )
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
@@ -574,9 +578,14 @@ class JobModel(PipelineModelMixin, BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
+    ready: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    """Whether the replica is ready to receive service requests based on probe statuses.
+    Always `False` for non-service runs.
+    """
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    """`registered` shows whether the replica is registered to receive service requests.
-    It is always `False` for non-service runs.
+    """Whether the replica is registered to receive service requests from dstack-proxy.
+    Always `False` for non-service runs or jobs that shouldn't be registered
+    (e.g., non-router replicas for services with routers).
     """
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
     """`waiting_master_job` is `True` for non-master jobs that have to wait for master processing before
@@ -853,7 +862,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     )
     """`fleet` can be `None` only for legacy instances created before fleets."""
 
-    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
+    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("compute_groups.id"), index=True
+    )
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)

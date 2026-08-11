@@ -38,6 +38,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     PlacementGroupModel,
+    ProjectModel,
     RunModel,
 )
 from dstack._internal.server.services import events
@@ -338,7 +339,7 @@ async def _refetch_locked_fleet_for_processing(
             FleetModel.id == item.id,
             FleetModel.lock_token == item.lock_token,
         )
-        .options(joinedload(FleetModel.project))
+        .options(joinedload(FleetModel.project).joinedload(ProjectModel.owner))
         .options(
             selectinload(FleetModel.instances.and_(InstanceModel.deleted == False))
             .joinedload(InstanceModel.jobs)

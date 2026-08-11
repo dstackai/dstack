@@ -55,7 +55,6 @@ from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
-from dstack._internal.server.services.prometheus.client_metrics import http_metrics
 from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
 from dstack._internal.server.services.proxy.routers import service_proxy
 from dstack._internal.server.services.runner.pool import instance_connection_pool
@@ -299,8 +298,6 @@ def register_routes(app: FastAPI, ui: bool = True):
         start_time = time.time()
         response: Response = await call_next(request)
         process_time = time.time() - start_time
-        # log process_time to be used in the log_http_metrics middleware
-        request.state.process_time = process_time
         logger.debug(
             "Processed request %s %s in %s. Status: %s",
             request.method,
@@ -326,42 +323,6 @@ def register_routes(app: FastAPI, ui: bool = True):
                 return respone
             else:
                 return await call_next(request)
-
-    # this middleware must be defined after the log_request middleware
-    @app.middleware("http")
-    async def log_http_metrics(request: Request, call_next):
-        def _extract_project_name(request: Request):
-            project_name = None
-            prefix = "/api/project/"
-            if request.url.path.startswith(prefix):
-                rest = request.url.path[len(prefix) :]
-                project_name = rest.split("/", 1)[0] if rest else None
-
-            return project_name
-
-        def _extract_endpoint_label(request: Request, response: Response) -> str:
-            route = request.scope.get("route")
-            route_path = getattr(route, "path", None)
-            if route_path:
-                return route_path
-            if not request.url.path.startswith("/api/"):
-                return "__non_api__"
-            if response.status_code == status.HTTP_404_NOT_FOUND:
-                return "__not_found__"
-            return "__unmatched__"
-
-        project_name = _extract_project_name(request)
-        response: Response = await call_next(request)
-        endpoint_label = _extract_endpoint_label(request, response)
-
-        http_metrics.log_request(
-            method=request.method,
-            endpoint=endpoint_label,
-            http_status=response.status_code,
-            project_name=project_name,
-            duration_seconds=request.state.process_time,
-        )
-        return response
 
     @app.get("/healthcheck")
     async def healthcheck():

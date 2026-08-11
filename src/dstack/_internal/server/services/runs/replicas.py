@@ -19,8 +19,8 @@ class GroupRolloutState:
     inactive_replicas: List[Tuple[int, bool, int, List[JobModel]]]
     has_out_of_date_replicas: bool
     non_terminated_replica_count: int
-    unregistered_out_of_date_replica_count: int
-    registered_non_terminating_replica_count: int
+    unready_out_of_date_replica_count: int
+    ready_non_terminating_replica_count: int
 
 
 class RouterEnvStatus(str, Enum):
@@ -77,7 +77,7 @@ def build_replica_lists(
         elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
             # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
             active_replicas.append((1, is_out_of_date, replica_num, replica_jobs))
-        elif not is_replica_registered(replica_jobs):
+        elif not is_replica_ready(replica_jobs):
             # all jobs are running, but not receiving traffic, the replica is active and has the importance of 2
             active_replicas.append((2, is_out_of_date, replica_num, replica_jobs))
         else:
@@ -98,8 +98,8 @@ def get_group_rollout_state(run_model: RunModel, group: ReplicaGroup) -> GroupRo
     )
 
     non_terminated_replica_nums = set()
-    unregistered_out_of_date_replica_count = 0
-    registered_non_terminating_replica_count = 0
+    unready_out_of_date_replica_count = 0
+    ready_non_terminating_replica_count = 0
 
     for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
         if not job_belongs_to_group(jobs[0], group.name):
@@ -114,20 +114,20 @@ def get_group_rollout_state(run_model: RunModel, group: ReplicaGroup) -> GroupRo
                 j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
                 for j in jobs
             )
-            and not is_replica_registered(jobs)
+            and not is_replica_ready(jobs)
         ):
-            unregistered_out_of_date_replica_count += 1
+            unready_out_of_date_replica_count += 1
 
-        if is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
-            registered_non_terminating_replica_count += 1
+        if is_replica_ready(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
+            ready_non_terminating_replica_count += 1
 
     return GroupRolloutState(
         active_replicas=active_replicas,
         inactive_replicas=inactive_replicas,
         has_out_of_date_replicas=has_out_of_date_replicas(run_model, group_filter=group.name),
         non_terminated_replica_count=len(non_terminated_replica_nums),
-        unregistered_out_of_date_replica_count=unregistered_out_of_date_replica_count,
-        registered_non_terminating_replica_count=registered_non_terminating_replica_count,
+        unready_out_of_date_replica_count=unready_out_of_date_replica_count,
+        ready_non_terminating_replica_count=ready_non_terminating_replica_count,
     )
 
 
@@ -149,9 +149,9 @@ def has_out_of_date_replicas(run: RunModel, group_filter: Optional[str] = None) 
     return False
 
 
-def is_replica_registered(jobs: list[JobModel]) -> bool:
+def is_replica_ready(jobs: list[JobModel]) -> bool:
     # Only job_num=0 is supposed to receive service requests
-    return jobs[0].registered
+    return jobs[0].ready
 
 
 def get_router_replica_group(run_spec: RunSpec) -> Optional[ReplicaGroup]:
