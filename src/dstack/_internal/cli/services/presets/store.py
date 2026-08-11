@@ -22,9 +22,8 @@ from dstack._internal.utils.common import get_dstack_dir
 
 
 class PresetStore:
-    """Presets live at `<root>/<preset id>/` — one directory per preset holding
-    the artifact (`preset.yaml`) next to the creation session internals.
-    Deleted presets are archived under `<root>/.archive/`."""
+    """One `<root>/<id>/preset.yaml` per preset; delete archives the directory
+    under `<root>/.archive/` instead of removing it."""
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
@@ -88,11 +87,9 @@ class PresetStore:
         return None
 
     def find_by_id_or_name(self, ref: str) -> Preset | None:
-        """Resolves a preset reference that may be an ID or a claimed name."""
         return self.get(ref) or self.find_by_name(ref)
 
     def release_name(self, name: str) -> Preset | None:
-        """Releases `name` from the preset holding it, keeping the preset."""
         preset = self.find_by_name(name)
         if preset is None:
             return None
@@ -185,7 +182,7 @@ def _parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
 def resolve_preset_prompt(
     configuration: PresetConfiguration, configuration_path: str
 ) -> str | None:
-    """The resolved user prompt text; file paths are relative to the configuration file."""
+    """Prompt-file paths resolve relative to the configuration file's directory (cwd for stdin)."""
     if configuration.prompt is None:
         return None
     if isinstance(configuration.prompt, str):

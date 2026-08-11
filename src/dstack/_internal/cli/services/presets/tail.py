@@ -18,9 +18,7 @@ from dstack._internal.cli.utils.common import console
 
 
 class _FileLineReader:
-    """`readline()` over a growing file, so stream parsing survives CLI
-    restarts: offsets persist, and a later attach continues exactly where the
-    previous reader stopped."""
+    """`readline()` over a growing file whose persisted offset lets a later attach resume exactly where the previous reader stopped."""
 
     _POLL_SECONDS = 0.2
     _MAX_CHUNK = 1024 * 1024
@@ -74,10 +72,9 @@ class _FileLineReader:
 
 
 class _OffsetStore:
-    """Persists tailer/mirror byte offsets so resumed sessions do not repeat
-    output. One instance serves the whole session — every reader and mirror
-    shares it with disjoint keys, and the exclusive session claim guarantees no
-    other process writes the file."""
+    """Persists per-stream read offsets under disjoint keys; a thread lock
+    suffices because the session claim guarantees no other process writes this
+    file."""
 
     def __init__(self, path: Path) -> None:
         self._path = path
@@ -101,7 +98,6 @@ class _OffsetStore:
 
 
 def open_session_offsets(session: PresetAgentSession) -> _OffsetStore:
-    """The session's single offset store, shared by all its tailers."""
     return _OffsetStore(session.path / ".offsets.json")
 
 
@@ -147,8 +143,6 @@ class _ProgressTailer:
 
 
 class _RecordMirror:
-    """Mirrors a workspace record file into the persistent session directory, redacted."""
-
     def __init__(
         self,
         *,
@@ -204,13 +198,8 @@ class _RecordMirror:
 
 
 class _DirectoryMirror:
-    """Mirrors a workspace record directory into the persistent session
-    directory, redacted.
-
-    Stateless where it matters: every flush re-lists the source and copies any
-    file whose size or mtime changed, whole and atomically. A torn read can
-    never be committed — the next flush re-copies the complete file — which is
-    the property byte-offset mirroring of a shared append-only file lacked."""
+    """Mirrors a directory by re-copying each whole file whose size or mtime
+    changed; a half-written file is simply recopied complete on a later flush."""
 
     _MAX_FILE_BYTES = 8 * 1024 * 1024
 

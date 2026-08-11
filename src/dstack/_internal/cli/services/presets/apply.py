@@ -55,10 +55,6 @@ def apply_preset(
 
 
 def _validate_preset_matches(preset: Preset, *, configuration: PresetConfiguration) -> None:
-    """The referenced preset must serve the model the configuration asks for.
-    A context length below the requested one warns instead of failing: the
-    preset is explicitly chosen by ID, and it may be the best a session could
-    verify (see `Preset.min_context_length`); the plan confirmation decides."""
     model_name = configuration.model.api_model_name
     service_model = preset.service.model
     if service_model is None or service_model.name.lower() != model_name.lower():
@@ -100,7 +96,5 @@ def _format_requested_model(configuration: PresetConfiguration) -> str:
 
 
 def _format_selected_preset(preset: Preset) -> str:
-    # The formatter dims its own keys; wrapping it again would flatten that.
-    # One line, so the objective and the result are joined rather than columned.
     details = f"{format_preset_objective(preset)} {format_preset_benchmark(preset, verbose=True)}"
     return f"{escape(preset.id)} ({details})"

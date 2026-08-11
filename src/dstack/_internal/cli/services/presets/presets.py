@@ -98,6 +98,9 @@ def preset_to_data(preset: Preset) -> dict[str, Any]:
 def service_configuration_to_preset_data(
     configuration: ServiceConfiguration,
 ) -> dict[str, Any]:
+    """The canonical service form used for preset identity and hashing: drops
+    type/name/gateway/profile fields, serializes env as sorted `key=value`
+    strings, and removes empty collections."""
     service_data = json.loads(configuration.model_dump_json(exclude_none=True))
     service_data.pop("type", None)
     service_data.pop("name", None)

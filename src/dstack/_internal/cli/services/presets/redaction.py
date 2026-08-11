@@ -18,6 +18,8 @@ _SENSITIVE_INHERITED_ENV_NAMES = (
 
 
 def get_redacted_values(values: Sequence[str]) -> tuple[str, ...]:
+    """Longest-first, so redacting a shorter secret can't leave the tail of a
+    longer secret that contains it exposed."""
     return tuple(sorted({value for value in values if value}, key=len, reverse=True))
 
 
@@ -49,8 +51,8 @@ def redact(value: str, redacted_values: Sequence[str]) -> str:
 
 
 def redact_bytes(value: bytes, redacted_values: Sequence[str]) -> bytes:
-    """As `redact`, on bytes. A copied file must keep its exact bytes, and
-    decoding it to text rewrites newlines and replaces non-UTF-8 bytes."""
+    """Redacts in raw bytes to preserve the file's exact newlines and any
+    non-UTF-8 bytes."""
     for redacted_value in redacted_values:
         # Environment values decode with surrogateescape, so encoding them back
         # the same way is what returns their original bytes.
@@ -63,7 +65,6 @@ def redact_bytes(value: bytes, redacted_values: Sequence[str]) -> bytes:
 
 
 def redact_structure(value: Any, redacted_values: Sequence[str]) -> Any:
-    """Recursively redacts every string (including dict keys) in a JSON-like value."""
     if isinstance(value, str):
         return redact(value, redacted_values)
     if isinstance(value, list):

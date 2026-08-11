@@ -67,15 +67,10 @@ class PresetBenchmark(CoreModel):
 
     @property
     def effective_output_tok_per_s(self) -> float:
-        """Performance as defined in the agent prompt's `## Performance`. Derived
-        rather than read, so a miscomputed field cannot become the displayed truth."""
         return self.metrics.total_output_tokens / self.metrics.duration_seconds
 
     @property
     def effective_per_user_tok_per_s(self) -> float:
-        """Per-user output speed as the serving literature defines it: the steady
-        decode rate, `1/TPOT`, which excludes time to first token. Dividing the
-        aggregate by concurrency instead folds TTFT and the ramp into it."""
         return 1000 / self.metrics.tpot_ms.p50
 
     @field_validator("tool", "tool_version", "command")
@@ -113,33 +108,22 @@ class PresetBenchmark(CoreModel):
 
 class PresetValidationReplica(CoreModel):
     resources: list[ResourcesSpec]
-    """Exact resources for each running replica in this service replica group."""
 
 
 class PresetValidation(CoreModel):
     replicas: list[PresetValidationReplica]
-    """Ordered to match `ServiceConfiguration.replica_groups`."""
     benchmark: PresetBenchmark
 
 
 class Preset(CoreModel):
     base: str
-    """Base model used for local preset lookup."""
     id: str
     name: Optional[str] = None
-    """Mutable human name; at most one preset or in-flight session holds it."""
     model: str
-    """Exact repo/path loaded by the service command."""
     context_length: PositiveInt
-    """Token context length this preset was verified to support."""
     trial: Optional[PositiveInt] = None
-    """Trial this preset was promoted from, within its creation session."""
     min_context_length: Optional[PositiveInt] = None
-    """Context length asked for at creation. `context_length` may be below it: a
-    session that found no compliant trial verifies its best failed one."""
     max_ttft: Optional[PositiveInt] = None
-    """Maximum p50 TTFT asked for at creation, in ms. The benchmark may exceed it,
-    for the same reason."""
     created_at: datetime
     service: ServiceConfiguration
     validations: list[PresetValidation]

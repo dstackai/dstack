@@ -47,9 +47,8 @@ def load_preset_agent_report(
                 redacted_values,
             )
         )
-    # Scrub known secret values before validation: an echoed secret must never
-    # be persisted, but it also must not cost the whole session — the bearer
-    # check below still rejects unknown leaked tokens.
+    # Redact known secrets; an unknown leaked token is still caught downstream by
+    # the command bearer-token check.
     report_data = redact_structure(report_data, redacted_values)
     try:
         report = AgentFinalReport.model_validate(report_data)
@@ -68,10 +67,8 @@ def load_preset_agent_report(
 def _rewrite_workspace_file_paths(
     service: ServiceConfiguration, *, workspace_path: Path, session_path: Path
 ) -> None:
-    """Re-roots `files` local paths onto the session's mirrored record copies.
-    At submission they were resolved into the agent workspace, which is deleted
-    when the session ends; only `trials/` and `service/` are mirrored, so a
-    path outside them cannot outlive the workspace and fails the save."""
+    """Re-roots `files` onto the session's mirrored copies because the submission
+    workspace is deleted when the session ends; only `trials/` and `service/` are mirrored."""
     workspace_root = workspace_path.resolve()
     for mapping in service.files:
         try:
@@ -99,6 +96,8 @@ def build_verified_preset(
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
 ) -> Preset:
+    """Cross-checks the agent's self-reported final report against the actual run
+    and service state before trusting it to build a preset."""
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
     if run.status != RunStatus.RUNNING or run.service is None:

@@ -13,14 +13,12 @@ _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent / "resources" / "system_pr
 # inline within a line. A marker alone on its line disappears with the whole
 # line, and the branch body is dedented by the indentation shared by every
 # line of it; a body whose lines do not share one exact indentation is kept
-# as written. The conditional text lives in the document; this module only
-# applies the rule.
+# as written.
 _MARKER_PATTERN = re.compile(r"<!--\?(.*?)-->")
 _IF_PATTERN = re.compile(r"if\s+(\w+)")
 
-# `<!--!NOTE-->` is a note for maintainers and is dropped before the agent sees
-# the document. Any other comment is left alone, so that a plain `<!-- -->`
-# stays visible instead of disappearing silently.
+# `<!--!NOTE-->` is a maintainer note, dropped before the agent sees the
+# document. The `!` is required, so ordinary `<!-- -->` comments are preserved.
 _NOTE_PATTERN = re.compile(r"<!--!.*?-->\n?", re.DOTALL)
 
 

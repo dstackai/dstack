@@ -124,9 +124,9 @@ def remove_agent_workspace(session: PresetAgentSession) -> None:
 
 
 def scrub_workspace_token(session: PresetAgentSession) -> None:
-    """Removes the agent's dstack config (a live token) from a workspace kept
-    for resume, so an interrupted session leaves no credential on disk. Resume
-    re-mints it via `build_preset_agent_env`."""
+    """The dstack config holds a live token; scrubbing it leaves an interrupted
+    session with no on-disk credential, and resume re-mints it via
+    `build_preset_agent_env`."""
     workspace = session.read_manifest().get("workspace")
     if not workspace:
         return
@@ -146,6 +146,8 @@ def _create_workspace_alias(real: Path) -> Path:
 
 
 def _ensure_workspace_alias(alias: Path, real: Path) -> None:
+    """Recreates the alias symlink idempotently, refusing an existing path unless
+    it is a symlink to `real` owned by the current user."""
     if os.path.lexists(alias):
         if (
             alias.is_symlink()
@@ -161,6 +163,9 @@ def _ensure_workspace_alias(alias: Path, real: Path) -> None:
 
 
 def _validate_control_socket_path(build_root: Path) -> None:
+    """Rejects the workspace if the longest possible run-name SSH control-socket
+    path would exceed the Unix-socket length limit (`'x' * _MAX_RUN_NAME_LENGTH`
+    stands in for the worst-case run name)."""
     if IS_WINDOWS:
         return
     path = build_root / "h" / ".dstack" / "ssh" / f"{'x' * _MAX_RUN_NAME_LENGTH}.control.sock"
@@ -269,10 +274,7 @@ with path.open("a", encoding="utf-8") as f:
 def install_previous_records(
     workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetAgentSession]
 ) -> None:
-    """Copies each previous session's records into `previous/<id>/` in the
-    workspace, so the agent can read what earlier sessions tried and how it
-    worked. Remove-then-recopy, so a crashed copy heals on the next run. Only
-    the records travel: logs, traces, and the manifest stay out."""
+    """Remove-then-recopy, so a crashed partial copy heals on the next run."""
     for session in previous_sessions:
         target_root = workspace.path / "previous" / session.preset_id
         shutil.rmtree(target_root, ignore_errors=True)
@@ -322,6 +324,9 @@ def _install_skills(workspace: Path) -> None:
 
 
 def _get_skills_dir() -> Path:
+    """Returns the bundled skills dir, preferring the pip-packaged
+    `resources/skills` copy and falling back to the repo checkout (`parents[6]`
+    is the repo root)."""
     source_path = Path(__file__).resolve()
     candidates = (
         source_path.parent / "resources" / "skills",

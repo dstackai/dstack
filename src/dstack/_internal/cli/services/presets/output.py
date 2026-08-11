@@ -25,10 +25,6 @@ def _format_status(status: str) -> str:
 
 
 def _verifying(session: dict[str, Any]) -> bool:
-    """Whether the agent has moved on to the final service. Read from the session's
-    verification records rather than inferred from a spent trial budget, which
-    misses every run that stopped early. An attempt that failed still counts: the
-    agent is picking the next trial to verify, not trialing again."""
     return isinstance(session.get("verification"), dict)
 
 
@@ -36,11 +32,6 @@ _SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
 
 
 def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
-    """One glyph per trial, scaled from zero: bar heights compare as the
-    numbers do, so the size of a gain is visible. A red `·` marks a trial
-    that produced no benchmark at all, and a red bar one that measured but
-    broke a constraint. Gold marks the best result while no trial meets the
-    constraints; green takes over once one does."""
     if not isinstance(session, dict):
         return ""
     trials = session.get("trials")
@@ -55,9 +46,6 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
         return "·" * len(series)
     high = max(values)
     passed = [v for v, f in zip(series, failed) if isinstance(v, (int, float)) and not f]
-    # The best trial is the answer the run found; everything else is context. Gold
-    # is that answer while none meets the constraints, so it gives way to green as
-    # soon as one does.
     best = max(passed) if passed else max(values)
     out = []
     for value, is_failed in zip(series, failed):
@@ -78,9 +66,6 @@ def _format_trial_spark(session: Optional[dict[str, Any]]) -> str:
 
 
 def _format_trial_progress(session: Optional[dict[str, Any]], *, in_flight: bool = False) -> str:
-    """The ` (N/M)` suffix; stays outside the status markup to render in the
-    default color. While trialing, `N` is the trial being worked on rather than
-    the completed count, so `trialing (2/3)` cannot read as two finished."""
     if not isinstance(session, dict):
         return ""
     trials = session.get("trials")
@@ -121,9 +106,8 @@ def get_presets_table(
     table = Table(box=None)
     compact = not verbose
     table.add_column("ID", no_wrap=True)
-    # In the compact view, BASE and GPU truncate and are capped so a long model
-    # name cannot starve CONSTRAINTS and BENCHMARK, which wrap to stay readable
-    # (below). Verbose is the wide-terminal detail view and keeps them uncapped.
+    # Compact-view caps keep a long model name from starving the wrapping
+    # CONSTRAINTS and BENCHMARK columns below.
     table.add_column("BASE", no_wrap=True, max_width=24 if compact else None, style="secondary")
     table.add_column(
         "RESOURCES" if verbose else "GPU",
@@ -131,15 +115,9 @@ def get_presets_table(
         max_width=18 if compact else None,
         style="secondary",
     )
-    # CONSTRAINTS is the test that was asked for; BENCHMARK is the best trial under
-    # it. Both wrap on a narrow terminal so their full content stays visible, and
-    # they wrap together rather than one clipping while the other folds.
     table.add_column("CONSTRAINTS", min_width=len("io=1K/1K"), overflow="fold")
     table.add_column("BENCHMARK", min_width=len("tps=1"), overflow="fold")
-    # The search shape, one glyph per trial. Unlabelled: it reads on sight.
     table.add_column("", no_wrap=True)
-    # STATUS and SUBMITTED wrap at their spaces on a narrow terminal, which also
-    # frees width for CONSTRAINTS and BENCHMARK instead of holding a fixed column.
     table.add_column("STATUS")
     table.add_column("SUBMITTED", style="secondary")
     if verbose:
@@ -159,10 +137,8 @@ def get_presets_table(
         model = str(session.get("model") or "unknown")
         sessions_by_model[repo_to_base.get(model, model)].append(session)
 
-    # One flat list, newest first, as in `dstack ps`. The base is a column, so
-    # runs of different models still sort together by when they were submitted.
-    # Same contract as `dstack ps`: only active by default, or the single most
-    # recent row when nothing is active. `-a` and `-n` show everything.
+    # Same contract as `dstack ps`: one flat list, newest first (base is a column,
+    # so different models interleave); active-only by default, else the latest row.
     rows: list[tuple[str, Any, bool]] = []
     for preset_list in presets_by_base.values():
         rows += [(preset.created_at.isoformat(), preset, True) for preset in preset_list]
@@ -236,15 +212,10 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
     max_ttft = constraints.get("max_ttft")
     if verbose and isinstance(max_ttft, (int, float)):
         objective.append(f"ttft<={_format_duration_ms(max_ttft)}")
-    # Stays empty until a trial has produced a benchmark: a run that has measured
-    # nothing yet has no best, and `n/a` is noise in a column of numbers.
     if isinstance(best, dict):
         tps = _format_number(best["tok_s"])
         if objective:
-            # Per-user leads: aggregate rises with concurrency, so it makes rows at
-            # different concurrencies look better or worse than they serve.
-            # Same definition as `effective_per_user_tok_per_s`: the steady decode
-            # rate, not the aggregate divided by concurrency.
+            # Lead with per-user tok/s: comparable across rows regardless of concurrency.
             tpot_ms = best.get("tpot_ms")
             if isinstance(tpot_ms, (int, float)) and tpot_ms > 0:
                 parts.append(f"tok/s/user={_format_number(1000 / tpot_ms)}")
@@ -272,8 +243,6 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
             "GPU": gpu,
             "RESOURCES": gpu,
             "": _format_trial_spark(session),
-            # The constraints are context for the number, so the whole cell recedes;
-            # the benchmark beside it is what the reader came for and stays bright.
             "CONSTRAINTS": f"[secondary]{' '.join(objective)}[/]" if objective else "",
             "BENCHMARK": benchmark,
             "STATUS": status,
@@ -300,8 +269,8 @@ def _add_preset(
         "": _format_trial_spark(creation),
         "CONSTRAINTS": format_preset_objective(
             preset,
-            # The preset carries what it was asked for; the creation record is the
-            # fallback for presets saved before it did.
+            # Fall back to the creation record for presets saved before the preset
+            # itself carried the requested values.
             min_context_length=preset.min_context_length
             or (creation or {}).get("constraints", {}).get("min_context_length"),
             max_ttft=preset.max_ttft or (creation or {}).get("constraints", {}).get("max_ttft"),
@@ -332,10 +301,6 @@ def format_preset_objective(
     max_ttft: Optional[float] = None,
     verbose: bool = False,
 ) -> str:
-    """What was asked for. The context the configuration actually reached is a
-    result and sits next to the numbers; the context that was *required* is shown
-    here under `-v`. Two runs can share every constraint and still serve different
-    context lengths, so both are worth seeing."""
     workload = preset.validations[0].benchmark.workload
     parts = [
         f"io={_format_token_count(workload.input_tokens)}"
@@ -347,17 +312,12 @@ def format_preset_objective(
     # Absent for presets saved before the creation record was consulted.
     if verbose and min_context_length is not None:
         parts.append(f"ctx>={_format_token_count(min_context_length)}")
-    # The latency ceiling only explains a number that is near it, so it waits for `-v`.
     if verbose and max_ttft is not None:
         parts.append(f"ttft<={_format_duration_ms(max_ttft)}")
-    # Context for the number, so the whole cell recedes.
     return f"[secondary]{' '.join(parts)}[/]"
 
 
 def _breaches_constraints(preset: Preset) -> bool:
-    """Whether the verified benchmark misses what was asked for. A session that
-    found no compliant trial verifies its best failed one, so a preset can be
-    real, reproducible, and still fall short."""
     metrics = preset.validations[0].benchmark.metrics
     if preset.max_ttft is not None and metrics.ttft_ms.p50 > preset.max_ttft:
         return True
@@ -369,8 +329,6 @@ def _breaches_constraints(preset: Preset) -> bool:
 def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
     benchmark = preset.validations[0].benchmark
     metrics = benchmark.metrics
-    # The workload and context define the number, so they are always shown next
-    # to it: two presets are comparable only when all three match.
     parts = [
         f"tok/s/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
     ]
@@ -382,15 +340,11 @@ def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
     ]
     text = " ".join(parts)
     if _breaches_constraints(preset):
-        # Marked, not only dimmed: colour alone is not a signal. Same `*` a
-        # session row uses when it has nothing but failed trials to show.
         return f"[secondary]*{text}[/]"
     return text
 
 
 def _format_duration_ms(value: float) -> str:
-    """Milliseconds below a second, seconds above it. A bare `4152` reads as small
-    until you notice the unit; `4.15s` does not."""
     # 999.6 rounds to 1000, which must read as 1s rather than 1000ms.
     if value < 999.5:
         return f"{_format_number(value)}ms"
@@ -398,6 +352,7 @@ def _format_duration_ms(value: float) -> str:
 
 
 def _format_token_count(value: int) -> str:
+    """Abbreviates only exact multiples of 1024/1024², so 2048 becomes "2K" but 2050 stays "2050"."""
     for divisor, suffix in ((1024 * 1024, "M"), (1024, "K")):
         if value >= divisor and value % divisor == 0:
             return f"{value // divisor}{suffix}"
