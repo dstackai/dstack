@@ -1199,7 +1199,7 @@ async def _maybe_register_replica(
     # non-router replicas aren't registered if the service has a router
     if router_group is not None and not is_router_replica:
         if context.job_model.registered:
-            # migration edge case: a pre-0.21.0 server replica incorrectly set registered=True
+            # migration edge case: a pre-0.21.1 server replica incorrectly set registered=True
             result.job_update_map["registered"] = False
         return
 

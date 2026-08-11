@@ -2563,7 +2563,7 @@ class TestJobRunningWorker:
         ssh_tunnel_mock: Mock,
         runner_client_mock: Mock,
     ):
-        """Migration edge case: a pre-0.21.0 server may have incorrectly marked
+        """Migration edge case: a pre-0.21.1 server may have incorrectly marked
         a non-router replica as registered. Should be corrected.
         """
         project = await create_project(session=session)
