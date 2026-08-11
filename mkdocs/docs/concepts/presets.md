@@ -9,6 +9,8 @@ A preset configuration lets you use an agent to create a preset: a verified and 
 
 The value of presets comes from combining two fundamental features: agent-driven model inference optimization and the `dstack` [service](services.md) primitive, which can deploy model inference to any cloud, Kubernetes, or on-prem cluster.
 
+To get the best performance for the given model, hardware, and other constraints, the agent selects the serving framework, quantization, and serving parameters, and can patch the framework's source code, generate custom kernels, and patch drivers.
+
 > The presets feature is experimental and may change.
 
 ??? info "Prerequisites"
@@ -268,11 +270,11 @@ $ dstack preset delete c83375b4
 
 For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
-!!! info "Roadmap and feedback"
-    Here's what is coming soon:
-
-    * Support for PD disaggregation
-    * Allow passing ranges to `concurrency`
+!!! info "Limitations"
+    * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
+    * Doesn't support PD disaggregation (coming soon)
+    * Doesn't allow a custom dataset; always uses `random`
+    * Doesn't support ranges for `concurrency`
 
     Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 
