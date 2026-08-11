@@ -10,13 +10,19 @@ from dstack._internal.core.models.gateways import (
 )
 
 
-def patch_gateway_spec_in_request(spec: GatewaySpec, client_version: Optional[Version]) -> None:
+def patch_gateway_configuration_in_request(
+    configuration: GatewayConfiguration, client_version: Optional[Version]
+) -> None:
     if client_version is None:
         return
-    if client_version < Version("0.21.1") and spec.configuration.default is False:
+    if client_version < Version("0.21.1") and configuration.default is False:
         # Pre-0.21.1 clients send `default=false` both when `default` was omitted and when it was
         # set to `false` explicitly. Assume it was omitted, which is more common and more useful.
-        spec.configuration.default = None
+        configuration.default = None
+
+
+def patch_gateway_spec_in_request(spec: GatewaySpec, client_version: Optional[Version]) -> None:
+    patch_gateway_configuration_in_request(spec.configuration, client_version)
 
 
 def patch_gateway(gateway: Gateway, client_version: Optional[Version]) -> None:

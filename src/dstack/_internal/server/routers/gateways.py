@@ -11,6 +11,7 @@ from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.server.compatibility.gateways import (
     patch_gateway,
+    patch_gateway_configuration_in_request,
     patch_gateway_plan,
     patch_gateway_spec_in_request,
 )
@@ -135,6 +136,7 @@ async def create_gateway(
     Deprecated in favor of `/apply`.
     """
     user, project = user_project
+    patch_gateway_configuration_in_request(body.configuration, client_version)
     gateway = await gateways.create_gateway(
         session=session,
         user=user,
