@@ -260,7 +260,7 @@ class ProjectModel(BaseModel):
     """
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    owner: Mapped[UserModel] = relationship(lazy="joined")
+    owner: Mapped[UserModel] = relationship()
     members: Mapped[List["MemberModel"]] = relationship(
         back_populates="project", order_by="MemberModel.member_num"
     )

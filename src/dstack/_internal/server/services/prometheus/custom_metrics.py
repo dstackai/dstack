@@ -63,9 +63,7 @@ async def get_instance_metrics(session: AsyncSession) -> Iterable[Metric]:
                 InstanceModel.backend,
                 InstanceModel.offer,
             ),
-            joinedload(InstanceModel.project)
-            .load_only(ProjectModel.name)
-            .noload(ProjectModel.owner),
+            joinedload(InstanceModel.project).load_only(ProjectModel.name),
             joinedload(InstanceModel.fleet).load_only(FleetModel.name),
         )
     )
