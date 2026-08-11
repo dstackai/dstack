@@ -1,7 +1,7 @@
 """Add JobModel.ready
 
 Revision ID: 72cfa56364ad
-Revises: ecc9e8a0bfac
+Revises: a1c3f5e7b209
 Create Date: 2026-08-04 07:02:02.041000+00:00
 
 """
@@ -16,7 +16,7 @@ from sqlalchemy_utils import UUIDType
 
 # revision identifiers, used by Alembic.
 revision = "72cfa56364ad"
-down_revision = "ecc9e8a0bfac"
+down_revision = "a1c3f5e7b209"
 branch_labels = None
 depends_on = None
 
