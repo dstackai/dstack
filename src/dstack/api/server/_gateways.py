@@ -3,6 +3,7 @@ from typing import List, Optional
 from dstack._internal.core.compatibility.gateways import (
     get_apply_plan_excludes,
     get_create_gateway_excludes,
+    get_get_plan_excludes,
     get_set_default_gateway_excludes,
 )
 from dstack._internal.core.models.common import validate_extra_ignore
@@ -46,7 +47,8 @@ class GatewaysAPIClient(APIClientGroup):
     def get_plan(self, project_name: str, spec: GatewaySpec) -> GatewayPlan:
         body = GetGatewayPlanRequest(spec=spec)
         resp = self._request(
-            f"/api/project/{project_name}/gateways/get_plan", body=body.model_dump_json()
+            f"/api/project/{project_name}/gateways/get_plan",
+            body=body.model_dump_json(exclude=get_get_plan_excludes(body)),
         )
         return validate_extra_ignore(GatewayPlan, resp.json())
 

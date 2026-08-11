@@ -55,7 +55,18 @@ class GatewayCertificate(RootModel[Annotated[AnyGatewayCertificate, Field(discri
 class GatewayConfiguration(CoreModel):
     type: Literal["gateway"] = "gateway"
     name: Annotated[Optional[str], Field(description="The gateway name")] = None
-    default: Annotated[bool, Field(description="Make the gateway default")] = False
+    default: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether the gateway is the project's default. Can be updated in-place."
+                " If unset when creating a new gateway,"
+                " the gateway will become the default unless there is already a default gateway."
+                " If unset when updating the gateway in-place,"
+                " the gateway's default status will not change"
+            )
+        ),
+    ] = None
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
     instance_type: Annotated[
