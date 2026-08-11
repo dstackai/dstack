@@ -206,6 +206,7 @@ async def list_projects_with_no_active_fleets(
             active_fleet_alias.id.is_(None),
         )
         .order_by(ProjectModel.created_at)
+        .options(joinedload(ProjectModel.owner))
     )
 
     res = await session.execute(query)
