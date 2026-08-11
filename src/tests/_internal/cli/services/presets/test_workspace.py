@@ -45,7 +45,7 @@ class TestInstallPreviousRecords:
 
         target = workspace.path / "previous" / "8d3b01aa"
         copied = sorted(
-            str(file.relative_to(target)) for file in target.rglob("*") if file.is_file()
+            file.relative_to(target).as_posix() for file in target.rglob("*") if file.is_file()
         )
         assert copied == [
             "constraints.json",

@@ -385,9 +385,8 @@ class TestResolvePreviousSessions:
 
         output = capsys.readouterr().out
         assert "e5f6a7b8 was created with --previous 00000000" in output
-        assert "a1b2c3d4" not in output.replace(
-            "e5f6a7b8 was created with --previous 00000000, which is not included", ""
-        )
+        # The included parent must not be warned about.
+        assert output.count("was created with") == 1
 
     def test_rejects_a_previous_session_that_is_still_running(self, tmp_path, monkeypatch):
         store = self._store(tmp_path, monkeypatch, "a1b2c3d4")
@@ -430,29 +429,22 @@ class TestEffectivePrevious:
         args.no_profile = True
         return args
 
-    def test_flag_overrides_the_configuration_property(self):
+    def test_flag_overrides_and_property_stands_without_it(self):
         from dstack._internal.cli.commands.preset import _get_effective_configuration
 
-        configuration = PresetConfiguration(
-            name="qwen", model={"base": "Qwen/Qwen3.5-27B"}, previous=["from-config"]
+        def configuration():
+            # A fresh object per call: the merger mutates its input.
+            return PresetConfiguration(
+                name="qwen", model={"base": "Qwen/Qwen3.5-27B"}, previous=["from-config"]
+            )
+
+        overridden = _get_effective_configuration(
+            configuration(), self._args(["from-flag"]), require_name=False
         )
+        kept = _get_effective_configuration(configuration(), self._args(None), require_name=False)
 
-        merged = _get_effective_configuration(
-            configuration, self._args(["from-flag"]), require_name=False
-        )
-
-        assert merged.previous == ["from-flag"]
-
-    def test_configuration_property_stands_without_the_flag(self):
-        from dstack._internal.cli.commands.preset import _get_effective_configuration
-
-        configuration = PresetConfiguration(
-            name="qwen", model={"base": "Qwen/Qwen3.5-27B"}, previous=["e8b7e09c"]
-        )
-
-        merged = _get_effective_configuration(configuration, self._args(None), require_name=False)
-
-        assert merged.previous == ["e8b7e09c"]
+        assert overridden.previous == ["from-flag"]
+        assert kept.previous == ["from-config"]
 
 
 class TestCreateWithPrevious:

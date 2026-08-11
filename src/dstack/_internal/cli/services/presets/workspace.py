@@ -266,12 +266,6 @@ with path.open("a", encoding="utf-8") as f:
 """
 
 
-_PREVIOUS_DIRNAME = "previous"
-_PATCHES_DIRNAME = "patches"
-_PREVIOUS_TRIAL_FILENAMES = ("trial.json", "task.dstack.yml")
-_PREVIOUS_SERVICE_FILENAMES = ("service.dstack.yml", "verification.json")
-
-
 def install_previous_records(
     workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetAgentSession]
 ) -> None:
@@ -280,7 +274,7 @@ def install_previous_records(
     worked. Remove-then-recopy, so a crashed copy heals on the next run. Only
     the records travel: logs, traces, and the manifest stay out."""
     for session in previous_sessions:
-        target_root = workspace.path / _PREVIOUS_DIRNAME / session.preset_id
+        target_root = workspace.path / "previous" / session.preset_id
         shutil.rmtree(target_root, ignore_errors=True)
         if not _copy_session_records(session.path, target_root):
             warn(f"Previous session {session.preset_id} has no records")
@@ -294,8 +288,8 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
             shutil.copyfile(source_root / name, target_root / name)
             copied = True
     for group, filenames in (
-        (_TRIALS_DIRNAME, _PREVIOUS_TRIAL_FILENAMES),
-        (_SERVICE_DIRNAME, _PREVIOUS_SERVICE_FILENAMES),
+        (_TRIALS_DIRNAME, ("trial.json", "task.dstack.yml")),
+        (_SERVICE_DIRNAME, ("service.dstack.yml", "verification.json")),
     ):
         source_group = source_root / group
         if not source_group.is_dir():
@@ -309,9 +303,9 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
                     target_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(record_dir / name, target_dir / name)
                     copied = True
-            patches = record_dir / _PATCHES_DIRNAME
+            patches = record_dir / "patches"
             if group == _TRIALS_DIRNAME and patches.is_dir():
-                shutil.copytree(patches, target_dir / _PATCHES_DIRNAME, dirs_exist_ok=True)
+                shutil.copytree(patches, target_dir / "patches", dirs_exist_ok=True)
                 copied = True
     return copied
 

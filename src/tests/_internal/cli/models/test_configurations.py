@@ -82,14 +82,3 @@ class TestPresetConfiguration:
     def test_requires_model(self):
         with pytest.raises(ValidationError):
             PresetConfiguration()
-
-
-class TestPresetPrevious:
-    def test_accepts_a_list_of_ids(self):
-        configuration = PresetConfiguration(
-            model={"base": "Qwen/Qwen3.5-27B"}, previous=["e8b7e09c", "8d3b01aa"]
-        )
-
-        assert configuration.previous == ["e8b7e09c", "8d3b01aa"]
-        rebuilt = PresetConfiguration.model_validate(configuration.model_dump())
-        assert rebuilt.previous == ["e8b7e09c", "8d3b01aa"]

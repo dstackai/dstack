@@ -169,6 +169,23 @@ prompt: |
 
 Set `baseline: true` to make the first trial a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts.
 
+### Previous sessions
+
+Set `previous` to a list of preset IDs to give the agent the results of earlier creation sessions. It analyzes what they tried and how it worked, and aims to improve on them instead of rediscovering it.
+
+<div editor-title="preset.dstack.yml">
+
+```yaml
+previous:
+  - c83375b4
+```
+
+</div>
+
+Alternatively, pass `--previous` (repeatable) to `dstack preset create`.
+
+With `baseline: true`, the first trial reproduces the best comparable previous result to confirm it still holds before optimizing further.
+
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
 
@@ -254,9 +271,7 @@ For command options and agent settings, see the [`dstack preset` CLI reference](
 !!! info "Roadmap and feedback"
     Here's what is coming soon:
 
-    * Allow the agent to change the source code, compile binaries, etc.
     * Support for PD disaggregation
-    * Allow passing multiple `--previous <preset ID>` to `dstack preset create` to reuse the insights from previous sessions
     * Allow passing ranges to `concurrency`
 
     Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
