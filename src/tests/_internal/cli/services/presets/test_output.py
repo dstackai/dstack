@@ -62,13 +62,17 @@ class TestFormatPresetObjective:
 
 
 class TestPrintPresets:
-    def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
+    def test_preserves_constraints_and_benchmark_at_narrow_width(self, monkeypatch):
         output = StringIO()
         monkeypatch.setattr(output_module, "console", plain_console(output, width=79))
 
         output_module.print_presets([get_preset()])
 
-        assert "conc=1" in "".join(output.getvalue().split())
+        # Both columns wrap rather than clip, so their full content survives even
+        # when a long model name would otherwise squeeze them out.
+        joined = "".join(output.getvalue().split())
+        assert "conc=1" in joined
+        assert "ttft=108ms" in joined
 
     def test_prints_submitted_column(self, monkeypatch):
         output = StringIO()

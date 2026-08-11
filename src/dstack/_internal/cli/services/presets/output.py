@@ -119,16 +119,29 @@ def get_presets_table(
     limit: Optional[int] = None,
 ) -> Table:
     table = Table(box=None)
+    compact = not verbose
     table.add_column("ID", no_wrap=True)
-    table.add_column("BASE", no_wrap=True, style="secondary")
-    table.add_column("RESOURCES" if verbose else "GPU", style="secondary")
-    # CONSTRAINTS is the test that was asked for; BENCHMARK is the best trial under it.
-    table.add_column("CONSTRAINTS", no_wrap=True)
+    # In the compact view, BASE and GPU truncate and are capped so a long model
+    # name cannot starve CONSTRAINTS and BENCHMARK, which wrap to stay readable
+    # (below). Verbose is the wide-terminal detail view and keeps them uncapped.
+    table.add_column("BASE", no_wrap=True, max_width=24 if compact else None, style="secondary")
+    table.add_column(
+        "RESOURCES" if verbose else "GPU",
+        no_wrap=compact,
+        max_width=18 if compact else None,
+        style="secondary",
+    )
+    # CONSTRAINTS is the test that was asked for; BENCHMARK is the best trial under
+    # it. Both wrap on a narrow terminal so their full content stays visible, and
+    # they wrap together rather than one clipping while the other folds.
+    table.add_column("CONSTRAINTS", min_width=len("io=1K/1K"), overflow="fold")
     table.add_column("BENCHMARK", min_width=len("tps=1"), overflow="fold")
     # The search shape, one glyph per trial. Unlabelled: it reads on sight.
     table.add_column("", no_wrap=True)
-    table.add_column("STATUS", no_wrap=True)
-    table.add_column("SUBMITTED", no_wrap=True, style="secondary")
+    # STATUS and SUBMITTED wrap at their spaces on a narrow terminal, which also
+    # frees width for CONSTRAINTS and BENCHMARK instead of holding a fixed column.
+    table.add_column("STATUS")
+    table.add_column("SUBMITTED", style="secondary")
     if verbose:
         table.add_column("NAME", no_wrap=True, style="secondary")
     presets_by_base: dict[str, list[Preset]] = defaultdict(list)
