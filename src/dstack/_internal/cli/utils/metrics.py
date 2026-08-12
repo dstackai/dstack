@@ -73,12 +73,6 @@ def get_metrics_table(
 
 
 def job_labels(jobs: Sequence[Job]) -> List[str]:
-    """`replica=`/`group=` only where they distinguish something, as `dstack ps` does --
-    one replica across four nodes is `job=0..3`, not `replica=0 job=0..3`.
-
-    Unlike `ps`, `job=` is always printed. This table is keyed by job, so every row names
-    one; `replica=` joins it only where there is more than one replica to tell apart.
-    """
     groups = {job.job_spec.replica_group for job in jobs}
     show_group = len(groups) > 1
     show_replica = len({job.job_spec.replica_num for job in jobs}) > 1
@@ -125,13 +119,6 @@ def _add_job(
 
 
 def _span(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, datetime]]:
-    """The window every job is drawn against: always the full retention hour.
-
-    Fixed rather than fitted to the data, so a row means the same thing in every
-    invocation and across every job. A job younger than the hour fills only its share of
-    the row and the rest is blank -- which is the fact worth seeing about a replica that
-    started two minutes ago.
-    """
     windows = [w for w in (_window(m) for m in metrics) if w is not None]
     if not windows:
         return None
@@ -140,7 +127,6 @@ def _span(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, datetime]]:
 
 
 def _lead(metrics: JobMetrics, span: Optional[tuple[datetime, datetime]], width: int) -> int:
-    """Cells before this job's first sample -- time it was not running for."""
     window = _window(metrics)
     if window is None or span is None:
         return 0
@@ -214,18 +200,6 @@ def _cell(spark: Text, label: str) -> Text:
 
 
 def _axis(width: int, first: datetime, last: datetime) -> Text:
-    """`<oldest> ┄┄┄ <newest>`, never wider than the sparkline above it.
-
-    The rule is what pairs the two stamps. UTILIZATION and MEMORY each print one, so the
-    row ends up holding four times, and with the rule left blank the only cue is spacing --
-    which points the wrong way above 88 columns: at 200 there are 66 blanks between a
-    column's own two stamps but only 13 between the columns, so each column's newest time
-    reads as belonging to the next column's oldest.
-
-    A run draws one cell per sample, so for its first few minutes there are fewer cells
-    than two dates need. Dropping the date keeps the axis inside its cell; overflowing
-    instead widens the column and pulls MEMORY out of line with the charts.
-    """
     left, right = _stamp(first), _stamp(last)
     if len(left) + len(right) + 3 > width:
         left, right = _stamp(first, clock_only=True), _stamp(last, clock_only=True)
@@ -250,8 +224,6 @@ def _window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
 
 
 def _samples_num(job_metrics: JobMetrics) -> int:
-    """`slices` never draws more cells than it has samples, so the axis must stop there
-    too -- else it claims a span nothing was measured over, and Rich widens the column."""
     return max((len(metric.timestamps) for metric in job_metrics.metrics), default=0)
 
 
