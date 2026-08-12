@@ -712,7 +712,7 @@ class TestBuildConstraints:
             "input_tokens": 1024,
             "output_tokens": 1024,
             "shared_prefix_tokens": 0,
-            "baseline": False,
+            "baseline": True,
             "fleets": ["gpu-fleet"],
             "env": ["HF_TOKEN"],
         }

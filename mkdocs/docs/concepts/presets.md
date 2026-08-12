@@ -169,7 +169,7 @@ prompt: |
 
 ### Baseline
 
-Set `baseline: true` to make the first trial a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts.
+By default, the first trial is a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts. Set `baseline: false` to make every trial an optimization attempt.
 
 ### Previous sessions
 
@@ -186,7 +186,7 @@ previous:
 
 Alternatively, pass `--previous` (repeatable) to `dstack preset create`.
 
-With `baseline: true`, the first trial reproduces the best comparable previous result to confirm it still holds before optimizing further.
+In this case, the baseline trial reproduces the best comparable previous result to confirm it still holds before optimizing further.
 
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
