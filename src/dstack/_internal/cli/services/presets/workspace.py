@@ -10,17 +10,18 @@ import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from dstack._internal.cli.services.presets.session import (
     _CONSTRAINTS_FILENAME,
     _FINAL_REPORT_FILENAME,
     _PROGRESS_FILENAME,
     _RUNS_FILENAME,
-    _TRIALS_FILENAME,
-    _VERIFICATIONS_FILENAME,
+    _SERVICE_DIRNAME,
+    _TRIALS_DIRNAME,
     PresetAgentSession,
 )
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 
@@ -52,12 +53,12 @@ class PresetAgentWorkspace:
         return self.path / _RUNS_FILENAME
 
     @property
-    def trials_path(self) -> Path:
-        return self.path / _TRIALS_FILENAME
+    def trials_dir(self) -> Path:
+        return self.path / _TRIALS_DIRNAME
 
     @property
-    def verifications_path(self) -> Path:
-        return self.path / _VERIFICATIONS_FILENAME
+    def service_dir(self) -> Path:
+        return self.path / _SERVICE_DIRNAME
 
     @property
     def constraints_path(self) -> Path:
@@ -123,9 +124,9 @@ def remove_agent_workspace(session: PresetAgentSession) -> None:
 
 
 def scrub_workspace_token(session: PresetAgentSession) -> None:
-    """Removes the agent's dstack config (a live token) from a workspace kept
-    for resume, so an interrupted session leaves no credential on disk. Resume
-    re-mints it via `build_preset_agent_env`."""
+    """The dstack config holds a live token; scrubbing it leaves an interrupted
+    session with no on-disk credential, and resume re-mints it via
+    `build_preset_agent_env`."""
     workspace = session.read_manifest().get("workspace")
     if not workspace:
         return
@@ -145,6 +146,8 @@ def _create_workspace_alias(real: Path) -> Path:
 
 
 def _ensure_workspace_alias(alias: Path, real: Path) -> None:
+    """Recreates the alias symlink idempotently, refusing an existing path unless
+    it is a symlink to `real` owned by the current user."""
     if os.path.lexists(alias):
         if (
             alias.is_symlink()
@@ -160,6 +163,9 @@ def _ensure_workspace_alias(alias: Path, real: Path) -> None:
 
 
 def _validate_control_socket_path(build_root: Path) -> None:
+    """Rejects the workspace if the longest possible run-name SSH control-socket
+    path would exceed the Unix-socket length limit (`'x' * _MAX_RUN_NAME_LENGTH`
+    stands in for the worst-case run name)."""
     if IS_WINDOWS:
         return
     path = build_root / "h" / ".dstack" / "ssh" / f"{'x' * _MAX_RUN_NAME_LENGTH}.control.sock"
@@ -171,13 +177,10 @@ def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
     workspace.path.mkdir(mode=0o700, parents=True, exist_ok=False)
     workspace.dstack_home.mkdir(mode=0o700)
     workspace.temp_path.mkdir(mode=0o700)
-    for path in [
-        workspace.progress_path,
-        workspace.runs_path,
-        workspace.trials_path,
-        workspace.verifications_path,
-    ]:
+    for path in [workspace.progress_path, workspace.runs_path]:
         path.touch()
+    workspace.trials_dir.mkdir()
+    workspace.service_dir.mkdir()
     workspace.bin_path.mkdir()
     _install_python_command(workspace.bin_path, "progress", _get_progress_script())
     (workspace.dstack_home / ".ssh").mkdir(mode=0o700)
@@ -268,6 +271,47 @@ with path.open("a", encoding="utf-8") as f:
 """
 
 
+def install_previous_records(
+    workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetAgentSession]
+) -> None:
+    """Remove-then-recopy, so a crashed partial copy heals on the next run."""
+    for session in previous_sessions:
+        target_root = workspace.path / "previous" / session.preset_id
+        shutil.rmtree(target_root, ignore_errors=True)
+        if not _copy_session_records(session.path, target_root):
+            warn(f"Previous session {session.preset_id} has no records")
+
+
+def _copy_session_records(source_root: Path, target_root: Path) -> bool:
+    copied = False
+    for name in (_CONSTRAINTS_FILENAME, _FINAL_REPORT_FILENAME):
+        if (source_root / name).is_file():
+            target_root.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source_root / name, target_root / name)
+            copied = True
+    for group, filenames in (
+        (_TRIALS_DIRNAME, ("trial.json", "task.dstack.yml")),
+        (_SERVICE_DIRNAME, ("service.dstack.yml", "verification.json")),
+    ):
+        source_group = source_root / group
+        if not source_group.is_dir():
+            continue
+        for record_dir in sorted(source_group.iterdir()):
+            if not record_dir.is_dir() or not record_dir.name.isdigit():
+                continue
+            target_dir = target_root / group / record_dir.name
+            for name in filenames:
+                if (record_dir / name).is_file():
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(record_dir / name, target_dir / name)
+                    copied = True
+            patches = record_dir / "patches"
+            if group == _TRIALS_DIRNAME and patches.is_dir():
+                shutil.copytree(patches, target_dir / "patches", dirs_exist_ok=True)
+                copied = True
+    return copied
+
+
 def _install_skills(workspace: Path) -> None:
     source_dir = _get_skills_dir()
     target_dir = workspace / ".claude" / "skills"
@@ -280,6 +324,9 @@ def _install_skills(workspace: Path) -> None:
 
 
 def _get_skills_dir() -> Path:
+    """Returns the bundled skills dir, preferring the pip-packaged
+    `resources/skills` copy and falling back to the repo checkout (`parents[6]`
+    is the repo root)."""
     source_path = Path(__file__).resolve()
     candidates = (
         source_path.parent / "resources" / "skills",

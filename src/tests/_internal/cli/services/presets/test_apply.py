@@ -27,7 +27,9 @@ class TestValidatePresetMatches:
 
         _validate_preset_matches(preset, configuration=configuration)
 
-    def test_rejects_insufficient_context(self):
+    def test_warns_on_insufficient_context_instead_of_failing(self, capsys):
+        # The preset is chosen by ID and may be the best a session could verify;
+        # the shortfall is stated and the plan confirmation decides.
         preset = get_preset(preset_id="small", context_length=4096)
         configuration = PresetConfiguration(
             name="qwen",
@@ -35,8 +37,11 @@ class TestValidatePresetMatches:
             min_context_length=8192,
         )
 
-        with pytest.raises(CLIError, match="context length"):
-            _validate_preset_matches(preset, configuration=configuration)
+        _validate_preset_matches(preset, configuration=configuration)
+
+        output = capsys.readouterr().out
+        assert "verified for context length 4096" in output
+        assert "8192" in output
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
         matching = get_preset(preset_id="matching")

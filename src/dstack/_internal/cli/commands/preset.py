@@ -22,6 +22,7 @@ from dstack._internal.cli.services.presets.create import (
     plan_preset,
     reassign_preset_name,
     reconcile_detached_sessions,
+    resolve_previous_sessions,
     show_preset_session_logs,
     stop_preset_session,
 )
@@ -113,6 +114,13 @@ class PresetCommand(BaseCommand):
             "--debug",
             action="store_true",
             help="Save the agent prompt and raw trace",
+        )
+        create_parser.add_argument(
+            "--previous",
+            action="append",
+            metavar="ID",
+            help="Give the agent a previous session's results to analyze and improve on."
+            " Repeat for several",
         )
         create_parser.add_argument(
             "--resume",
@@ -286,6 +294,14 @@ class PresetCommand(BaseCommand):
                     "[warning]--trials is ignored when resuming: "
                     "the constraints are fixed at creation[/]"
                 )
+            if configuration.previous:
+                console.print(
+                    "[warning]previous is ignored when resuming: "
+                    "the previous sessions are fixed at creation[/]"
+                )
+        previous = ()
+        if resume_session is None and configuration.previous:
+            previous = resolve_previous_sessions(configuration.previous)
         api = Client.from_config(project_name=args.project)
         allowed_fleets = None
         if resume_session is None:
@@ -310,6 +326,7 @@ class PresetCommand(BaseCommand):
                 resume_session=resume_session,
                 user_prompt=user_prompt,
                 allowed_fleets=allowed_fleets,
+                previous=previous,
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
@@ -524,6 +541,8 @@ def _get_effective_configuration(
     _apply_name(configuration, args.name, required=require_name)
     if getattr(args, "trials", None) is not None:
         configuration.trials = args.trials
+    if getattr(args, "previous", None):
+        configuration.previous = list(args.previous)
     profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
     for field in ProfileParams.model_fields:
         if getattr(configuration, field) is None:

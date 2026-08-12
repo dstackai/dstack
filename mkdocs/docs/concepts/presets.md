@@ -9,6 +9,8 @@ A preset configuration lets you use an agent to create a preset: a verified and 
 
 The value of presets comes from combining two fundamental features: agent-driven model inference optimization and the `dstack` [service](services.md) primitive, which can deploy model inference to any cloud, Kubernetes, or on-prem cluster.
 
+To get the best performance for the given model, hardware, and other constraints, the agent selects the serving framework, quantization, and serving parameters, and can patch the framework's source code, generate custom kernels, and patch drivers.
+
 > The presets feature is experimental and may change.
 
 ??? info "Prerequisites"
@@ -167,7 +169,24 @@ prompt: |
 
 ### Baseline
 
-Set `baseline: true` to make the first trial a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts.
+By default, the first trial is a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts. Set `baseline: false` to make every trial an optimization attempt.
+
+### Previous sessions
+
+Set `previous` to a list of preset IDs to give the agent the results of earlier creation sessions. It analyzes what they tried and how it worked, and aims to improve on them instead of rediscovering it.
+
+<div editor-title="preset.dstack.yml">
+
+```yaml
+previous:
+  - c83375b4
+```
+
+</div>
+
+Alternatively, pass `--previous` (repeatable) to `dstack preset create`.
+
+In this case, the baseline trial reproduces the best comparable previous result to confirm it still holds before optimizing further.
 
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
@@ -251,13 +270,11 @@ $ dstack preset delete c83375b4
 
 For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
-!!! info "Roadmap and feedback"
-    Here's what is coming soon:
-
-    * Allow the agent to change the source code, compile binaries, etc.
-    * Support for PD disaggregation
-    * Allow passing multiple `--previous <preset ID>` to `dstack preset create` to reuse the insights from previous sessions
-    * Allow passing ranges to `concurrency`
+!!! info "Limitations"
+    * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
+    * Doesn't support PD disaggregation (coming soon)
+    * Doesn't allow a custom dataset; always uses `random`
+    * Doesn't support ranges for `concurrency`
 
     Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 

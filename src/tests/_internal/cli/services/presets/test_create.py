@@ -26,6 +26,7 @@ from dstack._internal.cli.services.presets.create import (
     create_preset,
     follow_preset,
     reconcile_detached_sessions,
+    resolve_previous_sessions,
     stop_preset_session,
 )
 from dstack._internal.cli.services.presets.session import (
@@ -347,6 +348,157 @@ class TestCreatePreset:
         assert creation_context.run_apis.stopped_names == stopped_names
 
 
+class TestResolvePreviousSessions:
+    def _store(self, tmp_path, monkeypatch, *ids):
+        store = tmp_path / "presets-store"
+        for preset_id in ids:
+            root = store / preset_id
+            (root / "trials" / "1").mkdir(parents=True)
+            (root / "trials" / "1" / "trial.json").write_text("{}")
+            (root / "session.json").write_text(json.dumps({"status": "failed"}))
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
+            lambda: store,
+        )
+        return store
+
+    def test_resolves_and_dedupes_in_order(self, tmp_path, monkeypatch):
+        self._store(tmp_path, monkeypatch, "a1b2c3d4", "e5f6a7b8")
+
+        sessions = resolve_previous_sessions(["e5f6a7b8", "a1b2c3d4", "e5f6a7b8"])
+
+        assert [session.preset_id for session in sessions] == ["e5f6a7b8", "a1b2c3d4"]
+
+    def test_rejects_an_unknown_reference(self, tmp_path, monkeypatch):
+        self._store(tmp_path, monkeypatch, "a1b2c3d4")
+
+        with pytest.raises(CLIError, match="'nope' does not exist"):
+            resolve_previous_sessions(["a1b2c3d4", "nope"])
+
+    def test_warns_when_a_chained_session_is_not_included(self, tmp_path, monkeypatch, capsys):
+        store = self._store(tmp_path, monkeypatch, "a1b2c3d4", "e5f6a7b8")
+        (store / "e5f6a7b8" / "session.json").write_text(
+            json.dumps({"status": "failed", "previous": ["a1b2c3d4", "00000000"]})
+        )
+
+        resolve_previous_sessions(["e5f6a7b8", "a1b2c3d4"])
+
+        output = capsys.readouterr().out
+        assert "e5f6a7b8 was created with --previous 00000000" in output
+        # The included parent must not be warned about.
+        assert output.count("was created with") == 1
+
+    def test_rejects_a_previous_session_that_is_still_running(self, tmp_path, monkeypatch):
+        store = self._store(tmp_path, monkeypatch, "a1b2c3d4")
+        (store / "a1b2c3d4" / "session.json").write_text(json.dumps({"status": "running"}))
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.session_process_alive",
+            lambda manifest: True,
+        )
+
+        with pytest.raises(CLIError, match="still running"):
+            resolve_previous_sessions(["a1b2c3d4"])
+
+    def test_accepts_a_stale_running_session_whose_process_died(self, tmp_path, monkeypatch):
+        store = self._store(tmp_path, monkeypatch, "a1b2c3d4")
+        (store / "a1b2c3d4" / "session.json").write_text(json.dumps({"status": "running"}))
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.session_process_alive",
+            lambda manifest: False,
+        )
+
+        sessions = resolve_previous_sessions(["a1b2c3d4"])
+
+        assert [session.preset_id for session in sessions] == ["a1b2c3d4"]
+
+
+class TestEffectivePrevious:
+    def _args(self, previous):
+        # The real parser builds the namespace, so profile attributes stay in
+        # sync with `register_profile_args` instead of being hand-listed.
+        import argparse
+
+        from dstack._internal.cli.services.profile import register_profile_args
+
+        parser = argparse.ArgumentParser()
+        register_profile_args(parser)
+        args = parser.parse_args([])
+        args.name = None
+        args.trials = None
+        args.previous = previous
+        args.no_profile = True
+        return args
+
+    def test_flag_overrides_and_property_stands_without_it(self):
+        from dstack._internal.cli.commands.preset import _get_effective_configuration
+
+        def configuration():
+            # A fresh object per call: the merger mutates its input.
+            return PresetConfiguration(
+                name="qwen", model={"base": "Qwen/Qwen3.5-27B"}, previous=["from-config"]
+            )
+
+        overridden = _get_effective_configuration(
+            configuration(), self._args(["from-flag"]), require_name=False
+        )
+        kept = _get_effective_configuration(configuration(), self._args(None), require_name=False)
+
+        assert overridden.previous == ["from-flag"]
+        assert kept.previous == ["from-config"]
+
+
+class TestCreateWithPrevious:
+    @pytest.mark.asyncio
+    async def test_installs_records_pins_manifest_and_extends_the_prompt(
+        self, creation_context, monkeypatch, tmp_path
+    ):
+        store = tmp_path / "presets-store"
+        root = store / "8d3b01aa"
+        (root / "trials" / "1").mkdir(parents=True)
+        (root / "trials" / "1" / "trial.json").write_text('{"learned": "x"}')
+        (root / "session.json").write_text(json.dumps({"status": "failed"}))
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
+            lambda: store,
+        )
+        session_path = tmp_path / "fresh"
+        session_path.mkdir()
+        agent_session = PresetAgentSession(path=session_path, debug=False)
+        seen = {}
+
+        async def run_agent(**kwargs):
+            seen["prompt"] = kwargs["prompt"]
+            seen["record"] = (
+                kwargs["workspace"].path / "previous" / "8d3b01aa" / "trials" / "1" / "trial.json"
+            ).is_file()
+            return PresetAgentProcessOutput(
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
+            run_agent,
+        )
+        await _create_preset(
+            api=creation_context.api,
+            configuration=creation_context.configuration,
+            source_configuration=creation_context.source_configuration,
+            store=creation_context.store,
+            build_name="qwen-build",
+            agent_session=agent_session,
+            previous=resolve_previous_sessions(["8d3b01aa"]),
+        )
+
+        assert seen["record"] is True
+        assert "## Previous Sessions" in seen["prompt"]
+        assert "8d3b01aa" in seen["prompt"]
+        assert agent_session.read_manifest()["previous"] == ["8d3b01aa"]
+        # constraints.json is a session record even without --debug.
+        assert (session_path / "constraints.json").is_file()
+
+
 class TestBuildName:
     def test_derives_slug_for_nameless_and_keeps_prefix_bounded(self):
         assert _get_build_name(None, "Qwen/Qwen3.5-27B", "a1b2c3d4") == "qwen3-5-27b-a1b2c3d4"
@@ -560,7 +712,7 @@ class TestBuildConstraints:
             "input_tokens": 1024,
             "output_tokens": 1024,
             "shared_prefix_tokens": 0,
-            "baseline": False,
+            "baseline": True,
             "fleets": ["gpu-fleet"],
             "env": ["HF_TOKEN"],
         }

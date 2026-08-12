@@ -42,20 +42,110 @@ class TestSystemPrompt:
     def test_drops_maintainer_notes_but_keeps_every_other_comment(self, tmp_path, monkeypatch):
         noted = tmp_path / "system_prompt.md"
         noted.write_text(
-            "Kept.\n<!--!TODO: not for the agent.-->\n"
-            "Plain <!-- comment --> and <!--?typo--> stay.\n"
+            "Kept.\n<!--!TODO: not for the agent.-->\nPlain <!-- comment --> stays.\n"
         )
         monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", noted)
 
         text = get_preset_agent_system_prompt()
 
         assert "TODO" not in text
-        assert text == "Kept.\nPlain <!-- comment --> and <!--?typo--> stay."
+        assert text == "Kept.\nPlain <!-- comment --> stays."
 
-    def test_rejects_unknown_directive_variables(self, tmp_path, monkeypatch):
+    def test_rejects_unknown_variables_even_in_a_dropped_branch(self, tmp_path, monkeypatch):
+        broken = tmp_path / "system_prompt.md"
+        broken.write_text("<!--?if previous-->\n<!--?if typo-->\nX\n<!--?end-->\n<!--?end-->\n")
+        monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", broken)
+
+        # `previous` is unset, so the branch would be dropped; the typo inside
+        # it must not hide behind that.
+        with pytest.raises(CLIError, match="Unknown variable"):
+            get_preset_agent_system_prompt()
+
+    def test_rejects_malformed_directives(self, tmp_path, monkeypatch):
         broken = tmp_path / "system_prompt.md"
         broken.write_text("Text <!--?typo:oops--> more.\n")
         monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", broken)
 
-        with pytest.raises(CLIError, match="Unknown variable"):
+        with pytest.raises(CLIError, match="Invalid directive"):
             get_preset_agent_system_prompt()
+
+        broken.write_text("An opener that never closes its comment: <!--?if baseline\n")
+        with pytest.raises(CLIError, match="Malformed directive"):
+            get_preset_agent_system_prompt()
+
+    def test_inline_blocks_render_in_place(self, tmp_path, monkeypatch):
+        doc = tmp_path / "system_prompt.md"
+        doc.write_text("A<!--?if baseline-->B<!--?else-->C<!--?end-->D\n")
+        monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", doc)
+
+        assert get_preset_agent_system_prompt(baseline=True) == "ABD"
+        assert get_preset_agent_system_prompt() == "ACD"
+
+    def test_dedents_only_an_exactly_indented_body(self, tmp_path, monkeypatch):
+        doc = tmp_path / "system_prompt.md"
+        monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", doc)
+        # The reference examples: `baseline` plays <a>, `previous` plays <b>.
+        cases = [
+            ("<!--?if baseline-->asaga<!--?end-->\n", "asaga"),
+            ("<!--?if baseline-->\n  asaga\n<!--?end-->\n", "asaga"),
+            (
+                "<!--?if baseline-->\n  asaga\n\n  <!--?if previous-->c<!--?end-->\n<!--?end-->\n",
+                "asaga\n\nc",
+            ),
+            (
+                "<!--?if baseline-->\n  asaga\n\n"
+                "  <!--?if previous-->\n    c\n  <!--?end-->\n<!--?end-->\n",
+                "asaga\n\nc",
+            ),
+            # Not exact: the body keeps its indentation as written.
+            (
+                "<!--?if baseline-->\nasaga\n\n  <!--?if previous-->c<!--?end-->\n<!--?end-->\n",
+                "asaga\n\n  c",
+            ),
+            # An inline-opened block is never dedented.
+            (
+                "<!--?if baseline-->asaga\n\n  <!--?if previous-->c<!--?end-->\n<!--?end-->\n",
+                "asaga\n\n  c",
+            ),
+        ]
+        for content, expected in cases:
+            doc.write_text(content)
+            previous = "x" if "previous" in content else None
+            rendered = get_preset_agent_system_prompt(baseline=True, previous=previous)
+            assert rendered.strip("\n") == expected, content
+
+    def test_nested_blocks_render_one_branch(self, tmp_path, monkeypatch):
+        nested = tmp_path / "system_prompt.md"
+        nested.write_text(
+            "<!--?if previous-->\n"
+            "  IDS={previous}\n"
+            "\n"
+            "  <!--?if baseline-->\n"
+            "    SEEDED\n"
+            "  <!--?end-->\n"
+            "<!--?else-->\n"
+            "  <!--?if baseline-->\n"
+            "    SOLO\n"
+            "  <!--?end-->\n"
+            "<!--?end-->\n"
+        )
+        monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", nested)
+
+        assert get_preset_agent_system_prompt().strip() == ""
+        assert get_preset_agent_system_prompt(baseline=True).strip() == "SOLO"
+        assert get_preset_agent_system_prompt(previous="a1, b2").strip() == "IDS=a1, b2"
+        both = get_preset_agent_system_prompt(baseline=True, previous="a1")
+        assert both.strip() == "IDS=a1\n\nSEEDED"
+
+    def test_unbalanced_blocks_fail_loudly(self, tmp_path, monkeypatch):
+        for content, error in [
+            ("<!--?if baseline-->\nnever closed\n", "Unclosed"),
+            ("text\n<!--?end-->\n", "`end` without"),
+            ("text\n<!--?else-->\n", "`else` without"),
+            ("<!--?if baseline-->\n<!--?else-->\n<!--?else-->\n<!--?end-->\n", "`else` without"),
+        ]:
+            broken = tmp_path / "system_prompt.md"
+            broken.write_text(content)
+            monkeypatch.setattr(prompt_module, "_SYSTEM_PROMPT_PATH", broken)
+            with pytest.raises(CLIError, match=error):
+                get_preset_agent_system_prompt()

@@ -23,6 +23,7 @@ from dstack._internal.cli.services.presets.session import (
     print_preset_progress,
 )
 from dstack._internal.cli.services.presets.tail import (
+    _DirectoryMirror,
     _FileLineReader,
     _OffsetStore,
     _ProgressTailer,
@@ -171,6 +172,9 @@ def build_preset_agent_env(
     env[_PROGRESS_ENV] = str(workspace.progress_path)
     for name in ["TMPDIR", "TEMP", "TMP"]:
         env[name] = str(workspace.temp_path)
+    # Sandbox the agent's Claude config under the workspace home when we pass our
+    # own API key; under subscription auth keep the real HOME so it reuses the
+    # user's existing `claude` login.
     if auth.api_key is not None:
         env["ANTHROPIC_API_KEY"] = auth.api_key
         env["HOME"] = str(workspace.dstack_home)
@@ -222,14 +226,12 @@ async def run_preset_agent(
             # failure report from the agent returns immediately.
             if output.report_data is not None or output.error is None:
                 return output
-            # A failed attempt that produced agent work is a new outage, not a
-            # continuation of the previous one: restore the full retry budget.
-            # Attempts that fail without any work drain it, so the loop always
-            # terminates when the network stays down.
+            # Only reset the retry budget when the last attempt made progress; a
+            # run that keeps stalling exhausts its retries instead of retrying a
+            # stuck agent forever.
             if output.made_progress:
                 retry_delays = list(_RESUME_DELAYS_SECONDS)
-            # An externally recorded stop is a decision, not an outage: never
-            # resurrect an agent another CLI just terminated.
+            # Another process marked this session interrupted; don't restart it.
             if agent_session.read_manifest().get("status") == "interrupted":
                 return output
             if not retry_delays:
@@ -276,9 +278,9 @@ async def _run_claude_process(
                 stdout=stdout_file,
                 stderr=stderr_file,
                 start_new_session=not IS_WINDOWS,
-                # Inherit only the redirected std handles, not the CLI's other fds.
-                # Without this the untrusted agent inherits our open descriptors, and
-                # on Windows the broad inheritance flakes CreateProcess (WinError 87).
+                # So the untrusted agent inherits only the redirected std handles,
+                # not our other descriptors; broad inheritance also flakes
+                # CreateProcess on Windows (WinError 87).
                 close_fds=True,
             )
         agent_session.update_manifest(
@@ -358,6 +360,8 @@ def _build_claude_command(
 
 
 def _prepare_subprocess_command(command: list[str]) -> list[str]:
+    """On Windows a `.bat`/`.cmd` Claude launcher can't be exec'd directly; wrap
+    it in `cmd.exe /c`. Every other case is returned unchanged."""
     if not IS_WINDOWS or Path(command[0]).suffix.lower() not in {".bat", ".cmd"}:
         return command
     comspec = os.getenv("COMSPEC") or shutil.which("cmd.exe")
@@ -399,7 +403,6 @@ async def _session_tailers(
     redacted_values: Sequence[str],
     offset_store: _OffsetStore,
 ) -> AsyncIterator[None]:
-    """Mirrors the session's progress and record files while the body runs."""
     progress_tailer = _ProgressTailer(
         path=workspace.progress_path,
         redacted_values=redacted_values,
@@ -415,20 +418,16 @@ async def _session_tailers(
             offset_key="runs",
             echo=agent_session.echo,
         ),
-        _RecordMirror(
-            source=workspace.trials_path,
-            target=agent_session.trials_path,
+        _DirectoryMirror(
+            source=workspace.trials_dir,
+            target=agent_session.trials_dir,
             redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="trials",
             echo=agent_session.echo,
         ),
-        _RecordMirror(
-            source=workspace.verifications_path,
-            target=agent_session.verifications_path,
+        _DirectoryMirror(
+            source=workspace.service_dir,
+            target=agent_session.service_dir,
             redacted_values=redacted_values,
-            offset_store=offset_store,
-            offset_key="verifications",
             echo=agent_session.echo,
         ),
     ]
@@ -456,8 +455,7 @@ async def _collect_agent_output(
     is_alive: Callable[[], bool],
     offset_store: _OffsetStore,
 ) -> PresetAgentProcessOutput:
-    """Parses the agent's stream files until it exits; safe alongside a live
-    process or over the remains of a finished one."""
+    """Safe to run alongside a live agent or over the stream files a finished one left behind."""
     stdout_output, _ = await asyncio.gather(
         _read_process_stream(
             stream=_FileLineReader(
@@ -495,8 +493,7 @@ async def attach_preset_agent(
     redacted_values: Sequence[str],
     agent_session: PresetAgentSession,
 ) -> PresetAgentProcessOutput:
-    """Follows a detached session's agent to completion, like
-    `run_preset_agent` without owning the process."""
+    """Like `run_preset_agent`, but tails a detached agent it does not own."""
     offset_store = open_session_offsets(agent_session)
     async with _session_tailers(
         workspace=workspace,
@@ -574,8 +571,7 @@ async def _read_process_stream(
 
 
 async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
-    """SIGTERM, a grace period, then SIGKILL — the same ladder as
-    `terminate_agent_process`, driven through the owned process handle."""
+    """Twin of `terminate_agent_process` for a process this CLI owns, driven through its handle."""
     if IS_WINDOWS:
         await asyncio.to_thread(_terminate_windows_process_tree, proc.pid)
         await proc.wait()
@@ -601,9 +597,7 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
 
 
 def terminate_agent_process(manifest: dict[str, Any]) -> None:
-    """Terminates the session's agent process tree, if alive. The same
-    SIGTERM-grace-SIGKILL ladder as `_terminate_process`, driven by pid because
-    the caller (`preset stop`) never owned the process."""
+    """Twin of `_terminate_process` driven by pid, because the caller (`preset stop`) never owned the process."""
     agent_pid = manifest.get("agent_pid")
     if not isinstance(agent_pid, int) or not _pid_alive(
         agent_pid, manifest.get("agent_started_at")

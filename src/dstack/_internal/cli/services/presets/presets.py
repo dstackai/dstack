@@ -26,6 +26,9 @@ def build_preset(
     model: str,
     context_length: int,
     benchmark: PresetBenchmark,
+    trial: Optional[int] = None,
+    min_context_length: Optional[int] = None,
+    max_ttft: Optional[int] = None,
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
 ) -> Preset:
@@ -45,6 +48,9 @@ def build_preset(
         id=preset_id or make_preset_id(service, context_length=context_length),
         model=model,
         context_length=context_length,
+        trial=trial,
+        min_context_length=min_context_length,
+        max_ttft=max_ttft,
         created_at=get_current_datetime(),
         service=service,
         validations=[validation],
@@ -73,6 +79,13 @@ def preset_to_data(preset: Preset) -> dict[str, Any]:
         **({"name": preset.name} if preset.name else {}),
         "model": preset.model,
         "context_length": preset.context_length,
+        **({"trial": preset.trial} if preset.trial is not None else {}),
+        **(
+            {"min_context_length": preset.min_context_length}
+            if preset.min_context_length is not None
+            else {}
+        ),
+        **({"max_ttft": preset.max_ttft} if preset.max_ttft is not None else {}),
         "created_at": preset.created_at.isoformat(),
         "service": service_configuration_to_preset_data(preset.service),
         "validations": [
@@ -85,6 +98,9 @@ def preset_to_data(preset: Preset) -> dict[str, Any]:
 def service_configuration_to_preset_data(
     configuration: ServiceConfiguration,
 ) -> dict[str, Any]:
+    """The canonical service form used for preset identity and hashing: drops
+    type/name/gateway/profile fields, serializes env as sorted `key=value`
+    strings, and removes empty collections."""
     service_data = json.loads(configuration.model_dump_json(exclude_none=True))
     service_data.pop("type", None)
     service_data.pop("name", None)

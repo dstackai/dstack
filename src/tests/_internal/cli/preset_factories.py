@@ -142,6 +142,7 @@ def get_successful_preset_report(run: Run) -> AgentFinalReport:
         run_id=run.id,
         run_name=run.run_spec.run_name,
         service_yaml="type: service",
+        trial=1,
         base="Qwen/Qwen3.5-27B",
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=32768,

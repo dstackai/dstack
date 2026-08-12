@@ -10,6 +10,7 @@ from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.files import FilePathMapping
 from tests._internal.cli.preset_factories import get_preset
 
 pytestmark = pytest.mark.windows
@@ -43,7 +44,7 @@ class TestPresetStore:
 
         assert store.get(preset.id) == updated
 
-    def test_migrates_legacy_layout_and_archives_on_delete(self, tmp_path: Path):
+    def test_migrates_legacy_layout_and_deletes_permanently(self, tmp_path: Path):
         root = tmp_path / "presets"
         store = PresetStore(root)
         preset = get_preset()
@@ -62,7 +63,7 @@ class TestPresetStore:
 
         assert store.delete(preset.id) is True
         assert store.get(preset.id) is None
-        assert (root / ".archive" / preset.id / "preset.yaml").is_file()
+        assert not (root / preset.id).exists()
         assert store.list() == []
 
     def test_skips_invalid_preset_on_list_but_keeps_it_deletable(self, tmp_path: Path, capsys):
@@ -81,6 +82,41 @@ class TestPresetStore:
         # ...and the corrupt preset is still removable by ID.
         assert store.delete(get_preset().id) is True
         assert [preset.id for preset in store.list()] == [valid.id]
+
+    def test_resolves_relative_file_paths_against_the_preset_directory(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        preset.service.files = [FilePathMapping(local_path="service/1/patches", path="/patches")]
+        store.save(preset)
+
+        loaded = store.get(preset.id)
+
+        assert loaded.service.files[0].local_path == str(
+            tmp_path / "presets" / preset.id / "service" / "1" / "patches"
+        )
+
+    def test_keeps_absolute_file_paths_as_saved(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        absolute = str(tmp_path / "elsewhere" / "patches")
+        preset.service.files = [FilePathMapping(local_path=absolute, path="/patches")]
+        store.save(preset)
+
+        assert store.get(preset.id).service.files[0].local_path == absolute
+
+    def test_release_name_keeps_file_paths_relative(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset().model_copy(update={"name": "qwen"})
+        preset.service.files = [FilePathMapping(local_path="service/1/patches", path="/patches")]
+        store.save(preset)
+
+        # `release_name` re-saves a loaded preset, whose paths were resolved to
+        # absolute; the saved file must come back out relative or the preset
+        # directory silently stops being portable.
+        store.release_name("qwen")
+
+        data = yaml.safe_load((tmp_path / "presets" / preset.id / "preset.yaml").read_text())
+        assert data["service"]["files"][0]["local_path"] == "service/1/patches"
 
     def test_preserves_literal_env_values(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")

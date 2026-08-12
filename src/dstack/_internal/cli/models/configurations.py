@@ -17,7 +17,7 @@ from dstack._internal.core.models.profiles import ProfileParams
 
 DEFAULT_INPUT_TOKENS = 1024
 DEFAULT_OUTPUT_TOKENS = 1024
-DEFAULT_BASELINE = False
+DEFAULT_BASELINE = True
 
 
 class PresetModelRepo(CoreModel):
@@ -154,6 +154,15 @@ class PresetConfiguration(
             )
         ),
     ] = None
+    previous: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The IDs of previous presets whose creation results the agent"
+                " analyzes and improves on"
+            )
+        ),
+    ] = None
     concurrency: Annotated[
         Optional[PositiveInt],
         Field(
@@ -196,7 +205,7 @@ class PresetConfiguration(
             description=(
                 "Whether the first trial must be a baseline that serves the model with the"
                 " serving framework's recommended defaults instead of an optimization attempt."
-                " Defaults to `false`"
+                " Defaults to `true`"
             )
         ),
     ] = None
