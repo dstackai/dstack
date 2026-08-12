@@ -60,7 +60,21 @@ class PresetStore:
         directory = self.root / preset.id
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "preset.yaml"
-        content = yaml.safe_dump(preset_to_data(preset), sort_keys=False)
+        data = preset_to_data(preset)
+        # Undo the load-time resolution: paths under the preset directory are saved
+        # relative, or re-saving a loaded preset (e.g. `release_name`) would bake
+        # this machine's absolute paths back in and break portability.
+        for mapping in data.get("service", {}).get("files", []):
+            local_path = Path(mapping["local_path"])
+            if not local_path.is_absolute():
+                continue
+            for base in (directory, directory.resolve()):
+                try:
+                    mapping["local_path"] = local_path.relative_to(base).as_posix()
+                    break
+                except ValueError:
+                    continue
+        content = yaml.safe_dump(data, sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
             dir=directory,
             prefix=f".{preset.id}.",
@@ -124,9 +138,16 @@ class PresetStore:
     def _load(self, path: Path) -> Preset:
         try:
             with path.open(encoding="utf-8") as f:
-                return Preset.model_validate(yaml.safe_load(f))
+                preset = Preset.model_validate(yaml.safe_load(f))
         except (OSError, ValidationError, yaml.YAMLError) as e:
             raise CLIError(f"Invalid preset file {path}: {e}") from e
+        # `files` paths are saved relative to the preset directory so the directory
+        # is portable; resolve them so callers see absolute paths. Absolute values
+        # (presets saved before this) pass through.
+        for mapping in preset.service.files:
+            if not Path(mapping.local_path).is_absolute():
+                mapping.local_path = str(path.parent / mapping.local_path)
+        return preset
 
 
 def _validate_preset_id(preset_id: str) -> None:

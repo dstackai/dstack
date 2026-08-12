@@ -68,7 +68,9 @@ def _rewrite_workspace_file_paths(
     service: ServiceConfiguration, *, workspace_path: Path, session_path: Path
 ) -> None:
     """Re-roots `files` onto the session's mirrored copies because the submission
-    workspace is deleted when the session ends; only `trials/` and `service/` are mirrored."""
+    workspace is deleted when the session ends; only `trials/` and `service/` are
+    mirrored. Paths are written relative to the preset directory so the saved
+    preset stays portable; the store resolves them at load."""
     workspace_root = workspace_path.resolve()
     for mapping in service.files:
         try:
@@ -83,7 +85,7 @@ def _rewrite_workspace_file_paths(
                 f"Claude final service file '{mapping.local_path}' has no mirrored copy"
                 f" at '{target}'"
             )
-        mapping.local_path = str(target)
+        mapping.local_path = relative.as_posix()
 
 
 def build_verified_preset(

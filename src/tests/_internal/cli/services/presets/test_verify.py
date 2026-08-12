@@ -75,7 +75,8 @@ class TestBuildVerifiedPreset:
     def test_rewrites_file_paths_onto_the_mirrored_session_copies(self, tmp_path):
         # `files` local paths resolve into the agent workspace at submission, and
         # the workspace is deleted when the session ends; the preset must point at
-        # the session's mirrored copies or it cannot be applied later.
+        # the session's mirrored copies, relative to the preset directory so the
+        # directory stays portable.
         workspace = tmp_path / "session" / "workspace" / "w"
         (workspace / "service" / "1" / "patches").mkdir(parents=True)
         (workspace / "service" / "1" / "patches" / "moe.py.patch").write_text("--- a\n+++ b\n")
@@ -99,7 +100,7 @@ class TestBuildVerifiedPreset:
             session_path=session,
         )
 
-        assert preset.service.files[0].local_path == str(session / "service" / "1" / "patches")
+        assert preset.service.files[0].local_path == "service/1/patches"
         # The run spec itself is untouched: only the preset copy is re-rooted.
         assert run.run_spec.configuration.files[0].local_path == str(
             workspace / "service" / "1" / "patches"
