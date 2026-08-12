@@ -131,6 +131,14 @@ def validate_run_spec_and_set_defaults(
             )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
+    # Homogeneous tasks: keep nodes=1 in stored run_spec so it matches pre-upgrade
+    # runs and old clients (Optional nodes defaults to None in the model).
+    if (
+        isinstance(run_spec.configuration, TaskConfiguration)
+        and run_spec.configuration.groups is None
+        and run_spec.configuration.nodes is None
+    ):
+        run_spec.configuration.nodes = 1
     # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
     # would be fragile because the spec may be changed later (for example by plugins).
     # Same for task `groups`: provisioning uses each group's resources; top-level is not banned.

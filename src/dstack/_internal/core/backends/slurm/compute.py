@@ -190,7 +190,7 @@ class SlurmCompute(
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         requirements: Requirements,
-        node_count: Optional[int] = None,
+        node_count: int,
     ) -> ComputeGroupProvisioningData:
         if job.job_spec.registry_auth is not None:
             self._skip_offer_cache.add(run, job, instance_offer)
@@ -214,11 +214,7 @@ class SlurmCompute(
             assert run.run_spec.ssh_key_pub is not None
             authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
 
-            # Allocation size must match the provision batch (run_jobs passes
-            # len(job_configurations)). Default to 1 for any caller that omits it
-            # — never jobs_per_replica (that is the replica total, not batch size).
-            if node_count is None:
-                node_count = 1
+            # Slurm --nodes for this call (1 from run_job, len(batch) from run_jobs).
             resources_spec = requirements.resources
             requested_resources = get_requested_resources_from_resources_spec(resources_spec)
 

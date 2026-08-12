@@ -521,9 +521,6 @@ async def _prepare_startup_context(
             other_job.job_spec.replica_num == context.job.job_spec.replica_num
             and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
         ):
-            # Wait until all jobs in the replica leave SUBMITTED before starting.
-            # No hard timeout: TERMINATED_BY_SERVER is not retryable and would
-            # regress multinode retry-on-no-capacity. Follow-up: bound by retry.
             logger.debug(
                 "%s: waiting for all jobs in the replica to be provisioned",
                 fmt(context.job_model),
@@ -633,12 +630,14 @@ async def _prepare_startup_context(
         )
         return None
 
+    # Hetero commands may reference peer nodes via ${{ groups[i].nodes[j].IP_ADDRESS }}.
+    # Wait until every referenced node has an internal IP, then substitute placeholders
+    # in-place before the job is sent to the runner. Bad refs are rejected above;
+    # out-of-range or still-missing IPs terminate the job below.
     if any(find_groups_ip_refs(c) for c in commands):
         nodes_view = _build_nodes_ip_view(context.run.jobs, context.job.job_spec.replica_num)
         try:
             if not _referenced_ips_ready(commands, nodes_view):
-                # Wait for referenced internal_ips. No hard timeout for now
-                # (same rationale as the replica SUBMITTED wait above).
                 logger.debug(
                     "%s: waiting for referenced node group IPs",
                     fmt(context.job_model),

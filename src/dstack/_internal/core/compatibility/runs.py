@@ -87,6 +87,7 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         if run_spec.configuration.groups is None:
             configuration_excludes["groups"] = True
         if run_spec.configuration.nodes is None:
+            # Omit nodes when unset so old servers never see null (pre-hetero nodes was int=1).
             configuration_excludes["nodes"] = True
 
     if configuration_excludes:

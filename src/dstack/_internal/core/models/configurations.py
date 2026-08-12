@@ -958,6 +958,7 @@ class TaskConfiguration(
         return [
             NodeGroup(
                 name=DEFAULT_REPLICA_GROUP_NAME,
+                # Omitted nodes means a 1-node task (self.nodes stays None for serialization).
                 nodes=self.nodes if self.nodes is not None else 1,
                 commands=self.commands,
                 resources=self.resources,
