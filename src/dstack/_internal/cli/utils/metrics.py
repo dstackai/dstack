@@ -73,6 +73,7 @@ def get_metrics_table(
 
 
 def job_labels(jobs: Sequence[Job]) -> List[str]:
+    """A label per job, naming only what tells them apart, as `dstack ps` does."""
     groups = {job.job_spec.replica_group for job in jobs}
     show_group = len(groups) > 1
     show_replica = len({job.job_spec.replica_num for job in jobs}) > 1
@@ -119,6 +120,7 @@ def _add_job(
 
 
 def _shared_window(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, datetime]]:
+    """The window every job is charted against: the newest sample back one retention hour."""
     windows = [w for w in (_job_window(m) for m in metrics) if w is not None]
     if not windows:
         return None
@@ -129,6 +131,7 @@ def _shared_window(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, da
 def _blank_cells(
     metrics: JobMetrics, window: Optional[tuple[datetime, datetime]], width: int
 ) -> int:
+    """How many cells to leave empty before a job's chart, so it starts where it started."""
     job_window = _job_window(metrics)
     if job_window is None or window is None:
         return 0
@@ -142,11 +145,13 @@ def _blank_cells(
 def _cells_drawn(
     metrics: JobMetrics, window: Optional[tuple[datetime, datetime]], width: int
 ) -> int:
+    """How many cells a job's chart occupies: its empty lead plus one per sample."""
     blanks = _blank_cells(metrics, window, width)
     return blanks + min(width - blanks, _samples_num(metrics))
 
 
 def _pad(cell: Text, blanks: int) -> Text:
+    """Prefix a chart cell with empty cells, for time before the job started."""
     return cell if blanks <= 0 else Text.assemble(Text(" " * blanks), cell)
 
 
@@ -159,7 +164,7 @@ def _cpu_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: in
         values = [v / cpus for v in values]
     # no core count: the value is already normalised to it, and unlike memory there is no
     # total to give the number meaning
-    return _chart_cell(sparkline(values, width, HOST_RAMP), f"{values[-1]:.0f}%")
+    return Text.assemble(sparkline(values, width, HOST_RAMP), " ", f"{values[-1]:.0f}%")
 
 
 def _memory_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: int) -> Text:
@@ -189,22 +194,20 @@ def _gpu_util_cell(job_metrics: JobMetrics, index: int, width: int) -> Text:
     values = _metric_values(job_metrics, f"gpu_util_percent_gpu{index}")
     if not values:
         return no_data()
-    return _chart_cell(sparkline(values, width, GPU_RAMP), f"{values[-1]:.0f}%")
+    return Text.assemble(sparkline(values, width, GPU_RAMP), " ", f"{values[-1]:.0f}%")
 
 
 def _capacity_cell(values: List[float], total: Optional[float], width: int, ramp: Ramp) -> Text:
+    """A memory chart drawn against capacity, labelled `used/total`."""
     percents = [v / total * 100 for v in values] if total else values
     label = format_memory(values[-1], 0)
     if total:
         label += f"/{format_memory(total, 0)}"
-    return _chart_cell(sparkline(percents, width, ramp), label)
-
-
-def _chart_cell(spark: Text, label: str) -> Text:
-    return Text.assemble(spark, " ", label)
+    return Text.assemble(sparkline(percents, width, ramp), " ", label)
 
 
 def _time_axis(width: int, first: datetime, last: datetime) -> Text:
+    """The timeline row printed under the charts, exactly `width` columns wide."""
     left, right = _time_label(first), _time_label(last)
     if len(left) + len(right) + 3 > width:
         left, right = _time_label(first, clock_only=True), _time_label(last, clock_only=True)
@@ -217,6 +220,7 @@ def _time_axis(width: int, first: datetime, last: datetime) -> Text:
 
 
 def _time_label(moment: datetime, clock_only: bool = False) -> str:
+    """One timestamp for the axis: `now` while a job is still reporting, a date otherwise."""
     if datetime.now(timezone.utc) - moment < LIVE_THRESHOLD:
         return NOW
     local = moment.astimezone()
@@ -224,11 +228,13 @@ def _time_label(moment: datetime, clock_only: bool = False) -> str:
 
 
 def _job_window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
+    """The oldest and newest sample timestamps of one job, or None if it has none."""
     stamps = [t for metric in job_metrics.metrics for t in metric.timestamps]
     return (min(stamps), max(stamps)) if stamps else None
 
 
 def _samples_num(job_metrics: JobMetrics) -> int:
+    """How many samples the longest series holds."""
     return max((len(metric.timestamps) for metric in job_metrics.metrics), default=0)
 
 
