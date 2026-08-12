@@ -43,7 +43,7 @@ class TestPresetStore:
 
         assert store.get(preset.id) == updated
 
-    def test_migrates_legacy_layout_and_archives_on_delete(self, tmp_path: Path):
+    def test_migrates_legacy_layout_and_deletes_permanently(self, tmp_path: Path):
         root = tmp_path / "presets"
         store = PresetStore(root)
         preset = get_preset()
@@ -62,7 +62,7 @@ class TestPresetStore:
 
         assert store.delete(preset.id) is True
         assert store.get(preset.id) is None
-        assert (root / ".archive" / preset.id / "preset.yaml").is_file()
+        assert not (root / preset.id).exists()
         assert store.list() == []
 
     def test_skips_invalid_preset_on_list_but_keeps_it_deletable(self, tmp_path: Path, capsys):

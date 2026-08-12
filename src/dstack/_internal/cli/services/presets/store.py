@@ -22,8 +22,7 @@ from dstack._internal.utils.common import get_dstack_dir
 
 
 class PresetStore:
-    """One `<root>/<id>/preset.yaml` per preset; delete archives the directory
-    under `<root>/.archive/` instead of removing it."""
+    """One `<root>/<id>/preset.yaml` per preset."""
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
@@ -106,18 +105,8 @@ class PresetStore:
         directory = self.root / preset_id
         if not (directory / "preset.yaml").is_file():
             return False
-        self._archive(directory)
+        shutil.rmtree(directory)
         return True
-
-    def _archive(self, directory: Path) -> None:
-        archive_root = self.root / ".archive"
-        archive_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        target = archive_root / directory.name
-        index = 0
-        while target.exists():
-            index += 1
-            target = archive_root / f"{directory.name}-{index}"
-        shutil.move(str(directory), str(target))
 
     def _migrate_legacy(self) -> None:
         for legacy in list(self.root.glob("models--*/*.yaml")):
