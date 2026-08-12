@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Sequence
 
 from rich.console import RenderableType
@@ -10,7 +10,6 @@ from dstack._internal.cli.utils.sparkline import GPU_RAMP, HOST_RAMP, Ramp, no_d
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack._internal.core.models.runs import Job
-from dstack._internal.utils.common import pretty_date
 
 MAX_SAMPLES = 1000
 """A sample count, not a window: outruns the hour a running job retains, so a young run is
@@ -26,6 +25,9 @@ RETENTION = timedelta(hours=1)
 """What the server keeps for a running job, and so the widest window there can be."""
 
 AXIS_RULE = "┄"
+NOW = "now"
+
+LIVE_THRESHOLD = timedelta(seconds=3 * WATCH_INTERVAL_SECONDS)
 _FIXED_COLUMNS = 30
 """Everything but the sparklines and the job label: the `gpu=N` column, both numbers, and
 the table's padding. Hand-measured against a `589GB/1480GB`-sized number; a wider one
@@ -230,12 +232,14 @@ def _axis(width: int, first: datetime, last: datetime) -> Text:
     if len(left) + len(right) + 2 > width:
         return Text("")
     fill = width - len(left) - len(right) - 2
-    return Text(f"{left} " + AXIS_RULE * fill + f" {right}", style="grey42")
+    axis = Text(f"{left} " + AXIS_RULE * fill + " ", style="grey42")
+    axis.append(right, style="bold grey58" if right == NOW else "grey42")
+    return axis
 
 
 def _stamp(moment: datetime, clock_only: bool = False) -> str:
-    if pretty_date(moment) == "now":
-        return "now"
+    if datetime.now(timezone.utc) - moment < LIVE_THRESHOLD:
+        return NOW
     local = moment.astimezone()
     return f"{local:%H:%M}" if clock_only else f"{local.day} {local:%b %H:%M}"
 

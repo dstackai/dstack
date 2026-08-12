@@ -8,6 +8,9 @@ from rich.console import Console
 from rich.theme import Theme
 
 from dstack._internal.cli.utils.metrics import (
+    _axis,
+    _stamp,
+    _window,
     format_memory,
     get_metrics_table,
     job_labels,
@@ -185,6 +188,18 @@ class TestWindow:
         assert axis.endswith("now") == live
         if not live:
             assert ":" in axis  # a real clock time, not an age
+
+    @pytest.mark.parametrize("age_seconds,live", [(13, True), (45, False)])
+    def test_a_sample_may_lag_a_few_intervals_and_still_read_as_live(self, age_seconds, live):
+        moment = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
+        assert (_stamp(moment) == "now") == live
+
+    @pytest.mark.parametrize("state,emphasised", [("running", True), ("terminated", False)])
+    def test_only_a_live_edge_is_emphasised(self, state: str, emphasised: bool):
+        job, metrics = make_run("saturated", state=state)
+        axis = _axis(60, *_window(metrics))
+        styles = {str(span.style) for span in axis.spans}
+        assert ("bold grey58" in styles) == emphasised
 
 
 class TestJobs:
