@@ -985,6 +985,20 @@ class TestSessionLog:
         with pytest.raises(CLIError, match="Unknown preset"):
             load_agent_session("nope0000")
 
+    def test_lists_a_failed_session(self, tmp_path, monkeypatch):
+        from dstack._internal.cli.services.presets.session import list_agent_sessions
+
+        self._session(tmp_path, "dead0000", "failed", "[t] boom\n")
+        self._session(tmp_path, "beef0000", "success", "[t] saved preset\n")
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.session.get_presets_dir",
+            lambda: tmp_path,
+        )
+
+        listed = {entry["id"]: entry["status"] for entry in list_agent_sessions()}
+
+        assert listed == {"dead0000": "failed", "beef0000": "success"}
+
     def test_print_session_log_dumps_log_verbatim(self, tmp_path, monkeypatch, capsys):
         session = self._session(
             tmp_path, "abcd0000", "success", "[t] trial 1 done\n[t] saved preset\n"

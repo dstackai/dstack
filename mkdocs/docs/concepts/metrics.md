@@ -19,34 +19,31 @@ This tab displays key CPU, memory, and GPU metrics collected during the last hou
 ## CLI
 
 As an alternative to the UI, you can track essential metrics via the CLI.
-The `dstack metrics` command charts CPU, memory, and GPU utilization over the last hour of the
-job, with the latest value beside each chart.
+The `dstack metrics` command charts CPU, memory, and GPU utilization over the last hour.
 
 <div class="termy">
 
 ```shell
 dstack metrics gentle-mayfly-1
 
-        UTILIZATION                             MEMORY
- cpu    ▅▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▅▅▄▃▃▃▃▃▃▃▃ 41% of 128  ▃▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 581GB/960GB
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂ 33%  ▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 579GB/960GB
+        gpu=0  ▁▄▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=1  ▂▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=2  ▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=3  ▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=4  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=5  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=6  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=7  ▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
 
- gpu=0  ▁▂▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 89%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=1  ▁▂▆▆▆▅▆▆▆▆▆▆▆▆▆▆▁▁▅▆▆▅▆▆▆▆▆ 84%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=2  ▁▂▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 87%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=3  ▂▃▆▅▅▅▅▅▅▆▅▅▆▆▆▆▁▅▅▅▅▅▆▅▅▅▅ 82%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=4  ▂▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▁▆▆▆▆▆▆▆▆▆▆ 90%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=5  ▂▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆ 85%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=6  ▃▆▆▅▅▆▆▆▆▆▆▆▆▆▆▁▅▅▅▅▆▆▆▅▅▅▅ 83%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
- gpu=7  ▃▆▆▆▆▆▆▆▆▆▆▆▆▆▁▁▆▆▆▆▆▆▆▆▆▆▆ 88%         ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
-
-        4 Aug 14:10 ┄┄┄┄┄┄┄┄┄┄┄ now             4 Aug 14:10 ┄┄┄┄┄┄┄┄┄┄┄ now
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
 ```
 
 </div>
 
-Like [`dstack logs`](../reference/cli/dstack/logs.md), the command shows a single job.
-Use `--replica` and `--job` to select one; both default to `0`.
-Pass `-w` to keep the charts updating.
+By default, metrics are shown for all jobs and replicas. Use `--replica` or `--job` to
+show a single one, and `-w` to keep the charts updating.
 
 ## Prometheus
 

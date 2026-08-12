@@ -38,7 +38,7 @@ class TestCrusoeBackendConfig:
         }
         config_yaml_path.write_text(yaml.dump(config_dict))
 
-        with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_yaml_path):
+        with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             m = ServerConfigManager()
             assert m.load_config()
             assert m.config is not None
@@ -86,7 +86,7 @@ class TestNebiusBackendConfig:
         }
         config_yaml_path.write_text(yaml.dump(config_dict))
 
-        with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_yaml_path):
+        with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             m = ServerConfigManager()
             assert m.load_config()
             assert m.config is not None
@@ -130,7 +130,7 @@ class TestNebiusBackendConfig:
         }
         config_yaml_path.write_text(yaml.dump(config_dict))
 
-        with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_yaml_path):
+        with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             m = ServerConfigManager()
             assert m.load_config()
             assert m.config is not None

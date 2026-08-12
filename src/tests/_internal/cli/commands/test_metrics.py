@@ -2,9 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dstack._internal.cli.commands.metrics import _get_job, _get_job_metrics
+from dstack._internal.cli.commands.metrics import _get_job_metrics, select_jobs
 from dstack._internal.cli.utils.metrics import MAX_SAMPLES
-from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.metrics import JobMetrics
 
 
@@ -22,17 +21,14 @@ def _run(replicas: int = 1, jobs_per_replica: int = 1):
 
 
 class TestJobSelection:
-    def test_defaults_to_the_first_job_of_the_first_replica(self):
-        job = _get_job(_run(replicas=3), replica_num=0, job_num=0)
-        assert (job.job_spec.replica_num, job.job_spec.job_num) == (0, 0)
-
-    def test_selects_by_replica_and_job(self):
-        job = _get_job(_run(replicas=3, jobs_per_replica=2), replica_num=2, job_num=1)
-        assert (job.job_spec.replica_num, job.job_spec.job_num) == (2, 1)
-
-    def test_unknown_job_is_an_error(self):
-        with pytest.raises(CLIError, match="replica=7"):
-            _get_job(_run(replicas=3), replica_num=7, job_num=0)
+    @pytest.mark.parametrize(
+        "replica,job_num,expected",
+        [(None, None, 4), (0, None, 2), (None, 1, 2), (0, 1, 1), (9, None, 0)],
+        ids=["all", "one-replica", "one-node", "both", "no-match"],
+    )
+    def test_filters(self, replica, job_num, expected):
+        jobs = _run(replicas=2, jobs_per_replica=2)._run.jobs
+        assert len(select_jobs(jobs, replica, job_num)) == expected
 
 
 class TestMetricsRequest:

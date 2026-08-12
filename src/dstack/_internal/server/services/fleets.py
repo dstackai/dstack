@@ -87,7 +87,10 @@ from dstack._internal.server.services.projects import (
     list_user_project_models,
     project_model_to_project,
 )
-from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.resources import (
+    set_default_cpu_spec_arch,
+    set_default_gpu_spec,
+)
 from dstack._internal.utils import random_names
 from dstack._internal.utils import ssh as ssh_utils
 from dstack._internal.utils.common import (
@@ -203,6 +206,7 @@ async def list_projects_with_no_active_fleets(
             active_fleet_alias.id.is_(None),
         )
         .order_by(ProjectModel.created_at)
+        .options(joinedload(ProjectModel.owner))
     )
 
     res = await session.execute(query)
@@ -1423,8 +1427,10 @@ def _validate_fleet_configuration_subtype_specific_fields(conf: FleetConfigurati
 
 
 def _set_fleet_spec_defaults(spec: FleetSpec):
-    if spec.configuration.resources is not None:
-        set_resources_defaults(spec.configuration.resources)
+    resources_spec = spec.configuration.resources
+    if resources_spec is not None:
+        gpu_spec = set_default_gpu_spec(resources_spec)
+        set_default_cpu_spec_arch(resources_spec.cpu, gpu_spec)
 
 
 def _validate_all_ssh_params_specified(ssh_config: SSHParams):

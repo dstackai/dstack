@@ -1,11 +1,17 @@
+from typing import Optional
+
+import gpuhunt
+
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import (
     RUN_PRIORITY_DEFAULT,
     SERVICE_HTTPS_DEFAULT,
+    ReplicaGroup,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.profiles import ProfileRetry
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
+from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint
@@ -15,9 +21,11 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.resources import (
-    set_gpu_vendor_default,
-    set_resources_defaults,
+    set_default_cpu_spec_arch,
+    set_default_gpu_spec,
+    set_default_gpu_spec_vendor,
 )
+from dstack._internal.utils.gpu import detect_gpu_vendors_by_gpu_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -125,12 +133,9 @@ def validate_run_spec_and_set_defaults(
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
     # would be fragile because the spec may be changed later (for example by plugins).
-    set_resources_defaults(run_spec.configuration.resources)
-    set_gpu_vendor_default(
-        run_spec.configuration.resources,
-        image=run_spec.configuration.image,
-        docker=getattr(run_spec.configuration, "docker", None),
-    )
+    set_run_spec_resources_defaults(run_spec)
+    _validate_gpu_vendor_and_image(run_spec)
+    _validate_cpu_arch_and_image(run_spec)
     if run_spec.ssh_key_pub is None:
         if user.ssh_public_key:
             run_spec.ssh_key_pub = user.ssh_public_key
@@ -140,10 +145,135 @@ def validate_run_spec_and_set_defaults(
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
 
 
+def set_run_spec_resources_defaults(run_spec: RunSpec) -> None:
+    """Apply resource defaults to a run spec, including GPU vendor and CPU arch inference."""
+    configuration = run_spec.configuration
+    _set_resources_defaults(
+        resources_spec=configuration.resources,
+        image=configuration.image,
+        docker=configuration.docker,
+    )
+    if configuration.type == "service" and isinstance(configuration.replicas, list):
+        for replica_group in configuration.replicas:
+            image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
+            _set_resources_defaults(
+                resources_spec=replica_group.resources,
+                image=image,
+                docker=docker,
+            )
+
+
+def _set_resources_defaults(
+    resources_spec: ResourcesSpec, image: Optional[str], docker: Optional[bool]
+) -> None:
+    gpu_spec = set_default_gpu_spec(resources_spec)
+    set_default_cpu_spec_arch(cpu_spec=resources_spec.cpu, gpu_spec=gpu_spec)
+    set_default_gpu_spec_vendor(gpu_spec=gpu_spec, image=image, docker=docker)
+
+
 def _validate_retry_duration(run_spec: RunSpec) -> None:
     retry = run_spec.merged_profile.retry
     if isinstance(retry, ProfileRetry) and retry.duration is not None and retry.duration < 0:
         raise ServerClientError("retry.duration cannot be negative")
+
+
+def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
+    configuration = run_spec.configuration
+    vendors: set[gpuhunt.AcceleratorVendor] = set()
+    invalid_replicas: list[int] = []
+    if configuration.type == "service" and isinstance(configuration.replicas, list):
+        for idx, replica_group in enumerate(configuration.replicas):
+            image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
+            _vendors = _detect_gpu_vendors_requiring_image(
+                gpu_spec=replica_group.resources.gpu,
+                image=image,
+                docker=docker,
+            )
+            if _vendors:
+                vendors.update(_vendors)
+                invalid_replicas.append(idx)
+    else:
+        vendors = _detect_gpu_vendors_requiring_image(
+            gpu_spec=configuration.resources.gpu,
+            image=configuration.image,
+            docker=configuration.docker,
+        )
+    if vendors:
+        sorted_vendors = sorted(v.value for v in vendors)
+        msg = (
+            "`image` must be set when the requested accelerator is not supported by"
+            f" the default image: {sorted_vendors}"
+        )
+        if invalid_replicas:
+            msg = f"replicas{invalid_replicas}: {msg}"
+        raise ServerClientError(msg)
+
+
+def _detect_gpu_vendors_requiring_image(
+    gpu_spec: Optional[GPUSpec], image: Optional[str], docker: Optional[bool]
+) -> set[gpuhunt.AcceleratorVendor]:
+    if image is not None or docker:
+        return set()
+    if gpu_spec is None or gpu_spec.count.max == 0:
+        return set()
+    vendors: set[gpuhunt.AcceleratorVendor] = set()
+    if gpu_spec.vendor is not None:
+        vendors.add(gpu_spec.vendor)
+    else:
+        # Unknown models are ignored (loose validation -- skips possible models that
+        # won't work with the default dstack image). The other option would be to treat them as
+        # non-NVIDIA, forcing the user to set `image`, even if they actually are NVIDIA (overly
+        # strict validation)
+        for gpu_name in gpu_spec.name or []:
+            vendors.update(detect_gpu_vendors_by_gpu_name(gpu_name))
+    # * NVIDIA definitely works with our image -- it's built for NVIDIA
+    # * Google TPU should work with our image -- all dependencies may be installed from PyPI, there
+    #   are no vendors dependencies that must be preinstalled/shipped with the image; basically,
+    #    our image is just Ubuntu + pip (uv) for TPU workloads
+    # * AMD, Intel Gaudi, Tenstorrent rely on some pinned system packages and/or patched libraries
+    #   and ship their own images -- we don't expect them to work on our generic
+    #   Ubuntu + CUDA image
+    return vendors - {gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.AcceleratorVendor.GOOGLE}
+
+
+def _validate_cpu_arch_and_image(run_spec: RunSpec) -> None:
+    image_msg = "`image` must be set when ARM CPU requested"
+    docker_msg = "`docker: true` is not supported on ARM CPU"
+    configuration = run_spec.configuration
+    if configuration.type == "service" and isinstance(configuration.replicas, list):
+        invalid_replicas_without_image: list[int] = []
+        invalid_replicas_with_docker: list[int] = []
+        for idx, replica_group in enumerate(configuration.replicas):
+            image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
+            if replica_group.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
+                if docker:
+                    invalid_replicas_with_docker.append(idx)
+                elif image is None:
+                    invalid_replicas_without_image.append(idx)
+        errors: list[str] = []
+        if invalid_replicas_without_image:
+            errors.append(f"replicas{invalid_replicas_without_image}: {image_msg}")
+        if invalid_replicas_with_docker:
+            errors.append(f"replicas{invalid_replicas_with_docker}: {docker_msg}")
+        if errors:
+            raise ServerClientError("\n".join(errors))
+    elif configuration.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
+        if configuration.docker:
+            raise ServerClientError(docker_msg)
+        if configuration.image is None:
+            raise ServerClientError(image_msg)
+
+
+def _get_replica_group_image_and_docker(
+    replica_group: ReplicaGroup, configuration: ServiceConfiguration
+) -> tuple[Optional[str], Optional[bool]]:
+    image = replica_group.image
+    if image is None:
+        image = configuration.image
+    docker = replica_group.docker
+    if docker is None:
+        docker = configuration.docker
+    return image, docker
 
 
 def _check_dynamo_in_place_update_compatibility(

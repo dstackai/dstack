@@ -950,7 +950,7 @@ class TestRunActiveWorker:
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
         """Service with 1 out-of-date RUNNING replica whose spec differs from the new
-        deployment, desired=1 → creates 1 new replica (surge), old registered replica
+        deployment, desired=1 → creates 1 new replica (surge), old ready replica
         untouched."""
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -979,6 +979,7 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=0,
             registered=True,
+            ready=True,
             replica_num=0,
         )
         # Make the old job's spec differ from the current run_spec so in-place bump
@@ -1001,7 +1002,7 @@ class TestRunActiveWorker:
         )
         jobs = list(res.scalars().all())
         assert len(jobs) == 2
-        # Old replica still RUNNING (registered, not terminated during rolling)
+        # Old replica still RUNNING (ready, not terminated during rolling)
         assert jobs[0].status == JobStatus.RUNNING
         assert jobs[0].deployment_num == 0
         # New surge replica created
@@ -1041,6 +1042,7 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=1,
             registered=True,
+            ready=True,
             replica_num=0,
         )
         # Out-of-date unregistered replica with different spec
@@ -1050,6 +1052,7 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=0,
             registered=False,
+            ready=False,
             replica_num=1,
         )
         old_spec = get_job_spec(old_job)
@@ -1068,6 +1071,207 @@ class TestRunActiveWorker:
         await session.refresh(old_job)
         assert old_job.status == JobStatus.TERMINATING
         assert old_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+    async def test_service_router_rolling_deployment_surges_ready_worker_replica(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        # Up-to-date router replica
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica: ready to serve traffic but never registered.
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=True,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.RUNNING
+        assert old_worker_job.ready
+        assert not old_worker_job.registered
+        assert old_worker_job.deployment_num == 0
+
+        res = await session.execute(
+            select(JobModel).where(
+                JobModel.run_id == run.id,
+                JobModel.replica_num == 2,
+            )
+        )
+        new_worker_job = res.scalar_one()
+        assert new_worker_job.status == JobStatus.SUBMITTED
+        assert new_worker_job.deployment_num == 1
+
+    async def test_service_router_rolling_deployment_scales_down_unready_worker_replica(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica that never became ready.
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=False,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.TERMINATING
+        assert old_worker_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+    async def test_service_router_rolling_deployment_terminates_out_of_date_worker_once_replacement_ready(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica, still ready and serving traffic (surge in progress).
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=True,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        # Up-to-date surge worker replica has become ready → the old replica is now excess.
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=False,
+            ready=True,
+            replica_num=2,
+            replica_group_name="worker",
+        )
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.TERMINATING
+        assert old_worker_job.termination_reason == JobTerminationReason.SCALED_DOWN
 
     async def test_service_removed_group_cleanup(
         self, test_db, session: AsyncSession, worker: RunWorker
@@ -1126,3 +1330,22 @@ class TestRunActiveWorker:
         await session.refresh(old_group_job)
         assert old_group_job.status == JobStatus.TERMINATING
         assert old_group_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+
+def _router_worker_service_configuration() -> ServiceConfiguration:
+    return ServiceConfiguration.model_validate(
+        {
+            "type": "service",
+            "port": 8000,
+            "image": "ubuntu",
+            "replicas": [
+                {"name": "worker", "commands": ["echo worker"], "count": 1},
+                {
+                    "name": "router",
+                    "router": {"type": "sglang"},
+                    "commands": ["echo router"],
+                    "count": 1,
+                },
+            ],
+        }
+    )

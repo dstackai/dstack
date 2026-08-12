@@ -4,15 +4,30 @@ from dstack._internal.core.models.gateways import (
     GatewayConfiguration,
     GatewaySpec,
 )
-from dstack._internal.server.schemas.gateways import SetDefaultGatewayRequest
+from dstack._internal.server.schemas.gateways import (
+    GetGatewayPlanRequest,
+    SetDefaultGatewayRequest,
+)
+
+
+def get_get_plan_excludes(body: GetGatewayPlanRequest) -> IncludeExcludeDictType:
+    return {"spec": get_gateway_spec_excludes(body.spec)}
 
 
 def get_apply_plan_excludes(plan_input: ApplyGatewayPlanInput) -> IncludeExcludeDictType:
-    apply_plan_excludes: IncludeExcludeDictType = {}
+    apply_plan_excludes: IncludeExcludeDictType = {
+        "spec": get_gateway_spec_excludes(plan_input.spec)
+    }
     if plan_input.current_resource is not None:
         # `Gateway.backend` and `Gateway.region` are deprecated and never set since 0.21.
         # Not sending them lets 0.22 drop the fields without breaking 0.21 clients.
-        apply_plan_excludes["current_resource"] = {"backend": True, "region": True}
+        apply_plan_excludes["current_resource"] = {
+            "backend": True,
+            "region": True,
+            "configuration": _get_gateway_configuration_excludes(
+                plan_input.current_resource.configuration
+            ),
+        }
     return {"plan": apply_plan_excludes}
 
 
@@ -49,4 +64,8 @@ def _get_gateway_configuration_excludes(
     configuration: GatewayConfiguration,
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
+
+    if configuration.default is None:
+        configuration_excludes["default"] = True
+
     return configuration_excludes

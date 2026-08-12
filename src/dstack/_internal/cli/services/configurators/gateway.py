@@ -24,7 +24,7 @@ from dstack._internal.core.models.gateways import (
     GatewaySpec,
     GatewayStatus,
 )
-from dstack._internal.core.services.diff import diff_models
+from dstack._internal.core.services.gateways import diff_gateway_configurations
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
@@ -60,15 +60,11 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             confirm_message += "Create the gateway?"
         else:
             action_message += f"Found gateway [code]{plan.effective_spec.configuration.name}[/]."
-            diff = diff_models(
+            diff = diff_gateway_configurations(
                 plan.current_resource.configuration,
                 plan.effective_spec.configuration,
             )
-            changed_fields = list(diff.keys())
-            if (
-                plan.current_resource.configuration == plan.effective_spec.configuration
-                or changed_fields == ["default"]
-            ):
+            if not diff:
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.

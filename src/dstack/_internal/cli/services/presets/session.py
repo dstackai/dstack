@@ -418,7 +418,7 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         path = session.path
         manifest = session.read_manifest()
         status = manifest.get("status")
-        if status not in ("running", "interrupted", "success"):
+        if status not in ("running", "interrupted", "success", "failed"):
             continue
         if status == "running" and not session_process_alive(manifest):
             status = "interrupted"
