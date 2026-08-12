@@ -273,6 +273,7 @@ For command options and agent settings, see the [`dstack preset` CLI reference](
 !!! info "Limitations"
     * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
     * Doesn't support PD disaggregation (coming soon)
+    * Presets are saved locally (a preset registry is coming soon)
     * Doesn't allow a custom dataset; always uses `random`
     * Doesn't support ranges for `concurrency`
 
