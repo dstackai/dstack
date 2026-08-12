@@ -262,7 +262,7 @@ class Nginx:
 
         cmd = ["sudo", "timeout", "--kill-after", str(CERTBOT_2ND_TIMEOUT), str(CERTBOT_TIMEOUT)]
         cmd += ["certbot", "certonly"]
-        cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email"]
+        cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email", "--quiet"]
         cmd += ["--keep", "--nginx", "--domain", domain]
 
         if acme.server:
@@ -283,7 +283,13 @@ class Nginx:
                 " Make sure DNS records are configured for this gateway."
             )
         if r.returncode != 0:
-            raise ProxyError(f"Error obtaining {domain} TLS certificate:\n{r.stderr.decode()}")
+            msg = (
+                r.stderr.decode()
+                .lstrip("An unexpected error occurred:\n")
+                .strip()
+                .replace("\n", " ")
+            )
+            raise ProxyError(f"Error obtaining {domain} TLS certificate: {msg}")
 
     @staticmethod
     def certificate_exists(domain: str) -> bool:
