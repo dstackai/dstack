@@ -39,10 +39,15 @@ Field semantics:
   this session. It is fixed so that benchmark results are comparable.
 <!--!TODO: support a concurrency sweep, so that a trial is measured at several
 concurrencies instead of one.-->
+<!--?if dataset-->
+- `dataset`: the benchmark dataset for every benchmark in this session; see
+  `## Benchmark`.
+<!--?else-->
 - `input_tokens`, `output_tokens`: the request shape for every benchmark in
   this session. They are fixed for the same reason.
 - `shared_prefix_tokens`: how many of `input_tokens` are identical in every
   request. `0` means every request is fully unique.
+<!--?end-->
 - `baseline`: whether the first trial must be a baseline rather than an
   optimization attempt; see `# Trials (Main Section)`.
 - `fleets`: use these existing `dstack` fleets only. Do not create, delete,
@@ -293,9 +298,31 @@ no trials remain. In that case, log the failure to `final_report.json` (see
 ## Benchmark
 
 During trials, run benchmarks via SSH inside the task, directly against the
-serving engine: use `concurrency`, `input_tokens`, `output_tokens`, and
-`shared_prefix_tokens` from `constraints.json` and measure all trials the same
+serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`concurrency`, `input_tokens`, `output_tokens`, and
+`shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
+<!--?if dataset-->
+Before any benchmark, reset the serving engine's prefix cache, or restart the
+engine, so it does not reuse what a previous benchmark cached. Do not vary
+which samples the dataset provides between benchmarks.
+
+Use the `dataset` for every benchmark. Choose the benchmark tool's options
+that load exactly that dataset, and confirm from the tool's own
+documentation, for the version you run, how it loads the dataset. If the
+dataset fails to load, fix the loading; never fall back to another dataset or
+to synthetic prompts. Prefer the dataset's own output lengths; when the tool
+forces an output length instead, use the same value in every benchmark. For
+example, the dataset options are:
+
+| tool | dataset options |
+| --- | --- |
+| `vllm bench serve` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name, or `--dataset-name hf --dataset-path <dataset>` when it is a Hugging Face dataset ID |
+| `sglang.benchmark.serving` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name; the tool has no Hugging Face dataset option |
+
+The table is an example and not a full command: the remaining options still
+come from `concurrency`, option names and defaults differ between versions,
+and any other tool needs its own equivalent.
+<!--?else-->
 Before any benchmark, ensure it uses a different seed than the previous
 benchmark. Otherwise the benchmark will depend on what has been cached by the
 previous benchmark.
@@ -315,6 +342,7 @@ lengths. For example, the shared-prefix options are:
 The table is an example and not a full command: the remaining options still come
 from `concurrency` and `output_tokens`, option names and defaults differ between
 versions, and any other tool needs its own equivalent.
+<!--?end-->
 
 Before any benchmark — a trial one or the final one — verify that the model
 works as expected: send real requests and check the responses, including
@@ -331,8 +359,9 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 {
   "tool": "vllm bench serve",
   "tool_version": "0.11.0",
-  "command": "vllm bench serve ...",
-  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "shared_prefix_tokens": 768},
+  "command": "vllm bench serve ...",<!--?if dataset-->
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "dataset": "sharegpt"},<!--?else-->
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "shared_prefix_tokens": 768},<!--?end-->
   "metrics": {
     "successful_requests": 16, "failed_requests": 0, "duration_seconds": 4.0,
     "total_input_tokens": 16384, "total_output_tokens": 2048,
@@ -343,6 +372,11 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 }
 ```
 
+<!--?if dataset-->
+Set `workload.dataset` to `dataset` from `constraints.json`, and compute
+`workload.input_tokens` and `workload.output_tokens` as the measured mean
+input and output token counts of the benchmark, rounded to whole tokens.
+<!--?end-->
 Compute `output_tok_per_s` as `total_output_tokens / duration_seconds` and
 `per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`. These are
 the numbers used to compare trials (see `## Performance`).

@@ -36,14 +36,16 @@ _BENCHMARK_JSON_SCHEMA = {
                 "output_tokens": {"type": "integer", "minimum": 2},
                 "concurrency": {"type": "integer", "minimum": 1},
                 "shared_prefix_tokens": {"type": "integer", "minimum": 0},
+                "dataset": {"type": "string", "minLength": 1},
             },
+            # `shared_prefix_tokens` and `dataset` are not required: one schema
+            # serves both session modes, and each mode knows only its own field.
             "required": [
                 "api",
                 "num_requests",
                 "input_tokens",
                 "output_tokens",
                 "concurrency",
-                "shared_prefix_tokens",
             ],
             "additionalProperties": False,
         },

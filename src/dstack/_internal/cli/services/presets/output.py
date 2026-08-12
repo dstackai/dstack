@@ -192,6 +192,8 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
     constraints = session.get("constraints") or {}
     parts = []
     objective = []
+    if dataset := constraints.get("dataset"):
+        objective.append(f"data={dataset}")
     if constraints.get("input_tokens") and constraints.get("output_tokens"):
         objective.append(
             f"io={_format_token_count(constraints['input_tokens'])}"
@@ -302,12 +304,16 @@ def format_preset_objective(
     verbose: bool = False,
 ) -> str:
     workload = preset.validations[0].benchmark.workload
-    parts = [
-        f"io={_format_token_count(workload.input_tokens)}"
-        f"/{_format_token_count(workload.output_tokens)}",
-    ]
-    share = round(100 * workload.shared_prefix_tokens / workload.input_tokens)
-    parts.append(f"prefix={share}%")
+    parts = []
+    if workload.dataset:
+        parts.append(f"data={workload.dataset}")
+    else:
+        parts.append(
+            f"io={_format_token_count(workload.input_tokens)}"
+            f"/{_format_token_count(workload.output_tokens)}"
+        )
+        share = round(100 * (workload.shared_prefix_tokens or 0) / workload.input_tokens)
+        parts.append(f"prefix={share}%")
     parts.append(f"conc={workload.concurrency}")
     # Absent for presets saved before the creation record was consulted.
     if verbose and min_context_length is not None:

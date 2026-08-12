@@ -20,12 +20,16 @@ from dstack._internal.core.models.resources import ResourcesSpec
 class PresetBenchmarkWorkload(CoreModel):
     api: Literal["chat_completions", "completions"]
     num_requests: PositiveInt
+    # With a dataset other than `random`, the measured means rather than the
+    # configured request shape.
     input_tokens: PositiveInt
     output_tokens: Annotated[int, Field(ge=2)]
     concurrency: PositiveInt
-    # Defaulted rather than required: presets saved before this field existed
-    # must still load, and for them the benchmark was fully unique.
-    shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
+    # Absent for presets saved before the field existed, and with a dataset
+    # other than `random`, where the dataset decides prefix sharing.
+    shared_prefix_tokens: Annotated[Optional[int], Field(ge=0)] = None
+    # Absent means the synthetic `random` dataset.
+    dataset: Optional[str] = None
 
 
 class PresetBenchmarkLatency(CoreModel):

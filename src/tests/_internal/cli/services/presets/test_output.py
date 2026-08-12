@@ -55,9 +55,19 @@ class TestFormatPresetObjective:
         # `shared_prefix_tokens` is absent from every preset saved so far.
         preset = get_preset()
 
-        assert preset.validations[0].benchmark.workload.shared_prefix_tokens == 0
+        assert preset.validations[0].benchmark.workload.shared_prefix_tokens is None
         assert output_module.format_preset_objective(preset) == (
             "[secondary]io=1K/128 prefix=0% conc=1[/]"
+        )
+
+    def test_shows_the_dataset_instead_of_the_request_shape(self):
+        # With a custom dataset the io shape is measured, not configured, so the
+        # contract cell names the dataset instead.
+        preset = get_preset()
+        preset.validations[0].benchmark.workload.dataset = "spec_bench"
+
+        assert output_module.format_preset_objective(preset) == (
+            "[secondary]data=spec_bench conc=1[/]"
         )
 
 
@@ -136,6 +146,17 @@ class TestSessionRow:
         )
 
         assert row["CONSTRAINTS"] == ("[secondary]io=8K/1K prefix=90% conc=162[/]")
+
+    def test_shows_the_dataset_for_a_session_with_a_custom_dataset(self):
+        row = _session_row(
+            {
+                "id": "c7e18d52",
+                "status": "running",
+                "constraints": {"dataset": "spec_bench", "concurrency": 4},
+            }
+        )
+
+        assert row["CONSTRAINTS"] == ("[secondary]data=spec_bench conc=4[/]")
 
     def test_shows_the_shared_prefix_even_when_requests_are_fully_unique(self):
         # `prefix=0%` is not noise: it decides how much of each request the engine

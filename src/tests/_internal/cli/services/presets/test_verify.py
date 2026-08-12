@@ -141,6 +141,22 @@ class TestBuildVerifiedPreset:
                 report=get_successful_preset_report(run),
             )
 
+    def test_rejects_benchmark_on_a_different_dataset(self):
+        run = get_running_service_run()
+
+        # The report's workload defaults to `random`, but the configuration
+        # demanded a custom dataset: the benchmark does not match the contract.
+        with pytest.raises(CLIError, match="dataset does not match"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build",
+                    model={"base": "Qwen/Qwen3.5-27B"},
+                    dataset="spec_bench",
+                ),
+                report=get_successful_preset_report(run),
+            )
+
     def test_rejects_variant_for_exact_model_request(self):
         run = get_running_service_run()
         report = get_successful_preset_report(run).model_copy(update={"model": "other/model"})

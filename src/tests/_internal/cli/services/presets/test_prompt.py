@@ -27,6 +27,19 @@ class TestSystemPrompt:
         assert clause_at < section_at < text.index("## CLI And Skills")
         assert "<!--?" not in text
 
+    def test_renders_only_the_custom_dataset_branch(self):
+        text = get_preset_agent_system_prompt(custom_dataset=True)
+
+        assert "`workload.dataset`" in text
+        # The request shape is the random dataset's contract, not this one's.
+        assert "shared_prefix_tokens" not in text
+
+    def test_a_random_dataset_session_never_hears_of_datasets(self):
+        text = get_preset_agent_system_prompt()
+
+        assert "shared_prefix_tokens" in text
+        assert "`dataset`" not in text
+
     def test_fails_loudly_when_the_prompt_has_no_directives(self, tmp_path, monkeypatch):
         plain = tmp_path / "system_prompt.md"
         plain.write_text("# Objective\n\nA prompt without directives.\n")
