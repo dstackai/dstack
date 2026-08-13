@@ -27,10 +27,13 @@ from dstack._internal.utils.path import make_tmp_symlink_to_dir
 
 logger = get_logger(__name__)
 
-CONNECTIONS_DIR = settings.SERVER_DIR_PATH / "job-server-connections"
 _MIN_ALIVE_CHECK_INTERVAL = 30
 _PROBE_TIMEOUT = 3
 _REMOTE_SOCKET_PATH = Path(DSTACK_RUN_SERVER_SOCKET_PATH)
+
+
+def _get_connections_dir() -> Path:
+    return settings.SERVER_DIR_PATH / "job-server-connections"
 
 
 def _get_server_socket() -> IPSocket:
@@ -51,7 +54,7 @@ class JobServerConnection:
         self._last_verified_at = 0.0
         # Keep the control socket discoverable across server process restarts. The temporary
         # symlink keeps its effective path below OpenSSH's Unix-socket length limit.
-        self._connection_dir = CONNECTIONS_DIR / str(job.id)
+        self._connection_dir = _get_connections_dir() / str(job.id)
         self._connection_dir.mkdir(parents=True, exist_ok=True)
         self._temp_dir, effective_dir = make_tmp_symlink_to_dir(
             self._connection_dir,
@@ -207,7 +210,7 @@ class JobServerConnectionsPool:
             if connection is not None:
                 await self._close(connection)
             self._failure_started_at.pop(job_id, None)
-            shutil.rmtree(CONNECTIONS_DIR / str(job_id), ignore_errors=True)
+            shutil.rmtree(_get_connections_dir() / str(job_id), ignore_errors=True)
 
     async def remove_all(self) -> None:
         job_ids = set(self._connections).union(self._failure_started_at)

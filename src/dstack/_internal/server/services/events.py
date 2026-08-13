@@ -405,7 +405,6 @@ async def list_events(
                 joinedload(EventModel.targets)
                 .joinedload(EventTargetModel.entity_project)
                 .load_only(ProjectModel.name, ProjectModel.original_name, ProjectModel.deleted)
-                .noload(ProjectModel.owner)
             ),
             joinedload(EventModel.actor_user).load_only(
                 UserModel.name, UserModel.original_name, UserModel.deleted

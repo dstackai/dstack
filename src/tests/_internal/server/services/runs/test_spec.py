@@ -1,7 +1,9 @@
 import re
 import uuid
 from types import SimpleNamespace
+from typing import Any, Optional
 
+import gpuhunt
 import pytest
 
 from dstack._internal.core.errors import ServerClientError
@@ -17,6 +19,7 @@ from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
     check_can_update_run_spec,
+    set_run_spec_resources_defaults,
     validate_run_spec_and_set_defaults,
 )
 from dstack._internal.server.testing.common import get_run_spec
@@ -82,6 +85,51 @@ def _run_spec_with_overrides(configuration: ServiceConfiguration, **overrides) -
     if not run_spec_overrides:
         return run_spec
     return RunSpec.model_validate({**run_spec.model_dump(), **run_spec_overrides})
+
+
+def _task_run_spec(
+    *,
+    resources: Optional[dict] = None,
+    image: Optional[str] = None,
+    docker: Optional[bool] = None,
+) -> RunSpec:
+    conf: dict[str, Any] = {"type": "task", "commands": ["echo hello"]}
+    if resources is not None:
+        conf["resources"] = resources
+    if image is not None:
+        conf["image"] = image
+    if docker is not None:
+        conf["docker"] = docker
+    return get_run_spec(
+        repo_id="test-repo",
+        run_name="test-run",
+        configuration=TaskConfiguration.model_validate(conf),
+    )
+
+
+def _service_run_spec(
+    *,
+    replicas: list[dict],
+    resources: Optional[dict] = None,
+    image: Optional[str] = None,
+    docker: Optional[bool] = None,
+) -> RunSpec:
+    conf: dict[str, Any] = {"type": "service", "port": 8000, "replicas": replicas}
+    if resources is not None:
+        conf["resources"] = resources
+    if image is not None:
+        conf["image"] = image
+    if docker is not None:
+        conf["docker"] = docker
+    return get_run_spec(
+        repo_id="test-repo",
+        run_name="test-run",
+        configuration=ServiceConfiguration.model_validate(conf),
+    )
+
+
+def _validate(run_spec: RunSpec) -> None:
+    validate_run_spec_and_set_defaults(SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec)
 
 
 class TestValidateRunSpecRetryDuration:
@@ -329,3 +377,274 @@ class TestCheckCanUpdateConfigurationFieldAllowlist:
         current = _service_configuration(router_type="sglang", image="img:1")
         new = _service_configuration(router_type="sglang", image="img:2")
         _check_can_update_configuration(current, new, ignore_files=True)
+
+
+class TestSetRunSpecResourcesDefaultsGpuVendor:
+    @pytest.mark.parametrize(
+        ["gpu_spec", "expected_vendor"],
+        [
+            ("A100", gpuhunt.AcceleratorVendor.NVIDIA),
+            ("a40,l40", gpuhunt.AcceleratorVendor.NVIDIA),  # different names, same vendor
+            ("Mi300X", gpuhunt.AcceleratorVendor.AMD),
+            ("Gaudi2", gpuhunt.AcceleratorVendor.INTEL),
+            ("n300", gpuhunt.AcceleratorVendor.TENSTORRENT),
+            ("v5litepod-8", gpuhunt.AcceleratorVendor.GOOGLE),
+        ],
+    )
+    def test_sets_vendor_detected_by_gpu_names(
+        self, gpu_spec: str, expected_vendor: gpuhunt.AcceleratorVendor
+    ):
+        run_spec = _task_run_spec(resources={"gpu": gpu_spec}, image="ubuntu")
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor == expected_vendor
+
+    @pytest.mark.parametrize(
+        "gpu_spec",
+        [
+            "UNKNOWN1000",  # an unknown name
+            "A100,UNKNOWN1000",  # known and unknown names
+            "A100,MI300X",  # names of different vendors
+        ],
+    )
+    def test_does_not_set_vendor_if_gpu_names_are_ambiguous(self, gpu_spec: str):
+        run_spec = _task_run_spec(resources={"gpu": gpu_spec}, image="ubuntu")
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor is None
+
+    def test_does_not_override_vendor_set_by_the_user(self):
+        run_spec = _task_run_spec(
+            resources={"gpu": {"vendor": "amd", "name": ["A100"]}}, image="ubuntu"
+        )
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.AMD
+
+    def test_sets_nvidia_if_the_default_image_is_used(self):
+        run_spec = _task_run_spec(resources={"gpu": "1"})
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+
+    @pytest.mark.parametrize(
+        ["image", "docker"],
+        [
+            ("ubuntu", None),
+            (None, True),  # the DinD image can run containers with any accelerator
+        ],
+    )
+    def test_does_not_set_vendor_if_the_default_image_is_not_used(
+        self, image: Optional[str], docker: Optional[bool]
+    ):
+        run_spec = _task_run_spec(resources={"gpu": "1"}, image=image, docker=docker)
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor is None
+
+    def test_does_not_set_vendor_if_no_gpu_requested(self):
+        run_spec = _task_run_spec(resources={"gpu": "0"})
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.gpu.vendor is None
+
+    def test_sets_default_gpu_spec_if_gpu_is_null(self):
+        run_spec = _task_run_spec(resources={"gpu": None})
+
+        set_run_spec_resources_defaults(run_spec)
+
+        gpu_spec = run_spec.configuration.resources.gpu
+        assert gpu_spec is not None
+        assert gpu_spec.name is None
+        assert gpu_spec.count.min == 0
+        assert gpu_spec.count.max is None
+        assert gpu_spec.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+
+
+class TestSetRunSpecResourcesDefaultsCpuArch:
+    @pytest.mark.parametrize(
+        ["gpu_spec", "expected_arch"],
+        [
+            (None, gpuhunt.CPUArchitecture.X86),
+            ("H100", gpuhunt.CPUArchitecture.X86),
+            ("GH200", gpuhunt.CPUArchitecture.ARM),  # an NVIDIA superchip
+            ("GB200:4", gpuhunt.CPUArchitecture.ARM),
+        ],
+    )
+    def test_sets_arch_detected_by_gpu_names(
+        self, gpu_spec: Optional[str], expected_arch: gpuhunt.CPUArchitecture
+    ):
+        resources = {"gpu": gpu_spec} if gpu_spec is not None else None
+        run_spec = _task_run_spec(resources=resources, image="ubuntu")
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.cpu.arch == expected_arch
+
+    def test_does_not_override_arch_set_by_the_user(self):
+        run_spec = _task_run_spec(resources={"cpu": "arm:2", "gpu": "H100"}, image="ubuntu")
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM
+
+
+class TestSetRunSpecResourcesDefaultsReplicaGroups:
+    def test_sets_defaults_for_every_replica_group(self):
+        run_spec = _service_run_spec(
+            replicas=[
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "MI300X"}},
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "GH200"}},
+                {"count": 1, "commands": ["echo"]},
+            ],
+        )
+
+        set_run_spec_resources_defaults(run_spec)
+
+        groups = run_spec.configuration.replicas
+        assert [(g.resources.gpu.vendor, g.resources.cpu.arch) for g in groups] == [
+            (gpuhunt.AcceleratorVendor.AMD, gpuhunt.CPUArchitecture.X86),
+            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.ARM),
+            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.X86),
+        ]
+
+    @pytest.mark.parametrize(
+        ["service_image", "group_image", "expected_vendor"],
+        [
+            (None, None, gpuhunt.AcceleratorVendor.NVIDIA),
+            (None, "ubuntu", None),  # the group image overrides the default image
+            ("ubuntu", None, None),  # the group inherits the service-level image
+        ],
+    )
+    def test_infers_vendor_from_the_image_used_by_the_group(
+        self,
+        service_image: Optional[str],
+        group_image: Optional[str],
+        expected_vendor: Optional[gpuhunt.AcceleratorVendor],
+    ):
+        group: dict = {"count": 1, "commands": ["echo"], "resources": {"gpu": "1"}}
+        if group_image is not None:
+            group["image"] = group_image
+        run_spec = _service_run_spec(replicas=[group], image=service_image)
+
+        set_run_spec_resources_defaults(run_spec)
+
+        assert run_spec.configuration.replicas[0].resources.gpu.vendor == expected_vendor
+
+    def test_sets_defaults_for_top_level_resources(self):
+        # The top-level resources are ignored when replica groups are set, but they are still
+        # normalized so that resubmitting the same configuration produces no spec diff
+        run_spec = _service_run_spec(
+            replicas=[{"count": 1, "commands": ["echo"]}],
+            resources={"gpu": "H100"},
+        )
+
+        set_run_spec_resources_defaults(run_spec)
+
+        resources = run_spec.configuration.resources
+        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert resources.cpu.arch == gpuhunt.CPUArchitecture.X86
+
+
+class TestValidateRunSpecGpuVendorAndImage:
+    UNSUPPORTED_GPU_SPECS = ["amd", "MI300X", "intel", "Gaudi2", "tenstorrent", "n300"]
+
+    @pytest.mark.parametrize("gpu_spec", UNSUPPORTED_GPU_SPECS)
+    def test_rejects_gpu_not_supported_by_the_default_image(self, gpu_spec: str):
+        run_spec = _task_run_spec(resources={"gpu": gpu_spec})
+
+        with pytest.raises(ServerClientError, match="`image` must be set"):
+            _validate(run_spec)
+
+    @pytest.mark.parametrize("gpu_spec", UNSUPPORTED_GPU_SPECS)
+    @pytest.mark.parametrize(["image", "docker"], [("rocm", None), (None, True)])
+    def test_allows_any_gpu_if_the_default_image_is_not_used(
+        self, gpu_spec: str, image: Optional[str], docker: Optional[bool]
+    ):
+        _validate(_task_run_spec(resources={"gpu": gpu_spec}, image=image, docker=docker))
+
+    @pytest.mark.parametrize(
+        "gpu_spec",
+        [
+            "nvidia",
+            "H100",
+            # TPU workloads install all dependencies from PyPI, so they work with the default image
+            "google",
+            "v5litepod-8",
+            "UNKNOWN1000",  # unknown names are not validated
+        ],
+    )
+    def test_allows_gpu_supported_by_the_default_image(self, gpu_spec: str):
+        _validate(_task_run_spec(resources={"gpu": gpu_spec}))
+
+    def test_allows_any_vendor_if_no_gpu_requested(self):
+        _validate(_task_run_spec(resources={"gpu": {"vendor": "amd", "count": 0}}))
+
+    def test_reports_replica_groups_requiring_image(self):
+        run_spec = _service_run_spec(
+            replicas=[
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "MI300X"}},
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "H100"}},
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "n300"}},
+            ],
+        )
+
+        with pytest.raises(ServerClientError, match=re.escape("replicas[0, 2]")):
+            _validate(run_spec)
+
+    def test_allows_replica_group_with_its_own_image(self):
+        run_spec = _service_run_spec(
+            replicas=[{"count": 1, "image": "rocm", "resources": {"gpu": "MI300X"}}],
+        )
+
+        _validate(run_spec)
+
+
+class TestValidateRunSpecCpuArchAndImage:
+    @pytest.mark.parametrize(
+        "resources",
+        [
+            {"cpu": "arm:2"},  # the arch is set by the user
+            {"gpu": "GH200"},  # the arch is inferred from the GPU name
+        ],
+    )
+    def test_rejects_arm_without_image(self, resources: dict):
+        with pytest.raises(ServerClientError, match="`image` must be set when ARM CPU requested"):
+            _validate(_task_run_spec(resources=resources))
+
+    def test_allows_arm_with_image(self):
+        _validate(_task_run_spec(resources={"cpu": "arm:2"}, image="ubuntu"))
+
+    def test_rejects_arm_with_dind(self):
+        # `image` cannot be set with `docker: true`, and the DinD image is x86-only
+        with pytest.raises(ServerClientError, match="`docker: true` is not supported on ARM CPU"):
+            _validate(_task_run_spec(resources={"cpu": "arm:2"}, docker=True))
+
+    @pytest.mark.parametrize("resources", [None, {"cpu": "x86:2"}, {"gpu": "H100"}])
+    def test_allows_x86_without_image(self, resources: Optional[dict]):
+        _validate(_task_run_spec(resources=resources))
+
+    def test_reports_replica_groups_requiring_image(self):
+        run_spec = _service_run_spec(
+            replicas=[
+                {"count": 1, "commands": ["echo"], "resources": {"cpu": "arm:2"}},
+                {"count": 1, "commands": ["echo"]},
+                {"count": 1, "commands": ["echo"], "resources": {"gpu": "GH200"}},
+            ],
+        )
+
+        with pytest.raises(ServerClientError, match=re.escape("replicas[0, 2]")):
+            _validate(run_spec)
+
+    def test_allows_replica_group_with_its_own_image(self):
+        run_spec = _service_run_spec(
+            replicas=[{"count": 1, "image": "ubuntu", "resources": {"cpu": "arm:2"}}],
+        )
+
+        _validate(run_spec)

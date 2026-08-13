@@ -16,14 +16,38 @@ DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
 SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server")).resolve()
 
-SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
-SERVER_DATA_DIR_PATH = SERVER_DIR_PATH / "data"
-SERVER_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
+# Paths under `SERVER_DIR_PATH` are derived on access rather than at import time, so that
+# patching `SERVER_DIR_PATH` redirects all of them. Tests rely on this to keep each worker's
+# server state out of the real `~/.dstack`.
+#
+# TODO: Turn module level-constants into a ServerSettings class instance so that
+# all settings can be properties and there is no constant/function distinction.
 
-DATABASE_URL = os.getenv(
-    "DSTACK_DATABASE_URL", f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"
-)
+
+def get_server_config_file_path() -> Path:
+    return SERVER_DIR_PATH / "config.yml"
+
+
+def get_server_data_dir_path() -> Path:
+    return SERVER_DIR_PATH / "data"
+
+
+def init_server_data_dir() -> Path:
+    """
+    Creates the server data dir. Call before connecting to the default SQLite database.
+    """
+    data_dir = get_server_data_dir_path()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+def get_database_url() -> str:
+    return os.getenv(
+        "DSTACK_DATABASE_URL",
+        f"sqlite+aiosqlite:///{get_server_data_dir_path()}/sqlite.db",
+    )
+
 
 SERVER_HOST = os.getenv("DSTACK_SERVER_HOST", "localhost")
 SERVER_PORT = int(os.getenv("DSTACK_SERVER_PORT", "8000"))

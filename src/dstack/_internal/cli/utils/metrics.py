@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Any, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, List, Optional, Sequence
 
 from rich.console import RenderableType
 from rich.table import Table
@@ -10,7 +10,6 @@ from dstack._internal.cli.utils.sparkline import GPU_RAMP, HOST_RAMP, Ramp, no_d
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.metrics import JobMetrics
 from dstack._internal.core.models.runs import Job
-from dstack._internal.utils.common import pretty_date
 
 MAX_SAMPLES = 1000
 """A sample count, not a window: outruns the hour a running job retains, so a young run is
@@ -22,50 +21,138 @@ WATCH_INTERVAL_SECONDS = 10
 MIN_SPARK_WIDTH = 10
 MAX_SPARK_WIDTH = 80
 
+RETENTION = timedelta(hours=1)
+"""What the server keeps for a running job, and so the widest window there can be."""
+
 AXIS_RULE = "┄"
-_FIXED_COLUMNS = 34
-"""Labels, numbers and padding. Hand-measured against a `589GB/1480GB`-sized label; a
-wider one (a 2000GB host prints `1218GB/2000GB`) overflows and Rich ellipsizes the row
-labels rather than shrinking the sparklines."""
+NOW = "now"
+
+LIVE_THRESHOLD = timedelta(seconds=3 * WATCH_INTERVAL_SECONDS)
+_FIXED_COLUMNS = 30
+"""Everything but the sparklines and the job label: the `gpu=N` column, both numbers, and
+the table's padding. Hand-measured against a `589GB/1480GB`-sized number; a wider one
+overflows and Rich ellipsizes the labels rather than shrinking the sparklines."""
 
 _SPARKLINE_COLUMNS = 2
 
 
-def _spark_width(console_width: int) -> int:
-    budget = console_width - _FIXED_COLUMNS
+def _spark_width(console_width: int, label_width: int = 0) -> int:
+    budget = console_width - _FIXED_COLUMNS - label_width
     return max(MIN_SPARK_WIDTH, min(MAX_SPARK_WIDTH, budget // _SPARKLINE_COLUMNS))
 
 
 def get_metrics_table(
-    job: Job, metrics: JobMetrics, console_width: Optional[int] = None
+    jobs: Sequence[Job],
+    metrics: Sequence[JobMetrics],
+    console_width: Optional[int] = None,
 ) -> RenderableType:
-    resources = _get_resources(job)
-    width = _spark_width(console_width or console.width)
+    labels = job_labels(jobs)
+    label_width = max((len(label) for label in labels), default=0)
+    width = _spark_width(console_width or console.width, label_width)
+    window = _shared_window(metrics)
 
     table = Table(box=None)
-    # no header: every cell in this column already reads `cpu` or `gpu=N`
+    # no headers: the cells read `replica=0` and `gpu=1`, which need no naming
+    table.add_column("", no_wrap=True)
     table.add_column("", style="secondary", no_wrap=True)
     table.add_column("UTILIZATION", no_wrap=True)
     table.add_column("MEMORY", no_wrap=True)
 
+    for index, (job, job_metrics) in enumerate(zip(jobs, metrics)):
+        if index:
+            table.add_row("", "", "", "")
+        _add_job(table, job, job_metrics, width, labels[index], window)
+
+    if window is not None:
+        table.add_row("", "", "", "")
+        # the axis spans the widest chart drawn: a job with fewer samples than cells draws
+        # one cell per sample and cannot fill its share
+        axis = _time_axis(max(_cells_drawn(m, window, width) for m in metrics), *window)
+        table.add_row("", "", axis, axis)
+    return table
+
+
+def job_labels(jobs: Sequence[Job]) -> List[str]:
+    """A label per job, naming only what tells them apart, as `dstack ps` does."""
+    groups = {job.job_spec.replica_group for job in jobs}
+    show_group = len(groups) > 1
+    show_replica = len({job.job_spec.replica_num for job in jobs}) > 1
+
+    labels, last_group = [], None
+    for job in jobs:
+        parts = []
+        if show_group:
+            # as `ps`: name the group where it changes, and indent the replicas under it
+            group = job.job_spec.replica_group
+            parts.append(f"group={group}" if group != last_group else " " * len(f"group={group}"))
+            last_group = group
+        if show_replica:
+            parts.append(f"replica={job.job_spec.replica_num}")
+        parts.append(f"job={job.job_spec.job_num}")
+        labels.append(" ".join(parts))
+    return labels
+
+
+def _add_job(
+    table: Table,
+    job: Job,
+    metrics: JobMetrics,
+    width: int,
+    label: str,
+    window: Optional[tuple[datetime, datetime]],
+) -> None:
+    resources = _get_resources(job)
+    blanks = _blank_cells(metrics, window, width)
+    cells = width - blanks
     table.add_row(
+        label,
         "cpu",
-        _cpu_cell(metrics, resources, width),
-        _memory_cell(metrics, resources, width),
+        _pad(_cpu_cell(metrics, resources, cells), blanks),
+        _pad(_memory_cell(metrics, resources, cells), blanks),
     )
-    table.add_row("", "", "")  # host and devices are different things; separate them
     for index in range(_gpus_num(metrics, resources)):
         table.add_row(
+            "",
             f"gpu={index}",
-            _gpu_util_cell(metrics, index, width),
-            _gpu_memory_cell(metrics, resources, index, width),
+            _pad(_gpu_util_cell(metrics, index, cells), blanks),
+            _pad(_gpu_memory_cell(metrics, resources, index, cells), blanks),
         )
-    window = _window(metrics)
-    if window is not None:
-        axis = _axis(min(width, _samples_num(metrics)), *window)
-        table.add_row("", "", "")
-        table.add_row("", axis, axis)
-    return table
+
+
+def _shared_window(metrics: Sequence[JobMetrics]) -> Optional[tuple[datetime, datetime]]:
+    """The window every job is charted against: the newest sample back one retention hour."""
+    windows = [w for w in (_job_window(m) for m in metrics) if w is not None]
+    if not windows:
+        return None
+    latest, earliest = max(w[1] for w in windows), min(w[0] for w in windows)
+    return min(earliest, latest - RETENTION), latest
+
+
+def _blank_cells(
+    metrics: JobMetrics, window: Optional[tuple[datetime, datetime]], width: int
+) -> int:
+    """How many cells to leave empty before a job's chart, so it starts where it started."""
+    job_window = _job_window(metrics)
+    if job_window is None or window is None:
+        return 0
+    total = (window[1] - window[0]).total_seconds()
+    if total <= 0:
+        return 0
+    started = (job_window[0] - window[0]).total_seconds()
+    return min(width - 1, max(0, round(started / total * width)))
+
+
+def _cells_drawn(
+    metrics: JobMetrics, window: Optional[tuple[datetime, datetime]], width: int
+) -> int:
+    """How many cells a job's chart occupies: its empty lead plus one per sample."""
+    blanks = _blank_cells(metrics, window, width)
+    return blanks + min(width - blanks, _samples_num(metrics))
+
+
+def _pad(cell: Text, blanks: int) -> Text:
+    """Prefix a chart cell with empty cells, for time before the job started."""
+    return cell if blanks <= 0 else Text.assemble(Text(" " * blanks), cell)
 
 
 def _cpu_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: int) -> Text:
@@ -75,10 +162,9 @@ def _cpu_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: in
     cpus = resources.cpus if resources else None
     if cpus:
         values = [v / cpus for v in values]
-    label = f"{values[-1]:.0f}%"
-    if cpus:
-        label += f" of {cpus}"
-    return _cell(sparkline(values, width, HOST_RAMP), label)
+    # no core count: the value is already normalised to it, and unlike memory there is no
+    # total to give the number meaning
+    return Text.assemble(sparkline(values, width, HOST_RAMP), " ", f"{values[-1]:.0f}%")
 
 
 def _memory_cell(job_metrics: JobMetrics, resources: Optional[Resources], width: int) -> Text:
@@ -86,7 +172,7 @@ def _memory_cell(job_metrics: JobMetrics, resources: Optional[Resources], width:
     if not values:
         return no_data()
     total = resources.memory_mib * 1024 * 1024 if resources else None
-    return _level_cell(values, total, width, HOST_RAMP)
+    return _capacity_cell(values, total, width, HOST_RAMP)
 
 
 def _gpu_memory_cell(
@@ -101,65 +187,54 @@ def _gpu_memory_cell(
     total = None
     if resources and index < len(resources.gpus):
         total = resources.gpus[index].memory_mib * 1024 * 1024
-    return _level_cell(values, total, width, GPU_RAMP)
+    return _capacity_cell(values, total, width, GPU_RAMP)
 
 
 def _gpu_util_cell(job_metrics: JobMetrics, index: int, width: int) -> Text:
     values = _metric_values(job_metrics, f"gpu_util_percent_gpu{index}")
     if not values:
         return no_data()
-    return _cell(sparkline(values, width, GPU_RAMP), f"{values[-1]:.0f}%")
+    return Text.assemble(sparkline(values, width, GPU_RAMP), " ", f"{values[-1]:.0f}%")
 
 
-def _level_cell(values: List[float], total: Optional[float], width: int, ramp: Ramp) -> Text:
+def _capacity_cell(values: List[float], total: Optional[float], width: int, ramp: Ramp) -> Text:
+    """A memory chart drawn against capacity, labelled `used/total`."""
     percents = [v / total * 100 for v in values] if total else values
     label = format_memory(values[-1], 0)
     if total:
         label += f"/{format_memory(total, 0)}"
-    return _cell(sparkline(percents, width, ramp), label)
+    return Text.assemble(sparkline(percents, width, ramp), " ", label)
 
 
-def _cell(spark: Text, label: str) -> Text:
-    return Text.assemble(spark, " ", label)
-
-
-def _axis(width: int, first: datetime, last: datetime) -> Text:
-    """`<oldest> ┄┄┄ <newest>`, never wider than the sparkline above it.
-
-    The rule is what pairs the two stamps. UTILIZATION and MEMORY each print one, so the
-    row ends up holding four times, and with the rule left blank the only cue is spacing --
-    which points the wrong way above 88 columns: at 200 there are 66 blanks between a
-    column's own two stamps but only 13 between the columns, so each column's newest time
-    reads as belonging to the next column's oldest.
-
-    A run draws one cell per sample, so for its first few minutes there are fewer cells
-    than two dates need. Dropping the date keeps the axis inside its cell; overflowing
-    instead widens the column and pulls MEMORY out of line with the charts.
-    """
-    left, right = _stamp(first), _stamp(last)
+def _time_axis(width: int, first: datetime, last: datetime) -> Text:
+    """The timeline row printed under the charts, exactly `width` columns wide."""
+    left, right = _time_label(first), _time_label(last)
     if len(left) + len(right) + 3 > width:
-        left, right = _stamp(first, clock_only=True), _stamp(last, clock_only=True)
+        left, right = _time_label(first, clock_only=True), _time_label(last, clock_only=True)
     if len(left) + len(right) + 2 > width:
         return Text("")
     fill = width - len(left) - len(right) - 2
-    return Text(f"{left} " + AXIS_RULE * fill + f" {right}", style="grey42")
+    axis = Text(f"{left} " + AXIS_RULE * fill + " ", style="grey42")
+    axis.append(right, style="bold grey58" if right == NOW else "grey42")
+    return axis
 
 
-def _stamp(moment: datetime, clock_only: bool = False) -> str:
-    if pretty_date(moment) == "now":
-        return "now"
+def _time_label(moment: datetime, clock_only: bool = False) -> str:
+    """One timestamp for the axis: `now` while a job is still reporting, a date otherwise."""
+    if datetime.now(timezone.utc) - moment < LIVE_THRESHOLD:
+        return NOW
     local = moment.astimezone()
     return f"{local:%H:%M}" if clock_only else f"{local.day} {local:%b %H:%M}"
 
 
-def _window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
+def _job_window(job_metrics: JobMetrics) -> Optional[tuple[datetime, datetime]]:
+    """The oldest and newest sample timestamps of one job, or None if it has none."""
     stamps = [t for metric in job_metrics.metrics for t in metric.timestamps]
     return (min(stamps), max(stamps)) if stamps else None
 
 
 def _samples_num(job_metrics: JobMetrics) -> int:
-    """`slices` never draws more cells than it has samples, so the axis must stop there
-    too -- else it claims a span nothing was measured over, and Rich widens the column."""
+    """How many samples the longest series holds."""
     return max((len(metric.timestamps) for metric in job_metrics.metrics), default=0)
 
 
@@ -172,7 +247,7 @@ def _metric_values(job_metrics: JobMetrics, name: str) -> List[Any]:
     return []
 
 
-def _latest(job_metrics: JobMetrics, name: str) -> Optional[Any]:
+def _latest_value(job_metrics: JobMetrics, name: str) -> Optional[Any]:
     values = _metric_values(job_metrics, name)
     return values[-1] if values else None
 
@@ -180,7 +255,7 @@ def _latest(job_metrics: JobMetrics, name: str) -> Optional[Any]:
 def _gpus_num(job_metrics: JobMetrics, resources: Optional[Resources]) -> int:
     if resources is not None and resources.gpus:
         return len(resources.gpus)
-    detected = _latest(job_metrics, "gpus_detected_num")
+    detected = _latest_value(job_metrics, "gpus_detected_num")
     return int(detected) if detected else 0
 
 

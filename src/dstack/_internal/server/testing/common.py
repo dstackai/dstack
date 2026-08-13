@@ -442,13 +442,19 @@ async def create_job(
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
     registered: bool = False,
+    ready: bool = False,
     waiting_master_job: Optional[bool] = None,
+    replica_group_name: Optional[str] = None,
 ) -> JobModel:
+    assert not (registered and not ready), "registered=True with ready=False is invalid"
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = validate_json_extra_ignore(RunSpec, run.run_spec)
     job_specs = await get_job_specs_from_run_spec(
-        run_spec=run_spec, secrets={}, replica_num=replica_num
+        run_spec=run_spec,
+        secrets={},
+        replica_num=replica_num,
+        replica_group_name=replica_group_name,
     )
     if 0 <= job_num < len(job_specs):
         job_spec = job_specs[job_num]
@@ -482,6 +488,7 @@ async def create_job(
         disconnected_at=disconnected_at,
         probes=[],
         registered=registered,
+        ready=ready,
         waiting_master_job=waiting_master_job,
     )
     session.add(job)

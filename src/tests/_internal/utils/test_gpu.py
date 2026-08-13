@@ -1,9 +1,11 @@
+import gpuhunt
 import pytest
 
 from dstack._internal.utils.gpu import (
     convert_amd_gpu_name,
     convert_intel_accelerator_name,
     convert_nvidia_gpu_name,
+    detect_gpu_vendors_by_gpu_name,
 )
 
 
@@ -59,3 +61,37 @@ class TestConvertGpuName:
     )
     def test_convert_intel_accelerator_name(self, test_input, expected):
         assert convert_intel_accelerator_name(test_input) == expected
+
+
+class TestDetectGpuVendorsByGpuName:
+    @pytest.mark.parametrize(
+        ["name", "expected"],
+        [
+            ("A100", gpuhunt.AcceleratorVendor.NVIDIA),
+            ("MI300X", gpuhunt.AcceleratorVendor.AMD),
+            ("Gaudi2", gpuhunt.AcceleratorVendor.INTEL),
+            ("n300", gpuhunt.AcceleratorVendor.TENSTORRENT),
+            ("v5litepod-8", gpuhunt.AcceleratorVendor.GOOGLE),
+        ],
+    )
+    def test_detects_known_names(self, name: str, expected: gpuhunt.AcceleratorVendor):
+        assert detect_gpu_vendors_by_gpu_name(name) == {expected}
+
+    @pytest.mark.parametrize("name", ["mi300x", "MI300X", "Mi300X"])
+    def test_ignores_case(self, name: str):
+        assert detect_gpu_vendors_by_gpu_name(name) == {gpuhunt.AcceleratorVendor.AMD}
+
+    @pytest.mark.parametrize("name", ["v2-8", "V3-64", "v5litepod-8", "v6e-8"])
+    def test_detects_tpus_by_version_and_cores(self, name: str):
+        assert detect_gpu_vendors_by_gpu_name(name) == {gpuhunt.AcceleratorVendor.GOOGLE}
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "UNKNOWN1000",
+            "v3",  # a TPU version without the number of cores
+            "v3-x",  # a TPU version with a non-numeric number of cores
+        ],
+    )
+    def test_returns_empty_set_for_unknown_names(self, name: str):
+        assert detect_gpu_vendors_by_gpu_name(name) == set()

@@ -113,10 +113,6 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_head_proxy = rci.ssh_proxy
                 ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
             job_spec = get_job_spec(job)
-            if router_group is not None and job_spec.replica_group != router_group.name:
-                # Strict router-only: when a router is configured, the proxy should only be aware
-                # of router replicas.
-                continue
             replica = Replica(
                 id=job.id.hex,
                 app_port=get_service_port(job_spec, run_spec.configuration),

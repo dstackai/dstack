@@ -17,8 +17,7 @@ from dstack._internal.utils.path import FileContent
 
 
 @pytest.fixture
-def tunnel_mock(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(server_connection, "CONNECTIONS_DIR", tmp_path)
+def tunnel_mock(monkeypatch: pytest.MonkeyPatch):
     tunnel = MagicMock()
     tunnel.forwarded_sockets = []
     tunnel.reverse_forwarded_sockets = []
