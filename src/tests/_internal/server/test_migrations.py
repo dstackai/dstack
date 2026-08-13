@@ -6,7 +6,7 @@ from alembic.config import Config
 from alembic.util.exc import CommandError
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.postgres import PostgresContainer
 
 
 def test_sqlite_migrations(monkeypatch: pytest.MonkeyPatch):
