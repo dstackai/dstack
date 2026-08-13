@@ -278,6 +278,9 @@ $ dstack preset delete c83375b4
 
 </div>
 
+!!! info "Reference"
+    For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
+
 ## Troubleshooting
 
 To trace the agent's activity, pass `--debug` to `dstack preset create`:
@@ -292,15 +295,14 @@ $ dstack preset create -f preset.dstack.yml --debug
 
 The trace is written to `~/.dstack/presets/<id>/trace.jsonl` while the session runs. It contains the agent's messages and every tool call with its result.
 
-For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
+## Limitations
 
-!!! info "Limitations"
-    * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-    * Doesn't support PD disaggregation (coming soon)
-    * Presets are saved locally (a preset registry is coming soon)
-    * Doesn't support ranges for `concurrency`
+* Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
+* Doesn't support PD disaggregation (coming soon)
+* Presets are saved locally (a preset registry is coming soon)
+* Doesn't support ranges for `concurrency`
 
-    Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
+> Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 
 !!! info "What's next?"
     1. Learn how dstack [services](services.md) work
