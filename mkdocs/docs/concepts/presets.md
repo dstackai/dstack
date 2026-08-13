@@ -278,6 +278,20 @@ $ dstack preset delete c83375b4
 
 </div>
 
+## Troubleshooting
+
+To trace the agent's activity, pass `--debug` to `dstack preset create`:
+
+<div class="termy">
+
+```shell
+$ dstack preset create -f preset.dstack.yml --debug
+```
+
+</div>
+
+The trace is written to `~/.dstack/presets/<id>/trace.jsonl` while the session runs. It contains the agent's messages and every tool call with its result.
+
 For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
 !!! info "Limitations"
