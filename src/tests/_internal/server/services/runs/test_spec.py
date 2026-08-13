@@ -92,8 +92,12 @@ def _task_run_spec(
     resources: Optional[dict] = None,
     image: Optional[str] = None,
     docker: Optional[bool] = None,
+    groups: Optional[list[dict]] = None,
 ) -> RunSpec:
     conf: dict[str, Any] = {"type": "task", "commands": ["echo hello"]}
+    if groups is not None:
+        conf.pop("commands", None)
+        conf["groups"] = groups
     if resources is not None:
         conf["resources"] = resources
     if image is not None:
@@ -552,6 +556,40 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
         assert resources.cpu.arch == gpuhunt.CPUArchitecture.X86
 
 
+class TestSetRunSpecResourcesDefaultsNodeGroups:
+    def test_sets_defaults_for_every_node_group(self):
+        run_spec = _task_run_spec(
+            groups=[
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "MI300X"}},
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "GH200"}},
+                {"nodes": 1, "commands": ["echo"]},
+            ],
+        )
+
+        set_run_spec_resources_defaults(run_spec)
+
+        groups = run_spec.configuration.node_groups
+        assert [(g.resources.gpu.vendor, g.resources.cpu.arch) for g in groups] == [
+            (gpuhunt.AcceleratorVendor.AMD, gpuhunt.CPUArchitecture.X86),
+            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.ARM),
+            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.X86),
+        ]
+
+    def test_sets_defaults_for_top_level_resources(self):
+        # Top-level resources are unused when node groups are set, but still normalized
+        # so resubmitting the same configuration produces no spec diff.
+        run_spec = _task_run_spec(
+            groups=[{"nodes": 1, "commands": ["echo"]}],
+            resources={"gpu": "H100"},
+        )
+
+        set_run_spec_resources_defaults(run_spec)
+
+        resources = run_spec.configuration.resources
+        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert resources.cpu.arch == gpuhunt.CPUArchitecture.X86
+
+
 class TestValidateRunSpecGpuVendorAndImage:
     UNSUPPORTED_GPU_SPECS = ["amd", "MI300X", "intel", "Gaudi2", "tenstorrent", "n300"]
 
@@ -605,6 +643,26 @@ class TestValidateRunSpecGpuVendorAndImage:
 
         _validate(run_spec)
 
+    def test_reports_node_groups_requiring_image(self):
+        run_spec = _task_run_spec(
+            groups=[
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "MI300X"}},
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "H100"}},
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "n300"}},
+            ],
+        )
+
+        with pytest.raises(ServerClientError, match=re.escape("groups[0, 2]")):
+            _validate(run_spec)
+
+    def test_allows_node_group_with_task_level_image(self):
+        run_spec = _task_run_spec(
+            groups=[{"nodes": 1, "commands": ["echo"], "resources": {"gpu": "MI300X"}}],
+            image="rocm",
+        )
+
+        _validate(run_spec)
+
 
 class TestValidateRunSpecCpuArchAndImage:
     @pytest.mark.parametrize(
@@ -645,6 +703,26 @@ class TestValidateRunSpecCpuArchAndImage:
     def test_allows_replica_group_with_its_own_image(self):
         run_spec = _service_run_spec(
             replicas=[{"count": 1, "image": "ubuntu", "resources": {"cpu": "arm:2"}}],
+        )
+
+        _validate(run_spec)
+
+    def test_reports_node_groups_requiring_image(self):
+        run_spec = _task_run_spec(
+            groups=[
+                {"nodes": 1, "commands": ["echo"], "resources": {"cpu": "arm:2"}},
+                {"nodes": 1, "commands": ["echo"]},
+                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "GH200"}},
+            ],
+        )
+
+        with pytest.raises(ServerClientError, match=re.escape("groups[0, 2]")):
+            _validate(run_spec)
+
+    def test_allows_node_group_with_task_level_image(self):
+        run_spec = _task_run_spec(
+            groups=[{"nodes": 1, "commands": ["echo"], "resources": {"cpu": "arm:2"}}],
+            image="ubuntu",
         )
 
         _validate(run_spec)

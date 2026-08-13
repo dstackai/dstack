@@ -178,6 +178,14 @@ def set_run_spec_resources_defaults(run_spec: RunSpec) -> None:
                 image=image,
                 docker=docker,
             )
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        for node_group in configuration.node_groups:
+            _set_resources_defaults(
+                resources_spec=node_group.resources,
+                image=image,
+                docker=docker,
+            )
 
 
 def _set_resources_defaults(
@@ -231,6 +239,7 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
     configuration = run_spec.configuration
     vendors: set[gpuhunt.AcceleratorVendor] = set()
     invalid_replicas: list[int] = []
+    invalid_groups: list[int] = []
     if configuration.type == "service" and isinstance(configuration.replicas, list):
         for idx, replica_group in enumerate(configuration.replicas):
             image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
@@ -242,6 +251,17 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
             if _vendors:
                 vendors.update(_vendors)
                 invalid_replicas.append(idx)
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        for idx, node_group in enumerate(configuration.node_groups):
+            _vendors = _detect_gpu_vendors_requiring_image(
+                gpu_spec=node_group.resources.gpu,
+                image=image,
+                docker=docker,
+            )
+            if _vendors:
+                vendors.update(_vendors)
+                invalid_groups.append(idx)
     else:
         vendors = _detect_gpu_vendors_requiring_image(
             gpu_spec=configuration.resources.gpu,
@@ -256,6 +276,8 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
         )
         if invalid_replicas:
             msg = f"replicas{invalid_replicas}: {msg}"
+        elif invalid_groups:
+            msg = f"groups{invalid_groups}: {msg}"
         raise ServerClientError(msg)
 
 
@@ -305,6 +327,23 @@ def _validate_cpu_arch_and_image(run_spec: RunSpec) -> None:
             errors.append(f"replicas{invalid_replicas_without_image}: {image_msg}")
         if invalid_replicas_with_docker:
             errors.append(f"replicas{invalid_replicas_with_docker}: {docker_msg}")
+        if errors:
+            raise ServerClientError("\n".join(errors))
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        invalid_groups_without_image: list[int] = []
+        invalid_groups_with_docker: list[int] = []
+        for idx, node_group in enumerate(configuration.node_groups):
+            if node_group.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
+                if docker:
+                    invalid_groups_with_docker.append(idx)
+                elif image is None:
+                    invalid_groups_without_image.append(idx)
+        errors: list[str] = []
+        if invalid_groups_without_image:
+            errors.append(f"groups{invalid_groups_without_image}: {image_msg}")
+        if invalid_groups_with_docker:
+            errors.append(f"groups{invalid_groups_with_docker}: {docker_msg}")
         if errors:
             raise ServerClientError("\n".join(errors))
     elif configuration.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
