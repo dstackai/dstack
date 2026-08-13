@@ -146,6 +146,8 @@ filterwarnings = [
     # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
     # so they cannot creep back after the v2 migration.
     "error::pydantic.PydanticDeprecatedSince20",
+    # Remove or change to 3.11 once support for Python 3.10 is dropped.
+    "ignore:You are using a Python version \\(3.10:FutureWarning:^google\\.",
 ]
 
 [tool.tox]
