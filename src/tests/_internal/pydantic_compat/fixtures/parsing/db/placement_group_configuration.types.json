@@ -1,5 +1,0 @@
-{
-  "/": "PlacementGroupConfiguration",
-  "/backend": "BackendType",
-  "/placement_strategy": "PlacementStrategy"
-}

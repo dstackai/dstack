@@ -1,5 +1,0 @@
-{
-  "/": "GatewayComputeConfiguration",
-  "/backend": "BackendType",
-  "/certificate": "LetsEncryptGatewayCertificate"
-}

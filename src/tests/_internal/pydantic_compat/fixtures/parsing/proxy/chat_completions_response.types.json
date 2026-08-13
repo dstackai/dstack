@@ -1,6 +1,0 @@
-{
-  "/": "ChatCompletionsResponse",
-  "/choices/0": "ChatCompletionsChoice",
-  "/choices/0/message": "ChatMessage",
-  "/usage": "ChatCompletionsUsage"
-}

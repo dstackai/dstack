@@ -1,5 +1,0 @@
-{
-  "/": "InstanceHealthResponse",
-  "/dcgm": "DCGMHealthResponse",
-  "/dcgm/overall_health": "DCGMHealthResult"
-}

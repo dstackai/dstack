@@ -1,8 +1,0 @@
-{
-  "job_num": 0,
-  "job_name": "test-run-0-0",
-  "commands": ["/bin/bash", "-i", "-c", "echo hi"],
-  "env": {"A": "1"},
-  "image_name": "dstackai/base:latest",
-  "requirements": {"resources": {"cpu": "2..8", "memory": "16GB.."}}
-}

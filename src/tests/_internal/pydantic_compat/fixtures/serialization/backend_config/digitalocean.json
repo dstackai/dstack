@@ -1,8 +1,0 @@
-{
-  "project_name": "dstack",
-  "regions": [
-    "nyc3",
-    "ams3"
-  ],
-  "type": "digitalocean"
-}

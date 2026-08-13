@@ -1,9 +1,0 @@
-{
-  "configuration": {
-    "type": "volume",
-    "name": "my-volume",
-    "backend": "aws",
-    "region": "us-east-1",
-    "size": "100GB"
-  }
-}

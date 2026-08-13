@@ -1,5 +1,0 @@
-{
-  "url": "/proxy/services/main/llama-70b/",
-  "model": {"name": "llama-3.1-70b", "base_url": "https://inference.example.com/proxy/models/main", "type": "chat"},
-  "options": {"openai": {"model": {"type": "chat", "name": "llama-3.1-70b", "format": "openai", "prefix": "/v1"}}}
-}

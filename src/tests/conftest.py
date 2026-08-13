@@ -25,11 +25,6 @@ def pytest_configure(config):
         "markers", "windows: mark test to be run on Windows in addition to POSIX"
     )
     config.addinivalue_line("markers", "windows_only: mark test to be run on Windows only")
-    config.addinivalue_line(
-        "markers",
-        "pydantic_compat: mark test as a pydantic v1/v2 compat check to run only with"
-        " --pydantic-compat",
-    )
 
 
 def pytest_addoption(parser):
@@ -37,18 +32,11 @@ def pytest_addoption(parser):
     parser.addoption(
         "--runpostgres", action="store_true", default=False, help="Run tests with PostgreSQL"
     )
-    parser.addoption(
-        "--pydantic-compat",
-        action="store_true",
-        default=False,
-        help="Run the pydantic v1/v2 compat fixtures (src/tests/_internal/pydantic_compat)",
-    )
 
 
 def pytest_collection_modifyitems(config, items):
     skip_ui = pytest.mark.skip(reason="need --runui option to run")
     skip_postgres = pytest.mark.skip(reason="need --runpostgres option to run")
-    skip_pydantic_compat = pytest.mark.skip(reason="need --pydantic-compat option to run")
     is_windows = os.name == "nt"
     skip_posix = pytest.mark.skip(reason="requires POSIX")
     skip_windows = pytest.mark.skip(reason="requires Windows")
@@ -57,8 +45,6 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_ui)
         if not config.getoption("--runpostgres") and "postgres" in item.keywords:
             item.add_marker(skip_postgres)
-        if not config.getoption("--pydantic-compat") and "pydantic_compat" in item.keywords:
-            item.add_marker(skip_pydantic_compat)
         for_windows_only = "windows_only" in item.keywords
         for_windows = for_windows_only or "windows" in item.keywords
         if for_windows_only and not is_windows:
