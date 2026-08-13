@@ -376,7 +376,11 @@ async def _refetch_locked_run_for_pending(
                 ProjectModel.name,
             ),
         )
-        .options(contains_eager(RunModel.jobs, alias=job_alias))
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias).selectinload(
+                JobModel.service_replica_registrations
+            ),
+        )
         .options(
             joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
         )
