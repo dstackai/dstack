@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import StaticPool
 from sqlalchemy.ext.asyncio import create_async_engine
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.postgres import PostgresContainer
 
 from dstack._internal.server import settings
 from dstack._internal.server.db import Database, override_db
