@@ -661,48 +661,40 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 # TODO: Connect to gateway outside session
 async def get_or_add_gateway_connections(
-    session: AsyncSession, gateway_id: uuid.UUID
-) -> tuple[GatewayModel, List[GatewayConnection]]:
-    res = await session.execute(
-        select(GatewayModel)
-        .where(GatewayModel.id == gateway_id)
-        .options(joinedload(GatewayModel.gateway_compute))
-        .options(selectinload(GatewayModel.gateway_computes))
-    )
-    gateway = res.scalar_one_or_none()
-    if gateway is None:
-        raise GatewayError("Gateway not found")
-    computes = get_gateway_compute_models(gateway)
-    if not computes:
+    gateway_replicas: Sequence[GatewayComputeModel],
+) -> List[GatewayConnection]:
+    running_replicas = [r for r in gateway_replicas if r.status == GatewayReplicaStatus.RUNNING]
+    if not running_replicas:
         raise GatewayError("Gateway compute not found")
     connections: List[GatewayConnection] = []
-    for compute in computes:
-        if compute.ip_address is None:
-            logger.warning("Gateway replica %s has no ip_address", compute.id)
+    for replica in running_replicas:
+        if replica.ip_address is None:
+            logger.warning("Gateway replica %s has no ip_address", replica.id)
             raise GatewayError("Failed to connect to gateway")
         try:
             conn = await gateway_connections_pool.get_or_add(
-                hostname=compute.ip_address,
-                id_rsa=compute.ssh_private_key,
+                hostname=replica.ip_address,
+                id_rsa=replica.ssh_private_key,
             )
             connections.append(conn)
         except Exception as e:
-            logger.warning("Failed to connect to gateway %s: %s", compute.ip_address, e)
+            logger.warning("Failed to connect to gateway %s: %s", replica.ip_address, e)
             raise GatewayError("Failed to connect to gateway")
-    return gateway, connections
+    return connections
 
 
 async def get_combined_gateway_stats(
-    session: AsyncSession,
-    gateway_id: uuid.UUID,
+    gateway_replicas: Sequence[GatewayComputeModel],
     project_name: str,
     run_name: str,
 ) -> Optional[PerWindowStats]:
     """
-    Return stats for *run_name* aggregated across all replicas of *gateway_id*.
+    Return stats for *run_name* aggregated across all gateway replicas.
     """
     try:
-        _, connections = await get_or_add_gateway_connections(session, gateway_id)
+        # FIXME: once a gateway replica is scaled in, its connection is no longer available and its
+        # stats are lost, potentially resulting in incorrect service scaling decisions.
+        connections = await get_or_add_gateway_connections(gateway_replicas)
     except GatewayError:
         return None
     per_replica: list[PerWindowStats] = []

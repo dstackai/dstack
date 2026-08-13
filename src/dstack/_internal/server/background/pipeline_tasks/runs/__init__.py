@@ -6,7 +6,14 @@ from typing import Optional, Sequence
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
+from sqlalchemy.orm import (
+    aliased,
+    contains_eager,
+    joinedload,
+    load_only,
+    selectinload,
+    with_loader_criteria,
+)
 
 import dstack._internal.server.background.pipeline_tasks.runs.active as active
 import dstack._internal.server.background.pipeline_tasks.runs.pending as pending
@@ -38,7 +45,10 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_combined_gateway_stats
+from dstack._internal.server.services.gateways import (
+    get_combined_gateway_stats,
+    get_gateway_compute_models,
+)
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -322,9 +332,11 @@ async def _load_pending_context(
     run_spec = get_run_spec(run_model)
 
     gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
+    if run_spec.configuration.type == "service" and run_model.gateway is not None:
         gateway_stats = await get_combined_gateway_stats(
-            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+            get_gateway_compute_models(run_model.gateway),
+            run_model.project.name,
+            run_model.run_name,
         )
 
     return pending.PendingContext(
@@ -365,6 +377,13 @@ async def _refetch_locked_run_for_pending(
             ),
         )
         .options(contains_eager(RunModel.jobs, alias=job_alias))
+        .options(
+            joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
+        )
+        .options(
+            joinedload(RunModel.gateway).joinedload(GatewayModel.gateway_compute),
+        )
+        .options(with_loader_criteria(GatewayComputeModel, GatewayComputeModel.deleted == False))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -507,9 +526,11 @@ async def _load_active_context(
     run_spec = get_run_spec(run_model)
 
     gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
+    if run_spec.configuration.type == "service" and run_model.gateway is not None:
         gateway_stats = await get_combined_gateway_stats(
-            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+            get_gateway_compute_models(run_model.gateway),
+            run_model.project.name,
+            run_model.run_name,
         )
 
     return active.ActiveContext(
@@ -561,15 +582,12 @@ async def _refetch_locked_run_for_active(
         )
         .options(selectinload(RunModel.service_registrations))
         .options(
-            joinedload(RunModel.gateway)
-            .selectinload(GatewayModel.gateway_computes)
-            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+            joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
         )
         .options(
-            joinedload(RunModel.gateway)
-            .joinedload(GatewayModel.gateway_compute)
-            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+            joinedload(RunModel.gateway).joinedload(GatewayModel.gateway_compute),
         )
+        .options(with_loader_criteria(GatewayComputeModel, GatewayComputeModel.deleted == False))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
