@@ -298,6 +298,24 @@ def get_job_spec(job_model: JobModel) -> JobSpec:
     return validate_json_extra_ignore(JobSpec, job_model.job_spec_data)
 
 
+def job_spec_updatable_in_place(old_job_spec: JobSpec, new_job_spec: JobSpec) -> bool:
+    """
+    Check if a job running with `old_job_spec` already satisfies `new_job_spec`, that is,
+    the job can be marked as up-to-date without redeployment.
+    """
+    if old_job_spec == new_job_spec:
+        return True
+    # Older servers always resolved `cpu.arch` to a specific value. Now an unset `arch` means
+    # "any architecture supported by the image", so a specific value -> None change only widens
+    # the requirements -- an already provisioned job still satisfies them. Without this check,
+    # re-applying an unchanged configuration after a server upgrade would trigger redeployment.
+    if new_job_spec.requirements.resources.cpu.arch is not None:
+        return False
+    new_job_spec = new_job_spec.model_copy(deep=True)
+    new_job_spec.requirements.resources.cpu.arch = old_job_spec.requirements.resources.cpu.arch
+    return old_job_spec == new_job_spec
+
+
 def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 

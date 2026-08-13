@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional
 
+import gpuhunt
 from cachetools import TTLCache, cached
 
 from dstack._internal import settings
@@ -55,7 +56,7 @@ from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import (
     ImageConfig,
     apply_server_docker_defaults,
-    get_image_config,
+    get_image_config_and_cpu_architectures,
 )
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
@@ -68,6 +69,19 @@ logger = get_logger(__name__)
 
 DSTACK_DIR = "/dstack"
 DSTACK_PROFILE_PATH = f"{DSTACK_DIR}/profile"
+
+# A non-existent image name used to signal that the image registry must never be requested
+# and some dummy defaults should be used instead.
+# As a job with such an image cannot be started, this special value only makes sense
+# when used for offer collection (via `/runs/get_plan` with `for_offers_only`), not
+# regular run planning/submission.
+# Specifying a single "magic" value is still hacky but better than requiring clients to set
+# an ever-growing list of optional configuration fields such as `commands`/`entrypoint`,
+# `user`, `resources.cpu.arch`.
+# In addition, it has a special effect on `resources.cpu.arch` -- unlike unset image,
+# which defaults the arch to x86-only (as the default dstack image doesn't support ARM),
+# this dummy image leaves the arch unset.
+DUMMY_IMAGE_NAME = "scratch"
 
 
 def get_default_python_verison() -> str:
@@ -98,6 +112,7 @@ class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
     _image_config: Optional[ImageConfig] = None
+    _image_cpu_architectures: Optional[set[gpuhunt.CPUArchitecture]] = None
     # JobSSHKey should be shared for all jobs in a replica for inter-node communication.
     _job_ssh_key: Optional[JobSSHKey] = None
 
@@ -139,8 +154,17 @@ class JobConfigurator(ABC):
         pass
 
     async def _get_image_config(self) -> ImageConfig:
+        image_config, _ = await self._get_image_config_and_cpu_architectures()
+        return image_config
+
+    async def _get_image_config_and_cpu_architectures(
+        self,
+    ) -> tuple[ImageConfig, set[gpuhunt.CPUArchitecture]]:
         if self._image_config is not None:
-            return self._image_config
+            assert self._image_cpu_architectures is not None
+            return self._image_config, self._image_cpu_architectures
+        image_name = self._image_name()
+        assert image_name != DUMMY_IMAGE_NAME
         interpolate = VariablesInterpolator({"secrets": self.secrets}).interpolate_or_error
         registry_auth = self.run_spec.configuration.registry_auth
         if registry_auth is not None:
@@ -151,14 +175,15 @@ class JobConfigurator(ABC):
                 )
             except InterpolatorError as e:
                 raise ServerClientError(e.args[0])
-        image_name, registry_auth = apply_server_docker_defaults(self._image_name(), registry_auth)
-        image_config = await run_async(
-            _get_image_config,
+        image_name, registry_auth = apply_server_docker_defaults(image_name, registry_auth)
+        image_config, cpu_architectures = await run_async(
+            _get_image_config_and_cpu_architectures,
             image_name,
             registry_auth,
         )
         self._image_config = image_config
-        return image_config
+        self._image_cpu_architectures = cpu_architectures
+        return image_config, cpu_architectures
 
     async def _get_job_spec(
         self,
@@ -184,7 +209,7 @@ class JobConfigurator(ABC):
             stop_duration=self._stop_duration(),
             utilization_policy=self._utilization_policy(),
             registry_auth=self._registry_auth(),
-            requirements=self._requirements(jobs_per_replica),
+            requirements=await self._requirements(jobs_per_replica),
             retry=self._retry(),
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
@@ -219,6 +244,9 @@ class JobConfigurator(ABC):
             entrypoint = [self._shell(), "-i", "-c"]
             dstack_image_commands = self._dstack_image_commands()
             commands = [_join_shell_commands(dstack_image_commands + shell_commands)]
+        elif self._image_name() == DUMMY_IMAGE_NAME:
+            entrypoint = []
+            commands = [":"]
         else:  # custom docker image without commands
             image_config = await self._get_image_config()
             entrypoint = image_config.entrypoint or []
@@ -299,6 +327,8 @@ class JobConfigurator(ABC):
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user
         if user is None and self.run_spec.configuration.image is not None:
+            if self.run_spec.configuration.image == DUMMY_IMAGE_NAME:
+                return None
             image_config = await self._get_image_config()
             user = image_config.user
         if user is None:
@@ -335,13 +365,29 @@ class JobConfigurator(ABC):
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth
 
-    def _requirements(self, jobs_per_replica: int) -> Requirements:
+    async def _requirements(self, jobs_per_replica: int) -> Requirements:
         resources = self.run_spec.configuration.resources
+        image = self.run_spec.configuration.image
         if self.run_spec.configuration.type == "service":
             for group in self.run_spec.configuration.replica_groups:
                 if group.name == self.replica_group_name:
                     resources = group.resources
+                    if group.image is not None:
+                        image = group.image
                     break
+        resources = resources.model_copy(deep=True)
+        if resources.cpu.arch is None and image != DUMMY_IMAGE_NAME:
+            if image is None:
+                # dstackai/base or dstackai/dind image, both don't support ARM
+                resources.cpu.arch = gpuhunt.CPUArchitecture.X86
+            else:
+                _, cpu_architectures = await self._get_image_config_and_cpu_architectures()
+                if len(cpu_architectures) == 1:
+                    resources.cpu.arch = next(iter(cpu_architectures))
+                # len(cpu_architectures) > 1 => multi-arch image, keep CPUSpec.arch unset.
+                # In the requirements, unset arch means "any architecture supported by the
+                # image", unlike the run configuration, where unset arch means "not specified,
+                # resolve it here"
         spot_policy = self._spot_policy()
         return Requirements(
             resources=resources,
@@ -514,10 +560,15 @@ def _join_shell_commands(commands: List[str]) -> str:
     cache=TTLCache(maxsize=2048, ttl=80),
     lock=threading.Lock(),
 )
-def _get_image_config(image: str, registry_auth: Optional[RegistryAuth]) -> ImageConfig:
+def _get_image_config_and_cpu_architectures(
+    image: str, registry_auth: Optional[RegistryAuth]
+) -> tuple[ImageConfig, set[gpuhunt.CPUArchitecture]]:
     try:
-        return get_image_config(image, registry_auth).config
+        image_config, cpu_architectures = get_image_config_and_cpu_architectures(
+            image, registry_auth
+        )
     except DockerRegistryError as e:
         raise ServerClientError(
             f"Error pulling configuration for image {image!r} from the docker registry: {e}"
         )
+    return image_config.config, cpu_architectures

@@ -9,6 +9,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.server.services.jobs.configurators.base import (
+    DUMMY_IMAGE_NAME,
     JobConfigurator,
     get_default_image,
 )
@@ -94,6 +95,8 @@ class ServiceJobConfigurator(JobConfigurator):
         if self.run_spec.configuration.user is None:
             group = self._current_replica_group()
             if group is not None and group.image is not None:
+                if group.image == DUMMY_IMAGE_NAME:
+                    return None
                 image_config = await self._get_image_config()
                 if image_config.user is None:
                     return None

@@ -31,6 +31,7 @@ from dstack._internal.server.services.jobs import (
     get_job_specs_from_run_spec,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
+    job_spec_updatable_in_place,
 )
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
 from dstack._internal.server.services.runs.replicas import (
@@ -515,7 +516,7 @@ async def _build_deployment_update_map(
         can_update_all_jobs = True
         for old_job_model, new_job_spec in zip(job_models, new_job_specs):
             old_job_spec = get_job_spec(old_job_model)
-            if new_job_spec != old_job_spec:
+            if not job_spec_updatable_in_place(old_job_spec, new_job_spec):
                 can_update_all_jobs = False
                 break
         if can_update_all_jobs:

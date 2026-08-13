@@ -1,7 +1,9 @@
+import contextlib
 import re
 from dataclasses import dataclass
 from typing import List, Optional
 
+import gpuhunt
 import requests
 from dxf import DXF
 from dxf.exceptions import DXFError
@@ -18,7 +20,6 @@ from dstack._internal.utils.docker import (
     parse_image_name,
 )
 
-DEFAULT_PLATFORM = "linux/amd64"
 MAX_CONFIG_OBJECT_SIZE = 2**22  # 4 MiB
 REGISTRY_REQUEST_TIMEOUT = 20
 
@@ -50,6 +51,8 @@ class ImageConfig(CoreModel):
 
 
 class ImageConfigObject(CoreModel):
+    architecture: str
+    os: str
     config: ImageConfig = ImageConfig()
 
     @field_validator("config", mode="before")
@@ -66,7 +69,9 @@ class ImageManifest(CoreModel):
     config: ImageManifestConfigField
 
 
-def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> ImageConfigObject:
+def get_image_config_and_cpu_architectures(
+    image_name: str, registry_auth: Optional[RegistryAuth]
+) -> tuple[ImageConfigObject, set[gpuhunt.CPUArchitecture]]:
     image = parse_image_name(image_name)
 
     registry = image.registry
@@ -81,21 +86,54 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
     )
 
     with registry_client:
+        cpu_architectures: Optional[set[gpuhunt.CPUArchitecture]] = None
         try:
-            manifest_resp = registry_client.get_manifest(
-                alias=image.digest or image.tag, platform=DEFAULT_PLATFORM
-            )
-            assert isinstance(manifest_resp, str), (
-                "get_manifest() returns the manifest JSON when `platform` is given"
-            )
-            manifest = validate_json_extra_ignore(ImageManifest, manifest_resp)
+            # FIXME: get_manifest() makes N+1 requests when platform is not specified and alias
+            # points to an image index, where N is a number of images in the index,
+            # e.g., debian has 8 os/architecture[/variant] combinations
+            manifest_resp = registry_client.get_manifest(alias=image.digest or image.tag)
+            if isinstance(manifest_resp, dict):
+                # Image index (OCI) aka Manifest list (Docker) -- multi os/arch higher-level object
+                manifests: dict[gpuhunt.CPUArchitecture, ImageManifest] = {}
+                for platform, manifest_raw in manifest_resp.items():
+                    # os/architecture[/variant]
+                    os_name, architecture, *_ = platform.split("/")
+                    if not _os_supported(os_name):
+                        continue
+                    cpu_arch = _cpu_arch_from_string(architecture)
+                    if cpu_arch is not None:
+                        manifests[cpu_arch] = validate_json_extra_ignore(
+                            ImageManifest, manifest_raw
+                        )
+                # ImageConfigs (User/Cmd/Entrypoint) may be different for different images
+                # within the same index; we assume that it's not the case but at least pick
+                # the manifest deterministically
+                for cpu_arch in [gpuhunt.CPUArchitecture.X86, gpuhunt.CPUArchitecture.ARM]:
+                    with contextlib.suppress(KeyError):
+                        manifest = manifests[cpu_arch]
+                        break
+                else:
+                    raise _no_supported_platforms_error(image_name)
+                cpu_architectures = set(manifests)
+            else:
+                # Image manifest -- one specific os/arch combination
+                manifest = validate_json_extra_ignore(ImageManifest, manifest_resp)
+
             config_stream = registry_client.pull_blob(manifest.config.digest)
             config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)  # type: ignore[arg-type]
             if config_resp is None:
                 raise DockerRegistryError(
                     f"Image config object exceeds the size limit of {MAX_CONFIG_OBJECT_SIZE} bytes"
                 )
-            return validate_json_extra_ignore(ImageConfigObject, config_resp)
+            image_config = validate_json_extra_ignore(ImageConfigObject, config_resp)
+
+            if cpu_architectures is None:
+                cpu_arch = _cpu_arch_from_string(image_config.architecture)
+                if not _os_supported(image_config.os) or cpu_arch is None:
+                    raise _no_supported_platforms_error(image_name)
+                cpu_architectures = {cpu_arch}
+
+            return image_config, cpu_architectures
 
         except (DXFError, requests.RequestException, ValidationError) as e:
             raise DockerRegistryError(e)
@@ -130,3 +168,19 @@ def is_valid_docker_volume_target(path: str) -> bool:
     if path.endswith("/") and path != "/":
         return False
     return DOCKER_TARGET_PATH_PATTERN.match(path) is not None
+
+
+def _cpu_arch_from_string(architecture: str) -> Optional[gpuhunt.CPUArchitecture]:
+    if architecture == "amd64":
+        return gpuhunt.CPUArchitecture.X86
+    if architecture == "arm64":
+        return gpuhunt.CPUArchitecture.ARM
+    return None
+
+
+def _os_supported(os_name: str) -> bool:
+    return os_name == "linux"
+
+
+def _no_supported_platforms_error(image_name: str) -> DockerRegistryError:
+    return DockerRegistryError(f"No supported OS/architectures found: {image_name!r}")

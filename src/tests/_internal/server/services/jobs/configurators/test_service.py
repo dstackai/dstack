@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+import gpuhunt
 import pytest
 
 from dstack._internal import settings
@@ -295,8 +296,9 @@ class TestPerGroupOverrides:
         """When a group sets its own `image`, _user() queries that image's config."""
         image_config = ImageConfig.model_validate({"User": "nginx", "Entrypoint": None, "Cmd": []})
         monkeypatch.setattr(
-            "dstack._internal.server.services.jobs.configurators.base._get_image_config",
-            Mock(return_value=image_config),
+            "dstack._internal.server.services.jobs.configurators.base"
+            "._get_image_config_and_cpu_architectures",
+            Mock(return_value=(image_config, {gpuhunt.CPUArchitecture.X86})),
         )
         run_spec = _make_run_spec(
             replicas=[
@@ -316,7 +318,8 @@ class TestPerGroupOverrides:
         """`docker: true` should not trigger an image-config registry call."""
         mock_get_image_config = Mock()
         monkeypatch.setattr(
-            "dstack._internal.server.services.jobs.configurators.base._get_image_config",
+            "dstack._internal.server.services.jobs.configurators.base"
+            "._get_image_config_and_cpu_architectures",
             mock_get_image_config,
         )
         run_spec = _make_run_spec(

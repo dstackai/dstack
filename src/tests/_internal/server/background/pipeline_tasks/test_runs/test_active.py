@@ -3,6 +3,7 @@ import uuid
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
+import gpuhunt
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -945,6 +946,71 @@ class TestRunActiveWorker:
 
         await session.refresh(job)
         assert job.deployment_num == 1
+
+    async def test_service_in_place_deployment_bump_on_cpu_arch_widening(
+        self, test_db, session: AsyncSession, worker: RunWorker, image_config_mock
+    ) -> None:
+        """
+        A replica submitted when `cpu.arch` was always resolved to a specific value is not
+        redeployed after the arch becomes unset (`any arch supported by the image`).
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                image="debian",
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        # `image_config_mock` reports a single-arch image, so the job spec gets `arch: x86`
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=True,
+            ready=True,
+        )
+        assert get_job_spec(job).requirements.resources.cpu.arch == gpuhunt.CPUArchitecture.X86
+        lock_run(run)
+        await session.commit()
+
+        # The same image now reports both architectures, so the new job spec leaves `arch` unset
+        with patch(
+            "dstack._internal.server.services.jobs.configurators.base"
+            "._get_image_config_and_cpu_architectures",
+            return_value=(
+                image_config_mock,
+                {gpuhunt.CPUArchitecture.X86, gpuhunt.CPUArchitecture.ARM},
+            ),
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        session.expire_all()
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        res = await session.execute(select(JobModel).where(JobModel.run_id == run.id))
+        jobs = list(res.scalars().all())
+        # No surge replica created, the existing one is marked as up-to-date
+        assert len(jobs) == 1
+        assert jobs[0].id == job.id
+        assert jobs[0].status == JobStatus.RUNNING
+        assert jobs[0].deployment_num == 1
 
     async def test_service_rolling_deployment_scale_up(
         self, test_db, session: AsyncSession, worker: RunWorker
