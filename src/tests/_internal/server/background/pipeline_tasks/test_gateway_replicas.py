@@ -1112,6 +1112,96 @@ class TestGatewayReplicaWorkerRunningStateSync:
             )
         ).scalar_one_or_none() is None
 
+    async def test_unregisters_replicas_of_dangling_service_without_extra_gateway_call(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        compute = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            backend_id=backend.id,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        # A finished run whose service and replica are still (erroneously)
+        # registered on the gateway, including a stale DB registration record
+        # left over from before the run finished.
+        run, job = await self._create_service_run_and_job(
+            session,
+            project,
+            repo,
+            user,
+            gateway,
+            run_name="dangling-service",
+            run_status=RunStatus.TERMINATED,
+            job_status=JobStatus.TERMINATED,
+            job_registered=False,
+        )
+        stale_service_registration = ServiceRegistrationModel(
+            run_id=run.id, gateway_replica_id=compute.id, is_registered=True
+        )
+        stale_replica_registration = ServiceReplicaRegistrationModel(
+            job_id=job.id, gateway_replica_id=compute.id, is_registered=True
+        )
+        session.add_all([stale_service_registration, stale_replica_registration])
+        _lock_compute(compute)
+        await session.commit()
+
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = [
+            ServiceListItem(
+                id=run.id.hex,
+                project_name=project.name,
+                run_name="dangling-service",
+                replicas=[ServiceListReplicaItem(id=job.id.hex)],
+            ),
+        ]
+
+        await worker.process(_compute_to_pipeline_item(compute))
+
+        client_mock.unregister_service.assert_called_once_with(
+            project=project.name, run_name="dangling-service"
+        )
+        # The replica is implicitly unregistered along with the service - no
+        # separate unregister_replica call, which would fail anyway since the
+        # service is already gone.
+        client_mock.unregister_replica.assert_not_called()
+
+        # Both registration records are dropped in this same tick, rather than
+        # being kept around as `is_registered=True` until the next tick.
+        assert (
+            await session.execute(
+                select(ServiceRegistrationModel).where(
+                    ServiceRegistrationModel.id == stale_service_registration.id,
+                )
+            )
+        ).scalar_one_or_none() is None
+        assert (
+            await session.execute(
+                select(ServiceReplicaRegistrationModel).where(
+                    ServiceReplicaRegistrationModel.id == stale_replica_registration.id,
+                )
+            )
+        ).scalar_one_or_none() is None
+
+        events = await list_events(session)
+        assert {e.message for e in events} == {
+            f"Service unregistered from gateway replica {compute.replica_num}",
+            f"Service replica unregistered from gateway replica {compute.replica_num}",
+        }
+
     async def test_no_gateway_calls_when_state_already_in_sync(
         self,
         test_db,

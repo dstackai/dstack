@@ -889,7 +889,11 @@ async def _perform_state_sync(
                 service_ref.project_name,
                 service_ref.run_name,
             )
+        # Service replicas implicitly unregistered along with the service
+        result.unregistered_replicas.update(plan.unregister_replicas.get(service_ref, set()))
     for service_ref, replica_ids in plan.unregister_replicas.items():
+        if service_ref.id in result.unregistered_services:
+            continue  # already unregistered along with the service
         for replica_id in replica_ids:
             logger.debug(
                 "%s replica %d: unregistering replica %s for service %s/%s",
@@ -1513,6 +1517,9 @@ def _plan_state_sync(
             plan.unregister_replicas[service_ref] = currently_registered_job_ids - expected_job_ids
         else:
             plan.unregister_services.add(service_ref)
+            plan.unregister_replicas[service_ref] = {
+                uuid.UUID(replica.id) for replica in service.replicas
+            }
 
     for run_id in expected_run_ids - currently_registered_run_ids:
         plan.register_services.add(run_id)
