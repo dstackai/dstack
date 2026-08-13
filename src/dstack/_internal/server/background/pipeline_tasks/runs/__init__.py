@@ -381,6 +381,7 @@ async def _refetch_locked_run_for_pending(
                 JobModel.service_replica_registrations
             ),
         )
+        .options(selectinload(RunModel.service_registrations))
         .options(
             joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
         )
@@ -453,6 +454,9 @@ async def _apply_pending_result(
             run_id=item.id,
             new_job_models=result.new_job_models,
         )
+        # Set termination_reason on the model so emit_run_status_change_event can read it.
+        if "termination_reason" in result.run_update_map:
+            context.run_model.termination_reason = result.run_update_map["termination_reason"]
         emit_run_status_change_event(
             session=session,
             run_model=context.run_model,

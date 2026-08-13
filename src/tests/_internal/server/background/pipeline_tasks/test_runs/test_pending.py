@@ -8,15 +8,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import ScalingSpec, ServiceConfiguration
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
     RunStatus,
+    RunTerminationReason,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import JobModel, ServiceRegistrationModel
 from dstack._internal.server.testing.common import (
+    create_backend,
+    create_gateway,
+    create_gateway_compute,
     create_job,
     create_project,
     create_repo,
@@ -362,3 +367,60 @@ class TestRunPendingWorker:
         res = await session.execute(select(JobModel).where(JobModel.run_id == run.id))
         jobs = list(res.scalars().all())
         assert len(jobs) == 0
+
+    async def test_terminates_run_on_gateway_registration_failure(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(port=80, image="ubuntu"),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+            status=RunStatus.PENDING,
+            resubmission_attempt=0,
+            next_triggered_at=None,
+            gateway=gateway,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute.id,
+                is_registered=False,
+                register_attempt=3,
+                register_status_message="Connection refused",
+            )
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.GATEWAY_ERROR
+        assert run.lock_token is None
