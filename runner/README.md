@@ -9,7 +9,7 @@ For overview of `dstack-shim` and `dstack-runner`, see [/contributing/RUNNER-AND
 Run shim and runner tests on any OS inside a Docker container:
 
 ```shell
-just test-runner-in-container
+just test-in-container
 ```
 
 ## Running locally (standalone)
@@ -55,27 +55,33 @@ You can test the built shim and runner with `dstack` using standard backends (in
 > [!NOTE]
 > To run with standard backends, both the runner and shim must be built for linux.
 
-Build the runner and shim and upload them to S3 using `just` (see [`justfile`](justfile)).
+Build the runner and shim and upload them to S3 using `just` (see [`.justfile`](.justfile)).
 
 > [!IMPORTANT]
-> Before running any `just` commands that upload to S3, you must set the following environment variables:
+> Before running any `just` commands that upload to S3, configure the upload via environment variables:
 >
 > ```shell
 > export DSTACK_SHIM_UPLOAD_VERSION="your-version"
 > export DSTACK_SHIM_UPLOAD_S3_BUCKET="your-bucket"
+> export DSTACK_SHIM_BUILD_ARCH="arm64"  # Defaults to amd64 if not set
 > ```
 >
-> These variables are required and must be set before running any upload commands.
+> `DSTACK_SHIM_UPLOAD_VERSION` and `DSTACK_SHIM_UPLOAD_S3_BUCKET` are required and must be set before
+> running any upload commands. `DSTACK_SHIM_BUILD_ARCH` is optional.
+>
+> Set the target architecture via `DSTACK_SHIM_BUILD_ARCH`, not via `just upload --arch ...` — the
+> download URLs below are derived from the environment variable, so `--arch` would upload to one
+> architecture while the URLs point at another.
 
 ```shell
-just upload-runner
+just upload
 ```
 
 To use the built shim and runner with the `dstack` server, pass the URLs via `DSTACK_SHIM_DOWNLOAD_URL` and `DSTACK_RUNNER_DOWNLOAD_URL`:
 
 ```shell
-export DSTACK_SHIM_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-shim-linux-amd64"
-export DSTACK_RUNNER_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-runner-linux-amd64"
+export DSTACK_SHIM_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-shim-linux-${DSTACK_SHIM_BUILD_ARCH:-amd64}"
+export DSTACK_RUNNER_DOWNLOAD_URL="https://${DSTACK_SHIM_UPLOAD_S3_BUCKET}.s3.amazonaws.com/${DSTACK_SHIM_UPLOAD_VERSION}/binaries/dstack-runner-linux-${DSTACK_SHIM_BUILD_ARCH:-amd64}"
 
 dstack server --log-level=debug
 ```

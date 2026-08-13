@@ -11,12 +11,15 @@
 # * website/.justfile – Building and previewing the React landing page
 # * .tox.justfile – Running Python tests via tox
 
-# Run tests via tox
-mod tox '.tox.justfile'
+set minimum-version := '1.55.0'
+
+[doc("Building and uploading dstack runner and shim")]
+mod runner "runner/.justfile"
+
+[doc("Running Python tests via tox")]
+mod tox ".tox.justfile"
 
 set allow-duplicate-recipes
-
-import "runner/.justfile"
 
 import "frontend/.justfile"
 
