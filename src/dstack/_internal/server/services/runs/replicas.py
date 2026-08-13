@@ -160,8 +160,7 @@ def has_out_of_date_replicas(run: RunModel, group_filter: Optional[str] = None) 
 def is_replica_receiving_traffic(run_model: RunModel, jobs: list[JobModel]) -> bool:
     # Only job_num=0 is supposed to receive service requests
     job = jobs[0]
-    if not job.ready:
-        # waiting for probes to pass
+    if not job.ready or job.status != JobStatus.RUNNING:
         return False
     if not job.registered:
         # served by the service's router replica
