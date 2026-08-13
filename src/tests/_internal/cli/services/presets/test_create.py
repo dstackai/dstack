@@ -717,6 +717,36 @@ class TestBuildConstraints:
             "env": ["HF_TOKEN"],
         }
 
+    def test_renders_custom_dataset_without_request_shape(self):
+        configuration = PresetConfiguration(
+            name="qwen",
+            model={"base": "Qwen/Qwen3-32B"},
+            min_context_length=32768,
+            max_ttft=5000,
+            trials=3,
+            concurrency=8,
+            dataset="spec_bench",
+        )
+
+        text = _build_constraints(
+            configuration=configuration,
+            build_name="qwen-abc123",
+            allowed_fleets=("gpu-fleet",),
+        )
+
+        assert json.loads(text) == {
+            "run_name_prefix": "qwen-abc123",
+            "model": {"base": "Qwen/Qwen3-32B"},
+            "min_context_length": 32768,
+            "max_ttft": 5000,
+            "trials_num": 3,
+            "concurrency": 8,
+            "dataset": "spec_bench",
+            "baseline": True,
+            "fleets": ["gpu-fleet"],
+            "env": [],
+        }
+
     def test_renders_configured_values(self):
         configuration = PresetConfiguration(
             name="qwen",

@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.configurations import DEFAULT_DATASET, PresetConfiguration
 from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.models.presets import (
     Preset,
@@ -113,6 +113,12 @@ def build_verified_preset(
     assert report.model is not None
     assert report.context_length is not None
     assert report.benchmark is not None
+    # Only when a dataset was requested: a `random` session is never told the
+    # field exists, so whatever it reports there means nothing.
+    requested_dataset = preset_configuration.effective_dataset
+    if requested_dataset != DEFAULT_DATASET:
+        if report.benchmark.workload.dataset != requested_dataset:
+            raise CLIError("Claude final benchmark dataset does not match the requested dataset")
     if preset_configuration.model.allows_variant_selection:
         if report.base != preset_configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the requested model")

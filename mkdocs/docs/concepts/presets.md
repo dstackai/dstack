@@ -136,41 +136,6 @@ Alternatively, pass `--fleet` to `dstack preset create` or `dstack preset apply`
     repo: Qwen/Qwen2.5-7B-Instruct
     ```
 
-### Shared prefix
-
-By default every request is unique, so the cache hit rate is near zero. Set `shared_prefix_tokens` to control how much of each request the serving framework can serve from its prefix cache.
-
-<div editor-title="preset.dstack.yml">
-
-```yaml
-input_tokens: 8192
-output_tokens: 1024
-
-# Roughly 90% of prompt tokens can be served from cache
-shared_prefix_tokens: 7360
-```
-
-</div>
-
-The `shared_prefix_tokens` value is the part of `input_tokens` that is identical across requests, such as a system prompt or conversation history, and must be less than `input_tokens`.
-
-### Prompt
-
-The `prompt` property is optional. Set it to guide the agent with custom objectives, target metrics, or an experimentation approach. It accepts inline text or a file `path`.
-
-<div editor-title="preset.dstack.yml">
-
-```yaml
-prompt: |
-  Optimize for the lowest TTFT at concurrency 32. Consider FP8 quantization.
-```
-
-</div>
-
-### Baseline
-
-By default, the first trial is a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts. Set `baseline: false` to make every trial an optimization attempt.
-
 ### Previous sessions
 
 Set `previous` to a list of preset IDs to give the agent the results of earlier creation sessions. It analyzes what they tried and how it worked, and aims to improve on them instead of rediscovering it.
@@ -186,7 +151,52 @@ previous:
 
 Alternatively, pass `--previous` (repeatable) to `dstack preset create`.
 
-In this case, the baseline trial reproduces the best comparable previous result to confirm it still holds before optimizing further.
+### Prompt
+
+Set `prompt` to steer what the agent explores: which frameworks or model variants to try, or how deep to go before settling. It accepts inline text or a file `path`. Constraints such as `concurrency` and `max_ttft` can't be changed this way.
+
+<div editor-title="preset.dstack.yml">
+
+```yaml
+prompt: |
+  Profile the engine before each trial and report how far it is from the
+  memory-bandwidth roofline. While that gap is large, prefer patching the
+  serving framework over tuning flags.
+```
+
+</div>
+
+### Dataset
+
+The requests every benchmark measures.
+
+=== "Random"
+
+    By default, benchmarks use synthetic prompts shaped by `input_tokens` and `output_tokens`. Set `shared_prefix_tokens` to make part of every request identical, such as a system prompt or conversation history, so the serving framework can serve it from its prefix cache. It must be less than `input_tokens`.
+
+    ```yaml
+    input_tokens: 8192
+    output_tokens: 1024
+
+    # Roughly 90% of prompt tokens can be served from cache
+    shared_prefix_tokens: 7360
+    ```
+
+=== "Custom"
+
+    Set `dataset` to benchmark on real text instead: a dataset the benchmark tool supports, or a Hugging Face dataset ID.
+
+    ```yaml
+    dataset: sharegpt
+    ```
+
+    The dataset provides the requests, so `input_tokens`, `output_tokens`, and `shared_prefix_tokens` can't be set with it, and the preset records the measured means. A gated dataset requires `HF_TOKEN` in `env`.
+
+### Baseline
+
+By default, the first trial is a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts. Set `baseline: false` to make every trial an optimization attempt.
+
+When the session builds on `previous`, the baseline trial reproduces the best comparable previous result instead, to confirm it still holds before optimizing further.
 
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
@@ -268,16 +278,31 @@ $ dstack preset delete c83375b4
 
 </div>
 
-For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
+!!! info "Reference"
+    For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
-!!! info "Limitations"
-    * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-    * Doesn't support PD disaggregation (coming soon)
-    * Presets are saved locally (a preset registry is coming soon)
-    * Doesn't allow a custom dataset; always uses `random`
-    * Doesn't support ranges for `concurrency`
+## Troubleshooting
 
-    Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
+To trace the agent's activity, pass `--debug` to `dstack preset create`:
+
+<div class="termy">
+
+```shell
+$ dstack preset create -f preset.dstack.yml --debug
+```
+
+</div>
+
+The trace is written to `~/.dstack/presets/<id>/trace.jsonl` while the session runs. It contains the agent's messages and every tool call with its result.
+
+## Limitations
+
+* Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
+* Doesn't support PD disaggregation (coming soon)
+* Presets are saved locally (a preset registry is coming soon)
+* Doesn't support ranges for `concurrency`
+
+> Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).
 
 !!! info "What's next?"
     1. Learn how dstack [services](services.md) work

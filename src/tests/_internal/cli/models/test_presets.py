@@ -24,7 +24,13 @@ class TestPresetBenchmark:
         workload_schema = schema["properties"]["workload"]
         metrics_schema = schema["properties"]["metrics"]
         assert set(workload_schema["properties"]) == set(PresetBenchmarkWorkload.model_fields)
-        assert set(workload_schema["required"]) == set(workload_schema["properties"])
+        # Mode-dependent fields are optional: a `random` session records
+        # `shared_prefix_tokens` and never hears of `dataset`; a custom-dataset
+        # session records `dataset` and omits `shared_prefix_tokens`.
+        assert set(workload_schema["required"]) == set(workload_schema["properties"]) - {
+            "dataset",
+            "shared_prefix_tokens",
+        }
         assert set(metrics_schema["properties"]) == set(PresetBenchmarkMetrics.model_fields)
         assert set(metrics_schema["required"]) == set(metrics_schema["properties"])
         assert set(metrics_schema["properties"]["ttft_ms"]["properties"]) == set(

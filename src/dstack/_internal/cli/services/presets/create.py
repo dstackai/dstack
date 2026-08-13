@@ -15,6 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from dstack._internal.cli.models.configurations import (
+    DEFAULT_DATASET,
     PresetConfiguration,
     PresetConstraints,
 )
@@ -589,6 +590,7 @@ async def _create_preset(
         user_prompt=setup.user_prompt,
         baseline=configuration.effective_baseline,
         previous=", ".join(setup.previous) if setup.previous else None,
+        custom_dataset=configuration.effective_dataset != DEFAULT_DATASET,
     )
     if setup.write_constraints:
         if setup.user_prompt:
@@ -880,6 +882,7 @@ def _build_constraints(
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
+    dataset = configuration.effective_dataset
     constraints = PresetConstraints.model_validate(
         {
             "run_name_prefix": build_name,
@@ -888,16 +891,21 @@ def _build_constraints(
             "max_ttft": configuration.max_ttft,
             "trials_num": configuration.trials,
             "concurrency": configuration.concurrency,
-            "input_tokens": configuration.effective_input_tokens,
-            "output_tokens": configuration.effective_output_tokens,
-            "shared_prefix_tokens": configuration.shared_prefix_tokens or 0,
+            **(
+                {
+                    "input_tokens": configuration.effective_input_tokens,
+                    "output_tokens": configuration.effective_output_tokens,
+                    "shared_prefix_tokens": configuration.shared_prefix_tokens or 0,
+                }
+                if dataset == DEFAULT_DATASET
+                else {"dataset": dataset}
+            ),
             "baseline": configuration.effective_baseline,
             "fleets": list(allowed_fleets),
             "env": list(configuration.env),
         }
     )
-    # All fields are always present; unset optional constraints render as null.
-    return json.dumps(json.loads(constraints.model_dump_json()), indent=2) + "\n"
+    return json.dumps(json.loads(constraints.model_dump_json(exclude_none=True)), indent=2) + "\n"
 
 
 def _save_final_report_copy(

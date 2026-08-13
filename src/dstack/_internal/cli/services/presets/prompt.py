@@ -174,6 +174,7 @@ def get_preset_agent_system_prompt(
     user_prompt: Optional[str] = None,
     baseline: bool = False,
     previous: Optional[str] = None,
+    custom_dataset: bool = False,
 ) -> str:
     text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
     variables = {
@@ -182,6 +183,8 @@ def get_preset_agent_system_prompt(
         "baseline": "on" if baseline else None,
         # A comma-separated list of the previous session IDs.
         "previous": previous.strip() if previous else None,
+        # Rendered for its presence only; the dataset itself is in constraints.json.
+        "dataset": "on" if custom_dataset else None,
     }
     applied: set[str] = set()
     rendered = _render_branch(_parse_directives(text, variables), variables, applied, dedent=False)
