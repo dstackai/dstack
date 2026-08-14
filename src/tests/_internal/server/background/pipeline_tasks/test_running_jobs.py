@@ -3089,6 +3089,117 @@ class TestPrepareStartupContextRouterEnv:
 
 
 @pytest.mark.asyncio
+class TestPrepareStartupContextReplicaGate:
+    """Tests for the https://github.com/dstackai/dstack/issues/4146 fix"""
+
+    def _make_job(
+        self,
+        *,
+        replica_num: int,
+        status: JobStatus,
+        job_provisioning_data: Optional[MagicMock],
+        job_name: str = "run-0-0",
+    ) -> MagicMock:
+        job = MagicMock()
+        job.job_spec.replica_num = replica_num
+        job.job_spec.job_name = job_name
+        job_submission = MagicMock()
+        job_submission.status = status
+        job_submission.job_provisioning_data = job_provisioning_data
+        job.job_submissions = [job_submission]
+        return job
+
+    def _make_context(self, other_jobs: list[MagicMock]) -> _ProcessContext:
+        job = self._make_job(
+            replica_num=0,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=MagicMock(),
+        )
+        run = MagicMock()
+        run.jobs = [job] + other_jobs
+        return _ProcessContext(
+            job_model=MagicMock(),
+            run_model=MagicMock(),
+            run=run,
+            job=job,
+            job_submission=MagicMock(job_runtime_data=None),
+            job_provisioning_data=MagicMock(),
+            instance_access_revoked=False,
+        )
+
+    async def _run_gate(self, context: _ProcessContext, result: _ProcessResult):
+        # `get_router_env_for_job` is the first thing after the gate. Returning `FAILED`
+        # makes passing the gate observable without mocking the whole startup path.
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
+            return_value=RouterEnvStatus.FAILED,
+        ):
+            return await _prepare_startup_context(context=context, result=result)
+
+    def _assert_gate_not_passed(self, result: _ProcessResult) -> None:
+        assert result.job_update_map == {}
+
+    def _assert_gate_passed(self, result: _ProcessResult) -> None:
+        assert "Router replica is in a terminal state" in (
+            result.job_update_map.get("termination_reason_message") or ""
+        )
+
+    async def test_defers_on_submitted_job_in_replica(self):
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=0,
+                    status=JobStatus.SUBMITTED,
+                    job_provisioning_data=None,
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_not_passed(result)
+
+    @pytest.mark.parametrize("status", [JobStatus.FAILED, JobStatus.TERMINATED, JobStatus.ABORTED])
+    async def test_defers_on_job_in_replica_terminated_before_provisioning(self, status):
+        context = self._make_context(
+            [self._make_job(replica_num=0, status=status, job_provisioning_data=None)]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        # The job is not terminated here: the run pipeline decides whether the replica
+        # is retried or failed, and it can only do so once this job is unlocked.
+        self._assert_gate_not_passed(result)
+
+    async def test_does_not_defer_on_done_job_in_replica(self):
+        # A job that already finished its work does not block its slower siblings.
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=0,
+                    status=JobStatus.DONE,
+                    job_provisioning_data=MagicMock(),
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_passed(result)
+
+    async def test_does_not_defer_on_job_in_other_replica(self):
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=1,
+                    status=JobStatus.FAILED,
+                    job_provisioning_data=None,
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_passed(result)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestFetchRunModelDynamoBranch:
     async def test_dynamo_run_loads_all_non_terminated_replicas(
