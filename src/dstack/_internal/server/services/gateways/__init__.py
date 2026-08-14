@@ -79,7 +79,6 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import (
     get_current_datetime,
@@ -89,9 +88,7 @@ from dstack._internal.utils.common import (
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-_CONF_UPDATABLE_FIELDS = frozenset({"domain", "default"})
-if FeatureFlags.GATEWAY_SCALING:
-    _CONF_UPDATABLE_FIELDS |= {"replicas"}
+_CONF_UPDATABLE_FIELDS = frozenset({"domain", "default", "replicas"})
 
 
 def switch_gateway_status(
