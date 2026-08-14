@@ -1,9 +1,0 @@
-{
-  "project_name": "main",
-  "instance_name": "prod-gateway",
-  "backend": "aws",
-  "region": "eu-west-1",
-  "public_ip": true,
-  "ssh_key_pub": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 gateway@example.com",
-  "certificate": {"type": "lets-encrypt"}
-}

@@ -1,9 +1,0 @@
-{
-  "project_name": "main",
-  "instance_name": "main-fleet-0",
-  "instance_id": "i-0abc123def4567890",
-  "user": "alice",
-  "ssh_keys": [{"public": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI0000000000000000000000000000000000000000000 alice@example.com"}],
-  "reservation": "cr-0abc123def4567890",
-  "tags": {"team": "research"}
-}

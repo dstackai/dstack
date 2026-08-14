@@ -1,8 +1,0 @@
-{
-  "filename": null,
-  "private_key_content": "-----BEGIN PRIVATE KEY-----\nMIIBVgIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\n",
-  "private_key_file": null,
-  "public_key_id": "publickey-e00dstack",
-  "service_account_id": "serviceaccount-e00dstack",
-  "type": "service_account"
-}

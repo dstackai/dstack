@@ -1,6 +1,0 @@
-{
-  "http_listener_arn": null,
-  "lb_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/dstack/1a2b",
-  "listener_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/net/dstack/5e6f",
-  "tg_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/dstack/3c4d"
-}

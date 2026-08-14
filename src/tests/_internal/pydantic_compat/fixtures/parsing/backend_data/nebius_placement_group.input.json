@@ -1,7 +1,0 @@
-{
-  "cluster": {
-    "id": "computecluster-e02compat",
-    "fabric": "fabric-7",
-    "availability_zone": "eu-north1-c"
-  }
-}

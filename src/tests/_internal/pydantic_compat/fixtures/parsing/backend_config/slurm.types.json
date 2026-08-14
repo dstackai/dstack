@@ -1,8 +1,0 @@
-{
-  "/": "SlurmConfig",
-  "/clusters/0": "SlurmClusterConfigWithCreds",
-  "/clusters/0/gpu_partitions/0": "SlurmGPUPartitionConfig",
-  "/clusters/0/private_key": "SlurmPrivateKeyConfig",
-  "/clusters/1": "SlurmClusterConfigWithCreds",
-  "/clusters/1/private_key": "SlurmPrivateKeyConfig"
-}

@@ -1,1 +1,0 @@
-{"backend": "aws", "region": "us-east-1", "placement_strategy": "cluster"}

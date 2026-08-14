@@ -1,5 +1,0 @@
-{
-  "/": "RemoteConnectionInfo",
-  "/env": "Env",
-  "/ssh_keys/0": "SSHKey"
-}

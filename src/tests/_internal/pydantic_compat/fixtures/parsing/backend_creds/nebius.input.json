@@ -1,6 +1,0 @@
-{
-  "type": "service_account",
-  "service_account_id": "serviceaccount-e00fake9c2e8b1d4706",
-  "public_key_id": "publickey-e00fake5f3a9c3e5f7b2d",
-  "private_key_content": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIF9mYWtlTmViaXVzS2V5Q29udGVudEZvclRlc3Rz\n-----END PRIVATE KEY-----\n"
-}

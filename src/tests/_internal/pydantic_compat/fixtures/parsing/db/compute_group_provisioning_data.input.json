@@ -1,8 +1,0 @@
-{
-  "compute_group_id": "cr-0abc123def4567890",
-  "compute_group_name": "research-cluster-cg",
-  "backend": "aws",
-  "region": "us-east-1",
-  "job_provisioning_datas": [],
-  "backend_data": "{\"capacity_reservation_id\": \"cr-0abc123def4567890\"}"
-}

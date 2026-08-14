@@ -1,4 +1,0 @@
-{
-  "choices": [{"delta": {"role": "assistant", "content": "hi"}, "index": 0, "finish_reason": null}],
-  "model": "llama"
-}

@@ -1,5 +1,0 @@
-{
-  "lb_arn": "arn:aws:elasticloadbalancing:eu-west-1:123456789012:loadbalancer/net/gateway/7a8b",
-  "tg_arn": "arn:aws:elasticloadbalancing:eu-west-1:123456789012:targetgroup/gateway/9c0d",
-  "listener_arn": "arn:aws:elasticloadbalancing:eu-west-1:123456789012:listener/net/gateway/1e2f"
-}
