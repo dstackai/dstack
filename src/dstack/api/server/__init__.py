@@ -2,7 +2,7 @@ import hashlib
 import os
 import pprint
 import time
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Union
 
 import requests
 import requests_unixsocket
@@ -156,7 +156,7 @@ class APIClient:
     def _request(
         self,
         path: str,
-        body: Optional[str] = None,
+        body: Optional[Union[str, bytes]] = None,
         raise_for_status: bool = True,
         method: str = "POST",
         **kwargs,

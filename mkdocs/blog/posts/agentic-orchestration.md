@@ -250,8 +250,11 @@ $ dstack event --within-run train-qwen
 ```shell
 $ dstack metrics train-qwen
 
- NAME        STATUS   CPU  MEMORY       GPU
- train-qwen  running  92%  118GB/200GB  gpu=0 mem=71GB/80GB util=97%
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▂▂▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▂▂▂▂▂▂▁▁ 15%  ▃▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 116GB/200GB
+        gpu=0  ▃▃▃▃▃▃▃▃▃▃▃▃▃▄▄▄▄▅▅▄▄▄▃▃▃▃ 43%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 70GB/80GB
+
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
 ```
 
 </div>

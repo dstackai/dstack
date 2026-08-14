@@ -21,7 +21,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.errors import BackendError, ServerClientError, SkipOffer
-from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.common import NetworkMode, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
     ComputeGroupStatus,
@@ -451,8 +451,38 @@ class _ExistingInstanceProvisioning:
 
 
 @dataclass
+class _OfferAttemptError:
+    backend: str
+    region: str
+    instance: str
+    error: str
+
+
+@dataclass
+class _NewCapacityAttempts:
+    """
+    What happened when the offers of the selected fleet were tried.
+    Used to explain why provisioning failed.
+    """
+
+    total: int
+    """Offers matching the run requirements at the time of provisioning."""
+    tried: int
+    """Offers actually attempted. Lower than `total` if offers were skipped
+    or the attempt limit was reached."""
+    skip_reasons: list[str]
+    """Why the offers that could not be attempted at all were skipped."""
+    errors: list[_OfferAttemptError]
+    """Errors of the attempted offers."""
+    limit_reached: bool
+    """Whether the loop stopped at `settings.MAX_OFFERS_TRIED` with offers left."""
+
+
+@dataclass
 class _FailedNewCapacityProvisioning:
     placement_group_cleanup: Optional[_PlacementGroupCleanup]
+    message: Optional[str] = None
+    """Why the job could not be provisioned. `None` if the offers were never tried."""
 
 
 @dataclass
@@ -891,8 +921,8 @@ def _get_master_job_provisioning_data(
     if master_job.job_submissions[-1].job_provisioning_data is None:
         return None
 
-    return JobProvisioningData.__response__.parse_obj(
-        master_job.job_submissions[-1].job_provisioning_data
+    return validate_extra_ignore(
+        JobProvisioningData, master_job.job_submissions[-1].job_provisioning_data
     )
 
 
@@ -1178,7 +1208,7 @@ def _assign_instance_to_job(
     job_model.instance = instance_model
     job_model.used_instance_id = instance_model.id
     job_model.job_provisioning_data = instance_model.job_provisioning_data
-    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).model_dump_json()
     job_model.skip_min_processing_interval = True
 
     switch_instance_status(session, instance_model, InstanceStatus.BUSY)
@@ -1360,7 +1390,7 @@ async def _apply_existing_instance_provisioning(
         context.job_model.job_runtime_data = _prepare_job_runtime_data(
             offer=get_or_error(get_instance_offer(instance_model)),
             multinode=context.multinode,
-        ).json()
+        ).model_dump_json()
     switch_job_status(session, context.job_model, JobStatus.PROVISIONING)
     await _apply_volume_attachment_result(
         session=session,
@@ -1449,6 +1479,7 @@ async def _process_new_capacity_provisioning(
         logger.debug("%s: provisioning failed", fmt(context.job_model))
         return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message=provision_new_capacity_result.message,
             locked_fleet_id=locked_fleet_id,
             placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
         )
@@ -1473,6 +1504,55 @@ async def _process_new_capacity_provisioning(
         volume_attachment_result=volume_attachment_result,
         locked_fleet_id=locked_fleet_id,
     )
+
+
+_PROVISIONING_TROUBLESHOOTING_URL = (
+    "https://dstack.ai/docs/guides/troubleshooting/#provisioning-fails"
+)
+_MAX_REPORTED_OFFER_ERRORS = 3
+
+
+def _get_new_capacity_failure_message(
+    fleet_name: str,
+    attempts: _NewCapacityAttempts,
+) -> str:
+    if attempts.total == 0:
+        return (
+            f"No offers matching the run requirements in fleet {fleet_name!r}."
+            f"\nSee {_PROVISIONING_TROUBLESHOOTING_URL}"
+        )
+    if attempts.tried == 0:
+        return (
+            f"None of the {attempts.total} offers in fleet {fleet_name!r} could be tried:"
+            f" {_format_reported_reasons(attempts.skip_reasons)}."
+            f"\nSee {_PROVISIONING_TROUBLESHOOTING_URL}"
+        )
+    limit_reached = " (attempt limit reached)" if attempts.limit_reached else ""
+    message = (
+        f"Failed to provision in fleet {fleet_name!r}:"
+        f" tried {attempts.tried} of {attempts.total} offers{limit_reached}, all failed."
+    )
+    if attempts.errors:
+        message += f"\nErrors: {_format_offer_errors(attempts.errors)}."
+    return f"{message}\nSee {_PROVISIONING_TROUBLESHOOTING_URL}"
+
+
+def _format_offer_errors(errors: list[_OfferAttemptError]) -> str:
+    # Offers commonly fail with the same error, so report every error once.
+    errors_by_message: dict[str, _OfferAttemptError] = {}
+    for error in errors:
+        errors_by_message.setdefault(error.error, error)
+    return _format_reported_reasons(
+        [f"{e.instance} in {e.backend}/{e.region}: {e.error}" for e in errors_by_message.values()]
+    )
+
+
+def _format_reported_reasons(reasons: list[str]) -> str:
+    unique_reasons = list(dict.fromkeys(reasons))
+    reported = unique_reasons[:_MAX_REPORTED_OFFER_ERRORS]
+    if len(unique_reasons) > len(reported):
+        reported.append(f"and {len(unique_reasons) - len(reported)} more")
+    return "; ".join(reported)
 
 
 async def _apply_new_capacity_provisioning(
@@ -1580,7 +1660,7 @@ def _resolve_provisioned_jobs_and_data(
             project=context.project,
             fleet=fleet_model,
             status=ComputeGroupStatus.RUNNING,
-            provisioning_data=provisioning_data.json(),
+            provisioning_data=provisioning_data.model_dump_json(),
         )
         return (
             context.jobs_to_provision,
@@ -1611,7 +1691,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         provisioned_job_models, job_provisioning_datas
     ):
         provisioned_job_model.fleet_id = fleet_model.id
-        provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
+        provisioned_job_model.job_provisioning_data = job_provisioning_data.model_dump_json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
         provisioned_job_model.skip_min_processing_interval = True
 
@@ -1646,7 +1726,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         instance_models.append(instance_model)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
             offer, context.multinode
-        ).json()
+        ).model_dump_json()
         events.emit(
             session,
             f"Instance provisioned for job. Instance status: {instance_model.status.upper()}",
@@ -1714,8 +1794,8 @@ def _create_instance_model_for_job(
         started_at=get_current_datetime(),
         status=InstanceStatus.PROVISIONING,
         unreachable=False,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
+        job_provisioning_data=job_provisioning_data.model_dump_json(),
+        offer=offer.model_dump_json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
         jobs=[job_model],
@@ -1747,8 +1827,8 @@ def _promote_placeholder_instance(
     instance_model.status = InstanceStatus.PROVISIONING
     instance_model.started_at = get_current_datetime()
     instance_model.compute_group = compute_group_model
-    instance_model.job_provisioning_data = job_provisioning_data.json()
-    instance_model.offer = offer.json()
+    instance_model.job_provisioning_data = job_provisioning_data.model_dump_json()
+    instance_model.offer = offer.model_dump_json()
     instance_model.backend = offer.backend
     instance_model.price = offer.price
     instance_model.region = offer.region
@@ -1822,7 +1902,7 @@ async def _process_volume_attachments(
                 attachments.append(
                     _VolumeAttachmentPayload(
                         volume_id=volume_model.id,
-                        attachment_data=attachment_data.json(),
+                        attachment_data=attachment_data.model_dump_json(),
                         volume_name=volume.name,
                     )
                 )
@@ -1990,7 +2070,7 @@ async def _apply_volume_attachment_result(
     job_runtime_data.volume_names = [
         attachment.volume_name for attachment in volume_attachment_result.attachments
     ]
-    job_model.job_runtime_data = job_runtime_data.json()
+    job_model.job_runtime_data = job_runtime_data.model_dump_json()
 
     volume_ids = [attachment.volume_id for attachment in volume_attachment_result.attachments]
     if volume_ids:
@@ -2233,10 +2313,14 @@ async def _provision_new_capacity(
     )
     offers_iter = iter(offers)
     offers_tried = 0
+    offers_taken = 0
+    skip_reasons: list[str] = []
+    offer_errors: list[_OfferAttemptError] = []
     while offers_tried < settings.MAX_OFFERS_TRIED:
         backend_with_offer = next(offers_iter, None)
         if backend_with_offer is None:
             break
+        offers_taken += 1
         backend, offer = backend_with_offer
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
@@ -2276,6 +2360,7 @@ async def _provision_new_capacity(
                 compute=compute,
             )
             if placement_group_model is None:
+                skip_reasons.append("no compatible placement group")
                 continue
             if placement_group_model.id not in known_placement_group_ids:
                 new_placement_group_models.append(placement_group_model)
@@ -2334,6 +2419,7 @@ async def _provision_new_capacity(
             )
         except SkipOffer as e:
             offers_tried -= 1
+            skip_reasons.append(str(e) or "offer skipped")
             logger.info(
                 "%s: %s launch in %s/%s skipped: %s",
                 fmt(job_model),
@@ -2344,6 +2430,7 @@ async def _provision_new_capacity(
             )
             continue
         except BackendError as e:
+            offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
                 fmt(job_model),
@@ -2353,7 +2440,8 @@ async def _provision_new_capacity(
                 repr(e),
             )
             continue
-        except Exception:
+        except Exception as e:
+            offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
             logger.exception(
                 "%s: got exception when launching %s in %s/%s",
                 fmt(job_model),
@@ -2363,12 +2451,42 @@ async def _provision_new_capacity(
             )
             continue
     return _FailedNewCapacityProvisioning(
+        message=_get_new_capacity_failure_message(
+            fleet_name=fleet_model.name,
+            attempts=_NewCapacityAttempts(
+                total=len(offers),
+                tried=offers_tried,
+                skip_reasons=skip_reasons,
+                errors=offer_errors,
+                # Offers are left only if the attempt limit, not the offer list, ended the loop.
+                limit_reached=offers_taken < len(offers),
+            ),
+        ),
         placement_group_cleanup=_build_placement_group_cleanup(
             fleet_model=fleet_model,
             offers_tried=offers_tried,
             selected_placement_group_id=None,
             new_placement_group_models=new_placement_group_models,
-        )
+        ),
+    )
+
+
+_MAX_OFFER_ERROR_LEN = 200
+
+
+def _get_offer_attempt_error(
+    offer: InstanceOfferWithAvailability,
+    error: Exception,
+) -> _OfferAttemptError:
+    # Backend errors may be multiline and arbitrarily long since they often wrap cloud API errors.
+    message = " ".join(str(error).split()) or type(error).__name__
+    if len(message) > _MAX_OFFER_ERROR_LEN:
+        message = message[:_MAX_OFFER_ERROR_LEN] + "..."
+    return _OfferAttemptError(
+        backend=offer.backend.value,
+        region=offer.region,
+        instance=offer.instance.name,
+        error=message,
     )
 
 

@@ -32,6 +32,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.services import fleets as fleets_services
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
@@ -392,12 +393,36 @@ class TestListProjectFleets:
                 "name": fleet.name,
                 "project_name": project.name,
                 "spec": json.loads(fleet.spec),
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "status": fleet.status.value,
                 "status_message": None,
                 "instances": [],
             }
         ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_fleets_newest_first(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        for name, day in [("oldest", 1), ("newest", 3), ("middle", 2)]:
+            await create_fleet(
+                session=session,
+                project=project,
+                name=name,
+                created_at=datetime(2023, 1, day, tzinfo=timezone.utc),
+            )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert [f["name"] for f in response.json()] == ["newest", "middle", "oldest"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -628,7 +653,7 @@ class TestGetFleet:
             "name": fleet.name,
             "project_name": project.name,
             "spec": json.loads(fleet.spec),
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "status": fleet.status.value,
             "status_message": None,
             "instances": [],
@@ -670,7 +695,7 @@ class TestGetFleet:
             "name": active_fleet.name,
             "project_name": project.name,
             "spec": json.loads(active_fleet.spec),
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "status": active_fleet.status.value,
             "status_message": None,
             "instances": [],
@@ -923,7 +948,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 200
         assert response.json() == {
@@ -979,7 +1004,7 @@ class TestApplyFleetPlan:
                 },
                 "autocreated": False,
             },
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "status": "active",
             "status_message": None,
             "instances": [
@@ -997,7 +1022,7 @@ class TestApplyFleetPlan:
                     "health_status": "healthy",
                     "termination_reason": None,
                     "termination_reason_message": None,
-                    "created": "2023-01-02T03:04:00+00:00",
+                    "created": "2023-01-02T03:04:00Z",
                     "finished_at": None,
                     "backend": None,
                     "region": None,
@@ -1006,6 +1031,7 @@ class TestApplyFleetPlan:
                     "price": None,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 }
             ],
         }
@@ -1036,7 +1062,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 200, response.json()
         assert response.json() == {
@@ -1100,7 +1126,7 @@ class TestApplyFleetPlan:
                 },
                 "autocreated": False,
             },
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "status": "active",
             "status_message": None,
             "instances": [
@@ -1131,13 +1157,14 @@ class TestApplyFleetPlan:
                     "health_status": "healthy",
                     "termination_reason": None,
                     "termination_reason_message": None,
-                    "created": "2023-01-02T03:04:00+00:00",
+                    "created": "2023-01-02T03:04:00Z",
                     "finished_at": None,
                     "region": "remote",
                     "availability_zone": None,
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 }
             ],
         }
@@ -1190,7 +1217,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 200, response.json()
         res = await session.execute(select(FleetModel))
@@ -1216,7 +1243,7 @@ class TestApplyFleetPlan:
             network=None,
         )
         current_spec = get_fleet_spec(conf=current_conf)
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         # 10.0.0.100 removed, 10.0.0.101 added
         spec.configuration.ssh_config.hosts = ["10.0.0.101"]
 
@@ -1251,7 +1278,7 @@ class TestApplyFleetPlan:
             headers=get_auth_headers(user.token),
             json={
                 "plan": {
-                    "spec": spec.dict(),
+                    "spec": spec.model_dump(),
                     "current_resource": _fleet_model_to_json_dict(fleet),
                 },
                 "force": False,
@@ -1320,7 +1347,7 @@ class TestApplyFleetPlan:
                 },
                 "autocreated": False,
             },
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "status": "active",
             "status_message": None,
             "instances": [
@@ -1351,13 +1378,14 @@ class TestApplyFleetPlan:
                     "health_status": "healthy",
                     "termination_reason": "terminated_by_user",
                     "termination_reason_message": None,
-                    "created": "2023-01-02T03:04:00+00:00",
+                    "created": "2023-01-02T03:04:00Z",
                     "finished_at": None,
                     "region": "remote",
                     "availability_zone": None,
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 },
                 {
                     "id": SomeUUID4Str(),
@@ -1386,13 +1414,14 @@ class TestApplyFleetPlan:
                     "health_status": "healthy",
                     "termination_reason": None,
                     "termination_reason_message": None,
-                    "created": "2023-01-02T03:04:00+00:00",
+                    "created": "2023-01-02T03:04:00Z",
                     "finished_at": None,
                     "region": "remote",
                     "availability_zone": None,
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "gpu_driver": None,
                 },
             ],
         }
@@ -1432,7 +1461,7 @@ class TestApplyFleetPlan:
             status=InstanceStatus.BUSY,
             instance_num=0,
         )
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=3)
 
         response = await client.post(
@@ -1440,7 +1469,7 @@ class TestApplyFleetPlan:
             headers=get_auth_headers(user.token),
             json={
                 "plan": {
-                    "spec": spec.dict(),
+                    "spec": spec.model_dump(),
                     "current_resource": _fleet_model_to_json_dict(fleet),
                 },
                 "force": False,
@@ -1471,7 +1500,7 @@ class TestApplyFleetPlan:
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
         )
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         spec.configuration.nodes = FleetNodesSpec(min=0, target=1, max=1)
 
         response = await client.post(
@@ -1479,7 +1508,7 @@ class TestApplyFleetPlan:
             headers=get_auth_headers(user.token),
             json={
                 "plan": {
-                    "spec": spec.dict(),
+                    "spec": spec.model_dump(),
                     "current_resource": _fleet_model_to_json_dict(fleet),
                 },
                 "force": False,
@@ -1534,7 +1563,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 400
 
@@ -1569,7 +1598,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 400, response.json()
         assert response.json()["detail"][0]["msg"] == (
@@ -1579,7 +1608,7 @@ class TestApplyFleetPlan:
     @pytest.mark.parametrize(
         ["field_name", "field_value"],
         [
-            pytest.param("env", Env.parse_obj({"K": "V"}), id="env"),
+            pytest.param("env", Env.model_validate({"K": "V"}), id="env"),
         ],
     )
     @pytest.mark.asyncio
@@ -1603,7 +1632,7 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/apply",
             headers=get_auth_headers(user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 400, response.json()
         assert response.json()["detail"][0]["msg"] == (
@@ -1637,7 +1666,7 @@ class TestApplyFleetPlan:
             response = await client.post(
                 f"/api/project/{project.name}/fleets/apply",
                 headers=get_auth_headers(user.token),
-                json={"plan": {"spec": spec.dict()}, "force": False},
+                json={"plan": {"spec": spec.model_dump()}, "force": False},
             )
         assert response.status_code in [401, 403]
 
@@ -1674,9 +1703,15 @@ class TestApplyFleetPlan:
         response = await client.post(
             f"/api/project/{exporter_project.name}/fleets/apply",
             headers=get_auth_headers(importer_user.token),
-            json={"plan": {"spec": spec.dict()}, "force": False},
+            json={"plan": {"spec": spec.model_dump()}, "force": False},
         )
         assert response.status_code == 403
+
+
+@pytest.fixture
+def no_lock_retry_wait(monkeypatch: pytest.MonkeyPatch):
+    """Makes tests asserting lock contention errors exhaust the retries without waiting."""
+    monkeypatch.setattr(fleets_services, "_LOCK_RETRY_INTERVAL", 0)
 
 
 class TestDeleteFleets:
@@ -1790,7 +1825,7 @@ class TestDeleteFleets:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_fleet_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -1997,7 +2032,7 @@ class TestDeleteFleetInstances:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_selected_instance_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -2082,7 +2117,7 @@ class TestDeleteFleetInstances:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_fleet_locked(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, test_db, session: AsyncSession, client: AsyncClient, no_lock_retry_wait
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -2220,7 +2255,7 @@ class TestGetPlan:
             response = await client.post(
                 f"/api/project/{project.name}/fleets/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"spec": spec.model_dump()},
             )
             backend_mock.compute.return_value.get_offers.assert_called_once()
 
@@ -2228,10 +2263,10 @@ class TestGetPlan:
         assert response.json() == {
             "project_name": project.name,
             "user": user.name,
-            "spec": json.loads(spec.json()),
-            "effective_spec": json.loads(spec.json()),
+            "spec": json.loads(spec.model_dump_json()),
+            "effective_spec": json.loads(spec.model_dump_json()),
             "current_resource": None,
-            "offers": [json.loads(o.json()) for o in offers],
+            "offers": [json.loads(o.model_dump_json()) for o in offers],
             "total_offers": len(offers),
             "max_offer_price": 1.0,
             "action": "create",
@@ -2263,13 +2298,13 @@ class TestGetPlan:
             response = await client.post(
                 f"/api/project/{project.name}/fleets/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"spec": spec.model_dump()},
             )
             backend_mock.compute.return_value.get_offers.assert_called_once()
 
         response_json = response.json()
         assert response.status_code == 200, response_json
-        assert response_json["offers"] == [json.loads(offer.json())]
+        assert response_json["offers"] == [json.loads(offer.model_dump_json())]
         assert response_json["total_offers"] == 1
         assert response_json["max_offer_price"] == offer.price
 
@@ -2299,7 +2334,7 @@ class TestGetPlan:
             response = await client.post(
                 f"/api/project/{project.name}/fleets/get_plan",
                 headers=get_auth_headers(user.token),
-                json={"spec": spec.dict()},
+                json={"spec": spec.model_dump()},
             )
             backend_mock.compute.return_value.get_offers.assert_called_once()
 
@@ -2321,9 +2356,9 @@ class TestGetPlan:
         )
         conf = get_ssh_fleet_configuration(hosts=["10.0.0.100"])
         spec = get_fleet_spec(conf=conf)
-        effective_spec = spec.copy(deep=True)
+        effective_spec = spec.model_copy(deep=True)
         effective_spec.configuration.ssh_config.ssh_key = None
-        current_spec = spec.copy(deep=True)
+        current_spec = spec.model_copy(deep=True)
         # `hosts` can be updated in-place
         current_spec.configuration.ssh_config.hosts = ["10.0.0.100", "10.0.0.101"]
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
@@ -2331,15 +2366,15 @@ class TestGetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/get_plan",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
 
         assert response.status_code == 200
         assert response.json() == {
             "project_name": project.name,
             "user": user.name,
-            "spec": spec.dict(),
-            "effective_spec": effective_spec.dict(),
+            "spec": spec.model_dump(),
+            "effective_spec": effective_spec.model_dump(),
             "current_resource": _fleet_model_to_json_dict(fleet),
             "offers": [],
             "total_offers": 0,
@@ -2360,14 +2395,14 @@ class TestGetPlan:
         current_spec = get_fleet_spec(
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
         )
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=1)
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
 
         response = await client.post(
             f"/api/project/{project.name}/fleets/get_plan",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
 
         response_json = response.json()
@@ -2388,14 +2423,14 @@ class TestGetPlan:
         current_spec = get_fleet_spec(
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
         )
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         spec.configuration.blocks = 2
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
 
         response = await client.post(
             f"/api/project/{project.name}/fleets/get_plan",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
 
         response_json = response.json()
@@ -2416,7 +2451,7 @@ class TestGetPlan:
         current_spec = get_fleet_spec(
             conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
         )
-        spec = current_spec.copy(deep=True)
+        spec = current_spec.model_copy(deep=True)
         spec.configuration.backends = [BackendType.AWS]
         spec.configuration.regions = ["us-east-1"]
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
@@ -2424,7 +2459,7 @@ class TestGetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/get_plan",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
 
         response_json = response.json()
@@ -2444,9 +2479,9 @@ class TestGetPlan:
         )
         conf = get_ssh_fleet_configuration(placement=InstanceGroupPlacement.ANY)
         spec = get_fleet_spec(conf=conf)
-        effective_spec = spec.copy(deep=True)
+        effective_spec = spec.model_copy(deep=True)
         effective_spec.configuration.ssh_config.ssh_key = None
-        current_spec = spec.copy(deep=True)
+        current_spec = spec.model_copy(deep=True)
         # `placement` cannot be updated in-place
         current_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
@@ -2454,83 +2489,21 @@ class TestGetPlan:
         response = await client.post(
             f"/api/project/{project.name}/fleets/get_plan",
             headers=get_auth_headers(user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
 
         assert response.status_code == 200
         assert response.json() == {
             "project_name": project.name,
             "user": user.name,
-            "spec": spec.dict(),
-            "effective_spec": effective_spec.dict(),
+            "spec": spec.model_dump(),
+            "effective_spec": effective_spec.model_dump(),
             "current_resource": _fleet_model_to_json_dict(fleet),
             "offers": [],
             "total_offers": 0,
             "max_offer_price": None,
             "action": "create",
         }
-
-    @pytest.mark.parametrize(
-        ("client_version", "expected_availability"),
-        [
-            ("0.20.3", InstanceAvailability.NOT_AVAILABLE),
-            ("0.20.4", InstanceAvailability.NO_BALANCE),
-            (None, InstanceAvailability.NO_BALANCE),
-        ],
-    )
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_replaces_no_balance_with_not_available_for_old_clients(
-        self,
-        test_db,
-        session: AsyncSession,
-        client: AsyncClient,
-        client_version: Optional[str],
-        expected_availability: InstanceAvailability,
-    ):
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
-        offers = [
-            InstanceOfferWithAvailability(
-                backend=BackendType.AWS,
-                instance=InstanceType(
-                    name="instance-1",
-                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-                ),
-                region="us",
-                price=1.0,
-                availability=InstanceAvailability.AVAILABLE,
-            ),
-            InstanceOfferWithAvailability(
-                backend=BackendType.AWS,
-                instance=InstanceType(
-                    name="instance-2",
-                    resources=Resources(cpus=2, memory_mib=1024, spot=False, gpus=[]),
-                ),
-                region="us",
-                price=2.0,
-                availability=InstanceAvailability.NO_BALANCE,
-            ),
-        ]
-        headers = get_auth_headers(user.token)
-        if client_version is not None:
-            headers["X-API-Version"] = client_version
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
-            backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = offers
-            response = await client.post(
-                f"/api/project/{project.name}/fleets/get_plan",
-                headers=headers,
-                json={"spec": get_fleet_spec().dict()},
-            )
-
-        assert response.status_code == 200
-        offers = response.json()["offers"]
-        assert len(offers) == 2
-        assert offers[0]["availability"] == InstanceAvailability.AVAILABLE.value
-        assert offers[1]["availability"] == expected_availability.value
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -2561,10 +2534,10 @@ class TestGetPlan:
         response = await client.post(
             f"/api/project/{exporter_project.name}/fleets/get_plan",
             headers=get_auth_headers(importer_user.token),
-            json={"spec": spec.dict()},
+            json={"spec": spec.model_dump()},
         )
         assert response.status_code == 403
 
 
 def _fleet_model_to_json_dict(fleet: FleetModel) -> dict:
-    return json.loads(fleet_model_to_fleet(fleet).json())
+    return json.loads(fleet_model_to_fleet(fleet).model_dump_json())

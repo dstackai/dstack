@@ -21,6 +21,7 @@ from dstack._internal.core.backends.nebius.models import (
 from dstack._internal.core.backends.nebius.resources import get_all_infiniband_fabrics
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class NebiusConfigurator(
@@ -74,25 +75,28 @@ class NebiusConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=NebiusStoredConfig(
-                **NebiusBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=NebiusCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(NebiusBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=NebiusCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> NebiusBackendConfigWithCreds:
         config = self._get_config(record)
-        return NebiusBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(NebiusBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> NebiusBackendConfig:
         config = self._get_config(record)
-        return NebiusBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(NebiusBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> NebiusBackend:
         config = self._get_config(record)
         return NebiusBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> NebiusConfig:
-        return NebiusConfig.__response__(
-            **json.loads(record.config),
-            creds=NebiusCreds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            NebiusConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(NebiusCreds, record.auth),
+            },
         )

@@ -164,7 +164,6 @@ def generate_shared_offer(
         gpus=full_resources.gpus[: len(full_resources.gpus) // total_blocks * blocks],
         spot=full_resources.spot,
         disk=full_resources.disk,
-        description=full_resources.description,
     )
     return InstanceOfferWithAvailability(
         backend=offer.backend,
@@ -185,7 +184,7 @@ def get_instance_offer_with_restricted_az(
     instance_offer: InstanceOfferWithAvailability,
     master_job_provisioning_data: Optional[JobProvisioningData],
 ) -> InstanceOfferWithAvailability:
-    instance_offer = instance_offer.copy()
+    instance_offer = instance_offer.model_copy()
     if (
         master_job_provisioning_data is not None
         and master_job_provisioning_data.availability_zone is not None
@@ -233,7 +232,7 @@ def _filter_offers(
         if availability_zones is not None:
             if offer.availability_zones is None:
                 continue
-            new_offer = offer.copy()
+            new_offer = offer.model_copy()
             new_offer.availability_zones = [
                 z for z in offer.availability_zones if z in availability_zones
             ]
@@ -267,6 +266,6 @@ def _get_shareable_offers(
         divisible, total_blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
         if not divisible:
             continue
-        new_offer = offer.copy()
+        new_offer = offer.model_copy()
         new_offer.total_blocks = total_blocks
         yield (backend, new_offer)

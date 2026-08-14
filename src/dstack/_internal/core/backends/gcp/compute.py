@@ -55,7 +55,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -194,7 +194,7 @@ class GCPCompute(
                             zones_with_capacity.append(zone)
                 if not matching_zones:
                     return None
-                offer = offer.copy(deep=True)
+                offer = offer.model_copy(deep=True)
                 if zones_with_capacity:
                     offer.availability_zones = zones_with_capacity
                 else:
@@ -214,8 +214,8 @@ class GCPCompute(
 
             def reserved_offers_filter(offer: InstanceOfferWithAvailability) -> bool:
                 """Remove reserved-only offers"""
-                if GCPOfferBackendData.__response__.parse_obj(
-                    offer.backend_data
+                if validate_extra_ignore(
+                    GCPOfferBackendData, offer.backend_data
                 ).is_dws_calendar_mode:
                     return False
                 return True
@@ -606,9 +606,7 @@ class GCPCompute(
             machine_type=configuration.instance_type or DEFAULT_GATEWAY_INSTANCE_TYPE,
             accelerators=[],
             spot=False,
-            user_data=get_gateway_user_data(
-                configuration.ssh_key_pub, router=configuration.router
-            ),
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
             authorized_keys=[configuration.ssh_key_pub],
             labels=labels,
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
@@ -678,7 +676,7 @@ class GCPCompute(
                     detachable=True,
                     backend_data=GCPVolumeDiskBackendData(
                         disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
-                    ).json(),
+                    ).model_dump_json(),
                 )
         raise ComputeError(f"Persistent disk {volume.configuration.volume_id} not found")
 
@@ -746,7 +744,7 @@ class GCPCompute(
             detachable=True,
             backend_data=GCPVolumeDiskBackendData(
                 disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
-            ).json(),
+            ).model_dump_json(),
         )
 
     def delete_volume(self, volume: Volume):

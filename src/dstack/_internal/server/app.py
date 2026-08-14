@@ -55,7 +55,6 @@ from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
-from dstack._internal.server.services.prometheus.client_metrics import http_metrics
 from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
 from dstack._internal.server.services.proxy.routers import service_proxy
 from dstack._internal.server.services.runner.pool import instance_connection_pool
@@ -64,14 +63,15 @@ from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
     DEFAULT_PROJECT_NAME,
     DO_NOT_UPDATE_DEFAULT_PROJECT,
-    SERVER_CONFIG_FILE_PATH,
     SERVER_URL,
     UPDATE_DEFAULT_PROJECT,
+    get_server_config_file_path,
+    init_server_data_dir,
 )
 from dstack._internal.server.utils import otel, sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     CustomStaticFiles,
     check_client_server_compatibility,
     error_detail,
@@ -118,6 +118,7 @@ async def lifespan(app: FastAPI):
         )
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
     asyncio.get_running_loop().set_default_executor(server_executor)
+    init_server_data_dir()
     await migrate()
     _print_dstack_logo()
     if not check_required_ssh_version():
@@ -141,17 +142,18 @@ async def lifespan(app: FastAPI):
                 user=admin,
             )
             if server_config_manager is not None:
+                server_config_file_path = get_server_config_file_path()
                 server_config_dir = _get_server_config_dir()
                 if not server_config_loaded:
                     logger.info("Initializing the default configuration...", {"show_path": False})
                     await server_config_manager.init_config(session=session)
                     logger.info(
-                        f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
+                        f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
                         {"show_path": False},
                     )
                 else:
                     logger.info(
-                        f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
+                        f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
                         {"show_path": False},
                     )
                     await server_config_manager.apply_config(session=session, owner=admin)
@@ -270,14 +272,14 @@ def register_routes(app: FastAPI, ui: bool = True):
         msg = "Access denied"
         if len(exc.args) > 0:
             msg = exc.args[0]
-        return CustomORJSONResponse(
+        return CustomJSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content=error_detail(msg),
         )
 
     @app.exception_handler(ServerClientError)
     async def server_client_error_handler(request: Request, exc: ServerClientError):
-        return CustomORJSONResponse(
+        return CustomJSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": get_server_client_error_details(exc)},
         )
@@ -285,7 +287,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.exception_handler(OSError)
     async def os_error_handler(request, exc: OSError):
         if exc.errno in [36, 63]:
-            return CustomORJSONResponse(
+            return CustomJSONResponse(
                 {"detail": "Filename too long"},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
@@ -296,8 +298,6 @@ def register_routes(app: FastAPI, ui: bool = True):
         start_time = time.time()
         response: Response = await call_next(request)
         process_time = time.time() - start_time
-        # log process_time to be used in the log_http_metrics middleware
-        request.state.process_time = process_time
         logger.debug(
             "Processed request %s %s in %s. Status: %s",
             request.method,
@@ -324,45 +324,9 @@ def register_routes(app: FastAPI, ui: bool = True):
             else:
                 return await call_next(request)
 
-    # this middleware must be defined after the log_request middleware
-    @app.middleware("http")
-    async def log_http_metrics(request: Request, call_next):
-        def _extract_project_name(request: Request):
-            project_name = None
-            prefix = "/api/project/"
-            if request.url.path.startswith(prefix):
-                rest = request.url.path[len(prefix) :]
-                project_name = rest.split("/", 1)[0] if rest else None
-
-            return project_name
-
-        def _extract_endpoint_label(request: Request, response: Response) -> str:
-            route = request.scope.get("route")
-            route_path = getattr(route, "path", None)
-            if route_path:
-                return route_path
-            if not request.url.path.startswith("/api/"):
-                return "__non_api__"
-            if response.status_code == status.HTTP_404_NOT_FOUND:
-                return "__not_found__"
-            return "__unmatched__"
-
-        project_name = _extract_project_name(request)
-        response: Response = await call_next(request)
-        endpoint_label = _extract_endpoint_label(request, response)
-
-        http_metrics.log_request(
-            method=request.method,
-            endpoint=endpoint_label,
-            http_status=response.status_code,
-            project_name=project_name,
-            duration_seconds=request.state.process_time,
-        )
-        return response
-
     @app.get("/healthcheck")
     async def healthcheck():
-        return CustomORJSONResponse(content={"status": "running"})
+        return CustomJSONResponse(content={"status": "running"})
 
     if ui and Path(__file__).parent.joinpath("statics").exists():
         app.mount(
@@ -376,7 +340,7 @@ def register_routes(app: FastAPI, ui: bool = True):
                 or _is_proxy_request(request)
                 or _is_prometheus_request(request)
             ):
-                return CustomORJSONResponse(
+                return CustomJSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
@@ -435,4 +399,4 @@ def _print_dstack_logo():
 
 
 def _get_server_config_dir() -> str:
-    return str(SERVER_CONFIG_FILE_PATH).replace(os.path.expanduser("~"), "~", 1)
+    return str(get_server_config_file_path()).replace(os.path.expanduser("~"), "~", 1)

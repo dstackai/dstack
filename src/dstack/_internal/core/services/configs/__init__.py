@@ -28,13 +28,13 @@ class ConfigManager:
         self.config_filepath.parent.mkdir(parents=True, exist_ok=True)
         with self.config_filepath.open("w") as f:
             # hack to convert enums to strings, etc.
-            yaml.dump(json.loads(self.config.json()), f)
+            yaml.dump(json.loads(self.config.model_dump_json()), f)
 
     def load(self):
         try:
             with open(self.config_filepath, "r") as f:
                 config = yaml.safe_load(f)
-            self.config = GlobalConfig.parse_obj(config)
+            self.config = GlobalConfig.model_validate(config)
         except FileNotFoundError:
             self.config = GlobalConfig()
         except ValidationError:

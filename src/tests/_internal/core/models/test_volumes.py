@@ -1,5 +1,5 @@
 import pytest
-from pydantic import ValidationError, parse_obj_as
+from pydantic import ValidationError
 
 from dstack._internal.core.models.volumes import (
     InstanceMountPoint,
@@ -15,8 +15,8 @@ class TestVolumeMountPoint:
         )
 
     def test_path_normalization(self):
-        assert parse_obj_as(
-            VolumeMountPoint, {"name": "my-vol", "path": "/path/./to///dir/"}
+        assert VolumeMountPoint.model_validate(
+            {"name": "my-vol", "path": "/path/./to///dir/"}
         ) == VolumeMountPoint(name="my-vol", path="/path/to/dir")
 
     @pytest.mark.parametrize("value", ["my-vol", "my-vol:/run:ro"])
@@ -26,15 +26,15 @@ class TestVolumeMountPoint:
 
     def test_validation_error_empty_path(self):
         with pytest.raises(ValidationError, match="empty path"):
-            parse_obj_as(VolumeMountPoint, {"name": "vol", "path": ""})
+            VolumeMountPoint.model_validate({"name": "vol", "path": ""})
 
     def test_validation_error_rel_path(self):
         with pytest.raises(ValidationError, match="path must be absolute"):
-            parse_obj_as(VolumeMountPoint, {"name": "vol", "path": "rel/path"})
+            VolumeMountPoint.model_validate({"name": "vol", "path": "rel/path"})
 
     def test_validation_error_parent_dir(self):
         with pytest.raises(ValidationError, match=r"\.\. are not allowed"):
-            parse_obj_as(VolumeMountPoint, {"name": "vol", "path": "/path/../to"})
+            VolumeMountPoint.model_validate({"name": "vol", "path": "/path/../to"})
 
 
 class TestInstanceBindMountPoint:
@@ -44,8 +44,8 @@ class TestInstanceBindMountPoint:
         )
 
     def test_path_normalization(self):
-        assert parse_obj_as(
-            InstanceMountPoint, {"instance_path": "/host/.//path/", "path": "/run//./path"}
+        assert InstanceMountPoint.model_validate(
+            {"instance_path": "/host/.//path/", "path": "/run//./path"}
         ) == InstanceMountPoint(instance_path="/host/path", path="/run/path")
 
     @pytest.mark.parametrize("value", ["/path", "/host/path:/run/path:ro"])
@@ -58,21 +58,21 @@ class TestInstanceBindMountPoint:
         data = {"instance_path": "/instance_path", "path": "/run_path"}
         data[field] = ""
         with pytest.raises(ValidationError, match="empty path"):
-            parse_obj_as(InstanceMountPoint, data)
+            InstanceMountPoint.model_validate(data)
 
     @pytest.mark.parametrize("field", ["instance_path", "path"])
     def test_validation_error_rel_path(self, field: str):
         data = {"instance_path": "/instance_path", "path": "/run_path"}
         data[field] = "./rel/path"
         with pytest.raises(ValidationError, match="path must be absolute"):
-            parse_obj_as(InstanceMountPoint, data)
+            InstanceMountPoint.model_validate(data)
 
     @pytest.mark.parametrize("field", ["instance_path", "path"])
     def test_validation_error_parent_dir(self, field: str):
         data = {"instance_path": "/instance_path", "path": "/run_path"}
         data[field] = "/path/../to"
         with pytest.raises(ValidationError, match=r"\.\. are not allowed"):
-            parse_obj_as(InstanceMountPoint, data)
+            InstanceMountPoint.model_validate(data)
 
 
 class TestParseMountPoint:

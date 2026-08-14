@@ -4,6 +4,7 @@ import os
 from typing import Any, Sequence
 
 _REDACTION = "[redacted]"
+_REDACTION_BYTES = _REDACTION.encode("utf-8")
 # Replacing shorter values such as "1" or "false" corrupts unrelated diagnostics.
 _MIN_REDACTED_SUBSTRING_LENGTH = 8
 _SENSITIVE_INHERITED_ENV_NAMES = (
@@ -17,6 +18,8 @@ _SENSITIVE_INHERITED_ENV_NAMES = (
 
 
 def get_redacted_values(values: Sequence[str]) -> tuple[str, ...]:
+    """Longest-first, so redacting a shorter secret can't leave the tail of a
+    longer secret that contains it exposed."""
     return tuple(sorted({value for value in values if value}, key=len, reverse=True))
 
 
@@ -47,8 +50,21 @@ def redact(value: str, redacted_values: Sequence[str]) -> str:
     return value
 
 
+def redact_bytes(value: bytes, redacted_values: Sequence[str]) -> bytes:
+    """Redacts in raw bytes to preserve the file's exact newlines and any
+    non-UTF-8 bytes."""
+    for redacted_value in redacted_values:
+        # Environment values decode with surrogateescape, so encoding them back
+        # the same way is what returns their original bytes.
+        encoded = redacted_value.encode("utf-8", errors="surrogateescape")
+        if value == encoded:
+            return _REDACTION_BYTES
+        if len(redacted_value) >= _MIN_REDACTED_SUBSTRING_LENGTH:
+            value = value.replace(encoded, _REDACTION_BYTES)
+    return value
+
+
 def redact_structure(value: Any, redacted_values: Sequence[str]) -> Any:
-    """Recursively redacts every string (including dict keys) in a JSON-like value."""
     if isinstance(value, str):
         return redact(value, redacted_values)
     if isinstance(value, list):

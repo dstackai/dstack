@@ -1,10 +1,10 @@
 import datetime
 from enum import Enum
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import Field, root_validator
+from pydantic import model_validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -28,7 +28,8 @@ class Gpu(CoreModel):
     `assert gpu.vendor is not None` should be a safe type narrowing.
     """
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_name_and_vendor(cls, values):
         is_tpu = False
         name = values.get("name")
@@ -46,6 +47,12 @@ class Gpu(CoreModel):
         return values
 
 
+class GpuDriverInfo(CoreModel):
+    vendor: Optional[gpuhunt.AcceleratorVendor] = None
+    """`vendor` is not set on hosts where shim could not detect it."""
+    version: str
+
+
 class Disk(CoreModel):
     size_mib: int
     """`size_mib=0` has a special meaning -- size is unknown"""
@@ -59,11 +66,11 @@ class Resources(CoreModel):
     disk: Disk = Disk(size_mib=102400)
     """`disk` defaults to 100GB for backward compatibility."""
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
-    # TODO: remove `description` in 0.21.
-    description: Annotated[
-        str,
-        Field(description="Deprecated: generated client-side. Will be removed in 0.21."),
-    ] = ""
+    # TODO: remove `description` in 0.22.
+    description: str = ""
+    """Never set by the server since 0.21. Kept because pre-0.21 clients echo it back inside
+    `current_resource` on apply, and requests reject extra fields.
+    """
 
     def pretty_format(self, include_spot: bool = False, gpu_only: bool = False) -> str:
         return Resources._pretty_format(
@@ -198,7 +205,7 @@ class InstanceOffer(CoreModel):
         """Convert to InstanceOfferWithAvailability without re-serializing/re-validating fields.
         The result shares nested objects with self. This is generally safe because callers
         discard the original InstanceOffer after conversion."""
-        return InstanceOfferWithAvailability.construct(**self.__dict__, **kwargs)
+        return InstanceOfferWithAvailability.model_construct(**self.__dict__, **kwargs)
 
 
 class InstanceOfferWithAvailability(InstanceOffer):
@@ -325,3 +332,5 @@ class Instance(CoreModel):
     price: Optional[float] = None
     total_blocks: Optional[int] = None
     busy_blocks: int = 0
+    gpu_driver: Optional[GpuDriverInfo] = None
+    """`gpu_driver` is the accelerator driver installed on the host, when known."""

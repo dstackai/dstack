@@ -30,6 +30,8 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
+    GatewayLoadBalancerConfiguration,
+    GatewayLoadBalancerData,
     GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
@@ -39,7 +41,6 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -340,7 +341,7 @@ class ComputeWithFilteredOffersCached(ABC):
     ) -> int:
         hash_items: list[Union[str, bool]] = []
         # Requirements is not hashable, so we use a hack to get arguments hash
-        hash_items.append(requirements.json())
+        hash_items.append(requirements.model_dump_json())
         if self.full_offers_argument_has_effect:
             hash_items.append(full_offers)
         if self.unallocated_resources_argument_has_effect:
@@ -403,7 +404,7 @@ class ComputeWithCreateInstanceSupport(ABC):
             reservation=job.job_spec.requirements.reservation,
             tags=run.run_spec.merged_profile.tags,
         )
-        instance_offer = instance_offer.copy()
+        instance_offer = instance_offer.model_copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
         return self.create_instance(
             instance_offer, instance_config, placement_group=placement_group
@@ -574,6 +575,55 @@ class ComputeWithGatewaySupport(ABC):
         """
         Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
         but may perform additional work such as deleting a load balancer when a gateway has one.
+        """
+        pass
+
+
+class ComputeWithGatewayLoadBalancerSupport(ABC):
+    """
+    Must be subclassed and implemented to support gateways with a load balancer that fronts
+    all replica instances.
+
+    Backends implementing this mixin must also implement `ComputeWithGatewaySupport`.
+    """
+
+    @abstractmethod
+    def create_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+    ) -> GatewayLoadBalancerData:
+        """Creates the load balancer for a gateway."""
+        pass
+
+    @abstractmethod
+    def terminate_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+        backend_data: Optional[str],
+    ) -> None:
+        """Deletes the load balancer."""
+        pass
+
+    @abstractmethod
+    def register_gateway_replica_with_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        """Registers a gateway replica instance as a target of the load balancer."""
+        pass
+
+    @abstractmethod
+    def deregister_gateway_replica_from_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        """Deregisters a gateway replica instance from the load balancer.
+
+        If the replica is not registered, it should not raise errors but return silently.
         """
         pass
 
@@ -1038,9 +1088,7 @@ def get_run_shim_script(
     ]
 
 
-def get_gateway_user_data(
-    authorized_key: str, router: Optional[AnyGatewayRouterConfig] = None
-) -> str:
+def get_gateway_user_data(authorized_key: str) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -1056,7 +1104,7 @@ def get_gateway_user_data(
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router))],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -1156,22 +1204,19 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str, router: Optional[AnyGatewayRouterConfig] = None) -> str:
+def get_dstack_gateway_wheel(build: str) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
         build = _fetch_version(f"{base_url}/latest-version") or "latest"
         logger.debug("Found the latest gateway build: %s", build)
     wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
-    # Build package spec with extras if router is specified
-    if router:
-        return f"dstack-gateway[{router.type}] @ {wheel}"
     return f"dstack-gateway @ {wheel}"
 
 
-def get_dstack_gateway_commands(router: Optional[AnyGatewayRouterConfig] = None) -> List[str]:
+def get_dstack_gateway_commands() -> List[str]:
     build = get_dstack_runner_version() or "latest"
-    gateway_package = get_dstack_gateway_wheel(build, router)
+    gateway_package = get_dstack_gateway_wheel(build)
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",

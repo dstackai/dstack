@@ -21,7 +21,7 @@ from dstack._internal.server.security.permissions import (
     check_can_access_instance,
 )
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -50,7 +50,7 @@ async def list_instances(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last instance from the previous page as `prev_created_at` and `prev_id`.
     """
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await instances_services.list_user_instances(
             session=session,
             user=user,
@@ -82,7 +82,7 @@ async def get_instance_health_checks(
         before=body.before,
         limit=body.limit,
     )
-    return CustomORJSONResponse(GetInstanceHealthChecksResponse(health_checks=health_checks))
+    return CustomJSONResponse(GetInstanceHealthChecksResponse(health_checks=health_checks))
 
 
 @project_router.post("/get", response_model=Instance)
@@ -103,4 +103,4 @@ async def get_instance(
     )
     if instance is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(instance)
+    return CustomJSONResponse(instance)

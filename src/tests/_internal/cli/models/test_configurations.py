@@ -12,12 +12,12 @@ pytestmark = pytest.mark.windows
 
 class TestPresetConfiguration:
     def test_schema_documents_supported_input(self):
-        assert all(
-            field.field_info.description for field in PresetConfiguration.__fields__.values()
-        )
-        assert all(field.field_info.description for field in PresetModelBase.__fields__.values())
-        assert all(field.field_info.description for field in PresetModelRepo.__fields__.values())
-        assert {"type": "string"} in PresetConfiguration.schema()["properties"]["model"]["anyOf"]
+        assert all(field.description for field in PresetConfiguration.model_fields.values())
+        assert all(field.description for field in PresetModelBase.model_fields.values())
+        assert all(field.description for field in PresetModelRepo.model_fields.values())
+        assert {"type": "string"} in PresetConfiguration.model_json_schema()["properties"][
+            "model"
+        ]["anyOf"]
 
     def test_parses_string_as_exact_repo(self):
         configuration = PresetConfiguration(model="Qwen/Qwen3.5-27B")
@@ -67,7 +67,7 @@ class TestPresetConfiguration:
     def test_shorthand_round_trips_through_dict(self):
         configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
 
-        round_tripped = PresetConfiguration.parse_obj(configuration.dict())
+        round_tripped = PresetConfiguration.model_validate(configuration.model_dump())
 
         assert round_tripped.model == configuration.model
 
@@ -82,3 +82,22 @@ class TestPresetConfiguration:
     def test_requires_model(self):
         with pytest.raises(ValidationError):
             PresetConfiguration()
+
+    @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
+    def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
+        with pytest.raises(ValidationError, match="only be set with the `random` dataset"):
+            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
+
+    def test_allows_request_shape_fields_with_the_random_dataset(self):
+        configuration = PresetConfiguration(
+            base="Qwen/Qwen3.5-27B", dataset="random", input_tokens=1024, output_tokens=256
+        )
+
+        assert configuration.input_tokens == 1024
+        assert configuration.output_tokens == 256
+
+    def test_defaults_to_the_random_dataset(self):
+        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+
+        assert configuration.dataset is None
+        assert configuration.effective_dataset == "random"

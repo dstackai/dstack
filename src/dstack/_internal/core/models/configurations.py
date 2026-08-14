@@ -5,32 +5,42 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
-import orjson
-from pydantic import Field, ValidationError, conint, constr, root_validator, validator
+from pydantic import (
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    RootModel,
+    Tag,
+    ValidationError,
+    ValidationInfo,
+    conint,
+    constr,
+    field_validator,
+    model_validator,
+)
+from pydantic_core import CoreSchema, core_schema
 from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import (
-    CoreConfig,
+    JSON_SCHEMA_DIALECT,
     CoreModel,
-    Duration,
     EntityReference,
     RegistryAuth,
-    generate_dual_core_model,
+    validate_extra_ignore,
 )
+from dstack._internal.core.models.duration import Duration, parse_off_duration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import (
     ProfileParams,
-    ProfileParamsConfig,
     SpotPolicy,
-    parse_duration,
-    parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import (
@@ -44,13 +54,9 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.core.services import is_valid_replica_group_name
 from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
-from dstack._internal.utils.json_schema import add_extra_schema_types
-from dstack._internal.utils.json_utils import (
-    pydantic_orjson_dumps_with_indent,
-)
 
 CommandsList = List[str]
-ValidPort = conint(gt=0, le=65536)
+ValidPort = conint(gt=0, le=65535)
 MAX_INT64 = 2**63 - 1
 SERVICE_HTTPS_DEFAULT = True
 STRIP_PREFIX_DEFAULT = True
@@ -86,6 +92,7 @@ class PythonVersion(str, Enum):
     PY311 = "3.11"
     PY312 = "3.12"
     PY313 = "3.13"
+    PY314 = "3.14"
 
 
 class PortMapping(CoreModel):
@@ -168,6 +175,25 @@ class RepoSpec(CoreModel):
     ] = RepoExistsAction.ERROR
 
     @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        model_schema = handler(source_type)
+        return core_schema.no_info_before_validator_function(
+            cls._parse_shorthand,
+            model_schema,
+            json_schema_input_schema=core_schema.union_schema(
+                [model_schema, core_schema.str_schema()]
+            ),
+        )
+
+    @classmethod
+    def _parse_shorthand(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return cls.parse(v)
+        return v
+
+    @classmethod
     def parse(cls, v: str) -> Self:
         is_url = False
         parts = v.split(":")
@@ -193,15 +219,16 @@ class RepoSpec(CoreModel):
             return cls(local_path=parts[0], path=parts[1])
         raise ValueError(f"Invalid repo: {v}")
 
-    @root_validator
-    def validate_local_path_or_url(cls, values):
-        if values["local_path"] and values["url"]:
+    @model_validator(mode="after")
+    def validate_local_path_or_url(self) -> Self:
+        if self.local_path and self.url:
             raise ValueError("`local_path` and `url` are mutually exclusive")
-        if not values["local_path"] and not values["url"]:
+        if not self.local_path and not self.url:
             raise ValueError("Either `local_path` or `url` must be specified")
-        return values
+        return self
 
-    @validator("path")
+    @field_validator("path")
+    @classmethod
     def validate_path(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
@@ -256,7 +283,8 @@ class ScalingSpec(CoreModel):
         ),
     ] = Duration.parse("10m")
 
-    @validator("window")
+    @field_validator("window")
+    @classmethod
     def validate_window(cls, v: Optional[Duration]) -> Optional[Duration]:
         if v is not None and v not in SERVICE_SCALING_WINDOWS:
             raise ValueError(f"Window must be one of: {ALLOWED_SCALING_WINDOWS_DESCRIPTION}")
@@ -273,7 +301,7 @@ class HeaderPartitioningKey(CoreModel):
         str,
         Field(
             description="Name of the header to use for partitioning",
-            regex=r"^[a-zA-Z0-9-_]+$",  # prevent Nginx config injection
+            pattern=r"^[a-zA-Z0-9-_]+$",  # prevent Nginx config injection
             max_length=500,  # chosen randomly, Nginx limit is higher
         ),
     ]
@@ -288,7 +316,7 @@ class RateLimit(CoreModel):
                 " If an incoming request matches several prefixes, the longest prefix is applied"
             ),
             max_length=4094,  # Nginx limit
-            regex=r"^/[^\s\\{}]*$",  # prevent Nginx config injection
+            pattern=r"^/[^\s\\{}]*$",  # prevent Nginx config injection
         ),
     ] = "/"
     key: Annotated[
@@ -349,20 +377,7 @@ class HTTPHeaderSpec(CoreModel):
     ]
 
 
-class ProbeConfigConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["timeout"],
-            extra_types=[{"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["interval"],
-            extra_types=[{"type": "string"}],
-        )
-
-
-class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
+class ProbeConfig(CoreModel):
     type: Annotated[
         Literal["http"],
         Field(description="The probe type. Must be `http`"),
@@ -381,7 +396,7 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
     ] = None
     headers: Annotated[
         list[HTTPHeaderSpec],
-        Field(description="A list of HTTP headers to include in the request", max_items=16),
+        Field(description="A list of HTTP headers to include in the request", max_length=16),
     ] = []
     body: Annotated[
         Optional[str],
@@ -392,7 +407,7 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
         ),
     ] = None
     timeout: Annotated[
-        Optional[int],
+        Optional[Duration],
         Field(
             description=(
                 f"Maximum amount of time the HTTP request is allowed to take. Defaults to `{DEFAULT_PROBE_TIMEOUT}s`"
@@ -400,7 +415,7 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
         ),
     ] = None
     interval: Annotated[
-        Optional[int],
+        Optional[Duration],
         Field(
             description=(
                 "Minimum amount of time between the end of one probe execution"
@@ -430,25 +445,22 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
         ),
     ] = None
 
-    @validator("timeout", pre=True)
-    def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
-        if v is None:
-            return v
-        parsed = parse_duration(v)
-        if parsed < MIN_PROBE_TIMEOUT:
+    @field_validator("timeout")
+    @classmethod
+    def validate_timeout(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v < MIN_PROBE_TIMEOUT:
             raise ValueError(f"Probe timeout cannot be shorter than {MIN_PROBE_TIMEOUT}s")
-        return parsed
+        return v
 
-    @validator("interval", pre=True)
-    def parse_interval(cls, v: Optional[Union[int, str]]) -> Optional[int]:
-        if v is None:
-            return v
-        parsed = parse_duration(v)
-        if parsed < MIN_PROBE_INTERVAL:
+    @field_validator("interval")
+    @classmethod
+    def validate_interval(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v < MIN_PROBE_INTERVAL:
             raise ValueError(f"Probe interval cannot be shorter than {MIN_PROBE_INTERVAL}s")
-        return parsed
+        return v
 
-    @validator("url")
+    @field_validator("url")
+    @classmethod
     def validate_url(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
@@ -460,25 +472,45 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
             raise ValueError("Cannot contain non-printable characters")
         return v
 
-    @root_validator
-    def validate_body_matches_method(cls, values):
-        method: HTTPMethod = values["method"]
-        if values["body"] is not None and method in ["get", "head"]:
+    @model_validator(mode="after")
+    def validate_body_matches_method(self) -> Self:
+        method: HTTPMethod = self.method
+        if self.body is not None and method in ["get", "head"]:
             raise ValueError(f"Cannot set request body for the `{method}` method")
-        return values
+        return self
 
 
-class BaseRunConfigurationConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["volumes"]["items"],
-            extra_types=[{"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["files"]["items"],
-            extra_types=[{"type": "string"}],
-        )
+def _parse_mount_point_shorthand(v: Union[MountPoint, str]) -> MountPoint:
+    if isinstance(v, str):
+        return parse_mount_point(v)
+    return v
+
+
+def _parse_port_shorthand(v: Union[int, str, PortMapping]) -> PortMapping:
+    if isinstance(v, int):
+        return PortMapping(local_port=v, container_port=v)
+    if isinstance(v, str):
+        return PortMapping.parse(v)
+    return v
+
+
+# `json_schema_input_type` keeps the shorthand visible in the generated JSON Schema, which used to
+# be patched in per field by a sibling config class.
+MountPointOrShorthand = Annotated[
+    MountPoint,
+    BeforeValidator(_parse_mount_point_shorthand, json_schema_input_type=Union[MountPoint, str]),
+]
+# Declared as `PortMapping` rather than the input union: that is what the value always is once
+# `_parse_port_shorthand` has run.
+PortMappingOrShorthand = Annotated[
+    PortMapping,
+    BeforeValidator(
+        _parse_port_shorthand,
+        json_schema_input_type=Union[
+            ValidPort, constr(pattern=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping
+        ],
+    ),
+]
 
 
 class BaseRunConfiguration(CoreModel):
@@ -575,7 +607,9 @@ class BaseRunConfiguration(CoreModel):
             ),
         ),
     ] = None
-    volumes: Annotated[List[MountPoint], Field(description="The volumes mount points")] = []
+    volumes: Annotated[
+        List[MountPointOrShorthand], Field(description="The volumes mount points")
+    ] = []
     docker: Annotated[
         Optional[bool],
         Field(
@@ -605,9 +639,10 @@ class BaseRunConfiguration(CoreModel):
     dev environments it runs right before `init`.
     """
 
-    @validator("python", pre=True, always=True)
-    def convert_python(cls, v, values) -> Optional[PythonVersion]:
-        if v is not None and values.get("image"):
+    @field_validator("python", mode="before")
+    @classmethod
+    def convert_python(cls, v, info: ValidationInfo) -> Optional[PythonVersion]:
+        if v is not None and info.data.get("image"):
             raise ValueError("`image` and `python` are mutually exclusive fields")
         if isinstance(v, float):
             v = str(v)
@@ -617,50 +652,36 @@ class BaseRunConfiguration(CoreModel):
             return PythonVersion(v)
         return v
 
-    @validator("docker", pre=True, always=True)
-    def _docker(cls, v, values) -> Optional[bool]:
-        if v is True and values.get("image"):
+    @field_validator("docker", mode="before")
+    @classmethod
+    def _docker(cls, v, info: ValidationInfo) -> Optional[bool]:
+        if v is True and info.data.get("image"):
             raise ValueError("`image` and `docker` are mutually exclusive fields")
-        if v is True and values.get("python"):
+        if v is True and info.data.get("python"):
             raise ValueError("`python` and `docker` are mutually exclusive fields")
-        if v is True and values.get("nvcc"):
+        if v is True and info.data.get("nvcc"):
             raise ValueError("`nvcc` and `docker` are mutually exclusive fields")
         # Ideally, we'd like to also prohibit privileged=False when docker=True,
         #   but it's not possible to do so without breaking backwards compatibility.
         return v
 
-    @validator("volumes", each_item=True, pre=True)
-    def convert_volumes(cls, v: Union[MountPoint, str]) -> MountPoint:
-        if isinstance(v, str):
-            return parse_mount_point(v)
-        return v
-
-    @validator("files", each_item=True, pre=True)
-    def convert_files(cls, v: Union[FilePathMapping, str]) -> FilePathMapping:
-        if isinstance(v, str):
-            return FilePathMapping.parse(v)
-        return v
-
-    @validator("repos", pre=True, each_item=True)
-    def convert_repos(cls, v: Union[RepoSpec, str]) -> RepoSpec:
-        if isinstance(v, str):
-            return RepoSpec.parse(v)
-        return v
-
-    @validator("repos")
+    @field_validator("repos")
+    @classmethod
     def validate_repos(cls, v) -> RepoSpec:
         if len(v) > 1:
             raise ValueError("A maximum of one repo is currently supported")
         return v
 
-    @validator("user")
+    @field_validator("user")
+    @classmethod
     def validate_user(cls, v) -> Optional[str]:
         if v is None:
             return None
         UnixUser.parse(v)
         return v
 
-    @validator("shell")
+    @field_validator("shell")
+    @classmethod
     def validate_shell(cls, v) -> Optional[str]:
         if v is None:
             return None
@@ -674,32 +695,24 @@ class BaseRunConfiguration(CoreModel):
 
 class ConfigurationWithPortsParams(CoreModel):
     ports: Annotated[
-        List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
+        List[PortMappingOrShorthand],
         Field(description="Port numbers/mapping to expose"),
     ] = []
-
-    @validator("ports", each_item=True)
-    def convert_ports(cls, v) -> PortMapping:
-        if isinstance(v, int):
-            return PortMapping(local_port=v, container_port=v)
-        elif isinstance(v, str):
-            return PortMapping.parse(v)
-        return v
 
 
 class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
-    @root_validator
-    def check_image_or_commands_present(cls, values):
+    @model_validator(mode="after")
+    def check_image_or_commands_present(self) -> Self:
         # If replicas is list, skip validation - commands come from replica groups
-        replicas = values.get("replicas")
+        replicas = getattr(self, "replicas", None)
         if isinstance(replicas, list):
-            return values
+            return self
 
-        if not values.get("commands") and not values.get("image"):
+        if not self.commands and not getattr(self, "image", None):
             raise ValueError("Either `commands` or `image` must be set")
-        return values
+        return self
 
 
 class DevEnvironmentConfigurationParams(CoreModel):
@@ -717,7 +730,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
     ] = None
     init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
-        Optional[Union[Literal["off"], int, bool, str]],
+        Optional[int],
         Field(
             description=(
                 "The maximum amount of time the dev environment can be inactive"
@@ -732,7 +745,13 @@ class DevEnvironmentConfigurationParams(CoreModel):
         ),
     ] = None
 
-    @validator("inactivity_duration", pre=True, allow_reuse=True)
+    # Not `OptionalOffableDuration`: "off" collapses to `None` here rather than staying as the string.
+    @field_validator(
+        "inactivity_duration",
+        mode="before",
+        json_schema_input_type=Optional[Union[Literal["off"], int, bool, str]],
+    )
+    @classmethod
     def parse_inactivity_duration(
         cls, v: Optional[Union[Literal["off"], int, bool, str]]
     ) -> Optional[int]:
@@ -741,10 +760,10 @@ class DevEnvironmentConfigurationParams(CoreModel):
             return v
         return None
 
-    @root_validator
-    def validate_ide_and_version(cls, values):
-        ide = values.get("ide")
-        version = values.get("version")
+    @model_validator(mode="after")
+    def validate_ide_and_version(self) -> Self:
+        ide = self.ide
+        version = self.version
         if version and ide is None:
             raise ValueError("`version` requires `ide` to be set")
         if ide == "windsurf" and version:
@@ -754,17 +773,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
                     f"Invalid Windsurf version format: `{version}`. "
                     "Expected format: `version@commit` (e.g., `1.106.0@8951cd3ad688e789573d7f51750d67ae4a0bea7d`)"
                 )
-        return values
-
-
-class DevEnvironmentConfigurationConfig(
-    ProfileParamsConfig,
-    BaseRunConfigurationConfig,
-):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        ProfileParamsConfig.schema_extra(schema)
-        BaseRunConfigurationConfig.schema_extra(schema)
+        return self
 
 
 class DevEnvironmentConfiguration(
@@ -772,36 +781,26 @@ class DevEnvironmentConfiguration(
     BaseRunConfiguration,
     ConfigurationWithPortsParams,
     DevEnvironmentConfigurationParams,
-    generate_dual_core_model(DevEnvironmentConfigurationConfig),
 ):
     type: Literal["dev-environment"] = "dev-environment"
 
-    @validator("entrypoint")
+    @field_validator("entrypoint")
+    @classmethod
     def validate_entrypoint(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             raise ValueError("entrypoint is not supported for dev-environment")
         return v
 
-    @root_validator
-    def validate_dstack_and_inactivity_duration(cls, values):
-        if values.get("dstack") and values.get("inactivity_duration") is not None:
+    @model_validator(mode="after")
+    def validate_dstack_and_inactivity_duration(self) -> Self:
+        if self.dstack and self.inactivity_duration is not None:
             # The persistent server connection counts as activity, so inactivity is never detected
             raise ValueError("`dstack` is not supported together with `inactivity_duration`")
-        return values
+        return self
 
 
 class TaskConfigurationParams(CoreModel):
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
-
-
-class TaskConfigurationConfig(
-    ProfileParamsConfig,
-    BaseRunConfigurationConfig,
-):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        ProfileParamsConfig.schema_extra(schema)
-        BaseRunConfigurationConfig.schema_extra(schema)
 
 
 class TaskConfiguration(
@@ -810,22 +809,8 @@ class TaskConfiguration(
     ConfigurationWithCommandsParams,
     ConfigurationWithPortsParams,
     TaskConfigurationParams,
-    generate_dual_core_model(TaskConfigurationConfig),
 ):
     type: Literal["task"] = "task"
-
-
-class ServiceConfigurationParamsConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["replicas"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["model"],
-            extra_types=[{"type": "string"}],
-        )
 
 
 def _validate_replica_range(v: Range[int]) -> Range[int]:
@@ -845,7 +830,7 @@ class ReplicaGroup(CoreModel):
         Field(
             description="The name of the replica group. If not provided, defaults to '0', '1', etc. based on position."
         ),
-    ]
+    ] = None
     count: Annotated[
         Range[int],
         Field(
@@ -925,20 +910,23 @@ class ReplicaGroup(CoreModel):
         ),
     ] = None
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             if not is_valid_replica_group_name(v):
                 raise ValueError("Resource name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
         return v
 
-    @validator("count")
+    @field_validator("count")
+    @classmethod
     def convert_count(cls, v: Range[int]) -> Range[int]:
         return _validate_replica_range(v)
 
-    @validator("python", pre=True, always=True)
-    def convert_python(cls, v, values) -> Optional[PythonVersion]:
-        if v is not None and values.get("image"):
+    @field_validator("python", mode="before")
+    @classmethod
+    def convert_python(cls, v, info: ValidationInfo) -> Optional[PythonVersion]:
+        if v is not None and info.data.get("image"):
             raise ValueError("`image` and `python` are mutually exclusive within a replica group")
         if isinstance(v, float):
             v = str(v)
@@ -948,45 +936,47 @@ class ReplicaGroup(CoreModel):
             return PythonVersion(v)
         return v
 
-    @validator("docker", pre=True, always=True)
-    def _docker(cls, v, values) -> Optional[bool]:
-        if v is True and values.get("image"):
+    @field_validator("docker", mode="before")
+    @classmethod
+    def _docker(cls, v, info: ValidationInfo) -> Optional[bool]:
+        if v is True and info.data.get("image"):
             raise ValueError("`image` and `docker` are mutually exclusive within a replica group")
-        if v is True and values.get("python"):
+        if v is True and info.data.get("python"):
             raise ValueError("`python` and `docker` are mutually exclusive within a replica group")
-        if v is True and values.get("nvcc"):
+        if v is True and info.data.get("nvcc"):
             raise ValueError("`nvcc` and `docker` are mutually exclusive within a replica group")
         return v
 
-    @validator("privileged", pre=True, always=True)
-    def _privileged(cls, v, values) -> Optional[bool]:
+    @field_validator("privileged", mode="before")
+    @classmethod
+    def _privileged(cls, v, info: ValidationInfo) -> Optional[bool]:
         # Docker-in-docker requires privileged mode. The service level
         # cannot enforce this rule because its `privileged` field defaults
         # to `False` (existing backwards-compatibility constraint), so it
         # cannot distinguish "unset" from explicit `False`. At the group
         # level we keep `privileged` as `Optional[bool] = None`, so we can.
-        if v is False and values.get("docker") is True:
+        if v is False and info.data.get("docker") is True:
             raise ValueError(
                 "`privileged: false` is incompatible with `docker: true` within "
                 "a replica group (docker-in-docker requires privileged mode)"
             )
         return v
 
-    @root_validator()
-    def validate_scaling(cls, values):
-        scaling = values.get("scaling")
-        count = values.get("count")
+    @model_validator(mode="after")
+    def validate_scaling(self) -> Self:
+        scaling = self.scaling
+        count = self.count
         if count and count.min != count.max and not scaling:
             raise ValueError("When you set `count` to a range, ensure to specify `scaling`.")
         if count and count.min == count.max and scaling:
             raise ValueError("To use `scaling`, `count` must be set to a range.")
-        return values
+        return self
 
 
 class ServiceConfigurationParams(CoreModel):
     port: Annotated[
         # NOTE: it's a PortMapping for historical reasons. Only `port.container_port` is used.
-        Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
+        Union[ValidPort, constr(pattern=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port the application listens on"),
     ]
     gateway: Annotated[
@@ -998,6 +988,7 @@ class ServiceConfigurationParams(CoreModel):
             ]
         ],
         Field(
+            union_mode="left_to_right",  # preserving pydantic v1 parsing behavior
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
                 " Specify boolean `true` to run with the default gateway."
@@ -1015,15 +1006,20 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = STRIP_PREFIX_DEFAULT
+    # A discriminator cannot read `format` off the documented `model: <name>` shorthand, so it
+    # would reject it. This works only because the `convert_model` pre-validator below expands a
+    # bare string into an `OpenAIChatModel` first — leaving the union something that carries
+    # `format` either way: an attribute on the expanded model, or a key in a user-supplied mapping.
     model: Annotated[
         Optional[AnyModel],
         Field(
+            discriminator="format",
             description=(
                 "Mapping of the model for the OpenAI-compatible endpoint provided by `dstack`."
                 " Can be a full model format definition or just a model name."
                 " If it's a name, the service is expected to expose an OpenAI-compatible"
                 " API at the `/v1` path"
-            )
+            ),
         ),
     ] = None
     https: Annotated[
@@ -1051,7 +1047,16 @@ class ServiceConfigurationParams(CoreModel):
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
-        Optional[Union[List[ReplicaGroup], Range[int]]],
+        Optional[
+            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad
+            # `replicas` spells out the whole wrapped schema —
+            # `service.replicas.list[function-after[validate_scaling(), ReplicaGroup]].0` — which
+            # is what `dstack apply` shows the user.
+            Union[
+                Annotated[list[ReplicaGroup], Tag("ReplicaGroup")],
+                Annotated[Range[int], Tag("Range[int]")],
+            ]
+        ],
         Field(
             description=(
                 "The number of replicas or a list of replica groups. "
@@ -1063,16 +1068,9 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    router: Annotated[
-        Optional[AnyServiceRouterConfig],
-        Field(
-            description=(
-                "Router configuration for the service. Requires a gateway with matching router enabled. "
-            ),
-        ),
-    ] = None
 
-    @validator("port")
+    @field_validator("port")
+    @classmethod
     def convert_port(cls, v) -> PortMapping:
         if isinstance(v, int):
             return PortMapping(local_port=80, container_port=v)
@@ -1080,13 +1078,15 @@ class ServiceConfigurationParams(CoreModel):
             return PortMapping.parse(v)
         return v
 
-    @validator("model", pre=True)
+    @field_validator("model", mode="before", json_schema_input_type=Optional[Union[AnyModel, str]])
+    @classmethod
     def convert_model(cls, v: Optional[Union[AnyModel, str]]) -> Optional[AnyModel]:
         if isinstance(v, str):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
-    @validator("rate_limits")
+    @field_validator("rate_limits")
+    @classmethod
     def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
         counts = Counter(limit.prefix for limit in v)
         duplicates = [prefix for prefix, count in counts.items() if count > 1]
@@ -1097,7 +1097,8 @@ class ServiceConfigurationParams(CoreModel):
             )
         return v
 
-    @validator("probes")
+    @field_validator("probes")
+    @classmethod
     def validate_probes(cls, v: Optional[list[ProbeConfig]]) -> Optional[list[ProbeConfig]]:
         if v is None:
             return v
@@ -1109,7 +1110,8 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("Probes must be unique")
         return v
 
-    @validator("gateway")
+    @field_validator("gateway")
+    @classmethod
     def validate_gateway(
         cls, v: Optional[Union[bool, EntityReference, str]]
     ) -> Optional[Union[bool, EntityReference]]:
@@ -1117,7 +1119,8 @@ class ServiceConfigurationParams(CoreModel):
             return EntityReference.parse(v)
         return v
 
-    @validator("replicas")
+    @field_validator("replicas")
+    @classmethod
     def validate_replicas(
         cls, v: Optional[Union[Range[int], List[ReplicaGroup]]]
     ) -> Optional[Union[Range[int], List[ReplicaGroup]]]:
@@ -1145,10 +1148,10 @@ class ServiceConfigurationParams(CoreModel):
                 )
         return v
 
-    @root_validator()
-    def validate_scaling(cls, values):
-        scaling = values.get("scaling")
-        replicas = values.get("replicas")
+    @model_validator(mode="after")
+    def validate_scaling(self) -> Self:
+        scaling = self.scaling
+        replicas = self.replicas
 
         if isinstance(replicas, Range):
             if replicas and replicas.min != replicas.max and not scaling:
@@ -1157,80 +1160,80 @@ class ServiceConfigurationParams(CoreModel):
                 )
             if replicas and replicas.min == replicas.max and scaling:
                 raise ValueError("To use `scaling`, `replicas` must be set to a range.")
-        return values
+        return self
 
-    @root_validator()
-    def validate_top_level_properties_with_replica_groups(cls, values):
+    @model_validator(mode="after")
+    def validate_top_level_properties_with_replica_groups(self) -> Self:
         """
         When replicas is a list of ReplicaGroup, forbid top-level scaling and commands.
         """
-        replicas = values.get("replicas")
+        replicas = self.replicas
 
         if not isinstance(replicas, list):
-            return values
+            return self
 
-        scaling = values.get("scaling")
+        scaling = self.scaling
         if scaling is not None:
             raise ValueError(
                 "Top-level `scaling` is not allowed when `replicas` is a list. "
                 "Specify `scaling` in each replica group instead."
             )
 
-        commands = values.get("commands", [])
+        commands = getattr(self, "commands", None)
         if commands:
             raise ValueError(
                 "Top-level `commands` is not allowed when `replicas` is a list. "
                 "Specify `commands` in each replica group instead."
             )
 
-        return values
+        return self
 
-    @root_validator()
-    def validate_no_mixed_service_and_group_container_fields(cls, values):
+    @model_validator(mode="after")
+    def validate_no_mixed_service_and_group_container_fields(self) -> Self:
         """
         When replicas is a list, certain fields may be set
         at the service level OR in replica groups, never both. Mixing is
         rejected — including partial mixing, where only some groups set a
         field the service also sets — because it leaves precedence ambiguous.
         """
-        replicas = values.get("replicas")
+        replicas = self.replicas
         if not isinstance(replicas, list):
-            return values
+            return self
 
         checks = [
             (
                 "image",
-                values.get("image") is not None,
+                getattr(self, "image", None) is not None,
                 lambda g: g.image is not None,
             ),
             (
                 "docker",
-                values.get("docker") is True,
+                getattr(self, "docker", None) is True,
                 lambda g: g.docker is not None,
             ),
             (
                 "privileged",
-                values.get("privileged") is True,
+                getattr(self, "privileged", None) is True,
                 lambda g: g.privileged is not None,
             ),
             (
                 "python",
-                values.get("python") is not None,
+                getattr(self, "python", None) is not None,
                 lambda g: g.python is not None,
             ),
             (
                 "nvcc",
-                values.get("nvcc") is True,
+                getattr(self, "nvcc", None) is True,
                 lambda g: g.nvcc is not None,
             ),
             (
                 "spot_policy",
-                values.get("spot_policy") is not None,
+                getattr(self, "spot_policy", None) is not None,
                 lambda g: g.spot_policy is not None,
             ),
             (
                 "reservation",
-                values.get("reservation") is not None,
+                getattr(self, "reservation", None) is not None,
                 lambda g: g.reservation is not None,
             ),
         ]
@@ -1245,29 +1248,74 @@ class ServiceConfigurationParams(CoreModel):
                         f"place only — either at the service level (all groups "
                         f"inherit) or per group, but not both."
                     )
-        return values
+        return self
 
-    @root_validator()
-    def validate_no_conflicting_image_sources_across_levels(cls, values):
+    @model_validator(mode="after")
+    def validate_no_conflicting_image_sources_across_levels(self) -> Self:
         """
         Image-source fields (`image`, `docker`, `python`, `nvcc`) cannot
         be mixed across service and group levels in conflicting ways.
         """
-        replicas = values.get("replicas")
+        replicas = self.replicas
         if not isinstance(replicas, list):
-            return values
+            return self
 
         forbidden = [
-            ("image", values.get("image") is not None, "docker", lambda g: g.docker is not None),
-            ("image", values.get("image") is not None, "python", lambda g: g.python is not None),
-            ("image", values.get("image") is not None, "nvcc", lambda g: g.nvcc is not None),
-            ("docker", values.get("docker") is True, "image", lambda g: g.image is not None),
-            ("docker", values.get("docker") is True, "python", lambda g: g.python is not None),
-            ("docker", values.get("docker") is True, "nvcc", lambda g: g.nvcc is not None),
-            ("python", values.get("python") is not None, "image", lambda g: g.image is not None),
-            ("python", values.get("python") is not None, "docker", lambda g: g.docker is not None),
-            ("nvcc", values.get("nvcc") is True, "image", lambda g: g.image is not None),
-            ("nvcc", values.get("nvcc") is True, "docker", lambda g: g.docker is not None),
+            (
+                "image",
+                getattr(self, "image", None) is not None,
+                "docker",
+                lambda g: g.docker is not None,
+            ),
+            (
+                "image",
+                getattr(self, "image", None) is not None,
+                "python",
+                lambda g: g.python is not None,
+            ),
+            (
+                "image",
+                getattr(self, "image", None) is not None,
+                "nvcc",
+                lambda g: g.nvcc is not None,
+            ),
+            (
+                "docker",
+                getattr(self, "docker", None) is True,
+                "image",
+                lambda g: g.image is not None,
+            ),
+            (
+                "docker",
+                getattr(self, "docker", None) is True,
+                "python",
+                lambda g: g.python is not None,
+            ),
+            (
+                "docker",
+                getattr(self, "docker", None) is True,
+                "nvcc",
+                lambda g: g.nvcc is not None,
+            ),
+            (
+                "python",
+                getattr(self, "python", None) is not None,
+                "image",
+                lambda g: g.image is not None,
+            ),
+            (
+                "python",
+                getattr(self, "python", None) is not None,
+                "docker",
+                lambda g: g.docker is not None,
+            ),
+            ("nvcc", getattr(self, "nvcc", None) is True, "image", lambda g: g.image is not None),
+            (
+                "nvcc",
+                getattr(self, "nvcc", None) is True,
+                "docker",
+                lambda g: g.docker is not None,
+            ),
         ]
 
         for s_field, s_set, g_field, g_pred in forbidden:
@@ -1279,22 +1327,22 @@ class ServiceConfigurationParams(CoreModel):
                         f"`{g_field}` in replica group(s) {conflicting}. "
                         f"These image-source fields are mutually exclusive."
                     )
-        return values
+        return self
 
-    @root_validator()
-    def validate_replica_groups_have_commands_or_image(cls, values):
+    @model_validator(mode="after")
+    def validate_replica_groups_have_commands_or_image(self) -> Self:
         """
         When replicas is a list, ensure each ReplicaGroup has something
         to run. Mirrors the service-level rule: either explicit
         `commands` or an `image` (group-level or service-level) is
         required.
         """
-        replicas = values.get("replicas")
+        replicas = self.replicas
 
         if not isinstance(replicas, list):
-            return values
+            return self
 
-        service_has_image = values.get("image") is not None
+        service_has_image = getattr(self, "image", None) is not None
 
         for group in replicas:
             if not group.commands and group.image is None and not service_has_image:
@@ -1304,13 +1352,13 @@ class ServiceConfigurationParams(CoreModel):
                     "service level."
                 )
 
-        return values
+        return self
 
-    @root_validator()
-    def validate_at_most_one_router_replica_group(cls, values):
-        replicas = values.get("replicas")
+    @model_validator(mode="after")
+    def validate_at_most_one_router_replica_group(self) -> Self:
+        replicas = self.replicas
         if not isinstance(replicas, list):
-            return values
+            return self
         router_groups = [g for g in replicas if g.router is not None]
         if len(router_groups) > 1:
             raise ValueError("At most one replica group may specify `router`.")
@@ -1318,36 +1366,7 @@ class ServiceConfigurationParams(CoreModel):
             router_group = router_groups[0]
             if router_group.count.min != 1 or router_group.count.max != 1:
                 raise ValueError("For now replica group with `router` must have `count: 1`.")
-        return values
-
-    @root_validator()
-    def validate_replica_group_router_mutex(cls, values):
-        """
-        When a replica group sets `router:`, service-level `router` must be omitted.
-        (Gateway-level SGLang is rejected at service registration when a gateway is selected.)
-        """
-        replicas = values.get("replicas")
-        if not isinstance(replicas, list):
-            return values
-        if not any(g.router is not None for g in replicas):
-            return values
-        if values.get("router") is not None:
-            raise ValueError(
-                "Service-Level router configuration is not allowed together with replica-group `router`."
-            )
-        return values
-
-
-class ServiceConfigurationConfig(
-    ProfileParamsConfig,
-    BaseRunConfigurationConfig,
-    ServiceConfigurationParamsConfig,
-):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        ProfileParamsConfig.schema_extra(schema)
-        BaseRunConfigurationConfig.schema_extra(schema)
-        ServiceConfigurationParamsConfig.schema_extra(schema)
+        return self
 
 
 class ServiceConfiguration(
@@ -1355,7 +1374,6 @@ class ServiceConfiguration(
     BaseRunConfiguration,
     ConfigurationWithCommandsParams,
     ServiceConfigurationParams,
-    generate_dual_core_model(ServiceConfigurationConfig),
 ):
     type: Literal["service"] = "service"
 
@@ -1391,16 +1409,13 @@ class ServiceConfiguration(
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
 
 
-class RunConfiguration(CoreModel):
-    __root__: Annotated[
-        AnyRunConfiguration,
-        Field(discriminator="type"),
-    ]
+class RunConfiguration(RootModel[Annotated[AnyRunConfiguration, Field(discriminator="type")]]):
+    pass
 
 
 def parse_run_configuration(data: dict) -> AnyRunConfiguration:
     try:
-        conf = RunConfiguration.parse_obj(data).__root__
+        conf = RunConfiguration.model_validate(data).root
     except ValidationError as e:
         raise ConfigurationError(e)
     return conf
@@ -1423,7 +1438,20 @@ AnyApplyConfiguration = Union[
 ]
 
 
-class BaseApplyConfiguration(CoreModel):
+_AnyBaseApplyConfiguration = Annotated[
+    Union[
+        # Final configurations
+        AnyRunConfiguration,
+        FleetConfiguration,
+        GatewayConfiguration,
+        # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
+        BaseVolumeConfiguration,
+    ],
+    Field(discriminator="type"),
+]
+
+
+class BaseApplyConfiguration(RootModel[_AnyBaseApplyConfiguration]):
     """
     `BaseApplyConfiguration` parses the configuration based on the `type` discriminator field,
     but further dispatching (reparsing) may be required if there is another discriminator field,
@@ -1433,28 +1461,16 @@ class BaseApplyConfiguration(CoreModel):
     Don't use this model directly, use `parse_apply_configuration()` instead.
     """
 
-    __root__: Annotated[
-        Union[
-            # Final configurations
-            AnyRunConfiguration,
-            FleetConfiguration,
-            GatewayConfiguration,
-            # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
-            BaseVolumeConfiguration,
-        ],
-        Field(discriminator="type"),
-    ]
-
 
 def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     try:
         # First-pass parsing ignoring extra fields, to get the base (or final) configuration
-        conf = BaseApplyConfiguration.__response__.parse_obj(data).__root__
+        conf = validate_extra_ignore(BaseApplyConfiguration, data).root
         if not isinstance(conf, BaseVolumeConfiguration):
             # If it's a final configuration (currently, any configuration other than
             # BaseVolumeConfiguration), parse again rejecting extra fields
             # for validation purposes only and return the final configuration
-            _ = BaseApplyConfiguration.parse_obj(data).__root__
+            _ = BaseApplyConfiguration.model_validate(data).root
             return conf
     except ValidationError as e:
         raise ConfigurationError(e)
@@ -1470,19 +1486,14 @@ AnyDstackConfiguration = Union[
 ]
 
 
-class DstackConfiguration(CoreModel):
-    __root__: Annotated[
-        AnyDstackConfiguration,
-        Field(discriminator="type"),
-    ]
+def _dstack_configuration_schema(schema: Dict[str, Any]) -> None:
+    schema["$schema"] = JSON_SCHEMA_DIALECT
+    # Allow additionalProperties so that vscode and others not supporting
+    # top-level oneOf do not warn about properties being invalid.
+    schema["additionalProperties"] = True
 
-    class Config(CoreConfig):
-        json_loads = orjson.loads
-        json_dumps = pydantic_orjson_dumps_with_indent
 
-        @staticmethod
-        def schema_extra(schema: Dict[str, Any]):
-            schema["$schema"] = "http://json-schema.org/draft-07/schema#"
-            # Allow additionalProperties so that vscode and others not supporting
-            # top-level oneOf do not warn about properties being invalid.
-            schema["additionalProperties"] = True
+class DstackConfiguration(
+    RootModel[Annotated[AnyDstackConfiguration, Field(discriminator="type")]]
+):
+    model_config = ConfigDict(json_schema_extra=_dstack_configuration_schema)

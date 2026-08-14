@@ -1,17 +1,24 @@
 from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import Field, PositiveInt, root_validator, validator
+from pydantic import (
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import (
     CoreModel,
     EntityReference,
-    generate_dual_core_model,
 )
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.profiles import ProfileParams, ProfileParamsConfig
-from dstack._internal.utils.json_schema import add_extra_schema_types
+from dstack._internal.core.models.profiles import ProfileParams
 
-DEFAULT_CONCURRENCY = 8
+DEFAULT_INPUT_TOKENS = 1024
+DEFAULT_OUTPUT_TOKENS = 1024
+DEFAULT_BASELINE = True
+DEFAULT_DATASET = "random"
 
 
 class PresetModelRepo(CoreModel):
@@ -32,11 +39,13 @@ class PresetModelRepo(CoreModel):
     def allows_variant_selection(self) -> bool:
         return False
 
-    @validator("repo")
+    @field_validator("repo")
+    @classmethod
     def validate_repo(cls, value: str) -> str:
         return _validate_model(value, field="repo")
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
@@ -61,7 +70,8 @@ class PresetModelBase(CoreModel):
     def allows_variant_selection(self) -> bool:
         return True
 
-    @validator("base")
+    @field_validator("base")
+    @classmethod
     def validate_base(cls, value: str) -> str:
         return _validate_model(value, field="base")
 
@@ -77,26 +87,16 @@ class PresetPromptFile(CoreModel):
         Field(description="The path to a prompt file, relative to the configuration file"),
     ]
 
-    @validator("path")
+    @field_validator("path")
+    @classmethod
     def validate_path(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("Prompt path must be a non-empty string")
         return value
 
 
-class PresetConfigurationConfig(ProfileParamsConfig):
-    @staticmethod
-    def schema_extra(schema: dict[str, Any]):
-        ProfileParamsConfig.schema_extra(schema)
-        add_extra_schema_types(
-            schema["properties"]["model"],
-            extra_types=[{"type": "string"}],
-        )
-
-
 class PresetConfiguration(
     ProfileParams,
-    generate_dual_core_model(PresetConfigurationConfig),
 ):
     type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
     name: Annotated[
@@ -134,15 +134,33 @@ class PresetConfiguration(
             )
         ),
     ] = None
-    context_length: Annotated[
+    min_context_length: Annotated[
         Optional[PositiveInt], Field(description="The minimum required context length")
     ] = None
-    max_trials: Annotated[
+    max_ttft: Annotated[
         Optional[PositiveInt],
         Field(
             description=(
-                "The maximum number of benchmarked trials during preset creation"
+                "The maximum p50 time to first token, in milliseconds, that any benchmark"
+                " may report"
+            )
+        ),
+    ] = None
+    trials: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of benchmarked trials during preset creation"
                 " before the best one is promoted"
+            )
+        ),
+    ] = None
+    previous: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The IDs of previous presets whose creation results the agent"
+                " analyzes and improves on"
             )
         ),
     ] = None
@@ -150,19 +168,68 @@ class PresetConfiguration(
         Optional[PositiveInt],
         Field(
             description=(
-                "The number of simultaneous requests used for benchmarks during"
-                f" preset creation. Defaults to `{DEFAULT_CONCURRENCY}`"
+                "The number of simultaneous requests used for benchmarks during preset creation"
+            )
+        ),
+    ] = None
+    input_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of input tokens per request used for benchmarks during"
+                f" preset creation. Defaults to `{DEFAULT_INPUT_TOKENS}`"
+            )
+        ),
+    ] = None
+    output_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "The number of output tokens per request used for benchmarks during"
+                f" preset creation. Defaults to `{DEFAULT_OUTPUT_TOKENS}`"
+            )
+        ),
+    ] = None
+    shared_prefix_tokens: Annotated[
+        Optional[PositiveInt],
+        Field(
+            description=(
+                "How many of `input_tokens` are a prefix identical in every benchmark request,"
+                " as a repeated system prompt or conversation history would be. Defaults to `0`,"
+                " meaning every request is fully unique"
+            )
+        ),
+    ] = None
+    dataset: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The benchmark dataset used during preset creation: `random` for synthetic"
+                " prompts shaped by `input_tokens` and `output_tokens`, a benchmark tool's"
+                " dataset name (e.g. `sharegpt`, `spec_bench`), or a Hugging Face dataset ID."
+                " Defaults to `random`"
+            )
+        ),
+    ] = None
+    baseline: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether the first trial must be a baseline that serves the model with the"
+                " serving framework's recommended defaults instead of an optimization attempt."
+                " Defaults to `true`"
             )
         ),
     ] = None
     gateway: Annotated[
         Optional[Union[bool, EntityReference, str]],
         Field(
+            union_mode="left_to_right",  # preserving pydantic v1 parsing behavior
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
                 " Specify boolean `true` to run with the default gateway."
                 " Omit to run with the default gateway if there is one, or without a gateway otherwise"
-            )
+            ),
         ),
     ] = None
     env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (
@@ -170,10 +237,64 @@ class PresetConfiguration(
     )
 
     @property
-    def effective_concurrency(self) -> int:
-        return self.concurrency if self.concurrency is not None else DEFAULT_CONCURRENCY
+    def effective_input_tokens(self) -> int:
+        return self.input_tokens if self.input_tokens is not None else DEFAULT_INPUT_TOKENS
 
-    @root_validator(pre=True)
+    @property
+    def effective_output_tokens(self) -> int:
+        return self.output_tokens if self.output_tokens is not None else DEFAULT_OUTPUT_TOKENS
+
+    @property
+    def effective_baseline(self) -> bool:
+        return self.baseline if self.baseline is not None else DEFAULT_BASELINE
+
+    @property
+    def effective_dataset(self) -> str:
+        return self.dataset if self.dataset is not None else DEFAULT_DATASET
+
+    @field_validator("dataset")
+    @classmethod
+    def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        # Stripped because the agent reports the dataset it actually loaded, and
+        # the two are compared for equality when the preset is verified.
+        value = value.strip()
+        if not value:
+            raise ValueError("dataset must be a non-empty string")
+        return value
+
+    @model_validator(mode="after")
+    def validate_dataset(self) -> Self:
+        if self.dataset in (None, DEFAULT_DATASET):
+            return self
+        set_fields = [
+            name
+            for name in ("input_tokens", "output_tokens", "shared_prefix_tokens")
+            if getattr(self, name) is not None
+        ]
+        if set_fields:
+            raise ValueError(
+                f"{', '.join(set_fields)} can only be set with the `random` dataset;"
+                " a custom dataset defines its own request shape"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_shared_prefix_tokens(self) -> Self:
+        # The prefix is carved out of the request, so something has to be left
+        # to differ between requests.
+        if self.shared_prefix_tokens is None:
+            return self
+        input_tokens = self.input_tokens or DEFAULT_INPUT_TOKENS
+        if self.shared_prefix_tokens >= input_tokens:
+            raise ValueError(
+                f"shared_prefix_tokens must be less than input_tokens ({input_tokens})"
+            )
+        return self
+
+    @model_validator(mode="before")
+    @classmethod
     def apply_model_shorthand(cls, values: Any) -> Any:
         if not isinstance(values, dict):
             return values
@@ -189,13 +310,15 @@ class PresetConfiguration(
             values["model"] = {"base": base} if base else {"repo": repo}
         return values
 
-    @validator("model", pre=True)
+    @field_validator("model", mode="before", json_schema_input_type=Union[PresetModelSpec, str])
+    @classmethod
     def parse_model(cls, value: Any) -> Any:
         if isinstance(value, str):
             return {"repo": _validate_model(value, field="model")}
         return value
 
-    @validator("prompt")
+    @field_validator("prompt")
+    @classmethod
     def validate_prompt(cls, value: Any) -> Any:
         if isinstance(value, str):
             if not value.strip():
@@ -211,10 +334,16 @@ class PresetConstraints(CoreModel):
 
     run_name_prefix: str
     model: PresetModelSpec
-    context_length: Optional[PositiveInt] = None
-    max_trials: PositiveInt
+    min_context_length: PositiveInt
+    max_ttft: PositiveInt
+    trials_num: PositiveInt
     concurrency: PositiveInt
-    fleets: list[str] = Field(min_items=1)
+    input_tokens: Optional[PositiveInt] = None
+    output_tokens: Optional[PositiveInt] = None
+    shared_prefix_tokens: Optional[int] = None
+    dataset: Optional[str] = None
+    baseline: bool = False
+    fleets: list[str] = Field(min_length=1)
     env: list[str] = []
 
 

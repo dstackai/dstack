@@ -16,7 +16,22 @@ While it's possible to use third-party monitoring tools with `dstack`, it is oft
 track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli/dstack/metrics.md), a new CLI (and API)
 for monitoring container metrics, including GPU usage for `NVIDIA`, `AMD`, and other accelerators.
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-stats-v2.png" width="725"/>
+<div class="termy">
+
+```shell
+$ dstack metrics llama-70b-sft
+
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂ 33%  ▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 296GB/480GB
+        gpu=0  ▁▄▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=1  ▂▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=2  ▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+        gpu=3  ▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▃▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 67GB/80GB
+
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
+```
+
+</div>
 
 <!-- more -->
 

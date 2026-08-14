@@ -4,6 +4,7 @@ from uuid import UUID
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.health import HealthCheck, HealthStatus
+from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.server.schemas.runner import InstanceHealthResponse
 
 
@@ -26,6 +27,7 @@ class InstanceCheck(CoreModel):
     reachable: bool
     message: Optional[str] = None
     health_response: Optional[InstanceHealthResponse] = None
+    gpu_driver: Optional[GpuDriverInfo] = None
 
     def get_health_status(self) -> HealthStatus:
         if self.health_response is None:

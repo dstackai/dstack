@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import patch
 
 import pytest
@@ -78,7 +78,7 @@ class TestListAndGetGateways:
             {
                 "id": SomeUUID4Str(),
                 "project_name": project.name,
-                "backend": backend.type.value,
+                "backend": None,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
                 "status": "submitted",
@@ -98,7 +98,7 @@ class TestListAndGetGateways:
                 "ip_address": None,
                 "hostname": None,
                 "name": gateway.name,
-                "region": gateway.region,
+                "region": None,
                 "wildcard_domain": gateway.wildcard_domain,
                 "configuration": {
                     "type": "gateway",
@@ -106,7 +106,6 @@ class TestListAndGetGateways:
                     "backend": backend.type.value,
                     "region": gateway.region,
                     "instance_type": None,
-                    "router": None,
                     "domain": gateway.wildcard_domain,
                     "default": False,
                     "public_ip": True,
@@ -165,7 +164,7 @@ class TestListAndGetGateways:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "default": False,
             "status": "submitted",
@@ -185,7 +184,7 @@ class TestListAndGetGateways:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -193,7 +192,6 @@ class TestListAndGetGateways:
                 "backend": backend.type.value,
                 "region": gateway.region,
                 "instance_type": None,
-                "router": None,
                 "domain": gateway.wildcard_domain,
                 "default": False,
                 "public_ip": True,
@@ -518,8 +516,8 @@ class TestCreateGateway:
             "id": SomeUUID4Str(),
             "project_name": project.name,
             "name": "test",
-            "backend": "aws",
-            "region": "us",
+            "backend": None,
+            "region": None,
             "status": "submitted",
             "status_message": None,
             "replicas": [],
@@ -535,7 +533,6 @@ class TestCreateGateway:
                 "backend": backend.type.value,
                 "region": "us",
                 "instance_type": None,
-                "router": None,
                 "domain": None,
                 "default": True,
                 "public_ip": True,
@@ -609,8 +606,8 @@ class TestCreateGateway:
             "id": SomeUUID4Str(),
             "project_name": project.name,
             "name": "random-name",
-            "backend": "aws",
-            "region": "us",
+            "backend": None,
+            "region": None,
             "status": "submitted",
             "status_message": None,
             "replicas": [],
@@ -626,7 +623,6 @@ class TestCreateGateway:
                 "backend": backend.type.value,
                 "region": "us",
                 "instance_type": None,
-                "router": None,
                 "domain": None,
                 "default": True,
                 "public_ip": True,
@@ -736,41 +732,15 @@ class TestCreateGateway:
                     "name": "test",
                     "backend": "aws",
                     "region": "us",
-                    "certificate": {
-                        "type": "acm",
-                        "arn": "arn:aws:acm:us-east-1:123456789:certificate/abc",
-                    },
-                    "replicas": 2,
-                },
-                "Replicated gateways do not support certificates."
-                " Set either `certificate: null` or `replicas: 1` in the gateway configuration",
-                id="multi-replica-with-acm-cert",
-            ),
-            pytest.param(
-                {
-                    "type": "gateway",
-                    "name": "test",
-                    "backend": "aws",
-                    "region": "us",
                     "certificate": {"type": "lets-encrypt"},
                     "replicas": 2,
                 },
-                "Replicated gateways do not support certificates."
-                " Set either `certificate: null` or `replicas: 1` in the gateway configuration",
+                "The `lets-encrypt` certificate type is not supported for gateways with `replicas`"
+                " greater than `1`. To create a replicated gateway, set the `certificate`"
+                " configuration property to one of the supported values, such as"
+                " `certificate: null` (no HTTPS)"
+                " or `certificate: { type: acm, arn: <arn> }` (AWS ACM)",
                 id="multi-replica-with-letsencrypt-cert",
-            ),
-            pytest.param(
-                {
-                    "type": "gateway",
-                    "name": "test",
-                    "backend": "aws",
-                    "region": "us",
-                    "certificate": None,
-                    "router": {"type": "sglang"},
-                    "replicas": 2,
-                },
-                "The deprecated `router` property is not supported for multi-replica gateways",
-                id="multi-replica-with-router",
             ),
             pytest.param(
                 {
@@ -870,7 +840,7 @@ class TestDefaultGateway:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "default": True,
             "status": "submitted",
@@ -890,7 +860,7 @@ class TestDefaultGateway:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -898,7 +868,6 @@ class TestDefaultGateway:
                 "backend": backend.type.value,
                 "region": gateway.region,
                 "instance_type": None,
-                "router": None,
                 "domain": gateway.wildcard_domain,
                 "default": True,
                 "public_ip": True,
@@ -1267,7 +1236,7 @@ class TestUpdateGateway:
         assert response.json() == {
             "id": SomeUUID4Str(),
             "project_name": project.name,
-            "backend": backend.type.value,
+            "backend": None,
             "created_at": response.json()["created_at"],
             "status": "submitted",
             "status_message": None,
@@ -1287,7 +1256,7 @@ class TestUpdateGateway:
             "ip_address": None,
             "hostname": None,
             "name": gateway.name,
-            "region": gateway.region,
+            "region": None,
             "wildcard_domain": "new.example",
             "configuration": {
                 "type": "gateway",
@@ -1295,7 +1264,6 @@ class TestUpdateGateway:
                 "backend": backend.type.value,
                 "region": gateway.region,
                 "instance_type": None,
-                "router": None,
                 "domain": "new.example",
                 "default": False,
                 "public_ip": True,
@@ -1827,13 +1795,60 @@ class TestApplyGatewayPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_creates_new_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("default", [None, True])
+    async def test_creates_new_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient, default: Optional[bool]
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         await create_backend(session, project.id, backend_type=BackendType.AWS)
+        configuration: dict[str, Any] = {
+            "type": "gateway",
+            "name": "my-gateway",
+            "backend": "aws",
+            "region": "us-east-1",
+        }
+        if default is not None:
+            configuration["default"] = default
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {"configuration": configuration},
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "my-gateway"
+        assert data["status"] == "submitted"
+        # There is no other gateway in the project, so this one becomes the default
+        # regardless of whether `default` is omitted or set to `true`.
+        assert data["default"] is True
+        events = await list_events(session)
+        assert events[0].message == "Gateway created. Status: SUBMITTED"
+
+        await session.refresh(project)
+        assert str(project.default_gateway_id) == data["id"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_new_gateway_with_default_false_as_not_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+
         response = await client.post(
             f"/api/project/{project.name}/gateways/apply",
             json={
@@ -1842,6 +1857,45 @@ class TestApplyGatewayPlan:
                         "configuration": {
                             "type": "gateway",
                             "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": False,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is False
+        assert data["configuration"]["default"] is False
+
+        await session.refresh(project)
+        assert project.default_gateway_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_new_gateway_with_default_true_supersedes_existing_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "first-gateway",
                             "backend": "aws",
                             "region": "us-east-1",
                         }
@@ -1853,11 +1907,40 @@ class TestApplyGatewayPlan:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
+        first_gateway_id = response.json()["id"]
+
+        await session.refresh(project)
+        assert str(project.default_gateway_id) == first_gateway_id
+
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "second-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": True,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "my-gateway"
-        assert data["status"] == "submitted"
+        assert data["default"] is True
+
+        await session.refresh(project)
+        assert str(project.default_gateway_id) == data["id"]
         events = await list_events(session)
-        assert events[0].message == "Gateway created. Status: SUBMITTED"
+        assert any(e.message == "Gateway set as project default" for e in events)
+        assert any(e.message == "Gateway unset as project default" for e in events)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -2350,3 +2433,463 @@ class TestApplyGatewayPlan:
         )
         assert response.status_code == 400
         assert "FAILED status" in response.json()["detail"][0]["msg"]
+
+
+class TestApplyGatewayPlanDefault:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_sets_default_in_place(
+        self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        first_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="first-gateway",
+            region="us-east-1",
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session, backend_id=backend.id, gateway_id=first_gateway.id
+        )
+        second_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="second-gateway",
+            region="us-east-1",
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session, backend_id=backend.id, gateway_id=second_gateway.id
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/set_default",
+            json={"name": first_gateway.name},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "second-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        assert get_response.status_code == 200
+        current_resource = get_response.json()
+        assert current_resource["default"] is False
+
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "second-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": True,
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is True
+        assert data["configuration"]["default"] is True
+
+        await session.refresh(project)
+        assert project.default_gateway_id == second_gateway.id
+
+        events = await list_events(session)
+        assert any(e.message == "Gateway set as project default" for e in events)
+        assert any(e.message == "Gateway unset as project default" for e in events)
+        assert any("Gateway updated." in e.message and "default" in e.message for e in events)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_unsets_default_in_place(
+        self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/set_default",
+            json={"name": gateway.name},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        current_resource = get_response.json()
+        assert current_resource["default"] is True
+
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": False,
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is False
+        assert data["configuration"]["default"] is False
+        events = await list_events(session)
+        assert any(e.message == "Gateway unset as project default" for e in events)
+
+        await session.refresh(project)
+        assert project.default_gateway_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("initial_default", [True, False])
+    async def test_omitted_default_leaves_current_status_unchanged(
+        self, test_db, session: AsyncSession, client: AsyncClient, initial_default: bool
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+        )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        if initial_default:
+            response = await client.post(
+                f"/api/project/{project.name}/gateways/set_default",
+                json={"name": gateway.name},
+                headers=get_auth_headers(user.token),
+            )
+            assert response.status_code == 200
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        current_resource = get_response.json()
+        assert current_resource["default"] is initial_default
+
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "domain": "new.example.com",
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is initial_default
+        assert data["configuration"]["domain"] == "new.example.com"
+        events = await list_events(session)
+        assert not any("default" in e.message for e in events)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("initial_default", [True, False])
+    async def test_legacy_client_default_false_is_treated_as_omitted(
+        self, test_db, session: AsyncSession, client: AsyncClient, initial_default: bool
+    ):
+        """Pre-0.21.1 clients always send `default: false` when the user does not request
+        a default status change, since they predate `default: null`."""
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+        )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        if initial_default:
+            response = await client.post(
+                f"/api/project/{project.name}/gateways/set_default",
+                json={"name": gateway.name},
+                headers=get_auth_headers(user.token),
+            )
+            assert response.status_code == 200
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        current_resource = get_response.json()
+        assert current_resource["default"] is initial_default
+
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "domain": "new.example.com",
+                            "default": False,
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": False,
+            },
+            headers={**get_auth_headers(user.token), "x-api-version": "0.21.0"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is initial_default
+        assert data["configuration"]["domain"] == "new.example.com"
+        events = await list_events(session)
+        assert not any("default" in e.message for e in events)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_force_apply_default_true_restores_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "first-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": True,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        await session.refresh(project)
+        assert project.default_gateway_id is not None
+        assert str(project.default_gateway_id) == response.json()["id"]
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "second-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": True,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        await session.refresh(project)
+        assert str(project.default_gateway_id) == response.json()["id"]
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "first-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        assert get_response.status_code == 200
+        current_resource = get_response.json()
+        assert current_resource["default"] is False
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "first-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": True,
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": True,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is True
+
+        await session.refresh(project)
+        assert data["id"] == str(project.default_gateway_id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_force_apply_default_false_unsets_default(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": False,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        gateway_id = data["id"]
+        assert data["default"] is False
+
+        await session.refresh(project)
+        assert project.default_gateway_id is None
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/set_default",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        await session.refresh(project)
+        assert str(project.default_gateway_id) == gateway_id
+
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+        assert get_response.status_code == 200
+        current_resource = get_response.json()
+        assert current_resource["default"] is True
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "default": False,
+                        }
+                    },
+                    "current_resource": current_resource,
+                },
+                "force": True,
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["default"] is False
+
+        await session.refresh(project)
+        assert project.default_gateway_id is None

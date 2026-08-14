@@ -22,21 +22,26 @@ class TestValidatePresetMatches:
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
-            context_length=8192,
+            min_context_length=8192,
         )
 
         _validate_preset_matches(preset, configuration=configuration)
 
-    def test_rejects_insufficient_context(self):
+    def test_warns_on_insufficient_context_instead_of_failing(self, capsys):
+        # The preset is chosen by ID and may be the best a session could verify;
+        # the shortfall is stated and the plan confirmation decides.
         preset = get_preset(preset_id="small", context_length=4096)
         configuration = PresetConfiguration(
             name="qwen",
             model={"base": "Qwen/Qwen3.5-27B"},
-            context_length=8192,
+            min_context_length=8192,
         )
 
-        with pytest.raises(CLIError, match="context length"):
-            _validate_preset_matches(preset, configuration=configuration)
+        _validate_preset_matches(preset, configuration=configuration)
+
+        output = capsys.readouterr().out
+        assert "verified for context length 4096" in output
+        assert "8192" in output
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
         matching = get_preset(preset_id="matching")
@@ -51,7 +56,7 @@ class TestValidatePresetMatches:
         _validate_preset_matches(matching, configuration=configuration)
         with pytest.raises(CLIError, match="does not serve repo"):
             _validate_preset_matches(
-                matching.copy(update={"model": "other/repo"}),
+                matching.model_copy(update={"model": "other/repo"}),
                 configuration=configuration,
             )
 
@@ -124,7 +129,7 @@ class TestApplyPreset:
             configurator_args=service_args,
             plan_properties={
                 "Model": "Qwen/Qwen3.5-27B ([secondary]base[/])",
-                "Preset": "8f3a12c4 ([secondary]ctx=32K con=1 42.1 tok/s TTFT 108ms[/])",
+                "Preset": "8f3a12c4 ([secondary]io=1K/128 prefix=0% conc=1[/] tok/s/user=135 tok/s=42.1 ttft=108ms ctx=32K)",
             },
         )
 

@@ -29,7 +29,7 @@ func NewMetricsCollector(ctx context.Context) (*MetricsCollector, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get cgroup mount point: %w", err)
 	}
-	gpuVendor := gpu.GetGpuVendor()
+	gpuVendor := gpu.GetGpuVendor(ctx)
 	return &MetricsCollector{
 		cgroupMountPoint: cgroupMountPoint,
 		gpuVendor:        gpuVendor,

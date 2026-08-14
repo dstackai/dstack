@@ -213,9 +213,13 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         result.instance_update_map["backend"] = backend.TYPE
         result.instance_update_map["region"] = instance_offer.region
         result.instance_update_map["price"] = instance_offer.price
-        result.instance_update_map["instance_configuration"] = instance_configuration.json()
-        result.instance_update_map["job_provisioning_data"] = job_provisioning_data.json()
-        result.instance_update_map["offer"] = instance_offer.json()
+        result.instance_update_map["instance_configuration"] = (
+            instance_configuration.model_dump_json()
+        )
+        result.instance_update_map["job_provisioning_data"] = (
+            job_provisioning_data.model_dump_json()
+        )
+        result.instance_update_map["offer"] = instance_offer.model_dump_json()
         result.instance_update_map["total_blocks"] = instance_offer.total_blocks
         result.instance_update_map["started_at"] = NOW_PLACEHOLDER
 
@@ -398,7 +402,7 @@ async def _find_or_create_suitable_placement_group_model(
             backend=instance_offer.backend,
             region=instance_offer.region,
             placement_strategy=PlacementStrategy.CLUSTER,
-        ).json(),
+        ).model_dump_json(),
     )
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     logger.debug(
@@ -438,5 +442,5 @@ async def _find_or_create_suitable_placement_group_model(
         return None, False
 
     placement_group.provisioning_data = provisioning_data
-    placement_group_model.provisioning_data = provisioning_data.json()
+    placement_group_model.provisioning_data = provisioning_data.model_dump_json()
     return placement_group_model, True

@@ -13,7 +13,7 @@ from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import metrics
 from dstack._internal.server.services.jobs import get_run_job_model
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -72,7 +72,7 @@ async def get_job_metrics(
     if job_model is None:
         raise ResourceNotExistsError("Found no job with given parameters")
 
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await metrics.get_job_metrics(
             session=session,
             job_model=job_model,

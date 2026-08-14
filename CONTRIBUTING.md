@@ -63,6 +63,36 @@ Use the `--runpostgres` flag to run the tests against Postgres as well:
 uv run pytest src/tests --runpostgres
 ```
 
+Alternatively, you can run tests via [tox](https://tox.wiki/) inside an isolated environment ensuring that the `dstack` package itself is built correctly and all requirements are specified and correct. tox and [just](https://just.systems/) must be already installed.
+
+* Run tests in the default environment:
+
+  ```shell
+  just tox::test-default
+  ```
+
+  The Python version of the default environment is configured via the `.python-version` file in the repo root directory. Note, the same file [is used by uv](https://docs.astral.sh/uv/concepts/python-versions/#python-version-files).
+
+* Run tests against all currently supported Python versions:
+
+  ```shell
+  just tox::test-supported
+  ```
+
+* Run tests in the _current_ environment:
+
+  ```shell
+  just tox::test-current
+  ```
+
+  It saves about 30-60 seconds at the cost of Python environment isolation (defeating the core purpose of tox) — no packages are built or installed, and, as a consequence, all dependencies must be already installed, but, unlike the plain pytest command, the process environment variables are still isolated.
+
+It's possible to pass pytest arguments after the `--` separator (the arguments _before_ the separator are `tox run` arguments):
+
+```shell
+just tox::test-default -- -vvv --last-failed
+```
+
 ## Add a new backend
 
 If you'd like to integrate a new cloud provider to `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).

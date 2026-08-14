@@ -13,7 +13,6 @@ from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
-    CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
     GetFleetPlanRequest,
@@ -28,7 +27,7 @@ from dstack._internal.server.security.permissions import (
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
     get_client_version,
 )
@@ -73,7 +72,7 @@ async def list_fleets(
     )
     for fleet in fleet_list:
         patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet_list)
+    return CustomJSONResponse(fleet_list)
 
 
 @project_router.post("/list", summary="List project fleets", response_model=List[Fleet])
@@ -97,7 +96,7 @@ async def list_project_fleets(
     )
     for fleet in fleet_list:
         patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet_list)
+    return CustomJSONResponse(fleet_list)
 
 
 @project_router.post("/get", summary="Get fleet", response_model=Fleet)
@@ -122,7 +121,7 @@ async def get_fleet(
     if fleet is None:
         raise ResourceNotExistsError()
     patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
+    return CustomJSONResponse(fleet)
 
 
 @project_router.post("/get_plan", summary="Get fleet plan", response_model=FleetPlan)
@@ -143,7 +142,7 @@ async def get_plan(
         spec=body.spec,
     )
     patch_fleet_plan(plan, client_version)
-    return CustomORJSONResponse(plan)
+    return CustomJSONResponse(plan)
 
 
 @project_router.post("/apply", summary="Apply fleet plan", response_model=Fleet)
@@ -169,30 +168,7 @@ async def apply_plan(
         pipeline_hinter=pipeline_hinter,
     )
     patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
-
-
-@project_router.post("/create", summary="Create fleet", response_model=Fleet, deprecated=True)
-async def create_fleet(
-    body: CreateFleetRequest,
-    session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
-    client_version: Optional[Version] = Depends(get_client_version),
-):
-    """
-    Creates a fleet given a fleet configuration.
-    """
-    user, project = user_project
-    fleet = await fleets_services.create_fleet(
-        session=session,
-        project=project,
-        user=user,
-        spec=body.spec,
-        pipeline_hinter=pipeline_hinter,
-    )
-    patch_fleet(fleet, client_version)
-    return CustomORJSONResponse(fleet)
+    return CustomJSONResponse(fleet)
 
 
 @project_router.post("/delete", summary="Delete fleets")

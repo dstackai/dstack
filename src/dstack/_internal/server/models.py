@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable, Generic, List, Optional, TypeVar, Union
 
+from pydantic import ConfigDict
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -24,7 +25,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
@@ -76,18 +77,16 @@ class NaiveDateTime(TypeDecorator):
         return value.replace(tzinfo=timezone.utc)
 
 
-class DecryptedStringConfig(CoreConfig):
-    arbitrary_types_allowed = True
+class DecryptedString(CoreModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-
-class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     """
     A type for representing plaintext strings encrypted with `EncryptedString`.
     Besides the string, stores information if the decryption was successful.
     This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
     """
 
-    plaintext: Optional[str]
+    plaintext: Optional[str] = None
     """
     `plaintext` should not be read directly to avoid ignoring errors accidentally.
     Unpack with `get_plaintext_or_error()`.
@@ -261,7 +260,7 @@ class ProjectModel(BaseModel):
     """
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    owner: Mapped[UserModel] = relationship(lazy="joined")
+    owner: Mapped[UserModel] = relationship()
     members: Mapped[List["MemberModel"]] = relationship(
         back_populates="project", order_by="MemberModel.member_num"
     )
@@ -297,7 +296,9 @@ class MemberModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
@@ -312,7 +313,9 @@ class BackendModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
     type: Mapped[BackendType] = mapped_column(EnumAsString(BackendType, 100))
 
@@ -419,7 +422,7 @@ class RunModel(PipelineModelMixin, BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
 
-    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"), index=True)
     """`fleet_id` keeps runs attached to fleets so the fleets cannot be deleted while they are used.
     A fleet can have no busy instances but still be used by a run, for example a service with
     zero replicas.
@@ -459,6 +462,9 @@ class RunModel(PipelineModelMixin, BaseModel):
 
     service_router_worker_sync: Mapped[Optional["ServiceRouterWorkerSyncModel"]] = relationship(
         back_populates="run", uselist=False
+    )
+    service_registrations: Mapped[List["ServiceRegistrationModel"]] = relationship(
+        back_populates="run"
     )
 
     __table_args__ = (
@@ -565,7 +571,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     If `instance_assigned` is `True` and `instance` is `None`, no instance was assigned.
     """
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("instances.id", ondelete="CASCADE")
+        ForeignKey("instances.id", ondelete="CASCADE"), index=True
     )
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="jobs")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
@@ -575,9 +581,15 @@ class JobModel(PipelineModelMixin, BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
+    ready: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    """Whether the replica is ready to receive service requests based on probe statuses.
+    Always `False` for non-service runs.
+    """
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    """`registered` shows whether the replica is registered to receive service requests.
-    It is always `False` for non-service runs.
+    """Whether the replica should be registered to receive service requests from dstack-proxy.
+    Registration on the gateway can happen with a delay after this field is flipped to `True`.
+    Always `False` for non-service runs or jobs that shouldn't be registered
+    (e.g., non-router replicas for services with routers).
     """
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
     """`waiting_master_job` is `True` for non-master jobs that have to wait for master processing before
@@ -586,6 +598,10 @@ class JobModel(PipelineModelMixin, BaseModel):
     should be processed only one-by-one.
     """
     image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
+
+    service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
+        back_populates="job"
+    )
 
     __table_args__ = (
         Index(
@@ -614,7 +630,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     desired_replica_count: Mapped[Optional[int]] = mapped_column(Integer)
-    """Only `None` for pre-0.20.30 gateways that were never scaled"""
+    """Only `None` for pre-0.21.0 gateways that were never scaled"""
     replica_scale_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     last_replica_scale_attempt_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     last_update_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
@@ -631,6 +647,14 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
     backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
     backend: Mapped["BackendModel"] = relationship()
+
+    hostname: Mapped[Optional[str]] = mapped_column(String(255))
+    """Hostname of the gateway's load balancer (e.g. ALB domain name for AWS ACM gateways).
+    Unset when there is no load balancer.
+    """
+    backend_data: Mapped[Optional[str]] = mapped_column(Text)
+    """Backend-specific load balancer resource data in JSON.
+    """
 
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
@@ -682,10 +706,8 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     """Gateway replica IP address or domain name (e.g., k8s can use domain names).
     **TODO**: rename.
     """
-    hostname: Mapped[Optional[str]] = mapped_column(String(100))
-    """Hostname of the gateway's load balancer.
-    **TODO**: move to `GatewayModel`.
-    """
+    hostname_deprecated_readonly: Mapped[Optional[str]] = mapped_column("hostname", String(100))
+    """Replaced by GatewayModel.hostname since 0.21.0"""
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     """`configuration` is optional for compatibility with pre-0.18.2 gateways.
     Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
@@ -732,12 +754,87 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
+    service_registrations: Mapped[List["ServiceRegistrationModel"]] = relationship(
+        back_populates="gateway_replica"
+    )
+    service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
+        back_populates="gateway_replica"
+    )
+
     __table_args__ = (
         Index(
             "ix_gateway_computes_pipeline_fetch_q",
             last_processed_at.asc(),
             postgresql_where=deleted == false(),
             sqlite_where=deleted == false(),
+        ),
+    )
+
+
+class ServiceRegistrationModel(BaseModel):
+    """Many-to-many association between services and gateway replicas"""
+
+    __tablename__ = "service_registrations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    run: Mapped["RunModel"] = relationship(back_populates="service_registrations")
+    gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
+    )
+    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+        back_populates="service_registrations"
+    )
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Whether the service is successfully registered on this gateway replica"""
+    register_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    register_status_message: Mapped[Optional[str]] = mapped_column(Text)
+    unregister_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    unregister_status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "gateway_replica_id",
+            name="uq_service_registrations_run_id_gateway_replica_id",
+        ),
+    )
+
+
+class ServiceReplicaRegistrationModel(BaseModel):
+    """Many-to-many association between service replicas and gateway replicas"""
+
+    __tablename__ = "service_replica_registrations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), index=True
+    )
+    job: Mapped["JobModel"] = relationship(back_populates="service_replica_registrations")
+    gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
+    )
+    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+        back_populates="service_replica_registrations"
+    )
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Whether the service replica is successfully registered on this gateway replica"""
+    register_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    register_status_message: Mapped[Optional[str]] = mapped_column(Text)
+    unregister_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    unregister_status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "gateway_replica_id",
+            name="uq_service_replica_registrations_job_id_gateway_replica_id",
         ),
     )
 
@@ -848,7 +945,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     )
     """`fleet` can be `None` only for legacy instances created before fleets."""
 
-    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
+    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("compute_groups.id"), index=True
+    )
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)

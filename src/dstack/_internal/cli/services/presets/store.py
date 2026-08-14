@@ -22,9 +22,7 @@ from dstack._internal.utils.common import get_dstack_dir
 
 
 class PresetStore:
-    """Presets live at `<root>/<preset id>/` — one directory per preset holding
-    the artifact (`preset.yaml`) next to the creation session internals.
-    Deleted presets are archived under `<root>/.archive/`."""
+    """One `<root>/<id>/preset.yaml` per preset."""
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
@@ -62,7 +60,21 @@ class PresetStore:
         directory = self.root / preset.id
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / "preset.yaml"
-        content = yaml.safe_dump(preset_to_data(preset), sort_keys=False)
+        data = preset_to_data(preset)
+        # Undo the load-time resolution: paths under the preset directory are saved
+        # relative, or re-saving a loaded preset (e.g. `release_name`) would bake
+        # this machine's absolute paths back in and break portability.
+        for mapping in data.get("service", {}).get("files", []):
+            local_path = Path(mapping["local_path"])
+            if not local_path.is_absolute():
+                continue
+            for base in (directory, directory.resolve()):
+                try:
+                    mapping["local_path"] = local_path.relative_to(base).as_posix()
+                    break
+                except ValueError:
+                    continue
+        content = yaml.safe_dump(data, sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
             dir=directory,
             prefix=f".{preset.id}.",
@@ -88,15 +100,13 @@ class PresetStore:
         return None
 
     def find_by_id_or_name(self, ref: str) -> Preset | None:
-        """Resolves a preset reference that may be an ID or a claimed name."""
         return self.get(ref) or self.find_by_name(ref)
 
     def release_name(self, name: str) -> Preset | None:
-        """Releases `name` from the preset holding it, keeping the preset."""
         preset = self.find_by_name(name)
         if preset is None:
             return None
-        detached = preset.copy(update={"name": None})
+        detached = preset.model_copy(update={"name": None})
         self.save(detached)
         return detached
 
@@ -109,18 +119,8 @@ class PresetStore:
         directory = self.root / preset_id
         if not (directory / "preset.yaml").is_file():
             return False
-        self._archive(directory)
+        shutil.rmtree(directory)
         return True
-
-    def _archive(self, directory: Path) -> None:
-        archive_root = self.root / ".archive"
-        archive_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        target = archive_root / directory.name
-        index = 0
-        while target.exists():
-            index += 1
-            target = archive_root / f"{directory.name}-{index}"
-        shutil.move(str(directory), str(target))
 
     def _migrate_legacy(self) -> None:
         for legacy in list(self.root.glob("models--*/*.yaml")):
@@ -138,9 +138,16 @@ class PresetStore:
     def _load(self, path: Path) -> Preset:
         try:
             with path.open(encoding="utf-8") as f:
-                return Preset.parse_obj(yaml.safe_load(f))
+                preset = Preset.model_validate(yaml.safe_load(f))
         except (OSError, ValidationError, yaml.YAMLError) as e:
             raise CLIError(f"Invalid preset file {path}: {e}") from e
+        # `files` paths are saved relative to the preset directory so the directory
+        # is portable; resolve them so callers see absolute paths. Absolute values
+        # (presets saved before this) pass through.
+        for mapping in preset.service.files:
+            if not Path(mapping.local_path).is_absolute():
+                mapping.local_path = str(path.parent / mapping.local_path)
+        return preset
 
 
 def _validate_preset_id(preset_id: str) -> None:
@@ -167,7 +174,7 @@ def _parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ConfigurationError("Preset configuration must be a YAML object")
-        configuration = PresetConfiguration.parse_obj(data)
+        configuration = PresetConfiguration.model_validate(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
     except yaml.YAMLError as e:
@@ -185,7 +192,7 @@ def _parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
 def resolve_preset_prompt(
     configuration: PresetConfiguration, configuration_path: str
 ) -> str | None:
-    """The resolved user prompt text; file paths are relative to the configuration file."""
+    """Prompt-file paths resolve relative to the configuration file's directory (cwd for stdin)."""
     if configuration.prompt is None:
         return None
     if isinstance(configuration.prompt, str):

@@ -2,7 +2,7 @@ from typing import Optional
 
 import pytest
 from gpuhunt import AcceleratorVendor, CPUArchitecture
-from pydantic import ValidationError, parse_obj_as
+from pydantic import TypeAdapter, ValidationError
 
 from dstack._internal.core.models.resources import (
     DEFAULT_CPU_COUNT,
@@ -16,102 +16,107 @@ from dstack._internal.core.models.resources import (
 
 class TestMemory:
     def test_mb(self):
-        assert parse_obj_as(Memory, "512MB") == 0.5
+        assert TypeAdapter(Memory).validate_python("512MB") == 0.5
 
     def test_gb(self):
-        assert parse_obj_as(Memory, "16 Gb") == 16.0
+        assert TypeAdapter(Memory).validate_python("16 Gb") == 16.0
 
     def test_tb(self):
-        assert parse_obj_as(Memory, "1 TB ") == 1024.0
+        assert TypeAdapter(Memory).validate_python("1 TB ") == 1024.0
 
     def test_float(self):
-        assert parse_obj_as(Memory, 1.5) == 1.5
+        assert TypeAdapter(Memory).validate_python(1.5) == 1.5
 
     def test_int(self):
-        assert parse_obj_as(Memory, 1) == 1.0
+        assert TypeAdapter(Memory).validate_python(1) == 1.0
 
     def test_invalid(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(Memory, "1.5xb")
+            TypeAdapter(Memory).validate_python("1.5xb")
 
 
 class TestComputeCapability:
     def test_str(self):
-        assert parse_obj_as(ComputeCapability, "3.5") == (3, 5)
+        assert TypeAdapter(ComputeCapability).validate_python("3.5") == (3, 5)
 
     def test_float(self):
-        assert parse_obj_as(ComputeCapability, 8.0) == (8, 0)
+        assert TypeAdapter(ComputeCapability).validate_python(8.0) == (8, 0)
 
     def test_tuple(self):
-        assert parse_obj_as(ComputeCapability, (7, 5)) == (7, 5)
+        assert TypeAdapter(ComputeCapability).validate_python((7, 5)) == (7, 5)
 
     def test_invalid_len(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(ComputeCapability, "3.5.1")
+            TypeAdapter(ComputeCapability).validate_python("3.5.1")
 
     def test_invalid_type(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(ComputeCapability, "3.x")
+            TypeAdapter(ComputeCapability).validate_python("3.x")
 
 
 class TestIntRange:
     def test_int(self):
-        assert parse_obj_as(Range[int], 1).dict() == dict(min=1, max=1)
+        assert Range[int].model_validate(1).model_dump() == dict(min=1, max=1)
 
     def test_exact(self):
-        assert parse_obj_as(Range[int], "1").dict() == dict(min=1, max=1)
+        assert Range[int].model_validate("1").model_dump() == dict(min=1, max=1)
 
     def test_from(self):
-        assert parse_obj_as(Range[int], "1..").dict() == dict(min=1, max=None)
+        assert Range[int].model_validate("1..").model_dump() == dict(min=1, max=None)
 
     def test_to(self):
-        assert parse_obj_as(Range[int], "..1").dict() == dict(min=None, max=1)
+        assert Range[int].model_validate("..1").model_dump() == dict(min=None, max=1)
 
     def test_invalid_range(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[int], "..")
+            Range[int].model_validate("..")
 
     def test_range_typo(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[int], "1...3")
+            Range[int].model_validate("1...3")
 
     def test_dict(self):
-        assert parse_obj_as(Range[int], {"min": 1, "max": 3}).dict() == dict(min=1, max=3)
+        assert Range[int].model_validate({"min": 1, "max": 3}).model_dump() == dict(min=1, max=3)
 
     def test_unordered(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[int], "3..1")
+            Range[int].model_validate("3..1")
 
     def test__str__(self):
-        assert isinstance(str(parse_obj_as(Range[int], "1")), str)
+        assert isinstance(str(Range[int].model_validate("1")), str)
 
 
 class TestMemoryRange:
     def test_mb(self):
-        assert parse_obj_as(Range[Memory], "512MB").dict() == dict(min=0.5, max=0.5)
+        assert Range[Memory].model_validate("512MB").model_dump() == dict(min=0.5, max=0.5)
 
     def test_from(self):
-        assert parse_obj_as(Range[Memory], "512MB..").dict() == dict(min=0.5, max=None)
+        assert Range[Memory].model_validate("512MB..").model_dump() == dict(min=0.5, max=None)
 
     def test_to(self):
-        assert parse_obj_as(Range[Memory], "..1 TB").dict() == dict(min=None, max=1024.0)
+        assert Range[Memory].model_validate("..1 TB").model_dump() == dict(min=None, max=1024.0)
 
     def test_range(self):
-        assert parse_obj_as(Range[Memory], "512..1 TB").dict() == dict(min=512.0, max=1024.0)
+        assert Range[Memory].model_validate("512..1 TB").model_dump() == dict(
+            min=512.0, max=1024.0
+        )
 
     def test_invalid_range(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(Range[Memory], "...")
+            Range[Memory].model_validate("...")
 
     def test_dict(self):
-        assert parse_obj_as(Range[Memory], {"min": "512MB", "max": "1TB"}).dict() == dict(
+        assert Range[Memory].model_validate({"min": "512MB", "max": "1TB"}).model_dump() == dict(
             min=0.5, max=1024.0
         )
 
 
 class TestCPU:
     def test_integer(self):
-        assert parse_obj_as(CPUSpec, 1).dict() == {"arch": None, "count": {"min": 1, "max": 1}}
+        assert CPUSpec.model_validate(1).model_dump() == {
+            "arch": None,
+            "count": {"min": 1, "max": 1},
+        }
 
     @pytest.mark.parametrize(
         ["value", "expected_arch", "expected_min", "expected_max"],
@@ -129,7 +134,7 @@ class TestCPU:
         expected_min: Optional[int],
         expected_max: Optional[int],
     ):
-        assert parse_obj_as(CPUSpec, value).dict() == {
+        assert CPUSpec.model_validate(value).model_dump() == {
             "arch": expected_arch,
             "count": {"min": expected_min, "max": expected_max},
         }
@@ -145,34 +150,55 @@ class TestCPU:
     )
     def test_invalid_string(self, value: str, error: str):
         with pytest.raises(ValidationError, match=error):
-            parse_obj_as(CPUSpec, value)
+            CPUSpec.model_validate(value)
 
     def test_range_object(self):
-        assert parse_obj_as(CPUSpec, Range[int](min=1, max=2)).dict() == {
+        assert CPUSpec.model_validate(Range[int](min=1, max=2)).model_dump() == {
             "arch": None,
             "count": {"min": 1, "max": 2},
         }
 
-    def test_range_dict(self):
-        assert parse_obj_as(CPUSpec, {"min": 1, "max": 2}).dict() == {
+    @pytest.mark.parametrize(
+        ["value", "expected_min", "expected_max"],
+        [
+            pytest.param({"min": 1, "max": 2}, 1, 2, id="closed"),
+            pytest.param({"min": 1}, 1, None, id="min-only"),
+            pytest.param({"max": 2}, None, 2, id="max-only"),
+            # An empty mapping is not a range: it falls through to the `CPUSpec` defaults instead
+            # of an empty `count` range, which `Range` rejects.
+            pytest.param({}, DEFAULT_CPU_COUNT.min, DEFAULT_CPU_COUNT.max, id="empty"),
+        ],
+    )
+    def test_range_dict(
+        self, value: dict, expected_min: Optional[int], expected_max: Optional[int]
+    ):
+        assert CPUSpec.model_validate(value).model_dump() == {
             "arch": None,
-            "count": {"min": 1, "max": 2},
+            "count": {"min": expected_min, "max": expected_max},
         }
 
-    def test_valid_dict(self):
-        assert parse_obj_as(CPUSpec, {"arch": "ARM", "count": {"min": 1, "max": 2}}).dict() == {
+    def test_valid_dict_with_all_fields(self):
+        assert CPUSpec.model_validate(
+            {"arch": "ARM", "count": {"min": 1, "max": 2}}
+        ).model_dump() == {
             "arch": CPUArchitecture.ARM,
             "count": {"min": 1, "max": 2},
         }
 
+    def test_valid_dict_no_arch_half_open_count_range(self):
+        assert CPUSpec.model_validate({"count": {"max": 2}}).model_dump() == {
+            "arch": None,
+            "count": {"min": None, "max": 2},
+        }
+
     def test_invalid_dict(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(CPUSpec, {"arch": "x86", "min": 1, "max": 2})
+            CPUSpec.model_validate({"arch": "x86", "min": 1, "max": 2})
 
 
 class TestGPU:
     def test_count(self):
-        assert parse_obj_as(GPUSpec, "1") == parse_obj_as(GPUSpec, {"count": 1})
+        assert GPUSpec.model_validate("1") == GPUSpec.model_validate({"count": 1})
 
     @pytest.mark.parametrize(
         ["value", "expected"],
@@ -203,7 +229,7 @@ class TestGPU:
         ],
     )
     def test_vendor_in_string_form(self, value, expected):
-        assert parse_obj_as(GPUSpec, value) == parse_obj_as(GPUSpec, expected)
+        assert GPUSpec.model_validate(value) == GPUSpec.model_validate(expected)
 
     @pytest.mark.parametrize(
         ["value", "expected"],
@@ -218,44 +244,44 @@ class TestGPU:
         ],
     )
     def test_vendor_in_object_form(self, value, expected):
-        assert parse_obj_as(GPUSpec, {"vendor": value}) == parse_obj_as(
-            GPUSpec, {"vendor": expected}
+        assert GPUSpec.model_validate({"vendor": value}) == GPUSpec.model_validate(
+            {"vendor": expected}
         )
 
     def test_name(self):
-        assert parse_obj_as(GPUSpec, "A100") == parse_obj_as(GPUSpec, {"name": ["A100"]})
+        assert GPUSpec.model_validate("A100") == GPUSpec.model_validate({"name": ["A100"]})
 
     def test_name_with_tpu_prefix(self):
-        spec = parse_obj_as(GPUSpec, "tpu-v3-2048")
+        spec = GPUSpec.model_validate("tpu-v3-2048")
         assert spec.name == ["v3-2048"]
 
     def test_memory(self):
-        assert parse_obj_as(GPUSpec, "16GB") == parse_obj_as(GPUSpec, {"memory": "16GB"})
+        assert GPUSpec.model_validate("16GB") == GPUSpec.model_validate({"memory": "16GB"})
 
     def test_names_count(self):
-        assert parse_obj_as(GPUSpec, "A10,A10G:2") == parse_obj_as(
-            GPUSpec, {"name": ["A10", "A10G"], "count": 2}
+        assert GPUSpec.model_validate("A10,A10G:2") == GPUSpec.model_validate(
+            {"name": ["A10", "A10G"], "count": 2}
         )
 
     def test_empty_name(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(GPUSpec, "A100,:2")
+            GPUSpec.model_validate("A100,:2")
 
     def test_empty_token(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(GPUSpec, "A100:")
+            GPUSpec.model_validate("A100:")
 
     def test_vendor_conflict(self):
         with pytest.raises(ValidationError, match=r"vendor conflict"):
-            parse_obj_as(GPUSpec, "Nvidia:A100:2:AMD")
+            GPUSpec.model_validate("Nvidia:A100:2:AMD")
 
     def test_count_conflict(self):
         with pytest.raises(ValidationError, match=r"count conflict"):
-            parse_obj_as(GPUSpec, "A100:2:3")
+            GPUSpec.model_validate("A100:2:3")
 
     def test_memory_range(self):
-        assert parse_obj_as(GPUSpec, "16GB..32") == parse_obj_as(
-            GPUSpec, {"memory": {"min": 16, "max": 32}}
+        assert GPUSpec.model_validate("16GB..32") == GPUSpec.model_validate(
+            {"memory": {"min": 16, "max": 32}}
         )
 
 

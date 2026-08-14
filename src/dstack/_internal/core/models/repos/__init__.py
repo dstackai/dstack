@@ -28,7 +28,7 @@ class RepoHead(CoreModel):
 
 
 class RepoHeadWithCreds(RepoHead):
-    repo_creds: Optional[RemoteRepoCreds]
+    repo_creds: Optional[RemoteRepoCreds] = None
 
 
 AnyRepoHead = Union[RepoHeadWithCreds, RepoHead]

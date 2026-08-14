@@ -59,7 +59,7 @@ def print_runs_json(project: str, runs: List[Run]) -> None:
         project=project,
         runs=[r._run for r in runs],
     )
-    print(output.json())
+    print(output.model_dump_json())
 
 
 def print_run_plan(
@@ -205,7 +205,7 @@ def _format_run_status(run) -> str:
         RunStatus.FAILED: "indian_red1",
         RunStatus.DONE: "grey",
     }
-    if status_text in ("no offers", "interrupted"):
+    if status_text in ("no capacity", "interrupted"):
         color = "gold1"
     elif status_text == "no fleets":
         color = "indian_red1"
@@ -220,7 +220,7 @@ def _format_run_status(run) -> str:
 def _format_job_submission_status(job_submission: JobSubmission, verbose: bool) -> str:
     status_message = job_submission.status_message
     job_status = job_submission.status
-    if status_message in ("no offers", "interrupted"):
+    if status_message in ("no capacity", "interrupted"):
         color = "gold1"
     elif status_message == "no fleets":
         color = "indian_red1"

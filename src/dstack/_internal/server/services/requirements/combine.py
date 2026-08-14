@@ -86,7 +86,7 @@ def _combine_backend_options(
         if opt.type in by_type:
             by_type[opt.type] = by_type[opt.type].combine(opt)
         else:
-            by_type[opt.type] = opt.copy(deep=True)
+            by_type[opt.type] = opt.model_copy(deep=True)
     return list(by_type.values())
 
 
@@ -171,7 +171,7 @@ def _combine_tags(value1: dict[str, str], value2: dict[str, str]) -> dict[str, s
 
 def _combine_resources(value1: ResourcesSpec, value2: ResourcesSpec) -> ResourcesSpec:
     return ResourcesSpec(
-        cpu=_combine_cpu(value1.cpu, value2.cpu),  # type: ignore[attr-defined]
+        cpu=_combine_cpu(value1.cpu, value2.cpu),
         memory=_combine_memory(value1.memory, value2.memory),
         shm_size=_combine_shm_size_optional(value1.shm_size, value2.shm_size),
         gpu=_combine_gpu_optional(value1.gpu, value2.gpu),
@@ -251,10 +251,10 @@ def _combine_models_optional(
 ) -> Optional[_ModelT]:
     if value1 is None:
         if value2 is not None:
-            return value2.copy(deep=True)
+            return value2.model_copy(deep=True)
         return None
     if value2 is None:
-        return value1.copy(deep=True)
+        return value1.model_copy(deep=True)
     return combiner(value1, value2)
 
 
@@ -279,8 +279,8 @@ def _combine_copy_model_list_optional(
 ) -> Optional[List[_ModelT]]:
     if value1 is None:
         if value2 is not None:
-            return [item.copy(deep=True) for item in value2]
+            return [item.model_copy(deep=True) for item in value2]
         return None
     if value2 is None:
-        return [item.copy(deep=True) for item in value1]
+        return [item.model_copy(deep=True) for item in value1]
     return combiner(value1, value2)

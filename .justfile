@@ -9,9 +9,10 @@
 # * frontend/.justfile – Building and running the frontend
 # * mkdocs/.justfile – Building and previewing the docs site
 # * website/.justfile – Building and previewing the React landing page
+# * .tox.justfile – Running Python tests via tox
 
-default:
-    @just --list
+# Run tests via tox
+mod tox '.tox.justfile'
 
 set allow-duplicate-recipes
 
@@ -22,3 +23,8 @@ import "frontend/.justfile"
 import "mkdocs/.justfile"
 
 import "website/.justfile"
+
+[default]
+[private]
+default:
+    @just --list --list-submodules --unsorted

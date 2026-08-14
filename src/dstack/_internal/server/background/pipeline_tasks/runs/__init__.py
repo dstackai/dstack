@@ -6,7 +6,14 @@ from typing import Optional, Sequence
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
+from sqlalchemy.orm import (
+    aliased,
+    contains_eager,
+    joinedload,
+    load_only,
+    selectinload,
+    with_loader_criteria,
+)
 
 import dstack._internal.server.background.pipeline_tasks.runs.active as active
 import dstack._internal.server.background.pipeline_tasks.runs.pending as pending
@@ -29,9 +36,19 @@ from dstack._internal.server.background.pipeline_tasks.runs.common import (
     delete_superseded_no_capacity_job_submissions,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import (
+    GatewayComputeModel,
+    GatewayModel,
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_combined_gateway_stats
+from dstack._internal.server.services.gateways import (
+    get_combined_gateway_stats,
+    get_gateway_compute_models,
+)
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -315,9 +332,11 @@ async def _load_pending_context(
     run_spec = get_run_spec(run_model)
 
     gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
+    if run_spec.configuration.type == "service" and run_model.gateway is not None:
         gateway_stats = await get_combined_gateway_stats(
-            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+            get_gateway_compute_models(run_model.gateway),
+            run_model.project.name,
+            run_model.run_name,
         )
 
     return pending.PendingContext(
@@ -357,7 +376,19 @@ async def _refetch_locked_run_for_pending(
                 ProjectModel.name,
             ),
         )
-        .options(contains_eager(RunModel.jobs, alias=job_alias))
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias).selectinload(
+                JobModel.service_replica_registrations
+            ),
+        )
+        .options(selectinload(RunModel.service_registrations))
+        .options(
+            joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
+        )
+        .options(
+            joinedload(RunModel.gateway).joinedload(GatewayModel.gateway_compute),
+        )
+        .options(with_loader_criteria(GatewayComputeModel, GatewayComputeModel.deleted == False))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -423,6 +454,9 @@ async def _apply_pending_result(
             run_id=item.id,
             new_job_models=result.new_job_models,
         )
+        # Set termination_reason on the model so emit_run_status_change_event can read it.
+        if "termination_reason" in result.run_update_map:
+            context.run_model.termination_reason = result.run_update_map["termination_reason"]
         emit_run_status_change_event(
             session=session,
             run_model=context.run_model,
@@ -500,9 +534,11 @@ async def _load_active_context(
     run_spec = get_run_spec(run_model)
 
     gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
+    if run_spec.configuration.type == "service" and run_model.gateway is not None:
         gateway_stats = await get_combined_gateway_stats(
-            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+            get_gateway_compute_models(run_model.gateway),
+            run_model.project.name,
+            run_model.run_name,
         )
 
     return active.ActiveContext(
@@ -547,6 +583,19 @@ async def _refetch_locked_run_for_active(
             .joinedload(JobModel.instance)
             .load_only(InstanceModel.fleet_id),
         )
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias).selectinload(
+                JobModel.service_replica_registrations
+            ),
+        )
+        .options(selectinload(RunModel.service_registrations))
+        .options(
+            joinedload(RunModel.gateway).selectinload(GatewayModel.gateway_computes),
+        )
+        .options(
+            joinedload(RunModel.gateway).joinedload(GatewayModel.gateway_compute),
+        )
+        .options(with_loader_criteria(GatewayComputeModel, GatewayComputeModel.deleted == False))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -851,7 +900,6 @@ async def _apply_terminating_result(
     context: terminating.TerminatingContext,
     result: terminating.TerminatingResult,
 ) -> None:
-    run_model = context.run_model
     set_processed_update_map_fields(result.run_update_map)
     set_unlock_update_map_fields(result.run_update_map)
 
@@ -888,17 +936,6 @@ async def _apply_terminating_result(
 
         if job_update_rows:
             await session.execute(update(JobModel), job_update_rows)
-
-        if result.service_unregistration is not None:
-            targets = [events.Target.from_model(run_model)]
-            if result.service_unregistration.gateway_target is not None:
-                targets.append(result.service_unregistration.gateway_target)
-            events.emit(
-                session,
-                result.service_unregistration.event_message,
-                actor=events.SystemActor(),
-                targets=targets,
-            )
 
         _emit_terminating_job_status_change_events(
             session=session,

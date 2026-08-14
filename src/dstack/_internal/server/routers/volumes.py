@@ -17,7 +17,7 @@ from dstack._internal.server.schemas.volumes import (
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -42,7 +42,7 @@ async def list_volumes(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last fleet from the previous page as `prev_created_at` and `prev_id`.
     """
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await volumes_services.list_volumes(
             session=session,
             user=user,
@@ -65,7 +65,7 @@ async def list_project_volumes(
     Returns all volumes in the project.
     """
     _, project = user_project
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await volumes_services.list_project_volumes(session=session, project=project)
     )
 
@@ -85,7 +85,7 @@ async def get_volume(
     )
     if volume is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(volume)
+    return CustomJSONResponse(volume)
 
 
 @project_router.post("/create", summary="Create volume", response_model=Volume)
@@ -99,7 +99,7 @@ async def create_volume(
     Creates a volume given a volume configuration.
     """
     user, project = user_project
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await volumes_services.create_volume(
             session=session,
             project=project,

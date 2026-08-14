@@ -36,6 +36,7 @@ lock = Lock()
 
 async def register_service(
     project_name: str,
+    run_id: Optional[str],
     run_name: str,
     domain: str,
     https: bool,
@@ -52,6 +53,7 @@ async def register_service(
 ) -> None:
     cors_enabled = model is not None and model.type == "chat" and model.format == "openai"
     service = models.Service(
+        id=run_id,
         project_name=project_name,
         run_name=run_name,
         domain=domain,
@@ -129,6 +131,25 @@ async def unregister_service(
         await repo.delete_service(project_name, run_name)
 
     logger.info("Service %s is unregistered now", service.fmt())
+
+
+async def set_service_id(
+    project_name: str,
+    run_name: str,
+    run_id: str,
+    repo: GatewayProxyRepo,
+) -> None:
+    async with lock:
+        service = await repo.get_service(project_name, run_name)
+        if service is None:
+            raise ProxyError(f"Service {project_name}/{run_name} does not exist, cannot set ID")
+        if service.id is not None:
+            raise ProxyError(f"Service {project_name}/{run_name} already has an ID")
+
+        service = service.with_id(run_id)
+        await repo.set_service(service)
+
+    logger.info("Service %s id is set to %s", service.fmt(), run_id)
 
 
 async def register_replica(
@@ -443,7 +464,7 @@ async def _migrate_cors_enabled(repo: GatewayProxyRepo) -> None:
             not service.cors_enabled
             and (service.project_name, service.run_name) in openai_run_names
         ):
-            updated = models.Service(**{**service.dict(), "cors_enabled": True})
+            updated = models.Service(**{**service.model_dump(), "cors_enabled": True})
             await repo.set_service(updated)
 
 

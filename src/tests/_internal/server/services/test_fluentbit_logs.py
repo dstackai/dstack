@@ -68,8 +68,8 @@ class TestHTTPFluentBitWriter:
     def test_write_posts_records(self, mock_httpx_client):
         writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         records = [
-            {"message": "Hello", "@timestamp": "2023-10-06T10:00:00+00:00"},
-            {"message": "World", "@timestamp": "2023-10-06T10:00:01+00:00"},
+            {"message": "Hello", "@timestamp": "2023-10-06T10:00:00Z"},
+            {"message": "World", "@timestamp": "2023-10-06T10:00:01Z"},
         ]
         writer.write(tag="test-tag", records=records)
 
@@ -516,7 +516,7 @@ class TestElasticsearchReader:
                 "hits": [
                     {
                         "_source": {
-                            "@timestamp": "2023-10-06T10:01:53.234000+00:00",
+                            "@timestamp": "2023-10-06T10:01:53.234000Z",
                             "message": "Hello",
                             "stream": "test-stream",
                         },
@@ -524,7 +524,7 @@ class TestElasticsearchReader:
                     },
                     {
                         "_source": {
-                            "@timestamp": "2023-10-06T10:01:53.235000+00:00",
+                            "@timestamp": "2023-10-06T10:01:53.235000Z",
                             "message": "World",
                             "stream": "test-stream",
                         },

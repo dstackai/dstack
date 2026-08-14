@@ -25,7 +25,7 @@ class ListProjectFleetsRequest(CoreModel):
 
 
 class GetFleetRequest(CoreModel):
-    name: Optional[str]
+    name: Optional[str] = None
     id: Optional[UUID] = None
 
     def get_name_or_id(self) -> EntityNameOrID:
@@ -49,10 +49,6 @@ class ApplyFleetPlanRequest(CoreModel):
             description="Use `force: true` to apply even if the expected resource does not match."
         ),
     ]
-
-
-class CreateFleetRequest(CoreModel):
-    spec: FleetSpec
 
 
 class DeleteFleetsRequest(CoreModel):

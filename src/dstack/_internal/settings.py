@@ -1,7 +1,6 @@
 import os
 
 from dstack import version
-from dstack._internal.utils.env import environ
 from dstack._internal.utils.version import parse_version
 
 DSTACK_VERSION = os.getenv("DSTACK_VERSION", version.__version__)
@@ -33,8 +32,6 @@ DSTACK_DIND_IMAGE = os.getenv("DSTACK_DIND_IMAGE", "dstackai/dind")
 
 CLI_LOG_LEVEL = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
 CLI_FILE_LOG_LEVEL = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
-# Can be used to disable control characters (e.g. for testing).
-CLI_RICH_FORCE_TERMINAL = environ.get_bool("DSTACK_CLI_RICH_FORCE_TERMINAL")
 
 
 class FeatureFlags:
@@ -49,9 +46,4 @@ class FeatureFlags:
     )
     """If DSTACK_FF_CLI_PRINT_JOB_CONNECTION_INFO enabled, `dstack apply` command prints server-provided
     IDE URL(s) and SSH command(s) before job logs (for dev-environments only).
-    """
-    GATEWAY_SCALING = os.getenv("DSTACK_FF_GATEWAY_SCALING") is not None
-    """Allows in-place update of gateway `replicas`.
-    Has limited applicability at the current stage — without a state sync mechanism, newly started
-    gateway replicas are not aware of existing services.
     """

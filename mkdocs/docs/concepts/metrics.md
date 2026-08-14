@@ -18,26 +18,32 @@ This tab displays key CPU, memory, and GPU metrics collected during the last hou
 
 ## CLI
 
-As an alternative to the UI, you can track real-time essential metrics via the CLI.
-The `dstack metrics` command displays the most recently tracked CPU, memory, and GPU metrics.
+As an alternative to the UI, you can track essential metrics via the CLI.
+The `dstack metrics` command charts CPU, memory, and GPU utilization over the last hour.
 
 <div class="termy">
 
 ```shell
 dstack metrics gentle-mayfly-1
 
- NAME             STATUS  CPU  MEMORY          GPU
- gentle-mayfly-1  done    0%   16.27GB/2000GB  gpu=0 mem=72.48GB/80GB util=0%
-                                               gpu=1 mem=64.99GB/80GB util=0%
-                                               gpu=2 mem=580MB/80GB util=0%
-                                               gpu=3 mem=4MB/80GB util=0%
-                                               gpu=4 mem=4MB/80GB util=0%
-                                               gpu=5 mem=4MB/80GB util=0%
-                                               gpu=6 mem=4MB/80GB util=0%
-                                               gpu=7 mem=292MB/80GB util=0%
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂ 33%  ▃▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄ 579GB/960GB
+        gpu=0  ▁▄▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=1  ▂▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=2  ▃▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=3  ▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=4  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=5  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=6  ▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+        gpu=7  ▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
 ```
 
 </div>
+
+By default, metrics are shown for all jobs and replicas. Use `--replica` or `--job` to
+show a single one, and `-w` to keep the charts updating.
 
 ## Prometheus
 

@@ -27,16 +27,14 @@ dependencies = [
     "rich-argparse",
     "tqdm",
     "questionary>=2.0.1",
-    "pydantic>=1.10.10,<2.0.0",
-    "pydantic-duality>=1.2.4",
+    "pydantic>=2.12",
     "websocket-client",
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.28",
+    "gpuhunt==0.1.29",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
-    "orjson",
     "apscheduler<4",
 ]
 
@@ -115,7 +113,6 @@ include = [
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
     "src/dstack/_internal/cli/services/configurators",
-    "src/dstack/_internal/cli/services/endpoints",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
@@ -131,23 +128,60 @@ addopts = [
     # unix socket for Docker/testcontainers
     "--allow-unix-socket",
 ]
+# One session-scoped event loop for fixtures and tests so that `sqlite_db` and `postgres_db` engines are reused.
+# Tests must not leave pending asyncio tasks behind; nothing enforces it automatically.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 markers = [
     "shim_version",
     "dockerized",
 ]
 env = [
-    "DSTACK_CLI_RICH_FORCE_TERMINAL=0",
     "DSTACK_SSHPROXY_API_TOKEN=test-token",
+    # Pin every rich console in the process to non-terminal output so tests asserting on plain CLI
+    # text never see ANSI escapes.
+    "TTY_COMPATIBLE=0",
 ]
 filterwarnings = [
-    # testcontainers modules use deprecated decorators – nothing we can do:
-    # https://github.com/testcontainers/testcontainers-python/issues/874
-    "ignore:^The @wait_container_is_ready decorator:DeprecationWarning"
+    # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
+    # so they cannot creep back after the v2 migration.
+    "error::pydantic.PydanticDeprecatedSince20",
+    # Remove or change to 3.11 once support for Python 3.10 is dropped.
+    "ignore:You are using a Python version \\(3.10:FutureWarning:^google\\.",
 ]
+
+[tool.tox]
+env_list = ["default"]
+
+[tool.tox.env_run_base]
+description = "Run tests under {base_python}"
+extras = ["all"]
+dependency_groups = ["test"]
+commands = [["pytest", { replace = "posargs", extend = true }]]
+
+# `tox run [-e default]` -- run tests inside an isolated environment
+# with Python version read from `.python-version` file
+[tool.tox.env.default]
+base_python_file = [".python-version"]
+
+# `tox run -e dummy --skip-env-install` -- run tests inside the current environment
+# all dependencies must be already installed; a dummy environment is still created
+[tool.tox.env.dummy]
+description = "Run tests inside the current environment"
+# Must be called with --skip-env-install
+dependency_groups = ["nonexistent-group-to-trigger-failure"]
+allowlist_externals = ["pytest"]
 
 [dependency-groups]
 dev = [
     "pre-commit>=4.2.0",
+    "ruff==0.12.7",  # should match .pre-commit-config.yaml
+    "pyinstrument>=5.0.0",
+    "kubernetes-stubs-elephant-fork>=35.0.0.post3",
+    {include-group = "test"},
+    {include-group = "docs"},
+]
+test = [
     "pytest~=8.0",
     "pytest-asyncio>=0.25.2",
     "pytest-mock>=3.14.0",
@@ -155,16 +189,12 @@ dev = [
     "pytest-socket>=0.7.0",
     "pytest-env>=1.1.0",
     "pytest-unordered>=0.7.0",
-    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
-    "requests-mock>=1.12.1",
-    "openai>=1.68.2",
-    "freezegun>=1.5.1",
-    "ruff==0.12.7",  # should match .pre-commit-config.yaml
-    "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
-    "pyinstrument>=5.0.0",
-    "kubernetes-stubs-elephant-fork>=35.0.0.post3",
-    {include-group = "docs"},
+    "requests-mock>=1.12.1",
+    "freezegun>=1.5.1",
+    "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
+    "openai>=1.68.2",
+    "testcontainers>=4.15.0",
 ]
 docs = [
     "dstack[server]",

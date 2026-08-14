@@ -28,6 +28,10 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import (
+    validate_extra_ignore,
+    validate_json_extra_ignore,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -86,27 +90,30 @@ class AWSConfigurator(
             config.regions = DEFAULT_REGIONS
         return BackendRecord(
             config=AWSStoredConfig(
-                **AWSBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=AWSCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(AWSBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=AWSCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> AWSBackendConfigWithCreds:
         config = self._get_config(record)
-        return AWSBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(AWSBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> AWSBackendConfig:
         config = self._get_config(record)
-        return AWSBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(AWSBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> AWSBackend:
         config = self._get_config(record)
         return AWSBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> AWSConfig:
-        return AWSConfig.__response__(
-            **json.loads(record.config),
-            creds=AWSCreds.parse_raw(record.auth).__root__,
+        return validate_extra_ignore(
+            AWSConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(AWSCreds, record.auth).root,
+            },
         )
 
     def _check_config_tags(self, config: AWSBackendConfigWithCreds):
@@ -179,7 +186,8 @@ class AWSConfigurator(
                 future = executor.submit(
                     compute.get_vpc_id_subnets_ids_or_error,
                     ec2_client=ec2_client,
-                    config=AWSConfig.parse_obj(config),
+                    # `config` is an `AWSBackendConfigWithCreds`, a different class.
+                    config=AWSConfig.model_validate(config.model_dump()),
                     region=region,
                     allocate_public_ip=allocate_public_ip,
                 )

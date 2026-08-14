@@ -77,7 +77,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -88,7 +88,6 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import GPUSpec
-from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -128,7 +127,7 @@ class KubernetesBackendData(CoreModel):
 
     @classmethod
     def load(cls, raw: str) -> Self:
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class KubernetesCompute(
@@ -349,7 +348,7 @@ class KubernetesCompute(
             instance_type=instance_offer.instance,
             internal_ip=None,
             ssh_proxy=None,
-            backend_data=backend_data.json(),
+            backend_data=backend_data.model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -402,6 +401,10 @@ class KubernetesCompute(
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
         pod_spec = get_or_error(pod.spec)
         node = api.read_node(name=get_or_error(pod_spec.node_name))
+        # TODO: Set provisioning_data.gpu_driver from the node labels:
+        # nvidia.com/cuda.driver-version.full set by GPU Feature Discovery
+        # (or nvidia.com/cuda.driver.{major,minor,rev} set by older GFD versions),
+        # amd.com/gpu.driver-version set by the AMD GPU Operator.
         instance_offer = get_instance_offer_from_node(node=node, region=cluster.region)
         if instance_offer is not None:
             resource_requirements = get_or_error(pod_spec.containers[0].resources)
@@ -498,9 +501,7 @@ class KubernetesCompute(
         )
         labels = filter_invalid_labels(labels)
 
-        commands = _get_gateway_commands(
-            authorized_keys=[configuration.ssh_key_pub], router=configuration.router
-        )
+        commands = _get_gateway_commands(authorized_keys=[configuration.ssh_key_pub])
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=instance_name,
@@ -821,7 +822,7 @@ def _get_amd_gpu_node_affinity(
 def _offer_modifier(
     resource_requests: ResourceRequests, offer: InstanceOfferWithAvailability
 ) -> InstanceOfferWithAvailability:
-    offer_copy = offer.copy(deep=True)
+    offer_copy = offer.model_copy(deep=True)
     adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
     return offer_copy
 
@@ -1371,11 +1372,9 @@ def _wait_for_load_balancer_address(
         time.sleep(1)
 
 
-def _get_gateway_commands(
-    authorized_keys: List[str], router: Optional[AnyGatewayRouterConfig] = None
-) -> List[str]:
+def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
-    gateway_commands = " && ".join(get_dstack_gateway_commands(router=router))
+    gateway_commands = " && ".join(get_dstack_gateway_commands())
     quoted_gateway_commands = shlex.quote(gateway_commands)
 
     commands = [

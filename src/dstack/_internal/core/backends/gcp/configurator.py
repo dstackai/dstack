@@ -23,6 +23,7 @@ from dstack._internal.core.errors import BackendAuthError, BackendError, ServerC
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 LOCATIONS = [
     {
@@ -146,27 +147,30 @@ class GCPConfigurator(
             config.regions = DEFAULT_REGIONS
         return BackendRecord(
             config=GCPStoredConfig(
-                **GCPBackendConfig.__response__.parse_obj(config).dict(),
-            ).json(),
-            auth=GCPCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(GCPBackendConfig, config).model_dump(),
+            ).model_dump_json(),
+            auth=GCPCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> GCPBackendConfigWithCreds:
         config = self._get_config(record)
-        return GCPBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(GCPBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> GCPBackendConfig:
         config = self._get_config(record)
-        return GCPBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(GCPBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> GCPBackend:
         config = self._get_config(record)
         return GCPBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> GCPConfig:
-        return GCPConfig.__response__(
-            **json.loads(record.config),
-            creds=GCPCreds.parse_raw(record.auth).__root__,
+        return validate_extra_ignore(
+            GCPConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(GCPCreds, record.auth).root,
+            },
         )
 
     def _check_config_tags(self, config: GCPBackendConfigWithCreds):

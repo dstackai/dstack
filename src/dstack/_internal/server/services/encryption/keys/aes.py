@@ -3,7 +3,7 @@ from base64 import b64decode, b64encode
 from typing import Literal
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
@@ -15,13 +15,15 @@ class AESEncryptionKeyConfig(CoreModel):
     name: Annotated[str, Field(description="The key name for key identification")]
     secret: Annotated[str, Field(description="Base64-encoded AES-256 key")]
 
-    @validator("name")
+    @field_validator("name")
+    @classmethod
     def validate_name(cls, v):
         if not v.isalnum():
             raise ValueError("Key name must be alphanumeric")
         return v
 
-    @validator("secret")
+    @field_validator("secret")
+    @classmethod
     def validate_secret(cls, v):
         try:
             key = b64decode(v, validate=True)

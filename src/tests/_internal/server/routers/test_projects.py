@@ -65,7 +65,7 @@ class TestListProjects:
                 "owner": {
                     "id": str(user.id),
                     "username": user.name,
-                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "created_at": "2023-01-02T03:04:00Z",
                     "global_role": user.global_role,
                     "email": None,
                     "active": True,
@@ -74,7 +74,7 @@ class TestListProjects:
                     },
                     "ssh_public_key": None,
                 },
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "backends": [],
                 "members": [],
                 "is_public": False,
@@ -245,7 +245,7 @@ class TestListProjects:
                 "owner": {
                     "id": str(user.id),
                     "username": user.name,
-                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "created_at": "2023-01-02T03:00:00Z",
                     "global_role": user.global_role,
                     "email": None,
                     "active": True,
@@ -254,7 +254,7 @@ class TestListProjects:
                     },
                     "ssh_public_key": None,
                 },
-                "created_at": "2023-01-02T03:06:00+00:00",
+                "created_at": "2023-01-02T03:06:00Z",
                 "backends": [],
                 "members": [],
                 "is_public": False,
@@ -265,7 +265,7 @@ class TestListProjects:
             "/api/projects/list",
             headers=get_auth_headers(user.token),
             json={
-                "prev_created_at": "2023-01-02T03:06:00+00:00",
+                "prev_created_at": "2023-01-02T03:06:00Z",
                 "prev_id": str(project3.id),
                 "limit": 1,
             },
@@ -278,7 +278,7 @@ class TestListProjects:
                 "owner": {
                     "id": str(user.id),
                     "username": user.name,
-                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "created_at": "2023-01-02T03:00:00Z",
                     "global_role": user.global_role,
                     "email": None,
                     "active": True,
@@ -287,7 +287,7 @@ class TestListProjects:
                     },
                     "ssh_public_key": None,
                 },
-                "created_at": "2023-01-02T03:05:00+00:00",
+                "created_at": "2023-01-02T03:05:00Z",
                 "backends": [],
                 "members": [],
                 "is_public": False,
@@ -298,7 +298,7 @@ class TestListProjects:
             "/api/projects/list",
             headers=get_auth_headers(user.token),
             json={
-                "prev_created_at": "2023-01-02T03:05:00+00:00",
+                "prev_created_at": "2023-01-02T03:05:00Z",
                 "prev_id": str(project2.id),
                 "limit": 1,
             },
@@ -311,7 +311,7 @@ class TestListProjects:
                 "owner": {
                     "id": str(user.id),
                     "username": user.name,
-                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "created_at": "2023-01-02T03:00:00Z",
                     "global_role": user.global_role,
                     "email": None,
                     "active": True,
@@ -320,7 +320,7 @@ class TestListProjects:
                     },
                     "ssh_public_key": None,
                 },
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "backends": [],
                 "members": [],
                 "is_public": False,
@@ -363,7 +363,7 @@ class TestListProjects:
                     "owner": {
                         "id": str(user.id),
                         "username": user.name,
-                        "created_at": "2023-01-02T03:00:00+00:00",
+                        "created_at": "2023-01-02T03:00:00Z",
                         "global_role": user.global_role,
                         "email": None,
                         "active": True,
@@ -372,7 +372,7 @@ class TestListProjects:
                         },
                         "ssh_public_key": None,
                     },
-                    "created_at": "2023-01-02T03:05:00+00:00",
+                    "created_at": "2023-01-02T03:05:00Z",
                     "backends": [],
                     "members": [],
                     "is_public": False,
@@ -948,7 +948,7 @@ class TestCreateProject:
             "owner": {
                 "id": str(user.id),
                 "username": user.name,
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
@@ -957,14 +957,14 @@ class TestCreateProject:
                 },
                 "ssh_public_key": user.ssh_public_key,
             },
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "backends": [],
             "members": [
                 {
                     "user": {
                         "id": str(user.id),
                         "username": user.name,
-                        "created_at": "2023-01-02T03:04:00+00:00",
+                        "created_at": "2023-01-02T03:04:00Z",
                         "global_role": user.global_role,
                         "email": None,
                         "active": True,
@@ -1509,7 +1509,7 @@ class TestGetProject:
             "owner": {
                 "id": str(user.id),
                 "username": user.name,
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:04:00Z",
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
@@ -1518,14 +1518,14 @@ class TestGetProject:
                 },
                 "ssh_public_key": None,
             },
-            "created_at": "2023-01-02T03:04:00+00:00",
+            "created_at": "2023-01-02T03:04:00Z",
             "backends": [],
             "members": [
                 {
                     "user": {
                         "id": str(user.id),
                         "username": user.name,
-                        "created_at": "2023-01-02T03:04:00+00:00",
+                        "created_at": "2023-01-02T03:04:00Z",
                         "global_role": user.global_role,
                         "email": None,
                         "active": True,
@@ -1756,7 +1756,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(admin.id),
                     "username": admin.name,
-                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "created_at": "2023-01-02T03:04:00Z",
                     "global_role": admin.global_role,
                     "email": None,
                     "active": True,
@@ -1775,7 +1775,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(user1.id),
                     "username": user1.name,
-                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "created_at": "2023-01-02T03:04:00Z",
                     "global_role": user1.global_role,
                     "email": None,
                     "active": True,
@@ -1794,7 +1794,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(user2.id),
                     "username": user2.name,
-                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "created_at": "2023-01-02T03:04:00Z",
                     "global_role": user2.global_role,
                     "email": None,
                     "active": True,
@@ -1852,7 +1852,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(user1.id),
                     "username": user1.name,
-                    "created_at": "2023-01-02T03:04:00+00:00",
+                    "created_at": "2023-01-02T03:04:00Z",
                     "global_role": user1.global_role,
                     "email": user1.email,
                     "active": True,

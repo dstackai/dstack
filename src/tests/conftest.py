@@ -1,14 +1,19 @@
 import inspect
 import os
+from functools import cache
 
 import pytest
 
 from dstack._internal.server.testing.conf import (  # noqa: F401
     postgres_container,
+    postgres_db,
     session,
+    sqlite_db,
     test_db,
 )
 from dstack._internal.settings import FeatureFlags
+from dstack._internal.utils import crypto
+from dstack._internal.utils import ssh as ssh_utils
 
 
 def pytest_configure(config):
@@ -46,6 +51,38 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_windows)
         if not for_windows and is_windows:
             item.add_marker(skip_posix)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def reuse_one_rsa_key_pair():
+    """
+    Hands the same RSA key pair to every caller for the whole test session.
+
+    Generating a 2048-bit key takes ~80ms and the server generates one per user, project,
+    gateway, and job. A test that needs two different keys has to generate its own.
+    """
+    private_bytes, public_bytes = crypto.generate_rsa_key_pair_bytes()
+    public_key = public_bytes.rsplit(b" ", 1)[0]  # drop the comment, callers pass their own
+
+    def generate_rsa_key_pair_bytes(comment: str = "dstack") -> tuple[bytes, bytes]:
+        return private_bytes, public_key + f" {comment}\n".encode()
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(crypto, "generate_rsa_key_pair_bytes", generate_rsa_key_pair_bytes)
+        yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cache_parsed_ssh_keys():
+    """
+    Parses each SSH key once per session instead of once per call.
+
+    Parsing an RSA key costs ~190ms because paramiko validates it, and fleet spec
+    validation parses the same handful of test keys over and over.
+    """
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(ssh_utils, "pkey_from_str", cache(ssh_utils.pkey_from_str))
+        yield
 
 
 @pytest.fixture(scope="session", autouse=True)

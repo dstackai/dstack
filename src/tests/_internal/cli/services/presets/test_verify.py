@@ -18,6 +18,7 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.profiles import ProfileParams
 from tests._internal.cli.preset_factories import (
     get_running_service_run,
@@ -30,11 +31,11 @@ pytestmark = pytest.mark.windows
 class TestBuildVerifiedPreset:
     def test_successful_report_requires_benchmark(self):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data.pop("benchmark")
 
         with pytest.raises(ValidationError, match="benchmark"):
-            AgentFinalReport.parse_obj(data)
+            AgentFinalReport.model_validate(data)
 
     def test_builds_portable_self_contained_preset(self):
         run = get_running_service_run()
@@ -49,7 +50,7 @@ class TestBuildVerifiedPreset:
                 preset_configuration=PresetConfiguration(
                     name="qwen-build",
                     model={"base": "Qwen/Qwen3.5-27B"},
-                    context_length=8192,
+                    min_context_length=8192,
                     gateway="benchmark-gateway",
                     env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
                 ),
@@ -62,7 +63,7 @@ class TestBuildVerifiedPreset:
         assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
-        assert all(getattr(preset.service, field) is None for field in ProfileParams.__fields__)
+        assert all(getattr(preset.service, field) is None for field in ProfileParams.model_fields)
         assert isinstance(preset.service.env["LICENSE"], EnvSentinel)
         assert preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert preset.service.resources.gpu.vendor.value == "nvidia"
@@ -71,9 +72,94 @@ class TestBuildVerifiedPreset:
         assert validation.benchmark.target.type == "server-proxy"
         assert validation.benchmark.client.type == "local"
 
+    def test_rewrites_file_paths_onto_the_mirrored_session_copies(self, tmp_path):
+        # `files` local paths resolve into the agent workspace at submission, and
+        # the workspace is deleted when the session ends; the preset must point at
+        # the session's mirrored copies, relative to the preset directory so the
+        # directory stays portable.
+        workspace = tmp_path / "session" / "workspace" / "w"
+        (workspace / "service" / "1" / "patches").mkdir(parents=True)
+        (workspace / "service" / "1" / "patches" / "moe.py.patch").write_text("--- a\n+++ b\n")
+        session = tmp_path / "session"
+        (session / "service" / "1" / "patches").mkdir(parents=True)
+        (session / "service" / "1" / "patches" / "moe.py.patch").write_text("--- a\n+++ b\n")
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(
+                local_path=str(workspace / "service" / "1" / "patches"), path="/patches"
+            )
+        ]
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=PresetConfiguration(
+                name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+            ),
+            report=get_successful_preset_report(run),
+            workspace_path=workspace,
+            session_path=session,
+        )
+
+        assert preset.service.files[0].local_path == "service/1/patches"
+        # The run spec itself is untouched: only the preset copy is re-rooted.
+        assert run.run_spec.configuration.files[0].local_path == str(
+            workspace / "service" / "1" / "patches"
+        )
+
+    def test_rejects_a_file_without_a_mirrored_copy(self, tmp_path):
+        workspace = tmp_path / "session" / "workspace" / "w"
+        (workspace / "patches").mkdir(parents=True)  # workspace root: not mirrored
+        session = tmp_path / "session"
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(local_path=str(workspace / "patches"), path="/patches")
+        ]
+
+        with pytest.raises(CLIError, match="no mirrored copy"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+                ),
+                report=get_successful_preset_report(run),
+                workspace_path=workspace,
+                session_path=session,
+            )
+
+    def test_rejects_files_when_no_workspace_is_attached(self, tmp_path):
+        run = get_running_service_run()
+        run.run_spec.configuration.files = [
+            FilePathMapping(local_path=str(tmp_path / "patches"), path="/patches")
+        ]
+
+        with pytest.raises(CLIError, match="no workspace is attached"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build", model={"base": "Qwen/Qwen3.5-27B"}
+                ),
+                report=get_successful_preset_report(run),
+            )
+
+    def test_rejects_benchmark_on_a_different_dataset(self):
+        run = get_running_service_run()
+
+        # The report's workload defaults to `random`, but the configuration
+        # demanded a custom dataset: the benchmark does not match the contract.
+        with pytest.raises(CLIError, match="dataset does not match"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build",
+                    model={"base": "Qwen/Qwen3.5-27B"},
+                    dataset="spec_bench",
+                ),
+                report=get_successful_preset_report(run),
+            )
+
     def test_rejects_variant_for_exact_model_request(self):
         run = get_running_service_run()
-        report = get_successful_preset_report(run).copy(update={"model": "other/model"})
+        report = get_successful_preset_report(run).model_copy(update={"model": "other/model"})
 
         with pytest.raises(CLIError, match="changed an exact model request"):
             build_verified_preset(
@@ -99,7 +185,7 @@ class TestLoadPresetAgentReport:
 
     def test_redacts_known_secret_in_benchmark_command_instead_of_failing(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
@@ -113,7 +199,7 @@ class TestLoadPresetAgentReport:
 
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
@@ -126,7 +212,7 @@ class TestLoadPresetAgentReport:
         # Regression: "(auth via DSTACK_TOKEN bearer header from env)" failed
         # two live sessions — the word after "bearer" is prose, not a token.
         run = get_running_service_run()
-        data = get_successful_preset_report(run).dict()
+        data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
         data["benchmark"]["command"] = (
             "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"

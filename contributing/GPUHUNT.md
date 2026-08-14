@@ -4,10 +4,12 @@
 
 An offer is a possible configuration. It consists of:
 - Provider (or backend in dstack)
+- CPU architecture
 - CPU count
 - RAM size
 - Disk size
 - GPU count
+- GPU vendor (if any)
 - GPU model name (if any)
 - GPU VRAM size (if any)
 - Is interruptible (or spot)
@@ -15,11 +17,14 @@ An offer is a possible configuration. It consists of:
 - Instance name or ID (provider-specific)
 - Price per hour
 
+Offers are represented by `CatalogItem`. Providers construct them directly, setting `provider` to
+their own `NAME`, and `gpu_vendor` whenever `gpu_count` is non-zero.
+
 ## Catalog
 
 Some providers don't have a suitable API for querying all offers in real-time. That's why gpuhunt has two types of providers:
 
-- Online — offers can be queried in real-time
+- Online — offers can be queried quickly in real-time
 - Offline — offers must be loaded from a precomputed catalog file
 
 The `Catalog` class hides those details from the user, reading offers from the file for offline providers or querying online providers.
@@ -28,7 +33,16 @@ The `Catalog` class pulls the latest catalog from the S3 bucket and caches it fo
 
 ## Provider implementation
 
-Providers must implement a single method `get`. It has the same name for both online and offline providers but works differently.
+Providers subclass either `OnlineProvider` or `OfflineProvider` from `src/gpuhunt/providers/base.py`.
+
+Both implement `get`. It has the same name for both online and offline providers but works differently.
+
+In addition:
+
+- Online providers implement the `from_env` classmethod, since `default_catalog()` constructs them
+  in the user's process.
+- Offline providers may override `filter` to omit some offers from the published catalog.
+  Credentials are passed in by the caller, so a missing one is an error rather than a skip.
 
 ### Offers sorting
 
@@ -100,7 +114,7 @@ These mechanisms are used to preserve backward compatibility:
 
 - **`gpuhunt` version**: The interfaces in the `gpuhunt` package preserve backward compatibility
   within a minor version (`X` in `0.X.Y`).
-- **Offer flags**: If an offer breaks older `dstack` versions, it is marked with a flag in `RawCatalogItem.flags`
+- **Offer flags**: If an offer breaks older `dstack` versions, it is marked with a flag in `CatalogItem.flags`
   and the flag is added to the list of supported flags in `dstack`.
   Older `dstack` versions that don't support this flag will not see the respective offers.
 - **Offline catalog versions**: If a breaking change in the structure or content of an offline catalog is unavoidable,

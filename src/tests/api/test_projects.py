@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from dstack._internal.utils.common import render_datetime_as_api
 from dstack.api.server._projects import ProjectsAPIClient
 from tests.api.common import RequestRecorder
 
@@ -12,14 +13,14 @@ PROJECT_PAYLOAD = {
     "owner": {
         "id": "2b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
         "username": "u",
-        "created_at": "2023-01-02T03:04:00+00:00",
+        "created_at": "2023-01-02T03:04:00Z",
         "global_role": "user",
         "email": None,
         "active": True,
         "permissions": {"can_create_projects": True},
         "ssh_public_key": None,
     },
-    "created_at": "2023-01-02T03:04:00+00:00",
+    "created_at": "2023-01-02T03:04:00Z",
     "backends": [],
     "members": [],
     "is_public": False,
@@ -47,7 +48,7 @@ class TestProjectsAPIClientList:
         assert payload["include_not_joined"] is True
         assert payload["return_total_count"] is True
         assert payload["name_pattern"] == "p"
-        assert payload["prev_created_at"] == dt.isoformat()
+        assert payload["prev_created_at"] == render_datetime_as_api(dt)
         assert payload["prev_id"] == str(pid)
         assert payload["limit"] == 1
         assert payload["ascending"] is True

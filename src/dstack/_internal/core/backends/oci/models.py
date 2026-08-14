@@ -1,6 +1,7 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import Field, root_validator
+from pydantic import Field, RootModel, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -14,29 +15,29 @@ class OCIClientCreds(CoreModel):
         Field(
             description="Path to the user's private PEM key. Either this or `key_content` should be set"
         ),
-    ]
+    ] = None
     key_content: Annotated[
         Optional[str],
         Field(
             description="Content of the user's private PEM key. Either this or `key_file` should be set"
         ),
-    ]
+    ] = None
     pass_phrase: Annotated[
         Optional[str], Field(description="Passphrase for the private PEM key if it is encrypted")
-    ]
+    ] = None
     fingerprint: Annotated[str, Field(description="User's public key fingerprint")]
     region: Annotated[
         str, Field(description="Name or key of any region the tenancy is subscribed to")
     ]
 
-    @root_validator
-    def key_file_xor_key_content(cls, values):
-        key_file, key_content = values["key_file"], values["key_content"]
+    @model_validator(mode="after")
+    def key_file_xor_key_content(self) -> Self:
+        key_file, key_content = self.key_file, self.key_content
         if key_file and key_content:
             raise ValueError("key_file and key_content are mutually exclusive")
         if not key_file and not key_content:
             raise ValueError("Either key_file or key_content should be set")
-        return values
+        return self
 
 
 class OCIDefaultCreds(CoreModel):
@@ -50,8 +51,8 @@ class OCIDefaultCreds(CoreModel):
 AnyOCICreds = Union[OCIClientCreds, OCIDefaultCreds]
 
 
-class OCICreds(CoreModel):
-    __root__: AnyOCICreds = Field(..., discriminator="type")
+class OCICreds(RootModel[Annotated[AnyOCICreds, Field(discriminator="type")]]):
+    pass
 
 
 class OCIBackendConfig(CoreModel):
@@ -84,4 +85,4 @@ class OCIStoredConfig(OCIBackendConfig):
 
 
 class OCIConfig(OCIStoredConfig):
-    creds: AnyOCICreds
+    creds: Annotated[AnyOCICreds, Field(discriminator="type")]

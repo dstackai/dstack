@@ -9,7 +9,12 @@ import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.server.compatibility.gateways import patch_gateway, patch_gateway_plan
+from dstack._internal.server.compatibility.gateways import (
+    patch_gateway,
+    patch_gateway_configuration_in_request,
+    patch_gateway_plan,
+    patch_gateway_spec_in_request,
+)
 from dstack._internal.server.db import get_session
 from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -21,7 +26,7 @@ from dstack._internal.server.security.permissions import (
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
     get_client_version,
 )
@@ -50,7 +55,7 @@ async def list_gateways(
     )
     for gateway in gateway_list:
         patch_gateway(gateway, client_version)
-    return CustomORJSONResponse(gateway_list)
+    return CustomJSONResponse(gateway_list)
 
 
 @router.post("/get", summary="Get gateway", response_model=models.Gateway)
@@ -68,7 +73,7 @@ async def get_gateway(
     if gateway is None:
         raise ResourceNotExistsError()
     patch_gateway(gateway, client_version)
-    return CustomORJSONResponse(gateway)
+    return CustomJSONResponse(gateway)
 
 
 @router.post("/get_plan", summary="Get gateway plan", response_model=models.GatewayPlan)
@@ -83,6 +88,7 @@ async def get_plan(
     This is an optional step before calling `/apply`.
     """
     user, project = user_project
+    patch_gateway_spec_in_request(body.spec, client_version)
     plan = await gateways.get_plan(
         session=session,
         project=project,
@@ -90,7 +96,7 @@ async def get_plan(
         spec=body.spec,
     )
     patch_gateway_plan(plan, client_version)
-    return CustomORJSONResponse(plan)
+    return CustomJSONResponse(plan)
 
 
 @router.post("/apply", summary="Apply gateway plan", response_model=models.Gateway)
@@ -105,6 +111,7 @@ async def apply_plan(
     Creates a new gateway or updates an existing gateway in-place.
     """
     user, project = user_project
+    patch_gateway_spec_in_request(body.plan.spec, client_version)
     gateway = await gateways.apply_plan(
         session=session,
         user=user,
@@ -114,7 +121,7 @@ async def apply_plan(
         pipeline_hinter=pipeline_hinter,
     )
     patch_gateway(gateway, client_version)
-    return CustomORJSONResponse(gateway)
+    return CustomJSONResponse(gateway)
 
 
 @router.post("/create", summary="Create gateway", response_model=models.Gateway, deprecated=True)
@@ -129,6 +136,7 @@ async def create_gateway(
     Deprecated in favor of `/apply`.
     """
     user, project = user_project
+    patch_gateway_configuration_in_request(body.configuration, client_version)
     gateway = await gateways.create_gateway(
         session=session,
         user=user,
@@ -137,7 +145,7 @@ async def create_gateway(
         pipeline_hinter=pipeline_hinter,
     )
     patch_gateway(gateway, client_version)
-    return CustomORJSONResponse(gateway)
+    return CustomJSONResponse(gateway)
 
 
 @router.post("/delete", summary="Delete gateways")
@@ -194,4 +202,4 @@ async def set_gateway_wildcard_domain(
         user=user,
     )
     patch_gateway(gateway, client_version)
-    return CustomORJSONResponse(gateway)
+    return CustomJSONResponse(gateway)

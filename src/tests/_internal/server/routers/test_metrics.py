@@ -107,47 +107,47 @@ class TestGetJobMetrics:
             "metrics": [
                 {
                     "name": "cpu_usage_percent",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [60],
                 },
                 {
                     "name": "memory_usage_bytes",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [1024],
                 },
                 {
                     "name": "memory_working_set_bytes",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [512],
                 },
                 {
                     "name": "cpus_detected_num",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [64],
                 },
                 {
                     "name": "memory_total_bytes",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [137438953472],
                 },
                 {
                     "name": "gpus_detected_num",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [1],
                 },
                 {
                     "name": "gpu_memory_total_bytes",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [34359738368],
                 },
                 {
                     "name": "gpu_memory_usage_bytes_gpu0",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [1024],
                 },
                 {
                     "name": "gpu_util_percent_gpu0",
-                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "timestamps": ["2023-01-02T03:04:25Z"],
                     "values": [10],
                 },
             ]

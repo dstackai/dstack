@@ -19,8 +19,6 @@ from dstack._internal.cli.utils.gateway import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.core.models.gateways import GatewayStatus
-from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -111,20 +109,6 @@ class GatewayCommand(APIBaseCommand):
             raise CLIError("JSON output is not supported together with --watch")
 
         gateways = self.api.client.gateways.list(self.api.project, include_imported=True)
-        deprecated_router_gateways = [
-            g.name
-            for g in gateways
-            if g.status != GatewayStatus.FAILED and g.configuration.router is not None
-        ]
-        if deprecated_router_gateways and args.format != "json":
-            logger.warning(
-                "Specifying `router` in gateway configurations is deprecated"
-                " and will be disallowed in a future release."
-                " Please migrate to replica-based routers:"
-                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
-                " (affected gateways: %s)",
-                ", ".join(deprecated_router_gateways),
-            )
         if not args.watch:
             if args.format == "json":
                 print_gateways_json(gateways, project=self.api.project)
@@ -206,4 +190,4 @@ class GatewayCommand(APIBaseCommand):
             gateway_project=args.name.project or self.api.project,
             gateway_name=args.name.name,
         )
-        print(pydantic_orjson_dumps_with_indent(gateway.dict(), default=None))
+        print(gateway.model_dump_json(indent=2))

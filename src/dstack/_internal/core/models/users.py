@@ -27,7 +27,7 @@ class User(CoreModel):
     username: str
     created_at: Optional[datetime] = None
     global_role: GlobalRole
-    email: Optional[str]
+    email: Optional[str] = None
     active: bool
     permissions: UserPermissions
     ssh_public_key: Optional[str] = None

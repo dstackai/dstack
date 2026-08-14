@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from dstack._internal.core.models.routers import AnyServiceRouterConfig
 
@@ -10,8 +10,7 @@ from dstack._internal.core.models.routers import AnyServiceRouterConfig
 class RouterContext(BaseModel):
     """Context for router initialization and configuration."""
 
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
     host: str = "127.0.0.1"
     port: int

@@ -3,18 +3,17 @@ from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
-from pydantic import UUID4, Field, root_validator
-from typing_extensions import Annotated
+from pydantic import UUID4, ConfigDict, Field, model_validator
+from typing_extensions import Annotated, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
-    CoreConfig,
     CoreModel,
     NetworkMode,
     RegistryAuth,
-    generate_dual_core_model,
+    drop_merged_profile,
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
@@ -25,11 +24,11 @@ from dstack._internal.core.models.configurations import (
     HTTPHeaderSpec,
     HTTPMethod,
     RepoExistsAction,
-    RunConfiguration,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
     InstanceOfferWithAvailability,
     InstanceType,
     SSHConnectionParams,
@@ -53,7 +52,7 @@ from dstack._internal.utils.common import format_pretty_duration
 
 class AppSpec(CoreModel):
     port: int
-    map_to_port: Optional[int]
+    map_to_port: Optional[int] = None
     app_name: str
     url_path: Optional[str] = None
     url_query_params: Optional[Dict[str, str]] = None
@@ -95,6 +94,7 @@ class RunTerminationReason(str, Enum):
     STOPPED_BY_USER = "stopped_by_user"
     ABORTED_BY_USER = "aborted_by_user"
     SERVER_ERROR = "server_error"
+    GATEWAY_ERROR = "gateway_error"
 
     def to_job_termination_reason(self) -> "JobTerminationReason":
         """
@@ -108,6 +108,7 @@ class RunTerminationReason(str, Enum):
             self.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
             self.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
             self.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.GATEWAY_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
         }
         return mapping[self]
 
@@ -119,6 +120,7 @@ class RunTerminationReason(str, Enum):
             self.STOPPED_BY_USER: RunStatus.TERMINATED,
             self.ABORTED_BY_USER: RunStatus.TERMINATED,
             self.SERVER_ERROR: RunStatus.FAILED,
+            self.GATEWAY_ERROR: RunStatus.FAILED,
         }
         return mapping[self]
 
@@ -127,6 +129,8 @@ class RunTerminationReason(str, Enum):
             return "retry limit exceeded"
         elif self == RunTerminationReason.SERVER_ERROR:
             return "server error"
+        elif self == RunTerminationReason.GATEWAY_ERROR:
+            return "gateway error"
         else:
             return None
 
@@ -263,24 +267,24 @@ class JobSpec(CoreModel):
     jobs_per_replica: int = 1
     """`jobs_per_replica` uses a default value for backward compatibility."""
     replica_group: str = DEFAULT_REPLICA_GROUP_NAME
-    app_specs: Optional[List[AppSpec]]
+    app_specs: Optional[List[AppSpec]] = None
     user: Optional[UnixUser] = None
     """`user` uses a default value for backward compatibility."""
     commands: List[str]
     env: Dict[str, str]
-    home_dir: Optional[str]
+    home_dir: Optional[str] = None
     image_name: str
     privileged: bool = False
     single_branch: Optional[bool] = None
-    max_duration: Optional[int]
+    max_duration: Optional[int] = None
     stop_duration: Optional[int] = None
     utilization_policy: Optional[UtilizationPolicy] = None
-    registry_auth: Optional[RegistryAuth]
+    registry_auth: Optional[RegistryAuth] = None
     requirements: Requirements
-    retry: Optional[Retry]
+    retry: Optional[Retry] = None
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
-    working_dir: Optional[str]
+    working_dir: Optional[str] = None
     repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
     """`repo_data` is optional for client compatibility with pre-0.19.17 servers and for jobs
     submitted before 0.19.17. All new jobs are expected to have non-`None` `repo_data`.
@@ -336,6 +340,12 @@ class JobProvisioningData(CoreModel):
     ssh_proxy: Optional[SSHConnectionParams] = None
     backend_data: Optional[str] = None
     """`backend_data` stores backend-specific data in JSON."""
+    gpu_driver: Optional[GpuDriverInfo] = None
+    """`gpu_driver` is the accelerator driver installed on the host, when known.
+    Detected via the shim for VM-based backends and SSH fleets; taken from the
+    provider API or node labels for some container-based backends. May be set
+    after provisioning.
+    """
 
     def get_base_backend(self) -> BackendType:
         if self.base_backend is not None:
@@ -443,7 +453,7 @@ class JobSubmission(CoreModel):
 class JobConnectionInfo(CoreModel):
     ide_name: Annotated[
         Optional[str], Field(description="Dev environment IDE name for UI, human-readable.")
-    ]
+    ] = None
     attached_ide_url: Annotated[
         Optional[str],
         Field(
@@ -453,7 +463,7 @@ class JobConnectionInfo(CoreModel):
                 " Only works if the user is attached to the run via CLI or Python API."
             )
         ),
-    ]
+    ] = None
     proxied_ide_url: Annotated[
         Optional[str],
         Field(
@@ -462,7 +472,7 @@ class JobConnectionInfo(CoreModel):
                 " Not set if the job has hot started yet or sshproxy is not configured."
             )
         ),
-    ]
+    ] = None
     attached_ssh_command: Annotated[
         Optional[list[str]],
         Field(
@@ -471,7 +481,7 @@ class JobConnectionInfo(CoreModel):
                 " Only works if the user is attached to the run via CLI or Python API."
             )
         ),
-    ]
+    ] = None
     proxied_ssh_command: Annotated[
         Optional[list[str]],
         Field(
@@ -480,7 +490,7 @@ class JobConnectionInfo(CoreModel):
                 " Not set if sshproxy is not configured."
             )
         ),
-    ]
+    ] = None
     sshproxy_hostname: Annotated[
         Optional[str],
         Field(description="sshproxy hostname. Not set if sshproxy is not configured."),
@@ -512,14 +522,9 @@ class Job(CoreModel):
     job_connection_info: Optional[JobConnectionInfo] = None
 
 
-class RunSpecConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        prop = schema.get("properties", {})
-        prop.pop("merged_profile", None)
+class RunSpec(CoreModel):
+    model_config = ConfigDict(json_schema_extra=drop_merged_profile)
 
-
-class RunSpec(generate_dual_core_model(RunSpecConfig)):
     # TODO: consider removing `run_name` here because it is already passed in `configuration`.
     run_name: Annotated[
         Optional[str],
@@ -581,44 +586,40 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
             " Can be empty only before the run is submitted."
         ),
     ] = None
-    # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
+    # TODO: consider a `property` or `cached_property` instead of an excluded field.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
     """`merged_profile` stores profile parameters merged from `profile` and `configuration`.
     Read profile parameters from `merged_profile` instead of `profile` directly.
     """
 
-    @root_validator
-    def _merged_profile(cls, values) -> Dict:
-        if values.get("profile") is None:
+    @model_validator(mode="after")
+    def _merged_profile(self) -> Self:
+        if self.profile is None:
             merged_profile = Profile(name="default")
         else:
-            merged_profile = Profile.parse_obj(values["profile"])
-        try:
-            conf = RunConfiguration.parse_obj(values["configuration"]).__root__
-        except KeyError:
-            raise ValueError("Missing configuration")
-        for key in ProfileParams.__fields__:
-            conf_val = getattr(conf, key, None)
+            merged_profile = self.profile.model_copy(deep=True)
+        for key in ProfileParams.model_fields:
+            conf_val = getattr(self.configuration, key, None)
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
-        values["merged_profile"] = merged_profile
-        return values
+        self.merged_profile = merged_profile
+        return self
 
-    @root_validator
-    def _validate_dynamo_no_retry(cls, values) -> Dict:
+    @model_validator(mode="after")
+    def _validate_dynamo_no_retry(self) -> Self:
         """Reject `retry` for services with a Dynamo router replica group.
         Dynamo workers cache the router's internal IP at provisioning time. A
         retry would produce a new router and likely a new internal_ip, leaving workers bound
         to a router that no longer exists.
         """
-        merged_profile = values.get("merged_profile")
-        cfg = values.get("configuration")
+        merged_profile = self.merged_profile
+        cfg = self.configuration
         if merged_profile is None or merged_profile.retry is None:
-            return values
+            return self
         if not isinstance(cfg, ServiceConfiguration):
-            return values
+            return self
         for g in cfg.replica_groups:
             if g.router is not None and g.router.type == RouterType.DYNAMO:
                 raise ValueError(
@@ -629,7 +630,7 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
                     "Remove `retry` from the profile/configuration and "
                     "re-apply."
                 )
-        return values
+        return self
 
 
 class ServiceModelSpec(CoreModel):
@@ -689,7 +690,7 @@ class Run(CoreModel):
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission] = None
-    cost: float = 0
+    cost: float = 0.0
     service: Optional[ServiceSpec] = None
     deployment_num: int = 0
     """`deployment_num` uses a default value for compatibility with pre-0.19.14 servers."""
@@ -709,7 +710,7 @@ class JobPlan(CoreModel):
     job_spec: JobSpec
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
-    max_price: Optional[float]
+    max_price: Optional[float] = None
 
 
 class RunPlan(CoreModel):

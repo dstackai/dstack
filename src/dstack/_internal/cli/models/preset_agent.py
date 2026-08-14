@@ -1,7 +1,8 @@
 import uuid
 from typing import Any, Dict, Optional
 
-from pydantic import PositiveInt, root_validator
+from pydantic import PositiveInt, model_validator
+from typing_extensions import Self
 
 from dstack._internal.cli.models.presets import PresetBenchmark
 from dstack._internal.core.models.common import CoreModel
@@ -34,7 +35,11 @@ _BENCHMARK_JSON_SCHEMA = {
                 "input_tokens": {"type": "integer", "minimum": 1},
                 "output_tokens": {"type": "integer", "minimum": 2},
                 "concurrency": {"type": "integer", "minimum": 1},
+                "shared_prefix_tokens": {"type": "integer", "minimum": 0},
+                "dataset": {"type": "string", "minLength": 1},
             },
+            # `shared_prefix_tokens` and `dataset` are not required: one schema
+            # serves both session modes, and each mode knows only its own field.
             "required": [
                 "api",
                 "num_requests",
@@ -52,6 +57,8 @@ _BENCHMARK_JSON_SCHEMA = {
                 "duration_seconds": {"type": "number", "exclusiveMinimum": 0},
                 "total_input_tokens": {"type": "integer", "minimum": 0},
                 "total_output_tokens": {"type": "integer", "minimum": 0},
+                "output_tok_per_s": {"type": "number", "exclusiveMinimum": 0},
+                "per_user_tok_per_s": {"type": "number", "exclusiveMinimum": 0},
                 "ttft_ms": _LATENCY_JSON_SCHEMA,
                 "tpot_ms": _LATENCY_JSON_SCHEMA,
             },
@@ -61,6 +68,8 @@ _BENCHMARK_JSON_SCHEMA = {
                 "duration_seconds",
                 "total_input_tokens",
                 "total_output_tokens",
+                "output_tok_per_s",
+                "per_user_tok_per_s",
                 "ttft_ms",
                 "tpot_ms",
             ],
@@ -78,6 +87,7 @@ AGENT_FINAL_REPORT_JSON_SCHEMA = {
         "run_id": {"type": "string"},
         "run_name": {"type": "string"},
         "service_yaml": {"type": "string"},
+        "trial": {"type": "integer", "minimum": 1},
         "base": {"type": "string"},
         "model": {"type": "string"},
         "context_length": {"type": "integer", "minimum": 1},
@@ -94,30 +104,32 @@ class AgentFinalReport(CoreModel):
     run_id: Optional[uuid.UUID] = None
     run_name: Optional[str] = None
     service_yaml: Optional[str] = None
+    trial: Optional[PositiveInt] = None
     base: Optional[str] = None
     model: Optional[str] = None
     context_length: Optional[PositiveInt] = None
     benchmark: Optional[PresetBenchmark] = None
     failure_summary: Optional[str] = None
 
-    @root_validator
-    def validate_report(cls, values: dict) -> dict:
-        if values.get("success"):
+    @model_validator(mode="after")
+    def validate_report(self) -> Self:
+        if self.success:
             required = (
                 "run_id",
                 "run_name",
                 "service_yaml",
+                "trial",
                 "base",
                 "model",
                 "context_length",
                 "benchmark",
             )
-            missing = [field for field in required if values.get(field) in (None, "")]
+            missing = [field for field in required if getattr(self, field) in (None, "")]
             if missing:
                 raise ValueError("successful agent report must include " + ", ".join(missing))
-        elif not values.get("failure_summary"):
+        elif not self.failure_summary:
             raise ValueError("failed agent report must include failure_summary")
-        return values
+        return self
 
 
 class PresetAgentInfo(CoreModel):

@@ -269,7 +269,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	var dcgmExporter *dcgm.DCGMExporter
 	var dcgmWrapper dcgm.DCGMWrapperInterface
 
-	if gpu.GetGpuVendor() == gpu.GpuVendorNvidia {
+	if gpu.GetGpuVendor(ctx) == gpu.GpuVendorNvidia {
 		dcgmExporterPath, err := dcgm.GetDCGMExporterExecPath(ctx)
 		if err == nil {
 			interval := time.Duration(args.DCGMExporter.Interval * int(time.Millisecond))

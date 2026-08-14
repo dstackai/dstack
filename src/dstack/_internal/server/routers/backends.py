@@ -28,7 +28,7 @@ from dstack._internal.server.services.config import (
     update_backend_config_yaml,
 )
 from dstack._internal.server.utils.routers import (
-    CustomORJSONResponse,
+    CustomJSONResponse,
     get_base_api_additional_responses,
 )
 
@@ -46,7 +46,7 @@ project_router = APIRouter(
 
 @root_router.post("/list_types", summary="List backend types", response_model=List[BackendType])
 async def list_backend_types():
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         dstack._internal.core.backends.configurators.list_available_backend_types()
     )
 
@@ -61,7 +61,7 @@ async def create_backend(
     config = await backends.create_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
-    return CustomORJSONResponse(config)
+    return CustomJSONResponse(config)
 
 
 @project_router.post("/update", summary="Update backend", response_model=AnyBackendConfigWithCreds)
@@ -74,7 +74,7 @@ async def update_backend(
     config = await backends.update_backend(session=session, project=project, config=body)
     if settings.SERVER_CONFIG_ENABLED:
         await ServerConfigManager().sync_config(session=session)
-    return CustomORJSONResponse(config)
+    return CustomJSONResponse(config)
 
 
 @project_router.post("/delete", summary="Delete backends")
@@ -104,7 +104,7 @@ async def get_backend_config_info(
     config = await backends.get_backend_config(project=project, backend_type=backend_name)
     if config is None:
         raise ResourceNotExistsError()
-    return CustomORJSONResponse(config)
+    return CustomJSONResponse(config)
 
 
 @project_router.post("/create_yaml", summary="Create backend YAML")
@@ -143,6 +143,6 @@ async def get_backend_yaml(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    return CustomORJSONResponse(
+    return CustomJSONResponse(
         await get_backend_config_yaml(project=project, backend_type=backend_name)
     )

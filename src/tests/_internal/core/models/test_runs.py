@@ -1,13 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.core.compatibility.runs import get_run_spec_excludes
-from dstack._internal.core.models.configurations import (
-    DevEnvironmentConfiguration,
-    ServiceConfiguration,
-    TaskConfiguration,
+from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.core.models.profiles import (
+    CreationPolicy,
+    Profile,
+    RetryEvent,
+    SpotPolicy,
 )
-from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -27,23 +27,6 @@ def test_run_termination_reason_to_status_works_with_all_enum_variants():
     for run_termination_reason in RunTerminationReason:
         run_status = run_termination_reason.to_status()
         assert isinstance(run_status, RunStatus)
-
-
-@pytest.mark.parametrize("configuration_type", ["task", "dev-environment", "service"])
-@pytest.mark.parametrize("dstack", [False, True])
-def test_server_access_run_spec_compatibility(configuration_type: str, dstack: bool):
-    if configuration_type == "task":
-        configuration = TaskConfiguration(commands=["true"], dstack=dstack)
-    elif configuration_type == "service":
-        configuration = ServiceConfiguration(commands=["true"], port=8000, dstack=dstack)
-    else:
-        configuration = DevEnvironmentConfiguration(dstack=dstack)
-    configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
-        "configuration"
-    )
-
-    assert isinstance(configuration_excludes, dict)
-    assert ("dstack" in configuration_excludes) is not dstack
 
 
 def test_job_termination_reason_to_status_works_with_all_enum_variants():
@@ -139,7 +122,7 @@ class TestDynamoNoRetryValidator:
             retry={"on_events": ["error"]},
         )
         with pytest.raises(ValidationError, match="Dynamo"):
-            RunSpec.parse_obj(spec)
+            RunSpec.model_validate(spec)
 
     def test_dynamo_router_with_retry_in_configuration_is_rejected(self):
         # retry can also be specified at configuration level; _merged_profile
@@ -150,12 +133,12 @@ class TestDynamoNoRetryValidator:
             top_level_extras={"retry": {"on_events": ["error"]}},
         )
         with pytest.raises(ValidationError, match="Dynamo"):
-            RunSpec.parse_obj(spec)
+            RunSpec.model_validate(spec)
 
     def test_dynamo_router_without_retry_is_accepted(self):
         spec = _service_run_spec_dict(router_type="dynamo", retry=None)
         # Should not raise:
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_sglang_router_with_retry_is_accepted(self):
         spec = _service_run_spec_dict(
@@ -163,11 +146,11 @@ class TestDynamoNoRetryValidator:
             retry={"on_events": ["error"]},
         )
         # SGLang services are unaffected by the validator.
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_service_without_router_with_retry_is_accepted(self):
         spec = _service_run_spec_dict(router_type=None, retry={"on_events": ["error"]})
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
 
     def test_non_service_run_with_retry_is_accepted(self):
         # Validator is service-only. A task or dev-environment with retry
@@ -184,4 +167,64 @@ class TestDynamoNoRetryValidator:
             "ssh_key_pub": "ssh-rsa AAAA...",
             "repo_data": {"repo_type": "virtual"},
         }
-        RunSpec.parse_obj(spec)
+        RunSpec.model_validate(spec)
+
+
+class TestRunSpec:
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            pytest.param(
+                {"configuration": {"type": "dev-environment", "new_prop": 1}}, id="configuration"
+            ),
+            pytest.param(
+                {
+                    "configuration": {"type": "dev-environment"},
+                    "profile": {"name": "default", "new_prop": 1},
+                },
+                id="profile",
+            ),
+            pytest.param(
+                {
+                    "configuration": {
+                        "type": "dev-environment",
+                        "resources": {"gpu": {"name": ["A100"], "new_prop": 1}},
+                    }
+                },
+                id="nested-in-configuration",
+            ),
+            pytest.param(
+                {"configuration": {"type": "dev-environment"}, "new_prop": 1}, id="top-level"
+            ),
+        ],
+    )
+    def test_extra_ignored_on_read_path(self, spec: dict):
+        validate_extra_ignore(RunSpec, spec)
+        with pytest.raises(ValidationError, match="new_prop"):
+            RunSpec.model_validate(spec)
+
+    def test_configuration_profile_params_override_profile(self):
+        spec = RunSpec.model_validate(
+            {
+                "configuration": {"type": "dev-environment", "spot_policy": "spot"},
+                "profile": {"name": "default", "spot_policy": "on-demand", "max_price": 1.5},
+            }
+        )
+        assert spec.merged_profile.spot_policy == SpotPolicy.SPOT
+        assert spec.merged_profile.max_price == 1.5
+        assert spec.merged_profile.creation_policy == CreationPolicy.REUSE_OR_CREATE
+
+    def test_merging_does_not_mutate_the_passed_profile(self):
+        profile = Profile(name="default", spot_policy=SpotPolicy.ONDEMAND)
+        spec = RunSpec.model_validate(
+            {
+                "configuration": {"type": "dev-environment", "spot_policy": "spot"},
+                "profile": profile,
+            }
+        )
+        assert spec.merged_profile.spot_policy == SpotPolicy.SPOT
+        assert profile.spot_policy == SpotPolicy.ONDEMAND
+
+    def test_missing_configuration_rejected(self):
+        with pytest.raises(ValidationError, match="configuration"):
+            validate_extra_ignore(RunSpec, {})

@@ -28,7 +28,7 @@ from dstack._internal.core.errors import (
     ComputeError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -485,8 +485,6 @@ def _is_secure_cloud(region: str) -> bool:
 
 
 def _get_offer_pod_counts(offer: InstanceOfferWithAvailability) -> list[int]:
-    backend_data: RunpodOfferBackendData = RunpodOfferBackendData.__response__.parse_obj(
-        offer.backend_data
-    )
+    backend_data = validate_extra_ignore(RunpodOfferBackendData, offer.backend_data)
     pod_counts = backend_data.pod_counts or []
     return pod_counts

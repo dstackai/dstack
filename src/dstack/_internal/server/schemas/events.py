@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
-from pydantic import Field, root_validator
+from pydantic import Field, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.events import EventTargetType
@@ -21,8 +22,8 @@ class ListEventsRequest(CoreModel):
                 "List of project IDs."
                 " The response will only include events that target the specified projects"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_users: Annotated[
@@ -32,8 +33,8 @@ class ListEventsRequest(CoreModel):
                 "List of user IDs."
                 " The response will only include events that target the specified users"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_fleets: Annotated[
@@ -43,8 +44,8 @@ class ListEventsRequest(CoreModel):
                 "List of fleet IDs."
                 " The response will only include events that target the specified fleets"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_instances: Annotated[
@@ -54,8 +55,8 @@ class ListEventsRequest(CoreModel):
                 "List of instance IDs."
                 " The response will only include events that target the specified instances"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_runs: Annotated[
@@ -65,8 +66,8 @@ class ListEventsRequest(CoreModel):
                 "List of run IDs."
                 " The response will only include events that target the specified runs"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_jobs: Annotated[
@@ -76,8 +77,8 @@ class ListEventsRequest(CoreModel):
                 "List of job IDs."
                 " The response will only include events that target the specified jobs"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_volumes: Annotated[
@@ -87,8 +88,8 @@ class ListEventsRequest(CoreModel):
                 "List of volume IDs."
                 " The response will only include events that target the specified volumes"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_gateways: Annotated[
@@ -98,8 +99,8 @@ class ListEventsRequest(CoreModel):
                 "List of gateway IDs."
                 " The response will only include events that target the specified gateways"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     target_secrets: Annotated[
@@ -109,8 +110,8 @@ class ListEventsRequest(CoreModel):
                 "List of secret IDs."
                 " The response will only include events that target the specified secrets"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     within_projects: Annotated[
@@ -121,8 +122,8 @@ class ListEventsRequest(CoreModel):
                 " The response will only include events that target the specified projects"
                 " or any entities within those projects"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     within_fleets: Annotated[
@@ -133,8 +134,8 @@ class ListEventsRequest(CoreModel):
                 " The response will only include events that target the specified fleets"
                 " or instances within those fleets"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     within_runs: Annotated[
@@ -145,8 +146,8 @@ class ListEventsRequest(CoreModel):
                 " The response will only include events that target the specified runs"
                 " or jobs within those runs"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     include_target_types: Annotated[
@@ -157,8 +158,8 @@ class ListEventsRequest(CoreModel):
                 " The response will only include events that have a target"
                 " of one of the specified types"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     actors: Annotated[
@@ -170,8 +171,8 @@ class ListEventsRequest(CoreModel):
                 " performed by the specified users,"
                 " or performed by the system if `null` is specified"
             ),
-            min_items=MIN_FILTER_ITEMS,
-            max_items=MAX_FILTER_ITEMS,
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
     prev_recorded_at: Optional[datetime] = None
@@ -179,33 +180,33 @@ class ListEventsRequest(CoreModel):
     limit: int = Field(LIST_EVENTS_DEFAULT_LIMIT, ge=1, le=100)
     ascending: bool = False
 
-    @root_validator
-    def _validate_target_filters(cls, values):
+    @model_validator(mode="after")
+    def _validate_target_filters(self) -> Self:
         """
         Raise an error if more than one target_* filter is set. Setting multiple
         target_* filters would always result in an empty response, which might confuse users.
         """
 
-        target_filters = [name for name in cls.__fields__ if name.startswith("target_")]
-        set_filters = [f for f in target_filters if values.get(f) is not None]
+        target_filters = [name for name in type(self).model_fields if name.startswith("target_")]
+        set_filters = [f for f in target_filters if getattr(self, f) is not None]
         if len(set_filters) > 1:
             raise ValueError(
                 f"At most one target_* filter can be set at a time. Got {', '.join(set_filters)}"
             )
-        return values
+        return self
 
-    @root_validator
-    def _validate_within_filters(cls, values):
+    @model_validator(mode="after")
+    def _validate_within_filters(self) -> Self:
         """
         Raise an error if more than one within_* filter is set. Setting multiple
         within_* filters is either redundant or incorrect. Each within_* filter
         may also lead to additional db queries, causing unnecessary load.
         """
 
-        within_filters = [name for name in cls.__fields__ if name.startswith("within_")]
-        set_filters = [f for f in within_filters if values.get(f) is not None]
+        within_filters = [name for name in type(self).model_fields if name.startswith("within_")]
+        set_filters = [f for f in within_filters if getattr(self, f) is not None]
         if len(set_filters) > 1:
             raise ValueError(
                 f"At most one within_* filter can be set at a time. Got {', '.join(set_filters)}"
             )
-        return values
+        return self

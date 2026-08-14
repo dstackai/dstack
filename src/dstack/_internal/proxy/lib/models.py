@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Iterable, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
@@ -14,8 +14,7 @@ from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 # Models should be immutable so that they can be stored in memory and safely shared by
 # coroutines without copying on every read operation.
 class ImmutableModel(BaseModel):
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class Replica(ImmutableModel):
@@ -23,7 +22,7 @@ class Replica(ImmutableModel):
     app_port: int
     ssh_destination: str
     ssh_port: int
-    ssh_proxy: Optional[SSHConnectionParams]
+    ssh_proxy: Optional[SSHConnectionParams] = None
     ssh_proxy_private_key: Optional[str] = None
     "`None` means same as service project's key"
     # Optional outer proxy, a head node/bastion
@@ -38,11 +37,11 @@ class IPAddressPartitioningKey(ImmutableModel):
 
 class HeaderPartitioningKey(ImmutableModel):
     type: Literal["header"] = "header"
-    header: Annotated[str, Field(regex=r"^[a-zA-Z0-9-_]+$")]  # prevent Nginx config injection
+    header: Annotated[str, Field(pattern=r"^[a-zA-Z0-9-_]+$")]  # prevent Nginx config injection
 
 
 class RateLimit(ImmutableModel):
-    prefix: Annotated[str, Field(regex=r"^/[^\s\\{}]*$")]  # prevent Nginx config injection
+    prefix: Annotated[str, Field(pattern=r"^/[^\s\\{}]*$")]  # prevent Nginx config injection
     key: Annotated[
         Union[IPAddressPartitioningKey, HeaderPartitioningKey],
         Field(discriminator="type"),
@@ -52,10 +51,12 @@ class RateLimit(ImmutableModel):
 
 
 class Service(ImmutableModel):
+    id: Optional[str] = None
+    """Can temporarily be `None` for services registered before 0.21.0"""
     project_name: str
     run_name: str
-    domain: Optional[str]  # only used on gateways
-    https: Optional[bool]  # only used on gateways
+    domain: Optional[str] = None  # only used on gateways
+    https: Optional[bool] = None  # only used on gateways
     rate_limits: tuple[RateLimit, ...] = ()  # only used on gateways
     auth: bool
     client_max_body_size: int  # only enforced on gateways
@@ -63,6 +64,7 @@ class Service(ImmutableModel):
     replicas: tuple[Replica, ...]
     has_router_replica: bool = False
     router: Optional[AnyServiceRouterConfig] = None
+    """TODO: drop `router`, unused by the server since 0.21.0"""
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
 
     @property
@@ -78,7 +80,10 @@ class Service(ImmutableModel):
         return self.https
 
     def with_replicas(self, new_replicas: Iterable[Replica]) -> "Service":
-        return Service(**{**self.dict(), "replicas": tuple(new_replicas)})
+        return Service(**{**self.model_dump(), "replicas": tuple(new_replicas)})
+
+    def with_id(self, new_id: str) -> "Service":
+        return Service(**{**self.model_dump(), "id": new_id})
 
     def find_replica(self, replica_id: str) -> Optional[Replica]:
         for replica in self.replicas:

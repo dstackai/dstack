@@ -12,6 +12,8 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.duration import Duration
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     Profile,
@@ -28,10 +30,17 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import (
+    JobModel,
+    ServiceRegistrationModel,
+    ServiceReplicaRegistrationModel,
+)
 from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.testing.common import (
+    create_backend,
     create_fleet,
+    create_gateway,
+    create_gateway_compute,
     create_instance,
     create_job,
     create_project,
@@ -173,6 +182,253 @@ class TestRunActiveWorker:
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
         assert run.lock_token is None
 
+    async def test_terminates_run_on_gateway_registration_failure(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute.id,
+                is_registered=False,
+                register_attempt=3,
+                register_status_message="Connection refused",
+            )
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.GATEWAY_ERROR
+        assert run.lock_token is None
+
+    async def test_does_not_terminate_run_when_service_registered_despite_failed_attempt(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        gateway_compute_2 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=1
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=False,
+                register_attempt=3,
+                register_status_message="Connection refused",
+            )
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute_2.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert run.termination_reason is None
+        assert run.lock_token is None
+
+    async def test_does_not_terminate_run_when_one_running_replica_has_not_attempted_registration(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        # Second running replica has not attempted registration yet (e.g. just came up).
+        await create_gateway_compute(session=session, gateway_id=gateway.id, replica_num=1)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=False,
+                register_attempt=3,
+                register_status_message="Connection refused",
+            )
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert run.termination_reason is None
+        assert run.lock_token is None
+
+    async def test_terminates_run_ignoring_registration_on_non_running_replica(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_running = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        # Terminated replica successfully registered before going away — should be ignored,
+        # since only currently running replicas count towards the predicate.
+        gateway_compute_terminating = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            replica_num=1,
+            status=GatewayReplicaStatus.TERMINATING,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute_running.id,
+                is_registered=False,
+                register_attempt=3,
+                register_status_message="Connection refused",
+            )
+        )
+        session.add(
+            ServiceRegistrationModel(
+                run_id=run.id,
+                gateway_replica_id=gateway_compute_terminating.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.GATEWAY_ERROR
+        assert run.lock_token is None
+
     async def test_retries_failed_replica_within_retry_duration(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
@@ -185,7 +441,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.ERROR]),
             ),
         )
         run = await create_run(
@@ -227,7 +483,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.INTERRUPTION]),
             ),
             configuration=ServiceConfiguration(
                 port=8080,
@@ -306,7 +562,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.INTERRUPTION]),
             ),
             configuration=ServiceConfiguration(
                 port=8080,
@@ -386,7 +642,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.NO_CAPACITY]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.NO_CAPACITY]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -435,7 +691,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=600, on_events=[RetryEvent.NO_CAPACITY]),
+                retry=ProfileRetry(duration=Duration(600), on_events=[RetryEvent.NO_CAPACITY]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -484,7 +740,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(3600), on_events=[RetryEvent.ERROR]),
             ),
             configuration=TaskConfiguration(
                 commands=["echo hello"],
@@ -548,7 +804,7 @@ class TestRunActiveWorker:
             repo_id=repo.name,
             profile=Profile(
                 name="default",
-                retry=ProfileRetry(duration=60, on_events=[RetryEvent.ERROR]),
+                retry=ProfileRetry(duration=Duration(60), on_events=[RetryEvent.ERROR]),
             ),
         )
         run = await create_run(
@@ -949,7 +1205,7 @@ class TestRunActiveWorker:
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
         """Service with 1 out-of-date RUNNING replica whose spec differs from the new
-        deployment, desired=1 → creates 1 new replica (surge), old registered replica
+        deployment, desired=1 → creates 1 new replica (surge), old ready replica
         untouched."""
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -978,13 +1234,14 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=0,
             registered=True,
+            ready=True,
             replica_num=0,
         )
         # Make the old job's spec differ from the current run_spec so in-place bump
         # cannot be applied and rolling deployment is triggered instead.
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1000,7 +1257,7 @@ class TestRunActiveWorker:
         )
         jobs = list(res.scalars().all())
         assert len(jobs) == 2
-        # Old replica still RUNNING (registered, not terminated during rolling)
+        # Old replica still RUNNING (ready, not terminated during rolling)
         assert jobs[0].status == JobStatus.RUNNING
         assert jobs[0].deployment_num == 0
         # New surge replica created
@@ -1040,6 +1297,7 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=1,
             registered=True,
+            ready=True,
             replica_num=0,
         )
         # Out-of-date unregistered replica with different spec
@@ -1049,11 +1307,12 @@ class TestRunActiveWorker:
             status=JobStatus.RUNNING,
             deployment_num=0,
             registered=False,
+            ready=False,
             replica_num=1,
         )
         old_spec = get_job_spec(old_job)
         old_spec.commands = ["echo old!"]
-        old_job.job_spec_data = old_spec.json()
+        old_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1067,6 +1326,410 @@ class TestRunActiveWorker:
         await session.refresh(old_job)
         assert old_job.status == JobStatus.TERMINATING
         assert old_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+    @pytest.mark.parametrize("failed_registration", [False, True])
+    async def test_service_rolling_deployment_keeps_old_replica_until_new_replica_registered_with_gateway(
+        self, test_db, session: AsyncSession, worker: RunWorker, failed_registration: bool
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        gateway_compute_2 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=1
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo new!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+            gateway=gateway,
+        )
+        old_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=True,
+            ready=True,
+            replica_num=0,
+        )
+        old_spec = get_job_spec(old_job)
+        old_spec.commands = ["echo old!"]
+        old_job.job_spec_data = old_spec.model_dump_json()
+        new_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=1,
+        )
+        # Old replica is fully registered — receiving traffic on every running gateway replica.
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=old_job.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=old_job.id,
+                gateway_replica_id=gateway_compute_2.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        # New replica is only confirmed registered on the first gateway replica.
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=new_job.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        if failed_registration:
+            # Registration on the second gateway replica was attempted and failed.
+            session.add(
+                ServiceReplicaRegistrationModel(
+                    job_id=new_job.id,
+                    gateway_replica_id=gateway_compute_2.id,
+                    is_registered=False,
+                    register_attempt=2,
+                )
+            )
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_job)
+        await session.refresh(new_job)
+        assert old_job.status == JobStatus.RUNNING
+        assert new_job.status == JobStatus.RUNNING
+
+    async def test_service_rolling_deployment_scales_down_old_replica_once_new_replica_registered_with_gateway(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        gateway_compute_2 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=1
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo new!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+            gateway=gateway,
+        )
+        old_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=True,
+            ready=True,
+            replica_num=0,
+        )
+        old_spec = get_job_spec(old_job)
+        old_spec.commands = ["echo old!"]
+        old_job.job_spec_data = old_spec.model_dump_json()
+        new_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=1,
+        )
+        for gateway_compute in (gateway_compute_1, gateway_compute_2):
+            session.add(
+                ServiceReplicaRegistrationModel(
+                    job_id=old_job.id,
+                    gateway_replica_id=gateway_compute.id,
+                    is_registered=True,
+                    register_attempt=0,
+                )
+            )
+            session.add(
+                ServiceReplicaRegistrationModel(
+                    job_id=new_job.id,
+                    gateway_replica_id=gateway_compute.id,
+                    is_registered=True,
+                    register_attempt=0,
+                )
+            )
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_job)
+        await session.refresh(new_job)
+        assert old_job.status == JobStatus.TERMINATING
+        assert old_job.termination_reason == JobTerminationReason.SCALED_DOWN
+        assert new_job.status == JobStatus.RUNNING
+
+    async def test_service_router_rolling_deployment_surges_ready_worker_replica(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        # Up-to-date router replica
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica: ready to serve traffic but never registered.
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=True,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.RUNNING
+        assert old_worker_job.ready
+        assert not old_worker_job.registered
+        assert old_worker_job.deployment_num == 0
+
+        res = await session.execute(
+            select(JobModel).where(
+                JobModel.run_id == run.id,
+                JobModel.replica_num == 2,
+            )
+        )
+        new_worker_job = res.scalar_one()
+        assert new_worker_job.status == JobStatus.SUBMITTED
+        assert new_worker_job.deployment_num == 1
+
+    async def test_service_router_rolling_deployment_scales_down_unready_worker_replica(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica that never became ready.
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=False,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.TERMINATING
+        assert old_worker_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+    async def test_service_router_rolling_deployment_terminates_out_of_date_worker_once_replacement_ready(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=_router_worker_service_configuration(),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            ready=True,
+            replica_num=0,
+            replica_group_name="router",
+        )
+        # Out-of-date worker replica, still ready and serving traffic (surge in progress).
+        old_worker_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            ready=True,
+            replica_num=1,
+            replica_group_name="worker",
+        )
+        old_spec = get_job_spec(old_worker_job)
+        old_spec.commands = ["echo old worker!"]
+        old_worker_job.job_spec_data = old_spec.model_dump_json()
+        # Up-to-date surge worker replica has become ready → the old replica is now excess.
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=False,
+            ready=True,
+            replica_num=2,
+            replica_group_name="worker",
+        )
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_worker_job)
+        assert old_worker_job.status == JobStatus.TERMINATING
+        assert old_worker_job.termination_reason == JobTerminationReason.SCALED_DOWN
 
     async def test_service_removed_group_cleanup(
         self, test_db, session: AsyncSession, worker: RunWorker
@@ -1111,7 +1774,7 @@ class TestRunActiveWorker:
         # Patch the job spec to have replica_group="old"
         old_spec = get_job_spec(old_group_job)
         old_spec.replica_group = "old"
-        old_group_job.job_spec_data = old_spec.json()
+        old_group_job.job_spec_data = old_spec.model_dump_json()
         await session.commit()
 
         lock_run(run)
@@ -1125,3 +1788,22 @@ class TestRunActiveWorker:
         await session.refresh(old_group_job)
         assert old_group_job.status == JobStatus.TERMINATING
         assert old_group_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+
+def _router_worker_service_configuration() -> ServiceConfiguration:
+    return ServiceConfiguration.model_validate(
+        {
+            "type": "service",
+            "port": 8000,
+            "image": "ubuntu",
+            "replicas": [
+                {"name": "worker", "commands": ["echo worker"], "count": 1},
+                {
+                    "name": "router",
+                    "router": {"type": "sglang"},
+                    "commands": ["echo router"],
+                    "count": 1,
+                },
+            ],
+        }
+    )

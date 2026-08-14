@@ -1,14 +1,19 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
+from dstack._internal.core.errors import BackendError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
+    ACMGatewayCertificate,
+    GatewayLoadBalancerData,
     GatewayReplicaStatus,
     GatewayStatus,
 )
@@ -22,6 +27,7 @@ from dstack._internal.server.background.pipeline_tasks.gateways import (
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel
 from dstack._internal.server.services.gateways import get_gateway_compute_models
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_backend,
     create_gateway,
     create_gateway_compute,
@@ -308,7 +314,7 @@ class TestGatewayFetcher:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.replica_scale_attempt = 1
         await session.commit()
@@ -349,6 +355,99 @@ class TestGatewayFetcher:
         items = await fetcher.fetch(limit=10)
         assert {item.id for item in items} == {gateway.id}
 
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    async def test_fetch_includes_running_gateway_with_unmigrated_legacy_hostname(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher, legacy_compute: bool
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            last_processed_at=stale,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # not yet migrated
+        )
+        if legacy_compute:
+            compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+                hostname_deprecated_readonly="legacy-lb.example.com",
+            )
+            gateway.gateway_compute_id = compute.id
+        else:
+            await create_gateway_compute(
+                session=session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+                hostname_deprecated_readonly="legacy-lb.example.com",
+            )
+        await session.commit()
+
+        # Desired replica count matches the active replica count, so absent the
+        # pending-migration condition this gateway would not be fetched.
+        items = await fetcher.fetch(limit=10)
+        assert {item.id for item in items} == {gateway.id}
+
+    async def test_fetch_excludes_running_gateway_without_legacy_hostname_to_migrate(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            last_processed_at=stale,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,
+        )
+        await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            hostname_deprecated_readonly=None,
+        )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+        assert items == []
+
+    async def test_fetch_excludes_already_migrated_gateway(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            last_processed_at=stale,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",  # already migrated
+        )
+        await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+        )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+        assert items == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -388,6 +487,144 @@ class TestGatewayWorkerSubmitted:
         assert computes[1].status == GatewayReplicaStatus.SUBMITTED
         assert computes[1].replica_num == 1
         assert all(c.ip_address is None for c in computes)
+
+    async def test_submitted_to_provisioning_creates_load_balancer_for_acm_gateway(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.SUBMITTED,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.create_gateway_load_balancer.return_value = (
+                GatewayLoadBalancerData(
+                    hostname="gateway-lb.example.com", backend_data="lb-backend-data"
+                )
+            )
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+            create_lb_mock = backend_mock.compute.return_value.create_gateway_load_balancer
+            create_lb_mock.assert_called_once()
+            assert create_lb_mock.call_args.args[0].gateway_name == gateway.name
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.PROVISIONING
+        assert gateway.hostname == "gateway-lb.example.com"
+        assert gateway.backend_data == "lb-backend-data"
+
+    async def test_submitted_skips_load_balancer_creation_for_non_acm_gateway(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.SUBMITTED,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            await worker.process(_gateway_to_pipeline_item(gateway))
+            get_backends_mock.assert_not_called()
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.PROVISIONING
+        assert gateway.hostname is None
+        assert gateway.backend_data is None
+
+    async def test_submitted_to_failed_when_backend_does_not_support_load_balancer(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.SUBMITTED,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.FAILED
+        assert gateway.status_message == "Backend does not support load balancer operations"
+
+    @pytest.mark.parametrize(
+        "exception,expected_status_message",
+        [
+            (BackendError("Quota exceeded"), "Quota exceeded"),
+            (RuntimeError("boom"), "Unexpected error when creating load balancer"),
+        ],
+    )
+    async def test_submitted_to_failed_when_load_balancer_creation_raises(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        exception: Exception,
+        expected_status_message: str,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.SUBMITTED,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.create_gateway_load_balancer.side_effect = exception
+            get_backends_mock.return_value = [(backend, backend_mock)]
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.FAILED
+        assert gateway.status_message == expected_status_message
+        assert gateway.hostname is None
 
 
 @pytest.mark.asyncio
@@ -438,6 +675,69 @@ class TestGatewayWorkerProvisioning:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway status changed PROVISIONING -> RUNNING"
+
+    async def test_provisioning_migrates_hostname_and_backend_data_from_legacy_replica(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # migration not yet performed
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+            backend_data="legacy-backend-data",
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        assert gateway.hostname == "legacy-lb.example.com"
+        assert gateway.backend_data == "legacy-backend-data"
+
+    async def test_provisioning_does_not_overwrite_already_migrated_hostname(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="already-migrated.example.com",
+            backend_data="current-backend-data",
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            hostname_deprecated_readonly="stale-legacy-lb.example.com",
+            backend_data="stale-legacy-backend-data",
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        assert gateway.hostname == "already-migrated.example.com"
+        assert gateway.backend_data == "current-backend-data"
 
     async def test_provisioning_to_running_with_multiple_replicas(
         self, test_db, session: AsyncSession, worker: GatewayWorker
@@ -585,7 +885,7 @@ class TestGatewayWorkerProvisioning:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -787,6 +1087,37 @@ class TestGatewayWorkerRunning:
         assert computes[0].scale_in is False
         assert gateway.replica_scale_attempt == 0  # The desired count is met, reset counter
 
+    async def test_running_migrates_hostname_and_backend_data_from_legacy_replica(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # migration not yet performed
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+            backend_data="legacy-backend-data",
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.hostname == "legacy-lb.example.com"
+        assert gateway.backend_data == "legacy-backend-data"
+
     @pytest.mark.parametrize("legacy_compute", [False, True])
     @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_scales_out_when_desired_replica_count_increased(
@@ -906,7 +1237,7 @@ class TestGatewayWorkerRunning:
             ip_address=None,
             instance_id=None,
             region=None,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         submitted.created_at = datetime(2025, 1, 2)
         gateway.lock_token = uuid.uuid4()
@@ -1094,7 +1425,7 @@ class TestGatewayWorkerRunning:
             region=None,
             status=GatewayReplicaStatus.PROVISIONING,
             replica_num=0,
-            configuration=get_gateway_compute_configuration().json(),
+            configuration=get_gateway_compute_configuration().model_dump_json(),
         )
         gateway.replica_scale_attempt = 2
         gateway.lock_token = uuid.uuid4()
@@ -1242,6 +1573,216 @@ class TestGatewayWorkerDeleted:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway deleted"
+
+    async def test_deletes_gateway_and_terminates_load_balancer_when_hostname_set(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+            terminate_lb_mock = backend_mock.compute.return_value.terminate_gateway_load_balancer
+            terminate_lb_mock.assert_called_once()
+            assert terminate_lb_mock.call_args.args[0].gateway_name == gateway.name
+            assert terminate_lb_mock.call_args.args[1] == "lb-backend-data"
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway deleted"
+
+    async def test_delete_skips_load_balancer_termination_when_hostname_not_set(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            await worker.process(_gateway_to_pipeline_item(gateway))
+            get_backends_mock.assert_not_called()
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is None
+
+    async def test_delete_deferred_when_load_balancer_termination_fails(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        original_last_processed_at = gateway.last_processed_at
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.terminate_gateway_load_balancer.side_effect = (
+                Exception("boom")
+            )
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is not None
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        assert gateway.to_be_deleted is True
+        assert gateway.last_processed_at > original_last_processed_at
+        assert gateway.lock_token is None
+        events = await list_events(session)
+        assert len(events) == 0
+
+    async def test_delete_deferred_when_backend_does_not_support_load_balancer(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname="gateway-lb.example.com",
+            backend_data="lb-backend-data",
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
+            get_backends_mock.return_value = [(backend, backend_mock)]
+
+            await worker.process(_gateway_to_pipeline_item(gateway))
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is not None
+
+    async def test_delete_migrates_hostname_before_evaluating_termination(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            hostname=None,  # migration not yet performed
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+            hostname_deprecated_readonly="legacy-lb.example.com",
+            backend_data="legacy-backend-data",
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends_with_models"
+        ) as get_backends_mock:
+            await worker.process(_gateway_to_pipeline_item(gateway))
+            # Migration happens before the load balancer would be evaluated for termination,
+            # so no backend lookup occurs on this tick.
+            get_backends_mock.assert_not_called()
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is not None
+        await session.refresh(gateway)
+        assert gateway.to_be_deleted is True
+        assert gateway.hostname == "legacy-lb.example.com"
+        assert gateway.backend_data == "legacy-backend-data"
 
     @pytest.mark.parametrize(
         "replica_status",

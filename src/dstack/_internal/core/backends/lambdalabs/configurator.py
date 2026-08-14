@@ -17,6 +17,7 @@ from dstack._internal.core.backends.lambdalabs.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class LambdaConfigurator(
@@ -36,27 +37,30 @@ class LambdaConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=LambdaStoredConfig(
-                **LambdaBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=LambdaCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(LambdaBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=LambdaCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> LambdaBackendConfigWithCreds:
         config = self._get_config(record)
-        return LambdaBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(LambdaBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> LambdaBackendConfig:
         config = self._get_config(record)
-        return LambdaBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(LambdaBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> LambdaBackend:
         config = self._get_config(record)
         return LambdaBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> LambdaConfig:
-        return LambdaConfig.__response__(
-            **json.loads(record.config),
-            creds=LambdaCreds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            LambdaConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(LambdaCreds, record.auth),
+            },
         )
 
     def _validate_lambda_api_key(self, api_key: str):

@@ -14,7 +14,6 @@ from sqlalchemy.pool import ConnectionPoolEntry
 
 from dstack._internal.server import settings
 from dstack._internal.server.services.locking import advisory_lock_ctx
-from dstack._internal.server.settings import DATABASE_URL
 
 
 class Database:
@@ -63,13 +62,16 @@ def get_new_db() -> Database:
     Use this when you need to access the DB in a new thread instead of calling Database directly
     since it's easier to monkey-patch.
     """
-    return Database(url=DATABASE_URL)
+    return Database(url=settings.get_database_url())
 
 
-_db = get_new_db()
+_db: Optional[Database] = None
 
 
 def get_db() -> Database:
+    global _db
+    if _db is None:
+        _db = get_new_db()
     return _db
 
 
@@ -79,17 +81,18 @@ def override_db(new_db: Database):
 
 
 async def migrate():
-    async with _db.engine.connect() as connection:
+    db = get_db()
+    async with db.engine.connect() as connection:
         async with advisory_lock_ctx(
             bind=connection,
-            dialect_name=_db.dialect_name,
+            dialect_name=db.dialect_name,
             resource="migrations",
         ):
             await connection.run_sync(_run_alembic_upgrade)
 
 
 async def get_session():
-    async with _db.get_session() as session:
+    async with get_db().get_session() as session:
         yield session
         await session.commit()
 

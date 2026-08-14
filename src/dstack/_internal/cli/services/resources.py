@@ -2,7 +2,6 @@ import argparse
 
 from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
 from dstack._internal.cli.services.configurators.base import ArgsParser
-from dstack._internal.core.models import resources
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 
 
@@ -45,9 +44,9 @@ def register_resources_args(parser: ArgsParser) -> None:
 
 def apply_resources_args(args: argparse.Namespace, conf: AnyRunConfiguration) -> None:
     if args.cpu_spec:
-        conf.resources.cpu = resources.CPUSpec.parse_obj(args.cpu_spec)
+        conf.resources.cpu = args.cpu_spec
     if args.gpu_spec:
-        conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
+        conf.resources.gpu = args.gpu_spec
     if args.memory_spec:
         conf.resources.memory = args.memory_spec
     if args.disk_spec:

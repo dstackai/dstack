@@ -1,7 +1,6 @@
 from dstack._internal.core.models.common import IncludeExcludeDictType
 from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
-    KubernetesVolumeConfiguration,
     VolumeSpec,
 )
 
@@ -32,11 +31,4 @@ def _get_volume_configuration_excludes(
     configuration: AnyVolumeConfiguration,
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
-
-    if isinstance(configuration, KubernetesVolumeConfiguration):
-        if not configuration.read_only:
-            configuration_excludes["read_only"] = True
-        if configuration.region == "":
-            configuration_excludes["region"] = True
-
     return configuration_excludes

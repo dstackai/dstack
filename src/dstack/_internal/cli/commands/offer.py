@@ -91,6 +91,7 @@ class OfferCommand(APIBaseCommand):
             max_offers=args.max_offers,
             full_offers=args.full_offers,
             unallocated_resources=args.unallocated,
+            for_offers_only=True,
         )
         job_plan = run_plan.job_plans[0]
         if args.format == "plain":
@@ -252,4 +253,4 @@ def _print_offers_json(run_plan: RunPlan):
         offers=job_plan.offers,
         total_offers=job_plan.total_offers,
     )
-    print(output.json())
+    print(output.model_dump_json())

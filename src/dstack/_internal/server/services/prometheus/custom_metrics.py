@@ -10,11 +10,12 @@ from prometheus_client.parser import text_string_to_metric_families
 from prometheus_client.samples import Sample
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy.orm import aliased, joinedload, load_only
 
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceModel,
     JobMetricsPoint,
     JobModel,
@@ -55,8 +56,15 @@ async def get_instance_metrics(session: AsyncSession) -> Iterable[Metric]:
         )
         .order_by(ProjectModel.name, InstanceModel.name)
         .options(
-            joinedload(InstanceModel.project),
-            joinedload(InstanceModel.fleet),
+            load_only(
+                InstanceModel.name,
+                InstanceModel.created_at,
+                InstanceModel.price,
+                InstanceModel.backend,
+                InstanceModel.offer,
+            ),
+            joinedload(InstanceModel.project).load_only(ProjectModel.name),
+            joinedload(InstanceModel.fleet).load_only(FleetModel.name),
         )
     )
     instances = res.unique().scalars().all()

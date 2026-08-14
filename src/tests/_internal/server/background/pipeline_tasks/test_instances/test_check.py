@@ -1,19 +1,31 @@
 import datetime as dt
 import logging
+from typing import Optional
 from unittest.mock import Mock
 
 import pytest
 import pytest_asyncio
+import requests
+from gpuhunt import AcceleratorVendor
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.health import HealthStatus
-from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
+from dstack._internal.core.models.instances import (
+    GpuDriverInfo,
+    InstanceStatus,
+    InstanceTerminationReason,
+)
 from dstack._internal.core.models.profiles import TerminationPolicy
-from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server.background.pipeline_tasks.instances import InstanceWorker
 from dstack._internal.server.background.pipeline_tasks.instances import check as instances_check
+from dstack._internal.server.background.pipeline_tasks.instances.common import (
+    InstanceUpdateMap,
+    set_gpu_driver_update,
+)
 from dstack._internal.server.models import InstanceHealthCheckModel, InstanceModel
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse, DCGMHealthResult
 from dstack._internal.server.schemas.instances import InstanceCheck
@@ -23,6 +35,7 @@ from dstack._internal.server.schemas.runner import (
     ComponentStatus,
     HealthcheckResponse,
     InstanceHealthResponse,
+    InstanceInfoResponse,
     TaskListResponse,
 )
 from dstack._internal.server.services.runner.client import ComponentList, ShimClient
@@ -36,6 +49,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_fleet_configuration,
     get_fleet_spec,
+    get_job_provisioning_data,
     get_remote_connection_info,
     list_events,
 )
@@ -145,6 +159,75 @@ class TestCheckInstance:
         assert instance.status == InstanceStatus.BUSY
         assert instance.termination_deadline is None
         assert job.instance == instance
+
+    @pytest.mark.parametrize(
+        "stored_version",
+        [
+            pytest.param(None, id="driver-not-yet-known"),
+            pytest.param("550.90.07", id="driver-upgraded-on-the-host"),
+        ],
+    )
+    async def test_check_shim_stores_gpu_driver(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        monkeypatch: pytest.MonkeyPatch,
+        stored_version: Optional[str],
+    ):
+        project = await create_project(session=session)
+        job_provisioning_data = get_job_provisioning_data(dockerized=True, gpu_count=1)
+        if stored_version is not None:
+            job_provisioning_data.gpu_driver = GpuDriverInfo(
+                vendor=AcceleratorVendor.NVIDIA, version=stored_version
+            )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=job_provisioning_data,
+        )
+        await session.commit()
+
+        check_instance_inner_mock = Mock(
+            return_value=InstanceCheck(
+                reachable=True,
+                gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
+            )
+        )
+        monkeypatch.setattr(instances_check, "_check_instance_inner", check_instance_inner_mock)
+        await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+
+        assert check_instance_inner_mock.call_args.kwargs["check_instance_info"]
+        assert instance.job_provisioning_data is not None
+        jpd = validate_json_extra_ignore(JobProvisioningData, instance.job_provisioning_data)
+        assert jpd.gpu_driver is not None
+        assert jpd.gpu_driver.vendor == AcceleratorVendor.NVIDIA
+        assert jpd.gpu_driver.version == "570.86.15"
+
+    async def test_check_shim_does_not_request_instance_info_without_gpus(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True, gpu_count=0),
+        )
+        await session.commit()
+
+        check_instance_inner_mock = Mock(return_value=InstanceCheck(reachable=True))
+        monkeypatch.setattr(instances_check, "_check_instance_inner", check_instance_inner_mock)
+        await process_instance(session, worker, instance)
+
+        assert not check_instance_inner_mock.call_args.kwargs["check_instance_info"]
 
     async def test_check_shim_start_termination_deadline(
         self,
@@ -399,7 +482,7 @@ class TestCheckInstance:
         res = await session.execute(select(InstanceHealthCheckModel))
         health_check = res.scalars().one()
         assert health_check.status == HealthStatus.WARNING
-        assert health_check.response == health_response.json()
+        assert health_check.response == health_response.model_dump_json()
 
 
 @pytest.mark.asyncio
@@ -539,6 +622,7 @@ class BaseTestMaybeInstallComponents:
             version=self.EXPECTED_VERSION,
         )
         mock.get_instance_health.return_value = InstanceHealthResponse()
+        mock.get_instance_info.return_value = None
         mock.get_components.return_value = component_list
         mock.list_tasks.return_value = TaskListResponse(tasks=[])
         mock.is_safe_to_restart.return_value = False
@@ -942,3 +1026,113 @@ class TestMaybeRestartShim(BaseTestMaybeInstallComponents):
 
         shim_client_mock.get_components.assert_called_once()
         shim_client_mock.shutdown.assert_not_called()
+
+
+class TestSetGpuDriverUpdate:
+    def test_noop_without_driver(self):
+        jpd = get_job_provisioning_data(dockerized=True)
+        update_map = InstanceUpdateMap()
+        assert not set_gpu_driver_update(
+            update_map=update_map,
+            job_provisioning_data=jpd,
+            gpu_driver=None,
+        )
+        assert update_map == {}
+
+    def test_noop_when_driver_unchanged(self):
+        jpd = get_job_provisioning_data(dockerized=True)
+        jpd.gpu_driver = GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15")
+        update_map = InstanceUpdateMap()
+        assert not set_gpu_driver_update(
+            update_map=update_map,
+            job_provisioning_data=jpd,
+            gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
+        )
+        assert update_map == {}
+
+    @pytest.mark.parametrize("current_version", [None, "550.90.07"])
+    def test_sets_new_or_changed_driver(self, current_version):
+        jpd = get_job_provisioning_data(dockerized=True)
+        if current_version is not None:
+            jpd.gpu_driver = GpuDriverInfo(
+                vendor=AcceleratorVendor.NVIDIA, version=current_version
+            )
+        update_map = InstanceUpdateMap()
+        assert set_gpu_driver_update(
+            update_map=update_map,
+            job_provisioning_data=jpd,
+            gpu_driver=GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15"),
+        )
+        assert "job_provisioning_data" in update_map
+        parsed = validate_json_extra_ignore(
+            JobProvisioningData, update_map["job_provisioning_data"]
+        )
+        assert parsed.gpu_driver is not None
+        assert parsed.gpu_driver.version == "570.86.15"
+
+
+class TestShouldCheckInstanceInfo:
+    def _should_check(self, gpu_count: int, driver_known: bool) -> bool:
+        jpd = get_job_provisioning_data(dockerized=True, gpu_count=gpu_count)
+        if driver_known:
+            jpd.gpu_driver = GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15")
+        return instances_check._should_check_instance_info(jpd)
+
+    def test_no_gpus(self):
+        assert not self._should_check(gpu_count=0, driver_known=False)
+
+    def test_gpus_without_known_driver(self):
+        assert self._should_check(gpu_count=1, driver_known=False)
+
+    def test_gpus_with_known_driver(self):
+        # Shim restarts after a driver upgrade, which the server may not observe,
+        # so a known driver is re-requested to detect the change
+        assert self._should_check(gpu_count=1, driver_known=True)
+
+
+class TestGetGpuDriver(BaseTestMaybeInstallComponents):
+    async def test_returns_reported_driver(
+        self,
+        test_db,
+        instance: InstanceModel,
+        shim_client_mock: Mock,
+    ):
+        shim_client_mock.get_instance_info.return_value = InstanceInfoResponse(
+            gpu_vendor="nvidia", gpu_driver_version="570.86.15"
+        )
+
+        gpu_driver = instances_check._get_gpu_driver(instance, shim_client_mock)
+
+        assert gpu_driver == GpuDriverInfo(vendor=AcceleratorVendor.NVIDIA, version="570.86.15")
+
+    async def test_returns_none_if_driver_not_detected(
+        self,
+        test_db,
+        instance: InstanceModel,
+        shim_client_mock: Mock,
+    ):
+        shim_client_mock.get_instance_info.return_value = InstanceInfoResponse()
+
+        assert instances_check._get_gpu_driver(instance, shim_client_mock) is None
+
+    async def test_returns_none_on_request_error(
+        self,
+        test_db,
+        instance: InstanceModel,
+        shim_client_mock: Mock,
+    ):
+        shim_client_mock.get_instance_info.side_effect = requests.RequestException("boom")
+
+        assert instances_check._get_gpu_driver(instance, shim_client_mock) is None
+
+    async def test_returns_none_on_unknown_gpu_vendor(
+        self,
+        test_db,
+        instance: InstanceModel,
+        shim_client_mock: Mock,
+    ):
+        shim_client_mock.get_instance_info.return_value = InstanceInfoResponse(
+            gpu_vendor="quantumx", gpu_driver_version="1.2.3"
+        )
+
+        assert instances_check._get_gpu_driver(instance, shim_client_mock) is None

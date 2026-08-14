@@ -24,7 +24,10 @@ TAG_LIST_BEGIN = "<!-- BEGIN GENERATED HTTP API TAGS -->"
 TAG_LIST_END = "<!-- END GENERATED HTTP API TAGS -->"
 HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 UNTAGGED_TAG = "default"
-OPENAPI_VERSION = "3.0.3"
+# Must stay 3.1.x: pydantic v2 generates JSON Schema draft 2020-12, so the spec contains
+# constructs 3.0 has no equivalent for (`{"type": "null"}` for an optional field, `const`).
+# Declaring 3.0.3 over those produces a spec no validator accepts. swagger-ui renders 3.1.
+OPENAPI_VERSION = "3.1.0"
 
 if os.environ.get(disable_env):
     logger.warning("OpenAPI reference generation is disabled")

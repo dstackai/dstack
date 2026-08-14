@@ -29,7 +29,10 @@ if TYPE_CHECKING:
 
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
-_TRIALS_FILENAME = "trials.jsonl"
+_TRIALS_DIRNAME = "trials"
+_SERVICE_DIRNAME = "service"
+_TRIAL_RESULT_FILENAME = "trial.json"
+_VERIFICATION_RESULT_FILENAME = "verification.json"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
@@ -37,8 +40,8 @@ _USER_PROMPT_FILENAME = "user_prompt.md"
 
 
 class SessionBusyError(CLIError):
-    """Another live process owns the session — it is following or finalizing it.
-    Callers that only want to view can fall back to a read-only follow."""
+    """Raised when another live process owns the session; view-only callers can
+    fall back to a read-only follow."""
 
 
 @dataclass
@@ -46,9 +49,8 @@ class PresetAgentSession:
     path: Path
     debug: bool
     preset_id: str = ""
-    # Whether progress lines echo to this process's console (a live attach), on
-    # top of always being recorded to agent.log. Background reconcile sets it
-    # False so finalizing a detached session stays silent on the read command.
+    # Background reconcile sets this False so finalizing a detached session stays
+    # silent on the read command; agent.log is written regardless.
     echo: bool = field(default=True, repr=False)
     _log_enabled: bool = field(default=True, init=False, repr=False)
 
@@ -65,8 +67,12 @@ class PresetAgentSession:
         return self.path / _RUNS_FILENAME
 
     @property
-    def trials_path(self) -> Path:
-        return self.path / _TRIALS_FILENAME
+    def trials_dir(self) -> Path:
+        return self.path / _TRIALS_DIRNAME
+
+    @property
+    def service_dir(self) -> Path:
+        return self.path / _SERVICE_DIRNAME
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
@@ -93,7 +99,7 @@ class PresetAgentSession:
             _get_claude_version,
         )
 
-        info = ClaudeAgentInfo.parse_obj(
+        info = ClaudeAgentInfo.model_validate(
             {
                 "executable": auth.executable,
                 "version": _get_claude_version(auth),
@@ -105,7 +111,8 @@ class PresetAgentSession:
             }
         )
         _write_private_text(
-            self.path / "agent.json", json.dumps(json.loads(info.json()), indent=2) + "\n"
+            self.path / "agent.json",
+            json.dumps(json.loads(info.model_dump_json()), indent=2) + "\n",
         )
 
     def append_log(self, line: str) -> None:
@@ -172,12 +179,12 @@ def create_preset_agent_session(
             "name": configuration.name,
             "model": getattr(configuration.model, "base", None)
             or getattr(configuration.model, "repo", None),
-            "max_trials": configuration.max_trials,
+            "trials_num": configuration.trials,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "debug": debug,
         }
         _write_private_text(path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
-        data = json.loads(configuration.json(exclude_none=True))
+        data = json.loads(configuration.model_dump_json(exclude_none=True))
         if configuration.env:
             data["env"] = list(configuration.env)
         else:
@@ -230,16 +237,15 @@ def _pid_alive(pid: Any, started_at: Any = None) -> bool:
 
 
 def session_process_alive(manifest: dict[str, Any]) -> bool:
-    """Whether the session is still worked on: a live agent (possibly
-    detached) or a live CLI (possibly between agent retries)."""
+    """True if either a live agent (possibly detached) or a live CLI (possibly
+    between agent retries) still owns the session."""
     if _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at")):
         return True
     pid = manifest.get("pid")
     if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
         return False
-    # Guard the CLI pid with its start time too: after an ungraceful CLI death
-    # the OS can recycle the pid, and a bare pid_exists() would read a dead
-    # session as still owned (falsely blocking reconcile / follow).
+    # Guard the CLI pid with its start time: a recycled pid would otherwise read
+    # a dead session as still owned, falsely blocking reconcile / follow.
     return _pid_alive(pid, manifest.get("pid_started_at"))
 
 
@@ -275,7 +281,6 @@ def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
 
 
 def load_agent_session(preset_id: str) -> PresetAgentSession:
-    """Loads a session of any status for read-only inspection (its log)."""
     path = get_presets_dir() / preset_id
     session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
     if not path.is_dir() or not session.read_manifest():
@@ -284,7 +289,6 @@ def load_agent_session(preset_id: str) -> PresetAgentSession:
 
 
 def print_session_log(session: PresetAgentSession) -> None:
-    """Prints the session's redacted progress log verbatim (no markup)."""
     try:
         content = session.log_path.read_text(encoding="utf-8")
     except OSError:
@@ -302,9 +306,8 @@ def mark_session_owner(
     keep_service: Optional[bool] = None,
     claude_model: Optional[str] = None,
 ) -> None:
-    """Records this process as the session's owner (pid + start time) and, when
-    given, the finalize context a later detached reconcile needs (project and
-    keep-service intent). `None` fields are left untouched."""
+    """Beyond recording ownership, stores the finalize context a later detached
+    reconcile needs; `None` fields are left untouched."""
     fields: dict[str, Any] = {
         "status": "running",
         "pid": os.getpid(),
@@ -320,8 +323,8 @@ def mark_session_owner(
 
 
 def session_report_exists(manifest: dict[str, Any]) -> bool:
-    """Whether the agent left a final report on disk — the durable completion
-    signal a detached session is finalized from."""
+    """True once the agent has written final_report.json, marking a detached
+    session ready to finalize."""
     workspace = manifest.get("workspace")
     if not isinstance(workspace, str) or not workspace:
         return False
@@ -329,11 +332,10 @@ def session_report_exists(manifest: dict[str, Any]) -> bool:
 
 
 def try_claim_session(session: PresetAgentSession) -> Optional[int]:
-    """Takes an exclusive, kernel-held lock for the duration of a session's
-    finalization, so concurrent readers can't both finalize it. Returns an open
-    file descriptor to release via `release_session_claim`, or None if another
-    process holds it. The kernel drops the lock if the holder dies, so there are
-    no stale locks to reason about."""
+    """Takes an exclusive kernel lock so two readers can't both finalize the
+    session; returns an fd to release via `release_session_claim`, or None if
+    another process holds it. The kernel drops the lock if the holder dies, so
+    there are no stale locks."""
     try:
         fd = os.open(session.path / ".reconcile.lock", os.O_CREAT | os.O_RDWR, 0o600)
     except OSError:
@@ -353,8 +355,6 @@ def release_session_claim(fd: Optional[int]) -> None:
 
 
 def _try_lock_fd(fd: int) -> bool:
-    """Non-blocking exclusive lock on an open fd; True if acquired, False if
-    another process holds it."""
     if IS_WINDOWS:
         import msvcrt
 
@@ -378,13 +378,13 @@ def _try_lock_fd(fd: int) -> bool:
 
 
 def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
-    """The name this session holds."""
     value = manifest.get("name")
     return value if isinstance(value, str) and value else None
 
 
 def iter_agent_sessions() -> Iterator[PresetAgentSession]:
-    """Yields a handle for every session directory under the presets dir."""
+    """Skips dotfiles and `models--*` HuggingFace cache dirs that share the
+    presets directory but aren't sessions."""
     root = get_presets_dir()
     if not root.is_dir():
         return
@@ -418,7 +418,7 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         path = session.path
         manifest = session.read_manifest()
         status = manifest.get("status")
-        if status not in ("running", "interrupted", "success"):
+        if status not in ("running", "interrupted", "success", "failed"):
             continue
         if status == "running" and not session_process_alive(manifest):
             status = "interrupted"
@@ -426,57 +426,151 @@ def list_agent_sessions() -> list[dict[str, Any]]:
         entry["id"] = path.name
         entry["name"] = claimed_session_name(manifest)
         entry["status"] = status
-        entry["trials"] = _summarize_session_trials(path / _TRIALS_FILENAME)
+        entry["trials"] = _summarize_session_trials(path / _TRIALS_DIRNAME)
+        entry["verification"] = _read_last_session_verification(path / _SERVICE_DIRNAME)
+        entry["constraints"] = _read_session_constraints(path)
         entries.append(entry)
     return entries
 
 
-def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
-    """Best-so-far summary from a session's mirrored trial records."""
+def _read_session_constraints(path: Path) -> dict[str, Any]:
+    """Reads the session's own copy first: it outlives the agent workspace (removed
+    once the session finishes). The workspace copy is a backward-compat fallback for
+    sessions recorded before the session-level copy existed."""
+    for candidate in (
+        path / _CONSTRAINTS_FILENAME,
+        path / "workspace" / "w" / _CONSTRAINTS_FILENAME,
+    ):
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def _numbered_subdirs(path: Path) -> list[Path]:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        entries = [entry for entry in path.iterdir() if entry.is_dir() and entry.name.isdigit()]
     except OSError:
-        lines = []
+        return []
+    return sorted(entries, key=lambda entry: int(entry.name))
+
+
+def _read_record(path: Path) -> Optional[dict[str, Any]]:
+    """None if the record file is missing or caught half-written; the copy is
+    retried, so treat None as transient, not final."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
+    """An attempt whose result file has not appeared yet is still in flight
+    (reported as verifying)."""
+    attempts = _numbered_subdirs(path)
+    if not attempts:
+        return None
+    last = attempts[-1]
+    record = _read_record(last / _VERIFICATION_RESULT_FILENAME)
+    if record is not None and isinstance(record.get("status"), str):
+        return record
+    return {"status": "verifying"}
+
+
+def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+    """A trial directory without `trial.json` is still in flight and is not
+    counted."""
+    records = []
+    for trial_dir in _numbered_subdirs(path):
+        record = _read_record(trial_dir / _TRIAL_RESULT_FILENAME)
+        if record is not None:
+            records.append(record)
     count = 0
     best: Optional[dict[str, Any]] = None
-    for line in lines:
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(record, dict):
-            continue
-        # One record per trial (the agent contract); trials may share a task,
-        # so task names must not be deduplicated.
+    # The fastest trial that broke a constraint, shown only when nothing passed.
+    best_failed: Optional[dict[str, Any]] = None
+    # One entry per trial in order, `None` for a trial that produced no benchmark.
+    series: list[Optional[float]] = []
+    # Parallel to `series`: True where the trial broke a constraint.
+    failed: list[bool] = []
+    # Kept outside `best` so a run where nothing passed still shows what it ran on.
+    gpu: Optional[str] = None
+    for record in records:
         count += 1
         benchmark = record.get("benchmark")
+        failed.append(bool(record.get("failed")))
+        record_gpu = _format_trial_gpu(record)
+        if record_gpu:
+            gpu = record_gpu
         if not isinstance(benchmark, dict):
+            series.append(None)
             continue
         metrics = benchmark.get("metrics") or {}
         workload = benchmark.get("workload") or {}
         duration = metrics.get("duration_seconds")
         tokens = metrics.get("total_output_tokens")
         if not isinstance(duration, (int, float)) or duration <= 0:
+            series.append(None)
             continue
         if not isinstance(tokens, (int, float)):
+            series.append(None)
             continue
         tok_s = tokens / duration
+        series.append(tok_s)
+        # A failed trial keeps its benchmark — it is what the next trial learns
+        # from — but it is not a candidate for best, and promoting one would put
+        # a configuration that broke a constraint at the top of the listing.
+        if record.get("failed"):
+            if best_failed is None or tok_s > best_failed["tok_s"]:
+                best_failed = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+            continue
         if best is None or tok_s > best["tok_s"]:
-            resources = record.get("resources") or {}
-            gpu = resources.get("gpu") if isinstance(resources, dict) else None
-            gpu_text = None
-            if isinstance(gpu, dict) and gpu.get("name"):
-                gpu_text = str(gpu["name"])
-                if gpu.get("memory"):
-                    gpu_text += f":{gpu['memory']}"
-                if gpu.get("count"):
-                    gpu_text += f":{gpu['count']}"
-            best = {
-                "tok_s": tok_s,
-                "concurrency": workload.get("concurrency"),
-                "gpu": gpu_text,
-            }
-    return {"count": count, "best": best}
+            best = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+    return {
+        "count": count,
+        "best": best,
+        "best_failed": best_failed,
+        "series": series,
+        "failed": failed,
+        "gpu": gpu,
+    }
+
+
+def _trial_entry(
+    tok_s: float,
+    record: dict[str, Any],
+    metrics: dict[str, Any],
+    workload: dict[str, Any],
+    gpu: Optional[str],
+) -> dict[str, Any]:
+    ttft = (metrics.get("ttft_ms") or {}).get("p50")
+    tpot = (metrics.get("tpot_ms") or {}).get("p50")
+    context_length = record.get("context_length")
+    return {
+        "tok_s": tok_s,
+        "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
+        "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
+        "context_length": context_length if isinstance(context_length, int) else None,
+        "concurrency": workload.get("concurrency"),
+        "gpu": gpu,
+    }
+
+
+def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+    resources = record.get("resources")
+    gpu = resources.get("gpu") if isinstance(resources, dict) else None
+    if not isinstance(gpu, dict) or not gpu.get("name"):
+        return None
+    text = str(gpu["name"])
+    if gpu.get("memory"):
+        text += f":{gpu['memory']}"
+    if gpu.get("count"):
+        text += f":{gpu['count']}"
+    return text
 
 
 def print_preset_progress(message: str, *, agent_session: PresetAgentSession) -> None:
@@ -506,12 +600,13 @@ def _process_started_at(pid: int) -> Optional[float]:
         return None
 
 
-def _write_private_text(path: Path, content: str) -> None:
+def _write_private_bytes(path: Path, content: bytes) -> None:
     # Atomic tmp + fsync + replace (mkstemp already creates the file 0600), so
     # a crash mid-write cannot leave a truncated manifest or offsets file.
+    # Binary mode: mirrored files are copies, and text mode rewrites newlines.
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "wb") as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
@@ -528,7 +623,11 @@ def _write_private_text(path: Path, content: str) -> None:
                 with suppress(PermissionError):
                     os.replace(temporary, path)
                     return
-            path.write_text(content, encoding="utf-8")
+            path.write_bytes(content)
     finally:
         with suppress(FileNotFoundError):
             os.unlink(temporary)
+
+
+def _write_private_text(path: Path, content: str) -> None:
+    _write_private_bytes(path, content.encode("utf-8"))

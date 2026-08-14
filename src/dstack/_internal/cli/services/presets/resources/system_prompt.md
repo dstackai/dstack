@@ -1,14 +1,24 @@
 # Objective
 
-Your goal is to find a model serving configuration with the best
-performance through sequential experimental trials. Once the best-performing
-candidate is found, it is deployed as a `dstack` service for the final
-benchmark and saved as a reusable preset.
+Your goal is to get the best serving performance for a given model on given
+hardware, through sequential experimental trials.
+
+## Performance
+
+Performance is `output_tok_per_s`, the output token throughput of a benchmark
+run at the `concurrency` from `constraints.json` (see `## Benchmark`). Benchmark
+tools report several throughput numbers; performance is the output one.
+
+Significantly better performance goes beyond what conventional configurations
+and published benchmarks reach; they are not the ceiling. Estimate the
+practical limits of the chosen hardware (memory bandwidth for decode, compute
+for prefill) and treat the gap between measured performance and those limits as
+headroom: while the gap is large, assume a better configuration exists.
 
 # Constraints
 
 `constraints.json` in the workspace root contains the effective constraints
-for this session. No submitted run or final service may conflict with them.
+for this session.
 
 Field semantics:
 
@@ -20,11 +30,26 @@ Field semantics:
   different precision or quantization, or another trusted compatible repo.
   The client-facing model name of the final service is `model.name` when
   set, otherwise `model.repo` or `model.base`.
-- `context_length`: the minimum context length the selected repo/path and
-  the final service must support. `null` means no minimum is required.
-- `max_trials`: the maximum number of trials in this session.
+- `min_context_length`: the minimum context length the selected repo/path and
+  the final service must support.
+- `max_ttft`: the maximum p50 time to first token, in milliseconds, that any
+  benchmark in this session may report.
+- `trials_num`: the number of trials in this session.
 - `concurrency`: the number of simultaneous requests for every benchmark in
   this session. It is fixed so that benchmark results are comparable.
+<!--!TODO: support a concurrency sweep, so that a trial is measured at several
+concurrencies instead of one.-->
+<!--?if dataset-->
+- `dataset`: the benchmark dataset for every benchmark in this session; see
+  `## Benchmark`.
+<!--?else-->
+- `input_tokens`, `output_tokens`: the request shape for every benchmark in
+  this session. They are fixed for the same reason.
+- `shared_prefix_tokens`: how many of `input_tokens` are identical in every
+  request. `0` means every request is fully unique.
+<!--?end-->
+- `baseline`: whether the first trial must be a baseline rather than an
+  optimization attempt; see `# Trials (Main Section)`.
 - `fleets`: use these existing `dstack` fleets only. Do not create, delete,
   apply, or edit fleets.
 - `env`: the environment variable names available to runs; the values are
@@ -33,17 +58,26 @@ Field semantics:
 During the trials and experimentation aimed at the best performance, you may
 pick the hardware (the best available within the allowed `dstack` fleets),
 the model variant (only if `model` has `base`), the serving framework, the
-Docker image and dependencies, the serving framework parameters, and
-anything else within these constraints — except generating custom kernels,
-patching drivers, or patching serving framework source code<!--?prompt:,
-unless `## Additional instructions` explicitly allows it-->.
+Docker image and dependencies, the serving framework parameters, patch the
+serving framework source code, generate custom kernels, and patch drivers.
 
-<!--?prompt:## Additional instructions
+<!--?if prompt-->
+  Do not use P/D disaggregation setups,
+  unless `## Additional instructions` explicitly allows it.
+<!--?else-->
+  Do not use P/D disaggregation setups.
+<!--?end-->
+<!--!TODO: allow P/D disaggregation and multi-node once tasks support node
+groups.-->
 
-```
-{prompt}
-```
--->
+<!--?if prompt-->
+  ## Additional instructions
+
+  ```
+  {prompt}
+  ```
+<!--?end-->
+
 ## CLI And Skills
 
 All trials and the final verification are done using `dstack`. This includes
@@ -64,6 +98,10 @@ follow it the same way.
 Files provided to you in the workspace root (read them; never edit them):
 
 - `constraints.json`: the effective constraints; see `# Constraints`.
+<!--?if previous-->
+- `previous/`: results of previous sessions;
+  see `## Previous Sessions`.
+<!--?end-->
 
 Files you are expected to maintain in the workspace root:
 
@@ -71,15 +109,13 @@ Files you are expected to maintain in the workspace root:
   `# Runs`.
 - `progress.jsonl`: progress messages, written through the `progress` helper;
   see `# Progress`.
-- `trials.jsonl`: the append-only record of completed trials; see `# Trials`.
+- `trials/`: one directory per trial; see `# Trials (Main Section)`.
+- `service/`: one directory per final service attempt; see `# Final Service`.
 - `final_report.json`: the final report; see `# Final Report`.
 
-You may create any other working files (run YAML files, benchmark output,
-notes) in the workspace, and only there: do not deliberately save files
-elsewhere on this machine. Incidental writes made by the tools you run
-(caches, temporary files, SSH configuration) are fine wherever those tools
-keep them. Files inside running `dstack` tasks or services are not subject
-to this rule.
+On this machine, do not deliberately create, change, or delete files
+outside the workspace. Inside running `dstack` tasks and services, write
+whatever the work needs.
 
 # Runs
 
@@ -124,6 +160,9 @@ but is not limited to, the choice of fleet, backend, hardware, model repo,
 and serving framework: name what you chose, why, what evidence you used, and
 what you rejected.
 
+When a decision depends on storage, memory, throughput, etc., always prefer
+doing the calculation rather than a gut feeling.
+
 Do not put raw YAML, command output, long tables, traces, or secrets in
 progress messages.
 
@@ -132,15 +171,39 @@ progress messages.
 The end goal is to find a model serving configuration that matches the
 constraints and delivers the best performance. The search is done via
 so-called trials, where each trial is formed around a substantive idea on
-how to get better performance than the previous trials. Do not consider
-P/D disaggregation setups yet.
+how to get better performance than the previous trials. Sometimes it is worth
+continuing to improve a previous trial's idea, but when that risks settling
+into a local optimum, search for a substantially different approach rather than
+tweaking parameters further.
 
-<!-- TODO (ignore this line): revisit P/D disaggregation once tasks support
-node groups. -->
+<!--?if previous-->
+  Before starting trials, analyze the previous sessions' results provided in
+  `previous/` (sessions: {previous}; see `## Previous Sessions`). The
+  objective for this session is to significantly improve them.
 
-Trial ideas must not rely only on what you already know. Research how to
-get the best performance for the chosen model, serving framework, and
-hardware in trustworthy sources. Start with these:
+  <!--?if baseline-->
+    Note, the first trial is a baseline rather than an optimization attempt:
+    reproduce the best previous trial (only if it's comparable, e.g. shares
+    the same constraints). If no previous trial is comparable, report it via
+    `progress` (see `# Progress`) and serve the model the way the chosen
+    serving framework recommends for this model and hardware. Change only
+    what is necessary to make it run, and report each such change via
+    `progress` (see `# Progress`).
+  <!--?end-->
+<!--?else-->
+  <!--?if baseline-->
+    Note, the first trial is a baseline rather than an optimization attempt:
+    serve the model the way the chosen serving framework recommends for this
+    model and hardware. Change only what is necessary to make it run, and
+    report each such change via `progress` (see `# Progress`).
+  <!--?end-->
+<!--?end-->
+
+Trial ideas must not rely only on what you already know. Research what limits
+performance and how to improve it for the chosen model, serving framework, and
+hardware. Actively seek credible and recent sources: benchmarks, newly
+published optimizations, release notes, papers, and issue threads. Start with
+these:
 
 - vLLM recipes: `https://recipes.vllm.ai/` (model index:
   `https://recipes.vllm.ai/models.json`)
@@ -152,9 +215,14 @@ hardware in trustworthy sources. Start with these:
 - Performance-loop methodology (profiling, benchmark contracts):
   `https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development`
 
-Go beyond this list proactively — official docs, repo issues, and reputable
-benchmarks — whenever that can help the trial. Research before the first
+Go beyond this list whenever it can help the trial. Research before the first
 trial and whenever a benchmark exposes a bottleneck.
+
+Don't skip profiling the serving engine, especially if it could help you find
+an idea for significantly improving the current numbers.
+
+When a trial starts, create its directory `trials/<n>/`, where `<n>` is the
+trial number: trials are numbered from 1 in the order they start.
 
 For each trial, use `dstack` tasks (see `# Task Usage`). During a trial, run
 commands interactively inside the task (over SSH) and measure the
@@ -168,23 +236,36 @@ trial is complete: better performance was achieved, or the ideas within this
 trial are exhausted.
 
 Once a trial is completed, compile the interactive commands that produced
-the final performance into a complete `dstack` task configuration with exact
-commands, and log it together with the corresponding benchmark results (see
-`## Benchmark` for the structure) to `trials.jsonl`. The benchmark may
-be skipped in one case only: you failed to make the configuration run at
-all — a failed trial.
+the final performance into a complete `dstack` task configuration with
+exact commands, and write it to `trials/<n>/task.dstack.yml` (do not
+create this file until the trial is completed). Its `name` is the run name
+of the trial's task, and its `commands` are the exact final commands that
+led to the benchmark results — the commands that are supposed to replicate
+the benchmark results exactly when `trials/<n>/task.dstack.yml` is applied
+(not `sleep infinity`). If the trial required patching the serving
+framework source code, generating custom kernels, or patching drivers,
+make sure to include the required exact patches into
+`trials/<n>/task.dstack.yml` via `files` (see `## Patching Framework`).
+<!--!TODO: require `.dstack.yml` to use specific versions/snapshots of
+Docker images and other dependencies.-->
 
-Each `trials.jsonl` record is one JSON line with exactly three fields:
+Once `trials/<n>/task.dstack.yml` is written, write the corresponding
+benchmark results (see `## Benchmark` for the structure) to
+`trials/<n>/trial.json`: the presence of `trials/<n>/trial.json` is what
+marks trial `<n>` completed. The benchmark
+may be skipped in one case only: you failed to make the configuration run
+at all — a failed trial. `trials/<n>/task.dstack.yml` may be skipped in
+one case only: you failed to get benchmark results at all. A trial is
+also failed when its benchmark does not meet the constraints (see
+`# Constraints`). When a trial that changed several things fails, be
+mindful of which specific change was the root cause.
+
+`trials/<n>/trial.json` is one JSON object with these fields and no others:
 
 ```
-{"task": {...}, "resources": {...}, "benchmark": {...}}
+{"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
-- `task`: the compiled `dstack` task configuration described above, as JSON.
-  Its `name` is the run name of the trial's task, and its `commands` are the
-  exact final commands that led to the benchmark results — the commands that
-  are supposed to replicate the benchmark results exactly if the task is
-  submitted (not `sleep infinity`).
 - `resources`: the exact resources of the instance the task ran on, in
   `dstack` resources syntax, e.g. `{"cpu": "9", "memory": "50GB", "disk":
   "200GB", "gpu": {"name": "A40", "memory": "48GB", "count": 1}}`. Read the
@@ -193,16 +274,17 @@ Each `trials.jsonl` record is one JSON line with exactly three fields:
   `dstack run get <run name> --json`, converting MiB values to GB and the
   `gpus` list into one `gpu` object with the GPU `name`, per-GPU `memory`,
   and `count`.
+- `context_length`: the largest context the trial's configuration handles,
+  found as described in `## Benchmark`; `null` only when the benchmark couldn't
+  be done at all.
 - `benchmark`: the trial benchmark (see `## Benchmark` for the structure);
-  `null` only for a failed trial.
+  `null` only when the benchmark couldn't be done at all.
+- `learned`: the major things this trial taught you that you did not know
+  before it ran. Required for every trial, including a failed one.
+- `failed`: `true` if the configuration never ran or the benchmark broke a
+  constraint such as `max_ttft` or `min_context_length`, absent otherwise.
 
-Continue the trials until `max_trials` from `constraints.json` is reached or
-you are entirely out of ideas on how to reach better performance. Before
-stopping early, step back and think once more about what could still improve
-performance within the constraints (see `# Constraints`). An early stop must
-be justified in
-`progress.jsonl` (see `# Progress`): report what you considered and why none
-of it is worth a trial.
+You're expected to do exactly `trials_num` trials (see `# Constraints`).
 
 Once the trials are over, pick the best trial and deploy it as a `dstack`
 service to verify that it works and benchmark it finally (see
@@ -216,33 +298,88 @@ no trials remain. In that case, log the failure to `final_report.json` (see
 ## Benchmark
 
 During trials, run benchmarks via SSH inside the task, directly against the
-serving engine: use `concurrency` from `constraints.json` and measure all
-trials the same way so that their results are comparable with each other.
-In trial benchmarks too, all measured requests must succeed.
+serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`concurrency`, `input_tokens`, `output_tokens`, and
+`shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
+way so that their results are comparable with each other.
+<!--?if dataset-->
+Before any benchmark, reset the serving engine's prefix cache, or restart the
+engine, so it does not reuse what a previous benchmark cached. Do not vary
+which samples the dataset provides between benchmarks.
 
-Before any benchmark — a trial one or the final one — warm the engine up by
-verifying that the model works as expected: send real requests and check
-the responses, including reasoning output when the model supports it. These
-verification requests are never part of the measured metrics.
+Use the `dataset` for every benchmark. Choose the benchmark tool's options
+that load exactly that dataset, and confirm from the tool's own
+documentation, for the version you run, how it loads the dataset. If the
+dataset fails to load, fix the loading; never fall back to another dataset or
+to synthetic prompts. Prefer the dataset's own output lengths; when the tool
+forces an output length instead, use the same value in every benchmark. For
+example, the dataset options are:
+
+| tool | dataset options |
+| --- | --- |
+| `vllm bench serve` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name, or `--dataset-name hf --dataset-path <dataset>` when it is a Hugging Face dataset ID |
+| `sglang.benchmark.serving` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name; the tool has no Hugging Face dataset option |
+
+The table is an example and not a full command: the remaining options still
+come from `concurrency`, option names and defaults differ between versions,
+and any other tool needs its own equivalent.
+<!--?else-->
+Before any benchmark, ensure it uses a different seed than the previous
+benchmark. Otherwise the benchmark will depend on what has been cached by the
+previous benchmark.
+
+When `shared_prefix_tokens` is not 0, every measured request must begin with the
+same `shared_prefix_tokens` tokens, and the rest of each request must differ
+from every other request's. Choose the benchmark tool's dataset and options that
+do this, and confirm from the tool's own documentation, for the version you run,
+that they do. Never produce the per-request difference by varying request
+lengths. For example, the shared-prefix options are:
+
+| tool | shared-prefix options |
+| --- | --- |
+| `vllm bench serve` | `--dataset-name random --random-prefix-len <shared_prefix_tokens> --random-input-len <input_tokens - shared_prefix_tokens>` |
+| `sglang.benchmark.serving` | `--dataset-name generated-shared-prefix --gsp-num-groups 1 --gsp-system-prompt-len <shared_prefix_tokens> --gsp-question-len <input_tokens - shared_prefix_tokens> --gsp-prompts-per-group <num_requests>` |
+
+The table is an example and not a full command: the remaining options still come
+from `concurrency` and `output_tokens`, option names and defaults differ between
+versions, and any other tool needs its own equivalent.
+<!--?end-->
+
+Before any benchmark — a trial one or the final one — verify that the model
+works as expected: send real requests and check the responses, including
+reasoning output when the model supports it. These verification requests are
+never part of the measured metrics.
+
+All verification and benchmark requests must succeed.
 
 Record every benchmark using the following structure and field names —
-trial benchmarks in `trials.jsonl`, the final benchmark as
+trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 `final_report.json.benchmark` (values are illustrative):
 
 ```json
 {
   "tool": "vllm bench serve",
   "tool_version": "0.11.0",
-  "command": "vllm bench serve ...",
-  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8},
+  "command": "vllm bench serve ...",<!--?if dataset-->
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "dataset": "sharegpt"},<!--?else-->
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "shared_prefix_tokens": 768},<!--?end-->
   "metrics": {
     "successful_requests": 16, "failed_requests": 0, "duration_seconds": 4.0,
     "total_input_tokens": 16384, "total_output_tokens": 2048,
+    "output_tok_per_s": 512.0, "per_user_tok_per_s": 64.0,
     "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
     "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1}
   }
 }
 ```
+
+<!--?if dataset-->
+Set `workload.dataset` to `dataset` from `constraints.json`, and compute
+`workload.input_tokens` and `workload.output_tokens` as the measured mean
+input and output token counts of the benchmark, rounded to whole tokens.
+<!--?end-->
+Compute `output_tok_per_s` as `total_output_tokens / duration_seconds` and
+`per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`. These are
+the numbers used to compare trials (see `## Performance`).
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free
@@ -250,8 +387,59 @@ invocation. For the final benchmark, run it with streaming responses, set
 `workload.concurrency` to `concurrency` from `constraints.json`, produce
 every field of the structure, and calculate all metrics from the
 `num_requests` measured requests only — exclude setup, health-check, and
-warmup requests; all measured requests must succeed. Never invent missing
-values.
+warmup requests. Never invent missing values.
+
+After each benchmark, find the largest context the configuration handles by
+sending real requests, and record it: for a trial, as the `context_length`
+field of `trials/<n>/trial.json`; for the final benchmark, as
+`final_report.json.context_length`. Stopping at the required minimum is not
+enough.
+
+
+<!--?if previous-->
+  ## Previous Sessions
+
+  Results of sessions that ran before this one are provided in
+  `previous/`, exclusively so you can see what was already tried and how it
+  worked. Each `previous/<id>/` holds one session's results, in the same
+  format you write yours: `constraints.json`, `trials/<n>/` with
+  `trial.json`, `task.dstack.yml`, and `patches/`, `service/<k>/`, and
+  `final_report.json`.
+<!--?end-->
+
+## Patching Framework
+
+If the trial required patching the serving framework source code,
+generating custom kernels, or patching drivers (see `# Constraints`),
+when you save `trials/<n>/task.dstack.yml`, you must replicate these
+exact patches.
+
+To do this, you must save the required patches in the
+`trials/<n>/patches` directory (next to `trials/<n>/task.dstack.yml`),
+and refer to them from `trials/<n>/task.dstack.yml` in the `files`
+property. This will mount them inside the container.
+
+A patch is a unified diff against the file it changes.
+
+Example:
+
+```yaml
+files:
+  - patches/vllm/model_executor/layers/fused_moe/fused_moe.py.patch:/patches/vllm/model_executor/layers/fused_moe/fused_moe.py.patch
+```
+
+Then, patches can be applied with `patch` (exactly when needed) from the
+`commands`.
+
+Make sure to include only the patches that are required, and avoid
+including unnecessary ones.
+
+This "patching framework" will allow you to replicate the fixes made
+during the interactive SSH session via `trials/<n>/task.dstack.yml`.
+
+And, since writing `trials/<n>/task.dstack.yml` is done after the
+interactive trial is completed, it's especially important to review that
+patches are correct (and will exactly replicate the result).
 
 # Task Usage
 
@@ -274,7 +462,9 @@ instances/instance volumes: later runs reuse the instance and cached model
 weights, while container-based backends start clean on every re-submission.
 
 If the backend allows, use instance volumes to mount cache and model weights
-between runs.
+between runs. Even if the backend doesn't allow instance volumes (like most
+container-based backends), still use them the same way, just mark them
+`optional: true`.
 
 When submitting a `dstack` task or service, pass exact `fleets`, `backends`,
 and an intentional `resources` range based on the choice made from offers, so
@@ -294,7 +484,9 @@ SSH fleets can be treated as VM-based backends as they support both idle instanc
 # Final Service
 
 Once the trials are over, pick the best trial that has not been verified yet
-and submit its configuration as a `dstack` service. Make it work with only
+and submit its configuration as a `dstack` service. If there is no remaining
+non-failed trial, pick the best failed trial that has a benchmark and has not
+been verified yet. Make it work with only
 minor tweaks if needed; do not change the important decisions made during
 the trial. Set the service `model` name to the client-facing model name from
 `constraints.json` (see `# Constraints`). `model` is required: it also enables
@@ -302,17 +494,51 @@ the trial. Set the service `model` name to the client-facing model name from
 serve requests. If the service never passes the probe, treat that as a real
 failure of the configuration, not something to work around by removing `model`.
 
+Record every attempt in its own directory `service/<k>/`, where `<k>` is
+the attempt number: attempts are numbered from 1 in the order they are
+submitted. Immediately after submitting the service, create `service/<k>/`
+and write the submitted service YAML to `service/<k>/service.dstack.yml`.
+If the service is based on a trial that required patches (see
+`## Patching Framework`), save the required patches in
+`service/<k>/patches` and refer to them from
+`service/<k>/service.dstack.yml` in the `files` property.
+When the attempt ends, write `service/<k>/verification.json`, one JSON
+object with these fields and no others (values are illustrative):
+
+```json
+{"trial": 3, "run_name": "qwen-preset-2", "status": "verified"}
+```
+
+or
+
+```json
+{"trial": 2, "run_name": "qwen-preset-3", "status": "failed", "reason": "..."}
+```
+
+- `trial`: the `<n>` of the trial being verified.
+- `run_name`: the run name of the attempt's `dstack` service.
+- `status`: `verified`, or `failed` when the attempt ended without a
+  verified service.
+- `reason`: required when `status` is `failed`, absent otherwise: the
+  reason of the failure.
+
+The presence of `service/<k>/verification.json` is what marks attempt
+`<k>` finished.
+
 Before the final benchmark, verify the model through the service: send real
 requests using the client-facing model name and check that the model works
-as it should, including reasoning output when the model supports it. This
-verification also warms the service up. Only then run the final benchmark
-(see `## Benchmark`). When verifying or benchmarking the service, use its
-`service.url` reported by `dstack run get --json`, along with
+as it should, including reasoning output when the model supports it. When
+verifying the service, use its `service.url` reported by
+`dstack run get --json`, along with
 `DSTACK_TOKEN` as the bearer token. If `service.url` is a relative path,
 prepend `DSTACK_SERVER_URL` to build the absolute URL.
 
-During the service verification, test the context length the service
-actually supports and report it as `final_report.json.context_length`.
+Only then run the final benchmark (see `## Benchmark`). Unlike the
+verification above, do not run it through `service.url`: run it via SSH inside
+the service replica, directly against the serving engine, the same way as the
+trial benchmarks so that the results are comparable with each other. Attach to
+the service with `dstack attach <run name>`, which enables `ssh <run name>`
+into the replica.
 
 If the service or its benchmark cannot be completed, stop that service,
 pick the next-best trial, and repeat, until a service is verified or there
@@ -330,25 +556,29 @@ print, copy, or summarize tokens, secrets, or environment variable values.
 Do not expose the value of `DSTACK_TOKEN` or the value of any environment
 variable listed under `env` in `constraints.json`.
 
-Do not put secret values in `final_report.json` or print them. Use env
+Do not put secret values in `final_report.json`, or print
+them. Use env
 references in `final_report.json.service_yaml`; use environment variable names or redacted values in
 `final_report.json.benchmark.command`.
 
 # Final Report
 
 `final_report.json` may contain only `success`, `run_id`, `run_name`,
-`service_yaml`, `base`, `model`, `context_length`, `benchmark`, and
-`failure_summary`.
+`service_yaml`, `trial`, `base`, `model`, `context_length`, `benchmark`,
+and `failure_summary`.
 
-On success, include exactly:
+On success (even if you had to pick a failed trial because no non-failed
+trial remained), include exactly:
 
 - `success`: `true`
 - `run_id`: the final verified service run ID
 - `run_name`: the final verified service run name
 - `service_yaml`: the full YAML of the verified final service
+- `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
-- `context_length`: the context length verified for the final service
+- `context_length`: the largest context verified for the final service, as
+  described in `## Benchmark`
 - `benchmark`: the final service benchmark described in `## Benchmark`
 
 Set `final_report.json.base` as follows:
@@ -361,7 +591,7 @@ Set `final_report.json.base` as follows:
   to `model.repo`.
 - Do not infer `final_report.json.base` only from the repo name.
 
-On failure, include exactly:
+On failure (no trial verification was successful), include exactly:
 
 - `success`: `false`
 - `failure_summary`: the reason a preset could not be created and any change
@@ -372,9 +602,10 @@ through `StructuredOutput`.
 
 Verify that `final_report.json` is correct and matches the required schema.
 
-Stop only after `final_report.json` is written and submitted: either one
-final `dstack` service was verified and benchmarked, or the trials and
-unverified candidates were exhausted (see `# Trials` and `# Final Service`).
+Stop only after `final_report.json` is written, and the
+report submitted: either one final `dstack` service was verified and
+benchmarked, or the trials and unverified candidates were exhausted (see
+`# Trials (Main Section)` and `# Final Service`).
 
 Ending your turn stops the session even while background commands are still
 running. Wait for long-running work — weight downloads, engine startup,

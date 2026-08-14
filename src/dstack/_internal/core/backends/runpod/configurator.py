@@ -15,6 +15,7 @@ from dstack._internal.core.backends.runpod.models import (
     RunpodStoredConfig,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class RunpodConfigurator(
@@ -34,27 +35,30 @@ class RunpodConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=RunpodStoredConfig(
-                **RunpodBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=RunpodCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(RunpodBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=RunpodCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> RunpodBackendConfigWithCreds:
         config = self._get_config(record)
-        return RunpodBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(RunpodBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> RunpodBackendConfig:
         config = self._get_config(record)
-        return RunpodBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(RunpodBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> RunpodBackend:
         config = self._get_config(record)
         return RunpodBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> RunpodConfig:
-        return RunpodConfig(
-            **json.loads(record.config),
-            creds=RunpodCreds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            RunpodConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(RunpodCreds, record.auth),
+            },
         )
 
     def _validate_runpod_api_key(self, api_key: str):

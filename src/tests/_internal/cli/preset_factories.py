@@ -41,7 +41,7 @@ def get_preset_benchmark(*, verified: bool = True) -> PresetBenchmark:
     )
     if not verified:
         return benchmark
-    return benchmark.copy(
+    return benchmark.model_copy(
         update={
             "target": PresetBenchmarkTarget(type="server-proxy"),
             "client": PresetBenchmarkClient(type="local"),
@@ -54,7 +54,7 @@ def get_preset(
     preset_id: str = "8f3a12c4",
     context_length: int = 32768,
 ) -> Preset:
-    resources = ResourcesSpec.parse_obj(
+    resources = ResourcesSpec.model_validate(
         {
             "cpu": "16",
             "memory": "64GB",
@@ -68,7 +68,7 @@ def get_preset(
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=context_length,
         created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
-        service=ServiceConfiguration.parse_obj(
+        service=ServiceConfiguration.model_validate(
             {
                 "image": "vllm/vllm-openai:v0.11.0",
                 "commands": ["vllm serve community/Qwen3.5-27B-GPTQ-Int4"],
@@ -88,7 +88,7 @@ def get_preset(
 
 
 def get_running_service_run() -> Run:
-    service = ServiceConfiguration.parse_obj(
+    service = ServiceConfiguration.model_validate(
         {
             "name": "qwen-build-2",
             "image": "vllm/vllm-openai:v0.11.0",
@@ -125,7 +125,7 @@ def get_running_service_run() -> Run:
             )
         ],
     )
-    return Run.construct(
+    return Run.model_construct(
         id=uuid4(),
         project_name="main",
         status=RunStatus.RUNNING,
@@ -142,6 +142,7 @@ def get_successful_preset_report(run: Run) -> AgentFinalReport:
         run_id=run.id,
         run_name=run.run_spec.run_name,
         service_yaml="type: service",
+        trial=1,
         base="Qwen/Qwen3.5-27B",
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=32768,

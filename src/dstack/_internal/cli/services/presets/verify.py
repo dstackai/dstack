@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.configurations import DEFAULT_DATASET, PresetConfiguration
 from dstack._internal.cli.models.preset_agent import AgentFinalReport
 from dstack._internal.cli.models.presets import (
     Preset,
@@ -47,12 +47,11 @@ def load_preset_agent_report(
                 redacted_values,
             )
         )
-    # Scrub known secret values before validation: an echoed secret must never
-    # be persisted, but it also must not cost the whole session — the bearer
-    # check below still rejects unknown leaked tokens.
+    # Redact known secrets; an unknown leaked token is still caught downstream by
+    # the command bearer-token check.
     report_data = redact_structure(report_data, redacted_values)
     try:
-        report = AgentFinalReport.parse_obj(report_data)
+        report = AgentFinalReport.model_validate(report_data)
     except ValidationError as e:
         raise CLIError(f"Claude returned an invalid final report: {e}") from e
     if not report.success:
@@ -65,14 +64,42 @@ def load_preset_agent_report(
     return report
 
 
+def _rewrite_workspace_file_paths(
+    service: ServiceConfiguration, *, workspace_path: Path, session_path: Path
+) -> None:
+    """Re-roots `files` onto the session's mirrored copies because the submission
+    workspace is deleted when the session ends; only `trials/` and `service/` are
+    mirrored. Paths are written relative to the preset directory so the saved
+    preset stays portable; the store resolves them at load."""
+    workspace_root = workspace_path.resolve()
+    for mapping in service.files:
+        try:
+            relative = Path(mapping.local_path).resolve().relative_to(workspace_root)
+        except ValueError:
+            raise CLIError(
+                f"Claude final service file '{mapping.local_path}' is outside the agent workspace"
+            )
+        target = session_path / relative
+        if relative.parts[:1] not in (("trials",), ("service",)) or not target.exists():
+            raise CLIError(
+                f"Claude final service file '{mapping.local_path}' has no mirrored copy"
+                f" at '{target}'"
+            )
+        mapping.local_path = relative.as_posix()
+
+
 def build_verified_preset(
     *,
     run: Run,
     preset_configuration: PresetConfiguration,
     report: AgentFinalReport,
+    workspace_path: Optional[Path] = None,
+    session_path: Optional[Path] = None,
     preset_id: Optional[str] = None,
     name: Optional[str] = None,
 ) -> Preset:
+    """Cross-checks the agent's self-reported final report against the actual run
+    and service state before trusting it to build a preset."""
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
         raise CLIError("Claude final report identifies a different service run")
     if run.status != RunStatus.RUNNING or run.service is None:
@@ -86,31 +113,38 @@ def build_verified_preset(
     assert report.model is not None
     assert report.context_length is not None
     assert report.benchmark is not None
+    # Only when a dataset was requested: a `random` session is never told the
+    # field exists, so whatever it reports there means nothing.
+    requested_dataset = preset_configuration.effective_dataset
+    if requested_dataset != DEFAULT_DATASET:
+        if report.benchmark.workload.dataset != requested_dataset:
+            raise CLIError("Claude final benchmark dataset does not match the requested dataset")
     if preset_configuration.model.allows_variant_selection:
         if report.base != preset_configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the requested model")
     elif report.model != preset_configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
-    if (
-        preset_configuration.context_length is not None
-        and report.context_length < preset_configuration.context_length
-    ):
-        raise CLIError("Claude final service does not meet the requested context length")
 
     target_type = (
         "gateway" if urlparse(run.service.url).scheme in {"http", "https"} else "server-proxy"
     )
-    benchmark = report.benchmark.copy(
+    benchmark = report.benchmark.model_copy(
         update={
             "target": PresetBenchmarkTarget(type=target_type),
             "client": PresetBenchmarkClient(type="local"),
         }
     )
-    portable_service = service.copy(deep=True)
+    portable_service = service.model_copy(deep=True)
     # The CLI resolved preset env references before submission; presets retain the references.
     for key, value in preset_configuration.env.items():
         if isinstance(value, EnvSentinel) and key in portable_service.env:
             portable_service.env[key] = value
+    if portable_service.files:
+        if workspace_path is None or session_path is None:
+            raise CLIError("Claude final service uses files but no workspace is attached")
+        _rewrite_workspace_file_paths(
+            portable_service, workspace_path=workspace_path, session_path=session_path
+        )
     return build_preset(
         name=name,
         service=portable_service,
@@ -119,6 +153,9 @@ def build_verified_preset(
         model=report.model,
         context_length=report.context_length,
         benchmark=benchmark,
+        trial=report.trial,
+        min_context_length=preset_configuration.min_context_length,
+        max_ttft=preset_configuration.max_ttft,
         preset_id=preset_id,
     )
 

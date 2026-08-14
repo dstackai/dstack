@@ -12,6 +12,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.repos import (
     AnyRepoInfo,
     RepoHead,
@@ -58,7 +59,7 @@ async def get_repo(
     if repo is None:
         return None
     if not include_creds or repo.type != RepoType.REMOTE:
-        return RepoHeadWithCreds.parse_obj(repo_model_to_repo_head(repo))
+        return RepoHeadWithCreds.model_validate(repo_model_to_repo_head(repo).model_dump())
     repo_creds = await get_repo_creds(
         session=session,
         repo=repo,
@@ -130,7 +131,7 @@ async def create_repo(
         project_id=project.id,
         name=repo_id,
         type=RepoType(repo_info.repo_type),
-        info=repo_info.json(),
+        info=repo_info.model_dump_json(),
     )
     try:
         async with session.begin_nested():
@@ -154,7 +155,7 @@ async def update_repo(
             RepoModel.name == repo_id,
         )
         .values(
-            info=repo_info.json(),
+            info=repo_info.model_dump_json(),
         )
     )
     await session.commit()
@@ -221,7 +222,7 @@ async def create_repo_creds(
     repo_creds = RepoCredsModel(
         repo_id=repo.id,
         user_id=user.id,
-        creds=DecryptedString(plaintext=creds.json()),
+        creds=DecryptedString(plaintext=creds.model_dump_json()),
     )
     try:
         async with session.begin_nested():
@@ -245,7 +246,7 @@ async def update_repo_creds(
             RepoCredsModel.user_id == user.id,
         )
         .values(
-            creds=DecryptedString(plaintext=creds.json()),
+            creds=DecryptedString(plaintext=creds.model_dump_json()),
         )
     )
     await session.commit()
@@ -343,11 +344,12 @@ async def get_code_model(
 
 
 def repo_model_to_repo_head(repo_model: RepoModel) -> RepoHead:
-    return RepoHead.__response__.parse_obj(
+    return validate_extra_ignore(
+        RepoHead,
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),
-        }
+        },
     )
 
 
@@ -359,10 +361,11 @@ def repo_model_to_repo_head_with_creds(
         repo_creds_raw = repo_model.creds
     else:
         repo_creds_raw = repo_creds_model.creds.plaintext
-    return RepoHeadWithCreds.__response__.parse_obj(
+    return validate_extra_ignore(
+        RepoHeadWithCreds,
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),
             "repo_creds": json.loads(repo_creds_raw) if repo_creds_raw else None,
-        }
+        },
     )

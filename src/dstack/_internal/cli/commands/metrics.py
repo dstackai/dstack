@@ -1,21 +1,23 @@
 import argparse
 import time
-from typing import Any, List, Optional
+from typing import Optional
 
 from rich.live import Live
-from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import RunNameCompleter
 from dstack._internal.cli.utils.common import (
-    LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
-    add_row_from_dict,
     console,
 )
+from dstack._internal.cli.utils.metrics import (
+    MAX_SAMPLES,
+    WATCH_INTERVAL_SECONDS,
+    get_metrics_table,
+)
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.metrics import JobMetrics
+from dstack._internal.core.models.runs import Job
 from dstack.api._public import Client
 from dstack.api._public.runs import Run
 
@@ -33,121 +35,65 @@ class MetricsCommand(APIBaseCommand):
             help="Watch run metrics in realtime",
             action="store_true",
         )
+        self._parser.add_argument(
+            "--replica",
+            help="Show only this replica. By default, all jobs are shown.",
+            type=int,
+        )
+        self._parser.add_argument(
+            "--job",
+            help="Show only this job number. By default, all jobs are shown.",
+            type=int,
+        )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        run = self.api.runs.get(run_name=args.run_name)
-        if run is None:
-            raise CLIError(f"Run {args.run_name} not found")
-        metrics = _get_run_jobs_metrics(api=self.api, run=run)
+        jobs, metrics = self._fetch(args)
 
         if not args.watch:
-            console.print(_get_metrics_table(run, metrics))
+            console.print(get_metrics_table(jobs, metrics))
             return
 
         try:
             with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
                 while True:
-                    live.update(_get_metrics_table(run, metrics))
-                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
-                    run = self.api.runs.get(run_name=args.run_name)
-                    if run is None:
-                        raise CLIError(f"Run {args.run_name} not found")
-                    metrics = _get_run_jobs_metrics(api=self.api, run=run)
+                    live.update(get_metrics_table(jobs, metrics))
+                    time.sleep(WATCH_INTERVAL_SECONDS)
+                    jobs, metrics = self._fetch(args)
         except KeyboardInterrupt:
             pass
 
-
-def _get_run_jobs_metrics(api: Client, run: Run) -> List[JobMetrics]:
-    metrics = []
-    for job in run._run.jobs:
-        job_metrics = api.client.metrics.get_job_metrics(
-            project_name=api.project,
-            run_name=run.name,
-            replica_num=job.job_spec.replica_num,
-            job_num=job.job_spec.job_num,
-        )
-        metrics.append(job_metrics)
-    return metrics
-
-
-def _get_metrics_table(run: Run, metrics: List[JobMetrics]) -> Table:
-    table = Table(box=None)
-    table.add_column("NAME", style="bold", no_wrap=True)
-    table.add_column("STATUS")
-    table.add_column("CPU")
-    table.add_column("MEMORY")
-    table.add_column("GPU")
-
-    run_row = {"NAME": run.name, "STATUS": run.status.value}
-    if len(run._run.jobs) != 1:
-        add_row_from_dict(table, run_row)
-
-    for job, job_metrics in zip(run._run.jobs, metrics):
-        jrd = job.job_submissions[-1].job_runtime_data
-        jpd = job.job_submissions[-1].job_provisioning_data
-        resources: Optional[Resources] = None
-        if jrd is not None and jrd.offer is not None:
-            resources = jrd.offer.instance.resources
-        elif jpd is not None:
-            resources = jpd.instance_type.resources
-        cpu_usage = _get_metric_value(job_metrics, "cpu_usage_percent")
-        if cpu_usage is not None:
-            if resources is not None:
-                cpu_usage = cpu_usage / resources.cpus
-            cpu_usage = f"{cpu_usage:.0f}%"
-        memory_usage = _get_metric_value(job_metrics, "memory_working_set_bytes")
-        if memory_usage is not None:
-            memory_usage = _format_memory(memory_usage, 2)
-            if resources is not None:
-                memory_usage += f"/{_format_memory(resources.memory_mib * 1024 * 1024, 2)}"
-        gpu_metrics = ""
-        gpus_detected_num = _get_metric_value(job_metrics, "gpus_detected_num")
-        if gpus_detected_num is not None:
-            for i in range(gpus_detected_num):
-                gpu_memory_usage = _get_metric_value(job_metrics, f"gpu_memory_usage_bytes_gpu{i}")
-                gpu_util_percent = _get_metric_value(job_metrics, f"gpu_util_percent_gpu{i}")
-                if gpu_memory_usage is not None:
-                    if i != 0:
-                        gpu_metrics += "\n"
-                    gpu_metrics += f"gpu={i} mem={_format_memory(gpu_memory_usage, 2)}"
-                    if resources is not None:
-                        gpu_metrics += (
-                            f"/{_format_memory(resources.gpus[i].memory_mib * 1024 * 1024, 2)}"
-                        )
-                    gpu_metrics += f" util={gpu_util_percent}%"
-
-        job_row = {
-            "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}",
-            "STATUS": job.job_submissions[-1].status.value,
-            "CPU": cpu_usage or "-",
-            "MEMORY": memory_usage or "-",
-            "GPU": gpu_metrics or "-",
-        }
-        if len(run._run.jobs) == 1:
-            job_row.update(run_row)
-        add_row_from_dict(table, job_row)
-
-    return table
+    def _fetch(self, args: argparse.Namespace) -> tuple[list[Job], list[JobMetrics]]:
+        run = self.api.runs.get(run_name=args.run_name)
+        if run is None:
+            raise CLIError(f"Run {args.run_name} not found")
+        jobs = select_jobs(run._run.jobs, args.replica, args.job)
+        if not jobs:
+            wanted = " ".join(
+                f"{name}={value}"
+                for name, value in (("replica", args.replica), ("job", args.job))
+                if value is not None
+            )
+            raise CLIError(f"Run {args.run_name} has no job matching {wanted}")
+        return jobs, [_get_job_metrics(self.api, run, job) for job in jobs]
 
 
-def _get_metric_value(job_metrics: JobMetrics, name: str) -> Optional[Any]:
-    for metric in job_metrics.metrics:
-        if metric.name == name:
-            return metric.values[-1]
-    return None
+def _get_job_metrics(api: Client, run: Run, job: Job) -> JobMetrics:
+    """`limit` must be sent explicitly: the endpoint declares it `limit: int = 1`, not
+    Optional, so omitting it caps the response at one sample."""
+    return api.client.metrics.get_job_metrics(
+        project_name=api.project,
+        run_name=run.name,
+        replica_num=job.job_spec.replica_num,
+        job_num=job.job_spec.job_num,
+        limit=MAX_SAMPLES,
+    )
 
 
-def _format_memory(memory_bytes: int, decimal_places: int) -> str:
-    """See test_format_memory in tests/_internal/cli/commands/test_metrics.py for examples."""
-    memory_mb = memory_bytes / 1024 / 1024
-    if memory_mb >= 1024:
-        value = memory_mb / 1024
-        unit = "GB"
-    else:
-        value = memory_mb
-        unit = "MB"
-
-    if decimal_places == 0:
-        return f"{round(value)}{unit}"
-    return f"{value:.{decimal_places}f}".rstrip("0").rstrip(".") + unit
+def select_jobs(jobs: list[Job], replica: Optional[int], job_num: Optional[int]) -> list[Job]:
+    return [
+        job
+        for job in jobs
+        if (replica is None or job.job_spec.replica_num == replica)
+        and (job_num is None or job.job_spec.job_num == job_num)
+    ]

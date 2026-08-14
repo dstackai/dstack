@@ -596,17 +596,17 @@ class TestGetInstanceHealthChecks:
         assert response.json() == {
             "health_checks": [
                 {
-                    "collected_at": "2025-01-01T12:01:00+00:00",
+                    "collected_at": "2025-01-01T12:01:00Z",
                     "status": "failure",
                     "events": [
                         {
-                            "timestamp": "2025-01-01T12:01:00+00:00",
+                            "timestamp": "2025-01-01T12:01:00Z",
                             "status": "failure",
                             "message": "Detected 333 volatile double-bit ECC error(s) in GPU 0.",
                         }
                     ],
                 },
-                {"collected_at": "2025-01-01T12:00:00+00:00", "status": "healthy", "events": []},
+                {"collected_at": "2025-01-01T12:00:00Z", "status": "healthy", "events": []},
             ]
         }
 

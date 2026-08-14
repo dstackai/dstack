@@ -1,4 +1,6 @@
-from typing import Union
+from typing import Annotated, Union
+
+from pydantic import Field, RootModel
 
 from dstack._internal.core.backends.aws.models import (
     AWSBackendConfig,
@@ -145,6 +147,23 @@ AnyBackendConfigWithCreds = Union[
     SlurmBackendConfigWithCreds,
     DstackBackendConfig,
 ]
+
+# The same union tagged for validation. Without the discriminator, arm selection would depend on
+# trying each of the 20 arms in order and reporting 20 errors when none match.
+#
+# `AnyBackendConfigWithCreds` above stays a bare `Union` because it is also used as a plain type
+# annotation and as the bound of `BackendConfigWithCredsT` in `base/configurator.py`. Every site
+# that *validates* the union should use this alias instead of wrapping it again locally: two
+# `Annotated` `Field`s on the same type fail with "cannot specify multiple 'Annotated' 'Field's".
+AnyBackendConfigWithCredsTagged = Annotated[
+    AnyBackendConfigWithCreds,
+    Field(discriminator="type"),
+]
+
+
+class BackendConfigWithCreds(RootModel[AnyBackendConfigWithCredsTagged]):
+    pass
+
 
 # Backend config accepted in server/config.yaml.
 # This can be different from the API config.

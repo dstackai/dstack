@@ -293,7 +293,7 @@ class TestPerGroupOverrides:
 
     async def test_user_looks_up_group_image(self, monkeypatch: pytest.MonkeyPatch):
         """When a group sets its own `image`, _user() queries that image's config."""
-        image_config = ImageConfig.parse_obj({"User": "nginx", "Entrypoint": None, "Cmd": []})
+        image_config = ImageConfig.model_validate({"User": "nginx", "Entrypoint": None, "Cmd": []})
         monkeypatch.setattr(
             "dstack._internal.server.services.jobs.configurators.base._get_image_config",
             Mock(return_value=image_config),

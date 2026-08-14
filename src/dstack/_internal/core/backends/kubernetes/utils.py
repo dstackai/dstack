@@ -30,7 +30,7 @@ from dstack._internal.core.backends.kubernetes.models import (
     KubernetesBackendConfigWithCreds,
     KubernetesProxyJumpConfig,
 )
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -192,7 +192,7 @@ def kubeconfig_data_to_kubeconfig_dict(kubeconfig_data: str) -> dict:
 
 
 def kubeconfig_dict_to_kubeconfig(kubeconfig_dict: dict) -> Kubeconfig:
-    return Kubeconfig.__response__.parse_obj(kubeconfig_dict)
+    return validate_extra_ignore(Kubeconfig, kubeconfig_dict)
 
 
 def call_api_method(

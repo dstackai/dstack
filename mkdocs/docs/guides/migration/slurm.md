@@ -1475,8 +1475,12 @@ Check real-time metrics:
 
 ```shell
 $ dstack metrics training-job
-  NAME             STATUS  CPU  MEMORY          GPU
-  training-job     running 45%  16.27GB/200GB   gpu=0 mem=72.48GB/80GB util=95%
+
+               UTILIZATION                     MEMORY
+ job=0  cpu    ▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂ 33%  ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ 16GB/200GB
+        gpu=0  ▁▄▆▆▆▆▆▆▆▆▆▆▆▆▆▆▁▆▆▆▆▆▆▆▆▆ 93%  ▄▅▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆ 71GB/80GB
+
+               6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now      6 Aug 13:14 ┄┄┄┄┄┄┄┄┄┄ now
 ```
 
 </div>

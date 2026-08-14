@@ -26,6 +26,7 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 # where dstack images are published
 SUPPORTED_REGIONS = frozenset(
@@ -78,31 +79,38 @@ class OCIConfigurator(
             project_name, config, subscribed_regions.home_region_name
         )
         config.compartment_id = compartment_id
-        stored_config = OCIStoredConfig.__response__(
-            **config.dict(), subnet_ids_per_region=subnet_ids_per_region
+        stored_config = validate_extra_ignore(
+            OCIStoredConfig,
+            {
+                **config.model_dump(),
+                "subnet_ids_per_region": subnet_ids_per_region,
+            },
         )
 
         return BackendRecord(
-            config=stored_config.json(),
-            auth=OCICreds.parse_obj(config.creds).json(),
+            config=stored_config.model_dump_json(),
+            auth=OCICreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> OCIBackendConfigWithCreds:
         config = self._get_config(record)
-        return OCIBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(OCIBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> OCIBackendConfig:
         config = self._get_config(record)
-        return OCIBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(OCIBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> OCIBackend:
         config = self._get_config(record)
         return OCIBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> OCIConfig:
-        return OCIConfig.__response__(
-            **json.loads(record.config),
-            creds=OCICreds.parse_raw(record.auth).__root__,
+        return validate_extra_ignore(
+            OCIConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(OCICreds, record.auth).root,
+            },
         )
 
 

@@ -26,7 +26,7 @@ from dstack._internal.core.backends.jarvislabs.api_client import JarvisLabsAPICl
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -62,7 +62,7 @@ class JarvisLabsInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "JarvisLabsInstanceBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)
 
 
 class JarvisLabsCompute(
@@ -169,7 +169,7 @@ class JarvisLabsCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).json(),
+            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).model_dump_json(),
         )
 
     def update_provisioning_data(

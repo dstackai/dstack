@@ -384,7 +384,7 @@ def test_terminate_instance_deletes_created_ssh_keys():
     compute = _compute()
     backend_data = JarvisLabsInstanceBackendData(
         ssh_key_ids=["ssh-key-id-1", "ssh-key-id-2"]
-    ).json()
+    ).model_dump_json()
 
     compute.terminate_instance("123", "india-noida-01", backend_data)
 

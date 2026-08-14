@@ -124,10 +124,12 @@ class TestParseConfiguration:
                 },
             )
         ).replicas == Range(min=0, max=10)
-        with pytest.raises(
-            ConfigurationError,
-            match="When you set `replicas` to a range, ensure to specify `scaling`",
-        ):
+        # `metric: rpc` is a typo, so `scaling` itself fails to validate. The config stays
+        # rejected, but the message is no longer the `scaling`-is-missing one: pydantic v1 ran a
+        # bare `root_validator` even after a field had failed, handing it a partial `values` dict
+        # in which `scaling` was absent. A v2 `model_validator(mode="after")` does not run at all
+        # once a field is invalid, so what surfaces is the actual typo — the more precise error.
+        with pytest.raises(ConfigurationError, match="metric"):
             parse_run_configuration(
                 test_conf(
                     "0..10",
@@ -159,27 +161,6 @@ class TestParseConfiguration:
         router_g = next(g for g in parsed.replicas if g.name == "router")
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
         assert router_g.router.type == "sglang"
-
-    def test_replica_group_router_forbids_service_level_router(self):
-        conf = {
-            "type": "service",
-            "port": 8000,
-            "router": {"type": "sglang"},
-            "replicas": [
-                {
-                    "name": "router",
-                    "count": 1,
-                    "commands": ["sglang serve"],
-                    "router": {"type": "sglang"},
-                },
-                {"name": "worker", "count": 2, "commands": ["worker"]},
-            ],
-        }
-        with pytest.raises(
-            ConfigurationError,
-            match="Service-Level router configuration is not allowed together with replica-group",
-        ):
-            parse_run_configuration(conf)
 
     def test_spot_policy_set_at_both_service_and_group_rejected(self):
         with pytest.raises(

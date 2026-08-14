@@ -14,6 +14,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
     ComputeWithGroupProvisioningSupport,
     ComputeWithInstanceVolumesSupport,
@@ -25,7 +26,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.common import NetworkMode, validate_json_extra_ignore
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
     ComputeGroupStatus,
@@ -34,6 +35,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
 )
+from dstack._internal.core.models.duration import OptionalIdleDuration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
@@ -46,10 +48,12 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
+    AnyGatewayCertificate,
     GatewayComputeConfiguration,
     GatewayConfiguration,
     GatewayReplicaStatus,
     GatewayStatus,
+    LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
@@ -405,7 +409,7 @@ async def create_run(
         run_name=run_name,
         status=status,
         termination_reason=termination_reason,
-        run_spec=run_spec.json(),
+        run_spec=run_spec.model_dump_json(),
         last_processed_at=last_processed_at,
         jobs=[],
         priority=priority,
@@ -438,13 +442,21 @@ async def create_job(
     instance_assigned: bool = False,
     disconnected_at: Optional[datetime] = None,
     registered: bool = False,
+    ready: bool = False,
     waiting_master_job: Optional[bool] = None,
+    replica_group_name: Optional[str] = None,
 ) -> JobModel:
+    assert not (registered and not ready), "registered=True with ready=False is invalid"
     if deployment_num is None:
         deployment_num = run.deployment_num
-    run_spec = RunSpec.parse_raw(run.run_spec)
+    run_spec = validate_json_extra_ignore(RunSpec, run.run_spec)
     job_spec = (
-        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+        await get_job_specs_from_run_spec(
+            run_spec=run_spec,
+            secrets={},
+            replica_num=replica_num,
+            replica_group_name=replica_group_name,
+        )
     )[0]
     job_spec.job_num = job_num
     job = JobModel(
@@ -461,15 +473,18 @@ async def create_job(
         last_processed_at=last_processed_at,
         status=status,
         termination_reason=termination_reason,
-        job_spec_data=job_spec.json(),
-        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        job_runtime_data=job_runtime_data.json() if job_runtime_data else None,
+        job_spec_data=job_spec.model_dump_json(),
+        job_provisioning_data=job_provisioning_data.model_dump_json()
+        if job_provisioning_data
+        else None,
+        job_runtime_data=job_runtime_data.model_dump_json() if job_runtime_data else None,
         instance=instance,
         instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
         disconnected_at=disconnected_at,
         probes=[],
         registered=registered,
+        ready=ready,
         waiting_master_job=waiting_master_job,
     )
     session.add(job)
@@ -585,7 +600,7 @@ async def create_compute_group(
         project=project,
         fleet=fleet,
         status=status,
-        provisioning_data=provisioning_data.json(),
+        provisioning_data=provisioning_data.model_dump_json(),
         last_processed_at=last_processed_at,
     )
     session.add(compute_group)
@@ -649,6 +664,9 @@ async def create_gateway(
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     forbid_new_services: bool = False,
     populate_configuration: bool = True,
+    certificate: Optional[AnyGatewayCertificate] = LetsEncryptGatewayCertificate(),
+    hostname: Optional[str] = None,
+    backend_data: Optional[str] = None,
 ) -> GatewayModel:
     """
     Args:
@@ -666,7 +684,8 @@ async def create_gateway(
             region=region,
             domain=wildcard_domain,
             replicas=replicas,
-        ).json()
+            certificate=certificate,
+        ).model_dump_json()
     gateway = GatewayModel(
         project_id=project_id,
         backend_id=backend_id,
@@ -678,6 +697,8 @@ async def create_gateway(
         desired_replica_count=replicas if replicas is not None else GATEWAY_REPLICAS_DEFAULT,
         last_processed_at=last_processed_at,
         forbid_new_services=forbid_new_services,
+        hostname=hostname,
+        backend_data=backend_data,
     )
     session.add(gateway)
     await session.commit()
@@ -699,6 +720,8 @@ async def create_gateway_compute(
     active: bool = True,
     configuration: Optional[str] = None,
     populate_configuration: bool = True,
+    hostname_deprecated_readonly: Optional[str] = None,
+    backend_data: Optional[str] = None,
 ) -> GatewayComputeModel:
     """
     Args:
@@ -721,7 +744,7 @@ async def create_gateway_compute(
             public_ip=True,
             ssh_key_pub=ssh_public_key,
             certificate=None,
-        ).json()
+        ).model_dump_json()
     gateway_compute = GatewayComputeModel(
         gateway_id=gateway_id,
         backend_id=backend_id,
@@ -735,6 +758,8 @@ async def create_gateway_compute(
         replica_num=replica_num,
         active=active,
         configuration=configuration,
+        hostname_deprecated_readonly=hostname_deprecated_readonly,
+        backend_data=backend_data,
     )
     session.add(gateway_compute)
     await session.commit()
@@ -783,7 +808,7 @@ async def create_fleet(
         name=spec.configuration.name,
         status=status,
         created_at=created_at,
-        spec=spec.json(),
+        spec=spec.model_dump_json(),
         instances=[],
         runs=[],
         last_processed_at=last_processed_at,
@@ -929,17 +954,21 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        offer=offer.json() if offer else None,
+        job_provisioning_data=job_provisioning_data.model_dump_json()
+        if job_provisioning_data
+        else None,
+        offer=offer.model_dump_json() if offer else None,
         price=price,
         region=region,
         backend=backend,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        profile=profile.json(),
-        requirements=requirements.json(),
-        instance_configuration=instance_configuration.json(),
-        remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
+        profile=profile.model_dump_json(),
+        requirements=requirements.model_dump_json(),
+        instance_configuration=instance_configuration.model_dump_json(),
+        remote_connection_info=remote_connection_info.model_dump_json()
+        if remote_connection_info
+        else None,
         volume_attachments=volume_attachments,
         total_blocks=total_blocks,
         busy_blocks=busy_blocks,
@@ -999,7 +1028,6 @@ def get_instance_offer_with_availability(
                 gpus=gpus,
                 spot=spot,
                 disk=Disk(size_mib=int(disk_gib * 1024)),
-                description="",
             ),
         ),
         region=region,
@@ -1025,7 +1053,7 @@ def get_remote_connection_info(
     if env is None:
         env = Env()
     elif isinstance(env, dict):
-        env = Env.parse_obj(env)
+        env = Env.model_validate(env)
     return RemoteConnectionInfo(
         host=host,
         port=port,
@@ -1096,8 +1124,8 @@ async def create_volume(
         created_at=created_at,
         last_processed_at=last_processed_at,
         last_job_processed_at=last_job_processed_at,
-        configuration=configuration.json(),
-        volume_provisioning_data=volume_provisioning_data.json()
+        configuration=configuration.model_dump_json(),
+        volume_provisioning_data=volume_provisioning_data.model_dump_json()
         if volume_provisioning_data
         else None,
         attachments=[],
@@ -1157,10 +1185,10 @@ def get_volume_configuration(
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
     volume_id: Optional[str] = None,
-    auto_cleanup_duration: Optional[Union[str, int]] = None,
+    auto_cleanup_duration: OptionalIdleDuration = None,
 ) -> AnyVolumeConfiguration:
     assert backend != BackendType.KUBERNETES, "use get_kubernetes_volume_configuration() instead"
-    return VolumeConfiguration.parse_obj(
+    return VolumeConfiguration.model_validate(
         dict(
             name=name,
             backend=backend,
@@ -1169,14 +1197,14 @@ def get_volume_configuration(
             volume_id=volume_id,
             auto_cleanup_duration=auto_cleanup_duration,
         )
-    ).__root__
+    ).root
 
 
 def get_kubernetes_volume_configuration(
     name: str = "test-volume",
     size: Optional[Memory] = Memory(100),
     claim_name: Optional[str] = None,
-    auto_cleanup_duration: Optional[Union[str, int]] = None,
+    auto_cleanup_duration: OptionalIdleDuration = None,
     storage_class_name: Optional[str] = None,
 ) -> KubernetesVolumeConfiguration:
     return KubernetesVolumeConfiguration(
@@ -1228,8 +1256,8 @@ async def create_placement_group(
         fleet=fleet,
         name=name,
         created_at=created_at,
-        configuration=configuration.json(),
-        provisioning_data=provisioning_data.json(),
+        configuration=configuration.model_dump_json(),
+        provisioning_data=provisioning_data.model_dump_json(),
         fleet_deleted=fleet_deleted,
         deleted=deleted,
         deleted_at=deleted_at,
@@ -1415,6 +1443,7 @@ class ComputeMockSpec(
     ComputeWithReservationSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
 ):

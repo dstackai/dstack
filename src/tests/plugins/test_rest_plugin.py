@@ -6,7 +6,6 @@ from unittest.mock import Mock
 import pytest
 import pytest_asyncio
 import requests
-from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ServerClientError, ServerError
@@ -44,7 +43,7 @@ async def create_run_spec(
         run_name=run_name,
         profile=profile,
         configuration=ServiceConfiguration(
-            commands=["echo hello"], port=8000, replicas=parse_obj_as(Range[int], replicas)
+            commands=["echo hello"], port=8000, replicas=Range[int].model_validate(replicas)
         ),
     )
     return spec
@@ -110,7 +109,7 @@ class TestRESTPlugin:
         mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
         mock_response = Mock()
-        response_dict = {"spec": spec.dict(), "error": None}
+        response_dict = {"spec": spec.model_dump(), "error": None}
 
         if isinstance(spec, (RunSpec, FleetSpec)):
             response_dict["spec"]["profile"]["tags"] = {"env": "test", "team": "qa"}
@@ -197,7 +196,7 @@ class TestRESTPlugin:
         mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
         mock_response = Mock()
-        response_dict = {"spec": spec.dict(), "error": error}
+        response_dict = {"spec": spec.model_dump(), "error": error}
         mock_response.text = json.dumps(response_dict)
         mock_response.raise_for_status = Mock()
         mocker.patch("requests.post", return_value=mock_response)

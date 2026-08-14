@@ -3,14 +3,15 @@ import uuid
 from typing import Optional
 
 import httpx
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.configurations import RateLimit
+from dstack._internal.core.models.common import validate_json_extra_ignore
+from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
-from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
+from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
+from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
 
@@ -37,6 +38,7 @@ class GatewayClient:
     async def register_service(
         self,
         project: str,
+        run_id: uuid.UUID,
         run_name: str,
         domain: str,
         service_https: bool,
@@ -47,23 +49,22 @@ class GatewayClient:
         rate_limits: list[RateLimit],
         ssh_private_key: str,
         has_router_replica: bool = False,
-        router: Optional[AnyServiceRouterConfig] = None,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
             await self.register_openai_entrypoint(project, entrypoint, gateway_https)
 
         payload = {
+            "id": run_id.hex,
             "run_name": run_name,
             "domain": domain,
             "https": service_https,
             "auth": auth,
             "client_max_body_size": client_max_body_size,
             "options": options,
-            "rate_limits": [limit.dict() for limit in rate_limits],
+            "rate_limits": [limit.model_dump() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
             "has_router_replica": has_router_replica,
-            "router": router.dict() if router is not None else None,
         }
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/services/register"), json=payload
@@ -84,18 +85,19 @@ class GatewayClient:
 
     async def register_replica(
         self,
-        run: Run,
+        project: str,
+        run_name: str,
+        configuration: ServiceConfiguration,
         job_spec: JobSpec,
         job_submission: JobSubmission,
         instance_project_ssh_private_key: Optional[str],
         ssh_head_proxy: Optional[SSHConnectionParams],
         ssh_head_proxy_private_key: Optional[str],
     ):
-        assert run.run_spec.configuration.type == "service"
         payload = {
             "job_id": job_submission.id.hex,
-            "app_port": get_service_port(job_spec, run.run_spec.configuration),
-            "ssh_head_proxy": ssh_head_proxy.dict() if ssh_head_proxy is not None else None,
+            "app_port": get_service_port(job_spec, configuration),
+            "ssh_head_proxy": ssh_head_proxy.model_dump() if ssh_head_proxy is not None else None,
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
         }
         jpd = job_submission.job_provisioning_data
@@ -108,7 +110,7 @@ class GatewayClient:
                 {
                     "ssh_port": jpd.ssh_port,
                     "ssh_host": f"{jpd.username}@{jpd.hostname}",
-                    "ssh_proxy": jpd.ssh_proxy.dict() if jpd.ssh_proxy is not None else None,
+                    "ssh_proxy": jpd.ssh_proxy.model_dump() if jpd.ssh_proxy is not None else None,
                 }
             )
         else:
@@ -124,14 +126,12 @@ class GatewayClient:
                         hostname=jpd.hostname,
                         username=jpd.username,
                         port=jpd.ssh_port,
-                    ).dict(),
+                    ).model_dump(),
                     "ssh_proxy_private_key": instance_project_ssh_private_key,
                 }
             )
         resp = await self._client.post(
-            self._url(
-                f"/api/registry/{run.project_name}/services/{run.run_spec.run_name}/replicas/register"
-            ),
+            self._url(f"/api/registry/{project}/services/{run_name}/replicas/register"),
             json=payload,
         )
         if resp.status_code == 400:
@@ -150,6 +150,16 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
+    async def set_service_id(self, project: str, run_name: str, run_id: uuid.UUID) -> None:
+        resp = await self._client.post(
+            self._url(f"/api/registry/{project}/services/{run_name}/set_id"),
+            json={"id": run_id.hex},
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+        self.is_server_ready = True
+
     async def register_openai_entrypoint(self, project: str, domain: str, https: bool):
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/entrypoints/register"),
@@ -162,6 +172,15 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
         self.is_server_ready = True
+
+    async def list_services(self) -> list[ServiceListItem]:
+        resp = await self._client.get(self._url("/api/services/list"))
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+        resp_parsed = validate_json_extra_ignore(ServiceListResponse, resp.content)
+        self.is_server_ready = True
+        return resp_parsed.services
 
     async def submit_gateway_config(self) -> None:
         resp = await self._client.post(
@@ -196,7 +215,7 @@ class GatewayClient:
             # Avoid errors if gateway is updated to new format and current server replica isn't.
             # TODO: remove after a few releases
             return []
-        return parse_obj_as(list[ServiceStats], resp_data)
+        return TypeAdapter(list[ServiceStats]).validate_python(resp_data)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"

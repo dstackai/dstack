@@ -1,6 +1,6 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -10,7 +10,7 @@ class AzureClientCreds(CoreModel):
     client_id: Annotated[str, Field(description="The client ID")]
     client_secret: Annotated[str, Field(description="The client secret")]
     # if tenant_id is missing, it will be populated from config info
-    tenant_id: Optional[str]
+    tenant_id: Optional[str] = None
 
 
 class AzureDefaultCreds(CoreModel):
@@ -20,8 +20,8 @@ class AzureDefaultCreds(CoreModel):
 AnyAzureCreds = Union[AzureClientCreds, AzureDefaultCreds]
 
 
-class AzureCreds(CoreModel):
-    __root__: AnyAzureCreds = Field(..., discriminator="type")
+class AzureCreds(RootModel[Annotated[AnyAzureCreds, Field(discriminator="type")]]):
+    pass
 
 
 class AzureBackendConfig(CoreModel):
@@ -99,7 +99,7 @@ class AzureStoredConfig(AzureBackendConfig):
 
 
 class AzureConfig(AzureStoredConfig):
-    creds: AnyAzureCreds
+    creds: Annotated[AnyAzureCreds, Field(discriminator="type")]
 
     @property
     def allocate_public_ips(self) -> bool:

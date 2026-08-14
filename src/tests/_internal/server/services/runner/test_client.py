@@ -5,11 +5,13 @@ from typing import Optional
 
 import pytest
 import requests_mock
+from gpuhunt import AcceleratorVendor
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, Job, JobSpec, JobSubmission, Run
 from dstack._internal.core.models.volumes import (
@@ -21,6 +23,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
+    InstanceInfoResponse,
     JobResult,
     LegacyPullResponse,
     PortMapping,
@@ -32,6 +35,8 @@ from dstack._internal.server.services.runner.client import (
     ShimClient,
     ShimHTTPError,
     _parse_version,
+    healthcheck_response_to_instance_check,
+    instance_info_response_to_gpu_driver,
 )
 from dstack._internal.server.testing.common import (
     get_run_spec,
@@ -79,11 +84,11 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
         run_spec = get_run_spec(
             repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
-        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
-        job = Job.construct(
-            job_spec=JobSpec.construct(env={"DSTACK_TOKEN": "token"}),
+        run = Run.model_construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.model_construct(
+            job_spec=JobSpec.model_construct(env={"DSTACK_TOKEN": "token"}),
             job_submissions=[
-                JobSubmission.construct(
+                JobSubmission.model_construct(
                     id=uuid.uuid4(),
                     submitted_at=datetime.now(timezone.utc),
                 )
@@ -111,11 +116,11 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
         run_spec = get_run_spec(
             repo_id="repo", configuration=TaskConfiguration(commands=["true"], dstack=True)
         )
-        run = Run.construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
-        job = Job.construct(
-            job_spec=JobSpec.construct(env={"DSTACK_PROJECT": "other"}),
+        run = Run.model_construct(id=uuid.uuid4(), project_name="main", run_spec=run_spec)
+        job = Job.model_construct(
+            job_spec=JobSpec.model_construct(env={"DSTACK_PROJECT": "other"}),
             job_submissions=[
-                JobSubmission.construct(
+                JobSubmission.model_construct(
                     id=uuid.uuid4(),
                     submitted_at=datetime.now(timezone.utc),
                 )
@@ -598,3 +603,64 @@ class TestParseVersion:
     @pytest.mark.parametrize("value", ["", "foo", "1.12.3-next.20241231"])
     def test_invalid(self, value: str):
         assert _parse_version(value) is None
+
+
+class TestHealthcheckResponseToInstanceCheck:
+    def test_reachable(self):
+        response = HealthcheckResponse(service="dstack-shim", version="0.19.0")
+        check = healthcheck_response_to_instance_check(response)
+        assert check.reachable
+        assert check.gpu_driver is None
+
+    def test_unexpected_service(self):
+        response = HealthcheckResponse(service="not-dstack-shim", version="0.19.0")
+        check = healthcheck_response_to_instance_check(response)
+        assert not check.reachable
+        assert check.gpu_driver is None
+
+
+class TestInstanceInfoResponseToGpuDriver:
+    def test_none_response(self):
+        assert instance_info_response_to_gpu_driver(None) is None
+
+    def test_no_gpus(self):
+        assert instance_info_response_to_gpu_driver(InstanceInfoResponse()) is None
+
+    def test_vendor_without_version(self):
+        response = InstanceInfoResponse(gpu_vendor="nvidia")
+        assert instance_info_response_to_gpu_driver(response) is None
+
+    def test_gpu_driver(self):
+        response = InstanceInfoResponse(gpu_vendor="nvidia", gpu_driver_version="570.86.15")
+        assert instance_info_response_to_gpu_driver(response) == GpuDriverInfo(
+            vendor=AcceleratorVendor.NVIDIA, version="570.86.15"
+        )
+
+
+class TestShimClientGetInstanceInfo(BaseShimClientTest):
+    @pytest.mark.shim_version("0.21.0")
+    def test_returns_instance_info(self, adapter: requests_mock.Adapter, client: ShimClient):
+        adapter.register_uri(
+            "GET",
+            "/api/instance/info",
+            json={"gpu_vendor": "nvidia", "gpu_driver_version": "570.86.15"},
+        )
+        resp = client.get_instance_info()
+        assert resp is not None
+        assert resp.gpu_vendor == "nvidia"
+        assert resp.gpu_driver_version == "570.86.15"
+        self.assert_request(adapter, 1, "GET", "/api/instance/info")
+
+    @pytest.mark.shim_version("0.20.29")
+    def test_returns_none_if_not_supported(
+        self, adapter: requests_mock.Adapter, client: ShimClient
+    ):
+        assert client.get_instance_info() is None
+        assert len(adapter.request_history) == 1  # healthcheck only
+
+    @pytest.mark.shim_version("latest")
+    def test_returns_none_if_not_found(self, adapter: requests_mock.Adapter, client: ShimClient):
+        adapter.register_uri("GET", "/api/instance/info", status_code=404, text="Not Found")
+        assert client.get_instance_info() is None
+        # An unknown shim version is assumed to support the endpoint, so it is requested
+        self.assert_request(adapter, 1, "GET", "/api/instance/info")

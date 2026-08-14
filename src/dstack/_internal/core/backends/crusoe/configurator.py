@@ -15,6 +15,7 @@ from dstack._internal.core.backends.crusoe.models import (
 )
 from dstack._internal.core.backends.crusoe.resources import CrusoeClient
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 
 class CrusoeConfigurator(
@@ -54,25 +55,28 @@ class CrusoeConfigurator(
     ) -> BackendRecord:
         return BackendRecord(
             config=CrusoeStoredConfig(
-                **CrusoeBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=CrusoeCreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(CrusoeBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=CrusoeCreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> CrusoeBackendConfigWithCreds:
         config = self._get_config(record)
-        return CrusoeBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(CrusoeBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> CrusoeBackendConfig:
         config = self._get_config(record)
-        return CrusoeBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(CrusoeBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> CrusoeBackend:
         config = self._get_config(record)
         return CrusoeBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> CrusoeConfig:
-        return CrusoeConfig.__response__(
-            **json.loads(record.config),
-            creds=CrusoeCreds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            CrusoeConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(CrusoeCreds, record.auth),
+            },
         )

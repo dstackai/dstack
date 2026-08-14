@@ -8,6 +8,7 @@ import pytest
 
 from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.utils.common import render_datetime_as_api
 from tests._internal.cli.common import plain_console, run_dstack_cli
 from tests._internal.cli.preset_factories import get_preset
 
@@ -39,7 +40,7 @@ class TestPresetLocalCommands:
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=KeyboardInterrupt):
@@ -58,7 +59,7 @@ class TestPresetLocalCommands:
 
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=CreationStopped):
@@ -71,7 +72,7 @@ class TestPresetLocalCommands:
         assert exit_code == 0
         assert "Traceback" not in capsys.readouterr().err
 
-    def test_create_requires_max_trials(self, tmp_path, capsys):
+    def test_create_requires_trials(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
 
@@ -84,7 +85,7 @@ class TestPresetLocalCommands:
 
         assert exit_code == 1
         captured = capsys.readouterr()
-        assert "max_trials is required" in captured.out + captured.err
+        assert "trials is required" in captured.out + captured.err
         create.assert_not_called()
 
     def _list_output(self, tmp_path, args, *, created_at):
@@ -109,18 +110,24 @@ class TestPresetLocalCommands:
         assert "8f3a12c4" in output
         # The repo row is shown only in verbose mode.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" not in output
-        # The context column is shown only in verbose mode.
+        # The benchmark always carries the context and workload that define its
+        # number. The context that was *required* waits for `-v`, and comes from
+        # the creation record, which a preset saved on its own does not have.
         assert "CONTEXT" not in output
+        assert "CONSTRAINTS" in output
         assert "BENCHMARK" in output
-        assert "32K" not in output
-        assert "42.1" in output
-        assert "con=1" in "".join(output.split())
-        assert "tok/s" in output
-        assert "TTFT" in output
-        assert "108ms" in output
+        assert "ctx=32K" in "".join(output.split())
+        assert "ctx>=" not in "".join(output.split())
+        assert "io=1K/128" in "".join(output.split())
+        # 42.1 is the aggregate, verbose-only; the default row shows per-user 1/TPOT.
+        assert "135" in output
+        assert "conc=1" in "".join(output.split())
+        assert "tok/s/user=" in "".join(output.split())
+        assert "ttft=" in "".join(output.split())
+        assert "ttft=[/]108" in "".join(output.split()) or "ttft=108" in "".join(output.split())
         assert "A6000:48GB:1" not in output
 
-    def test_verbose_list_adds_repo_and_context(self, tmp_path):
+    def test_verbose_list_adds_repo(self, tmp_path):
         preset = get_preset()
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
@@ -130,10 +137,10 @@ class TestPresetLocalCommands:
             ).split()
         )
 
-        # Verbose adds only the repo and the ctx= benchmark prefix.
+        # Verbose adds only the repo row.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in joined_verbose
         assert "ctx=32K" in joined_verbose
-        assert "con=1" in joined_verbose
+        assert "conc=1" in joined_verbose
         assert "hardware=" not in joined_verbose
 
     def test_deletes_preset_without_api_client(self, tmp_path):
@@ -162,7 +169,7 @@ class TestPresetLocalCommands:
 
         data = json.loads(capsys.readouterr().out)
         assert data["id"] == preset.id
-        assert data["created_at"] == preset.created_at.isoformat()
+        assert data["created_at"] == render_datetime_as_api(preset.created_at)
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
@@ -183,7 +190,7 @@ class TestPresetLocalCommands:
         assert len(output["presets"]) == 1
         data = output["presets"][0]
         assert data["id"] == preset.id
-        assert data["created_at"] == preset.created_at.isoformat()
+        assert data["created_at"] == render_datetime_as_api(preset.created_at)
         assert data["context_length"] == 32768
         assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
@@ -195,10 +202,12 @@ class TestPresetLocalCommands:
         preset = get_preset()
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
-        store.save(preset.copy(update={"id": "01234567"}))
+        store.save(preset.model_copy(update={"id": "01234567"}))
         # A preset of a different model must survive the delete.
         store.save(
-            preset.copy(update={"id": "89abcdef", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+            preset.model_copy(
+                update={"id": "89abcdef", "base": "meta/Llama-4", "model": "meta/Llama-4"}
+            )
         )
 
         with patch("dstack.api.Client.from_config") as from_config:
@@ -220,7 +229,9 @@ class TestPresetLocalCommands:
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         store.save(
-            preset.copy(update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"})
+            preset.model_copy(
+                update={"id": "01234567", "base": "meta/Llama-4", "model": "meta/Llama-4"}
+            )
         )
 
         args = ["preset", "list", "--json", flag, getattr(preset, attribute)]
@@ -269,7 +280,10 @@ model:
   base: Qwen/Qwen3.5-27B
 regions: [file-region]
 max_price: 0.5
-max_trials: 1
+trials: 1
+concurrency: 8
+max_ttft: 5000
+min_context_length: 8192
 env:
   - HF_TOKEN
 """
@@ -368,12 +382,12 @@ env:
 
 class TestPresetNameClaims:
     def test_create_detaches_the_name_from_the_old_preset(self, tmp_path):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
         result = SimpleNamespace(
             preset=preset, path=tmp_path / "preset.yaml", final_run_name="qwen-1"
@@ -391,12 +405,12 @@ class TestPresetNameClaims:
         assert store.get(preset.id).name is None
 
     def test_create_without_confirmation_exits_before_creating(self, tmp_path):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")
         store.save(preset)
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with (
@@ -414,7 +428,7 @@ class TestPresetNameClaims:
         assert store.get(preset.id).name == "qwen"
 
     def test_get_and_delete_resolve_names(self, tmp_path, capsys):
-        preset = get_preset().copy(update={"name": "qwen"})
+        preset = get_preset().model_copy(update={"name": "qwen"})
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
         assert run_dstack_cli(["preset", "get", "qwen", "--json"], home_dir=tmp_path) == 0
@@ -425,7 +439,9 @@ class TestPresetNameClaims:
 
     def test_create_always_asks_even_without_a_name_conflict(self, tmp_path):
         configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text("type: preset\nbase: Qwen/Qwen3.5-27B\nmax_trials: 1\n")
+        configuration_path.write_text(
+            "type: preset\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
+        )
 
         with (
             _patched_create_preset() as create,

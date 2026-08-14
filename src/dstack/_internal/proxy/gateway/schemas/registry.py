@@ -37,6 +37,8 @@ class Options(BaseModel):
 
 
 class RegisterServiceRequest(BaseModel):
+    id: Optional[str] = None
+    """Only optional for compatibility with pre-0.21.0 callers"""
     run_name: str
     domain: str
     https: bool
@@ -49,15 +51,19 @@ class RegisterServiceRequest(BaseModel):
     router: Optional[AnyServiceRouterConfig] = None
 
 
+class SetServiceIdRequest(BaseModel):
+    id: str
+
+
 class RegisterReplicaRequest(BaseModel):
     job_id: str
     app_port: int
     ssh_host: str
     ssh_port: int
-    ssh_proxy: Optional[SSHConnectionParams]
-    ssh_proxy_private_key: Optional[str]
-    ssh_head_proxy: Optional[SSHConnectionParams]
-    ssh_head_proxy_private_key: Optional[str]
+    ssh_proxy: Optional[SSHConnectionParams] = None
+    ssh_proxy_private_key: Optional[str] = None
+    ssh_head_proxy: Optional[SSHConnectionParams] = None
+    ssh_head_proxy_private_key: Optional[str] = None
     internal_ip: Optional[str] = None
 
 

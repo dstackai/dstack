@@ -50,8 +50,8 @@ from dstack._internal.server.services.locking import (
 )
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
+from dstack._internal.utils import crypto
 from dstack._internal.utils.common import get_current_datetime, run_async
-from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -147,7 +147,12 @@ async def list_user_accessible_projects(
     if return_total_count:
         res = await session.execute(stmt.with_only_columns(safunc.count(literal_column("1"))))
         total_count = res.scalar_one()
-    res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
+    res = await session.execute(
+        stmt.where(*pagination_filters)
+        .order_by(*order_by)
+        .limit(limit)
+        .options(joinedload(ProjectModel.owner))
+    )
     project_models = res.unique().scalars().all()
     projects = [
         project_model_to_project(p, include_backends=False, include_members=False)
@@ -516,25 +521,6 @@ async def list_member_project_models(
     return list(res.scalars().unique().all())
 
 
-async def list_public_non_member_project_models(
-    session: AsyncSession,
-    user: UserModel,
-) -> List[ProjectModel]:
-    """
-    List public project models where user is NOT a member.
-    """
-    res = await session.execute(
-        select(ProjectModel).where(
-            ProjectModel.deleted == False,
-            ProjectModel.is_public == True,
-            ProjectModel.id.notin_(
-                select(MemberModel.project_id).where(MemberModel.user_id == user.id)
-            ),
-        )
-    )
-    return list(res.scalars().all())
-
-
 async def list_user_owned_project_models(
     session: AsyncSession, user: UserModel, include_deleted: bool = False
 ) -> List[ProjectModel]:
@@ -580,6 +566,7 @@ async def get_project_model_by_name(
     res = await session.execute(
         select(ProjectModel)
         .where(*filters)
+        .options(joinedload(ProjectModel.owner))
         .options(joinedload(ProjectModel.backends))
         .options(joinedload(ProjectModel.members))
     )
@@ -596,22 +583,7 @@ async def get_project_model_by_name_or_error(
             ProjectModel.name == project_name,
             ProjectModel.deleted == False,
         )
-        .options(joinedload(ProjectModel.backends))
-        .options(joinedload(ProjectModel.members))
-    )
-    return res.unique().scalar_one()
-
-
-async def get_project_model_by_id_or_error(
-    session: AsyncSession,
-    project_id: uuid.UUID,
-) -> ProjectModel:
-    res = await session.execute(
-        select(ProjectModel)
-        .where(
-            ProjectModel.id == project_id,
-            ProjectModel.deleted == False,
-        )
+        .options(joinedload(ProjectModel.owner))
         .options(joinedload(ProjectModel.backends))
         .options(joinedload(ProjectModel.members))
     )
@@ -628,7 +600,7 @@ async def create_project_model(
     validate_project_name(project_name)
     templates_repo = await _normalize_templates_repo_url(templates_repo)
     private_bytes, public_bytes = await run_async(
-        generate_rsa_key_pair_bytes, f"{project_name}@dstack"
+        crypto.generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
     project = ProjectModel(
         id=uuid.uuid4(),

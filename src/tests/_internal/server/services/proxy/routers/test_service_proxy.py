@@ -19,6 +19,9 @@ from dstack._internal.proxy.lib.testing.common import (
 from dstack._internal.server.services.proxy.routers.service_proxy import router
 
 MOCK_REPLICA_CLIENT_TIMEOUT = 8
+# Kept well below `MOCK_REPLICA_CLIENT_TIMEOUT` so the gateway timeout test does not wait 8s.
+# Only the timeout test may use it: httpbin needs more than this to serve the other tests.
+SHORT_REPLICA_CLIENT_TIMEOUT = 0.5
 
 # Using GatewayProxyRepo for tests because it is easier to populate than ServerProxyRepo
 ProxyTestRepo = GatewayProxyRepo
@@ -33,6 +36,19 @@ def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
     ) as add_connection_mock:
         add_connection_mock.return_value.client.return_value = ServiceClient(
             base_url=httpbin.url, timeout=MOCK_REPLICA_CLIENT_TIMEOUT
+        )
+        yield
+
+
+@pytest.fixture
+def mock_replica_client_httpbin_short_timeout(httpbin) -> Generator[None, None, None]:
+    """Same as `mock_replica_client_httpbin`, but times out quickly"""
+
+    with patch(
+        "dstack._internal.proxy.lib.services.service_connection.ServiceConnectionPool.get_or_add"
+    ) as add_connection_mock:
+        add_connection_mock.return_value.client.return_value = ServiceClient(
+            base_url=httpbin.url, timeout=SHORT_REPLICA_CLIENT_TIMEOUT
         )
         yield
 
@@ -155,13 +171,13 @@ async def test_proxy_not_leaks_cookies(mock_replica_client_httpbin) -> None:
 
 
 @pytest.mark.asyncio
-async def test_proxy_gateway_timeout(mock_replica_client_httpbin) -> None:
+async def test_proxy_gateway_timeout(mock_replica_client_httpbin_short_timeout) -> None:
     repo = ProxyTestRepo()
     await repo.set_project(make_project("test-proj"))
     await repo.set_service(make_service("test-proj", "httpbin"))
     _, client = make_app_client(repo)
-    assert MOCK_REPLICA_CLIENT_TIMEOUT < 10
-    resp = await client.get("http://test-host/proxy/services/test-proj/httpbin/delay/10")
+    assert SHORT_REPLICA_CLIENT_TIMEOUT < 2
+    resp = await client.get("http://test-host/proxy/services/test-proj/httpbin/delay/2")
     assert resp.status_code == 504
     assert resp.json()["detail"] == "Timed out requesting upstream"
 

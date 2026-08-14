@@ -5,7 +5,7 @@ from packaging.version import Version
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
-from dstack._internal.server.compatibility.common import patch_offers_list, patch_profile_params
+from dstack._internal.server.compatibility.common import patch_profile_params
 
 
 def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None:
@@ -16,8 +16,6 @@ def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None
         patch_run_spec(run_plan.effective_run_spec, client_version)
     if run_plan.current_resource is not None:
         patch_run(run_plan.current_resource, client_version)
-    for job_plan in run_plan.job_plans:
-        patch_offers_list(job_plan.offers, client_version)
 
 
 def patch_run(run: Run, client_version: Optional[Version]) -> None:
@@ -52,3 +50,21 @@ def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None
         and isinstance(run_spec.configuration.gateway, EntityReference)
     ):
         run_spec.configuration.gateway = run_spec.configuration.gateway.format()
+
+
+def is_run_plan_for_offers_only(
+    run_spec: RunSpec, for_offers_only: bool, client_version: Optional[Version]
+) -> bool:
+    """
+    Clients < 0.21.0 don't support `for_offers_only` argument and rely on a magic configuration
+    that triggers "offer collection only" path.
+
+    TODO: Drop once clients < 0.21.0 are no longer supported.
+
+    NOTE: A real task with `commands == [":"]` would also match this special `dstack offer` path.
+    """
+    if for_offers_only:
+        return True
+    if client_version is not None and client_version < Version("0.21.0"):
+        return run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"]
+    return False

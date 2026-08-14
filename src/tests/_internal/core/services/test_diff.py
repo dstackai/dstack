@@ -58,36 +58,6 @@ class TestDiffModels:
                 {},
                 id="core-model-no-diff",
             ),
-            pytest.param(
-                _CoreModelA.__request__(a=1, b="x"),
-                _CoreModelA.__request__(a=1, b="y"),
-                {"b": ModelFieldDiff(old="x", new="y")},
-                id="core-model-request",
-            ),
-            pytest.param(
-                _CoreModelA.__response__(a=1, b="x"),
-                _CoreModelA.__response__(a=1, b="y"),
-                {"b": ModelFieldDiff(old="x", new="y")},
-                id="core-model-response",
-            ),
-            pytest.param(
-                _CoreModelA.__request__(a=1, b="x"),
-                _CoreModelA.__response__(a=1, b="y"),
-                {"b": ModelFieldDiff(old="x", new="y")},
-                id="core-model-request-response",
-            ),
-            pytest.param(
-                _CoreModelA(a=1, b="x"),
-                _CoreModelA.__request__(a=1, b="y"),
-                {"b": ModelFieldDiff(old="x", new="y")},
-                id="core-model-base-request",
-            ),
-            pytest.param(
-                _CoreModelA(a=1, b="x"),
-                _CoreModelA.__response__(a=1, b="y"),
-                {"b": ModelFieldDiff(old="x", new="y")},
-                id="core-model-base-response",
-            ),
         ],
     )
     def test_diff_models(self, old: BaseModel, new: BaseModel, expected: ModelDiff) -> None:

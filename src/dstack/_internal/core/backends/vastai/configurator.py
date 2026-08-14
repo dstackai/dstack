@@ -17,6 +17,7 @@ from dstack._internal.core.backends.vastai.models import (
 from dstack._internal.core.models.backends.base import (
     BackendType,
 )
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
 REGIONS = []
 
@@ -40,27 +41,30 @@ class VastAIConfigurator(
             config.regions = REGIONS
         return BackendRecord(
             config=VastAIStoredConfig(
-                **VastAIBackendConfig.__response__.parse_obj(config).dict()
-            ).json(),
-            auth=VastAICreds.parse_obj(config.creds).json(),
+                **validate_extra_ignore(VastAIBackendConfig, config).model_dump()
+            ).model_dump_json(),
+            auth=VastAICreds.model_validate(config.creds).model_dump_json(),
         )
 
     def get_backend_config_with_creds(self, record: BackendRecord) -> VastAIBackendConfigWithCreds:
         config = self._get_config(record)
-        return VastAIBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(VastAIBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> VastAIBackendConfig:
         config = self._get_config(record)
-        return VastAIBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(VastAIBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> VastAIBackend:
         config = self._get_config(record)
         return VastAIBackend(config=config)
 
     def _get_config(self, record: BackendRecord) -> VastAIConfig:
-        return VastAIConfig.__response__(
-            **json.loads(record.config),
-            creds=VastAICreds.parse_raw(record.auth),
+        return validate_extra_ignore(
+            VastAIConfig,
+            {
+                **json.loads(record.config),
+                "creds": validate_json_extra_ignore(VastAICreds, record.auth),
+            },
         )
 
     def _validate_vastai_creds(self, api_key: str):

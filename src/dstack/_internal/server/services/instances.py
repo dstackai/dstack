@@ -16,7 +16,7 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import EntityReference
+from dstack._internal.core.models.common import EntityReference, validate_json_extra_ignore
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
 from dstack._internal.core.models.instances import (
@@ -63,6 +63,7 @@ from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.utils import common as common_utils
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -259,6 +260,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
         instance.availability_zone = jpd.availability_zone
+        instance.gpu_driver = jpd.gpu_driver
 
     return instance
 
@@ -302,31 +304,35 @@ def dcgm_health_response_to_health_check(
 def get_instance_health_response(
     instance_health_check_model: InstanceHealthCheckModel,
 ) -> InstanceHealthResponse:
-    return InstanceHealthResponse.__response__.parse_raw(instance_health_check_model.response)
+    return validate_json_extra_ignore(InstanceHealthResponse, instance_health_check_model.response)
 
 
 def get_instance_provisioning_data(instance_model: InstanceModel) -> Optional[JobProvisioningData]:
     if instance_model.job_provisioning_data is None:
         return None
-    return JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+    return validate_json_extra_ignore(JobProvisioningData, instance_model.job_provisioning_data)
 
 
 def get_instance_offer(instance_model: InstanceModel) -> Optional[InstanceOfferWithAvailability]:
     if instance_model.offer is None:
         return None
-    return InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
+    return validate_json_extra_ignore(
+        InstanceOfferWithAvailability, get_or_error(instance_model.offer)
+    )
 
 
 def get_instance_configuration(instance_model: InstanceModel) -> InstanceConfiguration:
-    return InstanceConfiguration.__response__.parse_raw(instance_model.instance_configuration)
+    return validate_json_extra_ignore(
+        InstanceConfiguration, get_or_error(instance_model.instance_configuration)
+    )
 
 
 def get_instance_profile(instance_model: InstanceModel) -> Profile:
-    return Profile.__response__.parse_raw(instance_model.profile)
+    return validate_json_extra_ignore(Profile, get_or_error(instance_model.profile))
 
 
 def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
-    return Requirements.__response__.parse_raw(instance_model.requirements)
+    return validate_json_extra_ignore(Requirements, get_or_error(instance_model.requirements))
 
 
 def is_ssh_instance(instance_model: InstanceModel) -> bool:
@@ -356,7 +362,7 @@ def get_instance_remote_connection_info(
 ) -> Optional[RemoteConnectionInfo]:
     if instance_model.remote_connection_info is None:
         return None
-    return RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
+    return validate_json_extra_ignore(RemoteConnectionInfo, instance_model.remote_connection_info)
 
 
 def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, Optional[str]]:
@@ -582,7 +588,7 @@ def instance_matches_constraints(
     if requirements is not None:
         if instance.offer is None:
             return False
-        offer = InstanceOffer.__response__.parse_raw(instance.offer)
+        offer = validate_json_extra_ignore(InstanceOffer, instance.offer)
         catalog_item = offer_to_catalog_item(offer)
         if not gpuhunt.matches(catalog_item, q=requirements_to_query_filter(requirements)):
             return False
@@ -911,9 +917,9 @@ def create_instance_model(
         last_processed_at=now,
         status=InstanceStatus.PENDING,
         unreachable=False,
-        profile=profile.json(),
-        requirements=requirements.json(),
-        instance_configuration=instance_config.json(),
+        profile=profile.model_dump_json(),
+        requirements=requirements.model_dump_json(),
+        instance_configuration=instance_config.model_dump_json(),
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
         total_blocks=None if blocks == "auto" else blocks,
@@ -986,9 +992,9 @@ async def create_ssh_instance_model(
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
         unreachable=False,
-        job_provisioning_data=remote.json(),
-        remote_connection_info=remote_connection_info.json(),
-        offer=offer.json(),
+        job_provisioning_data=remote.model_dump_json(),
+        remote_connection_info=remote_connection_info.model_dump_json(),
+        offer=offer.model_dump_json(),
         region=offer.region,
         price=offer.price,
         termination_policy=TerminationPolicy.DONT_DESTROY,

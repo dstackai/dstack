@@ -16,6 +16,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
 )
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +50,7 @@ class KubernetesConfigurator(
         self, project_name: str, config: KubernetesBackendConfigWithCreds
     ) -> BackendRecord:
         return BackendRecord(
-            config=KubernetesStoredConfig.__response__.parse_obj(config).json(),
+            config=validate_extra_ignore(KubernetesStoredConfig, config).model_dump_json(),
             auth="",
         )
 
@@ -57,17 +58,17 @@ class KubernetesConfigurator(
         self, record: BackendRecord
     ) -> KubernetesBackendConfigWithCreds:
         config = self._get_config(record)
-        return KubernetesBackendConfigWithCreds.__response__.parse_obj(config)
+        return validate_extra_ignore(KubernetesBackendConfigWithCreds, config)
 
     def get_backend_config_without_creds(self, record: BackendRecord) -> KubernetesBackendConfig:
         config = self._get_config(record)
-        return KubernetesBackendConfig.__response__.parse_obj(config)
+        return validate_extra_ignore(KubernetesBackendConfig, config)
 
     def get_backend(self, record: BackendRecord) -> KubernetesBackend:
         return KubernetesBackend(self._get_config(record))
 
     def _get_config(self, record: BackendRecord) -> KubernetesConfig:
-        return KubernetesConfig.__response__.parse_raw(record.config)
+        return validate_json_extra_ignore(KubernetesConfig, record.config)
 
     def _check_config_contexts(self, config: KubernetesBackendConfig):
         if config.contexts is None:
