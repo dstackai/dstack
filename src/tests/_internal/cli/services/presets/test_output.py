@@ -5,10 +5,10 @@ from io import StringIO
 import pytest
 from rich.table import Table
 
+from dstack._internal.cli.models.presets import PresetWorkload
 from dstack._internal.cli.services.presets import output as output_module
 from dstack._internal.cli.services.presets.output import _add_session, _format_number
-from tests._internal.cli.common import plain_console
-from tests._internal.cli.preset_factories import get_preset
+from tests._internal.cli.common import get_preset, plain_console
 
 pytestmark = pytest.mark.windows
 
@@ -27,7 +27,7 @@ class TestFormatNumber:
 class TestFormatPresetBenchmark:
     def test_formats_second_scale_ttft_without_scientific_notation(self):
         preset = get_preset()
-        ttft = preset.validations[0].benchmark.metrics.ttft_ms
+        ttft = preset.benchmark.metrics.ttft_ms
         ttft.mean = 8148.3
         ttft.p50 = 8151.4
         ttft.p99 = 8334.2
@@ -43,28 +43,44 @@ class TestFormatPresetBenchmark:
 
 
 class TestFormatPresetObjective:
-    def test_shows_the_shared_prefix_the_benchmark_actually_used(self):
+    def test_shows_the_requested_shared_prefix(self):
         preset = get_preset()
-        preset.validations[0].benchmark.workload.shared_prefix_tokens = 768
+        preset.configuration.shared_prefix_tokens = 768
 
         assert output_module.format_preset_objective(preset) == (
             "[secondary]io=1K/128 prefix=75% conc=1[/]"
         )
 
-    def test_a_preset_saved_before_the_field_existed_still_loads(self):
-        # `shared_prefix_tokens` is absent from every preset saved so far.
+    def test_treats_an_unset_shared_prefix_as_none_shared(self):
         preset = get_preset()
 
-        assert preset.validations[0].benchmark.workload.shared_prefix_tokens is None
+        assert preset.configuration.shared_prefix_tokens is None
         assert output_module.format_preset_objective(preset) == (
             "[secondary]io=1K/128 prefix=0% conc=1[/]"
         )
 
     def test_shows_the_dataset_instead_of_the_request_shape(self):
-        # With a custom dataset the io shape is measured, not configured, so the
-        # contract cell names the dataset instead.
+        # A dataset defines its own request shape, so the cell names it instead.
         preset = get_preset()
-        preset.validations[0].benchmark.workload.dataset = "spec_bench"
+        preset.configuration.dataset = "spec_bench"
+
+        assert output_module.format_preset_objective(preset) == (
+            "[secondary]data=spec_bench conc=1[/]"
+        )
+
+    def test_renders_the_requested_workload_not_the_measured_one(self):
+        # They diverge with a dataset, where the benchmark records measured means.
+        preset = get_preset()
+        preset.configuration.dataset = "spec_bench"
+        benchmark = preset.benchmark
+        benchmark.workload = PresetWorkload(
+            api=benchmark.workload.api,
+            num_requests=benchmark.workload.num_requests,
+            input_tokens=347,
+            output_tokens=2451,
+            concurrency=8,
+            dataset="spec_bench",
+        )
 
         assert output_module.format_preset_objective(preset) == (
             "[secondary]data=spec_bench conc=1[/]"
@@ -213,7 +229,7 @@ class TestOrdering:
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         old = get_preset()
         new = old.model_copy(
-            update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)}
+            update={"id": "11aa22bb", "submitted_at": old.submitted_at + timedelta(days=2)}
         )
         sessions = [
             {
@@ -456,3 +472,18 @@ class TestFailedTrialSpark:
         assert spark.count("gold1") == 1
         assert spark.count("indian_red1") == 2
         assert "sea_green3" not in spark
+
+
+def test_warn_respects_stderr_redirect():
+    """`preset -w` suppresses store warnings during refreshes via
+    redirect_stderr; that only works while `error_console` resolves
+    `sys.stderr` at write time."""
+    import io
+    from contextlib import redirect_stderr
+
+    from dstack._internal.cli.utils.common import warn
+
+    buffer = io.StringIO()
+    with redirect_stderr(buffer):
+        warn("torn render", stderr=True)
+    assert "torn render" in buffer.getvalue()

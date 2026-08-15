@@ -10,17 +10,26 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional, Sequence
 
 import psutil
 import yaml
+from pydantic import ValidationError
 from rich.text import Text
 
 from dstack._internal.cli.models.configurations import PresetConfiguration
-from dstack._internal.cli.models.preset_agent import ClaudeAgentInfo
+from dstack._internal.cli.models.preset_agent import (
+    PresetSessionFinalize,
+    PresetSessionProcess,
+    PresetSessionRun,
+    PresetSessionState,
+    PresetSessionStatus,
+    PresetSessionWorkspace,
+)
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.utils.common import get_dstack_dir
 
 if TYPE_CHECKING:
@@ -29,10 +38,10 @@ if TYPE_CHECKING:
 
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
-_TRIALS_DIRNAME = "trials"
-_SERVICE_DIRNAME = "service"
-_TRIAL_RESULT_FILENAME = "trial.json"
-_VERIFICATION_RESULT_FILENAME = "verification.json"
+TRIALS_DIRNAME = "trials"
+SERVICE_DIRNAME = "service"
+TRIAL_RESULT_FILENAME = "trial.json"
+VERIFICATION_RESULT_FILENAME = "verification.json"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
@@ -45,14 +54,21 @@ class SessionBusyError(CLIError):
 
 
 @dataclass
-class PresetAgentSession:
+class PresetSession:
     path: Path
     debug: bool
-    preset_id: str = ""
+    preset_id: str
     # Background reconcile sets this False so finalizing a detached session stays
     # silent on the read command; agent.log is written regardless.
     echo: bool = field(default=True, repr=False)
     _log_enabled: bool = field(default=True, init=False, repr=False)
+
+    @property
+    def created_at(self) -> datetime:
+        state = self.read_state()
+        if state is None:
+            raise CLIError(f"Unknown preset session {self.preset_id}")
+        return state.created_at
 
     @property
     def log_path(self) -> Path:
@@ -68,11 +84,11 @@ class PresetAgentSession:
 
     @property
     def trials_dir(self) -> Path:
-        return self.path / _TRIALS_DIRNAME
+        return self.path / TRIALS_DIRNAME
 
     @property
     def service_dir(self) -> Path:
-        return self.path / _SERVICE_DIRNAME
+        return self.path / SERVICE_DIRNAME
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
@@ -99,21 +115,15 @@ class PresetAgentSession:
             _get_claude_version,
         )
 
-        info = ClaudeAgentInfo.model_validate(
-            {
-                "executable": auth.executable,
-                "version": _get_claude_version(auth),
-                "model": {
-                    "name": auth.model,
-                    "effort": auth.effort or "default",
-                },
-                "auth": _get_claude_auth_status(auth),
-            }
-        )
-        _write_private_text(
-            self.path / "agent.json",
-            json.dumps(json.loads(info.model_dump_json()), indent=2) + "\n",
-        )
+        # `agent.json`: a debug document written once and read by nothing, so it
+        # is a plain dump, not a model.
+        info = {
+            "executable": auth.executable,
+            "version": _get_claude_version(auth),
+            "model": {"name": auth.model, "effort": auth.effort or "default"},
+            "auth_status": _get_claude_auth_status(auth),
+        }
+        _write_private_text(self.path / "agent.json", json.dumps(info, indent=2) + "\n")
 
     def append_log(self, line: str) -> None:
         if not self._log_enabled:
@@ -127,35 +137,134 @@ class PresetAgentSession:
             if self.echo:
                 console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
 
-    def read_manifest(self) -> dict[str, Any]:
+    def read_state(self) -> Optional[PresetSessionState]:
+        """None marks a session with no readable state: never created, or corrupt."""
         try:
-            manifest = json.loads((self.path / _SESSION_FILENAME).read_text(encoding="utf-8"))
+            data = json.loads((self.path / _SESSION_FILENAME).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {}
-        return manifest if isinstance(manifest, dict) else {}
+            return None
+        if isinstance(data, dict) and "run" not in data and ("pid" in data or "workspace" in data):
+            data = _upgrade_pre_0_21_2_state(data)
+        try:
+            return validate_extra_ignore(PresetSessionState, data)
+        except ValidationError:
+            return None
 
-    def update_manifest(self, **fields: Any) -> None:
-        manifest = self.read_manifest()
-        manifest.update(fields)
-        _write_private_text(self.path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
+    def write_state(self, state: PresetSessionState) -> None:
+        _write_private_text(
+            self.path / _SESSION_FILENAME,
+            state.model_dump_json(indent=2) + "\n",
+        )
+
+    def begin_run(
+        self,
+        *,
+        workspace: PresetSessionWorkspace,
+        finalize: PresetSessionFinalize,
+        claude_model: Optional[str],
+    ) -> None:
+        """This CLI takes ownership and starts (or joins) the agent run. Everything
+        an earlier run established survives: the claude session id and model pin so
+        a resume finds them, and the agent process reference so following a live
+        detached agent keeps it alive instead of reading it as dead."""
+        state = self.read_state()
+        if state is None:
+            raise CLIError(f"Preset {self.preset_id} session state is unreadable")
+        earlier = state.run
+        state.status = "running"
+        state.owner = _current_process()
+        state.run = PresetSessionRun(
+            workspace=workspace,
+            finalize=finalize,
+            claude_model=claude_model or (earlier.claude_model if earlier else None),
+            agent=earlier.agent if earlier else None,
+            claude_session_id=earlier.claude_session_id if earlier else None,
+        )
+        self.write_state(state)
+
+    def record_agent(self, agent: PresetSessionProcess) -> None:
+        state = self.read_state()
+        if state is None or state.run is None:
+            return
+        state.run.agent = agent
+        self.write_state(state)
 
     def record_claude_session_id(self, session_id: str) -> None:
-        self.update_manifest(claude_session_id=session_id)
+        # An unreadable state stays as it is: rewriting it would fabricate a
+        # session record out of one field.
+        state = self.read_state()
+        if state is None or state.run is None:
+            return
+        state.run.claude_session_id = session_id
+        self.write_state(state)
 
-    def finish(self, status: str) -> Path:
-        self.update_manifest(status=status)
+    def detach(self) -> None:
+        state = self.read_state()
+        if state is None:
+            return
+        state.owner = None
+        self.write_state(state)
+
+    def release_name(self) -> None:
+        state = self.read_state()
+        if state is None:
+            return
+        state.name = None
+        self.write_state(state)
+
+    def finish(self, status: PresetSessionStatus) -> Path:
+        state = self.read_state()
+        if state is not None:
+            state.status = status
+            self.write_state(state)
         return self.path
+
+
+# TODO: Remove in 0.22
+def _upgrade_pre_0_21_2_state(data: dict[str, Any]) -> dict[str, Any]:
+    """A session file from before 0.21.2 held every field flat; the same facts now
+    live in `owner` and `run`. Pure regrouping for backward compatibility."""
+    data = dict(data)
+    pid = data.pop("pid", None)
+    pid_started_at = data.pop("pid_started_at", None)
+    data["owner"] = {"pid": pid, "started_at": pid_started_at} if pid is not None else None
+    workspace = data.pop("workspace", None)
+    alias = data.pop("alias", None)
+    agent_pid = data.pop("agent_pid", None)
+    agent_started_at = data.pop("agent_started_at", None)
+    project = data.pop("project", None)
+    keep_service = data.pop("keep_service", None)
+    claude_model = data.pop("claude_model", None)
+    claude_session_id = data.pop("claude_session_id", None)
+    if workspace is None or project is None:
+        # Without the finalize context there is no run to reconcile or resume.
+        data["run"] = None
+    else:
+        data["run"] = {
+            "workspace": {"path": workspace, "alias": alias or workspace},
+            "finalize": {"project": project, "keep_service": bool(keep_service)},
+            "claude_model": claude_model,
+            "agent": (
+                {"pid": agent_pid, "started_at": agent_started_at}
+                if agent_pid is not None
+                else None
+            ),
+            "claude_session_id": claude_session_id,
+        }
+    data.setdefault("previous", [])
+    return data
 
 
 def get_presets_dir() -> Path:
     return get_dstack_dir() / "presets"
 
 
-def create_preset_agent_session(
+def create_preset_session(
     configuration: PresetConfiguration,
     *,
-    debug: bool = False,
-) -> PresetAgentSession:
+    previous: Sequence[str],
+    debug: bool,
+) -> PresetSession:
     if configuration.name is None:
         raise CLIError("The service name is required to save agent output")
     parent = get_presets_dir()
@@ -171,27 +280,30 @@ def create_preset_agent_session(
                 continue
             break
         _write_private_text(path / "agent.log", "")
-        manifest = {
-            "id": preset_id,
-            "status": "running",
-            "pid": os.getpid(),
-            "pid_started_at": _process_started_at(os.getpid()),
-            "name": configuration.name,
-            "model": getattr(configuration.model, "base", None)
-            or getattr(configuration.model, "repo", None),
-            "trials_num": configuration.trials,
-            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "debug": debug,
-        }
-        _write_private_text(path / _SESSION_FILENAME, json.dumps(manifest, indent=2) + "\n")
-        data = json.loads(configuration.model_dump_json(exclude_none=True))
-        if configuration.env:
-            data["env"] = list(configuration.env)
-        else:
-            data.pop("env", None)
+        session = PresetSession(path=path, debug=debug, preset_id=preset_id)
+        session.write_state(
+            PresetSessionState(
+                id=preset_id,
+                name=configuration.name,
+                model=configuration.model.exact_repo or configuration.model.api_model_name,
+                trials_num=configuration.trials,
+                previous=list(previous),
+                created_at=datetime.now(timezone.utc),
+                debug=debug,
+                status="running",
+                owner=_current_process(),
+                run=None,
+            )
+        )
+        record = configuration.model_dump(mode="json", exclude_none=True)
+        # Env values may be secrets: the session records only the variable names,
+        # which read back as passthrough references resolved from the environment.
+        record["env"] = list(configuration.env)
+        if not configuration.env:
+            record.pop("env")
         _write_private_text(
             path / "preset.dstack.yml",
-            yaml.safe_dump(data, sort_keys=False),
+            yaml.safe_dump(record, sort_keys=False),
         )
         if debug:
             _write_private_text(path / "trace.jsonl", "")
@@ -199,96 +311,89 @@ def create_preset_agent_session(
         if path is not None:
             shutil.rmtree(path, ignore_errors=True)
         raise CLIError(f"Could not create agent output under {parent}: {e}") from e
-    assert path is not None
-    return PresetAgentSession(path=path, debug=debug, preset_id=preset_id)
+    return session
 
 
-def load_resumable_agent_session(preset_id: str) -> PresetAgentSession:
+def load_resumable_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
-    manifest = session.read_manifest()
-    if not path.is_dir() or not manifest:
+    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    state = session.read_state()
+    if not path.is_dir() or state is None:
         raise CLIError(f"Unknown preset: {preset_id}")
-    status = manifest.get("status")
-    if status == "success":
+    if state.status == "success":
         raise CLIError(f"Preset {preset_id} is already created; nothing to resume")
-    if status == "failed":
+    if state.status == "failed":
         raise CLIError(f"Preset {preset_id} creation failed and cannot be resumed")
-    if status == "running" and session_process_alive(manifest):
+    if state.status == "running" and session_process_alive(state):
         raise CLIError(
             f"Preset {preset_id} is still being created;"
             f" follow it with dstack preset logs -f {preset_id}"
         )
-    if not manifest.get("claude_session_id"):
+    if state.run is None or state.run.claude_session_id is None:
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
-    session.debug = bool(manifest.get("debug"))
+    session.debug = state.debug
     return session
 
 
-def _pid_alive(pid: Any, started_at: Any = None) -> bool:
-    if not isinstance(pid, int) or pid <= 0 or not psutil.pid_exists(pid):
+def _current_process() -> PresetSessionProcess:
+    return PresetSessionProcess(pid=os.getpid(), started_at=process_started_at(os.getpid()))
+
+
+def process_alive(process: Optional[PresetSessionProcess]) -> bool:
+    if process is None or process.pid <= 0 or not psutil.pid_exists(process.pid):
         return False
-    if isinstance(started_at, (int, float)):
-        create_time = _process_started_at(pid)
+    if process.started_at is not None:
+        create_time = process_started_at(process.pid)
         # A recycled pid has a different start time.
-        if create_time is not None and abs(create_time - started_at) > 1.0:
+        if create_time is not None and abs(create_time - process.started_at) > 1.0:
             return False
     return True
 
 
-def session_process_alive(manifest: dict[str, Any]) -> bool:
+def session_process_alive(state: PresetSessionState) -> bool:
     """True if either a live agent (possibly detached) or a live CLI (possibly
     between agent retries) still owns the session."""
-    if _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at")):
+    if state.run is not None and process_alive(state.run.agent):
         return True
-    pid = manifest.get("pid")
-    if not isinstance(pid, int) or pid <= 0 or pid == os.getpid():
+    if state.owner is None or state.owner.pid == os.getpid():
         return False
-    # Guard the CLI pid with its start time: a recycled pid would otherwise read
-    # a dead session as still owned, falsely blocking reconcile / follow.
-    return _pid_alive(pid, manifest.get("pid_started_at"))
+    return process_alive(state.owner)
 
 
-def load_attachable_agent_session(preset_id: str) -> PresetAgentSession:
+def load_attachable_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
-    manifest = session.read_manifest()
-    if not path.is_dir() or not manifest:
+    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    state = session.read_state()
+    if not path.is_dir() or state is None:
         raise CLIError(f"Unknown preset: {preset_id}")
-    status = manifest.get("status")
-    if status == "success":
+    if state.status == "success":
         raise CLIError(f"Preset {preset_id} is already created")
-    if status == "failed":
+    if state.status == "failed":
         raise CLIError(f"Preset {preset_id} creation failed")
-    if status == "interrupted":
+    if state.status == "interrupted":
         raise CLIError(
             f"Preset {preset_id} creation was interrupted; resume it with"
             f" dstack preset create -f <config> --resume {preset_id}"
         )
-    pid = manifest.get("pid")
-    if (
-        isinstance(pid, int)
-        and pid > 0
-        and pid != os.getpid()
-        and _pid_alive(pid, manifest.get("pid_started_at"))
-    ):
+    owner = state.owner
+    if owner is not None and owner.pid != os.getpid() and process_alive(owner):
         raise SessionBusyError(
-            f"Preset {preset_id} is already being followed by another CLI (pid {pid});"
+            f"Preset {preset_id} is already being followed by another CLI (pid {owner.pid});"
             f" stop or detach it there with Ctrl+C"
         )
-    session.debug = bool(manifest.get("debug"))
+    session.debug = state.debug
     return session
 
 
-def load_agent_session(preset_id: str) -> PresetAgentSession:
+def load_preset_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetAgentSession(path=path, debug=False, preset_id=preset_id)
-    if not path.is_dir() or not session.read_manifest():
+    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    if not path.is_dir() or session.read_state() is None:
         raise CLIError(f"Unknown preset: {preset_id}")
     return session
 
 
-def print_session_log(session: PresetAgentSession) -> None:
+def print_session_log(session: PresetSession) -> None:
     try:
         content = session.log_path.read_text(encoding="utf-8")
     except OSError:
@@ -299,39 +404,15 @@ def print_session_log(session: PresetAgentSession) -> None:
         console.print(f"No log output yet for session [code]{session.preset_id}[/].")
 
 
-def mark_session_owner(
-    session: PresetAgentSession,
-    *,
-    project: Optional[str] = None,
-    keep_service: Optional[bool] = None,
-    claude_model: Optional[str] = None,
-) -> None:
-    """Beyond recording ownership, stores the finalize context a later detached
-    reconcile needs; `None` fields are left untouched."""
-    fields: dict[str, Any] = {
-        "status": "running",
-        "pid": os.getpid(),
-        "pid_started_at": _process_started_at(os.getpid()),
-    }
-    if project is not None:
-        fields["project"] = project
-    if keep_service is not None:
-        fields["keep_service"] = keep_service
-    if claude_model is not None:
-        fields["claude_model"] = claude_model
-    session.update_manifest(**fields)
-
-
-def session_report_exists(manifest: dict[str, Any]) -> bool:
+def session_report_exists(state: PresetSessionState) -> bool:
     """True once the agent has written final_report.json, marking a detached
     session ready to finalize."""
-    workspace = manifest.get("workspace")
-    if not isinstance(workspace, str) or not workspace:
+    if state.run is None:
         return False
-    return (Path(workspace) / "w" / _FINAL_REPORT_FILENAME).is_file()
+    return (Path(state.run.workspace.path) / "w" / _FINAL_REPORT_FILENAME).is_file()
 
 
-def try_claim_session(session: PresetAgentSession) -> Optional[int]:
+def try_claim_session(session: PresetSession) -> Optional[int]:
     """Takes an exclusive kernel lock so two readers can't both finalize the
     session; returns an fd to release via `release_session_claim`, or None if
     another process holds it. The kernel drops the lock if the holder dies, so
@@ -377,12 +458,11 @@ def _try_lock_fd(fd: int) -> bool:
         return False
 
 
-def claimed_session_name(manifest: dict[str, Any]) -> Optional[str]:
-    value = manifest.get("name")
-    return value if isinstance(value, str) and value else None
+def claimed_session_name(state: PresetSessionState) -> Optional[str]:
+    return state.name or None
 
 
-def iter_agent_sessions() -> Iterator[PresetAgentSession]:
+def iter_preset_sessions() -> Iterator[PresetSession]:
     """Skips dotfiles and `models--*` HuggingFace cache dirs that share the
     presets directory but aren't sessions."""
     root = get_presets_dir()
@@ -390,15 +470,15 @@ def iter_agent_sessions() -> Iterator[PresetAgentSession]:
         return
     for path in sorted(root.iterdir()):
         if path.is_dir() and not path.name.startswith((".", "models--")):
-            yield PresetAgentSession(path=path, debug=False, preset_id=path.name)
+            yield PresetSession(path=path, debug=False, preset_id=path.name)
 
 
-def find_session_name_claims(name: str) -> list[PresetAgentSession]:
+def find_session_name_claims(name: str) -> list[PresetSession]:
     """Sessions of any status holding `name`, including failed ones."""
     return [
         session
-        for session in iter_agent_sessions()
-        if claimed_session_name(session.read_manifest()) == name
+        for session in iter_preset_sessions()
+        if (state := session.read_state()) is not None and claimed_session_name(state) == name
     ]
 
 
@@ -412,22 +492,22 @@ def resolve_session_ref(ref: str) -> str:
     return ref
 
 
-def list_agent_sessions() -> list[dict[str, Any]]:
+def list_preset_sessions() -> list[dict[str, Any]]:
     entries = []
-    for session in iter_agent_sessions():
+    for session in iter_preset_sessions():
         path = session.path
-        manifest = session.read_manifest()
-        status = manifest.get("status")
-        if status not in ("running", "interrupted", "success", "failed"):
+        state = session.read_state()
+        if state is None:
             continue
-        if status == "running" and not session_process_alive(manifest):
+        status = state.status
+        if status == "running" and not session_process_alive(state):
             status = "interrupted"
-        entry = dict(manifest)
+        entry = state.model_dump(mode="json")
         entry["id"] = path.name
-        entry["name"] = claimed_session_name(manifest)
+        entry["name"] = claimed_session_name(state)
         entry["status"] = status
-        entry["trials"] = _summarize_session_trials(path / _TRIALS_DIRNAME)
-        entry["verification"] = _read_last_session_verification(path / _SERVICE_DIRNAME)
+        entry["trials"] = _summarize_session_trials(path / TRIALS_DIRNAME)
+        entry["verification"] = _read_last_session_verification(path / SERVICE_DIRNAME)
         entry["constraints"] = _read_session_constraints(path)
         entries.append(entry)
     return entries
@@ -475,7 +555,7 @@ def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
     if not attempts:
         return None
     last = attempts[-1]
-    record = _read_record(last / _VERIFICATION_RESULT_FILENAME)
+    record = _read_record(last / VERIFICATION_RESULT_FILENAME)
     if record is not None and isinstance(record.get("status"), str):
         return record
     return {"status": "verifying"}
@@ -486,7 +566,7 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
     counted."""
     records = []
     for trial_dir in _numbered_subdirs(path):
-        record = _read_record(trial_dir / _TRIAL_RESULT_FILENAME)
+        record = _read_record(trial_dir / TRIAL_RESULT_FILENAME)
         if record is not None:
             records.append(record)
     count = 0
@@ -573,11 +653,11 @@ def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
     return text
 
 
-def print_preset_progress(message: str, *, agent_session: PresetAgentSession) -> None:
+def print_preset_progress(message: str, *, session: PresetSession) -> None:
     timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S")
     message = message.rstrip("\r\n")
-    agent_session.append_log(f"[{timestamp}] {message}")
-    if not agent_session.echo:
+    session.append_log(f"[{timestamp}] {message}")
+    if not session.echo:
         return
     console.print(
         Text(f"[{timestamp}]", style="log.time"),
@@ -586,14 +666,14 @@ def print_preset_progress(message: str, *, agent_session: PresetAgentSession) ->
     )
 
 
-def _pid_running(pid: int) -> bool:
+def pid_running(pid: int) -> bool:
     try:
         return psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
     except psutil.Error:
         return False
 
 
-def _process_started_at(pid: int) -> Optional[float]:
+def process_started_at(pid: int) -> Optional[float]:
     try:
         return psutil.Process(pid).create_time()
     except psutil.Error:
@@ -602,7 +682,7 @@ def _process_started_at(pid: int) -> Optional[float]:
 
 def _write_private_bytes(path: Path, content: bytes) -> None:
     # Atomic tmp + fsync + replace (mkstemp already creates the file 0600), so
-    # a crash mid-write cannot leave a truncated manifest or offsets file.
+    # a crash mid-write cannot leave a truncated state or offsets file.
     # Binary mode: mirrored files are copies, and text mode rewrites newlines.
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
@@ -615,7 +695,7 @@ def _write_private_bytes(path: Path, content: bytes) -> None:
         except PermissionError:
             if not IS_WINDOWS:
                 raise
-            # A concurrent reader (a viewer polling the manifest) can hold the
+            # A concurrent reader (a viewer polling the state) can hold the
             # destination open without FILE_SHARE_DELETE; retry briefly, then
             # prefer an in-place write over crashing the owner.
             for _ in range(3):

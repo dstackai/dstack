@@ -28,7 +28,7 @@ class TestPresetConfiguration:
         assert not configuration.model.allows_variant_selection
 
     def test_parses_base_model(self):
-        configuration = PresetConfiguration(model={"base": "Qwen/Qwen3.5-27B"})
+        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.exact_repo is None
@@ -76,7 +76,7 @@ class TestPresetConfiguration:
             PresetConfiguration(base="Qwen/base", repo="Qwen/repo")
 
     def test_rejects_shorthand_combined_with_model(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="cannot be combined"):
             PresetConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
 
     def test_requires_model(self):
