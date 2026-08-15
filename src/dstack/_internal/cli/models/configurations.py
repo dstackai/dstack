@@ -135,14 +135,15 @@ class PresetConfiguration(
         ),
     ] = None
     min_context_length: Annotated[
-        Optional[PositiveInt], Field(description="The minimum required context length")
+        Optional[PositiveInt],
+        Field(description="The minimum required context length. Required for creation"),
     ] = None
     max_ttft: Annotated[
         Optional[PositiveInt],
         Field(
             description=(
                 "The maximum p50 time to first token, in milliseconds, that any benchmark"
-                " may report"
+                " may report. Required for creation"
             )
         ),
     ] = None
@@ -151,7 +152,7 @@ class PresetConfiguration(
         Field(
             description=(
                 "The number of benchmarked trials during preset creation"
-                " before the best one is promoted"
+                " before the best one is promoted. Required for creation"
             )
         ),
     ] = None
@@ -168,7 +169,8 @@ class PresetConfiguration(
         Optional[PositiveInt],
         Field(
             description=(
-                "The number of simultaneous requests used for benchmarks during preset creation"
+                "The number of simultaneous requests used for benchmarks during preset"
+                " creation. Required for creation"
             )
         ),
     ] = None
@@ -182,7 +184,7 @@ class PresetConfiguration(
         ),
     ] = None
     output_tokens: Annotated[
-        Optional[PositiveInt],
+        Optional[Annotated[int, Field(ge=2)]],
         Field(
             description=(
                 "The number of output tokens per request used for benchmarks during"
@@ -191,7 +193,7 @@ class PresetConfiguration(
         ),
     ] = None
     shared_prefix_tokens: Annotated[
-        Optional[PositiveInt],
+        Optional[Annotated[int, Field(ge=0)]],
         Field(
             description=(
                 "How many of `input_tokens` are a prefix identical in every benchmark request,"
@@ -338,13 +340,23 @@ class PresetConstraints(CoreModel):
     max_ttft: PositiveInt
     trials_num: PositiveInt
     concurrency: PositiveInt
-    input_tokens: Optional[PositiveInt] = None
-    output_tokens: Optional[PositiveInt] = None
-    shared_prefix_tokens: Optional[int] = None
-    dataset: Optional[str] = None
-    baseline: bool = False
-    fleets: list[str] = Field(min_length=1)
-    env: list[str] = []
+    baseline: bool
+    fleets: Annotated[list[str], Field(min_length=1)]
+    env: list[str]
+
+
+class PresetRandomConstraints(PresetConstraints):
+    """Constraints for the synthetic `random` dataset, which the request shape defines."""
+
+    input_tokens: PositiveInt
+    output_tokens: Annotated[int, Field(ge=2)]
+    shared_prefix_tokens: Annotated[int, Field(ge=0)]
+
+
+class PresetDatasetConstraints(PresetConstraints):
+    """Constraints for a named dataset, which defines its own request shape."""
+
+    dataset: str
 
 
 def _validate_model(value: Any, *, field: str) -> str:

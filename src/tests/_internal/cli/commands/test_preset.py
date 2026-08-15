@@ -1,3 +1,4 @@
+import argparse
 import json
 from contextlib import contextmanager
 from io import StringIO
@@ -6,11 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
+from dstack._internal.cli.commands.preset import _check_stdin_configuration_confirmable
 from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import render_datetime_as_api
-from tests._internal.cli.common import plain_console, run_dstack_cli
-from tests._internal.cli.preset_factories import get_preset
+from tests._internal.cli.common import get_preset, plain_console, run_dstack_cli
 
 pytestmark = pytest.mark.windows
 
@@ -36,11 +38,24 @@ def mock_ssh_client_info():
         yield
 
 
+class TestStdinConfiguration:
+    def test_create_from_stdin_requires_yes(self):
+        # Same rule as `dstack apply`: the prompt cannot read from a stdin that
+        # is the configuration itself.
+        args = argparse.Namespace(yes=False, configuration_file="-")
+        with pytest.raises(CLIError, match="stdin"):
+            _check_stdin_configuration_confirmable(args)
+
+        _check_stdin_configuration_confirmable(
+            argparse.Namespace(yes=True, configuration_file="-")
+        )
+
+
 class TestPresetLocalCommands:
     def test_handles_keyboard_interrupt(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=KeyboardInterrupt):
@@ -59,7 +74,7 @@ class TestPresetLocalCommands:
 
         configuration_path = tmp_path / "preset.dstack.yml"
         configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
+            "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
 
         with _patched_create_preset(side_effect=CreationStopped):
@@ -104,7 +119,7 @@ class TestPresetLocalCommands:
         preset = get_preset()
         PresetStore(tmp_path / ".dstack" / "presets").save(preset)
 
-        output = self._list_output(tmp_path, ["preset", "list"], created_at=preset.created_at)
+        output = self._list_output(tmp_path, ["preset", "list"], created_at=preset.submitted_at)
 
         assert "Qwen/Qwen3.5-27B" in output
         assert "8f3a12c4" in output
@@ -133,7 +148,7 @@ class TestPresetLocalCommands:
 
         joined_verbose = "".join(
             self._list_output(
-                tmp_path, ["preset", "list", "-v"], created_at=preset.created_at
+                tmp_path, ["preset", "list", "-v"], created_at=preset.submitted_at
             ).split()
         )
 
@@ -169,9 +184,9 @@ class TestPresetLocalCommands:
 
         data = json.loads(capsys.readouterr().out)
         assert data["id"] == preset.id
-        assert data["created_at"] == render_datetime_as_api(preset.created_at)
+        assert data["submitted_at"] == render_datetime_as_api(preset.submitted_at)
         assert data["context_length"] == 32768
-        assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
+        assert data["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize(
         "args",
@@ -190,9 +205,9 @@ class TestPresetLocalCommands:
         assert len(output["presets"]) == 1
         data = output["presets"][0]
         assert data["id"] == preset.id
-        assert data["created_at"] == render_datetime_as_api(preset.created_at)
+        assert data["submitted_at"] == render_datetime_as_api(preset.submitted_at)
         assert data["context_length"] == 32768
-        assert data["validations"][0]["benchmark"]["metrics"]["total_output_tokens"] == 2048
+        assert data["benchmark"]["metrics"]["total_output_tokens"] == 2048
 
     @pytest.mark.parametrize("flag_attribute", [("--base", "base"), ("--repo", "model")])
     def test_deletes_all_presets_of_model_keeping_others_without_api_client(
@@ -246,7 +261,7 @@ class TestPresetLocalCommands:
         store.save(preset)
         corrupt_dir = tmp_path / ".dstack" / "presets" / "deadbeef"
         corrupt_dir.mkdir(parents=True)
-        (corrupt_dir / "preset.yaml").write_text("{not valid yaml")
+        (corrupt_dir / "preset.yml").write_text("{not valid yaml")
 
         # The corrupt-file warning goes to stderr, so --json stdout stays parseable.
         assert run_dstack_cli(["preset", "list", "--json"], home_dir=tmp_path) == 0
@@ -276,8 +291,7 @@ class TestPresetLocalCommands:
         configuration_path.write_text(
             """type: preset
 name: file-name
-model:
-  base: Qwen/Qwen3.5-27B
+base: Qwen/Qwen3.5-27B
 regions: [file-region]
 max_price: 0.5
 trials: 1
@@ -291,7 +305,7 @@ env:
         preset = get_preset()
         result = SimpleNamespace(
             preset=preset,
-            path=tmp_path / "preset.yaml",
+            path=tmp_path / "preset.yml",
             final_run_name="qwen-build-2",
         )
 
@@ -334,9 +348,7 @@ env:
             "profiles:\n  - name: gpu\n    max_price: 0.5\n"
         )
         configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
-        )
+        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
 
         with (
             patch("dstack.api.Client.from_config"),
@@ -364,9 +376,7 @@ env:
 
     def test_apply_requires_preset_id(self, tmp_path, capsys):
         configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text(
-            "type: preset\nname: qwen\nmodel:\n  base: Qwen/Qwen3.5-27B\n"
-        )
+        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
 
         with patch("dstack._internal.cli.commands.preset.apply_preset") as apply:
             exit_code = run_dstack_cli(
@@ -390,7 +400,7 @@ class TestPresetNameClaims:
             "type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\ntrials: 1\nconcurrency: 8\nmax_ttft: 5000\nmin_context_length: 8192\n"
         )
         result = SimpleNamespace(
-            preset=preset, path=tmp_path / "preset.yaml", final_run_name="qwen-1"
+            preset=preset, path=tmp_path / "preset.yml", final_run_name="qwen-1"
         )
 
         with _patched_create_preset(return_value=result) as create:

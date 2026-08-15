@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import (
     Field,
@@ -11,25 +11,29 @@ from pydantic import (
 )
 from typing_extensions import Self
 
+from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Range, ResourcesSpec
+
+# The service name, the gateway, and the profile parameters are chosen by whoever
+# runs `dstack apply` with the preset, so a preset never carries them.
+PRESET_EXCLUDED_FIELDS = ("name", "gateway", *ProfileParams.model_fields)
 
 
-class PresetBenchmarkWorkload(CoreModel):
+class PresetWorkload(CoreModel):
     api: Literal["chat_completions", "completions"]
+    dataset: str
     num_requests: PositiveInt
-    # With a dataset other than `random`, the measured means rather than the
-    # configured request shape.
     input_tokens: PositiveInt
     output_tokens: Annotated[int, Field(ge=2)]
     concurrency: PositiveInt
-    # Absent for presets saved before the field existed, and with a dataset
-    # other than `random`, where the dataset decides prefix sharing.
-    shared_prefix_tokens: Annotated[Optional[int], Field(ge=0)] = None
-    # Absent means the synthetic `random` dataset.
-    dataset: Optional[str] = None
+
+
+class PresetRandomWorkload(PresetWorkload):
+    dataset: Literal["random"] = "random"
+    shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
 
 
 class PresetBenchmarkLatency(CoreModel):
@@ -44,30 +48,26 @@ class PresetBenchmarkMetrics(CoreModel):
     duration_seconds: PositiveFloat
     total_input_tokens: Annotated[int, Field(ge=0)]
     total_output_tokens: Annotated[int, Field(ge=0)]
-    # Defaulted rather than required: presets saved before these fields existed
-    # must still load. The `effective_*` properties derive them when absent.
-    output_tok_per_s: Optional[PositiveFloat] = None
-    per_user_tok_per_s: Optional[PositiveFloat] = None
+    # Stored as reported, but never read back: `effective_*` recomputes both
+    # from the totals rather than trusting self-reported rates.
+    output_tok_per_s: PositiveFloat
+    per_user_tok_per_s: PositiveFloat
     ttft_ms: PresetBenchmarkLatency
     tpot_ms: PresetBenchmarkLatency
 
 
-class PresetBenchmarkTarget(CoreModel):
-    type: Literal["gateway", "server-proxy"]
-
-
-class PresetBenchmarkClient(CoreModel):
-    type: Literal["local"]
-
-
 class PresetBenchmark(CoreModel):
-    tool: str
-    tool_version: str
-    command: str
-    workload: PresetBenchmarkWorkload
+    """The agent reports its benchmark in exactly this shape, and is forced to by
+    the schema generated from it. Changing a field here means also changing the
+    `## Benchmark` section of the system prompt, which tells it what to put there."""
+
+    tool: Annotated[str, Field(min_length=1)]
+    tool_version: Annotated[str, Field(min_length=1)]
+    command: Annotated[str, Field(min_length=1)]
+    # The subclass first: a report without `dataset` is a random workload, and a
+    # base-typed field would reject its `shared_prefix_tokens` as unknown.
+    workload: Union[PresetRandomWorkload, PresetWorkload]
     metrics: PresetBenchmarkMetrics
-    target: Optional[PresetBenchmarkTarget] = None
-    client: Optional[PresetBenchmarkClient] = None
 
     @property
     def effective_output_tok_per_s(self) -> float:
@@ -76,13 +76,6 @@ class PresetBenchmark(CoreModel):
     @property
     def effective_per_user_tok_per_s(self) -> float:
         return 1000 / self.metrics.tpot_ms.p50
-
-    @field_validator("tool", "tool_version", "command")
-    @classmethod
-    def validate_non_empty(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("value must be non-empty")
-        return value
 
     @field_validator("command")
     @classmethod
@@ -100,73 +93,61 @@ class PresetBenchmark(CoreModel):
 
     @model_validator(mode="after")
     def validate_metrics(self) -> Self:
-        metrics = self.metrics
-        workload = self.workload
-        assert metrics is not None and workload is not None
-        if metrics.failed_requests != 0:
+        if self.metrics.failed_requests != 0:
             raise ValueError("benchmark must not include failed requests")
-        if metrics.successful_requests != workload.num_requests:
+        if self.metrics.successful_requests != self.workload.num_requests:
             raise ValueError("benchmark request count must match workload.num_requests")
         return self
 
 
-class PresetValidationReplica(CoreModel):
-    resources: list[ResourcesSpec]
-
-
-class PresetValidation(CoreModel):
-    replicas: list[PresetValidationReplica]
-    benchmark: PresetBenchmark
+class PresetVerificationReplicaGroup(CoreModel):
+    # The service replica group this was measured for.
+    name: str
+    # One entry per replica that was running: its actual resources.
+    replicas: list[ResourcesSpec]
 
 
 class Preset(CoreModel):
-    base: str
+    """What was asked (`configuration`), what to deploy (`service`), and
+    the evidence it works (`verification_data`)."""
+
     id: str
     name: Optional[str] = None
-    model: str
+    configuration: PresetConfiguration
+    base: Annotated[str, Field(min_length=1)]
+    model: Annotated[str, Field(min_length=1)]
+    # The largest context the service was verified to serve.
     context_length: PositiveInt
-    trial: Optional[PositiveInt] = None
-    min_context_length: Optional[PositiveInt] = None
-    max_ttft: Optional[PositiveInt] = None
-    created_at: datetime
+    # The session's `trials/<n>` that won verification and became this preset.
+    best_trial: PositiveInt
+    submitted_at: datetime
+    # The service that passed verification, stripped of this machine's deployment
+    # choices; `apply` submits it with the user's own name, gateway, and profile.
     service: ServiceConfiguration
-    validations: list[PresetValidation]
-
-    @field_validator("base", "id", "model")
-    @classmethod
-    def validate_non_empty(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("value must be non-empty")
-        return value
+    benchmark: PresetBenchmark
+    # The hardware it was verified on: the actual resources of every running
+    # replica, by service replica group.
+    verified_on: list[PresetVerificationReplicaGroup]
 
     @model_validator(mode="after")
     def validate_preset(self) -> Self:
         service = self.service
-        validations = self.validations
-        if service is None or validations is None:
-            return self
         if service.model is None:
             raise ValueError("preset service must specify model")
         if any(group.resources is None for group in service.replica_groups):
             raise ValueError("preset service must specify resources")
-        if service.name is not None or service.gateway is not None:
-            raise ValueError("preset service must not specify name or gateway")
-        if any(getattr(service, field) is not None for field in ProfileParams.model_fields):
-            raise ValueError("preset service must not specify placement constraints")
-        if not validations:
-            raise ValueError("preset must include validation evidence")
-        for validation in validations:
-            if len(validation.replicas) != len(service.replica_groups):
-                raise ValueError(
-                    "preset validation replicas must match service replica group order"
-                )
-            if validation.benchmark.target is None or validation.benchmark.client is None:
-                raise ValueError("preset benchmark must specify target and client")
-            for replica_group in validation.replicas:
-                if not replica_group.resources:
-                    raise ValueError("preset validation replicas must specify resources")
-                for resources in replica_group.resources:
-                    _validate_exact_resources(resources)
+        for field in PRESET_EXCLUDED_FIELDS:
+            if getattr(service, field) is not None:
+                raise ValueError(f"preset service must not specify {field}")
+        if [group.name for group in self.verified_on] != [
+            group.name for group in service.replica_groups
+        ]:
+            raise ValueError("preset verification replica groups must match the service's")
+        for replica_group in self.verified_on:
+            if not replica_group.replicas:
+                raise ValueError("preset verification replica groups must not be empty")
+            for resources in replica_group.replicas:
+                _validate_exact_resources(resources)
         return self
 
 
@@ -177,19 +158,19 @@ class PresetListOutput(CoreModel):
 def _validate_exact_resources(resources: ResourcesSpec) -> None:
     cpu = resources.cpu
     if not _is_exact(cpu.count) or not _is_exact(resources.memory):
-        raise ValueError("preset validation resources must be exact")
+        raise ValueError("preset verification resources must be exact")
     if resources.disk is None or not _is_exact(resources.disk.size):
-        raise ValueError("preset validation resources must be exact")
+        raise ValueError("preset verification resources must be exact")
     gpu = resources.gpu
     if gpu is None or not _is_exact(gpu.count):
-        raise ValueError("preset validation resources must be exact")
+        raise ValueError("preset verification resources must be exact")
     if gpu.count.min == 0:
         return
     if gpu.name is None or len(gpu.name) != 1 or not _is_exact(gpu.memory):
-        raise ValueError("preset validation resources must be exact")
+        raise ValueError("preset verification resources must be exact")
 
 
-def _is_exact(value) -> bool:
+def _is_exact(value: Optional[Range]) -> bool:
     return (
         value is not None
         and value.min is not None

@@ -12,21 +12,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
+from dstack._internal.cli.models.preset_agent import PresetSessionWorkspace
 from dstack._internal.cli.services.presets.session import (
     _CONSTRAINTS_FILENAME,
     _FINAL_REPORT_FILENAME,
     _PROGRESS_FILENAME,
     _RUNS_FILENAME,
-    _SERVICE_DIRNAME,
-    _TRIALS_DIRNAME,
-    PresetAgentSession,
+    SERVICE_DIRNAME,
+    TRIALS_DIRNAME,
+    PresetSession,
 )
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 
 _SKILL_NAMES = ("dstack", "dstack-prototyping")
-_PROGRESS_ENV = "DSTACK_PRESET_PROGRESS_LOG"
+PROGRESS_ENV = "DSTACK_PRESET_PROGRESS_LOG"
 _MAX_RUN_NAME_LENGTH = 41
 _MAX_UNIX_SOCKET_PATH_BYTES = 103
 
@@ -54,11 +55,11 @@ class PresetAgentWorkspace:
 
     @property
     def trials_dir(self) -> Path:
-        return self.path / _TRIALS_DIRNAME
+        return self.path / TRIALS_DIRNAME
 
     @property
     def service_dir(self) -> Path:
-        return self.path / _SERVICE_DIRNAME
+        return self.path / SERVICE_DIRNAME
 
     @property
     def constraints_path(self) -> Path:
@@ -77,7 +78,9 @@ class PresetAgentWorkspace:
         return self.path / ".agent-stderr.log"
 
 
-def create_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
+def create_agent_workspace(
+    session: PresetSession,
+) -> tuple[PresetAgentWorkspace, PresetSessionWorkspace]:
     real = session.path / "workspace"
     try:
         real.mkdir(mode=0o700)
@@ -92,15 +95,16 @@ def create_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
         _prepare_workspace(workspace)
     except OSError as e:
         raise CLIError(f"Could not create the agent workspace under {real}: {e}") from e
-    session.update_manifest(workspace=str(real), alias=str(alias))
-    return workspace
+    return workspace, PresetSessionWorkspace(path=str(real), alias=str(alias))
 
 
-def attach_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
-    manifest = session.read_manifest()
-    real_value, alias_value = manifest.get("workspace"), manifest.get("alias")
-    if not real_value or not alias_value:
+def attach_agent_workspace(
+    session: PresetSession,
+) -> tuple[PresetAgentWorkspace, PresetSessionWorkspace]:
+    state = session.read_state()
+    if state is None or state.run is None:
         raise CLIError("The preset creation has no workspace to resume")
+    real_value, alias_value = state.run.workspace.path, state.run.workspace.alias
     real, alias = Path(real_value), Path(alias_value)
     if not real.is_dir():
         raise CLIError(
@@ -109,13 +113,16 @@ def attach_agent_workspace(session: PresetAgentSession) -> PresetAgentWorkspace:
         )
     if alias != real:
         _ensure_workspace_alias(alias, real)
-    return PresetAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
+    workspace = PresetAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
+    return workspace, state.run.workspace
 
 
-def remove_agent_workspace(session: PresetAgentSession) -> None:
-    manifest = session.read_manifest()
-    alias = manifest.get("alias")
-    workspace = manifest.get("workspace")
+def remove_agent_workspace(session: PresetSession) -> None:
+    state = session.read_state()
+    if state is None or state.run is None:
+        return
+    alias = state.run.workspace.alias
+    workspace = state.run.workspace.path
     if alias and alias != workspace and Path(alias).is_symlink():
         with suppress(OSError):
             os.unlink(alias)
@@ -123,11 +130,12 @@ def remove_agent_workspace(session: PresetAgentSession) -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def scrub_workspace_token(session: PresetAgentSession) -> None:
+def scrub_workspace_token(session: PresetSession) -> None:
     """The dstack config holds a live token; scrubbing it leaves an interrupted
     session with no on-disk credential, and resume re-mints it via
     `build_preset_agent_env`."""
-    workspace = session.read_manifest().get("workspace")
+    state = session.read_state()
+    workspace = state.run.workspace.path if state is not None and state.run else None
     if not workspace:
         return
     with suppress(OSError):
@@ -265,14 +273,14 @@ if not message and not sys.stdin.isatty():
 if not message:
     print("Usage: progress <message>", file=sys.stderr)
     raise SystemExit(2)
-path = Path(os.environ.get("{_PROGRESS_ENV}", "{_PROGRESS_FILENAME}"))
+path = Path(os.environ.get("{PROGRESS_ENV}", "{_PROGRESS_FILENAME}"))
 with path.open("a", encoding="utf-8") as f:
     f.write(json.dumps({{"message": message}}, ensure_ascii=False) + "\\n")
 """
 
 
 def install_previous_records(
-    workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetAgentSession]
+    workspace: PresetAgentWorkspace, previous_sessions: Sequence[PresetSession]
 ) -> None:
     """Remove-then-recopy, so a crashed partial copy heals on the next run."""
     for session in previous_sessions:
@@ -290,8 +298,8 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
             shutil.copyfile(source_root / name, target_root / name)
             copied = True
     for group, filenames in (
-        (_TRIALS_DIRNAME, ("trial.json", "task.dstack.yml")),
-        (_SERVICE_DIRNAME, ("service.dstack.yml", "verification.json")),
+        (TRIALS_DIRNAME, ("trial.json", "task.dstack.yml")),
+        (SERVICE_DIRNAME, ("service.dstack.yml", "verification.json")),
     ):
         source_group = source_root / group
         if not source_group.is_dir():
@@ -306,7 +314,7 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
                     shutil.copyfile(record_dir / name, target_dir / name)
                     copied = True
             patches = record_dir / "patches"
-            if group == _TRIALS_DIRNAME and patches.is_dir():
+            if group == TRIALS_DIRNAME and patches.is_dir():
                 shutil.copytree(patches, target_dir / "patches", dirs_exist_ok=True)
                 copied = True
     return copied

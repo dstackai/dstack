@@ -8,7 +8,7 @@ import uuid
 from contextlib import nullcontext, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Literal, Optional, Sequence
 
 import yaml
 from rich.table import Table
@@ -18,8 +18,17 @@ from dstack._internal.cli.models.configurations import (
     DEFAULT_DATASET,
     PresetConfiguration,
     PresetConstraints,
+    PresetDatasetConstraints,
+    PresetRandomConstraints,
 )
-from dstack._internal.cli.models.preset_agent import AgentFinalReport
+from dstack._internal.cli.models.preset_agent import (
+    PresetAgentFailure,
+    PresetAgentSuccess,
+    PresetSessionFinalize,
+    PresetSessionState,
+    PresetSessionStatus,
+    PresetSessionWorkspace,
+)
 from dstack._internal.cli.models.presets import Preset
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
@@ -30,7 +39,7 @@ from dstack._internal.cli.services.presets.agent import (
     run_preset_agent,
     terminate_agent_process,
 )
-from dstack._internal.cli.services.presets.presets import preset_to_data
+from dstack._internal.cli.services.presets.build import preset_to_yaml_dict
 from dstack._internal.cli.services.presets.prompt import get_preset_agent_system_prompt
 from dstack._internal.cli.services.presets.redaction import (
     contains_redacted_value,
@@ -39,17 +48,17 @@ from dstack._internal.cli.services.presets.redaction import (
     redact,
 )
 from dstack._internal.cli.services.presets.session import (
-    PresetAgentSession,
+    PresetSession,
     SessionBusyError,
     claimed_session_name,
-    create_preset_agent_session,
+    create_preset_session,
     find_session_name_claims,
-    iter_agent_sessions,
-    load_agent_session,
-    load_attachable_agent_session,
-    mark_session_owner,
+    iter_preset_sessions,
+    load_attachable_session,
+    load_preset_session,
     print_preset_progress,
     print_session_log,
+    process_alive,
     release_session_claim,
     resolve_session_ref,
     session_process_alive,
@@ -116,13 +125,13 @@ def follow_preset(
 
     Takes the exclusive finalize lock so a concurrent `logs -f` and reconcile
     can't both finalize the same session."""
-    agent_session = load_attachable_agent_session(preset_id)
-    agent_session.echo = echo
-    lock = try_claim_session(agent_session)
+    session = load_attachable_session(preset_id)
+    session.echo = echo
+    lock = try_claim_session(session)
     if lock is None:
         raise SessionBusyError(f"Preset {preset_id} is being finalized by another process")
     try:
-        configuration = _load_session_configuration(agent_session)
+        configuration = _load_session_configuration(session)
         try:
             result = asyncio.run(
                 _create_preset(
@@ -131,39 +140,39 @@ def follow_preset(
                     source_configuration=configuration,
                     store=store,
                     keep_service=keep_service,
-                    agent_session=agent_session,
-                    attach=True,
+                    session=session,
+                    mode="attach",
                     wait_for_run_stop=wait_for_run_stop,
                 )
             )
         except KeyboardInterrupt:
             # `logs -f` is a viewer: Ctrl+C detaches and leaves the agent
             # running (reconcile finalizes it later), never stops it.
-            _detach_agent_session(agent_session)
+            _detach_agent_session(session)
             raise
         except AgentExitedWithoutReport as e:
-            _stop_active_session_runs(api, agent_session)
-            _suspend_agent_session(agent_session)
+            _stop_active_session_runs(api, session)
+            _suspend_agent_session(session)
             raise CLIError(str(e)) from e
         except CLIError:
             # A CLIError is definitive (bad report, unverifiable service, leaked
             # secret): the preset cannot be built, so fail it.
-            _close_agent_session(agent_session, "failed")
+            _close_agent_session(session, "failed")
             raise
         # A transient error (network / OS) propagates untouched: the completed
         # session and its report stay intact for a later follow or reconcile.
-        _close_agent_session(agent_session, "success")
+        _close_agent_session(session, "success")
         return result
     finally:
         release_session_claim(lock)
 
 
-def _load_session_configuration(agent_session: PresetAgentSession) -> PresetConfiguration:
-    configuration_path = agent_session.path / "preset.dstack.yml"
+def _load_session_configuration(session: PresetSession) -> PresetConfiguration:
+    configuration_path = session.path / "preset.dstack.yml"
     if not configuration_path.is_file():
         raise CLIError(
-            f"Preset {agent_session.preset_id} has no saved configuration and cannot be"
-            f" followed; resume it with --resume {agent_session.preset_id} instead"
+            f"Preset {session.preset_id} has no saved configuration and cannot be"
+            f" followed; resume it with --resume {session.preset_id} instead"
         )
     try:
         return PresetConfiguration.model_validate(
@@ -181,9 +190,9 @@ def show_preset_session_logs(
     follow: bool,
     keep_service: bool,
 ) -> Optional[PresetCreateResult]:
-    session = load_agent_session(preset_id)
-    status = session.read_manifest().get("status")
-    if not follow or status in ("success", "failed", "interrupted"):
+    session = load_preset_session(preset_id)
+    state = session.read_state()
+    if not follow or state is None or state.status in ("success", "failed", "interrupted"):
         print_session_log(session)
         return None
     print_session_log(session)
@@ -201,7 +210,7 @@ def show_preset_session_logs(
         return None
 
 
-def _follow_session_log_readonly(session: PresetAgentSession) -> None:
+def _follow_session_log_readonly(session: PresetSession) -> None:
     try:
         offset = session.log_path.stat().st_size
     except OSError:
@@ -216,10 +225,10 @@ def _follow_session_log_readonly(session: PresetAgentSession) -> None:
             chunk = ""
         if chunk:
             console.print(Text(chunk.rstrip("\n")), soft_wrap=True)
-        manifest = session.read_manifest()
-        if manifest.get("status") in ("success", "failed", "interrupted"):
+        state = session.read_state()
+        if state is None or state.status in ("success", "failed", "interrupted"):
             return
-        if not chunk and not session_process_alive(manifest):
+        if not chunk and not session_process_alive(state):
             # The owner died without recording a terminal status; stop tailing
             # rather than poll forever.
             console.print(
@@ -236,27 +245,30 @@ def reconcile_detached_sessions(store: PresetStore) -> None:
 
     Best-effort and parallel-safe: finalize takes an exclusive claim, and every
     error is swallowed so the calling read command never fails."""
-    for session in iter_agent_sessions():
-        if _is_reconcilable(session.read_manifest()):
+    for session in iter_preset_sessions():
+        if _is_reconcilable(session.read_state()):
             _reconcile_session(session, store)
 
 
-def _is_reconcilable(manifest: dict[str, Any]) -> bool:
+def _is_reconcilable(state: Optional[PresetSessionState]) -> bool:
     # An orphaned session (no live owner) whose agent left a completion report.
     # Sessions created before finalize context was persisted lack `project` and
     # are skipped — they finalize interactively via `logs -f`.
     return (
-        manifest.get("status") == "running"
-        and bool(manifest.get("project"))
-        and session_report_exists(manifest)
-        and not session_process_alive(manifest)
+        state is not None
+        and state.status == "running"
+        and state.run is not None
+        and session_report_exists(state)
+        and not session_process_alive(state)
     )
 
 
-def _reconcile_session(session: PresetAgentSession, store: PresetStore) -> None:
-    manifest = session.read_manifest()
+def _reconcile_session(session: PresetSession, store: PresetStore) -> None:
+    state = session.read_state()
+    if state is None or state.run is None:
+        return
     try:
-        api = Client.from_config(project_name=str(manifest.get("project") or ""))
+        api = Client.from_config(project_name=state.run.finalize.project)
     except Exception:  # noqa: BLE001 — offline/misconfigured must not break the read command
         return
     # follow_preset records the terminal status and is claim-safe; suppress every
@@ -266,16 +278,18 @@ def _reconcile_session(session: PresetAgentSession, store: PresetStore) -> None:
             api=api,
             store=store,
             preset_id=session.preset_id,
-            keep_service=bool(manifest.get("keep_service")),
+            keep_service=state.run.finalize.keep_service,
             wait_for_run_stop=False,
             echo=False,
         )
 
 
 def stop_preset_session(api: Client, preset_id: str) -> None:
-    session = load_agent_session(preset_id)
-    manifest = session.read_manifest()
-    status = manifest.get("status")
+    session = load_preset_session(preset_id)
+    state = session.read_state()
+    if state is None:
+        raise CLIError(f"Preset {preset_id} session state is unreadable")
+    status = state.status
     if status == "success":
         console.print(f"Preset [code]{preset_id}[/] is already created")
         return
@@ -285,14 +299,14 @@ def stop_preset_session(api: Client, preset_id: str) -> None:
     if status == "interrupted":
         console.print(f"Preset [code]{preset_id}[/] creation was interrupted.")
         return
-    if session_report_exists(manifest) and not session_process_alive(manifest):
+    if session_report_exists(state) and not session_process_alive(state):
         # The agent already finished; finalize like reconcile would instead of
         # leaving a not-yet-saved intermediate state behind.
         follow_preset(
             api=api,
             store=PresetStore(),
             preset_id=preset_id,
-            keep_service=bool(manifest.get("keep_service")),
+            keep_service=state.run.finalize.keep_service if state.run else False,
             echo=False,
         )
         console.print(f"Preset [code]{preset_id}[/] is already created")
@@ -300,12 +314,12 @@ def stop_preset_session(api: Client, preset_id: str) -> None:
     # Stop wins, like `dstack stop`: record the intent first so a live owner's
     # retry loop exits instead of resurrecting the agent, then terminate.
     _finish_agent_session(session, "interrupted")
-    terminate_agent_process(manifest)
+    terminate_agent_process(state.run.agent if state.run else None)
     _stop_active_session_runs(api, session)
     _suspend_agent_session(session)
 
 
-def _stop_active_session_runs(api: Client, session: PresetAgentSession) -> None:
+def _stop_active_session_runs(api: Client, session: PresetSession) -> None:
     names = _load_submitted_run_names(session.runs_path)
     active = []
     for name in names:
@@ -342,24 +356,26 @@ def _resolve_preset_env(
     return configuration
 
 
-def resolve_previous_sessions(refs: Sequence[str]) -> tuple[PresetAgentSession, ...]:
-    sessions: list[PresetAgentSession] = []
+def resolve_previous_sessions(refs: Sequence[str]) -> tuple[PresetSession, ...]:
+    sessions: list[PresetSession] = []
     for ref in refs:
         try:
-            session = load_agent_session(resolve_session_ref(ref))
+            session = load_preset_session(resolve_session_ref(ref))
         except CLIError:
             raise CLIError(f"Previous session {ref!r} does not exist")
         if all(existing.preset_id != session.preset_id for existing in sessions):
             sessions.append(session)
     included = {session.preset_id for session in sessions}
     for session in sessions:
-        manifest = session.read_manifest()
-        if manifest.get("status") == "running" and session_process_alive(manifest):
+        state = session.read_state()
+        if state is None:
+            raise CLIError(f"Previous session {session.preset_id} state is unreadable")
+        if state.status == "running" and session_process_alive(state):
             raise CLIError(
                 f"Previous session {session.preset_id} is still running;"
                 " wait for it to finish or stop it"
             )
-        for parent in manifest.get("previous") or []:
+        for parent in state.previous:
             if parent not in included:
                 warn(
                     f"{session.preset_id} was created with --previous {parent},"
@@ -368,11 +384,11 @@ def resolve_previous_sessions(refs: Sequence[str]) -> tuple[PresetAgentSession, 
     return tuple(sessions)
 
 
-def _load_pinned_previous_sessions(ids: Sequence[str]) -> tuple[PresetAgentSession, ...]:
+def _load_pinned_previous_sessions(ids: Sequence[str]) -> tuple[PresetSession, ...]:
     sessions = []
     for preset_id in ids:
         try:
-            sessions.append(load_agent_session(preset_id))
+            sessions.append(load_preset_session(preset_id))
         except CLIError:
             warn(f"Previous session {preset_id} no longer exists; keeping its copied records")
     return tuple(sessions)
@@ -386,12 +402,16 @@ def create_preset(
     keep_service: bool = False,
     build_name: Optional[str] = None,
     debug: bool = False,
-    resume_session: Optional[PresetAgentSession] = None,
+    resume_session: Optional[PresetSession] = None,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
-    previous: Sequence[PresetAgentSession] = (),
+    previous: Sequence[PresetSession] = (),
 ) -> PresetCreateResult:
-    agent_session = resume_session or create_preset_agent_session(configuration, debug=debug)
+    session = resume_session or create_preset_session(
+        configuration,
+        previous=tuple(session.preset_id for session in previous),
+        debug=debug,
+    )
     try:
         resolved_configuration = _resolve_preset_env(configuration)
         result = asyncio.run(
@@ -402,23 +422,23 @@ def create_preset(
                 store=store,
                 keep_service=keep_service,
                 build_name=build_name,
-                agent_session=agent_session,
-                resume=resume_session is not None,
+                session=session,
+                mode="resume" if resume_session is not None else "fresh",
                 user_prompt=user_prompt,
                 allowed_fleets=allowed_fleets,
                 previous=previous,
             )
         )
     except KeyboardInterrupt:
-        _stop_or_detach_agent_session(agent_session, api)
+        _stop_or_detach_agent_session(session, api)
         raise
     except CreationStopped:
         # The stopping CLI already suspended the session.
         raise
     except BaseException:
-        _close_agent_session(agent_session, "failed")
+        _close_agent_session(session, "failed")
         raise
-    _close_agent_session(agent_session, "success")
+    _close_agent_session(session, "success")
     return result
 
 
@@ -429,6 +449,7 @@ class _CreationSetup:
 
     auth: Optional[ClaudeAuth]
     workspace: PresetAgentWorkspace
+    workspace_record: PresetSessionWorkspace
     build_name: str
     allowed_fleets: tuple[str, ...]
     user_prompt: Optional[str]
@@ -440,28 +461,28 @@ class _CreationSetup:
 def _fresh_setup(
     api: Client,
     configuration: PresetConfiguration,
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     build_name: Optional[str],
     allowed_fleets: Optional[tuple[str, ...]],
     user_prompt: Optional[str],
-    previous: Sequence[PresetAgentSession] = (),
+    previous: Sequence[PresetSession],
 ) -> _CreationSetup:
     if allowed_fleets is None:
         allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
         raise CLIError(_NO_FLEETS_ERROR)
     auth = get_claude_auth()
-    workspace = create_agent_workspace(agent_session)
+    workspace, workspace_record = create_agent_workspace(session)
     previous_ids = tuple(session.preset_id for session in previous)
     if previous_ids:
-        agent_session.update_manifest(previous=list(previous_ids))
         install_previous_records(workspace, previous)
     build_name = build_name or _get_build_name(
-        configuration.name, configuration.model.api_model_name, agent_session.preset_id
+        configuration.name, configuration.model.api_model_name, session.preset_id
     )
     return _CreationSetup(
         auth=auth,
         workspace=workspace,
+        workspace_record=workspace_record,
         build_name=build_name,
         allowed_fleets=allowed_fleets,
         user_prompt=user_prompt,
@@ -472,33 +493,32 @@ def _fresh_setup(
 
 
 def _resume_setup(
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     build_name: Optional[str],
     user_prompt: Optional[str],
 ) -> _CreationSetup:
     # The prompt is fixed at session creation, like the constraints.
-    pinned_prompt = agent_session.read_user_prompt()
+    pinned_prompt = session.read_user_prompt()
     if user_prompt is not None and user_prompt != pinned_prompt:
         warn(
             "The configuration prompt is ignored when resuming: the preset keeps its original prompt"
         )
     user_prompt = pinned_prompt
     auth = get_claude_auth()
-    workspace = attach_agent_workspace(agent_session)
-    manifest = agent_session.read_manifest()
-    claude_model = manifest.get("claude_model")
-    if isinstance(claude_model, str) and claude_model:
-        auth = dataclasses.replace(auth, model=claude_model)
-    initial_resume_session_id: Optional[str] = None
-    claude_session_id = manifest.get("claude_session_id")
-    if isinstance(claude_session_id, str) and claude_session_id:
-        initial_resume_session_id = claude_session_id
-    previous_ids = tuple(manifest.get("previous") or [])
+    workspace, workspace_record = attach_agent_workspace(session)
+    state = session.read_state()
+    if state is None or state.run is None:
+        raise CLIError(f"Preset {session.preset_id} session state is unreadable")
+    if state.run.claude_model:
+        auth = dataclasses.replace(auth, model=state.run.claude_model)
+    initial_resume_session_id = state.run.claude_session_id
+    previous_ids = tuple(state.previous)
     if previous_ids:
         install_previous_records(workspace, _load_pinned_previous_sessions(previous_ids))
     return _CreationSetup(
         auth=auth,
         workspace=workspace,
+        workspace_record=workspace_record,
         build_name=build_name or _load_build_name(workspace),
         allowed_fleets=(),
         user_prompt=user_prompt,
@@ -509,19 +529,20 @@ def _resume_setup(
 
 
 def _attach_setup(
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     build_name: Optional[str],
 ) -> _CreationSetup:
-    workspace = attach_agent_workspace(agent_session)
+    workspace, workspace_record = attach_agent_workspace(session)
     return _CreationSetup(
         auth=None,
         workspace=workspace,
+        workspace_record=workspace_record,
         build_name=build_name or _load_build_name(workspace),
         allowed_fleets=(),
         user_prompt=None,
         initial_resume_session_id=None,
         write_constraints=False,
-        previous=tuple(agent_session.read_manifest().get("previous") or []),
+        previous=_read_previous_ids(session),
     )
 
 
@@ -530,38 +551,35 @@ async def _create_preset(
     api: Client,
     configuration: PresetConfiguration,
     store: PresetStore,
-    source_configuration: Optional[PresetConfiguration] = None,
+    source_configuration: PresetConfiguration,
     keep_service: bool = False,
     build_name: Optional[str] = None,
-    agent_session: PresetAgentSession,
-    resume: bool = False,
-    attach: bool = False,
+    session: PresetSession,
+    mode: Literal["fresh", "resume", "attach"] = "fresh",
     wait_for_run_stop: bool = True,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
-    previous: Sequence[PresetAgentSession] = (),
+    previous: Sequence[PresetSession] = (),
 ) -> PresetCreateResult:
-    source_configuration = source_configuration or configuration
-    if attach:
-        setup = _attach_setup(agent_session, build_name)
-    elif resume:
-        setup = _resume_setup(agent_session, build_name, user_prompt)
+    if mode == "attach":
+        setup = _attach_setup(session, build_name)
+    elif mode == "resume":
+        setup = _resume_setup(session, build_name, user_prompt)
     else:
         setup = _fresh_setup(
-            api, configuration, agent_session, build_name, allowed_fleets, user_prompt, previous
+            api, configuration, session, build_name, allowed_fleets, user_prompt, previous
         )
-    # Record ownership + the finalize context (project, keep-service) so a later
-    # detached reconcile can complete this session from disk alone.
-    mark_session_owner(
-        agent_session,
-        project=api.project,
-        keep_service=keep_service,
+    # Take ownership and record the run whole: workspace, finalize context, and
+    # the model pin, so a later detached reconcile or resume works from disk alone.
+    session.begin_run(
+        workspace=setup.workspace_record,
+        finalize=PresetSessionFinalize(project=api.project, keep_service=keep_service),
         claude_model=setup.auth.model if setup.auth is not None else None,
     )
 
     preset_env = configuration.env.as_dict()
-    token = getattr(api.client, "_token", None)
-    if not isinstance(token, str) or not token:
+    token = api.client.token
+    if not token:
         raise CLIError("The configured dstack client has no authentication token")
     redacted_values = get_redacted_values(
         [
@@ -572,7 +590,7 @@ async def _create_preset(
         ]
     )
     env: dict[str, str] = {}
-    report: Optional[AgentFinalReport] = None
+    report: Optional[PresetAgentSuccess] = None
     preset: Optional[Preset] = None
     preset_path: Optional[Path] = None
     creation_succeeded = False
@@ -589,12 +607,12 @@ async def _create_preset(
     prompt = get_preset_agent_system_prompt(
         user_prompt=setup.user_prompt,
         baseline=configuration.effective_baseline,
-        previous=", ".join(setup.previous) if setup.previous else None,
+        previous=setup.previous,
         custom_dataset=configuration.effective_dataset != DEFAULT_DATASET,
     )
     if setup.write_constraints:
         if setup.user_prompt:
-            agent_session.write_user_prompt(setup.user_prompt)
+            session.write_user_prompt(setup.user_prompt)
         constraints_text = _build_constraints(
             configuration=configuration,
             build_name=setup.build_name,
@@ -603,19 +621,19 @@ async def _create_preset(
         setup.workspace.constraints_path.write_text(constraints_text, encoding="utf-8")
         # A second, persistent copy: the workspace above is deleted with the run,
         # while the listing and `--previous` read constraints from the session dir.
-        agent_session.write_constraints(constraints_text)
-        if agent_session.debug:
-            agent_session.write_prompt(prompt)
+        session.write_constraints(constraints_text)
+        if session.debug:
+            session.write_prompt(prompt)
             if setup.auth is not None:
-                agent_session.write_agent_info(setup.auth)
+                session.write_agent_info(setup.auth)
     try:
-        if attach:
+        if mode == "attach":
             process_output = await attach_preset_agent(
                 workspace=setup.workspace,
                 redacted_values=redacted_values,
-                agent_session=agent_session,
+                session=session,
             )
-            _raise_if_externally_stopped(agent_session, process_output)
+            _raise_if_externally_stopped(session, process_output)
             if (
                 process_output.report_data is None
                 and not setup.workspace.final_report_path.exists()
@@ -629,26 +647,30 @@ async def _create_preset(
                 workspace=setup.workspace,
                 auth=setup.auth,
                 redacted_values=redacted_values,
-                agent_session=agent_session,
+                session=session,
                 initial_resume_session_id=setup.initial_resume_session_id,
             )
-            _raise_if_externally_stopped(agent_session, process_output)
-        report = load_preset_agent_report(
+            _raise_if_externally_stopped(session, process_output)
+        result = load_preset_agent_report(
             output=process_output,
             workspace=setup.workspace,
             redacted_values=redacted_values,
         )
+        if isinstance(result, PresetAgentFailure):
+            raise CLIError(result.failure_summary or "Claude did not create a preset")
+        report = result
         run = api.client.runs.get(api.project, report.run_name)
         preset = build_verified_preset(
             run=run,
             preset_configuration=source_configuration,
             report=report,
             workspace_path=setup.workspace.path,
-            session_path=agent_session.path,
-            preset_id=agent_session.preset_id or None,
-            name=claimed_session_name(agent_session.read_manifest()),
+            session_path=session.path,
+            preset_id=session.preset_id,
+            name=_read_claimed_name(session),
+            submitted_at=session.created_at,
         )
-        if contains_redacted_value(preset_to_data(preset), redacted_values):
+        if contains_redacted_value(preset_to_yaml_dict(preset), redacted_values):
             raise CLIError("Generated preset contains a secret value")
         preset_path = store.save(preset)
         creation_succeeded = True
@@ -656,10 +678,10 @@ async def _create_preset(
         interrupted = True
         raise
     finally:
-        if agent_session.debug:
+        if session.debug:
             _save_final_report_copy(
                 workspace=setup.workspace,
-                agent_session=agent_session,
+                session=session,
                 redacted_values=redacted_values,
             )
         if not interrupted:
@@ -671,7 +693,7 @@ async def _create_preset(
                     workspace=setup.workspace,
                     final_run_name=report.run_name if report is not None else None,
                     keep_final_service=keep_final_service,
-                    agent_session=agent_session,
+                    session=session,
                     wait_for_stop=wait_for_run_stop,
                 )
             except Exception as e:
@@ -680,7 +702,7 @@ async def _create_preset(
     if cleanup_error is not None:
         # The preset is already saved; a failed cleanup only means trial runs may
         # still be running. Warn rather than fail — else a blip discards the work.
-        if agent_session.echo:
+        if session.echo:
             warn(f"Failed to stop preset creation runs: {cleanup_error}")
     assert preset is not None
     assert preset_path is not None
@@ -695,16 +717,27 @@ async def _create_preset(
     )
 
 
+def _read_previous_ids(session: PresetSession) -> tuple[str, ...]:
+    state = session.read_state()
+    return tuple(state.previous) if state is not None else ()
+
+
+def _read_claimed_name(session: PresetSession) -> Optional[str]:
+    state = session.read_state()
+    return claimed_session_name(state) if state is not None else None
+
+
 def _raise_if_externally_stopped(
-    session: PresetAgentSession, output: "PresetAgentProcessOutput"
+    session: PresetSession, output: "PresetAgentProcessOutput"
 ) -> None:
-    if output.report_data is None and session.read_manifest().get("status") == "interrupted":
+    state = session.read_state()
+    if output.report_data is None and state is not None and state.status == "interrupted":
         raise CreationStopped
 
 
 def _finish_agent_session(
-    session: PresetAgentSession,
-    status: str,
+    session: PresetSession,
+    status: PresetSessionStatus,
 ) -> None:
     try:
         session.finish(status)
@@ -713,24 +746,22 @@ def _finish_agent_session(
             warn(f"Could not finalize agent output. Files remain at {session.path}: {e}")
 
 
-def _close_agent_session(session: PresetAgentSession, status: str) -> None:
+def _close_agent_session(session: PresetSession, status: Literal["success", "failed"]) -> None:
     _finish_agent_session(session, status)
     remove_agent_workspace(session)
 
 
-def _detach_agent_session(session: PresetAgentSession) -> None:
+def _detach_agent_session(session: PresetSession) -> None:
     """Releases ownership but leaves the agent running (still reconcilable in
     `dstack preset`), and stays silent since `logs -f` calls this on Ctrl+C."""
-    session.update_manifest(pid=None)
+    session.detach()
 
 
-def _stop_or_detach_agent_session(
-    session: PresetAgentSession, api: Optional[Client] = None
-) -> None:
+def _stop_or_detach_agent_session(session: PresetSession, api: Client) -> None:
     """`create` interrupt: stop the session, or detach and leave the agent
     working as a running session in `dstack preset`."""
-    manifest = session.read_manifest()
-    agent_alive = session_process_alive({**manifest, "pid": None})
+    state = session.read_state()
+    agent_alive = state is not None and state.run is not None and process_alive(state.run.agent)
     stop = True
     if agent_alive:
         try:
@@ -744,13 +775,13 @@ def _stop_or_detach_agent_session(
             f" or stop with [code]dstack preset stop {session.preset_id}[/]."
         )
         return
-    terminate_agent_process(manifest)
-    if api is not None:
-        _stop_active_session_runs(api, session)
+    if state is not None:
+        terminate_agent_process(state.run.agent if state.run else None)
+    _stop_active_session_runs(api, session)
     _suspend_agent_session(session)
 
 
-def _suspend_agent_session(session: PresetAgentSession) -> None:
+def _suspend_agent_session(session: PresetSession) -> None:
     try:
         session.finish("interrupted")
     except OSError as e:
@@ -797,7 +828,7 @@ class PresetNameHolders:
 
     name: str
     preset: Optional[Preset]
-    sessions: list[PresetAgentSession]
+    sessions: list[PresetSession]
 
     @property
     def preset_ids(self) -> list[str]:
@@ -820,7 +851,7 @@ def reassign_preset_name(store: PresetStore, holders: PresetNameHolders) -> None
     if holders.preset is not None:
         store.release_name(holders.name)
     for session in holders.sessions:
-        session.update_manifest(name=None)
+        session.release_name()
 
 
 def plan_preset(*, api: Client, configuration: PresetConfiguration) -> tuple[str, ...]:
@@ -883,42 +914,48 @@ def _build_constraints(
     allowed_fleets: Sequence[str],
 ) -> str:
     dataset = configuration.effective_dataset
-    constraints = PresetConstraints.model_validate(
-        {
-            "run_name_prefix": build_name,
-            "model": json.loads(configuration.model.model_dump_json(exclude_none=True)),
-            "min_context_length": configuration.min_context_length,
-            "max_ttft": configuration.max_ttft,
-            "trials_num": configuration.trials,
-            "concurrency": configuration.concurrency,
-            **(
-                {
-                    "input_tokens": configuration.effective_input_tokens,
-                    "output_tokens": configuration.effective_output_tokens,
-                    "shared_prefix_tokens": configuration.shared_prefix_tokens or 0,
-                }
-                if dataset == DEFAULT_DATASET
-                else {"dataset": dataset}
-            ),
-            "baseline": configuration.effective_baseline,
-            "fleets": list(allowed_fleets),
-            "env": list(configuration.env),
-        }
-    )
-    return json.dumps(json.loads(constraints.model_dump_json(exclude_none=True)), indent=2) + "\n"
+    if dataset == DEFAULT_DATASET:
+        constraints: PresetConstraints = PresetRandomConstraints(
+            run_name_prefix=build_name,
+            model=configuration.model,
+            min_context_length=configuration.min_context_length,
+            max_ttft=configuration.max_ttft,
+            trials_num=configuration.trials,
+            concurrency=configuration.concurrency,
+            input_tokens=configuration.effective_input_tokens,
+            output_tokens=configuration.effective_output_tokens,
+            shared_prefix_tokens=configuration.shared_prefix_tokens or 0,
+            baseline=configuration.effective_baseline,
+            fleets=list(allowed_fleets),
+            env=list(configuration.env),
+        )
+    else:
+        constraints = PresetDatasetConstraints(
+            run_name_prefix=build_name,
+            model=configuration.model,
+            min_context_length=configuration.min_context_length,
+            max_ttft=configuration.max_ttft,
+            trials_num=configuration.trials,
+            concurrency=configuration.concurrency,
+            dataset=dataset,
+            baseline=configuration.effective_baseline,
+            fleets=list(allowed_fleets),
+            env=list(configuration.env),
+        )
+    return constraints.model_dump_json(exclude_none=True, indent=2) + "\n"
 
 
 def _save_final_report_copy(
     *,
     workspace: PresetAgentWorkspace,
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     redacted_values: Sequence[str],
 ) -> None:
     if not workspace.final_report_path.exists():
         return
     try:
         report_text = workspace.final_report_path.read_text(encoding="utf-8", errors="replace")
-        agent_session.write_final_report(redact(report_text, redacted_values))
+        session.write_final_report(redact(report_text, redacted_values))
     except OSError as e:
         warn(f"Could not save a final report copy: {e}")
 
@@ -929,7 +966,7 @@ async def _cleanup_runs(
     build_name: str,
     workspace: PresetAgentWorkspace,
     final_run_name: Optional[str],
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     keep_final_service: bool = False,
     wait_for_stop: bool = True,
 ) -> None:
@@ -956,7 +993,7 @@ async def _cleanup_runs(
     deadline = asyncio.get_running_loop().time() + _RUN_STOP_TIMEOUT_SECONDS
     pending = set(active_names)
     # Without a spinner the CLI looks hung while the runs terminate.
-    spinner = console.status("Stopping runs...") if agent_session.echo else nullcontext()
+    spinner = console.status("Stopping runs...") if session.echo else nullcontext()
     with spinner:
         while pending:
             if asyncio.get_running_loop().time() >= deadline:
@@ -967,8 +1004,8 @@ async def _cleanup_runs(
                     pending.remove(name)
             if pending:
                 await asyncio.sleep(2)
-    if agent_session.debug:
-        print_preset_progress("All preset creation runs stopped.", agent_session=agent_session)
+    if session.debug:
+        print_preset_progress("All preset creation runs stopped.", session=session)
 
 
 def _load_submitted_run_names(path: Path) -> list[str]:

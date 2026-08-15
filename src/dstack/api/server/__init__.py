@@ -148,6 +148,10 @@ class APIClient:
     def events(self) -> EventsAPIClient:
         return EventsAPIClient(self._request, self._logger)
 
+    @property
+    def token(self) -> Optional[str]:
+        return self._token
+
     def get_token_hash(self) -> str:
         if self._token is None:
             raise ValueError("Token not set")

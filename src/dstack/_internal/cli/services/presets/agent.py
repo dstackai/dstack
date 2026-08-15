@@ -9,38 +9,46 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Optional, Sequence
+from typing import Any, AsyncIterator, Callable, Literal, Optional, Sequence, get_args
 
 import psutil
+from pydantic import ValidationError
 
-from dstack._internal.cli.models.preset_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
+from dstack._internal.cli.models.preset_agent import (
+    AnyClaudeStreamEvent,
+    ClaudeResultEvent,
+    PresetAgentFailure,
+    PresetAgentSuccess,
+    PresetSessionProcess,
+)
 from dstack._internal.cli.services.presets.redaction import redact, redact_structure
 from dstack._internal.cli.services.presets.session import (
-    PresetAgentSession,
-    _pid_alive,
-    _pid_running,
-    _process_started_at,
+    PresetSession,
+    pid_running,
     print_preset_progress,
+    process_alive,
+    process_started_at,
 )
 from dstack._internal.cli.services.presets.tail import (
-    _DirectoryMirror,
-    _FileLineReader,
-    _OffsetStore,
-    _ProgressTailer,
-    _RecordMirror,
+    DirectoryMirror,
+    FileLineReader,
+    OffsetStore,
+    ProgressTailer,
+    RecordMirror,
     open_session_offsets,
 )
 from dstack._internal.cli.services.presets.workspace import (
-    _PROGRESS_ENV,
+    PROGRESS_ENV,
     PresetAgentWorkspace,
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
 _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
-_CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
+ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
 _TERMINATE_GRACE_SECONDS = 3
 _RESUME_PROMPT = (
@@ -81,7 +89,8 @@ _WINDOWS_INHERITED_ENV_NAMES = (
 class ClaudeAuth:
     api_key: Optional[str]
     executable: str
-    effort: Optional[str]
+    # None uses the claude CLI's own default.
+    effort: Optional[ClaudeEffort]
     model: str
 
 
@@ -106,9 +115,9 @@ def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
         return None
 
 
-def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
+def _get_claude_auth_status(auth: "ClaudeAuth") -> str:
     if auth.api_key:
-        return {"authMethod": "api-key"}
+        return "api-key"
     try:
         result = subprocess.run(
             [auth.executable, "auth", "status", "--json"],
@@ -116,12 +125,9 @@ def _get_claude_auth_status(auth: "ClaudeAuth") -> dict[str, Any]:
             text=True,
             timeout=15,
         )
-        status = json.loads(result.stdout)
-        if isinstance(status, dict):
-            return status
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        pass
-    return {"authMethod": "unknown"}
+        return result.stdout.strip() or "unknown"
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
 
 
 def get_claude_auth() -> ClaudeAuth:
@@ -131,9 +137,9 @@ def get_claude_auth() -> ClaudeAuth:
     if executable is None:
         raise CLIError(f"Claude executable not found: {configured_path}")
     effort = os.getenv("DSTACK_AGENT_CLAUDE_EFFORT") or None
-    if effort is not None and effort not in _CLAUDE_EFFORT_LEVELS:
+    if effort is not None and effort not in get_args(ClaudeEffort):
         raise CLIError(
-            f"DSTACK_AGENT_CLAUDE_EFFORT must be one of: {', '.join(_CLAUDE_EFFORT_LEVELS)}"
+            f"DSTACK_AGENT_CLAUDE_EFFORT must be one of: {', '.join(get_args(ClaudeEffort))}"
         )
     return ClaudeAuth(
         api_key=api_key,
@@ -169,7 +175,7 @@ def build_preset_agent_env(
     env["DSTACK_SERVER_URL"] = api.client.base_url
     env["DSTACK_PROJECT"] = api.project
     env["DSTACK_TOKEN"] = token
-    env[_PROGRESS_ENV] = str(workspace.progress_path)
+    env[PROGRESS_ENV] = str(workspace.progress_path)
     for name in ["TMPDIR", "TEMP", "TMP"]:
         env[name] = str(workspace.temp_path)
     # Sandbox the agent's Claude config under the workspace home when we pass our
@@ -194,13 +200,13 @@ async def run_preset_agent(
     workspace: PresetAgentWorkspace,
     auth: ClaudeAuth,
     redacted_values: Sequence[str],
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     initial_resume_session_id: Optional[str] = None,
 ) -> PresetAgentProcessOutput:
-    offset_store = open_session_offsets(agent_session)
+    offset_store = open_session_offsets(session)
     async with _session_tailers(
         workspace=workspace,
-        agent_session=agent_session,
+        session=session,
         redacted_values=redacted_values,
         offset_store=offset_store,
     ):
@@ -217,7 +223,7 @@ async def run_preset_agent(
                 env=env,
                 workspace=workspace,
                 redacted_values=redacted_values,
-                agent_session=agent_session,
+                session=session,
                 offset_store=offset_store,
             )
             if output.report_data is None and returncode != 0:
@@ -232,7 +238,8 @@ async def run_preset_agent(
             if output.made_progress:
                 retry_delays = list(_RESUME_DELAYS_SECONDS)
             # Another process marked this session interrupted; don't restart it.
-            if agent_session.read_manifest().get("status") == "interrupted":
+            state = session.read_state()
+            if state is not None and state.status == "interrupted":
                 return output
             if not retry_delays:
                 return output
@@ -246,7 +253,7 @@ async def run_preset_agent(
                 action = "retrying"
             print_preset_progress(
                 f"Agent process exited without a report; {action} in {delay}s.",
-                agent_session=agent_session,
+                session=session,
             )
             await asyncio.sleep(delay)
 
@@ -258,8 +265,8 @@ async def _run_claude_process(
     env: dict[str, str],
     workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
-    agent_session: PresetAgentSession,
-    offset_store: _OffsetStore,
+    session: PresetSession,
+    offset_store: OffsetStore,
 ) -> tuple[PresetAgentProcessOutput, int]:
     proc: Optional[asyncio.subprocess.Process] = None
     try:
@@ -283,8 +290,8 @@ async def _run_claude_process(
                 # CreateProcess on Windows (WinError 87).
                 close_fds=True,
             )
-        agent_session.update_manifest(
-            agent_pid=proc.pid, agent_started_at=_process_started_at(proc.pid)
+        session.record_agent(
+            PresetSessionProcess(pid=proc.pid, started_at=process_started_at(proc.pid))
         )
         assert proc.stdin is not None
         proc.stdin.write(prompt.encode())
@@ -298,7 +305,7 @@ async def _run_claude_process(
         collect_task = asyncio.create_task(
             _collect_agent_output(
                 workspace=workspace,
-                agent_session=agent_session,
+                session=session,
                 redacted_values=redacted_values,
                 is_alive=agent_alive,
                 offset_store=offset_store,
@@ -326,9 +333,7 @@ async def _run_claude_process(
     return output, returncode
 
 
-def _build_claude_command(
-    *, auth: ClaudeAuth, resume_session_id: Optional[str] = None
-) -> list[str]:
+def _build_claude_command(*, auth: ClaudeAuth, resume_session_id: Optional[str]) -> list[str]:
     command = [
         auth.executable,
         "-p",
@@ -346,7 +351,7 @@ def _build_claude_command(
         "--model",
         auth.model,
         "--json-schema",
-        json.dumps(AGENT_FINAL_REPORT_JSON_SCHEMA),
+        json.dumps(_get_report_json_schema()),
     ]
     if auth.api_key is None:
         command[2:2] = ["--setting-sources", "project,local"]
@@ -371,9 +376,9 @@ def _prepare_subprocess_command(command: list[str]) -> list[str]:
 
 
 def _write_debug_trace(
-    session: PresetAgentSession,
+    session: PresetSession,
     *,
-    stream_name: str,
+    stream_name: Literal["stdout", "stderr"],
     text: str,
     redacted_values: Sequence[str],
 ) -> None:
@@ -399,36 +404,36 @@ def _write_debug_trace(
 async def _session_tailers(
     *,
     workspace: PresetAgentWorkspace,
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     redacted_values: Sequence[str],
-    offset_store: _OffsetStore,
+    offset_store: OffsetStore,
 ) -> AsyncIterator[None]:
-    progress_tailer = _ProgressTailer(
+    progress_tailer = ProgressTailer(
         path=workspace.progress_path,
         redacted_values=redacted_values,
-        agent_session=agent_session,
+        session=session,
         offset_store=offset_store,
     )
     record_mirrors = [
-        _RecordMirror(
+        RecordMirror(
             source=workspace.runs_path,
-            target=agent_session.runs_path,
+            target=session.runs_path,
             redacted_values=redacted_values,
             offset_store=offset_store,
             offset_key="runs",
-            echo=agent_session.echo,
+            echo=session.echo,
         ),
-        _DirectoryMirror(
+        DirectoryMirror(
             source=workspace.trials_dir,
-            target=agent_session.trials_dir,
+            target=session.trials_dir,
             redacted_values=redacted_values,
-            echo=agent_session.echo,
+            echo=session.echo,
         ),
-        _DirectoryMirror(
+        DirectoryMirror(
             source=workspace.service_dir,
-            target=agent_session.service_dir,
+            target=session.service_dir,
             redacted_values=redacted_values,
-            echo=agent_session.echo,
+            echo=session.echo,
         ),
     ]
     tailer_tasks = [
@@ -450,40 +455,36 @@ async def _session_tailers(
 async def _collect_agent_output(
     *,
     workspace: PresetAgentWorkspace,
-    agent_session: PresetAgentSession,
+    session: PresetSession,
     redacted_values: Sequence[str],
     is_alive: Callable[[], bool],
-    offset_store: _OffsetStore,
+    offset_store: OffsetStore,
 ) -> PresetAgentProcessOutput:
     """Safe to run alongside a live agent or over the stream files a finished one left behind."""
     stdout_output, _ = await asyncio.gather(
         _read_process_stream(
-            stream=_FileLineReader(
+            stream=FileLineReader(
                 workspace.agent_stdout_path,
                 offset_store=offset_store,
                 offset_key="agent_stdout",
                 is_alive=is_alive,
             ),
             stream_name="stdout",
-            parse_result=True,
             redacted_values=redacted_values,
-            agent_session=agent_session,
+            session=session,
         ),
         _read_process_stream(
-            stream=_FileLineReader(
+            stream=FileLineReader(
                 workspace.agent_stderr_path,
                 offset_store=offset_store,
                 offset_key="agent_stderr",
                 is_alive=is_alive,
             ),
             stream_name="stderr",
-            parse_result=False,
             redacted_values=redacted_values,
-            agent_session=agent_session,
+            session=session,
         ),
     )
-    # stderr is tailed with parse_result=False — it feeds the debug trace and
-    # advances the persisted offset, but can never contribute report data.
     return stdout_output
 
 
@@ -491,24 +492,24 @@ async def attach_preset_agent(
     *,
     workspace: PresetAgentWorkspace,
     redacted_values: Sequence[str],
-    agent_session: PresetAgentSession,
+    session: PresetSession,
 ) -> PresetAgentProcessOutput:
     """Like `run_preset_agent`, but tails a detached agent it does not own."""
-    offset_store = open_session_offsets(agent_session)
+    offset_store = open_session_offsets(session)
     async with _session_tailers(
         workspace=workspace,
-        agent_session=agent_session,
+        session=session,
         redacted_values=redacted_values,
         offset_store=offset_store,
     ):
-        manifest = agent_session.read_manifest()
+        state = session.read_state()
 
         def agent_alive() -> bool:
-            return _pid_alive(manifest.get("agent_pid"), manifest.get("agent_started_at"))
+            return state is not None and state.run is not None and process_alive(state.run.agent)
 
         return await _collect_agent_output(
             workspace=workspace,
-            agent_session=agent_session,
+            session=session,
             redacted_values=redacted_values,
             is_alive=agent_alive,
             offset_store=offset_store,
@@ -517,21 +518,23 @@ async def attach_preset_agent(
 
 async def _read_process_stream(
     *,
-    stream: "_FileLineReader",
-    stream_name: str,
-    parse_result: bool,
+    stream: "FileLineReader",
+    stream_name: Literal["stdout", "stderr"],
     redacted_values: Sequence[str],
-    agent_session: PresetAgentSession,
+    session: PresetSession,
 ) -> PresetAgentProcessOutput:
+    # stderr feeds the debug trace and advances the persisted offset, but only
+    # stdout can carry the report.
+    parse_result = stream_name == "stdout"
     output = PresetAgentProcessOutput()
     while True:
         line = await stream.readline()
         if not line:
             return output
         text = line.decode(errors="replace")
-        if agent_session.debug:
+        if session.debug:
             _write_debug_trace(
-                agent_session,
+                session,
                 stream_name=stream_name,
                 text=text,
                 redacted_values=redacted_values,
@@ -539,31 +542,26 @@ async def _read_process_stream(
         if not parse_result:
             continue
         try:
-            message = json.loads(text)
-        except json.JSONDecodeError:
+            event = validate_json_extra_ignore(AnyClaudeStreamEvent, text)
+        except ValidationError:
             continue
-        if not isinstance(message, dict):
-            continue
-        if output.session_id is None:
-            session_id = message.get("session_id")
-            if isinstance(session_id, str) and session_id:
-                output.session_id = session_id
-                agent_session.record_claude_session_id(session_id)
-        if message.get("type") == "assistant":
+        if output.session_id is None and event.session_id:
+            output.session_id = event.session_id
+            session.record_claude_session_id(event.session_id)
+        if event.type == "assistant":
             output.made_progress = True
-        if message.get("type") != "result":
+        if not isinstance(event, ClaudeResultEvent):
             continue
-        if message.get("is_error"):
-            error = message.get("result") or "Claude failed"
-            output.error = redact(str(error), redacted_values)
-        structured_output = message.get("structured_output")
-        if isinstance(structured_output, dict):
-            output.report_data = structured_output
+        if event.is_error:
+            output.error = redact(str(event.result or "Claude failed"), redacted_values)
+        if event.structured_output is not None:
+            output.report_data = event.structured_output
             continue
-        result = message.get("result")
-        if isinstance(result, str):
+        # An agent may print the report as its final text instead of submitting
+        # it through `StructuredOutput`.
+        if isinstance(event.result, str):
             try:
-                parsed = json.loads(result)
+                parsed = json.loads(event.result)
             except json.JSONDecodeError:
                 continue
             if isinstance(parsed, dict):
@@ -596,20 +594,18 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
         await proc.wait()
 
 
-def terminate_agent_process(manifest: dict[str, Any]) -> None:
+def terminate_agent_process(agent: Optional[PresetSessionProcess]) -> None:
     """Twin of `_terminate_process` driven by pid, because the caller (`preset stop`) never owned the process."""
-    agent_pid = manifest.get("agent_pid")
-    if not isinstance(agent_pid, int) or not _pid_alive(
-        agent_pid, manifest.get("agent_started_at")
-    ):
+    if agent is None or not process_alive(agent):
         return
+    agent_pid = agent.pid
     if IS_WINDOWS:
         _terminate_windows_process_tree(agent_pid)
         return
     with suppress(OSError):
         os.killpg(agent_pid, signal.SIGTERM)  # pyright: ignore[reportAttributeAccessIssue]
     for _ in range(_TERMINATE_GRACE_SECONDS * 10):
-        if not _pid_running(agent_pid):
+        if not pid_running(agent_pid):
             return
         time.sleep(0.1)
     with suppress(OSError):
@@ -630,3 +626,22 @@ def _terminate_windows_process_tree(pid: int) -> None:
         with suppress(psutil.NoSuchProcess):
             process.kill()
     psutil.wait_procs(alive, timeout=3)
+
+
+def _get_report_json_schema() -> dict[str, Any]:
+    """The one shape the API can enforce: a single object, no union, only
+    `success` required. `AnyPresetAgentResult` enforces the rest at parse."""
+    success = PresetAgentSuccess.model_json_schema()
+    failure = PresetAgentFailure.model_json_schema()
+    return {
+        "type": "object",
+        "properties": {
+            **success["properties"],
+            **failure["properties"],
+            # Each outcome fixes its own value; only the merged shape offers both.
+            "success": {"type": "boolean"},
+        },
+        "required": ["success"],
+        "additionalProperties": False,
+        "$defs": {**success.get("$defs", {}), **failure.get("$defs", {})},
+    }

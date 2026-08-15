@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from rich.table import Table
 
+from dstack._internal.cli.models.configurations import DEFAULT_DATASET
 from dstack._internal.cli.models.presets import (
     Preset,
 )
@@ -11,7 +12,7 @@ from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
-    "ready": ("verified", "grey"),
+    "ready": ("verified", "secondary"),
     "running": ("trialing", "bold sea_green3"),
     "verifying": ("verifying", "bold deep_sky_blue1"),
     "interrupted": ("interrupted", "secondary"),
@@ -141,7 +142,7 @@ def get_presets_table(
     # so different models interleave); active-only by default, else the latest row.
     rows: list[tuple[str, Any, bool]] = []
     for preset_list in presets_by_base.values():
-        rows += [(preset.created_at.isoformat(), preset, True) for preset in preset_list]
+        rows += [(preset.submitted_at.isoformat(), preset, True) for preset in preset_list]
     for session_list in sessions_by_model.values():
         rows += [
             (str(session.get("created_at") or ""), session, False) for session in session_list
@@ -271,15 +272,10 @@ def _add_preset(
         "": _format_trial_spark(creation),
         "CONSTRAINTS": format_preset_objective(
             preset,
-            # Fall back to the creation record for presets saved before the preset
-            # itself carried the requested values.
-            min_context_length=preset.min_context_length
-            or (creation or {}).get("constraints", {}).get("min_context_length"),
-            max_ttft=preset.max_ttft or (creation or {}).get("constraints", {}).get("max_ttft"),
             verbose=verbose,
         ),
         "BENCHMARK": format_preset_benchmark(preset, verbose=verbose),
-        "SUBMITTED": pretty_date(preset.created_at),
+        "SUBMITTED": pretty_date(preset.submitted_at),
     }
     if verbose and preset.model != preset.base:
         row["BASE"] = f"[secondary]  repo={preset.model}[/]"
@@ -299,41 +295,41 @@ def _add_preset(
 def format_preset_objective(
     preset: Preset,
     *,
-    min_context_length: Optional[int] = None,
-    max_ttft: Optional[float] = None,
     verbose: bool = False,
 ) -> str:
-    workload = preset.validations[0].benchmark.workload
+    configuration = preset.configuration
+    workload = preset.benchmark.workload
     parts = []
-    if workload.dataset:
-        parts.append(f"data={workload.dataset}")
+    if configuration.effective_dataset != DEFAULT_DATASET:
+        parts.append(f"data={configuration.effective_dataset}")
     else:
+        input_tokens = configuration.effective_input_tokens
         parts.append(
-            f"io={_format_token_count(workload.input_tokens)}"
-            f"/{_format_token_count(workload.output_tokens)}"
+            f"io={_format_token_count(input_tokens)}"
+            f"/{_format_token_count(configuration.effective_output_tokens)}"
         )
-        share = round(100 * (workload.shared_prefix_tokens or 0) / workload.input_tokens)
+        share = round(100 * (configuration.shared_prefix_tokens or 0) / input_tokens)
         parts.append(f"prefix={share}%")
-    parts.append(f"conc={workload.concurrency}")
-    # Absent for presets saved before the creation record was consulted.
-    if verbose and min_context_length is not None:
-        parts.append(f"ctx>={_format_token_count(min_context_length)}")
-    if verbose and max_ttft is not None:
-        parts.append(f"ttft<={_format_duration_ms(max_ttft)}")
+    parts.append(f"conc={configuration.concurrency or workload.concurrency}")
+    if verbose and configuration.min_context_length is not None:
+        parts.append(f"ctx>={_format_token_count(configuration.min_context_length)}")
+    if verbose and configuration.max_ttft is not None:
+        parts.append(f"ttft<={_format_duration_ms(configuration.max_ttft)}")
     return f"[secondary]{' '.join(parts)}[/]"
 
 
 def _breaches_constraints(preset: Preset) -> bool:
-    metrics = preset.validations[0].benchmark.metrics
-    if preset.max_ttft is not None and metrics.ttft_ms.p50 > preset.max_ttft:
+    configuration = preset.configuration
+    metrics = preset.benchmark.metrics
+    if configuration.max_ttft is not None and metrics.ttft_ms.p50 > configuration.max_ttft:
         return True
-    return preset.min_context_length is not None and (
-        preset.context_length < preset.min_context_length
+    return configuration.min_context_length is not None and (
+        preset.context_length < configuration.min_context_length
     )
 
 
 def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
-    benchmark = preset.validations[0].benchmark
+    benchmark = preset.benchmark
     metrics = benchmark.metrics
     parts = [
         f"tok/s/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
@@ -370,12 +366,6 @@ def _format_number(value: float) -> str:
     if abs(value) >= 999.5:
         return f"{value:.0f}"
     return f"{value:.3g}"
-
-
-def _format_latency(value_ms: float) -> str:
-    if value_ms >= 1000:
-        return f"{_format_number(value_ms / 1000)}s"
-    return f"{_format_number(value_ms)}ms"
 
 
 def _format_resources(resources, *, verbose: bool) -> str:

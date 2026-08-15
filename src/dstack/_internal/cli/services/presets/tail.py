@@ -9,7 +9,7 @@ from typing import Any, Callable, Optional, Sequence
 
 from dstack._internal.cli.services.presets.redaction import redact, redact_bytes
 from dstack._internal.cli.services.presets.session import (
-    PresetAgentSession,
+    PresetSession,
     _write_private_bytes,
     _write_private_text,
     print_preset_progress,
@@ -17,7 +17,7 @@ from dstack._internal.cli.services.presets.session import (
 from dstack._internal.cli.utils.common import console
 
 
-class _FileLineReader:
+class FileLineReader:
     """`readline()` over a growing file whose persisted offset lets a later attach resume exactly where the previous reader stopped."""
 
     _POLL_SECONDS = 0.2
@@ -27,7 +27,7 @@ class _FileLineReader:
         self,
         path: Path,
         *,
-        offset_store: "_OffsetStore",
+        offset_store: "OffsetStore",
         offset_key: str,
         is_alive: Callable[[], bool],
     ) -> None:
@@ -71,7 +71,7 @@ class _FileLineReader:
             await asyncio.sleep(self._POLL_SECONDS)
 
 
-class _OffsetStore:
+class OffsetStore:
     """Persists per-stream read offsets under disjoint keys; a thread lock
     suffices because the session claim guarantees no other process writes this
     file."""
@@ -97,30 +97,30 @@ class _OffsetStore:
                 _write_private_text(self._path, json.dumps(self._data) + "\n")
 
 
-def open_session_offsets(session: PresetAgentSession) -> _OffsetStore:
-    return _OffsetStore(session.path / ".offsets.json")
+def open_session_offsets(session: PresetSession) -> OffsetStore:
+    return OffsetStore(session.path / ".offsets.json")
 
 
-class _ProgressTailer:
+class ProgressTailer:
     def __init__(
         self,
         *,
         path: Path,
         redacted_values: Sequence[str],
-        agent_session: PresetAgentSession,
-        offset_store: Optional[_OffsetStore] = None,
+        session: PresetSession,
+        offset_store: OffsetStore,
         offset_key: str = "progress",
     ) -> None:
         self._path = path
         self._redacted_values = redacted_values
-        self._agent_session = agent_session
+        self._agent_session = session
         self._offset_store = offset_store
         self._offset_key = offset_key
-        self._offset = offset_store.get(offset_key) if offset_store else 0
+        self._offset = offset_store.get(offset_key)
 
     async def run(self) -> None:
         while True:
-            # File IO runs off the event loop; see _FileLineReader.readline.
+            # File IO runs off the event loop; see FileLineReader.readline.
             await asyncio.to_thread(self.flush)
             await asyncio.sleep(1)
 
@@ -131,40 +131,40 @@ class _ProgressTailer:
             f.seek(self._offset)
             lines = f.readlines()
             self._offset = f.tell()
-        if lines and self._offset_store is not None:
+        if lines:
             self._offset_store.set(self._offset_key, self._offset)
         for line in lines:
             message = _parse_progress(line)
             if message is not None:
                 print_preset_progress(
                     redact(message, self._redacted_values),
-                    agent_session=self._agent_session,
+                    session=self._agent_session,
                 )
 
 
-class _RecordMirror:
+class RecordMirror:
     def __init__(
         self,
         *,
         source: Path,
         target: Path,
         redacted_values: Sequence[str],
-        offset_store: Optional[_OffsetStore] = None,
-        offset_key: str = "",
-        echo: bool = True,
+        offset_store: OffsetStore,
+        offset_key: str,
+        echo: bool,
     ) -> None:
         self._source = source
         self._target = target
         self._redacted_values = redacted_values
         self._offset_store = offset_store
         self._offset_key = offset_key
-        self._offset = offset_store.get(offset_key) if offset_store and offset_key else 0
+        self._offset = offset_store.get(offset_key)
         self._enabled = True
         self._echo = echo
 
     async def run(self) -> None:
         while True:
-            # File IO runs off the event loop; see _FileLineReader.readline.
+            # File IO runs off the event loop; see FileLineReader.readline.
             await asyncio.to_thread(self.flush)
             await asyncio.sleep(1)
 
@@ -180,8 +180,7 @@ class _RecordMirror:
             return
         chunk = data[: end + 1].decode("utf-8", errors="replace")
         self._offset += end + 1
-        if self._offset_store is not None and self._offset_key:
-            self._offset_store.set(self._offset_key, self._offset)
+        self._offset_store.set(self._offset_key, self._offset)
         try:
             if not self._target.exists():
                 _write_private_text(self._target, "")
@@ -197,7 +196,7 @@ class _RecordMirror:
                 console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
 
 
-class _DirectoryMirror:
+class DirectoryMirror:
     """Mirrors a directory by re-copying each whole file whose size or mtime
     changed; a half-written file is simply recopied complete on a later flush."""
 
@@ -209,7 +208,7 @@ class _DirectoryMirror:
         source: Path,
         target: Path,
         redacted_values: Sequence[str],
-        echo: bool = True,
+        echo: bool,
     ) -> None:
         self._source = source
         self._target = target
@@ -220,7 +219,7 @@ class _DirectoryMirror:
 
     async def run(self) -> None:
         while True:
-            # File IO runs off the event loop; see _FileLineReader.readline.
+            # File IO runs off the event loop; see FileLineReader.readline.
             await asyncio.to_thread(self.flush)
             await asyncio.sleep(1)
 
