@@ -14,6 +14,7 @@ from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.models.presets import (
     Preset,
     PresetListOutput,
+    VerifiedPreset,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.configurators import APPLY_STDIN_NAME
@@ -250,7 +251,7 @@ class PresetCommand(BaseCommand):
 
     def _list_presets_and_sessions(
         self, *, base: str | None, repo: str | None
-    ) -> tuple[list[Preset], list[dict]]:
+    ) -> tuple[list[VerifiedPreset], list[dict]]:
         self._reconcile()
         presets = PresetStore().list()
         sessions = list_preset_sessions()
@@ -458,11 +459,11 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _filter_presets(
-    presets: list[Preset],
+    presets: list[VerifiedPreset],
     *,
     base: str | None,
     repo: str | None,
-) -> list[Preset]:
+) -> list[VerifiedPreset]:
     return [
         preset
         for preset in presets
