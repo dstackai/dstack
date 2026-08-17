@@ -432,7 +432,7 @@ def _check_instance_inner(
     try:
         remove_dangling_tasks_from_instance(shim_client, instance)
     except Exception as exc:
-        logger.exception("%s: error removing dangling tasks: %s", fmt(instance), exc)
+        logger.warning("%s: error removing dangling tasks: %s", fmt(instance), exc)
 
     # There should be no shim API calls after this function call since it can request shim restart.
     _maybe_install_components(instance, shim_client)
