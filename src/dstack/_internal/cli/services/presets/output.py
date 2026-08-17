@@ -6,7 +6,7 @@ from rich.table import Table
 
 from dstack._internal.cli.models.configurations import DEFAULT_DATASET
 from dstack._internal.cli.models.presets import (
-    Preset,
+    VerifiedPreset,
 )
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.utils.common import pretty_date, pretty_resources
@@ -83,7 +83,7 @@ def _format_trial_progress(session: Optional[dict[str, Any]], *, in_flight: bool
 
 
 def print_presets(
-    presets: list[Preset],
+    presets: list[VerifiedPreset],
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
     all_presets: bool = False,
@@ -98,32 +98,24 @@ def print_presets(
 
 
 def get_presets_table(
-    presets: list[Preset],
+    presets: list[VerifiedPreset],
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
     all_presets: bool = False,
     limit: Optional[int] = None,
 ) -> Table:
     table = Table(box=None)
-    compact = not verbose
-    table.add_column("ID", no_wrap=True)
-    # Compact-view caps keep a long model name from starving the wrapping
-    # CONSTRAINTS and BENCHMARK columns below.
-    table.add_column("BASE", no_wrap=True, max_width=24 if compact else None, style="secondary")
-    table.add_column(
-        "RESOURCES" if verbose else "GPU",
-        no_wrap=compact,
-        max_width=18 if compact else None,
-        style="secondary",
-    )
+    table.add_column("NAME", no_wrap=True)
+    table.add_column("ID", no_wrap=True, style="secondary")
+    table.add_column("BASE", no_wrap=True, style="secondary")
+    if verbose:
+        table.add_column("RESOURCES", style="secondary")
     table.add_column("CONSTRAINTS", min_width=len("io=1K/1K"), overflow="fold")
     table.add_column("BENCHMARK", min_width=len("tps=1"), overflow="fold")
     table.add_column("", no_wrap=True)
     table.add_column("STATUS")
     table.add_column("SUBMITTED", style="secondary")
-    if verbose:
-        table.add_column("NAME", no_wrap=True, style="secondary")
-    presets_by_base: dict[str, list[Preset]] = defaultdict(list)
+    presets_by_base: dict[str, list[VerifiedPreset]] = defaultdict(list)
     repo_to_base: dict[str, str] = {}
     for preset in presets:
         presets_by_base[preset.base].append(preset)
@@ -200,15 +192,15 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
             f"io={_format_token_count(constraints['input_tokens'])}"
             f"/{_format_token_count(constraints['output_tokens'])}"
         )
-    # Shown even at `0%`: rows are only comparable when it matches.
     input_tokens = constraints.get("input_tokens")
     if input_tokens:
         shared_prefix_tokens = constraints.get("shared_prefix_tokens") or 0
         share = round(100 * shared_prefix_tokens / input_tokens)
-        objective.append(f"prefix={share}%")
+        if share:
+            objective.append(f"prefix={share}%")
     concurrency = (best or {}).get("concurrency") or constraints.get("concurrency")
     if concurrency:
-        objective.append(f"conc={concurrency}")
+        objective.append(f"c={concurrency}")
     min_context_length = constraints.get("min_context_length")
     if verbose and isinstance(min_context_length, int):
         objective.append(f"ctx>={_format_token_count(min_context_length)}")
@@ -232,7 +224,7 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
                 parts.append(f"ctx={_format_token_count(context_length)}")
             benchmark = " ".join(parts)
         else:
-            benchmark = f"conc={best.get('concurrency')} tps={tps}"
+            benchmark = f"c={best.get('concurrency')} tps={tps}"
     benchmark = benchmark.strip()
     if benchmark and breached:
         # Marked, not only dimmed: colour alone is not a signal.
@@ -256,17 +248,16 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
 
 def _add_preset(
     table: Table,
-    preset: Preset,
+    preset: VerifiedPreset,
     *,
     verbose: bool,
     creation: Optional[dict[str, Any]] = None,
 ) -> None:
     groups = preset.service.replica_groups
-    column = "RESOURCES" if verbose else "GPU"
     row = {
         "ID": preset.id,
         "NAME": preset.name or "",
-        column: _format_resources(groups[0].resources, verbose=verbose),
+        "RESOURCES": _format_resources(groups[0].resources, verbose=verbose),
         "BASE": preset.base,
         "STATUS": _format_status("ready") + _format_trial_progress(creation),
         "": _format_trial_spark(creation),
@@ -286,14 +277,14 @@ def _add_preset(
                 table,
                 {
                     "BASE": f"  group={group.name}",
-                    column: _format_resources(group.resources, verbose=verbose),
+                    "RESOURCES": _format_resources(group.resources, verbose=verbose),
                 },
                 style="secondary",
             )
 
 
 def format_preset_objective(
-    preset: Preset,
+    preset: VerifiedPreset,
     *,
     verbose: bool = False,
 ) -> str:
@@ -309,8 +300,9 @@ def format_preset_objective(
             f"/{_format_token_count(configuration.effective_output_tokens)}"
         )
         share = round(100 * (configuration.shared_prefix_tokens or 0) / input_tokens)
-        parts.append(f"prefix={share}%")
-    parts.append(f"conc={configuration.concurrency or workload.concurrency}")
+        if share:
+            parts.append(f"prefix={share}%")
+    parts.append(f"c={configuration.concurrency or workload.concurrency}")
     if verbose and configuration.min_context_length is not None:
         parts.append(f"ctx>={_format_token_count(configuration.min_context_length)}")
     if verbose and configuration.max_ttft is not None:
@@ -318,7 +310,7 @@ def format_preset_objective(
     return f"[secondary]{' '.join(parts)}[/]"
 
 
-def _breaches_constraints(preset: Preset) -> bool:
+def _breaches_constraints(preset: VerifiedPreset) -> bool:
     configuration = preset.configuration
     metrics = preset.benchmark.metrics
     if configuration.max_ttft is not None and metrics.ttft_ms.p50 > configuration.max_ttft:
@@ -328,7 +320,7 @@ def _breaches_constraints(preset: Preset) -> bool:
     )
 
 
-def format_preset_benchmark(preset: Preset, *, verbose: bool = False) -> str:
+def format_preset_benchmark(preset: VerifiedPreset, *, verbose: bool = False) -> str:
     benchmark = preset.benchmark
     metrics = benchmark.metrics
     parts = [
@@ -354,10 +346,15 @@ def _format_duration_ms(value: float) -> str:
 
 
 def _format_token_count(value: int) -> str:
-    """Abbreviates only exact multiples of 1024/1024², so 2048 becomes "2K" but 2050 stays "2050"."""
+    # The conventional name: exact binary multiples keep binary names
+    # (32768 is "32K"), anything else rounds as decimal (1500 is "1.5K").
     for divisor, suffix in ((1024 * 1024, "M"), (1024, "K")):
         if value >= divisor and value % divisor == 0:
             return f"{value // divisor}{suffix}"
+    if value >= 999_950:
+        return f"{value / 1_000_000:.1f}".removesuffix(".0") + "M"
+    if value >= 1000:
+        return f"{value / 1000:.1f}".removesuffix(".0") + "K"
     return str(value)
 
 

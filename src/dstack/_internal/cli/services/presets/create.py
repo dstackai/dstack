@@ -131,7 +131,7 @@ def follow_preset(
     if lock is None:
         raise SessionBusyError(f"Preset {preset_id} is being finalized by another process")
     try:
-        configuration = _load_session_configuration(session)
+        configuration = load_session_configuration(session)
         try:
             result = asyncio.run(
                 _create_preset(
@@ -167,12 +167,12 @@ def follow_preset(
         release_session_claim(lock)
 
 
-def _load_session_configuration(session: PresetSession) -> PresetConfiguration:
+def load_session_configuration(session: PresetSession) -> PresetConfiguration:
     configuration_path = session.path / "preset.dstack.yml"
     if not configuration_path.is_file():
         raise CLIError(
             f"Preset {session.preset_id} has no saved configuration and cannot be"
-            f" followed; resume it with --resume {session.preset_id} instead"
+            f" followed; run `dstack preset resume {session.preset_id}` instead"
         )
     try:
         return PresetConfiguration.model_validate(
@@ -789,9 +789,7 @@ def _suspend_agent_session(session: PresetSession) -> None:
     # The kept workspace must not retain a live credential while suspended.
     scrub_workspace_token(session)
     console.print(f"\nPreset [code]{session.preset_id}[/] creation interrupted.")
-    console.print(
-        f"Resume it with [code]dstack preset create -f <config> --resume {session.preset_id}[/]."
-    )
+    console.print(f"Resume it with [code]dstack preset resume {session.preset_id}[/].")
 
 
 def _get_build_name(name: Optional[str], model_name: str, suffix: str) -> str:

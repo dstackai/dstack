@@ -1,6 +1,6 @@
 # dstack preset
 
-The `dstack preset` commands create, list, apply, and delete local
+The `dstack preset` commands create, list, export, and delete local
 [presets](../../../concepts/presets.md).
 
 ## dstack preset list
@@ -97,17 +97,32 @@ $ dstack preset get --help
 
 </div>
 
-## dstack preset apply
+## dstack preset resume
 
-The `dstack preset apply` command selects a matching local preset and
-submits its service.
+The `dstack preset resume` command resumes an interrupted preset creation.
 
 ##### Usage
 
 <div class="termy">
 
 ```shell
-$ dstack preset apply --help
+$ dstack preset resume --help
+#GENERATE#
+```
+
+</div>
+
+## dstack preset export
+
+The `dstack preset export` command exports a preset as a service
+configuration that `dstack apply` deploys.
+
+##### Usage
+
+<div class="termy">
+
+```shell
+$ dstack preset export --help
 #GENERATE#
 ```
 

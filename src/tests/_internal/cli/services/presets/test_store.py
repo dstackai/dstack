@@ -29,6 +29,8 @@ class TestPresetStore:
         assert data["id"] == preset.id
         assert data["model"] == preset.model
         assert data["submitted_at"] == "2026-01-02T03:04:00Z"
+        # Wire-only: the stored file never carries `status`.
+        assert "status" not in data
         assert "presets" not in data
         assert store.list() == [preset]
         assert store.get(preset.id) == preset

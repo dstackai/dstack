@@ -702,7 +702,7 @@ class TestPerformanceConstraints:
         expected = benchmark.metrics.total_output_tokens / benchmark.metrics.duration_seconds
         assert benchmark.effective_output_tok_per_s == expected
         # Per-user speed is the steady decode rate, not the aggregate over concurrency.
-        assert benchmark.effective_per_user_tok_per_s == 1000 / benchmark.metrics.tpot_ms.p50
+        assert benchmark.effective_per_user_tok_per_s == 1000 / benchmark.metrics.tpot_ms.mean
 
 
 class TestBuildConstraints:
@@ -852,7 +852,7 @@ class TestInterruptAndResume:
         state = json.loads((sessions[0] / "session.json").read_text())
         assert state["status"] == "interrupted"
         output = capsys.readouterr().out
-        assert "--resume" in output
+        assert "dstack preset resume" in output
         assert sessions[0].name in output
 
     def test_suspend_scrubs_workspace_token(self, tmp_path, capsys):

@@ -93,6 +93,12 @@ class PresetSession:
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
 
+    def read_prompt(self) -> Optional[str]:
+        path = self.path / "prompt.md"
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8").strip() or None
+
     def write_user_prompt(self, user_prompt: str) -> None:
         _write_private_text(self.path / _USER_PROMPT_FILENAME, user_prompt + "\n")
 
@@ -628,7 +634,8 @@ def _trial_entry(
     gpu: Optional[str],
 ) -> dict[str, Any]:
     ttft = (metrics.get("ttft_ms") or {}).get("p50")
-    tpot = (metrics.get("tpot_ms") or {}).get("p50")
+    # Mean, not p50: MTP skews TPOT right, and mean is the delivered decode rate.
+    tpot = (metrics.get("tpot_ms") or {}).get("mean")
     context_length = record.get("context_length")
     return {
         "tok_s": tok_s,

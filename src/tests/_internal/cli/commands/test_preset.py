@@ -12,7 +12,13 @@ from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import render_datetime_as_api
-from tests._internal.cli.common import get_preset, plain_console, run_dstack_cli
+from tests._internal.cli.common import (
+    get_preset,
+    get_session_run,
+    get_session_state,
+    plain_console,
+    run_dstack_cli,
+)
 
 pytestmark = pytest.mark.windows
 
@@ -68,6 +74,60 @@ class TestPresetLocalCommands:
         # create reports its own Ctrl+C outcome (Detached / interrupted) via the
         # interrupt handler, so the command layer stays silent — no generic line.
         assert "Operation interrupted by user" not in capsys.readouterr().out
+
+    def test_resume_uses_the_configuration_and_prompt_pinned_at_creation(self, tmp_path):
+        session_dir = tmp_path / ".dstack" / "presets" / "ab12cd34"
+        session_dir.mkdir(parents=True)
+        (session_dir / "session.json").write_text(
+            json.dumps(
+                get_session_state(
+                    status="interrupted", run=get_session_run(claude_session_id="sid-1")
+                ).model_dump(mode="json")
+            )
+        )
+        (session_dir / "preset.dstack.yml").write_text(
+            "type: preset\nbase: Qwen/Qwen3.5-27B\nmin_context_length: 8192\n"
+        )
+        (session_dir / "prompt.md").write_text("go deep\n")
+
+        with (
+            patch("dstack.api.Client.from_config"),
+            patch("dstack._internal.cli.commands.preset.create_preset") as create,
+        ):
+            exit_code = run_dstack_cli(
+                ["preset", "resume", "ab12cd34"], home_dir=tmp_path, repo_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        kwargs = create.call_args.kwargs
+        assert kwargs["resume_session"].preset_id == "ab12cd34"
+        assert kwargs["configuration"].model.base == "Qwen/Qwen3.5-27B"
+        assert kwargs["user_prompt"] == "go deep"
+
+    def test_get_returns_the_requested_configuration_for_an_unfinished_preset(
+        self, tmp_path, capsys
+    ):
+        session_dir = tmp_path / ".dstack" / "presets" / "ab12cd34"
+        session_dir.mkdir(parents=True)
+        session_dir.joinpath("session.json").write_text(
+            json.dumps(
+                get_session_state(status="running", name="in-flight").model_dump(mode="json")
+            )
+        )
+        session_dir.joinpath("preset.dstack.yml").write_text(
+            "type: preset\nbase: Qwen/Qwen3.5-27B\nmin_context_length: 8192\n"
+        )
+
+        exit_code = run_dstack_cli(
+            ["preset", "get", "--json", "in-flight"], home_dir=tmp_path, repo_dir=tmp_path
+        )
+
+        assert exit_code == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["status"] == "running"
+        assert data["id"] == "ab12cd34"
+        assert data["configuration"]["model"]["base"] == "Qwen/Qwen3.5-27B"
+        assert "service" not in data
 
     def test_create_ends_quietly_when_stopped_from_another_cli(self, tmp_path, capsys):
         from dstack._internal.cli.services.presets.create import CreationStopped
@@ -135,8 +195,8 @@ class TestPresetLocalCommands:
         assert "ctx>=" not in "".join(output.split())
         assert "io=1K/128" in "".join(output.split())
         # 42.1 is the aggregate, verbose-only; the default row shows per-user 1/TPOT.
-        assert "135" in output
-        assert "conc=1" in "".join(output.split())
+        assert "133" in output
+        assert "c=1" in "".join(output.split())
         assert "tok/s/user=" in "".join(output.split())
         assert "ttft=" in "".join(output.split())
         assert "ttft=[/]108" in "".join(output.split()) or "ttft=108" in "".join(output.split())
@@ -155,7 +215,7 @@ class TestPresetLocalCommands:
         # Verbose adds only the repo row.
         assert "repo=community/Qwen3.5-27B-GPTQ-Int4" in joined_verbose
         assert "ctx=32K" in joined_verbose
-        assert "conc=1" in joined_verbose
+        assert "c=1" in joined_verbose
         assert "hardware=" not in joined_verbose
 
     def test_deletes_preset_without_api_client(self, tmp_path):
@@ -341,56 +401,6 @@ env:
         assert [fleet.format() for fleet in configuration.fleets] == ["cli-fleet"]
         assert create.call_args.kwargs["debug"] is True
 
-    def test_apply_passes_selected_profile_and_preset_id(self, tmp_path):
-        extra_args = ["--id", "cli-preset"]
-        (tmp_path / ".dstack").mkdir()
-        (tmp_path / ".dstack" / "profiles.yml").write_text(
-            "profiles:\n  - name: gpu\n    max_price: 0.5\n"
-        )
-        configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
-
-        with (
-            patch("dstack.api.Client.from_config"),
-            patch("dstack._internal.cli.commands.preset.apply_preset") as apply,
-        ):
-            args = [
-                "preset",
-                "apply",
-                "-f",
-                str(configuration_path),
-                "--profile",
-                "gpu",
-                *extra_args,
-            ]
-            exit_code = run_dstack_cli(
-                args,
-                home_dir=tmp_path,
-                repo_dir=tmp_path,
-            )
-
-        assert exit_code == 0
-        assert apply.call_args.kwargs["profile_name"] == "gpu"
-        assert apply.call_args.kwargs["preset_id"] == "cli-preset"
-        assert apply.call_args.kwargs["configuration"].max_price == 0.5
-
-    def test_apply_requires_preset_id(self, tmp_path, capsys):
-        configuration_path = tmp_path / "preset.dstack.yml"
-        configuration_path.write_text("type: preset\nname: qwen\nbase: Qwen/Qwen3.5-27B\n")
-
-        with patch("dstack._internal.cli.commands.preset.apply_preset") as apply:
-            exit_code = run_dstack_cli(
-                ["preset", "apply", "-f", str(configuration_path)],
-                home_dir=tmp_path,
-                repo_dir=tmp_path,
-            )
-
-        assert exit_code == 2
-        assert "--id" in capsys.readouterr().err
-        apply.assert_not_called()
-
-
-class TestPresetNameClaims:
     def test_create_detaches_the_name_from_the_old_preset(self, tmp_path):
         preset = get_preset().model_copy(update={"name": "qwen"})
         store = PresetStore(tmp_path / ".dstack" / "presets")

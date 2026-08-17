@@ -11,8 +11,8 @@ from dstack._internal.cli.models.preset_agent import (
     PresetAgentSuccess,
 )
 from dstack._internal.cli.models.presets import (
-    Preset,
     PresetVerificationReplicaGroup,
+    VerifiedPreset,
 )
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
@@ -88,7 +88,7 @@ def build_verified_preset(
     preset_id: str,
     name: Optional[str],
     submitted_at: datetime,
-) -> Preset:
+) -> VerifiedPreset:
     """Cross-checks the agent's self-reported final report against the actual run
     and service state before trusting it to build a preset. The preset's service is
     taken from the run the server verified, not from anything the agent wrote, and
