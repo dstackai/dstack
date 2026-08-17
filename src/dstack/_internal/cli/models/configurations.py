@@ -17,7 +17,8 @@ from dstack._internal.core.models.profiles import ProfileParams
 
 DEFAULT_INPUT_TOKENS = 1024
 DEFAULT_OUTPUT_TOKENS = 1024
-DEFAULT_BASELINE = False
+DEFAULT_BASELINE = True
+DEFAULT_DATASET = "random"
 
 
 class PresetModelRepo(CoreModel):
@@ -134,14 +135,15 @@ class PresetConfiguration(
         ),
     ] = None
     min_context_length: Annotated[
-        Optional[PositiveInt], Field(description="The minimum required context length")
+        Optional[PositiveInt],
+        Field(description="The minimum required context length. Required for creation"),
     ] = None
     max_ttft: Annotated[
         Optional[PositiveInt],
         Field(
             description=(
                 "The maximum p50 time to first token, in milliseconds, that any benchmark"
-                " may report"
+                " may report. Required for creation"
             )
         ),
     ] = None
@@ -150,7 +152,16 @@ class PresetConfiguration(
         Field(
             description=(
                 "The number of benchmarked trials during preset creation"
-                " before the best one is promoted"
+                " before the best one is promoted. Required for creation"
+            )
+        ),
+    ] = None
+    previous: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The IDs of previous presets whose creation results the agent"
+                " analyzes and improves on"
             )
         ),
     ] = None
@@ -158,7 +169,8 @@ class PresetConfiguration(
         Optional[PositiveInt],
         Field(
             description=(
-                "The number of simultaneous requests used for benchmarks during preset creation"
+                "The number of simultaneous requests used for benchmarks during preset"
+                " creation. Required for creation"
             )
         ),
     ] = None
@@ -172,7 +184,7 @@ class PresetConfiguration(
         ),
     ] = None
     output_tokens: Annotated[
-        Optional[PositiveInt],
+        Optional[Annotated[int, Field(ge=2)]],
         Field(
             description=(
                 "The number of output tokens per request used for benchmarks during"
@@ -181,12 +193,23 @@ class PresetConfiguration(
         ),
     ] = None
     shared_prefix_tokens: Annotated[
-        Optional[PositiveInt],
+        Optional[Annotated[int, Field(ge=0)]],
         Field(
             description=(
                 "How many of `input_tokens` are a prefix identical in every benchmark request,"
                 " as a repeated system prompt or conversation history would be. Defaults to `0`,"
                 " meaning every request is fully unique"
+            )
+        ),
+    ] = None
+    dataset: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The benchmark dataset used during preset creation: `random` for synthetic"
+                " prompts shaped by `input_tokens` and `output_tokens`, a benchmark tool's"
+                " dataset name (e.g. `sharegpt`, `spec_bench`), or a Hugging Face dataset ID."
+                " Defaults to `random`"
             )
         ),
     ] = None
@@ -196,7 +219,7 @@ class PresetConfiguration(
             description=(
                 "Whether the first trial must be a baseline that serves the model with the"
                 " serving framework's recommended defaults instead of an optimization attempt."
-                " Defaults to `false`"
+                " Defaults to `true`"
             )
         ),
     ] = None
@@ -226,6 +249,38 @@ class PresetConfiguration(
     @property
     def effective_baseline(self) -> bool:
         return self.baseline if self.baseline is not None else DEFAULT_BASELINE
+
+    @property
+    def effective_dataset(self) -> str:
+        return self.dataset if self.dataset is not None else DEFAULT_DATASET
+
+    @field_validator("dataset")
+    @classmethod
+    def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        # Stripped because the agent reports the dataset it actually loaded, and
+        # the two are compared for equality when the preset is verified.
+        value = value.strip()
+        if not value:
+            raise ValueError("dataset must be a non-empty string")
+        return value
+
+    @model_validator(mode="after")
+    def validate_dataset(self) -> Self:
+        if self.dataset in (None, DEFAULT_DATASET):
+            return self
+        set_fields = [
+            name
+            for name in ("input_tokens", "output_tokens", "shared_prefix_tokens")
+            if getattr(self, name) is not None
+        ]
+        if set_fields:
+            raise ValueError(
+                f"{', '.join(set_fields)} can only be set with the `random` dataset;"
+                " a custom dataset defines its own request shape"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_shared_prefix_tokens(self) -> Self:
@@ -285,12 +340,23 @@ class PresetConstraints(CoreModel):
     max_ttft: PositiveInt
     trials_num: PositiveInt
     concurrency: PositiveInt
+    baseline: bool
+    fleets: Annotated[list[str], Field(min_length=1)]
+    env: list[str]
+
+
+class PresetRandomConstraints(PresetConstraints):
+    """Constraints for the synthetic `random` dataset, which the request shape defines."""
+
     input_tokens: PositiveInt
-    output_tokens: PositiveInt
-    shared_prefix_tokens: int = 0
-    baseline: bool = False
-    fleets: list[str] = Field(min_length=1)
-    env: list[str] = []
+    output_tokens: Annotated[int, Field(ge=2)]
+    shared_prefix_tokens: Annotated[int, Field(ge=0)]
+
+
+class PresetDatasetConstraints(PresetConstraints):
+    """Constraints for a named dataset, which defines its own request shape."""
+
+    dataset: str
 
 
 def _validate_model(value: Any, *, field: str) -> str:

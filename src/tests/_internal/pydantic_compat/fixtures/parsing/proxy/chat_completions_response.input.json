@@ -1,9 +1,0 @@
-{
-  "id": "chatcmpl-1",
-  "choices": [{"finish_reason": "stop", "index": 0, "message": {"role": "assistant", "content": "hi"}}],
-  "created": 1700000000,
-  "model": "llama",
-  "usage": {"completion_tokens": 2, "prompt_tokens": 3, "total_tokens": 5},
-  "system_fingerprint": "fp_1",
-  "field_added_by_a_newer_upstream": true
-}

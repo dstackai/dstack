@@ -146,9 +146,8 @@ filterwarnings = [
     # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
     # so they cannot creep back after the v2 migration.
     "error::pydantic.PydanticDeprecatedSince20",
-    # testcontainers modules use deprecated decorators – nothing we can do:
-    # https://github.com/testcontainers/testcontainers-python/issues/874
-    "ignore:^The @wait_container_is_ready decorator:DeprecationWarning",
+    # Remove or change to 3.11 once support for Python 3.10 is dropped.
+    "ignore:You are using a Python version \\(3.10:FutureWarning:^google\\.",
 ]
 
 [tool.tox]
@@ -195,7 +194,7 @@ test = [
     "freezegun>=1.5.1",
     "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
     "openai>=1.68.2",
-    "testcontainers>=4.9.2",
+    "testcontainers>=4.15.0",
 ]
 docs = [
     "dstack[server]",

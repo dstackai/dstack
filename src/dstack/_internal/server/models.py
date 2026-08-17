@@ -463,6 +463,9 @@ class RunModel(PipelineModelMixin, BaseModel):
     service_router_worker_sync: Mapped[Optional["ServiceRouterWorkerSyncModel"]] = relationship(
         back_populates="run", uselist=False
     )
+    service_registrations: Mapped[List["ServiceRegistrationModel"]] = relationship(
+        back_populates="run"
+    )
 
     __table_args__ = (
         Index("ix_submitted_at_id", submitted_at.desc(), id),
@@ -583,7 +586,8 @@ class JobModel(PipelineModelMixin, BaseModel):
     Always `False` for non-service runs.
     """
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    """Whether the replica is registered to receive service requests from dstack-proxy.
+    """Whether the replica should be registered to receive service requests from dstack-proxy.
+    Registration on the gateway can happen with a delay after this field is flipped to `True`.
     Always `False` for non-service runs or jobs that shouldn't be registered
     (e.g., non-router replicas for services with routers).
     """
@@ -594,6 +598,10 @@ class JobModel(PipelineModelMixin, BaseModel):
     should be processed only one-by-one.
     """
     image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
+
+    service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
+        back_populates="job"
+    )
 
     __table_args__ = (
         Index(
@@ -746,12 +754,87 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
+    service_registrations: Mapped[List["ServiceRegistrationModel"]] = relationship(
+        back_populates="gateway_replica"
+    )
+    service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
+        back_populates="gateway_replica"
+    )
+
     __table_args__ = (
         Index(
             "ix_gateway_computes_pipeline_fetch_q",
             last_processed_at.asc(),
             postgresql_where=deleted == false(),
             sqlite_where=deleted == false(),
+        ),
+    )
+
+
+class ServiceRegistrationModel(BaseModel):
+    """Many-to-many association between services and gateway replicas"""
+
+    __tablename__ = "service_registrations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), index=True
+    )
+    run: Mapped["RunModel"] = relationship(back_populates="service_registrations")
+    gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
+    )
+    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+        back_populates="service_registrations"
+    )
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Whether the service is successfully registered on this gateway replica"""
+    register_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    register_status_message: Mapped[Optional[str]] = mapped_column(Text)
+    unregister_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    unregister_status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "gateway_replica_id",
+            name="uq_service_registrations_run_id_gateway_replica_id",
+        ),
+    )
+
+
+class ServiceReplicaRegistrationModel(BaseModel):
+    """Many-to-many association between service replicas and gateway replicas"""
+
+    __tablename__ = "service_replica_registrations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("jobs.id", ondelete="CASCADE"), index=True
+    )
+    job: Mapped["JobModel"] = relationship(back_populates="service_replica_registrations")
+    gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
+    )
+    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+        back_populates="service_replica_registrations"
+    )
+    is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
+    """Whether the service replica is successfully registered on this gateway replica"""
+    register_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    register_status_message: Mapped[Optional[str]] = mapped_column(Text)
+    unregister_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    unregister_status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "gateway_replica_id",
+            name="uq_service_replica_registrations_job_id_gateway_replica_id",
         ),
     )
 

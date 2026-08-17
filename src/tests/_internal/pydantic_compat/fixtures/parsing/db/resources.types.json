@@ -1,7 +1,0 @@
-{
-  "/": "Resources",
-  "/cpu_arch": "CPUArchitecture",
-  "/disk": "Disk",
-  "/gpus/0": "Gpu",
-  "/gpus/0/vendor": "AcceleratorVendor"
-}

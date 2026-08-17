@@ -22,7 +22,6 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.resources import (
-    set_default_cpu_spec_arch,
     set_default_gpu_spec,
     set_default_gpu_spec_vendor,
 )
@@ -192,7 +191,6 @@ def _set_resources_defaults(
     resources_spec: ResourcesSpec, image: Optional[str], docker: Optional[bool]
 ) -> None:
     gpu_spec = set_default_gpu_spec(resources_spec)
-    set_default_cpu_spec_arch(cpu_spec=resources_spec.cpu, gpu_spec=gpu_spec)
     set_default_gpu_spec_vendor(gpu_spec=gpu_spec, image=image, docker=docker)
 
 
@@ -536,6 +534,13 @@ def _check_can_update_configuration(
     ):
         # Allow switching between `https: <explicit-default>` and unset `https`. Has no effect.
         updatable_fields.append("https")
+    # Services allow updating any field in ResourcesSpec via rolling deployment. For other
+    # configuration types, only changes that an already provisioned job still satisfies
+    # are allowed.
+    if "resources" not in updatable_fields and _is_compatible_resources_update(
+        current.resources, new.resources
+    ):
+        updatable_fields.append("resources")
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:
@@ -544,3 +549,19 @@ def _check_can_update_configuration(
                 f"Failed to update fields {changed_fields}. Can only update {updatable_fields}"
             )
     return diff
+
+
+def _is_compatible_resources_update(current: ResourcesSpec, new: ResourcesSpec) -> bool:
+    """Check if a job provisioned with the `current` resources still satisfies the `new` ones."""
+    diff = diff_models(current, new)
+    if not diff:
+        return True
+    if set(diff) != {"cpu"}:
+        return False
+    if set(diff_models(current.cpu, new.cpu)) != {"arch"}:
+        return False
+    # Older servers always resolved `cpu.arch` to a specific value. Now an unset `arch` means
+    # "any architecture supported by the image", so a specific value -> None change only
+    # widens the requirements. Without this, re-applying an unchanged configuration after
+    # a server upgrade would be rejected as a non-updatable change.
+    return new.cpu.arch is None

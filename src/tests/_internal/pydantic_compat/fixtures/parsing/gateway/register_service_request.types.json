@@ -1,6 +1,0 @@
-{
-  "/": "RegisterServiceRequest",
-  "/options": "Options",
-  "/options/openai": "OpenAIOptions",
-  "/options/openai/model": "OpenAIChatModel"
-}

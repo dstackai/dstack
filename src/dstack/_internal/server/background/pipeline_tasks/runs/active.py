@@ -31,8 +31,12 @@ from dstack._internal.server.services.jobs import (
     get_job_specs_from_run_spec,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
+    job_spec_updatable_in_place,
 )
-from dstack._internal.server.services.runs import create_job_model_for_new_submission
+from dstack._internal.server.services.runs import (
+    create_job_model_for_new_submission,
+    gateway_registration_failed,
+)
 from dstack._internal.server.services.runs.replicas import (
     build_replica_lists,
     get_group_rollout_state,
@@ -384,6 +388,12 @@ def _get_active_run_transition(
             termination_reason=termination_reason,
         )
 
+    if gateway_registration_failed(run_model):
+        return _ActiveRunTransition(
+            new_status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.GATEWAY_ERROR,
+        )
+
     if _should_stop_on_master_done(run_spec, run_model):
         return _ActiveRunTransition(
             new_status=RunStatus.TERMINATING,
@@ -515,7 +525,7 @@ async def _build_deployment_update_map(
         can_update_all_jobs = True
         for old_job_model, new_job_spec in zip(job_models, new_job_specs):
             old_job_spec = get_job_spec(old_job_model)
-            if new_job_spec != old_job_spec:
+            if not job_spec_updatable_in_place(old_job_spec, new_job_spec):
                 can_update_all_jobs = False
                 break
         if can_update_all_jobs:
@@ -686,11 +696,11 @@ async def _build_rolling_deployment_maps(
                 max_new = max(j.replica_num for j in new_jobs)
                 next_replica_num = max(next_replica_num, max_new + 1)
 
-        # Scale down: terminate unready out-of-date + excess ready replicas
-        replicas_to_stop = state.unready_out_of_date_replica_count
+        # Scale down: terminate not-receiving-traffic out-of-date + excess receiving-traffic replicas
+        replicas_to_stop = state.not_receiving_traffic_out_of_date_replica_count
         replicas_to_stop += max(
             0,
-            state.ready_non_terminating_replica_count - group_desired,
+            state.receiving_traffic_non_terminating_replica_count - group_desired,
         )
         if replicas_to_stop > 0:
             scale_down_maps = _build_scale_down_job_update_maps(

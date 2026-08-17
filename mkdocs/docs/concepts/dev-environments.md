@@ -159,7 +159,8 @@ resources:
 </div>
 
 The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
-If not set, `dstack` infers it from the GPU or defaults to `x86`.
+If the architecture is not set, `dstack` allows any architecture supported by the `image`, or `x86` if no `image` is set.
+Since the default `dstack` image only supports `x86`, requesting `arm` requires setting `image` and is not compatible with `docker: true`.
 
 The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
 

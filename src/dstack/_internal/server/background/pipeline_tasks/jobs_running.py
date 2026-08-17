@@ -6,13 +6,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
 
-import httpx
 from sqlalchemy import and_, exists, false, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
-from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.common import (
     NetworkMode,
     RegistryAuth,
@@ -22,7 +20,8 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
-from dstack._internal.core.models.instances import InstanceStatus, SSHConnectionParams
+from dstack._internal.core.models.gateways import GatewayReplicaStatus
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
@@ -60,6 +59,8 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
+    GatewayComputeModel,
+    GatewayModel,
     ImportModel,
     InstanceModel,
     JobModel,
@@ -78,7 +79,7 @@ from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_mounts,
     resolve_provisioning_image,
 )
-from dstack._internal.server.services.gateways import get_or_add_gateway_connections
+from dstack._internal.server.services.gateways import get_gateway_compute_models
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -377,15 +378,9 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
-class _RegisterReplicaResult:
-    gateway_target: Optional[events.Target]  # None = no gateway
-
-
-@dataclass
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
     new_probe_models: list[ProbeModel] = field(default_factory=list)
-    replica_registration: Optional[_RegisterReplicaResult] = None  # None = not registered yet
 
 
 @dataclass
@@ -409,7 +404,9 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
             return None
         if item.status == JobStatus.RUNNING:
             # RUNNING jobs don't access run.jobs — skip loading sibling jobs entirely.
-            run_model = await _fetch_run_model(session=session, run_id=job_model.run_id)
+            run_model = await _fetch_run_model(
+                session=session, run_id=job_model.run_id, include_gateway=True
+            )
             run = run_model_to_run(run_model, include_sensitive=True, include_jobs=False)
             job = Job(
                 job_spec=get_job_spec(job_model),
@@ -502,6 +499,7 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
             )
         await _maybe_register_replica(context=context, result=result)
         await _check_gpu_utilization(context=context, result=result)
+        _check_service_registration(context=context, result=result)
     elif _server_access_enabled(context) and context.job_model.status == JobStatus.RUNNING:
         # Removing on PROVISIONING/PULLING iterations would reset the failure time
         # tracked by the pool, breaking retry_timed_out()
@@ -515,16 +513,32 @@ async def _prepare_startup_context(
 ) -> Optional[_StartupContext]:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
 
+    # `_get_cluster_info` below requires every job in the replica to have provisioning
+    # data, so gate on that rather than on job statuses. A `SUBMITTED` job is simply not
+    # provisioned yet, while a job that has no provisioning data and is no longer
+    # `SUBMITTED` reached a terminal state without ever provisioning (e.g. due to no
+    # capacity) and never will. Deferring in the latter case is what allows recovery:
+    # the run pipeline retries or fails the replica, but it can only lock the run's jobs
+    # once this job is unlocked, which does not happen if we raise here.
     for other_job in context.run.jobs:
-        if (
-            other_job.job_spec.replica_num == context.job.job_spec.replica_num
-            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-        ):
+        if other_job.job_spec.replica_num != context.job.job_spec.replica_num:
+            continue
+        other_job_submission = other_job.job_submissions[-1]
+        if other_job_submission.job_provisioning_data is not None:
+            continue
+        if other_job_submission.status == JobStatus.SUBMITTED:
             logger.debug(
                 "%s: waiting for all jobs in the replica to be provisioned",
                 fmt(context.job_model),
             )
-            return None
+        else:
+            logger.debug(
+                "%s: job %s in the replica has no provisioning data, waiting for the run"
+                " to be retried or terminated",
+                fmt(context.job_model),
+                other_job.job_spec.job_name,
+            )
+        return None
 
     # If this run has a router replica group and this job is a worker, gate
     # startup on the router replica's state. The helper returns None for the
@@ -678,6 +692,7 @@ async def _refetch_locked_job_model(
         .options(
             joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec, RunModel.status)
         )
+        .options(selectinload(JobModel.service_replica_registrations))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -688,6 +703,7 @@ async def _fetch_run_model(
     run_id: uuid.UUID,
     replica_num: Optional[int] = None,
     run_spec: Optional[RunSpec] = None,
+    include_gateway: bool = False,
 ) -> RunModel:
     """Fetch run model with related project, user, repo, and fleet.
 
@@ -712,6 +728,16 @@ async def _fetch_run_model(
         .options(joinedload(RunModel.repo))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
     )
+    if include_gateway:
+        query = query.options(
+            joinedload(RunModel.gateway)
+            .selectinload(GatewayModel.gateway_computes)
+            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+        ).options(
+            joinedload(RunModel.gateway)
+            .joinedload(GatewayModel.gateway_compute)
+            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+        )
     if replica_num is not None:
         assert run_spec is not None, "run_spec must be provided when replica_num is set"
         router_group = get_router_replica_group(run_spec)
@@ -1132,16 +1158,6 @@ def _emit_result_events(
         old_ready=job_model.ready,
         new_ready=result.job_update_map.get("ready", job_model.ready),
     )
-    if result.replica_registration is not None:
-        targets = [events.Target.from_model(job_model)]
-        if result.replica_registration.gateway_target is not None:
-            targets.append(result.replica_registration.gateway_target)
-        events.emit(
-            session,
-            "Service replica registered to receive requests",
-            actor=events.SystemActor(),
-            targets=targets,
-        )
 
 
 def _wait_for_instance_provisioning_data(
@@ -1250,92 +1266,7 @@ async def _maybe_register_replica(
     if not is_ready or _get_result_registered(context.job_model, result):
         return
 
-    ssh_head_proxy: Optional[SSHConnectionParams] = None
-    ssh_head_proxy_private_key: Optional[str] = None
-    instance = get_or_error(context.job_model.instance)
-    rci = get_instance_remote_connection_info(instance)
-    if rci is not None and rci.ssh_proxy is not None:
-        ssh_head_proxy = rci.ssh_proxy
-        ssh_head_proxy_keys = get_or_error(rci.ssh_proxy_keys)
-        ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
-
-    try:
-        gateway_target = await _register_service_replica(
-            context=context,
-            result=result,
-            ssh_head_proxy=ssh_head_proxy,
-            ssh_head_proxy_private_key=ssh_head_proxy_private_key,
-        )
-    except GatewayError as e:
-        logger.warning("%s: failed to register service replica: %s", fmt(context.job_model), e)
-        _terminate_job(
-            job_model=context.job_model,
-            job_update_map=result.job_update_map,
-            termination_reason=JobTerminationReason.GATEWAY_ERROR,
-            termination_reason_message="Failed to register service replica",
-        )
-        return
-
     result.job_update_map["registered"] = True
-    result.replica_registration = _RegisterReplicaResult(gateway_target=gateway_target)
-
-
-async def _register_service_replica(
-    context: _ProcessContext,
-    result: _ProcessResult,
-    ssh_head_proxy: Optional[SSHConnectionParams],
-    ssh_head_proxy_private_key: Optional[str],
-) -> Optional[events.Target]:
-    if context.run_model.gateway_id is None:
-        return None
-    async with get_session_ctx() as session:
-        gateway_model, connections = await get_or_add_gateway_connections(
-            session, context.run_model.gateway_id
-        )
-    gateway_target = events.Target.from_model(gateway_model)
-    assert context.job_model.instance is not None
-    instance_project_ssh_private_key = None
-    if context.job_model.project_id != context.job_model.instance.project_id:
-        instance_project_ssh_private_key = context.job_model.instance.project.ssh_private_key
-    # JobRuntimeData might change on PULLING -> RUNNING path
-    # so we must update job_submission with the result value.
-    job_submission = context.job_submission.model_copy(deep=True)
-    job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
-    for conn in connections:
-        try:
-            logger.debug(
-                "%s: registering replica for service %s on gateway replica %s",
-                fmt(context.job_model),
-                context.run.id.hex,
-                conn.ip_address,
-            )
-            async with conn.client() as gateway_client:
-                await gateway_client.register_replica(
-                    run=context.run,
-                    job_spec=context.job.job_spec,
-                    job_submission=job_submission,
-                    instance_project_ssh_private_key=instance_project_ssh_private_key,
-                    ssh_head_proxy=ssh_head_proxy,
-                    ssh_head_proxy_private_key=ssh_head_proxy_private_key,
-                )
-        except (httpx.RequestError, SSHError) as e:
-            logger.debug("Gateway request failed", exc_info=True)
-            raise GatewayError(repr(e))
-        except GatewayError as e:
-            if "already exists in service" in e.msg:
-                logger.warning(
-                    (
-                        "%s: could not register replica in gateway %s: %s."
-                        " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
-                        " expect to see this warning once for every running service replica"
-                    ),
-                    fmt(context.job_model),
-                    conn.ip_address,
-                    e.msg,
-                )
-            else:
-                raise
-    return gateway_target
 
 
 async def _check_gpu_utilization(
@@ -1371,6 +1302,49 @@ async def _check_gpu_utilization(
         )
     else:
         logger.debug("%s: GPU utilization check: OK", fmt(context.job_model))
+
+
+def _job_gateway_registration_failed(gateway: GatewayModel | None, job_model: JobModel) -> bool:
+    if gateway is None:
+        return False
+    running_gateway_replica_ids = {
+        replica.id
+        for replica in get_gateway_compute_models(gateway)
+        if replica.status == GatewayReplicaStatus.RUNNING
+    }
+    if not running_gateway_replica_ids:
+        return False
+    registration_by_replica_id = {
+        r.gateway_replica_id: r for r in job_model.service_replica_registrations
+    }
+    for replica_id in running_gateway_replica_ids:
+        registration = registration_by_replica_id.get(replica_id)
+        if (
+            registration is None
+            or registration.is_registered
+            or registration.register_attempt == 0
+        ):
+            return False
+    return True
+
+
+def _check_service_registration(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> None:
+    # `run_model.gateway` is only loaded for jobs that were already RUNNING
+    if context.job_model.status != JobStatus.RUNNING:
+        return
+    if _get_result_status(context.job_model, result) != JobStatus.RUNNING:
+        return
+    if _job_gateway_registration_failed(context.run_model.gateway, context.job_model):
+        logger.debug("%s: service registration check: terminating", fmt(context.job_model))
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.GATEWAY_ERROR,
+            termination_reason_message="Failed to register service replica with the gateway",
+        )
 
 
 def _should_terminate_due_to_low_gpu_util(

@@ -11,6 +11,7 @@ from dstack._internal.cli.services.presets.output import (
     format_preset_objective,
 )
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
@@ -54,15 +55,15 @@ def apply_preset(
 
 
 def _validate_preset_matches(preset: Preset, *, configuration: PresetConfiguration) -> None:
-    """The referenced preset must serve what the configuration asks for."""
     model_name = configuration.model.api_model_name
     service_model = preset.service.model
     if service_model is None or service_model.name.lower() != model_name.lower():
         raise CLIError(f"Preset {preset.id} does not serve {model_name}")
     if configuration.min_context_length is not None:
         if preset.context_length < configuration.min_context_length:
-            raise CLIError(
-                f"Preset {preset.id} does not support context length"
+            warn(
+                f"Preset {preset.id} is verified for context length"
+                f" {preset.context_length}, below the requested"
                 f" {configuration.min_context_length}"
             )
     if configuration.model.allows_variant_selection:
@@ -95,7 +96,5 @@ def _format_requested_model(configuration: PresetConfiguration) -> str:
 
 
 def _format_selected_preset(preset: Preset) -> str:
-    # The formatter dims its own keys; wrapping it again would flatten that.
-    # One line, so the objective and the result are joined rather than columned.
     details = f"{format_preset_objective(preset)} {format_preset_benchmark(preset, verbose=True)}"
     return f"{escape(preset.id)} ({details})"

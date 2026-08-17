@@ -28,7 +28,7 @@ class TestPresetConfiguration:
         assert not configuration.model.allows_variant_selection
 
     def test_parses_base_model(self):
-        configuration = PresetConfiguration(model={"base": "Qwen/Qwen3.5-27B"})
+        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.exact_repo is None
@@ -76,9 +76,28 @@ class TestPresetConfiguration:
             PresetConfiguration(base="Qwen/base", repo="Qwen/repo")
 
     def test_rejects_shorthand_combined_with_model(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="cannot be combined"):
             PresetConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
 
     def test_requires_model(self):
         with pytest.raises(ValidationError):
             PresetConfiguration()
+
+    @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
+    def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
+        with pytest.raises(ValidationError, match="only be set with the `random` dataset"):
+            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
+
+    def test_allows_request_shape_fields_with_the_random_dataset(self):
+        configuration = PresetConfiguration(
+            base="Qwen/Qwen3.5-27B", dataset="random", input_tokens=1024, output_tokens=256
+        )
+
+        assert configuration.input_tokens == 1024
+        assert configuration.output_tokens == 256
+
+    def test_defaults_to_the_random_dataset(self):
+        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+
+        assert configuration.dataset is None
+        assert configuration.effective_dataset == "random"

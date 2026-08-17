@@ -1,36 +1,15 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.preset_agent import AGENT_FINAL_REPORT_JSON_SCHEMA
 from dstack._internal.cli.models.presets import (
     PresetBenchmark,
-    PresetBenchmarkLatency,
-    PresetBenchmarkMetrics,
-    PresetBenchmarkWorkload,
 )
-from tests._internal.cli.preset_factories import get_preset_benchmark
+from tests._internal.cli.common import get_preset_benchmark
 
 pytestmark = pytest.mark.windows
 
 
 class TestPresetBenchmark:
-    def test_agent_schema_matches_benchmark_model(self):
-        schema = AGENT_FINAL_REPORT_JSON_SCHEMA["properties"]["benchmark"]
-        assert set(schema["properties"]) == set(PresetBenchmark.model_fields) - {
-            "target",
-            "client",
-        }
-        assert set(schema["required"]) == set(schema["properties"])
-        workload_schema = schema["properties"]["workload"]
-        metrics_schema = schema["properties"]["metrics"]
-        assert set(workload_schema["properties"]) == set(PresetBenchmarkWorkload.model_fields)
-        assert set(workload_schema["required"]) == set(workload_schema["properties"])
-        assert set(metrics_schema["properties"]) == set(PresetBenchmarkMetrics.model_fields)
-        assert set(metrics_schema["required"]) == set(metrics_schema["properties"])
-        assert set(metrics_schema["properties"]["ttft_ms"]["properties"]) == set(
-            PresetBenchmarkLatency.model_fields
-        )
-
     @pytest.mark.parametrize(
         ("field", "value", "error"),
         [

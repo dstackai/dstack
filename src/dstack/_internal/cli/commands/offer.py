@@ -154,9 +154,13 @@ def _process_group_by_args(group_by_args: List[str]) -> List[str]:
 
 
 def _get_run_spec(args: argparse.Namespace) -> RunSpec:
-    # Set image and user so that the server (a) does not default gpu.vendor
-    # to nvidia — `dstack offer` should show all vendors, and (b) does not
-    # attempt to pull image config from the Docker registry.
+    # image="scratch" is a special value that forces the server to use some dummy default
+    # values for optional fields that otherwise would be extracted from the image config
+    # pulled from the image registry (commands/entrypoint, user, resources.cpu.arch).
+    # Additionally, it disables the server code path that sets gpu.vendor to nvidia when
+    # the image is not set.
+    # We still set `commands` and `user` for compatibility with older servers that don't treat
+    # "scratch" as a special "don't request the registry" value.
     conf = TaskConfiguration(
         resources=ResourcesSpec.unconstrained(),
         commands=[":"],

@@ -1,7 +1,9 @@
 import argparse
+import io
 import os
+import sys
 import time
-from contextlib import suppress
+from contextlib import redirect_stderr, suppress
 from pathlib import Path
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
@@ -14,6 +16,7 @@ from dstack._internal.cli.models.presets import (
     PresetListOutput,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
+from dstack._internal.cli.services.configurators import APPLY_STDIN_NAME
 from dstack._internal.cli.services.presets.apply import apply_preset
 from dstack._internal.cli.services.presets.create import (
     CreationStopped,
@@ -22,18 +25,20 @@ from dstack._internal.cli.services.presets.create import (
     plan_preset,
     reassign_preset_name,
     reconcile_detached_sessions,
+    resolve_previous_sessions,
     show_preset_session_logs,
     stop_preset_session,
 )
 from dstack._internal.cli.services.presets.output import get_presets_table, print_presets
 from dstack._internal.cli.services.presets.session import (
-    list_agent_sessions,
-    load_resumable_agent_session,
+    list_preset_sessions,
+    load_resumable_session,
     resolve_session_ref,
 )
 from dstack._internal.cli.services.presets.store import (
     PresetStore,
     load_preset_configuration,
+    parse_preset_configuration,
     resolve_preset_prompt,
 )
 from dstack._internal.cli.services.profile import (
@@ -113,6 +118,13 @@ class PresetCommand(BaseCommand):
             "--debug",
             action="store_true",
             help="Save the agent prompt and raw trace",
+        )
+        create_parser.add_argument(
+            "--previous",
+            action="append",
+            metavar="ID",
+            help="Give the agent a previous session's results to analyze and improve on."
+            " Repeat for several",
         )
         create_parser.add_argument(
             "--resume",
@@ -243,9 +255,13 @@ class PresetCommand(BaseCommand):
                 limit=args.limit,
             )
             return
+        # The store warns about unreadable presets on stderr once per read;
+        # inside Live that would tear the render on every refresh. The first
+        # read happens before Live starts so warnings print once, above the
+        # table; refreshes read with stderr suppressed.
+        presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
         with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
             while True:
-                presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
                 live.update(
                     get_presets_table(
                         presets,
@@ -256,13 +272,15 @@ class PresetCommand(BaseCommand):
                     )
                 )
                 time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                with redirect_stderr(io.StringIO()):
+                    presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
 
     def _list_presets_and_sessions(
         self, *, base: str | None, repo: str | None
     ) -> tuple[list[Preset], list[dict]]:
         self._reconcile()
         presets = PresetStore().list()
-        sessions = list_agent_sessions()
+        sessions = list_preset_sessions()
         if base or repo:
             repo_to_base = {preset.model: preset.base for preset in presets}
             presets = _filter_presets(presets, base=base, repo=repo)
@@ -274,18 +292,27 @@ class PresetCommand(BaseCommand):
         return presets, sessions
 
     def _create(self, args: argparse.Namespace) -> None:
-        configuration_path, configuration = load_preset_configuration(args.configuration_file)
+        _check_stdin_configuration_confirmable(args)
+        _, configuration = _read_configuration_arg(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args, require_name=False)
-        user_prompt = resolve_preset_prompt(configuration, configuration_path)
+        user_prompt = resolve_preset_prompt(configuration, _prompt_base(args.configuration_file))
         store = PresetStore()
         resume_session = None
         if getattr(args, "resume", None):
-            resume_session = load_resumable_agent_session(args.resume)
+            resume_session = load_resumable_session(args.resume)
             if getattr(args, "trials", None) is not None:
                 console.print(
                     "[warning]--trials is ignored when resuming: "
                     "the constraints are fixed at creation[/]"
                 )
+            if configuration.previous:
+                console.print(
+                    "[warning]previous is ignored when resuming: "
+                    "the previous sessions are fixed at creation[/]"
+                )
+        previous = ()
+        if resume_session is None and configuration.previous:
+            previous = resolve_previous_sessions(configuration.previous)
         api = Client.from_config(project_name=args.project)
         allowed_fleets = None
         if resume_session is None:
@@ -310,6 +337,7 @@ class PresetCommand(BaseCommand):
                 resume_session=resume_session,
                 user_prompt=user_prompt,
                 allowed_fleets=allowed_fleets,
+                previous=previous,
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
@@ -351,7 +379,7 @@ class PresetCommand(BaseCommand):
 
     def _apply(self, args: argparse.Namespace) -> None:
         self._reconcile()
-        configuration_path, configuration = load_preset_configuration(args.configuration_file)
+        configuration_path, configuration = _read_configuration_arg(args.configuration_file)
         configuration = _get_effective_configuration(configuration, args)
         apply_preset(
             api=Client.from_config(project_name=args.project),
@@ -515,6 +543,28 @@ def _confirm_preset_creation(store: PresetStore, name: str | None, *, assume_yes
     return True
 
 
+def _read_configuration_arg(configuration_file: str) -> tuple[str, PresetConfiguration]:
+    """`-f <path>`, or `-f -` for stdin — the same convention as `dstack apply`."""
+    if configuration_file == APPLY_STDIN_NAME:
+        return APPLY_STDIN_NAME, parse_preset_configuration(sys.stdin)
+    path = Path(configuration_file)
+    return str(path.resolve()), load_preset_configuration(path)
+
+
+def _prompt_base(configuration_file: str) -> Path:
+    """Prompt files resolve relative to the configuration file; cwd for stdin."""
+    if configuration_file == APPLY_STDIN_NAME:
+        return Path.cwd()
+    return Path(configuration_file).resolve().parent
+
+
+def _check_stdin_configuration_confirmable(args: argparse.Namespace) -> None:
+    # Same rule as `dstack apply`: the confirmation prompt cannot read from a
+    # stdin that is the configuration itself.
+    if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
+        raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
+
+
 def _get_effective_configuration(
     configuration: PresetConfiguration,
     args: argparse.Namespace,
@@ -524,6 +574,8 @@ def _get_effective_configuration(
     _apply_name(configuration, args.name, required=require_name)
     if getattr(args, "trials", None) is not None:
         configuration.trials = args.trials
+    if getattr(args, "previous", None):
+        configuration.previous = list(args.previous)
     profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
     for field in ProfileParams.model_fields:
         if getattr(configuration, field) is None:

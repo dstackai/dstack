@@ -11,7 +11,6 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.configurations import (
@@ -4003,8 +4002,9 @@ class TestSubmitService:
         assert response.status_code == 200
         assert response.json()["service"]["url"] == expected_service_url
         assert response.json()["service"]["model"]["base_url"] == expected_model_url
-        events = await list_events(session)
-        assert ("Service registered in gateway" in {e.message for e in events}) == is_gateway
+        res = await session.execute(select(RunModel))
+        run = res.scalar_one()
+        assert (run.gateway_id is not None) == is_gateway
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("populate_configuration", [True, False])
@@ -4055,8 +4055,9 @@ class TestSubmitService:
         )
         assert response.status_code == 200
         assert response.json()["service"]["url"] == "https://test-service.my-gateway.example"
-        events = await list_events(session)
-        assert "Service registered in gateway" in {e.message for e in events}
+        res = await session.execute(select(RunModel))
+        run = res.scalar_one()
+        assert run.gateway_id is not None
 
     @pytest.mark.asyncio
     async def test_return_error_if_specified_gateway_not_exists(
@@ -4407,62 +4408,6 @@ class TestSubmitService:
                 }
             ]
         }
-
-    @pytest.mark.asyncio
-    async def test_unregister_dangling_service(
-        self,
-        test_db,
-        session: AsyncSession,
-        client: AsyncClient,
-        mock_gateway_connection: AsyncMock,
-    ) -> None:
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session, owner=user, name="test-project")
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
-        repo = await create_repo(session=session, project_id=project.id)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.RUNNING,
-            wildcard_domain="example.com",
-        )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
-        project.default_gateway_id = gateway.id
-        await session.commit()
-
-        client_mock = (
-            mock_gateway_connection.return_value.client.return_value.__aenter__.return_value
-        )
-        client_mock.register_service.side_effect = [
-            GatewayError("Service test-project/test-service is already registered"),
-            None,  # Second call succeeds
-        ]
-
-        response = await client.post(
-            f"/api/project/{project.name}/runs/apply",
-            headers=get_auth_headers(user.token),
-            json={
-                "plan": {
-                    "run_spec": get_service_run_spec(repo_id=repo.name, run_name="test-service"),
-                    "current_resource": None,
-                },
-                "force": False,
-            },
-        )
-
-        assert response.status_code == 200
-        assert response.json()["service"]["url"] == "https://test-service.example.com"
-        # Verify that unregister_service was called to clean up the dangling service
-        client_mock.unregister_service.assert_called_once_with(
-            project=project.name,
-            run_name="test-service",
-        )
-        # Verify that register_service was called twice (first failed, then succeeded)
-        assert client_mock.register_service.call_count == 2
 
     @pytest.mark.asyncio
     async def test_return_error_if_default_gateway_forbids_new_services(

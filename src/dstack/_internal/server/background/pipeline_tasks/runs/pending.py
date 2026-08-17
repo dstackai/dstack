@@ -5,7 +5,7 @@ from datetime import timedelta
 from typing import Optional
 
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.runs import RunSpec, RunStatus
+from dstack._internal.core.models.runs import RunSpec, RunStatus, RunTerminationReason
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
 from dstack._internal.server.background.pipeline_tasks.runs.common import (
@@ -13,6 +13,7 @@ from dstack._internal.server.background.pipeline_tasks.runs.common import (
     compute_desired_replica_counts,
 )
 from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.services.runs import gateway_registration_failed
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -21,6 +22,7 @@ logger = get_logger(__name__)
 
 class PendingRunUpdateMap(ItemUpdateMap, total=False):
     status: RunStatus
+    termination_reason: Optional[RunTerminationReason]
     desired_replica_count: int
     desired_replica_counts: Optional[str]
 
@@ -48,6 +50,15 @@ async def process_pending_run(context: PendingContext) -> Optional[PendingResult
     """
     run_model = context.run_model
     run_spec = context.run_spec
+
+    if gateway_registration_failed(run_model):
+        return PendingResult(
+            run_update_map=PendingRunUpdateMap(
+                status=RunStatus.TERMINATING,
+                termination_reason=RunTerminationReason.GATEWAY_ERROR,
+            ),
+            new_job_models=[],
+        )
 
     if run_model.resubmission_attempt > 0 and not _is_ready_for_resubmission(run_model):
         return None

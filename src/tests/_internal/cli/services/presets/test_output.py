@@ -5,10 +5,10 @@ from io import StringIO
 import pytest
 from rich.table import Table
 
+from dstack._internal.cli.models.presets import PresetWorkload
 from dstack._internal.cli.services.presets import output as output_module
 from dstack._internal.cli.services.presets.output import _add_session, _format_number
-from tests._internal.cli.common import plain_console
-from tests._internal.cli.preset_factories import get_preset
+from tests._internal.cli.common import get_preset, plain_console
 
 pytestmark = pytest.mark.windows
 
@@ -27,7 +27,7 @@ class TestFormatNumber:
 class TestFormatPresetBenchmark:
     def test_formats_second_scale_ttft_without_scientific_notation(self):
         preset = get_preset()
-        ttft = preset.validations[0].benchmark.metrics.ttft_ms
+        ttft = preset.benchmark.metrics.ttft_ms
         ttft.mean = 8148.3
         ttft.p50 = 8151.4
         ttft.p99 = 8334.2
@@ -43,32 +43,62 @@ class TestFormatPresetBenchmark:
 
 
 class TestFormatPresetObjective:
-    def test_shows_the_shared_prefix_the_benchmark_actually_used(self):
+    def test_shows_the_requested_shared_prefix(self):
         preset = get_preset()
-        preset.validations[0].benchmark.workload.shared_prefix_tokens = 768
+        preset.configuration.shared_prefix_tokens = 768
 
         assert output_module.format_preset_objective(preset) == (
             "[secondary]io=1K/128 prefix=75% conc=1[/]"
         )
 
-    def test_a_preset_saved_before_the_field_existed_still_loads(self):
-        # `shared_prefix_tokens` is absent from every preset saved so far.
+    def test_treats_an_unset_shared_prefix_as_none_shared(self):
         preset = get_preset()
 
-        assert preset.validations[0].benchmark.workload.shared_prefix_tokens == 0
+        assert preset.configuration.shared_prefix_tokens is None
         assert output_module.format_preset_objective(preset) == (
             "[secondary]io=1K/128 prefix=0% conc=1[/]"
         )
 
+    def test_shows_the_dataset_instead_of_the_request_shape(self):
+        # A dataset defines its own request shape, so the cell names it instead.
+        preset = get_preset()
+        preset.configuration.dataset = "spec_bench"
+
+        assert output_module.format_preset_objective(preset) == (
+            "[secondary]data=spec_bench conc=1[/]"
+        )
+
+    def test_renders_the_requested_workload_not_the_measured_one(self):
+        # They diverge with a dataset, where the benchmark records measured means.
+        preset = get_preset()
+        preset.configuration.dataset = "spec_bench"
+        benchmark = preset.benchmark
+        benchmark.workload = PresetWorkload(
+            api=benchmark.workload.api,
+            num_requests=benchmark.workload.num_requests,
+            input_tokens=347,
+            output_tokens=2451,
+            concurrency=8,
+            dataset="spec_bench",
+        )
+
+        assert output_module.format_preset_objective(preset) == (
+            "[secondary]data=spec_bench conc=1[/]"
+        )
+
 
 class TestPrintPresets:
-    def test_preserves_benchmark_concurrency_at_narrow_width(self, monkeypatch):
+    def test_preserves_constraints_and_benchmark_at_narrow_width(self, monkeypatch):
         output = StringIO()
         monkeypatch.setattr(output_module, "console", plain_console(output, width=79))
 
         output_module.print_presets([get_preset()])
 
-        assert "conc=1" in "".join(output.getvalue().split())
+        # Both columns wrap rather than clip, so their full content survives even
+        # when a long model name would otherwise squeeze them out.
+        joined = "".join(output.getvalue().split())
+        assert "conc=1" in joined
+        assert "ttft=108ms" in joined
 
     def test_prints_submitted_column(self, monkeypatch):
         output = StringIO()
@@ -110,7 +140,8 @@ class TestSessionRow:
             }
         )
 
-        assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](2/3)[/]"
+        # 2 completed, so the 3rd is the one being trialed.
+        assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](3/3)[/]"
         # Per-user speed is 1/TPOT, the same definition the preset row uses — not
         # the aggregate over concurrency, which would read 292 here.
         assert row["BENCHMARK"].startswith("tok/s/user=292")
@@ -131,6 +162,17 @@ class TestSessionRow:
         )
 
         assert row["CONSTRAINTS"] == ("[secondary]io=8K/1K prefix=90% conc=162[/]")
+
+    def test_shows_the_dataset_for_a_session_with_a_custom_dataset(self):
+        row = _session_row(
+            {
+                "id": "c7e18d52",
+                "status": "running",
+                "constraints": {"dataset": "spec_bench", "concurrency": 4},
+            }
+        )
+
+        assert row["CONSTRAINTS"] == ("[secondary]data=spec_bench conc=4[/]")
 
     def test_shows_the_shared_prefix_even_when_requests_are_fully_unique(self):
         # `prefix=0%` is not noise: it decides how much of each request the engine
@@ -155,7 +197,20 @@ class TestSessionRow:
             {"id": "ab12cd34", "status": "running", "trials_num": 3, "trials": {"count": 0}}
         )
 
-        assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](0/3)[/]"
+        assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](1/3)[/]"
+
+    def test_verifying_keeps_the_completed_count(self):
+        row = _session_row(
+            {
+                "id": "ab12cd34",
+                "status": "running",
+                "trials_num": 3,
+                "trials": {"count": 3},
+                "verification": {"status": "verifying"},
+            }
+        )
+
+        assert row["STATUS"] == "[bold deep_sky_blue1]verifying[/] [secondary](3/3)[/]"
 
     def test_omits_progress_without_trials_data(self):
         row = _session_row({"id": "ab12cd34", "status": "interrupted"})
@@ -174,7 +229,7 @@ class TestOrdering:
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         old = get_preset()
         new = old.model_copy(
-            update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)}
+            update={"id": "11aa22bb", "submitted_at": old.submitted_at + timedelta(days=2)}
         )
         sessions = [
             {
@@ -269,29 +324,35 @@ class TestVerifyingStatus:
         assert row["STATUS"].startswith("[bold sea_green3]trialing[/]")
 
 
+def _write_trials(tmp_path, records):
+    trials_dir = tmp_path / "trials"
+    for number, record in enumerate(records, 1):
+        (trials_dir / str(number)).mkdir(parents=True)
+        (trials_dir / str(number) / "trial.json").write_text(json.dumps(record))
+    return trials_dir
+
+
 class TestFailedTrials:
     def test_a_failed_trial_keeps_its_benchmark_but_never_becomes_best(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
 
         # The failed trial is the fastest. It broke `max_ttft`, so promoting it
         # would put a non-compliant configuration at the top of the listing.
-        path = tmp_path / "trials.jsonl"
-        path.write_text(
-            "\n".join(
-                json.dumps(
-                    {
-                        "benchmark": {
-                            "metrics": {"total_output_tokens": tokens, "duration_seconds": 1.0},
-                            "workload": {"concurrency": 8},
-                        },
-                        **({"failed": True} if failed else {}),
-                    }
-                )
+        trials_dir = _write_trials(
+            tmp_path,
+            [
+                {
+                    "benchmark": {
+                        "metrics": {"total_output_tokens": tokens, "duration_seconds": 1.0},
+                        "workload": {"concurrency": 8},
+                    },
+                    **({"failed": True} if failed else {}),
+                }
                 for tokens, failed in ((100.0, False), (900.0, True), (300.0, False))
-            )
+            ],
         )
 
-        summary = _summarize_session_trials(path)
+        summary = _summarize_session_trials(trials_dir)
 
         assert summary["count"] == 3
         # Still charted: the trial happened and its number is real.
@@ -304,12 +365,12 @@ class TestFailedTrials:
 
         # Neither `best` nor `best_failed` can carry the hardware here, so this is
         # the only thing left that knows what the run was on.
-        path = tmp_path / "trials.jsonl"
-        path.write_text(
-            json.dumps({"resources": {"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}})
+        trials_dir = _write_trials(
+            tmp_path,
+            [{"resources": {"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}}],
         )
 
-        summary = _summarize_session_trials(path)
+        summary = _summarize_session_trials(trials_dir)
 
         assert summary["best"] is None
         assert summary["best_failed"] is None
@@ -318,28 +379,26 @@ class TestFailedTrials:
     def test_the_fastest_failed_trial_is_kept_when_nothing_passed(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
 
-        path = tmp_path / "trials.jsonl"
-        path.write_text(
-            "\n".join(
-                json.dumps(
-                    {
-                        "benchmark": {
-                            "metrics": {
-                                "total_output_tokens": tokens,
-                                "duration_seconds": 1.0,
-                                "tpot_ms": {"p50": 34.4},
-                                "ttft_ms": {"p50": 4300.0},
-                            },
-                            "workload": {"concurrency": 4},
+        trials_dir = _write_trials(
+            tmp_path,
+            [
+                {
+                    "benchmark": {
+                        "metrics": {
+                            "total_output_tokens": tokens,
+                            "duration_seconds": 1.0,
+                            "tpot_ms": {"p50": 34.4},
+                            "ttft_ms": {"p50": 4300.0},
                         },
-                        "failed": True,
-                    }
-                )
+                        "workload": {"concurrency": 4},
+                    },
+                    "failed": True,
+                }
                 for tokens in (100.0, 300.0, 200.0)
-            )
+            ],
         )
 
-        summary = _summarize_session_trials(path)
+        summary = _summarize_session_trials(trials_dir)
 
         assert summary["best"] is None
         assert summary["best_failed"]["tok_s"] == 300.0
@@ -375,9 +434,9 @@ class TestFailedTrials:
 
 
 class TestFailedTrialSpark:
-    def test_a_trial_that_broke_a_constraint_is_yellow_but_still_charted(self):
-        # Its number is real, so it earns a bar; the breach makes it yellow, not
-        # red — red is reserved for a trial that produced nothing.
+    def test_a_trial_that_broke_a_constraint_is_charted_but_not_the_best(self):
+        # Its number is real, so it earns a bar rather than a `·`, and green goes
+        # to the best trial that meets the constraints even on a lower number.
         session = {
             "id": "ab12cd34",
             "status": "running",
@@ -390,8 +449,41 @@ class TestFailedTrialSpark:
 
         spark = output_module._format_trial_spark(session)
 
-        assert spark.count("gold1") == 1
-        assert "indian_red1" not in spark
+        assert spark.count("indian_red1") == 1
+        assert spark.count("sea_green3") == 1
+        assert "gold1" not in spark
         assert "·" not in spark
-        # The failed trial is the highest number and must not be styled as best.
+
+    def test_the_best_failed_trial_is_gold_while_none_passes(self):
+        # With nothing meeting the constraints, the best result so far is still
+        # what the run has to show; the rest are context.
+        session = {
+            "id": "ab12cd34",
+            "status": "running",
+            "trials": {
+                "count": 3,
+                "series": [100.0, 900.0, 300.0],
+                "failed": [True, True, True],
+            },
+        }
+
+        spark = output_module._format_trial_spark(session)
+
+        assert spark.count("gold1") == 1
+        assert spark.count("indian_red1") == 2
         assert "sea_green3" not in spark
+
+
+def test_warn_respects_stderr_redirect():
+    """`preset -w` suppresses store warnings during refreshes via
+    redirect_stderr; that only works while `error_console` resolves
+    `sys.stderr` at write time."""
+    import io
+    from contextlib import redirect_stderr
+
+    from dstack._internal.cli.utils.common import warn
+
+    buffer = io.StringIO()
+    with redirect_stderr(buffer):
+        warn("torn render", stderr=True)
+    assert "torn render" in buffer.getvalue()

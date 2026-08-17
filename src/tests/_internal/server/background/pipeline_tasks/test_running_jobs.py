@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
@@ -24,7 +24,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.duration import Duration
-from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
@@ -60,7 +60,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     _SubmitJobToRunnerResult,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
-from dstack._internal.server.models import JobModel, ProbeModel
+from dstack._internal.server.models import JobModel, ProbeModel, ServiceReplicaRegistrationModel
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     JobInfoResponse,
@@ -1872,6 +1872,353 @@ class TestJobRunningWorker:
             assert job.termination_reason is None
             assert job.termination_reason_message is None
 
+    async def test_terminates_job_on_gateway_registration_failure(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute.id,
+                is_registered=False,
+                register_attempt=2,
+                register_status_message="Connection refused",
+            )
+        )
+        await session.commit()
+
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await _process_job(session, worker, job)
+            ssh_tunnel_cls.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.GATEWAY_ERROR
+
+    async def test_does_not_terminate_job_when_registered_with_at_least_one_gateway_replica(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        gateway_compute_2 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=1
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=False,
+                register_attempt=2,
+                register_status_message="Connection refused",
+            )
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute_2.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        await session.commit()
+
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await _process_job(session, worker, job)
+            ssh_tunnel_cls.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.termination_reason is None
+
+    async def test_does_not_terminate_job_when_gateway_replica_has_not_attempted_registration(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_1 = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        # Second running replica has not attempted registration yet (e.g. just came up).
+        await create_gateway_compute(session=session, gateway_id=gateway.id, replica_num=1)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute_1.id,
+                is_registered=False,
+                register_attempt=2,
+                register_status_message="Connection refused",
+            )
+        )
+        await session.commit()
+
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await _process_job(session, worker, job)
+            ssh_tunnel_cls.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.termination_reason is None
+
+    async def test_terminates_job_ignoring_registration_on_non_running_replica(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway_compute_running = await create_gateway_compute(
+            session=session, gateway_id=gateway.id, replica_num=0
+        )
+        # Terminated replica successfully registered before going away — should be ignored,
+        # since only currently running replicas count towards the predicate.
+        gateway_compute_terminating = await create_gateway_compute(
+            session=session,
+            gateway_id=gateway.id,
+            replica_num=1,
+            status=GatewayReplicaStatus.TERMINATING,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(port=80, image="ubuntu"),
+            ),
+            gateway=gateway,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+            registered=True,
+            ready=True,
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute_running.id,
+                is_registered=False,
+                register_attempt=2,
+                register_status_message="Connection refused",
+            )
+        )
+        session.add(
+            ServiceReplicaRegistrationModel(
+                job_id=job.id,
+                gateway_replica_id=gateway_compute_terminating.id,
+                is_registered=True,
+                register_attempt=0,
+            )
+        )
+        await session.commit()
+
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await _process_job(session, worker, job)
+            ssh_tunnel_cls.assert_called_once()
+            runner_client_mock.pull.assert_called_once()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.GATEWAY_ERROR
+
     @pytest.mark.parametrize("probe_count", [1, 2])
     async def test_creates_probe_models_and_not_registers_service_replica(
         self,
@@ -1978,7 +2325,6 @@ class TestJobRunningWorker:
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
             "Service replica ready to receive requests",
-            "Service replica registered to receive requests",
         }
 
     @pytest.mark.parametrize(
@@ -2067,10 +2413,9 @@ class TestJobRunningWorker:
         events = await list_events(session)
         if expect_to_register:
             assert job.registered
-            assert len(events) == 2
+            assert len(events) == 1
             assert {event.message for event in events} == {
                 "Service replica ready to receive requests",
-                "Service replica registered to receive requests",
             }
         else:
             assert not job.registered
@@ -2084,7 +2429,6 @@ class TestJobRunningWorker:
         ssh_tunnel_mock: Mock,
         shim_client_mock: Mock,
         runner_client_mock: Mock,
-        mock_gateway_connection: AsyncMock,
     ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -2143,16 +2487,7 @@ class TestJobRunningWorker:
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
             "Service replica ready to receive requests",
-            "Service replica registered to receive requests",
         }
-        mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
-            run=ANY,
-            job_spec=ANY,
-            job_submission=ANY,
-            instance_project_ssh_private_key=None,
-            ssh_head_proxy=None,
-            ssh_head_proxy_private_key=None,
-        )
 
     async def test_registers_service_replica_in_gateway_when_running_on_imported_instance(
         self,
@@ -2162,7 +2497,6 @@ class TestJobRunningWorker:
         ssh_tunnel_mock: Mock,
         shim_client_mock: Mock,
         runner_client_mock: Mock,
-        mock_gateway_connection: AsyncMock,
     ):
         user = await create_user(session=session)
         exporter_project = await create_project(
@@ -2230,16 +2564,7 @@ class TestJobRunningWorker:
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
             "Service replica ready to receive requests",
-            "Service replica registered to receive requests",
         }
-        mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
-            run=ANY,
-            job_spec=ANY,
-            job_submission=ANY,
-            instance_project_ssh_private_key="exporter-private-key",
-            ssh_head_proxy=None,
-            ssh_head_proxy_private_key=None,
-        )
 
     @pytest.mark.parametrize("job_status", [JobStatus.RUNNING, JobStatus.PULLING])
     async def test_terminates_job_when_instance_access_revoked(
@@ -2477,7 +2802,6 @@ class TestJobRunningWorker:
         worker: JobRunningWorker,
         ssh_tunnel_mock: Mock,
         runner_client_mock: Mock,
-        mock_gateway_connection: AsyncMock,
     ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -2545,7 +2869,6 @@ class TestJobRunningWorker:
         events = await list_events(session)
         assert {event.message for event in events} == {
             "Service replica ready to receive requests",
-            "Service replica registered to receive requests",
         }
 
         await clear_events(session)
@@ -2889,6 +3212,117 @@ class TestPrepareStartupContextGroupsIpWait:
             out = await _prepare_startup_context(context=context, result=result)
         assert out is None
         assert result.job_update_map == {}
+
+
+@pytest.mark.asyncio
+class TestPrepareStartupContextReplicaGate:
+    """Tests for the https://github.com/dstackai/dstack/issues/4146 fix"""
+
+    def _make_job(
+        self,
+        *,
+        replica_num: int,
+        status: JobStatus,
+        job_provisioning_data: Optional[MagicMock],
+        job_name: str = "run-0-0",
+    ) -> MagicMock:
+        job = MagicMock()
+        job.job_spec.replica_num = replica_num
+        job.job_spec.job_name = job_name
+        job_submission = MagicMock()
+        job_submission.status = status
+        job_submission.job_provisioning_data = job_provisioning_data
+        job.job_submissions = [job_submission]
+        return job
+
+    def _make_context(self, other_jobs: list[MagicMock]) -> _ProcessContext:
+        job = self._make_job(
+            replica_num=0,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=MagicMock(),
+        )
+        run = MagicMock()
+        run.jobs = [job] + other_jobs
+        return _ProcessContext(
+            job_model=MagicMock(),
+            run_model=MagicMock(),
+            run=run,
+            job=job,
+            job_submission=MagicMock(job_runtime_data=None),
+            job_provisioning_data=MagicMock(),
+            instance_access_revoked=False,
+        )
+
+    async def _run_gate(self, context: _ProcessContext, result: _ProcessResult):
+        # `get_router_env_for_job` is the first thing after the gate. Returning `FAILED`
+        # makes passing the gate observable without mocking the whole startup path.
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
+            return_value=RouterEnvStatus.FAILED,
+        ):
+            return await _prepare_startup_context(context=context, result=result)
+
+    def _assert_gate_not_passed(self, result: _ProcessResult) -> None:
+        assert result.job_update_map == {}
+
+    def _assert_gate_passed(self, result: _ProcessResult) -> None:
+        assert "Router replica is in a terminal state" in (
+            result.job_update_map.get("termination_reason_message") or ""
+        )
+
+    async def test_defers_on_submitted_job_in_replica(self):
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=0,
+                    status=JobStatus.SUBMITTED,
+                    job_provisioning_data=None,
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_not_passed(result)
+
+    @pytest.mark.parametrize("status", [JobStatus.FAILED, JobStatus.TERMINATED, JobStatus.ABORTED])
+    async def test_defers_on_job_in_replica_terminated_before_provisioning(self, status):
+        context = self._make_context(
+            [self._make_job(replica_num=0, status=status, job_provisioning_data=None)]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        # The job is not terminated here: the run pipeline decides whether the replica
+        # is retried or failed, and it can only do so once this job is unlocked.
+        self._assert_gate_not_passed(result)
+
+    async def test_does_not_defer_on_done_job_in_replica(self):
+        # A job that already finished its work does not block its slower siblings.
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=0,
+                    status=JobStatus.DONE,
+                    job_provisioning_data=MagicMock(),
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_passed(result)
+
+    async def test_does_not_defer_on_job_in_other_replica(self):
+        context = self._make_context(
+            [
+                self._make_job(
+                    replica_num=1,
+                    status=JobStatus.FAILED,
+                    job_provisioning_data=None,
+                )
+            ]
+        )
+        result = _ProcessResult()
+        assert await self._run_gate(context, result) is None
+        self._assert_gate_passed(result)
 
 
 @pytest.mark.asyncio

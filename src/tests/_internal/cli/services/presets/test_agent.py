@@ -14,6 +14,7 @@ import pytest
 import yaml
 
 from dstack._internal.cli.models.configurations import PresetConfiguration
+from dstack._internal.cli.models.preset_agent import PresetSessionProcess
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     _build_claude_command,
@@ -28,16 +29,17 @@ from dstack._internal.cli.services.presets.redaction import (
     redact,
 )
 from dstack._internal.cli.services.presets.session import (
-    PresetAgentSession,
+    PresetSession,
     _read_last_session_verification,
     _summarize_session_trials,
-    create_preset_agent_session,
-    load_resumable_agent_session,
+    create_preset_session,
+    load_resumable_session,
     print_preset_progress,
 )
 from dstack._internal.cli.services.presets.tail import (
-    _ProgressTailer,
-    _RecordMirror,
+    ProgressTailer,
+    RecordMirror,
+    open_session_offsets,
 )
 from dstack._internal.cli.services.presets.workspace import (
     PresetAgentWorkspace,
@@ -48,6 +50,15 @@ from dstack._internal.cli.services.presets.workspace import (
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.services.configs import ConfigManager
+from tests._internal.cli.common import get_session_run, get_session_state
+
+
+def _record_run(session, workspace_record):
+    state = session.read_state()
+    assert state is not None
+    state.run = get_session_run(workspace=workspace_record)
+    session.write_state(state)
+
 
 pytestmark = pytest.mark.windows
 
@@ -76,7 +87,9 @@ class TestClaudeAuth:
 
     @pytest.mark.parametrize("api_key", ["key", None])
     def test_builds_command_for_selected_auth_mode(self, api_key):
-        command = _build_claude_command(auth=_claude_auth(api_key=api_key, effort="high"))
+        command = _build_claude_command(
+            auth=_claude_auth(api_key=api_key, effort="high"), resume_session_id=None
+        )
 
         assert ("--bare" in command) is (api_key is not None)
         assert ("--setting-sources" in command) is (api_key is None)
@@ -164,15 +177,17 @@ class TestAgentIsolation:
 def _session_workspace(tmp_path):
     session_dir = tmp_path / "session-under-test"
     session_dir.mkdir()
-    session = PresetAgentSession(path=session_dir, debug=False, preset_id="abcd1234")
-    return create_agent_workspace(session)
+    session = PresetSession(path=session_dir, debug=False, preset_id="abcd1234")
+    session.write_state(get_session_state(id="abcd1234"))
+    workspace, _ = create_agent_workspace(session)
+    return workspace
 
 
 class TestAgentSession:
     def _configuration(self) -> PresetConfiguration:
         return PresetConfiguration(
             name="qwen",
-            model={"base": "Qwen/Qwen3.5-27B"},
+            base="Qwen/Qwen3.5-27B",
             max_price=0.5,
             env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
         )
@@ -184,7 +199,7 @@ class TestAgentSession:
     def test_creates_private_session_with_log_and_manifest(self, tmp_path, monkeypatch, capsys):
         self._home(tmp_path, monkeypatch)
 
-        session = create_preset_agent_session(self._configuration())
+        session = create_preset_session(self._configuration(), previous=(), debug=False)
 
         assert session.path.parent == tmp_path / ".dstack" / "presets"
         assert session.path.name == session.preset_id
@@ -194,13 +209,13 @@ class TestAgentSession:
             "session.json",
             "preset.dstack.yml",
         }
-        manifest = json.loads((session.path / "session.json").read_text())
-        assert manifest["id"] == session.preset_id
-        assert manifest["status"] == "running"
-        assert manifest["name"] == "qwen"
-        assert manifest["model"] == "Qwen/Qwen3.5-27B"
-        assert manifest["pid"] == os.getpid()
-        print_preset_progress("creating preset", agent_session=session)
+        state = json.loads((session.path / "session.json").read_text())
+        assert state["id"] == session.preset_id
+        assert state["status"] == "running"
+        assert state["name"] == "qwen"
+        assert state["model"] == "Qwen/Qwen3.5-27B"
+        assert state["owner"]["pid"] == os.getpid()
+        print_preset_progress("creating preset", session=session)
         assert "creating preset" in session.log_path.read_text()
         assert "creating preset" in capsys.readouterr().out
         if not IS_WINDOWS:
@@ -210,7 +225,7 @@ class TestAgentSession:
     def test_debug_session_saves_scrubbed_configuration_and_trace(self, tmp_path, monkeypatch):
         self._home(tmp_path, monkeypatch)
 
-        debug_session = create_preset_agent_session(self._configuration(), debug=True)
+        debug_session = create_preset_session(self._configuration(), previous=(), debug=True)
 
         data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
         assert {path.name for path in debug_session.path.iterdir()} == {
@@ -226,7 +241,7 @@ class TestAgentSession:
     @pytest.mark.parametrize("status", ["success", "failed"])
     def test_finish_records_terminal_status(self, tmp_path, monkeypatch, status):
         self._home(tmp_path, monkeypatch)
-        session = create_preset_agent_session(self._configuration())
+        session = create_preset_session(self._configuration(), previous=(), debug=False)
 
         finished_path = session.finish(status)
 
@@ -237,15 +252,19 @@ class TestAgentSession:
         session_dir = tmp_path / "20260714-120000-000000Z"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetAgentSession(
+        session = PresetSession(
             path=session_dir,
             debug=False,
+            preset_id="ab12cd34",
         )
+        session.write_state(get_session_state())
 
         path = session.finish("failed")
 
         assert path == session_dir
-        assert json.loads((session_dir / "session.json").read_text()) == {"status": "failed"}
+        state = session.read_state()
+        assert state is not None
+        assert state.status == "failed"
 
     def test_reports_invalid_existing_parent(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -254,17 +273,18 @@ class TestAgentSession:
         (tmp_path / ".dstack" / "presets").write_text("not a directory")
 
         with pytest.raises(CLIError, match="Could not create agent output"):
-            create_preset_agent_session(
-                PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"})
+            create_preset_session(
+                PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"), previous=(), debug=False
             )
 
     def test_log_write_failure_warns_once(self, tmp_path, capsys):
         path = tmp_path / "agent-running"
         path.mkdir()
         (path / "agent.log").touch()
-        session = PresetAgentSession(
+        session = PresetSession(
             path=path,
             debug=False,
+            preset_id="ab12cd34",
         )
         shutil.rmtree(path)
 
@@ -310,9 +330,10 @@ print(json.dumps({
         session_path.mkdir()
         (session_path / "agent.log").touch()
         (session_path / "trace.jsonl").touch()
-        agent_session = PresetAgentSession(
+        session = PresetSession(
             path=session_path,
             debug=True,
+            preset_id="ab12cd34",
         )
         output = await run_preset_agent(
             prompt="full preset prompt",
@@ -320,18 +341,69 @@ print(json.dumps({
             workspace=workspace,
             auth=_claude_auth(),
             redacted_values=("secret-token",),
-            agent_session=agent_session,
+            session=session,
         )
 
         assert output.report_data == {"prompt": "full preset prompt"}
         assert output.error == "bad [redacted]"
-        trace = [json.loads(line) for line in agent_session.trace_path.read_text().splitlines()]
+        trace = [json.loads(line) for line in session.trace_path.read_text().splitlines()]
         assert len(trace) == 1
         assert trace[0]["timestamp"].endswith("Z")
         assert trace[0]["stream"] == "stdout"
         assert trace[0]["event"]["result"] == "bad [redacted]"
         assert "[redacted]" in trace[0]["event"]
         assert capsys.readouterr().out == ""
+
+    @pytest.mark.asyncio
+    async def test_mirrors_trial_and_service_records_into_the_session(self, tmp_path, monkeypatch):
+        script = tmp_path / "fake_claude.py"
+        script.write_text(
+            """import json
+import os
+import sys
+
+sys.stdin.read()
+os.makedirs("trials/1")
+with open("trials/1/task.dstack.yml", "w") as f:
+    f.write("env:\\n  - TOKEN=secret-token\\n")
+with open("trials/1/trial.json", "w") as f:
+    json.dump({"learned": "uses secret-token"}, f)
+os.makedirs("service/1")
+with open("service/1/verification.json", "w") as f:
+    json.dump({"trial": 1, "status": "verified"}, f)
+print(json.dumps({"type": "result", "structured_output": {"ok": True}}))
+"""
+        )
+        (tmp_path / "progress.jsonl").touch()
+        (tmp_path / "trials").mkdir()
+        (tmp_path / "service").mkdir()
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
+            lambda **_: [sys.executable, str(script)],
+        )
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        session_path = tmp_path / "session"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        session = PresetSession(path=session_path, debug=False, preset_id="ab12cd34")
+
+        output = await run_preset_agent(
+            prompt="p",
+            env=os.environ.copy(),
+            workspace=workspace,
+            auth=_claude_auth(),
+            redacted_values=("secret-token",),
+            session=session,
+        )
+
+        assert output.report_data == {"ok": True}
+        trial_dir = session_path / "trials" / "1"
+        assert (trial_dir / "task.dstack.yml").read_text() == "env:\n  - TOKEN=[redacted]\n"
+        assert json.loads((trial_dir / "trial.json").read_text()) == {"learned": "uses [redacted]"}
+        assert json.loads((session_path / "service" / "1" / "verification.json").read_text()) == {
+            "trial": 1,
+            "status": "verified",
+        }
 
     @pytest.mark.asyncio
     async def test_accepts_stream_event_larger_than_64_kib(self, tmp_path, monkeypatch):
@@ -360,9 +432,10 @@ print(json.dumps({
             workspace=PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
             auth=_claude_auth(),
             redacted_values=(),
-            agent_session=PresetAgentSession(
+            session=PresetSession(
                 path=session_path,
                 debug=False,
+                preset_id="ab12cd34",
             ),
         )
 
@@ -375,21 +448,23 @@ print(json.dumps({
         session_path = tmp_path / "agent-running"
         session_path.mkdir()
         (session_path / "agent.log").touch()
-        agent_session = PresetAgentSession(
+        session = PresetSession(
             path=session_path,
             debug=False,
+            preset_id="ab12cd34",
         )
 
-        _ProgressTailer(
+        ProgressTailer(
             path=progress_path,
             redacted_values=("secret-token",),
-            agent_session=agent_session,
+            session=session,
+            offset_store=open_session_offsets(session),
         ).flush()
 
         output = capsys.readouterr().out
         assert "using [redacted]" in output
         assert "secret-token" not in output
-        log = agent_session.log_path.read_text()
+        log = session.log_path.read_text()
         assert "using [redacted]" in log
         assert "secret-token" not in log
 
@@ -422,7 +497,14 @@ class TestRecordMirror:
         source = tmp_path / "runs.jsonl"
         target = tmp_path / "mirror" / "runs.jsonl"
         target.parent.mkdir()
-        mirror = _RecordMirror(source=source, target=target, redacted_values=["dstack-secret"])
+        mirror = RecordMirror(
+            source=source,
+            target=target,
+            redacted_values=["dstack-secret"],
+            offset_store=_offsets(tmp_path),
+            offset_key="runs",
+            echo=False,
+        )
 
         source.write_text(
             '{"name":"run-1","note":"dstack-secret"}\n{"name":"run-2"', encoding="utf-8"
@@ -441,15 +523,106 @@ class TestRecordMirror:
         ]
 
     def test_missing_source_is_no_op(self, tmp_path):
-        mirror = _RecordMirror(
+        mirror = RecordMirror(
             source=tmp_path / "absent.jsonl",
             target=tmp_path / "target.jsonl",
             redacted_values=[],
+            offset_store=_offsets(tmp_path),
+            offset_key="runs",
+            echo=False,
         )
 
         mirror.flush()
 
         assert not (tmp_path / "target.jsonl").exists()
+
+
+class TestDirectoryMirror:
+    def _mirror(self, tmp_path, **kwargs):
+        from dstack._internal.cli.services.presets.tail import DirectoryMirror
+
+        return DirectoryMirror(
+            source=tmp_path / "w" / "trials",
+            target=tmp_path / "session" / "trials",
+            **{"redacted_values": ["dstack-secret"], "echo": False, **kwargs},
+        )
+
+    def test_copies_the_tree_redacted(self, tmp_path):
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "task.dstack.yml").write_text("env:\n  - TOKEN=dstack-secret\n")
+        (source / "trial.json").write_text('{"learned": "x"}')
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1"
+        assert (target / "task.dstack.yml").read_text() == "env:\n  - TOKEN=[redacted]\n"
+        assert (target / "trial.json").read_text() == '{"learned": "x"}'
+
+    def test_copies_bytes_verbatim(self, tmp_path):
+        # Patches must replicate the trial exactly, and text mode rewrites
+        # newlines and replaces bytes that are not valid UTF-8.
+        source = tmp_path / "w" / "trials" / "1" / "patches"
+        source.mkdir(parents=True)
+        (source / "tuned.csv").write_bytes(b"m,n,k\r\n8,1536,4096\r\n")
+        (source / "weights.bin").write_bytes(b"\x00\xff\xfe binary")
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1" / "patches"
+        assert (target / "tuned.csv").read_bytes() == b"m,n,k\r\n8,1536,4096\r\n"
+        assert (target / "weights.bin").read_bytes() == b"\x00\xff\xfe binary"
+
+    def test_a_rewritten_source_converges_instead_of_corrupting(self, tmp_path):
+        # The failure mode this mirror exists to remove: a source rewritten
+        # under a byte-offset tailer used to commit a torn record forever.
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "first"}')
+        mirror = self._mirror(tmp_path)
+        mirror.flush()
+
+        (source / "trial.json").write_text('{"learned": "rewritten"}')
+        os.utime(source / "trial.json", ns=(1, 1))  # force a distinct signature
+        mirror.flush()
+
+        target = tmp_path / "session" / "trials" / "1" / "trial.json"
+        assert json.loads(target.read_text()) == {"learned": "rewritten"}
+
+    def test_an_unchanged_file_is_not_rewritten(self, tmp_path):
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "x"}')
+        mirror = self._mirror(tmp_path)
+        mirror.flush()
+        target = tmp_path / "session" / "trials" / "1" / "trial.json"
+        first_stat = target.stat().st_mtime_ns
+
+        mirror.flush()
+
+        assert target.stat().st_mtime_ns == first_stat
+
+    def test_missing_source_is_no_op(self, tmp_path):
+        mirror = self._mirror(tmp_path)
+
+        mirror.flush()
+
+        assert not (tmp_path / "session").exists()
+
+    def test_skips_files_above_the_size_limit(self, tmp_path, monkeypatch):
+        from dstack._internal.cli.services.presets.tail import DirectoryMirror
+
+        monkeypatch.setattr(DirectoryMirror, "_MAX_FILE_BYTES", 8)
+        source = tmp_path / "w" / "trials" / "1"
+        source.mkdir(parents=True)
+        (source / "trial.json").write_text('{"learned": "far larger than eight bytes"}')
+        mirror = self._mirror(tmp_path, echo=False)
+
+        mirror.flush()
+
+        assert not (tmp_path / "session" / "trials" / "1" / "trial.json").exists()
 
 
 class TestWriteAgentInfo:
@@ -460,11 +633,11 @@ class TestWriteAgentInfo:
         )
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent._get_claude_auth_status",
-            lambda auth: {"authMethod": "claude.ai", "loggedIn": True},
+            lambda auth: '{"authMethod": "claude.ai", "loggedIn": true}',
         )
         session_dir = tmp_path / "session"
         session_dir.mkdir()
-        session = PresetAgentSession(path=session_dir, debug=True)
+        session = PresetSession(path=session_dir, debug=True, preset_id="ab12cd34")
 
         session.write_agent_info(
             ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
@@ -474,8 +647,14 @@ class TestWriteAgentInfo:
             "executable": "claude",
             "version": "2.1.0 (Claude Code)",
             "model": {"name": "claude-opus-4-8", "effort": "default"},
-            "auth": {"authMethod": "claude.ai", "loggedIn": True},
+            "auth_status": '{"authMethod": "claude.ai", "loggedIn": true}',
         }
+
+
+def _offsets(tmp_path):
+    session_dir = tmp_path / "offsets-session"
+    session_dir.mkdir(exist_ok=True)
+    return open_session_offsets(PresetSession(path=session_dir, debug=False, preset_id="offsets0"))
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -498,11 +677,13 @@ def _agent_setup(tmp_path):
     session_path = tmp_path / "session"
     session_path.mkdir()
     (session_path / "agent.log").touch()
-    agent_session = PresetAgentSession(
+    session = PresetSession(
         path=session_path,
         debug=False,
+        preset_id="ab12cd34",
     )
-    return workspace, agent_session
+    session.write_state(get_session_state())
+    return workspace, session
 
 
 def _patch_claude_command(monkeypatch, script):
@@ -545,7 +726,7 @@ else:
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
         _patch_claude_command(monkeypatch, script)
-        workspace, agent_session = _agent_setup(tmp_path)
+        workspace, session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -553,7 +734,7 @@ else:
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
-            agent_session=agent_session,
+            session=session,
         )
 
         assert output.report_data == {"resumed": True}
@@ -587,7 +768,7 @@ else:
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
         )
         _patch_claude_command(monkeypatch, script)
-        workspace, agent_session = _agent_setup(tmp_path)
+        workspace, session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -595,7 +776,7 @@ else:
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
-            agent_session=agent_session,
+            session=session,
         )
 
         assert output.report_data == {"recovered": True}
@@ -626,7 +807,7 @@ sys.exit(1)
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0, 0)
         )
         _patch_claude_command(monkeypatch, script)
-        workspace, agent_session = _agent_setup(tmp_path)
+        workspace, session = _agent_setup(tmp_path)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -634,7 +815,7 @@ sys.exit(1)
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
-            agent_session=agent_session,
+            session=session,
         )
 
         assert output.report_data is None
@@ -665,10 +846,12 @@ sys.exit(1)
             "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0, 0)
         )
         _patch_claude_command(monkeypatch, script)
-        workspace, agent_session = _agent_setup(tmp_path)
+        workspace, session = _agent_setup(tmp_path)
         # Another CLI recorded a stop: the death must read as a decision, not an
         # outage to retry.
-        agent_session.update_manifest(status="interrupted")
+        state = session.read_state()
+        state.status = "interrupted"
+        session.write_state(state)
 
         output = await run_preset_agent(
             prompt="system prompt",
@@ -676,7 +859,7 @@ sys.exit(1)
             workspace=workspace,
             auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
             redacted_values=(),
-            agent_session=agent_session,
+            session=session,
         )
 
         assert output.report_data is None
@@ -687,21 +870,23 @@ class TestWorkspaceLifecycle:
     def _session(self, tmp_path):
         session_dir = tmp_path / "sessions" / "ab12cd34"
         session_dir.mkdir(parents=True)
-        return PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session.write_state(get_session_state())
+        return session
 
     @pytest.mark.skipif(IS_WINDOWS, reason="workspace alias symlinks are POSIX-only")
     def test_create_attach_and_remove(self, tmp_path):
         session = self._session(tmp_path)
 
-        workspace = create_agent_workspace(session)
-        manifest = session.read_manifest()
-        alias = Path(manifest["alias"])
-        assert Path(manifest["workspace"]) == session.path / "workspace"
+        workspace, workspace_record = create_agent_workspace(session)
+        _record_run(session, workspace_record)
+        alias = Path(workspace_record.alias)
+        assert Path(workspace_record.path) == session.path / "workspace"
         assert alias.is_symlink()
         (workspace.path / "note.txt").write_text("kept", encoding="utf-8")
 
         os.unlink(alias)
-        attached = attach_agent_workspace(session)
+        attached, _ = attach_agent_workspace(session)
         assert alias.is_symlink()
         assert (attached.path / "note.txt").read_text() == "kept"
 
@@ -712,9 +897,9 @@ class TestWorkspaceLifecycle:
     @pytest.mark.skipif(IS_WINDOWS, reason="workspace alias symlinks are POSIX-only")
     def test_attach_refuses_occupied_alias(self, tmp_path):
         session = self._session(tmp_path)
-        create_agent_workspace(session)
-        manifest = session.read_manifest()
-        alias = Path(manifest["alias"])
+        _, workspace_record = create_agent_workspace(session)
+        _record_run(session, workspace_record)
+        alias = Path(workspace_record.alias)
         os.unlink(alias)
         alias.mkdir()
         try:
@@ -725,7 +910,8 @@ class TestWorkspaceLifecycle:
 
     def test_attach_fails_when_workspace_is_gone(self, tmp_path):
         session = self._session(tmp_path)
-        create_agent_workspace(session)
+        _, workspace_record = create_agent_workspace(session)
+        _record_run(session, workspace_record)
         remove_agent_workspace(session)
         with pytest.raises(CLIError, match="no longer exists"):
             attach_agent_workspace(session)
@@ -733,43 +919,89 @@ class TestWorkspaceLifecycle:
 
 class TestOffsetPersistence:
     def test_mirror_does_not_duplicate_after_restart(self, tmp_path):
-        from dstack._internal.cli.services.presets.tail import _OffsetStore
+        from dstack._internal.cli.services.presets.tail import OffsetStore
 
         source = tmp_path / "runs.jsonl"
         target = tmp_path / "mirror.jsonl"
         state = tmp_path / ".offsets.json"
         source.write_text('{"name":"one"}\n', encoding="utf-8")
 
-        mirror = _RecordMirror(
+        mirror = RecordMirror(
             source=source,
             target=target,
             redacted_values=(),
-            offset_store=_OffsetStore(state),
+            offset_store=OffsetStore(state),
             offset_key="runs",
+            echo=False,
         )
         mirror.flush()
 
         with source.open("a", encoding="utf-8") as f:
             f.write('{"name":"two"}\n')
-        restarted = _RecordMirror(
+        restarted = RecordMirror(
             source=source,
             target=target,
             redacted_values=(),
-            offset_store=_OffsetStore(state),
+            offset_store=OffsetStore(state),
             offset_key="runs",
+            echo=False,
         )
         restarted.flush()
 
         assert target.read_text().splitlines() == ['{"name":"one"}', '{"name":"two"}']
 
 
+class TestOldFlatSessionState:
+    def test_reads_a_pre_0_22_flat_session_file(self, tmp_path):
+        # Verbatim shape of a session written by the pre-0.21.2 CLI: every field flat.
+        flat = {
+            "id": "30a012bf",
+            "status": "success",
+            "pid": 70516,
+            "pid_started_at": 1755116373.0,
+            "name": "dsv4-flash-mi300x-kernel2",
+            "model": "deepseek-ai/DeepSeek-V4-Flash",
+            "trials_num": 7,
+            "created_at": "2026-08-13T20:19:33+00:00",
+            "debug": False,
+            "agent_pid": 70521,
+            "agent_started_at": 1755116374.0,
+            "claude_model": "claude-opus-5",
+            "claude_session_id": "71b025f9-fba0-42b9-8734-e357deca5281",
+            "workspace": "/tmp/w",
+            "alias": "/tmp/dpe-1",
+            "project": "main",
+            "keep_service": True,
+        }
+        session_dir = tmp_path / "30a012bf"
+        session_dir.mkdir()
+        (session_dir / "session.json").write_text(json.dumps(flat))
+        session = PresetSession(path=session_dir, debug=False, preset_id="30a012bf")
+
+        state = session.read_state()
+
+        assert state is not None
+        assert state.status == "success"
+        assert state.owner == PresetSessionProcess(pid=70516, started_at=1755116373.0)
+        assert state.run is not None
+        assert state.run.workspace.path == "/tmp/w"
+        assert state.run.workspace.alias == "/tmp/dpe-1"
+        assert state.run.finalize.project == "main"
+        assert state.run.finalize.keep_service is True
+        assert state.run.agent == PresetSessionProcess(pid=70521, started_at=1755116374.0)
+        assert state.run.claude_session_id == "71b025f9-fba0-42b9-8734-e357deca5281"
+        assert state.previous == []
+
+
 class TestLoadResumableSession:
-    def _write_session(self, tmp_path, monkeypatch, manifest):
+    def _write_session(self, tmp_path, monkeypatch, state):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
-        path = tmp_path / ".dstack" / "presets" / manifest["id"]
+        path = tmp_path / ".dstack" / "presets" / state["id"]
         path.mkdir(parents=True)
-        (path / "session.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (path / "session.json").write_text(
+            get_session_state(**state).model_dump_json(), encoding="utf-8"
+        )
         return path
 
     def test_loads_interrupted_session(self, tmp_path, monkeypatch):
@@ -779,13 +1011,13 @@ class TestLoadResumableSession:
             {
                 "id": "ab12cd34",
                 "status": "interrupted",
-                "claude_session_id": "sid-1",
+                "run": get_session_run(claude_session_id="sid-1"),
                 "debug": True,
                 "created_at": "2026-07-20T10:00:00Z",
             },
         )
 
-        session = load_resumable_agent_session("ab12cd34")
+        session = load_resumable_session("ab12cd34")
 
         assert session.preset_id == "ab12cd34"
         assert session.debug is True
@@ -797,8 +1029,8 @@ class TestLoadResumableSession:
             {
                 "id": "ab12cd34",
                 "status": "running",
-                "pid": 4242,
-                "claude_session_id": "sid-1",
+                "owner": {"pid": 4242, "started_at": None},
+                "run": get_session_run(claude_session_id="sid-1"),
             },
         )
         monkeypatch.setattr(
@@ -806,10 +1038,10 @@ class TestLoadResumableSession:
             lambda pid: False,
         )
 
-        assert load_resumable_agent_session("ab12cd34").preset_id == "ab12cd34"
+        assert load_resumable_session("ab12cd34").preset_id == "ab12cd34"
 
     @pytest.mark.parametrize(
-        ("manifest", "match"),
+        ("state", "match"),
         [
             pytest.param(None, "Unknown preset", id="unknown-preset"),
             pytest.param(
@@ -820,8 +1052,8 @@ class TestLoadResumableSession:
                 {
                     "id": "aa000003",
                     "status": "running",
-                    "pid": 4242,
-                    "claude_session_id": "sid-1",
+                    "owner": {"pid": 4242, "started_at": None},
+                    "run": get_session_run(claude_session_id="sid-1"),
                 },
                 "still being created",
                 id="still-running",
@@ -833,25 +1065,32 @@ class TestLoadResumableSession:
             ),
         ],
     )
-    def test_refusals(self, tmp_path, monkeypatch, manifest, match):
+    def test_refusals(self, tmp_path, monkeypatch, state, match):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
-        if manifest is not None:
-            self._write_session(tmp_path, monkeypatch, manifest)
+        if state is not None:
+            self._write_session(tmp_path, monkeypatch, state)
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.session.psutil.pid_exists",
             lambda pid: True,
         )
-        preset_id = manifest["id"] if manifest is not None else "00000000"
+        preset_id = state["id"] if state is not None else "00000000"
 
         with pytest.raises(CLIError, match=match):
-            load_resumable_agent_session(preset_id)
+            load_resumable_session(preset_id)
+
+
+def _write_trials(tmp_path, records):
+    trials_dir = tmp_path / "trials"
+    for number, record in enumerate(records, 1):
+        (trials_dir / str(number)).mkdir(parents=True)
+        (trials_dir / str(number) / "trial.json").write_text(json.dumps(record))
+    return trials_dir
 
 
 class TestSummarizeSessionTrials:
     def test_counts_records_even_when_trials_share_a_task(self, tmp_path):
         record = {
-            "task": {"name": "qwen-ab12cd34-1"},
             "resources": {"gpu": {"name": "A40", "memory": "48GB", "count": 1}},
             "benchmark": {
                 "workload": {"concurrency": 8},
@@ -860,18 +1099,13 @@ class TestSummarizeSessionTrials:
         }
         rerun = json.loads(json.dumps(record))
         rerun["benchmark"]["metrics"]["total_output_tokens"] = 23000
-        second_trial = json.loads(json.dumps(record))
-        second_trial["task"]["name"] = "qwen-ab12cd34-2"
         nameless = {"benchmark": {"workload": {}, "metrics": {}}}
-        path = tmp_path / "trials.jsonl"
-        path.write_text(
-            "\n".join(json.dumps(entry) for entry in [record, rerun, second_trial, nameless])
-        )
+        trials_dir = _write_trials(tmp_path, [record, rerun, record, nameless])
 
-        summary = _summarize_session_trials(path)
+        summary = _summarize_session_trials(trials_dir)
 
         # 4 records = 4 trials: one long-lived task commonly hosts several
-        # trials, so shared task names must not collapse the count.
+        # trials, so identical records must not collapse the count.
         assert summary["count"] == 4
         assert summary["best"] == {
             "tok_s": 2300.0,
@@ -882,56 +1116,106 @@ class TestSummarizeSessionTrials:
             "gpu": "A40:48GB:1",
         }
 
+    def test_trials_are_ordered_numerically_beyond_nine(self, tmp_path):
+        # Twelve trials: a string sort would chart 1, 10, 11, 12, 2, ...
+        records = [
+            {
+                "benchmark": {
+                    "metrics": {"total_output_tokens": float(i * 100), "duration_seconds": 1.0},
+                    "workload": {"concurrency": 1},
+                }
+            }
+            for i in range(1, 13)
+        ]
+        trials_dir = _write_trials(tmp_path, records)
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["series"] == [float(i * 100) for i in range(1, 13)]
+
+    def test_a_trial_still_in_flight_is_not_counted(self, tmp_path):
+        record = {
+            "resources": {},
+            "benchmark": {
+                "workload": {"concurrency": 8},
+                "metrics": {"duration_seconds": 10.0, "total_output_tokens": 20000},
+            },
+        }
+        trials_dir = _write_trials(tmp_path, [record])
+        # Trial 2 has started but has no result yet.
+        (trials_dir / "2").mkdir()
+        (trials_dir / "2" / "task.dstack.yml").write_text("type: task\n")
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["count"] == 1
+        assert summary["series"] == [2000.0]
+
+    def test_a_torn_result_copy_reads_as_still_in_flight(self, tmp_path):
+        trials_dir = _write_trials(tmp_path, [])
+        (trials_dir / "1").mkdir(parents=True)
+        (trials_dir / "1" / "trial.json").write_text('{"benchmark": {"met')
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["count"] == 0
+
 
 class TestReadLastSessionVerification:
-    def test_last_record_wins_and_a_missing_file_is_not_verifying(self, tmp_path):
-        path = tmp_path / "verifications.jsonl"
+    def test_newest_attempt_wins_and_a_missing_directory_is_not_verifying(self, tmp_path):
+        service_dir = tmp_path / "service"
 
-        assert _read_last_session_verification(path) is None
+        assert _read_last_session_verification(service_dir) is None
 
-        path.write_text(
-            "\n".join(
-                json.dumps(entry)
-                for entry in [
-                    {"trial": 3, "run_name": "p-2", "status": "verifying"},
-                    {"trial": 3, "run_name": "p-2", "status": "failed", "reason": "probe"},
-                    {"trial": 2, "run_name": "p-3", "status": "verifying"},
-                ]
-            )
-            + "\n"
+        (service_dir / "1").mkdir(parents=True)
+        (service_dir / "1" / "service.dstack.yml").write_text("type: service\n")
+        (service_dir / "1" / "verification.json").write_text(
+            json.dumps({"trial": 3, "run_name": "p-2", "status": "failed", "reason": "probe"})
         )
+        (service_dir / "2").mkdir()
+        (service_dir / "2" / "service.dstack.yml").write_text("type: service\n")
 
-        assert _read_last_session_verification(path) == {
-            "trial": 2,
-            "run_name": "p-3",
-            "status": "verifying",
+        # Attempt 2 has no result yet, so it is the one in flight.
+        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
+
+    def test_the_newest_result_is_returned(self, tmp_path):
+        # Attempts 9 and 10: a string sort would pick "9" as the newest.
+        service_dir = tmp_path / "service"
+        for number, status in ((1, "failed"), (9, "failed"), (10, "verified")):
+            (service_dir / str(number)).mkdir(parents=True)
+            (service_dir / str(number) / "verification.json").write_text(
+                json.dumps({"trial": number, "run_name": f"p-{number}", "status": status})
+            )
+
+        assert _read_last_session_verification(service_dir) == {
+            "trial": 10,
+            "run_name": "p-10",
+            "status": "verified",
         }
 
-    def test_skips_partial_trailing_lines(self, tmp_path):
-        # The mirror appends as the agent writes, so the file can be read
-        # mid-line.
-        path = tmp_path / "verifications.jsonl"
-        path.write_text(
-            json.dumps({"trial": 1, "run_name": "p-2", "status": "verifying"})
-            + '\n{"trial": 1, "run_na'
-        )
+    def test_a_torn_result_copy_reads_as_verifying(self, tmp_path):
+        # The mirror copies whole files, but a reader can still catch one
+        # mid-replace; the next pass converges.
+        service_dir = tmp_path / "service"
+        (service_dir / "1").mkdir(parents=True)
+        (service_dir / "1" / "verification.json").write_text('{"trial": 1, "run_na')
 
-        assert _read_last_session_verification(path)["status"] == "verifying"
+        assert _read_last_session_verification(service_dir) == {"status": "verifying"}
 
 
 class TestFileLineReader:
     @pytest.mark.asyncio
     async def test_reads_lines_and_continues_from_persisted_offset(self, tmp_path):
-        from dstack._internal.cli.services.presets.tail import _FileLineReader, _OffsetStore
+        from dstack._internal.cli.services.presets.tail import FileLineReader, OffsetStore
 
         stream = tmp_path / "stdout.jsonl"
         state = tmp_path / ".offsets.json"
         stream.write_bytes(b"first\nsecond\n")
         alive = True
 
-        reader = _FileLineReader(
+        reader = FileLineReader(
             stream,
-            offset_store=_OffsetStore(state),
+            offset_store=OffsetStore(state),
             offset_key="agent_stdout",
             is_alive=lambda: alive,
         )
@@ -942,9 +1226,9 @@ class TestFileLineReader:
         with stream.open("ab") as f:
             f.write(b"third\npartial")
         alive = False
-        attached = _FileLineReader(
+        attached = FileLineReader(
             stream,
-            offset_store=_OffsetStore(state),
+            offset_store=OffsetStore(state),
             offset_key="agent_stdout",
             is_alive=lambda: alive,
         )
@@ -962,23 +1246,28 @@ class TestStopOrDetach:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetAgentSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session.write_state(get_session_state())
         agent = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True
         )
         try:
-            session.update_manifest(status="running", agent_pid=agent.pid)
+            state = session.read_state()
+            assert state is not None
+            state.status = "running"
+            state.run = get_session_run(agent=PresetSessionProcess(pid=agent.pid, started_at=None))
+            session.write_state(state)
 
             monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)
-            _stop_or_detach_agent_session(session)
+            _stop_or_detach_agent_session(session, None)
             assert agent.poll() is None
-            assert session.read_manifest()["status"] == "running"
+            assert session.read_state().status == "running"
             assert "Detached" in capsys.readouterr().out
 
             monkeypatch.setattr(create_module, "confirm_ask", lambda *_: True)
-            _stop_or_detach_agent_session(session)
+            _stop_or_detach_agent_session(session, None)
             psutil.Process(agent.pid).wait(timeout=10)
-            assert session.read_manifest()["status"] == "interrupted"
+            assert session.read_state().status == "interrupted"
         finally:
             with suppress(OSError):
                 os.killpg(agent.pid, signal.SIGKILL)
@@ -988,10 +1277,10 @@ class TestOffsetStoreSharing:
     def test_shared_store_keeps_every_writers_keys(self, tmp_path):
         import threading
 
-        from dstack._internal.cli.services.presets.tail import _OffsetStore
+        from dstack._internal.cli.services.presets.tail import OffsetStore
 
         state = tmp_path / ".offsets.json"
-        store = _OffsetStore(state)
+        store = OffsetStore(state)
 
         # One store serves the whole session; readers and mirrors write
         # disjoint keys from worker threads.
@@ -1008,6 +1297,6 @@ class TestOffsetStoreSharing:
         for thread in threads:
             thread.join()
 
-        reloaded = _OffsetStore(state)
+        reloaded = OffsetStore(state)
         for key in ("agent_stdout", "agent_stderr", "runs", "trials"):
             assert reloaded.get(key) == 50

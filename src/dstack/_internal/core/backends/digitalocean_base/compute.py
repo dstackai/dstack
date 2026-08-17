@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, NamedTuple, Optional
 
 import gpuhunt
 from gpuhunt.providers.digitalocean import DigitalOceanProvider
@@ -29,6 +29,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 MAX_INSTANCE_NAME_LEN = 60
+
+
+class _Image(NamedTuple):
+    slug: str
+    ships_docker: bool
+
+
 DOCKER_INSTALL_COMMANDS = [
     "export DEBIAN_FRONTEND=noninteractive",
     "mkdir -p /etc/apt/keyrings",
@@ -86,10 +93,8 @@ class BaseDigitalOceanCompute(
         )
         size_slug = instance_offer.instance.name
 
-        if not instance_offer.instance.resources.gpus:
-            backend_specific_commands = DOCKER_INSTALL_COMMANDS
-        else:
-            backend_specific_commands = None
+        image = self._get_image_for_instance(instance_offer)
+        backend_specific_commands = None if image.ships_docker else DOCKER_INSTALL_COMMANDS
 
         project_id = None
         if self.config.project_name:
@@ -100,7 +105,7 @@ class BaseDigitalOceanCompute(
             "name": instance_name,
             "region": instance_offer.region,
             "size": size_slug,
-            "image": self._get_image_for_instance(instance_offer),
+            "image": image.slug,
             "ssh_keys": [ssh_key_id],
             "backups": False,
             "ipv6": False,
@@ -148,28 +153,27 @@ class BaseDigitalOceanCompute(
     ):
         self.api_client.delete_droplet(instance_id)
 
-    def _get_image_for_instance(self, instance_offer: InstanceOfferWithAvailability) -> str:
+    def _get_image_for_instance(self, instance_offer: InstanceOfferWithAvailability) -> _Image:
         if not instance_offer.instance.resources.gpus:
-            # No GPUs, use CPU image
-            return "ubuntu-24-04-x64"
+            return _Image("ubuntu-24-04-x64", ships_docker=False)
 
         gpu_count = len(instance_offer.instance.resources.gpus)
         gpu_vendor = instance_offer.instance.resources.gpus[0].vendor
 
         if gpu_vendor == gpuhunt.AcceleratorVendor.AMD:
-            # AMD GPU
-            return "digitaloceanai-rocmjupyter"
+            # Ubuntu 24.04, ROCm 7.14 (amdgpu 6.19.14).
+            return _Image("gpu-amd-base", ships_docker=False)
         else:
             # NVIDIA GPUs - DO only supports 1 and 8 GPU configurations.
             # DO says for single GPU plans using GPUs other than H100s use "gpu-h100x1-base". DO does not provide guidance for x8 GPUs so assuming the same applies.
             # See (https://docs.digitalocean.com/products/droplets/getting-started/recommended-gpu-setup/#aiml-ready-image)
             if gpu_count == 8:
-                return "gpu-h100x8-base"
+                return _Image("gpu-h100x8-base", ships_docker=True)
             elif gpu_count == 1:
-                return "gpu-h100x1-base"
+                return _Image("gpu-h100x1-base", ships_docker=True)
             else:
                 # For Unsupported GPU count - use single GPU image and log warning
                 logger.warning(
                     f"Unsupported NVIDIA GPU count: {gpu_count}, using single GPU image"
                 )
-                return "gpu-h100x1-base"
+                return _Image("gpu-h100x1-base", ships_docker=True)

@@ -11,7 +11,7 @@ from dstack._internal.cli.services.presets.apply import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.instances import InstanceAvailability
-from tests._internal.cli.preset_factories import get_preset
+from tests._internal.cli.common import get_preset
 
 pytestmark = pytest.mark.windows
 
@@ -21,22 +21,27 @@ class TestValidatePresetMatches:
         preset = get_preset(preset_id="large", context_length=32768)
         configuration = PresetConfiguration(
             name="qwen",
-            model={"base": "Qwen/Qwen3.5-27B"},
+            base="Qwen/Qwen3.5-27B",
             min_context_length=8192,
         )
 
         _validate_preset_matches(preset, configuration=configuration)
 
-    def test_rejects_insufficient_context(self):
+    def test_warns_on_insufficient_context_instead_of_failing(self, capsys):
+        # The preset is chosen by ID and may be the best a session could verify;
+        # the shortfall is stated and the plan confirmation decides.
         preset = get_preset(preset_id="small", context_length=4096)
         configuration = PresetConfiguration(
             name="qwen",
-            model={"base": "Qwen/Qwen3.5-27B"},
+            base="Qwen/Qwen3.5-27B",
             min_context_length=8192,
         )
 
-        with pytest.raises(CLIError, match="context length"):
-            _validate_preset_matches(preset, configuration=configuration)
+        _validate_preset_matches(preset, configuration=configuration)
+
+        output = capsys.readouterr().out
+        assert "verified for context length 4096" in output
+        assert "8192" in output
 
     def test_exact_request_matches_repo_and_client_facing_name(self):
         matching = get_preset(preset_id="matching")
@@ -60,7 +65,7 @@ class TestBuildService:
     def test_applies_preset_name_env_gateway_and_constraints(self):
         configuration = PresetConfiguration(
             name="qwen-production",
-            model={"base": "Qwen/Qwen3.5-27B"},
+            base="Qwen/Qwen3.5-27B",
             gateway="inference",
             env={"HF_TOKEN": "token"},
             fleets=["gpu-fleet"],
@@ -81,7 +86,7 @@ class TestApplyPreset:
         with pytest.raises(CLIError, match="does not exist"):
             apply_preset(
                 api=Mock(),
-                configuration=PresetConfiguration(name="qwen", model={"base": "Qwen/Qwen3.5-27B"}),
+                configuration=PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"),
                 configuration_path="preset.dstack.yml",
                 preset_id="ee55ff66",
                 profile_name=None,
@@ -107,7 +112,7 @@ class TestApplyPreset:
             api=Mock(),
             configuration=PresetConfiguration(
                 name="qwen",
-                model={"base": "Qwen/Qwen3.5-27B"},
+                base="Qwen/Qwen3.5-27B",
             ),
             configuration_path="preset.dstack.yml",
             preset_id="8f3a12c4",

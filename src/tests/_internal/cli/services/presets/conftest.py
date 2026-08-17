@@ -1,6 +1,6 @@
 import pytest
 
-from dstack._internal.cli.services.presets.tail import _FileLineReader
+from dstack._internal.cli.services.presets.tail import FileLineReader
 
 
 @pytest.fixture(autouse=True)
@@ -12,4 +12,4 @@ def no_tail_poll_wait(monkeypatch: pytest.MonkeyPatch):
     and `_POLL_SECONDS` makes every run wait once after the agent has already exited.
     Tests write the whole output up front, so there is nothing to wait for.
     """
-    monkeypatch.setattr(_FileLineReader, "_POLL_SECONDS", 0)
+    monkeypatch.setattr(FileLineReader, "_POLL_SECONDS", 0)

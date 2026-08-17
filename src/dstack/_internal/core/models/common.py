@@ -57,6 +57,25 @@ class FrozenCoreModel(CoreModel):
     model_config = ConfigDict(frozen=True)
 
 
+def pop_null_field(values: Any, *path: str) -> Any:
+    """
+    Drop a field at `path` from the `values` nested dict if it's set to `null`.
+
+    Mutates and returns the same `values` object.
+    """
+    if not isinstance(values, dict):
+        return values
+    node = values
+    for key in path[:-1]:
+        node = node.get(key)
+        if not isinstance(node, dict):
+            return values
+    field = path[-1]
+    if field in node and node[field] is None:
+        del node[field]
+    return values
+
+
 T = TypeVar("T")
 
 _type_adapters: dict[Any, TypeAdapter] = {}

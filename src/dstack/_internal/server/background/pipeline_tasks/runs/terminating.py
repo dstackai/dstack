@@ -3,9 +3,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-import httpx
-
-from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -14,10 +11,6 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server import models
 from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
-from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_or_add_gateway_connections
-from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import _get_next_triggered_at, get_run_spec
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
@@ -40,12 +33,6 @@ class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
-class ServiceUnregistration:
-    event_message: str
-    gateway_target: Optional[events.Target]
-
-
-@dataclass
 class TerminatingContext:
     run_model: models.RunModel
     locked_job_ids: set[uuid.UUID]
@@ -55,7 +42,6 @@ class TerminatingContext:
 class TerminatingResult:
     run_update_map: TerminatingRunUpdateMap = field(default_factory=TerminatingRunUpdateMap)
     job_id_to_update_map: dict[uuid.UUID, TerminatingRunJobUpdateMap] = field(default_factory=dict)
-    service_unregistration: Optional[ServiceUnregistration] = None
 
 
 async def process_terminating_run(context: TerminatingContext) -> TerminatingResult:
@@ -92,16 +78,8 @@ async def process_terminating_run(context: TerminatingContext) -> TerminatingRes
     if any(not job_model.status.is_finished() for job_model in run_model.jobs):
         return TerminatingResult()
 
-    service_unregistration = None
-    if run_model.service_spec is not None:
-        try:
-            service_unregistration = await _unregister_service(run_model)
-        except Exception as e:
-            logger.warning("%s: failed to unregister service: %s", fmt(run_model), repr(e))
-
     return TerminatingResult(
         run_update_map=_get_run_update_map(run_model),
-        service_unregistration=service_unregistration,
     )
 
 
@@ -141,45 +119,3 @@ def _get_run_update_map(run_model: models.RunModel) -> TerminatingRunUpdateMap:
             resubmission_attempt=0,
         )
     return TerminatingRunUpdateMap(status=termination_reason.to_status())
-
-
-async def _unregister_service(run_model: models.RunModel) -> Optional[ServiceUnregistration]:
-    if run_model.gateway_id is None:  # in-server proxy
-        return None
-
-    async with get_session_ctx() as session:
-        gateway, connections = await get_or_add_gateway_connections(session, run_model.gateway_id)
-        gateway_target = events.Target.from_model(gateway)
-
-    gateway_errors = []
-    for conn in connections:
-        try:
-            logger.debug(
-                "%s: unregistering service on gateway replica %s", fmt(run_model), conn.ip_address
-            )
-            async with conn.client() as client:
-                await client.unregister_service(
-                    project=run_model.project.name,
-                    run_name=run_model.run_name,
-                )
-        except GatewayError as e:
-            # Ignore if the service is not registered on this replica.
-            logger.warning(
-                "%s: unregistering service on gateway replica %s: %s",
-                fmt(run_model),
-                conn.ip_address,
-                e,
-            )
-            gateway_errors.append(str(e))
-        except (httpx.RequestError, SSHError) as e:
-            logger.debug("Gateway request failed", exc_info=True)
-            raise GatewayError(repr(e))
-
-    if gateway_errors:
-        event_message = f"Gateway error when unregistering service: {'; '.join(gateway_errors)}"
-    else:
-        event_message = "Service unregistered from gateway"
-    return ServiceUnregistration(
-        event_message=event_message,
-        gateway_target=gateway_target,
-    )

@@ -4,7 +4,6 @@ import gpuhunt
 
 from dstack._internal.core.models.resources import (
     DEFAULT_GPU_SPEC,
-    CPUSpec,
     GPUSpec,
     ResourcesSpec,
 )
@@ -15,18 +14,6 @@ def set_default_gpu_spec(resources_spec: ResourcesSpec) -> GPUSpec:
     if resources_spec.gpu is None:
         resources_spec.gpu = DEFAULT_GPU_SPEC.model_copy(deep=True)
     return resources_spec.gpu
-
-
-def set_default_cpu_spec_arch(cpu_spec: CPUSpec, gpu_spec: GPUSpec) -> None:
-    if cpu_spec.arch is None:
-        if (
-            gpu_spec.vendor in [None, gpuhunt.AcceleratorVendor.NVIDIA]
-            and gpu_spec.name
-            and any(map(gpuhunt.is_nvidia_superchip, gpu_spec.name))
-        ):
-            cpu_spec.arch = gpuhunt.CPUArchitecture.ARM
-        else:
-            cpu_spec.arch = gpuhunt.CPUArchitecture.X86
 
 
 def set_default_gpu_spec_vendor(

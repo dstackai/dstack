@@ -1,6 +1,0 @@
-{
-  "/": "CreateVolumeRequest",
-  "/configuration": "AWSVolumeConfiguration",
-  "/configuration/backend": "BackendType",
-  "/configuration/size": "Memory"
-}

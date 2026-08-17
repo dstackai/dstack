@@ -2,6 +2,7 @@ from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
+import gpuhunt
 import httpx
 import pytest
 
@@ -66,12 +67,18 @@ def image_config_mock(monkeypatch: pytest.MonkeyPatch) -> ImageConfig:
         {"User": None, "Entrypoint": None, "Cmd": ["/bin/bash"]}
     )
     monkeypatch.setattr(
-        "dstack._internal.server.services.jobs.configurators.base._get_image_config",
-        Mock(return_value=image_config),
+        "dstack._internal.server.services.jobs.configurators.base"
+        "._get_image_config_and_cpu_architectures",
+        Mock(return_value=(image_config, {gpuhunt.CPUArchitecture.X86})),
     )
     monkeypatch.setattr(
-        "dstack._internal.server.services.docker.get_image_config",
-        Mock(return_value=ImageConfigObject(config=image_config)),
+        "dstack._internal.server.services.docker.get_image_config_and_cpu_architectures",
+        Mock(
+            return_value=(
+                ImageConfigObject(architecture="amd64", os="linux", config=image_config),
+                {gpuhunt.CPUArchitecture.X86},
+            )
+        ),
     )
     return image_config
 
