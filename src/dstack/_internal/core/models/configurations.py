@@ -35,6 +35,7 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import GatewayConfiguration
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import (
     ProfileParams,
     SpotPolicy,
@@ -1586,6 +1587,7 @@ class ApplyConfigurationType(str, Enum):
     FLEET = "fleet"
     GATEWAY = "gateway"
     VOLUME = "volume"
+    PRESET = "preset"
 
 
 AnyApplyConfiguration = Union[
@@ -1593,6 +1595,7 @@ AnyApplyConfiguration = Union[
     FleetConfiguration,
     GatewayConfiguration,
     AnyVolumeConfiguration,
+    PresetConfiguration,
 ]
 
 
@@ -1602,6 +1605,7 @@ _AnyBaseApplyConfiguration = Annotated[
         AnyRunConfiguration,
         FleetConfiguration,
         GatewayConfiguration,
+        PresetConfiguration,
         # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
         BaseVolumeConfiguration,
     ],
@@ -1641,6 +1645,7 @@ AnyDstackConfiguration = Union[
     FleetConfiguration,
     GatewayConfiguration,
     VolumeConfiguration,
+    PresetConfiguration,
 ]
 
 

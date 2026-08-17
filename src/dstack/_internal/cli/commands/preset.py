@@ -5,33 +5,36 @@ import sys
 import time
 from contextlib import redirect_stderr, suppress
 from pathlib import Path
+from typing import Optional
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 from rich.live import Live
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.presets import (
     Preset,
     PresetListOutput,
+    VerifiedPreset,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.configurators import APPLY_STDIN_NAME
-from dstack._internal.cli.services.presets.apply import apply_preset
+from dstack._internal.cli.services.configurators.preset import (
+    PresetConfigurator,
+    register_creation_args,
+)
 from dstack._internal.cli.services.presets.create import (
     CreationStopped,
     create_preset,
-    find_preset_name_holders,
-    plan_preset,
-    reassign_preset_name,
+    load_session_configuration,
     reconcile_detached_sessions,
-    resolve_previous_sessions,
     show_preset_session_logs,
     stop_preset_session,
 )
+from dstack._internal.cli.services.presets.export import export_preset
 from dstack._internal.cli.services.presets.output import get_presets_table, print_presets
 from dstack._internal.cli.services.presets.session import (
     list_preset_sessions,
+    load_preset_session,
     load_resumable_session,
     resolve_session_ref,
 )
@@ -39,11 +42,8 @@ from dstack._internal.cli.services.presets.store import (
     PresetStore,
     load_preset_configuration,
     parse_preset_configuration,
-    resolve_preset_prompt,
 )
 from dstack._internal.cli.services.profile import (
-    apply_profile_args,
-    load_profile_from_args,
     register_profile_args,
 )
 from dstack._internal.cli.utils.common import (
@@ -53,9 +53,8 @@ from dstack._internal.cli.utils.common import (
     console,
     warn,
 )
-from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
-from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack.api import Client
 
 
@@ -103,34 +102,7 @@ class PresetCommand(BaseCommand):
         )
         _add_configuration_args(create_parser)
         register_profile_args(create_parser)
-        create_parser.add_argument(
-            "--keep-service",
-            action="store_true",
-            help="Leave the verified service running",
-        )
-        create_parser.add_argument(
-            "--trials",
-            type=int,
-            metavar="N",
-            help="The number of benchmarked trials before the best one is promoted",
-        )
-        create_parser.add_argument(
-            "--debug",
-            action="store_true",
-            help="Save the agent prompt and raw trace",
-        )
-        create_parser.add_argument(
-            "--previous",
-            action="append",
-            metavar="ID",
-            help="Give the agent a previous session's results to analyze and improve on."
-            " Repeat for several",
-        )
-        create_parser.add_argument(
-            "--resume",
-            metavar="ID",
-            help="Resume an interrupted preset creation by its preset ID",
-        )
+        register_creation_args(create_parser)
         create_parser.add_argument(
             "-y", "--yes", action="store_true", help="Do not ask for confirmation"
         )
@@ -166,33 +138,35 @@ class PresetCommand(BaseCommand):
         )
         stop_parser.set_defaults(subfunc=self._stop)
 
-        apply_parser = preset_subparsers.add_parser(
-            "apply",
-            help="Apply a preset",
+        resume_parser = preset_subparsers.add_parser(
+            "resume",
+            help="Resume an interrupted preset creation",
             formatter_class=self._parser.formatter_class,
         )
-        _add_configuration_args(apply_parser)
-        register_profile_args(apply_parser)
-        apply_parser.add_argument(
-            "--id",
-            dest="preset_id",
-            metavar="ID",
+        resume_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
+        resume_parser.add_argument(
+            "--keep-service",
+            action="store_true",
+            help="Leave the verified service running",
+        )
+        resume_parser.set_defaults(subfunc=self._resume)
+
+        export_parser = preset_subparsers.add_parser(
+            "export",
+            help="Export a preset as a service configuration",
+            formatter_class=self._parser.formatter_class,
+        )
+        export_parser.add_argument("preset", metavar="ID", help="The preset ID or name")
+        export_parser.add_argument(
+            "-f",
+            "--file",
             required=True,
-            help="The preset ID to deploy",
+            metavar="FILE",
+            dest="destination",
+            help="The service configuration file to write",
         )
-        apply_parser.add_argument(
-            "-y", "--yes", action="store_true", help="Do not ask for confirmation"
-        )
-        apply_parser.add_argument(
-            "--force", action="store_true", help="Force apply when no changes are detected"
-        )
-        apply_parser.add_argument(
-            "-d", "--detach", action="store_true", help="Exit after submitting the service"
-        )
-        apply_parser.add_argument(
-            "-v", "--verbose", action="store_true", help="Show all plan properties"
-        )
-        apply_parser.set_defaults(subfunc=self._apply)
+        export_parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+        export_parser.set_defaults(subfunc=self._export)
 
         delete_parser = preset_subparsers.add_parser(
             "delete",
@@ -277,7 +251,7 @@ class PresetCommand(BaseCommand):
 
     def _list_presets_and_sessions(
         self, *, base: str | None, repo: str | None
-    ) -> tuple[list[Preset], list[dict]]:
+    ) -> tuple[list[VerifiedPreset], list[dict]]:
         self._reconcile()
         presets = PresetStore().list()
         sessions = list_preset_sessions()
@@ -292,58 +266,38 @@ class PresetCommand(BaseCommand):
         return presets, sessions
 
     def _create(self, args: argparse.Namespace) -> None:
+        warn(
+            "`dstack preset create` is deprecated; use `dstack apply -f <configuration>`",
+            stderr=True,
+        )
         _check_stdin_configuration_confirmable(args)
         _, configuration = _read_configuration_arg(args.configuration_file)
-        configuration = _get_effective_configuration(configuration, args, require_name=False)
-        user_prompt = resolve_preset_prompt(configuration, _prompt_base(args.configuration_file))
-        store = PresetStore()
-        resume_session = None
-        if getattr(args, "resume", None):
-            resume_session = load_resumable_session(args.resume)
-            if getattr(args, "trials", None) is not None:
-                console.print(
-                    "[warning]--trials is ignored when resuming: "
-                    "the constraints are fixed at creation[/]"
-                )
-            if configuration.previous:
-                console.print(
-                    "[warning]previous is ignored when resuming: "
-                    "the previous sessions are fixed at creation[/]"
-                )
-        previous = ()
-        if resume_session is None and configuration.previous:
-            previous = resolve_previous_sessions(configuration.previous)
-        api = Client.from_config(project_name=args.project)
-        allowed_fleets = None
-        if resume_session is None:
-            if configuration.trials is None:
-                raise ConfigurationError(
-                    "trials is required. Set it in the configuration or pass --trials"
-                )
-            for field in ("max_ttft", "min_context_length", "concurrency"):
-                if getattr(configuration, field) is None:
-                    raise ConfigurationError(f"{field} is required")
-            allowed_fleets = plan_preset(api=api, configuration=configuration)
-            if not _confirm_preset_creation(store, configuration.name, assume_yes=args.yes):
-                console.print("\nExiting...")
-                return
+        # A thin adapter over the configurator, the same path `dstack apply` takes.
+        # The create parser has no -d, which the configurator contract reads.
+        args.detach = False
+        configurator = PresetConfigurator(api_client=Client.from_config(project_name=args.project))
+        configurator.apply_configuration(
+            conf=configuration,
+            configuration_path=args.configuration_file,
+            command_args=args,
+            configurator_args=args,
+        )
+
+    def _resume(self, args: argparse.Namespace) -> None:
+        session = load_resumable_session(resolve_session_ref(args.preset))
         try:
             result = create_preset(
-                api=api,
-                configuration=configuration,
-                store=store,
+                api=Client.from_config(project_name=args.project),
+                configuration=load_session_configuration(session),
+                store=PresetStore(),
                 keep_service=args.keep_service,
-                debug=args.debug,
-                resume_session=resume_session,
-                user_prompt=user_prompt,
-                allowed_fleets=allowed_fleets,
-                previous=previous,
+                resume_session=session,
+                user_prompt=session.read_prompt(),
             )
         except KeyboardInterrupt:
             return  # the interrupt handler already reported detach / stop
         except CreationStopped:
             return  # stopped from another CLI, which reported the interruption
-        # The log already told the story; like a finished run, success is silent.
         if args.keep_service:
             console.print(f"Final service [code]{result.final_run_name}[/] kept running")
 
@@ -374,21 +328,26 @@ class PresetCommand(BaseCommand):
         self._reconcile()
         preset = PresetStore().find_by_id_or_name(args.preset)
         if preset is None:
+            preset = _get_unfinished_preset(args.preset)
+        if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
         print(preset.model_dump_json())
 
-    def _apply(self, args: argparse.Namespace) -> None:
-        self._reconcile()
-        configuration_path, configuration = _read_configuration_arg(args.configuration_file)
-        configuration = _get_effective_configuration(configuration, args)
-        apply_preset(
-            api=Client.from_config(project_name=args.project),
-            configuration=configuration,
-            configuration_path=configuration_path,
-            preset_id=args.preset_id,
-            profile_name=args.profile,
-            command_args=args,
-            store=PresetStore(),
+    def _export(self, args: argparse.Namespace) -> None:
+        store = PresetStore()
+        preset = store.find_by_id_or_name(args.preset)
+        if preset is None:
+            raise CLIError(f"Preset {args.preset!r} does not exist")
+        written = export_preset(
+            preset,
+            preset_dir=store.root / preset.id,
+            destination=Path(args.destination),
+            force=args.force,
+        )
+        console.print(
+            f"Preset [code]{preset.id}[/] exported to [code]{args.destination}[/]"
+            f" ({len(written)} files). Deploy it with"
+            f" [code]dstack apply -f {args.destination}[/]"
         )
 
     def _delete(self, args: argparse.Namespace) -> None:
@@ -423,6 +382,24 @@ class PresetCommand(BaseCommand):
         console.print(f"Deleted {description}")
 
 
+def _get_unfinished_preset(ref: str) -> Optional[Preset]:
+    """The preset as its creation session knows it, for any state but verified."""
+    try:
+        session = load_preset_session(resolve_session_ref(ref))
+    except CLIError:
+        return None
+    state = session.read_state()
+    if state is None or state.status == "success":
+        return None
+    return Preset(
+        status=state.status,
+        id=state.id,
+        name=state.name,
+        configuration=load_session_configuration(session),
+        submitted_at=state.created_at,
+    )
+
+
 def _add_configuration_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-f",
@@ -436,7 +413,7 @@ def _add_configuration_args(parser: argparse.ArgumentParser) -> None:
         "-n",
         "--name",
         metavar="NAME",
-        help="The service name. Required when the configuration omits name",
+        help="The preset name",
     )
 
 
@@ -482,11 +459,11 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _filter_presets(
-    presets: list[Preset],
+    presets: list[VerifiedPreset],
     *,
     base: str | None,
     repo: str | None,
-) -> list[Preset]:
+) -> list[VerifiedPreset]:
     return [
         preset
         for preset in presets
@@ -509,40 +486,6 @@ def _session_matches_model(
     return model == base or repo_to_base.get(model) == base
 
 
-def _apply_name(configuration: PresetConfiguration, name: str | None, *, required: bool) -> None:
-    if name is not None:
-        configuration.name = name
-    if configuration.name is None:
-        if required:
-            raise CLIError(
-                "The service name is required. Set `name` in the configuration or use --name"
-            )
-        return
-    try:
-        validate_dstack_resource_name(configuration.name)
-    except ServerClientError as e:
-        raise CLIError(str(e)) from e
-
-
-def _confirm_preset_creation(store: PresetStore, name: str | None, *, assume_yes: bool) -> bool:
-    """One apply-style confirmation; reassigns the name from any holder on yes."""
-    holders = find_preset_name_holders(store, name) if name is not None else None
-    if holders is not None and holders.preset_ids:
-        used_by = ", ".join(f"preset [code]{preset_id}[/]" for preset_id in holders.preset_ids)
-        message = (
-            f"The name [code]{name}[/] is already used by {used_by}. Reassign it to a new preset?"
-        )
-    elif name is not None:
-        message = f"Create the preset [code]{name}[/]?"
-    else:
-        message = "Create the preset?"
-    if not assume_yes and not confirm_ask(message):
-        return False
-    if holders is not None:
-        reassign_preset_name(store, holders)
-    return True
-
-
 def _read_configuration_arg(configuration_file: str) -> tuple[str, PresetConfiguration]:
     """`-f <path>`, or `-f -` for stdin — the same convention as `dstack apply`."""
     if configuration_file == APPLY_STDIN_NAME:
@@ -551,34 +494,8 @@ def _read_configuration_arg(configuration_file: str) -> tuple[str, PresetConfigu
     return str(path.resolve()), load_preset_configuration(path)
 
 
-def _prompt_base(configuration_file: str) -> Path:
-    """Prompt files resolve relative to the configuration file; cwd for stdin."""
-    if configuration_file == APPLY_STDIN_NAME:
-        return Path.cwd()
-    return Path(configuration_file).resolve().parent
-
-
 def _check_stdin_configuration_confirmable(args: argparse.Namespace) -> None:
     # Same rule as `dstack apply`: the confirmation prompt cannot read from a
     # stdin that is the configuration itself.
     if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
         raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
-
-
-def _get_effective_configuration(
-    configuration: PresetConfiguration,
-    args: argparse.Namespace,
-    *,
-    require_name: bool = True,
-) -> PresetConfiguration:
-    _apply_name(configuration, args.name, required=require_name)
-    if getattr(args, "trials", None) is not None:
-        configuration.trials = args.trials
-    if getattr(args, "previous", None):
-        configuration.previous = list(args.previous)
-    profile = load_profile_from_args(args=args, repo_dir=Path.cwd())
-    for field in ProfileParams.model_fields:
-        if getattr(configuration, field) is None:
-            setattr(configuration, field, getattr(profile, field))
-    apply_profile_args(args, configuration)
-    return PresetConfiguration.model_validate(configuration.model_dump())

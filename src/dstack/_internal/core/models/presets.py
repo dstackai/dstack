@@ -1,6 +1,7 @@
 from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import (
+    ConfigDict,
     Field,
     PositiveInt,
     field_validator,
@@ -95,13 +96,26 @@ class PresetPromptFile(CoreModel):
         return value
 
 
+def _drop_model_from_required(schema: dict) -> None:
+    # `model` is synthesized from the top-level `base`/`repo` shorthand by a
+    # before-validator, which JSON Schema consumers never run.
+    required = [field for field in schema.get("required", []) if field != "model"]
+    if required:
+        schema["required"] = required
+    else:
+        schema.pop("required", None)
+
+
 class PresetConfiguration(
     ProfileParams,
 ):
+    model_config = ConfigDict(json_schema_extra=_drop_model_from_required)
+
     type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
+    # TODO: Generate a random name when omitted, like runs and fleets do
     name: Annotated[
         Optional[str],
-        Field(description="The service name. Required unless passed with `--name`"),
+        Field(description="The preset name"),
     ] = None
     model: Annotated[
         PresetModelSpec,

@@ -11,9 +11,9 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 
@@ -75,7 +75,7 @@ class PresetBenchmark(CoreModel):
 
     @property
     def effective_per_user_tok_per_s(self) -> float:
-        return 1000 / self.metrics.tpot_ms.p50
+        return 1000 / self.metrics.tpot_ms.mean
 
     @field_validator("command")
     @classmethod
@@ -108,19 +108,21 @@ class PresetVerificationReplicaGroup(CoreModel):
 
 
 class Preset(CoreModel):
-    """What was asked (`configuration`), what to deploy (`service`), and
-    the evidence it works (`verification_data`)."""
-
+    status: Literal["running", "interrupted", "failed", "verified"]
     id: str
     name: Optional[str] = None
     configuration: PresetConfiguration
+    submitted_at: datetime
+
+
+class VerifiedPreset(Preset):
+    status: Literal["verified"] = "verified"
     base: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
     # The largest context the service was verified to serve.
     context_length: PositiveInt
     # The session's `trials/<n>` that won verification and became this preset.
     best_trial: PositiveInt
-    submitted_at: datetime
     # The service that passed verification, stripped of this machine's deployment
     # choices; `apply` submits it with the user's own name, gateway, and profile.
     service: ServiceConfiguration
@@ -152,7 +154,7 @@ class Preset(CoreModel):
 
 
 class PresetListOutput(CoreModel):
-    presets: list[Preset]
+    presets: list[VerifiedPreset]
 
 
 def _validate_exact_resources(resources: ResourcesSpec) -> None:

@@ -7,16 +7,16 @@ from typing import TextIO
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import (
-    MAX_PROMPT_LENGTH,
-    PresetConfiguration,
-    PresetPromptFile,
-)
-from dstack._internal.cli.models.presets import PRESET_EXCLUDED_FIELDS, Preset
+from dstack._internal.cli.models.presets import PRESET_EXCLUDED_FIELDS, VerifiedPreset
 from dstack._internal.cli.services.presets.build import preset_to_yaml_dict
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.presets import (
+    MAX_PROMPT_LENGTH,
+    PresetConfiguration,
+    PresetPromptFile,
+)
 from dstack._internal.utils.common import get_dstack_dir
 
 
@@ -31,7 +31,7 @@ class PresetStore:
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
 
-    def list(self) -> list[Preset]:
+    def list(self) -> list[VerifiedPreset]:
         if not self.root.exists():
             return []
         presets = []
@@ -61,7 +61,7 @@ class PresetStore:
             )
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 
-    def get(self, preset_id: str) -> Preset | None:
+    def get(self, preset_id: str) -> VerifiedPreset | None:
         _validate_preset_id(preset_id)
         if not self.root.exists():
             return None
@@ -73,7 +73,7 @@ class PresetStore:
             raise CLIError(f"Preset file {path} does not match its path")
         return preset
 
-    def save(self, preset: Preset) -> Path:
+    def save(self, preset: VerifiedPreset) -> Path:
         _validate_preset_id(preset.id)
         directory = self.root / preset.id
         directory.mkdir(parents=True, exist_ok=True)
@@ -103,16 +103,16 @@ class PresetStore:
                 pass
         return path
 
-    def find_by_name(self, name: str) -> Preset | None:
+    def find_by_name(self, name: str) -> VerifiedPreset | None:
         for preset in self.list():
             if preset.name == name:
                 return preset
         return None
 
-    def find_by_id_or_name(self, ref: str) -> Preset | None:
+    def find_by_id_or_name(self, ref: str) -> VerifiedPreset | None:
         return self.get(ref) or self.find_by_name(ref)
 
-    def release_name(self, name: str) -> Preset | None:
+    def release_name(self, name: str) -> VerifiedPreset | None:
         preset = self.find_by_name(name)
         if preset is None:
             return None
@@ -131,7 +131,7 @@ class PresetStore:
         shutil.rmtree(directory)
         return True
 
-    def _load(self, path: Path) -> Preset:
+    def _load(self, path: Path) -> VerifiedPreset:
         data = None
         try:
             with path.open(encoding="utf-8") as f:
@@ -141,7 +141,7 @@ class PresetStore:
             # stores `verified_on`.
             if isinstance(data, dict) and "validations" in data:
                 upgraded = _upgrade_pre_0_21_2_preset(data, preset_id=path.parent.name)
-            preset = Preset.model_validate(upgraded)
+            preset = VerifiedPreset.model_validate(upgraded)
         except (OSError, ValidationError, yaml.YAMLError) as e:
             if isinstance(data, dict) and "validations" in data:
                 raise _earlier_version_preset_error(path.parent.name) from e
@@ -261,12 +261,6 @@ def parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
             raise ConfigurationError("Preset configuration must be a YAML object")
-        # Only checked here: a stored preset serializes `model` as an object, so
-        # the model itself has to keep accepting the form a file may not use.
-        model = data.get("model")
-        if isinstance(model, dict) and model.get("name") is None:
-            key = "base" if "base" in model else "repo"
-            raise ConfigurationError(f"Use top-level `{key}:` instead of nested `model.{key}`")
         configuration = PresetConfiguration.model_validate(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e

@@ -10,7 +10,6 @@ from rich.console import Console
 from rich.theme import Theme
 
 from dstack._internal.cli.main import main
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import (
     PresetAgentSuccess,
     PresetSessionFinalize,
@@ -19,9 +18,9 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionWorkspace,
 )
 from dstack._internal.cli.models.presets import (
-    Preset,
     PresetBenchmark,
     PresetVerificationReplicaGroup,
+    VerifiedPreset,
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.models.configurations import (
@@ -29,6 +28,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
 
@@ -110,7 +110,7 @@ def get_preset(
     *,
     preset_id: str = "8f3a12c4",
     context_length: int = 32768,
-) -> Preset:
+) -> VerifiedPreset:
     resources = ResourcesSpec.model_validate(
         {
             "cpu": "16",
@@ -119,7 +119,7 @@ def get_preset(
             "gpu": {"name": "A6000", "memory": "48GB", "count": 1},
         }
     )
-    return Preset(
+    return VerifiedPreset(
         configuration=PresetConfiguration.model_validate(
             {
                 "type": "preset",

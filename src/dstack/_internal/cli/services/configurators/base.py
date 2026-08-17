@@ -14,6 +14,8 @@ from dstack.api._public import Client
 
 ArgsParser = Union[argparse._ArgumentGroup, argparse.ArgumentParser]
 
+APPLY_STDIN_NAME = "-"
+
 ApplyConfigurationT = TypeVar("ApplyConfigurationT", bound=AnyApplyConfiguration)
 
 

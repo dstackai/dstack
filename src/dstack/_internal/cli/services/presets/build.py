@@ -3,16 +3,16 @@ from typing import Any, Optional, TypeVar
 
 import gpuhunt
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.presets import (
     PRESET_EXCLUDED_FIELDS,
-    Preset,
     PresetBenchmark,
     PresetVerificationReplicaGroup,
+    VerifiedPreset,
 )
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.instances import Resources
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.resources import (
     CPUSpec,
     DiskSpec,
@@ -39,12 +39,12 @@ def build_preset(
     preset_id: str,
     name: Optional[str],
     submitted_at: datetime,
-) -> Preset:
+) -> VerifiedPreset:
     service = _without_excluded_fields(service)
     configuration = _without_excluded_fields(configuration)
     configuration.env = Env()
     set_service_gpu_vendor_from_verification(service, verification_replica_groups)
-    return Preset(
+    return VerifiedPreset(
         name=name,
         base=base_model,
         id=preset_id,
@@ -59,10 +59,11 @@ def build_preset(
     )
 
 
-def preset_to_yaml_dict(preset: Preset) -> dict[str, Any]:
-    """`Preset` in the plain types `yaml.safe_dump` accepts."""
+def preset_to_yaml_dict(preset: VerifiedPreset) -> dict[str, Any]:
+    """`VerifiedPreset` in the plain types `yaml.safe_dump` accepts."""
     return {
-        **preset.model_dump(mode="json", exclude_none=True),
+        # A saved preset is verified by definition; `status` is wire-only.
+        **preset.model_dump(mode="json", exclude_none=True, exclude={"status"}),
         "service": service_configuration_to_yaml_dict(preset.service),
     }
 

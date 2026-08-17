@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import AnyPresetAgentResult
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
@@ -20,6 +19,7 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from tests._internal.cli.common import (
     get_preset,

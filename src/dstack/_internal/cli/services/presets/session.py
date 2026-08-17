@@ -17,7 +17,6 @@ import yaml
 from pydantic import ValidationError
 from rich.text import Text
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import (
     PresetSessionFinalize,
     PresetSessionProcess,
@@ -30,6 +29,7 @@ from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.utils.common import get_dstack_dir
 
 if TYPE_CHECKING:
@@ -92,6 +92,12 @@ class PresetSession:
 
     def write_prompt(self, prompt: str) -> None:
         _write_private_text(self.path / "prompt.md", prompt + "\n")
+
+    def read_prompt(self) -> Optional[str]:
+        path = self.path / "prompt.md"
+        if not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8").strip() or None
 
     def write_user_prompt(self, user_prompt: str) -> None:
         _write_private_text(self.path / _USER_PROMPT_FILENAME, user_prompt + "\n")
@@ -628,7 +634,8 @@ def _trial_entry(
     gpu: Optional[str],
 ) -> dict[str, Any]:
     ttft = (metrics.get("ttft_ms") or {}).get("p50")
-    tpot = (metrics.get("tpot_ms") or {}).get("p50")
+    # Mean, not p50: MTP skews TPOT right, and mean is the delivered decode rate.
+    tpot = (metrics.get("tpot_ms") or {}).get("mean")
     context_length = record.get("context_length")
     return {
         "tok_s": tok_s,

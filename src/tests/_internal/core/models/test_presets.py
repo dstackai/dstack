@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import (
+from dstack._internal.core.models.presets import (
     PresetConfiguration,
     PresetModelBase,
     PresetModelRepo,
@@ -101,3 +101,13 @@ class TestPresetConfiguration:
 
         assert configuration.dataset is None
         assert configuration.effective_dataset == "random"
+
+
+class TestPresetConfigurationSchema:
+    def test_schema_does_not_require_model(self):
+        # `model` is filled from the `base`/`repo` shorthand by a before-validator,
+        # which JSON Schema consumers (IDEs) never run.
+        schema = PresetConfiguration.model_json_schema()
+        assert "model" not in schema.get("required", [])
+        for field in ("model", "base", "repo"):
+            assert field in schema["properties"]
