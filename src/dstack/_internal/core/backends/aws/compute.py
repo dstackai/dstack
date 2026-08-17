@@ -1291,6 +1291,19 @@ _ON_DEMAND_QUOTA_CODES = {
     "L-DB2E81BA": "G/OnDemand",
 }
 
+# `GetServiceQuota` errors that say nothing about dstack: the quota stays unknown and
+# the offer availability stays `UNKNOWN`. Any other error code is reported, since it
+# may mean the request is malformed.
+_EXPECTED_QUOTA_ERROR_CODES = {
+    "408",  # request timed out
+    "TooManyRequestsException",  # rate limits
+    "AccessDeniedException",  # no servicequotas:GetServiceQuota permission
+    "AuthFailure",  # invalid, expired, or deactivated credentials
+    "InvalidClientTokenId",
+    "RequestExpired",
+    "UnrecognizedClientException",
+}
+
 
 def _get_regions_to_quotas(
     session: boto3.Session, regions: List[str]
@@ -1302,14 +1315,16 @@ def _get_regions_to_quotas(
                 resp = client.get_service_quota(ServiceCode="ec2", QuotaCode=quota_code)
                 region_quotas[quota_class] = resp["Quota"]["Value"]
             except botocore.exceptions.ClientError as e:
-                if "TooManyRequestsException" in str(e):
+                error_code = e.response.get("Error", {}).get("Code", "")
+                if error_code in _EXPECTED_QUOTA_ERROR_CODES:
                     logger.warning(
-                        "Failed to get quota %s in %s due to rate limits",
+                        "Failed to get quota %s in %s: %s",
                         quota_code,
                         region_name,
+                        e,
                     )
                 else:
-                    logger.exception(e)
+                    logger.exception("Failed to get quota %s in %s", quota_code, region_name)
         return region_quotas
 
     regions_to_quotas = {}

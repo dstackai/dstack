@@ -1,5 +1,6 @@
 import asyncio
 
+import httpx
 from sqlalchemy import select
 
 from dstack._internal.core.errors import SSHError
@@ -60,4 +61,9 @@ async def _process_connection(conn: GatewayConnection):
         logger.warning("Connection to gateway %s failed: %s", conn.ip_address, e)
         return
 
-    await conn.try_collect_stats()
+    try:
+        await conn.try_collect_stats()
+    except httpx.HTTPError as e:
+        logger.warning("Failed to collect stats from gateway %s: %r", conn.ip_address, e)
+    except Exception:
+        logger.exception("Failed to collect stats from gateway %s", conn.ip_address)

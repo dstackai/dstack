@@ -9,6 +9,10 @@ from typing import AsyncGenerator, Iterable, Iterator, Protocol, TypeVar, Union
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 KeyT = TypeVar("KeyT")
 
 
@@ -134,12 +138,12 @@ async def advisory_lock_ctx(
 
     To prevent unreleased locks:
 
-    1. When possible, prefer using `pg_advisory_xact_lock` instead of this context manager.
+    * When possible, prefer using `pg_advisory_xact_lock` instead of this context manager.
        `pg_advisory_xact_lock` is automatically released at the end of transaction.
 
-    1. Prefer using `AsyncConnection` as `bind`.
+    * Prefer using `AsyncConnection` as `bind`.
 
-    1. If using `AsyncSession` as `bind`, **do not** commit before exiting from the context manager.
+    * If using `AsyncSession` as `bind`, **do not** commit before exiting from the context manager.
        Committing will prompt `AsyncSession` to start a new transaction for releasing the lock,
        which may be assigned to a different database connection, which will fail to release.
     """
@@ -150,7 +154,7 @@ async def advisory_lock_ctx(
         yield
     finally:
         if dialect_name == "postgresql":
-            await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
+            await _release_advisory_lock(bind, resource)
 
 
 @asynccontextmanager
@@ -165,7 +169,7 @@ async def try_advisory_lock_ctx(
         yield locked
     finally:
         if dialect_name == "postgresql" and locked:
-            await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
+            await _release_advisory_lock(bind, resource)
 
 
 _in_memory_locker = InMemoryResourceLocker()
@@ -203,3 +207,18 @@ async def _wait_to_lock_many(
         if not left_to_lock:
             return
         await asyncio.sleep(delay)
+
+
+async def _release_advisory_lock(
+    bind: Union[AsyncConnection, AsyncSession], resource: str
+) -> None:
+    """
+    Release an advisory lock, tolerating failures.
+    Releasing typically fails with `PendingRollbackError` because the connection has been
+    invalidated. In this case Postgres has already dropped the lock along with the
+    session and there is nothing left to release.
+    """
+    try:
+        await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
+    except Exception as e:
+        logger.warning("Failed to release advisory lock on %s: %r", resource, e)
