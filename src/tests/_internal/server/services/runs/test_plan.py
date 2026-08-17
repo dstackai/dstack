@@ -8,6 +8,9 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
+    NodeGroup,
+    ReplicaGroup,
+    ServiceConfiguration,
     TaskConfiguration,
 )
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
@@ -19,7 +22,7 @@ from dstack._internal.core.models.profiles import (
     InstanceNameSelector,
     Profile,
 )
-from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
 from dstack._internal.server.services.projects import get_project_model_by_name
 from dstack._internal.server.services.runs import get_plan
@@ -184,6 +187,160 @@ class TestGetJobPlansBackendOffers:
         assert len(job_plans) == 1
         assert job_plans[0].total_offers == 1
         assert job_plans[0].offers == [instance_offer]
+
+
+class TestGetJobPlansNodeGroups:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_plans_each_node_group_with_its_own_requirements(
+        self,
+        test_db,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="router",
+                        nodes=1,
+                        commands=["echo router"],
+                        resources=ResourcesSpec(cpu=CPUSpec(count=Range[int](min=4, max=4))),
+                    ),
+                    NodeGroup(
+                        name="prefill",
+                        nodes=2,
+                        commands=["echo prefill"],
+                        resources=ResourcesSpec(
+                            gpu=GPUSpec(name=["L40S"], count=1),
+                        ),
+                    ),
+                ],
+            ),
+        )
+        cpu_offer = get_instance_offer_with_availability(price=1.0)
+        gpu_offer = get_instance_offer_with_availability(price=2.0, gpu_count=1, gpu_name="L40S")
+
+        async def find_optimal_fleet_with_offers_side_effect(*, job, **kwargs):
+            gpu = job.job_spec.requirements.resources.gpu
+            if gpu is not None and gpu.name:
+                return Mock(), [], [(Mock(), gpu_offer)]
+            return Mock(), [], [(Mock(), cpu_offer)]
+
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+            AsyncMock(return_value=[Mock()]),
+        )
+        find_optimal_mock = AsyncMock(side_effect=find_optimal_fleet_with_offers_side_effect)
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+            find_optimal_mock,
+        )
+
+        job_plans = await get_job_plans(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            max_offers=None,
+            full_offers=False,
+            unallocated_resources=False,
+            for_offers_only=False,
+        )
+
+        assert find_optimal_mock.await_count == 2
+        planned_jobs = [call.kwargs["job"] for call in find_optimal_mock.await_args_list]
+        assert [j.job_spec.node_group_name for j in planned_jobs] == ["router", "prefill"]
+        assert planned_jobs[0].job_spec.requirements.resources.gpu.name is None
+        assert planned_jobs[1].job_spec.requirements.resources.gpu.name == ["L40S"]
+
+        assert len(job_plans) == 3
+        assert [p.job_spec.node_group_name for p in job_plans] == [
+            "router",
+            "prefill",
+            "prefill",
+        ]
+        assert job_plans[0].offers == [cpu_offer]
+        assert job_plans[1].offers == [gpu_offer]
+        assert job_plans[2].offers == [gpu_offer]
+
+
+class TestGetJobPlansReplicaGroups:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_plans_each_replica_group_with_its_own_requirements(
+        self,
+        test_db,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080,
+                gateway=False,
+                replicas=[
+                    ReplicaGroup(
+                        name="gpu-group",
+                        count=Range[int](min=1, max=1),
+                        resources=ResourcesSpec(gpu=GPUSpec(name=["L40S"], count=1)),
+                        commands=["python server.py"],
+                    ),
+                    ReplicaGroup(
+                        name="cpu-group",
+                        count=Range[int](min=1, max=1),
+                        resources=ResourcesSpec(cpu=CPUSpec(count=Range[int](min=4, max=4))),
+                        commands=["python router.py"],
+                    ),
+                ],
+            ),
+        )
+        gpu_offer = get_instance_offer_with_availability(price=2.0, gpu_count=1, gpu_name="L40S")
+        cpu_offer = get_instance_offer_with_availability(price=1.0)
+
+        async def find_optimal_fleet_with_offers_side_effect(*, job, **kwargs):
+            gpu = job.job_spec.requirements.resources.gpu
+            if gpu is not None and gpu.name:
+                return Mock(), [], [(Mock(), gpu_offer)]
+            return Mock(), [], [(Mock(), cpu_offer)]
+
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+            AsyncMock(return_value=[Mock()]),
+        )
+        find_optimal_mock = AsyncMock(side_effect=find_optimal_fleet_with_offers_side_effect)
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+            find_optimal_mock,
+        )
+
+        job_plans = await get_job_plans(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            max_offers=None,
+            full_offers=False,
+            unallocated_resources=False,
+            for_offers_only=False,
+        )
+
+        assert find_optimal_mock.await_count == 2
+        planned_jobs = [call.kwargs["job"] for call in find_optimal_mock.await_args_list]
+        assert [j.job_spec.replica_group for j in planned_jobs] == ["gpu-group", "cpu-group"]
+        assert planned_jobs[0].job_spec.requirements.resources.gpu.name == ["L40S"]
+        assert planned_jobs[1].job_spec.requirements.resources.gpu.name is None
+
+        assert len(job_plans) == 2
+        assert [p.job_spec.replica_group for p in job_plans] == ["gpu-group", "cpu-group"]
+        assert job_plans[0].offers == [gpu_offer]
+        assert job_plans[1].offers == [cpu_offer]
 
 
 class TestGetPlan:

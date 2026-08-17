@@ -120,6 +120,12 @@ from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.nodes_interpolator import (
+    find_groups_ip_refs,
+    interpolate_groups_ip_address,
+    validate_groups_ref_bounds,
+    validate_groups_refs,
+)
 
 logger = get_logger(__name__)
 
@@ -623,6 +629,44 @@ async def _prepare_startup_context(
             termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
         )
         return None
+
+    commands = context.job.job_spec.commands
+    try:
+        for c in commands:
+            validate_groups_refs(c)
+    except InterpolatorError as e:
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
+        )
+        return None
+
+    # Hetero commands may reference peer nodes via ${{ groups[i].nodes[j].IP_ADDRESS }}.
+    # Wait until every referenced node has an internal IP, then substitute placeholders
+    # in-place before the job is sent to the runner. Bad refs are rejected above;
+    # out-of-range or still-missing IPs terminate the job below.
+    if any(find_groups_ip_refs(c) for c in commands):
+        nodes_view = _build_nodes_ip_view(context.run.jobs, context.job.job_spec.replica_num)
+        try:
+            if not _referenced_ips_ready(commands, nodes_view):
+                logger.debug(
+                    "%s: waiting for referenced node group IPs",
+                    fmt(context.job_model),
+                )
+                return None
+            context.job.job_spec.commands = [
+                interpolate_groups_ip_address(c, nodes_view) for c in commands
+            ]
+        except InterpolatorError as e:
+            _terminate_job(
+                job_model=context.job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+                termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
+            )
+            return None
 
     return _StartupContext(
         cluster_info=cluster_info,
@@ -1743,18 +1787,58 @@ def _reset_disconnected_at(job_model: JobModel, result: _ProcessResult) -> None:
         result.job_update_map["disconnected_at"] = None
 
 
+def _build_nodes_ip_view(jobs: list[Job], replica_num: int) -> list[list[str]]:
+    replica_jobs = [job for job in jobs if job.job_spec.replica_num == replica_num]
+    if not replica_jobs:
+        return []
+    max_group_index = max(job.job_spec.node_group_index for job in replica_jobs)
+    nodes: list[list[str]] = [[] for _ in range(max_group_index + 1)]
+    for job in replica_jobs:
+        group_index = job.job_spec.node_group_index
+        local_index = job.job_spec.node_group_job_index
+        while len(nodes[group_index]) <= local_index:
+            nodes[group_index].append("")
+        ip = ""
+        if job.job_submissions:
+            jpd = job.job_submissions[-1].job_provisioning_data
+            if jpd is not None:
+                ip = jpd.internal_ip or ""
+        nodes[group_index][local_index] = ip
+    return nodes
+
+
+def _referenced_ips_ready(commands: list[str], nodes_view: list[list[str]]) -> bool:
+    group_sizes = [len(g) for g in nodes_view]
+    for command in commands:
+        validate_groups_ref_bounds(command, group_sizes)
+        for group_index, node_index in find_groups_ip_refs(command):
+            # Wait until every referenced slot has a non-empty internal IP.
+            if not nodes_view[group_index][node_index]:
+                return False
+    return True
+
+
 def _get_cluster_info(
     jobs: list[Job],
     replica_num: int,
     job_provisioning_data: JobProvisioningData,
     job_runtime_data: Optional[JobRuntimeData],
 ) -> ClusterInfo:
-    job_ips = []
-    for job in jobs:
-        if job.job_spec.replica_num == replica_num:
-            job_ips.append(
-                get_or_error(job.job_submissions[-1].job_provisioning_data).internal_ip or ""
-            )
+    job_ips: list[str] = []
+    gpus_per_node: list[int] = []
+    replica_jobs = sorted(
+        (job for job in jobs if job.job_spec.replica_num == replica_num),
+        key=lambda j: j.job_spec.job_num,
+    )
+    for job in replica_jobs:
+        submission = job.job_submissions[-1]
+        jpd = get_or_error(submission.job_provisioning_data)
+        job_ips.append(jpd.internal_ip or "")
+        jrd = submission.job_runtime_data
+        if jrd is not None and jrd.offer is not None:
+            gpus_per_node.append(len(jrd.offer.instance.resources.gpus))
+        else:
+            gpus_per_node.append(len(jpd.instance_type.resources.gpus))
     gpus_per_job = len(job_provisioning_data.instance_type.resources.gpus)
     if job_runtime_data is not None and job_runtime_data.offer is not None:
         gpus_per_job = len(job_runtime_data.offer.instance.resources.gpus)
@@ -1762,6 +1846,7 @@ def _get_cluster_info(
         job_ips=job_ips,
         master_job_ip=job_ips[0],
         gpus_per_job=gpus_per_job,
+        gpus_per_node=gpus_per_node,
     )
 
 

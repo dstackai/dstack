@@ -1,6 +1,7 @@
 import pytest
 
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
+from dstack._internal.utils.nodes_interpolator import is_valid_groups_ip_ref
 
 
 def get_interpolator():
@@ -49,3 +50,23 @@ class TestVariablesInterpolator:
             get_interpolator().interpolate("${{ secrets.password.hash }}")
         with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.007 }}")
+
+    def test_skips_groups_refs(self):
+        s = "ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379"
+        interpolator = VariablesInterpolator(
+            {"run": {"args": "x"}},
+            skip={"groups": is_valid_groups_ip_ref},
+        )
+        assert interpolator.interpolate(s) == s
+
+    def test_rejects_invalid_groups_refs(self):
+        interpolator = VariablesInterpolator(
+            {"run": {"args": "x"}},
+            skip={"groups": is_valid_groups_ip_ref},
+        )
+        with pytest.raises(InterpolatorError, match="Illegal reference name"):
+            interpolator.interpolate("${{ groups[0].nodes[0].IP }}")
+        with pytest.raises(InterpolatorError, match="Illegal reference name"):
+            interpolator.interpolate("${{ groups[0].node[0].IP_ADDRESS }}")
+        with pytest.raises(InterpolatorError, match="Illegal reference name"):
+            interpolator.interpolate("${{ groups.prefill.nodes[0].IP_ADDRESS }}")

@@ -18,7 +18,11 @@ from dstack._internal.core.models.common import (
     RegistryAuth,
     validate_json_extra_ignore,
 )
-from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    NodeGroup,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
@@ -49,6 +53,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     _load_submitted_job_context,
     _NewCapacityAttempts,
     _OfferAttemptError,
+    _release_replica_jobs_from_master_wait,
 )
 from dstack._internal.server.models import (
     ComputeGroupModel,
@@ -2061,6 +2066,68 @@ class TestJobSubmittedWorker:
         res = await session.execute(select(ComputeGroupModel))
         assert res.scalar_one_or_none() is not None
 
+    async def test_provisions_one_job_node_group_via_run_job(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        """1-node hetero groups use run_job (not run_jobs).
+
+        RunPod Instant Clusters reject pod_count=1; Slurm gets node_count=1 from run_job.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(name="prefill", nodes=1, commands=["echo prefill"]),
+                NodeGroup(name="decode", nodes=1, commands=["echo decode"]),
+            ],
+        )
+        run_spec = get_run_spec(repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job0 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.return_value = get_job_provisioning_data(
+                dockerized=True, backend=BackendType.RUNPOD
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job0)
+
+        compute_mock.run_job.assert_called_once()
+        compute_mock.run_jobs.assert_not_called()
+        assert compute_mock.run_job.call_args[0][1].job_spec.job_num == 0
+        job0 = await _get_job(session, job0.id)
+        assert job0.status == JobStatus.PROVISIONING
+
     async def test_defers_job_while_waiting_for_master_provisioning(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
@@ -2729,13 +2796,15 @@ class TestLoadSubmittedJobContext:
         assert not context.multinode
         assert context.jobs_to_provision == [context.job]
 
-    async def test_non_master_loads_master_and_current_job(self, test_db, session: AsyncSession):
-        """Non-master: run_model.jobs should contain master job + current job (latest submissions)."""
+    async def test_non_master_multinode_loads_master_and_current_job(
+        self, test_db, session: AsyncSession
+    ):
+        """Homogeneous multinode workers: run_model.jobs should contain job 0 + current."""
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet = await create_fleet(session=session, project=project)
-        configuration = TaskConfiguration(image="debian", nodes=2)
+        configuration = TaskConfiguration(image="debian", nodes=3)
         run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
         run = await create_run(
             session=session,
@@ -2755,19 +2824,25 @@ class TestLoadSubmittedJobContext:
             job_provisioning_data=get_job_provisioning_data(),
             waiting_master_job=False,
         )
-        worker_job = await create_job(
+        worker_job_1 = await create_job(
             session=session,
             run=run,
             job_num=1,
             status=JobStatus.SUBMITTED,
             waiting_master_job=False,
         )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
         await session.commit()
 
-        context = await _load_submitted_job_context(session=session, job_model=worker_job)
-        # Only master (job_num=0) and current job (job_num=1) should be loaded.
+        context = await _load_submitted_job_context(session=session, job_model=worker_job_1)
         loaded_job_ids = {jm.id for jm in context.run_model.jobs}
-        assert loaded_job_ids == {master_job.id, worker_job.id}
+        assert loaded_job_ids == {master_job.id, worker_job_1.id}
         assert context.jobs_to_provision == [context.job]
 
     async def test_multinode_master_loads_all_replica_jobs(self, test_db, session: AsyncSession):
@@ -2810,6 +2885,285 @@ class TestLoadSubmittedJobContext:
         assert context.multinode
         assert len(context.jobs_to_provision) == 2
         assert len(context.replica_job_model_ids) == 2
+
+    async def test_node_group_master_provisions_only_its_group(
+        self, test_db, session: AsyncSession
+    ):
+        """Heterogeneous node groups: each group master batches only its own group."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(
+                    name="small",
+                    nodes=1,
+                    resources=ResourcesSpec(
+                        cpu=CPUSpec(count=Range[int](min=2)),
+                        memory=Range[Memory](min=Memory(4)),
+                    ),
+                    commands=["echo small"],
+                ),
+                NodeGroup(
+                    name="large",
+                    nodes=2,
+                    resources=ResourcesSpec(
+                        cpu=CPUSpec(count=Range[int](min=4)),
+                        memory=Range[Memory](min=Memory(8)),
+                    ),
+                    commands=["echo large"],
+                ),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        small_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_job_0 = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_job_1 = await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        await session.commit()
+
+        small_context = await _load_submitted_job_context(session=session, job_model=small_job)
+        # Multinode master: load all replica jobs.
+        assert {jm.job_num for jm in small_context.run_model.jobs} == {0, 1, 2}
+        assert [j.job_spec.job_num for j in small_context.jobs_to_provision] == [0]
+        assert small_context.jobs_to_provision[0].job_spec.node_group_name == "small"
+
+        large_context = await _load_submitted_job_context(session=session, job_model=large_job_0)
+        # Node-group masters load all replica jobs (for chain unlock).
+        assert {jm.job_num for jm in large_context.run_model.jobs} == {0, 1, 2}
+        assert sorted(j.job_spec.job_num for j in large_context.jobs_to_provision) == [1, 2]
+        assert {j.job_spec.node_group_name for j in large_context.jobs_to_provision} == {"large"}
+
+        large_worker_context = await _load_submitted_job_context(
+            session=session, job_model=large_job_1
+        )
+        # Non-master job in the group: job 0 + current.
+        assert {jm.job_num for jm in large_worker_context.run_model.jobs} == {0, 2}
+        assert [j.job_spec.job_num for j in large_worker_context.jobs_to_provision] == [2]
+
+    async def test_global_master_unlocks_only_next_waiting_group_master(
+        self, test_db, session: AsyncSession
+    ):
+        """After job 0, unlock only the next waiting group master — not later masters or their workers."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(name="small", nodes=1, commands=["echo small"]),
+                NodeGroup(name="large", nodes=2, commands=["echo large"]),
+                NodeGroup(name="other", nodes=1, commands=["echo other"]),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        small_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_master = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        large_worker = await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        other_master = await create_job(
+            session=session,
+            run=run,
+            job_num=3,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=small_job)
+        _release_replica_jobs_from_master_wait(
+            job_model=context.job_model,
+            job=context.job,
+            replica_job_models=list(context.run_model.jobs),
+        )
+        await session.commit()
+        await session.refresh(large_master)
+        await session.refresh(large_worker)
+        await session.refresh(other_master)
+
+        assert large_master.waiting_master_job is False
+        assert large_worker.waiting_master_job is True
+        assert other_master.waiting_master_job is True
+
+    async def test_homogeneous_master_unlocks_same_group_workers(
+        self, test_db, session: AsyncSession
+    ):
+        """Homogeneous nodes:N — job 0 unlocks the other ranks in the single group."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(image="debian", nodes=3, commands=["true"])
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        master = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        worker_1 = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        worker_2 = await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=master)
+        _release_replica_jobs_from_master_wait(
+            job_model=context.job_model,
+            job=context.job,
+            replica_job_models=list(context.run_model.jobs),
+        )
+        await session.commit()
+        await session.refresh(worker_1)
+        await session.refresh(worker_2)
+
+        assert worker_1.waiting_master_job is False
+        assert worker_2.waiting_master_job is False
+
+    async def test_group_master_unlocks_same_group_workers_and_next_master(
+        self, test_db, session: AsyncSession
+    ):
+        """After a non-zero group master: unlock its workers and the next waiting group master."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(
+            image="debian",
+            groups=[
+                NodeGroup(name="small", nodes=1, commands=["echo small"]),
+                NodeGroup(name="large", nodes=2, commands=["echo large"]),
+                NodeGroup(name="other", nodes=1, commands=["echo other"]),
+            ],
+        )
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_master = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        large_worker = await create_job(
+            session=session,
+            run=run,
+            job_num=2,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        other_master = await create_job(
+            session=session,
+            run=run,
+            job_num=3,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=large_master)
+        assert {jm.job_num for jm in context.run_model.jobs} == {0, 1, 2, 3}
+        _release_replica_jobs_from_master_wait(
+            job_model=context.job_model,
+            job=context.job,
+            replica_job_models=list(context.run_model.jobs),
+        )
+        await session.commit()
+        await session.refresh(large_worker)
+        await session.refresh(other_master)
+
+        assert large_worker.waiting_master_job is False
+        assert other_master.waiting_master_job is False
 
     async def test_loads_only_latest_submission(self, test_db, session: AsyncSession):
         """Only the latest submission per (replica_num, job_num) should be loaded, not historical ones."""

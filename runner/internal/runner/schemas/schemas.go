@@ -95,6 +95,7 @@ type ClusterInfo struct {
 	JobIPs      []string `json:"job_ips"`
 	MasterJobIP string   `json:"master_job_ip"`
 	GPUSPerJob  int      `json:"gpus_per_job"`
+	GPUSPerNode []int    `json:"gpus_per_node"`
 }
 
 type SSHKey struct {

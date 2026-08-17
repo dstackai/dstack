@@ -3,6 +3,7 @@ import shlex
 import sys
 import threading
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional
 
@@ -27,6 +28,7 @@ from dstack._internal.core.models.configurations import (
     LEGACY_REPO_DIR,
     OPENAI_MODEL_PROBE_TIMEOUT,
     HTTPHeaderSpec,
+    NodeGroup,
     PortMapping,
     ProbeConfig,
     PythonVersion,
@@ -108,6 +110,13 @@ def get_default_image(nvcc: bool = False) -> str:
     return f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
 
 
+@dataclass(frozen=True)
+class NodeGroupJobContext:
+    group: NodeGroup
+    group_index: int
+    job_index: int
+
+
 class JobConfigurator(ABC):
     TYPE: RunConfigurationType
 
@@ -131,7 +140,7 @@ class JobConfigurator(ABC):
         return [job_spec]
 
     @abstractmethod
-    def _shell_commands(self) -> List[str]:
+    def _shell_commands(self, node_group: Optional[NodeGroup] = None) -> List[str]:
         pass
 
     @abstractmethod
@@ -150,7 +159,7 @@ class JobConfigurator(ABC):
         return self.run_spec.merged_profile.reservation
 
     @abstractmethod
-    def _ports(self) -> List[PortMapping]:
+    def _ports(self, node_group: Optional[NodeGroup] = None) -> List[PortMapping]:
         pass
 
     async def _get_image_config(self) -> ImageConfig:
@@ -190,15 +199,17 @@ class JobConfigurator(ABC):
         replica_num: int,
         job_num: int,
         jobs_per_replica: int,
+        node_group_context: Optional[NodeGroupJobContext] = None,
     ) -> JobSpec:
+        node_group = node_group_context.group if node_group_context is not None else None
         job_spec = JobSpec(
             replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
             job_num=job_num,
             job_name=f"{self.run_spec.run_name}-{job_num}-{replica_num}",
             jobs_per_replica=jobs_per_replica,
             replica_group=self.replica_group_name or DEFAULT_REPLICA_GROUP_NAME,
-            app_specs=self._app_specs(),
-            commands=await self._commands(),
+            app_specs=self._app_specs(node_group),
+            commands=await self._commands(node_group),
             env=self._env(),
             home_dir=self._home_dir(),
             image_name=self._image_name(),
@@ -209,7 +220,7 @@ class JobConfigurator(ABC):
             stop_duration=self._stop_duration(),
             utilization_policy=self._utilization_policy(),
             registry_auth=self._registry_auth(),
-            requirements=await self._requirements(jobs_per_replica),
+            requirements=await self._requirements(jobs_per_replica, node_group),
             retry=self._retry(),
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
@@ -221,6 +232,15 @@ class JobConfigurator(ABC):
             file_archives=self.run_spec.file_archives,
             service_port=self._service_port(),
             probes=self._probes(),
+            node_group_index=(
+                node_group_context.group_index if node_group_context is not None else 0
+            ),
+            node_group_name=(
+                node_group.required_name if node_group is not None else DEFAULT_REPLICA_GROUP_NAME
+            ),
+            node_group_job_index=(
+                node_group_context.job_index if node_group_context is not None else 0
+            ),
         )
         return job_spec
 
@@ -235,12 +255,12 @@ class JobConfigurator(ABC):
             return "/bin/bash"
         return "/bin/sh"
 
-    async def _commands(self) -> List[str]:
+    async def _commands(self, node_group: Optional[NodeGroup] = None) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             assert self.run_spec.configuration.type != "dev-environment"
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
-        elif shell_commands := self._shell_commands():
+        elif shell_commands := self._shell_commands(node_group):
             entrypoint = [self._shell(), "-i", "-c"]
             dstack_image_commands = self._dstack_image_commands()
             commands = [_join_shell_commands(dstack_image_commands + shell_commands)]
@@ -293,9 +313,9 @@ class JobConfigurator(ABC):
             f"eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a {DSTACK_PROFILE_PATH})",
         ]
 
-    def _app_specs(self) -> List[AppSpec]:
+    def _app_specs(self, node_group: Optional[NodeGroup] = None) -> List[AppSpec]:
         specs = []
-        for i, pm in enumerate(filter_reserved_ports(self._ports())):
+        for i, pm in enumerate(filter_reserved_ports(self._ports(node_group))):
             specs.append(
                 AppSpec(
                     port=pm.container_port,
@@ -365,7 +385,11 @@ class JobConfigurator(ABC):
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth
 
-    async def _requirements(self, jobs_per_replica: int) -> Requirements:
+    async def _requirements(
+        self,
+        jobs_per_replica: int,
+        node_group: Optional[NodeGroup] = None,
+    ) -> Requirements:
         resources = self.run_spec.configuration.resources
         image = self.run_spec.configuration.image
         if self.run_spec.configuration.type == "service":
@@ -375,6 +399,8 @@ class JobConfigurator(ABC):
                     if group.image is not None:
                         image = group.image
                     break
+        elif self.run_spec.configuration.type == "task" and node_group is not None:
+            resources = node_group.resources
         resources = resources.model_copy(deep=True)
         if resources.cpu.arch is None and image != DUMMY_IMAGE_NAME:
             if image is None:

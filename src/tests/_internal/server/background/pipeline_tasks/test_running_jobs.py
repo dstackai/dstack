@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -30,8 +30,11 @@ from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolic
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     ImagePullProgress,
+    Job,
     JobRuntimeData,
+    JobSpec,
     JobStatus,
+    JobSubmission,
     JobTerminationReason,
     RunSpec,
     RunStatus,
@@ -46,10 +49,13 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     JobRunningPipeline,
     JobRunningPipelineItem,
     JobRunningWorker,
+    _build_nodes_ip_view,
     _fetch_run_model,
+    _get_cluster_info,
     _prepare_startup_context,
     _ProcessContext,
     _ProcessResult,
+    _referenced_ips_ready,
     _RunnerAvailability,
     _SubmitJobToRunnerResult,
 )
@@ -92,6 +98,7 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime, get_or_error
+from dstack._internal.utils.interpolator import InterpolatorError
 
 pytestmark = pytest.mark.usefixtures("image_config_mock", "test_log_storage")
 
@@ -3089,6 +3096,127 @@ class TestPrepareStartupContextRouterEnv:
 
 
 @pytest.mark.asyncio
+class TestPrepareStartupContextClusterWait:
+    def _make_context(self) -> _ProcessContext:
+        job_model = MagicMock()
+        job_model.submitted_at = datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        sibling = MagicMock()
+        sibling.job_spec.replica_num = 0
+        sibling.job_submissions = [
+            MagicMock(status=JobStatus.SUBMITTED, job_provisioning_data=None)
+        ]
+        job = MagicMock()
+        job.job_spec.replica_num = 0
+        job.job_spec.commands = ["echo ok"]
+        run = MagicMock()
+        run.jobs = [sibling]
+        run.run_spec = MagicMock()
+        return _ProcessContext(
+            job_model=job_model,
+            run_model=MagicMock(),
+            run=run,
+            job=job,
+            job_submission=MagicMock(job_runtime_data=None),
+            job_provisioning_data=MagicMock(),
+            instance_access_revoked=False,
+        )
+
+    @freeze_time("2023-01-01 12:00:00Z")
+    async def test_submitted_sibling_defers(self):
+        context = self._make_context()
+        result = _ProcessResult()
+        out = await _prepare_startup_context(context=context, result=result)
+        assert out is None
+        assert result.job_update_map == {}
+
+
+@pytest.mark.asyncio
+class TestPrepareStartupContextGroupsIpWait:
+    def _make_context(self) -> _ProcessContext:
+        job_model = MagicMock()
+        job_model.submitted_at = datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        peer = MagicMock()
+        peer.job_spec.replica_num = 0
+        peer.job_spec.node_group_index = 0
+        peer.job_spec.node_group_job_index = 0
+        peer.job_submissions = [
+            MagicMock(
+                status=JobStatus.PROVISIONING, job_provisioning_data=MagicMock(internal_ip="")
+            )
+        ]
+        job = MagicMock()
+        job.job_spec.replica_num = 0
+        job.job_spec.commands = ["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"]
+        run = MagicMock()
+        run.jobs = [peer]
+        run.run_spec = MagicMock()
+        return _ProcessContext(
+            job_model=job_model,
+            run_model=MagicMock(),
+            run=run,
+            job=job,
+            job_submission=MagicMock(job_runtime_data=None),
+            job_provisioning_data=MagicMock(),
+            instance_access_revoked=False,
+        )
+
+    def _patches(self):
+        @asynccontextmanager
+        async def _fake_session_ctx():
+            yield MagicMock()
+
+        return (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
+                return_value=None,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_session_ctx",
+                _fake_session_ctx,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_job_attached_volumes",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_repo_creds",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_project_secrets_mapping",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.repo_model_to_repo_head_with_creds",
+                return_value=MagicMock(repo_creds=None),
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.interpolate_job_spec_secrets",
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_cluster_info",
+                return_value=ClusterInfo(
+                    job_ips=["10.0.0.1"], master_job_ip="10.0.0.1", gpus_per_job=0
+                ),
+            ),
+        )
+
+    @freeze_time("2023-01-01 12:00:00Z")
+    async def test_groups_ip_not_ready_defers(self):
+        context = self._make_context()
+        result = _ProcessResult()
+        with ExitStack() as stack:
+            for p in self._patches():
+                stack.enter_context(p)
+            out = await _prepare_startup_context(context=context, result=result)
+        assert out is None
+        assert result.job_update_map == {}
+
+
+@pytest.mark.asyncio
 class TestPrepareStartupContextReplicaGate:
     """Tests for the https://github.com/dstackai/dstack/issues/4146 fix"""
 
@@ -3274,3 +3402,139 @@ class TestFetchRunModelDynamoBranch:
             run_spec=parsed,
         )
         assert {j.replica_num for j in run_model.jobs} == {0}
+
+
+def _node_group_job(
+    *,
+    job_num: int,
+    node_group_index: int,
+    node_group_job_index: int,
+    internal_ip: str,
+    gpu_count: int,
+) -> Job:
+    return Job.model_construct(
+        job_spec=JobSpec.model_construct(
+            replica_num=0,
+            job_num=job_num,
+            node_group_index=node_group_index,
+            node_group_job_index=node_group_job_index,
+            commands=[],
+        ),
+        job_submissions=[
+            JobSubmission.model_construct(
+                id=uuid.uuid4(),
+                submitted_at=datetime.now(timezone.utc),
+                job_provisioning_data=get_job_provisioning_data(
+                    internal_ip=internal_ip,
+                    gpu_count=gpu_count,
+                ),
+                job_runtime_data=None,
+            )
+        ],
+    )
+
+
+class TestGetClusterInfo:
+    def test_fills_gpus_per_node(self):
+        jobs = [
+            _node_group_job(
+                job_num=0,
+                node_group_index=0,
+                node_group_job_index=0,
+                internal_ip="10.0.0.1",
+                gpu_count=8,
+            ),
+            _node_group_job(
+                job_num=1,
+                node_group_index=1,
+                node_group_job_index=0,
+                internal_ip="10.0.0.2",
+                gpu_count=4,
+            ),
+        ]
+        this_jpd = get_job_provisioning_data(internal_ip="10.0.0.1", gpu_count=8)
+        info = _get_cluster_info(
+            jobs=jobs,
+            replica_num=0,
+            job_provisioning_data=this_jpd,
+            job_runtime_data=None,
+        )
+        assert info.job_ips == ["10.0.0.1", "10.0.0.2"]
+        assert info.master_job_ip == "10.0.0.1"
+        assert info.gpus_per_job == 8
+        assert info.gpus_per_node == [8, 4]
+
+    def test_raises_when_sibling_missing_provisioning_data(self):
+        provisioned = _node_group_job(
+            job_num=0,
+            node_group_index=0,
+            node_group_job_index=0,
+            internal_ip="10.0.0.1",
+            gpu_count=1,
+        )
+        unprovisioned = Job.model_construct(
+            job_spec=JobSpec.model_construct(
+                replica_num=0,
+                job_num=1,
+                node_group_index=1,
+                node_group_job_index=0,
+                commands=[],
+            ),
+            job_submissions=[
+                JobSubmission.model_construct(
+                    id=uuid.uuid4(),
+                    submitted_at=datetime.now(timezone.utc),
+                    job_provisioning_data=None,
+                    job_runtime_data=None,
+                )
+            ],
+        )
+        this_jpd = get_job_provisioning_data(internal_ip="10.0.0.1", gpu_count=1)
+        with pytest.raises(ValueError, match="Optional value is None"):
+            _get_cluster_info(
+                jobs=[provisioned, unprovisioned],
+                replica_num=0,
+                job_provisioning_data=this_jpd,
+                job_runtime_data=None,
+            )
+
+
+class TestNodesIpView:
+    def test_builds_group_view(self):
+        jobs = [
+            _node_group_job(
+                job_num=0,
+                node_group_index=0,
+                node_group_job_index=0,
+                internal_ip="10.0.0.1",
+                gpu_count=1,
+            ),
+            _node_group_job(
+                job_num=1,
+                node_group_index=0,
+                node_group_job_index=1,
+                internal_ip="10.0.0.2",
+                gpu_count=1,
+            ),
+            _node_group_job(
+                job_num=2,
+                node_group_index=1,
+                node_group_job_index=0,
+                internal_ip="10.0.0.3",
+                gpu_count=1,
+            ),
+        ]
+        assert _build_nodes_ip_view(jobs, replica_num=0) == [
+            ["10.0.0.1", "10.0.0.2"],
+            ["10.0.0.3"],
+        ]
+
+    def test_referenced_ips_ready(self):
+        nodes_view = [["10.0.0.1"], [""]]
+        assert _referenced_ips_ready(["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"], nodes_view)
+        assert not _referenced_ips_ready(["echo ${{ groups[1].nodes[0].IP_ADDRESS }}"], nodes_view)
+
+    def test_referenced_ips_out_of_range(self):
+        nodes_view = [["10.0.0.1"]]
+        with pytest.raises(InterpolatorError, match="out of range"):
+            _referenced_ips_ready(["echo ${{ groups[1].nodes[0].IP_ADDRESS }}"], nodes_view)

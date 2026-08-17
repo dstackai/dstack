@@ -5,7 +5,9 @@ from dstack._internal.core.models.common import (
     IncludeExcludeDictType,
     IncludeExcludeSetType,
 )
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.runs import (
+    DEFAULT_REPLICA_GROUP_NAME,
     ApplyRunPlanInput,
     JobSpec,
     JobSubmission,
@@ -80,6 +82,14 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     profile_excludes = get_profile_excludes(run_spec.profile)
     for field in get_profile_excludes(run_spec.configuration):
         configuration_excludes[field] = True
+
+    if isinstance(run_spec.configuration, TaskConfiguration):
+        if run_spec.configuration.groups is None:
+            configuration_excludes["groups"] = True
+        if run_spec.configuration.nodes is None:
+            # Omit nodes when unset so old servers never see null (pre-hetero nodes was int=1).
+            configuration_excludes["nodes"] = True
+
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
@@ -94,6 +104,12 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     clients backward-compatibility with older servers.
     """
     spec_excludes: IncludeExcludeDictType = {}
+    if all(s.node_group_index == 0 for s in job_specs):
+        spec_excludes["node_group_index"] = True
+    if all(s.node_group_name == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
+        spec_excludes["node_group_name"] = True
+    if all(s.node_group_job_index == 0 for s in job_specs):
+        spec_excludes["node_group_job_index"] = True
     return spec_excludes
 
 

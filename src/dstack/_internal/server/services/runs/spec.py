@@ -8,6 +8,7 @@ from dstack._internal.core.models.configurations import (
     SERVICE_HTTPS_DEFAULT,
     ReplicaGroup,
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.models.profiles import ProfileRetry
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
@@ -25,7 +26,13 @@ from dstack._internal.server.services.resources import (
     set_default_gpu_spec_vendor,
 )
 from dstack._internal.utils.gpu import detect_gpu_vendors_by_gpu_name
+from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.nodes_interpolator import (
+    contains_groups_ref,
+    validate_groups_ref_bounds,
+    validate_groups_refs,
+)
 
 logger = get_logger(__name__)
 
@@ -89,6 +96,7 @@ def validate_run_spec_and_set_defaults(
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
     _validate_retry_duration(run_spec)
+    _validate_groups_ip_refs(run_spec)
     for mount_point in run_spec.configuration.volumes:
         if not is_valid_docker_volume_target(mount_point.path):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
@@ -130,8 +138,17 @@ def validate_run_spec_and_set_defaults(
             )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
+    # Homogeneous tasks: keep nodes=1 in stored run_spec so it matches pre-upgrade
+    # runs and old clients (Optional nodes defaults to None in the model).
+    if (
+        isinstance(run_spec.configuration, TaskConfiguration)
+        and run_spec.configuration.groups is None
+        and run_spec.configuration.nodes is None
+    ):
+        run_spec.configuration.nodes = 1
     # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
     # would be fragile because the spec may be changed later (for example by plugins).
+    # Same for task `groups`: provisioning uses each group's resources; top-level is not banned.
     set_run_spec_resources_defaults(run_spec)
     _validate_gpu_vendor_and_image(run_spec)
     _validate_cpu_arch_and_image(run_spec)
@@ -160,6 +177,14 @@ def set_run_spec_resources_defaults(run_spec: RunSpec) -> None:
                 image=image,
                 docker=docker,
             )
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        for node_group in configuration.node_groups:
+            _set_resources_defaults(
+                resources_spec=node_group.resources,
+                image=image,
+                docker=docker,
+            )
 
 
 def _set_resources_defaults(
@@ -175,10 +200,44 @@ def _validate_retry_duration(run_spec: RunSpec) -> None:
         raise ServerClientError("retry.duration cannot be negative")
 
 
+def _validate_groups_ip_refs(run_spec: RunSpec) -> None:
+    """Validate groups IP refs at submit time (CLI and API).
+
+    Refs are only supported in commands. Typo'd and out-of-range refs are rejected.
+    """
+    for value in run_spec.configuration.env.values():
+        if isinstance(value, str) and contains_groups_ref(value):
+            raise ServerClientError(
+                "groups IP references are only supported in commands, not in `env`"
+            )
+    try:
+        for command in _iter_configuration_commands(run_spec.configuration):
+            validate_groups_refs(command)
+        if isinstance(run_spec.configuration, TaskConfiguration):
+            group_sizes = [g.nodes for g in run_spec.configuration.node_groups]
+            for command in _iter_configuration_commands(run_spec.configuration):
+                validate_groups_ref_bounds(command, group_sizes)
+    except InterpolatorError as e:
+        raise ServerClientError(e.args[0]) from e
+
+
+def _iter_configuration_commands(configuration: AnyRunConfiguration):
+    if isinstance(configuration, TaskConfiguration):
+        for group in configuration.node_groups:
+            yield from group.commands
+        return
+    yield from getattr(configuration, "commands", None) or []
+    yield from getattr(configuration, "init", None) or []
+    if isinstance(configuration, ServiceConfiguration):
+        for group in configuration.replica_groups:
+            yield from group.commands
+
+
 def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
     configuration = run_spec.configuration
     vendors: set[gpuhunt.AcceleratorVendor] = set()
     invalid_replicas: list[int] = []
+    invalid_groups: list[int] = []
     if configuration.type == "service" and isinstance(configuration.replicas, list):
         for idx, replica_group in enumerate(configuration.replicas):
             image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
@@ -190,6 +249,17 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
             if _vendors:
                 vendors.update(_vendors)
                 invalid_replicas.append(idx)
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        for idx, node_group in enumerate(configuration.node_groups):
+            _vendors = _detect_gpu_vendors_requiring_image(
+                gpu_spec=node_group.resources.gpu,
+                image=image,
+                docker=docker,
+            )
+            if _vendors:
+                vendors.update(_vendors)
+                invalid_groups.append(idx)
     else:
         vendors = _detect_gpu_vendors_requiring_image(
             gpu_spec=configuration.resources.gpu,
@@ -204,6 +274,8 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
         )
         if invalid_replicas:
             msg = f"replicas{invalid_replicas}: {msg}"
+        elif invalid_groups:
+            msg = f"groups{invalid_groups}: {msg}"
         raise ServerClientError(msg)
 
 
@@ -253,6 +325,23 @@ def _validate_cpu_arch_and_image(run_spec: RunSpec) -> None:
             errors.append(f"replicas{invalid_replicas_without_image}: {image_msg}")
         if invalid_replicas_with_docker:
             errors.append(f"replicas{invalid_replicas_with_docker}: {docker_msg}")
+        if errors:
+            raise ServerClientError("\n".join(errors))
+    elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
+        image, docker = configuration.image, configuration.docker
+        invalid_groups_without_image: list[int] = []
+        invalid_groups_with_docker: list[int] = []
+        for idx, node_group in enumerate(configuration.node_groups):
+            if node_group.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
+                if docker:
+                    invalid_groups_with_docker.append(idx)
+                elif image is None:
+                    invalid_groups_without_image.append(idx)
+        errors: list[str] = []
+        if invalid_groups_without_image:
+            errors.append(f"groups{invalid_groups_without_image}: {image_msg}")
+        if invalid_groups_with_docker:
+            errors.append(f"groups{invalid_groups_with_docker}: {docker_msg}")
         if errors:
             raise ServerClientError("\n".join(errors))
     elif configuration.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
@@ -384,7 +473,7 @@ def can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> boo
 def get_nodes_required_num(run_spec: RunSpec) -> int:
     nodes_required_num = 1
     if run_spec.configuration.type == "task":
-        nodes_required_num = run_spec.configuration.nodes
+        nodes_required_num = run_spec.configuration.nodes_num
     elif run_spec.configuration.type == "service":
         nodes_required_num = sum(
             group.count.min or 0 for group in run_spec.configuration.replica_groups

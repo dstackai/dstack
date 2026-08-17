@@ -1195,7 +1195,7 @@ async def _validate_run_volumes(
     # that won't be created immediately (e.g. range of replicas or nodes).
     nodes = 1
     if run_spec.configuration.type == "task":
-        nodes = run_spec.configuration.nodes
+        nodes = run_spec.configuration.nodes_num
     for job_num in range(nodes):
         volumes = await get_job_configured_volumes(
             session=session, project=project, run_spec=run_spec, job_num=job_num

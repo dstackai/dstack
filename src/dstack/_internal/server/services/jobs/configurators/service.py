@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from dstack._internal import settings
 from dstack._internal.core.models.configurations import (
+    NodeGroup,
     PortMapping,
     ReplicaGroup,
     RunConfigurationType,
@@ -25,7 +26,7 @@ class ServiceJobConfigurator(JobConfigurator):
                 return group
         return None
 
-    def _shell_commands(self) -> List[str]:
+    def _shell_commands(self, node_group: Optional[NodeGroup] = None) -> List[str]:
         assert self.run_spec.configuration.type == "service"
         group = self._current_replica_group()
         if group is not None:
@@ -127,5 +128,5 @@ class ServiceJobConfigurator(JobConfigurator):
             return group.reservation
         return super()._reservation()
 
-    def _ports(self) -> List[PortMapping]:
+    def _ports(self, node_group: Optional[NodeGroup] = None) -> List[PortMapping]:
         return []

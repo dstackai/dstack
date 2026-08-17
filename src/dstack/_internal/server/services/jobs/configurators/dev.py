@@ -1,7 +1,11 @@
 from typing import Dict, List, Optional
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
+from dstack._internal.core.models.configurations import (
+    NodeGroup,
+    PortMapping,
+    RunConfigurationType,
+)
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.ides import get_ide
@@ -33,7 +37,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             self.ide = ide
         super().__init__(run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name)
 
-    def _shell_commands(self) -> List[str]:
+    def _shell_commands(self, node_group: Optional[NodeGroup] = None) -> List[str]:
         assert self.run_spec.configuration.type == "dev-environment"
 
         commands = []
@@ -65,6 +69,6 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     def _spot_policy(self) -> SpotPolicy:
         return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
-    def _ports(self) -> List[PortMapping]:
+    def _ports(self, node_group: Optional[NodeGroup] = None) -> List[PortMapping]:
         assert self.run_spec.configuration.type == "dev-environment"
         return self.run_spec.configuration.ports

@@ -122,7 +122,7 @@ def print_run_plan(
     props.add_row(th("User"), run_plan.user)
     configuration_type = run_spec.configuration.type
     if run_spec.configuration.type == "task":
-        configuration_type += f" (nodes={run_spec.configuration.nodes})"
+        configuration_type += f" (nodes={run_spec.configuration.nodes_num})"
     props.add_row(th("Type"), configuration_type)
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Spot policy"), spot_policy)

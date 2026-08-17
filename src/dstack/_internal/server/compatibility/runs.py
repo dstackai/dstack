@@ -3,7 +3,11 @@ from typing import Optional
 from packaging.version import Version
 
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    SERVICE_HTTPS_DEFAULT,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
 from dstack._internal.server.compatibility.common import patch_profile_params
 
@@ -27,6 +31,13 @@ def patch_run(run: Run, client_version: Optional[Version]) -> None:
 def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None:
     if client_version is None:
         return
+    # Clients that type nodes as int reject null. Homogeneous default is 1.
+    if (
+        isinstance(run_spec.configuration, TaskConfiguration)
+        and run_spec.configuration.groups is None
+        and run_spec.configuration.nodes is None
+    ):
+        run_spec.configuration.nodes = 1
     # Clients prior to 0.20.8 do not support probes = None
     if client_version < Version("0.20.8") and isinstance(
         run_spec.configuration, ServiceConfiguration

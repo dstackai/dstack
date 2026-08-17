@@ -45,6 +45,7 @@ from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
     JobRuntimeData,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
     Requirements,
@@ -807,25 +808,38 @@ async def _fetch_run_model_for_submitted_job(
 ) -> RunModel:
     """Fetch run model with only the relevant latest-submission jobs.
 
+    Loading jobs is separate from provisioning them. job_num=0 may load all
+    siblings for coordination, but still provisions only its own node group.
+
     Only a small subset is needed depending on the job type:
-        * Master multinode: all same-replica jobs (for cluster provisioning and releasing sibling waits).
-        * Non-master: master job + current job (for master provisioning data lookup).
-        * Master single-node: current job only (no siblings needed).
+        * Multinode global master (job_num=0) or node-group master: all
+          same-replica jobs (group masters need siblings to chain-unlock the
+          next waiting group master).
+        * Other multinode jobs: job 0 + current job.
+        * Single-node master: current job only.
 
     Only the latest submission per (replica_num, job_num) is loaded since historical
     submissions are never accessed in submitted job processing.
     """
-    is_master = job_model.job_num == 0
-    is_multinode = get_job_spec(job_model).jobs_per_replica > 1
+    job_spec = get_job_spec(job_model)
+    is_multinode = job_spec.jobs_per_replica > 1
 
     job_num_filters: list = []
-    if is_master and not is_multinode:
-        # Master single-node: only current job needed.
-        job_num_filters.append(JobModel.job_num == 0)
-    elif not is_master:
-        # Non-master: master job (for provisioning data) + current job.
+    if not is_multinode:
+        if job_model.job_num == 0:
+            # Single-node master: only current job needed.
+            job_num_filters.append(JobModel.job_num == 0)
+        else:
+            # Non-master single-node should not happen; keep master + current for safety.
+            job_num_filters.append(JobModel.job_num.in_([0, job_model.job_num]))
+    elif _is_node_group_master(job_spec):
+        # Global master or later node-group master: load all jobs (fleet setup,
+        # chain waiting_master_job release). Provisioning still batches only
+        # this job's node group (same shape).
+        pass
+    else:
+        # Other multinode jobs: job 0 + current job.
         job_num_filters.append(JobModel.job_num.in_([0, job_model.job_num]))
-    # else: master multinode — no job_num filter, load all jobs in replica.
 
     latest_submissions_sq = (
         select(
@@ -1402,11 +1416,11 @@ async def _apply_existing_instance_provisioning(
         context.job_model.skip_min_processing_interval = True
     _release_replica_jobs_from_master_wait(
         job_model=context.job_model,
+        job=context.job,
         replica_job_models=_get_job_models_by_ids(
             job_models=context.run_model.jobs,
             job_model_ids=context.replica_job_model_ids,
         ),
-        jobs_to_provision=context.jobs_to_provision,
     )
     await _unlock_related_volumes(
         session=session,
@@ -1589,11 +1603,11 @@ async def _apply_new_capacity_provisioning(
         )
     _release_replica_jobs_from_master_wait(
         job_model=fresh_context.job_model,
+        job=fresh_context.job,
         replica_job_models=_get_job_models_by_ids(
             job_models=fresh_context.run_model.jobs,
             job_model_ids=fresh_context.replica_job_model_ids,
         ),
-        jobs_to_provision=fresh_context.jobs_to_provision,
     )
     await _unlock_related_volumes(
         session=session,
@@ -2222,27 +2236,120 @@ def _hint_pipelines_fetch(
         pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
+def _is_node_group_master(job_spec: JobSpec) -> bool:
+    """True if this job_spec is a node-group master for unlock/batching/fetch.
+
+    Prefer `node_group_job_index == 0`, but that field defaults to 0 on pre-branch
+    job specs, so every legacy job would look like a master. Treat job_num 0 as
+    master always; only treat a non-zero group index + local index 0 as a later
+    group master (new heterogeneous specs).
+    """
+    return job_spec.job_num == 0 or (
+        job_spec.node_group_index > 0 and job_spec.node_group_job_index == 0
+    )
+
+
+def _job_needs_provisioning(job: Job) -> bool:
+    if not job.job_submissions:
+        return True
+    return job.job_submissions[-1].job_provisioning_data is None
+
+
 def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
-    jobs_to_provision = [job]
-    if is_multinode_job(job) and is_master_job(job) and job_model.waiting_master_job is not None:
-        jobs_to_provision = replica_jobs
-    return jobs_to_provision
+    """Select jobs to launch in this provision attempt.
+
+    Homogeneous multinode (`nodes: N` → one node group) still batches the whole
+    replica on the group master (rank 0).
+
+    Heterogeneous node groups batch only jobs that share `node_group_index`, so
+    ComputeGroup backends (`run_jobs`) receive a single-shape offer set.
+
+    Global `waiting_master_job` blocks non-masters until the global master
+    (job_num=0) finishes; chain unlock then lets each group master run before
+    its workers (see `_release_replica_jobs_from_master_wait`).
+    """
+    if not is_multinode_job(job):
+        return [job]
+    # Legacy rows without the master-wait protocol: provision one-by-one only.
+    if job_model.waiting_master_job is None:
+        return [job]
+    if not _is_node_group_master(job.job_spec):
+        return [job]
+
+    group_index = job.job_spec.node_group_index
+    group_jobs = [
+        j
+        for j in replica_jobs
+        if j.job_spec.node_group_index == group_index and _job_needs_provisioning(j)
+    ]
+    return group_jobs if group_jobs else [job]
 
 
 def _get_required_targeted_instance_offers(context: _SubmittedJobContext) -> int:
-    if is_multinode_job(context.job) and is_master_job(context.job):
+    # Node-group masters (including non-zero groups) may batch multiple jobs.
+    if is_multinode_job(context.job) and len(context.jobs_to_provision) > 1:
         return len(context.jobs_to_provision)
     return 1
 
 
+def _next_waiting_group_master_job_num(
+    job: Job,
+    replica_job_models: list[JobModel],
+) -> Optional[int]:
+    """Lowest job_num of a still-waiting group master in a later node group."""
+    my_group = job.job_spec.node_group_index
+    candidates: list[int] = []
+    for m in replica_job_models:
+        if not m.waiting_master_job:
+            continue
+        spec = get_job_spec(m)
+        if spec.node_group_job_index == 0 and spec.node_group_index > my_group:
+            candidates.append(m.job_num)
+    return min(candidates) if candidates else None
+
+
 def _release_replica_jobs_from_master_wait(
     job_model: JobModel,
+    job: Job,
     replica_job_models: list[JobModel],
-    jobs_to_provision: list[Job],
 ) -> None:
-    if len(jobs_to_provision) > 1:
-        logger.debug("%s: allow replica jobs to be provisioned one-by-one", fmt(job_model))
-        for replica_job_model in replica_job_models:
+    """Chain unlock of `waiting_master_job` after a provision attempt.
+
+    Group masters unlock:
+      * remaining jobs in their own node group (non-ComputeGroup one-by-one), and
+      * the lowest still-waiting group master in a later node group (chain).
+
+    Unlocking one later master at a time is deliberate: concurrent group-master
+    provisioning races on instance_num assignment (no fleet lock). N groups
+    therefore take N sequential provision rounds after job 0 finishes fleet setup.
+
+    Only called on successful provision paths; a terminating group master leaves
+    later masters locked until run-level FAILED cleanup.
+
+    Group masters load all replica jobs for this (same cost as the global master).
+    Non-masters are a no-op.
+    """
+    if not any(m.waiting_master_job for m in replica_job_models):
+        return
+    if not _is_node_group_master(job.job_spec):
+        return
+
+    my_group = job.job_spec.node_group_index
+    next_master = _next_waiting_group_master_job_num(job, replica_job_models)
+    logger.debug(
+        "%s: chain unlock (same-group workers + next waiting group master=%s)",
+        fmt(job_model),
+        next_master,
+    )
+    for replica_job_model in replica_job_models:
+        if not replica_job_model.waiting_master_job:
+            continue
+        if replica_job_model.job_num == job_model.job_num:
+            continue
+        spec = get_job_spec(replica_job_model)
+        if spec.node_group_index == my_group or (
+            next_master is not None and replica_job_model.job_num == next_master
+        ):
             replica_job_model.waiting_master_job = False
 
 
@@ -2368,7 +2475,13 @@ async def _provision_new_capacity(
                 known_placement_group_ids.add(placement_group_model.id)
         offers_tried += 1
         try:
-            if len(jobs) > 1 and offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT:
+            # Use run_jobs only for a real batch (2+ jobs). A 1-job batch must
+            # stay on run_job: Slurm gets node_count=1 there, and RunPod's
+            # Instant Cluster API rejects pod_count=1 (only sizes like 2/4/8).
+            use_group_provisioning = (
+                offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT and len(jobs) > 1
+            )
+            if use_group_provisioning:
                 assert isinstance(compute, ComputeWithGroupProvisioningSupport)
                 compute_group_provisioning_data = await run_async(
                     compute.run_jobs,

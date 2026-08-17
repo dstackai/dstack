@@ -138,12 +138,15 @@ class SlurmCompute(
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
     ) -> JobProvisioningData:
+        # run_job provisions a single dstack job → one Slurm node. Do not fall
+        # back to jobs_per_replica (total across hetero groups).
         compute_provisioning_data = self._run_slurm_job(
             run=run,
             job=job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
             requirements=requirements,
+            node_count=1,
         )
         return compute_provisioning_data.job_provisioning_datas[0]
 
@@ -164,6 +167,7 @@ class SlurmCompute(
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
             requirements=requirements,
+            node_count=len(job_configurations),
         )
 
     def terminate_instance(
@@ -186,6 +190,7 @@ class SlurmCompute(
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         requirements: Requirements,
+        node_count: int,
     ) -> ComputeGroupProvisioningData:
         if job.job_spec.registry_auth is not None:
             self._skip_offer_cache.add(run, job, instance_offer)
@@ -209,7 +214,7 @@ class SlurmCompute(
             assert run.run_spec.ssh_key_pub is not None
             authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
 
-            node_count = job.job_spec.jobs_per_replica
+            # Slurm --nodes for this call (1 from run_job, len(batch) from run_jobs).
             resources_spec = requirements.resources
             requested_resources = get_requested_resources_from_resources_spec(resources_spec)
 
