@@ -507,16 +507,32 @@ async def _prepare_startup_context(
 ) -> Optional[_StartupContext]:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
 
+    # `_get_cluster_info` below requires every job in the replica to have provisioning
+    # data, so gate on that rather than on job statuses. A `SUBMITTED` job is simply not
+    # provisioned yet, while a job that has no provisioning data and is no longer
+    # `SUBMITTED` reached a terminal state without ever provisioning (e.g. due to no
+    # capacity) and never will. Deferring in the latter case is what allows recovery:
+    # the run pipeline retries or fails the replica, but it can only lock the run's jobs
+    # once this job is unlocked, which does not happen if we raise here.
     for other_job in context.run.jobs:
-        if (
-            other_job.job_spec.replica_num == context.job.job_spec.replica_num
-            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-        ):
+        if other_job.job_spec.replica_num != context.job.job_spec.replica_num:
+            continue
+        other_job_submission = other_job.job_submissions[-1]
+        if other_job_submission.job_provisioning_data is not None:
+            continue
+        if other_job_submission.status == JobStatus.SUBMITTED:
             logger.debug(
                 "%s: waiting for all jobs in the replica to be provisioned",
                 fmt(context.job_model),
             )
-            return None
+        else:
+            logger.debug(
+                "%s: job %s in the replica has no provisioning data, waiting for the run"
+                " to be retried or terminated",
+                fmt(context.job_model),
+                other_job.job_spec.job_name,
+            )
+        return None
 
     # If this run has a router replica group and this job is a worker, gate
     # startup on the router replica's state. The helper returns None for the
