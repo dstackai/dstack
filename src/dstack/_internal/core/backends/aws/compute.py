@@ -1321,7 +1321,7 @@ def _get_regions_to_quotas(
                         "Failed to get quota %s in %s: %s",
                         quota_code,
                         region_name,
-                        error_code,
+                        e,
                     )
                 else:
                     logger.exception("Failed to get quota %s in %s", quota_code, region_name)
