@@ -1,11 +1,19 @@
+import json
+from typing import Any, Union
+from unittest.mock import MagicMock, patch
+
+import gpuhunt
 import pytest
 
 import dstack._internal.server.settings as server_settings
+from dstack._internal.core.errors import DockerRegistryError
 from dstack._internal.core.models.common import RegistryAuth, validate_extra_ignore
+from dstack._internal.server.services import docker as docker_services
 from dstack._internal.server.services.docker import (
     ImageConfigObject,
     ImageManifest,
     apply_server_docker_defaults,
+    get_image_config_and_cpu_architectures,
     is_valid_docker_volume_target,
 )
 
@@ -266,3 +274,125 @@ class TestIsValidDockerVolumeTarget:
 
     def test_trailing_slash(self):
         assert not is_valid_docker_volume_target("/invalid/path/")
+
+
+def _image_manifest(digest: str) -> str:
+    return json.dumps({"config": {"digest": digest, "size": 7023}})
+
+
+class TestGetImageConfigAndCpuArchitectures:
+    """
+    `get_manifest()` returns a dict of platform -> manifest JSON for an image index
+    (multi-platform image) and a manifest JSON string for a single-platform image.
+    """
+
+    def _get_image_config(
+        self,
+        manifest_resp: Union[str, dict[str, str]],
+        config_object: dict[str, Any],
+    ) -> tuple[ImageConfigObject, set[gpuhunt.CPUArchitecture], MagicMock]:
+        registry_client = MagicMock()
+        registry_client.__enter__.return_value = registry_client
+        registry_client.get_manifest.return_value = manifest_resp
+        registry_client.pull_blob.return_value = [json.dumps(config_object).encode()]
+        with patch.object(docker_services, "DXF", return_value=registry_client):
+            image_config, cpu_architectures = get_image_config_and_cpu_architectures(
+                "debian", None
+            )
+        return image_config, cpu_architectures, registry_client
+
+    def test_index_reports_all_supported_architectures(self, sample_image_config_object):
+        image_config, cpu_architectures, _ = self._get_image_config(
+            {
+                "linux/amd64": _image_manifest("sha256:amd64"),
+                "linux/arm64": _image_manifest("sha256:arm64"),
+            },
+            sample_image_config_object,
+        )
+
+        assert cpu_architectures == {gpuhunt.CPUArchitecture.X86, gpuhunt.CPUArchitecture.ARM}
+        assert image_config.config.user == "alice"
+
+    def test_index_picks_the_x86_manifest_regardless_of_the_response_order(
+        self, sample_image_config_object
+    ):
+        # The ImageConfigs are assumed to be the same for all images within the index, but the
+        # manifest must still be picked deterministically, not in the registry response order
+        _, _, registry_client = self._get_image_config(
+            {
+                "linux/arm64": _image_manifest("sha256:arm64"),
+                "linux/amd64": _image_manifest("sha256:amd64"),
+            },
+            sample_image_config_object,
+        )
+
+        registry_client.pull_blob.assert_called_once_with("sha256:amd64")
+
+    def test_index_falls_back_to_the_arm_manifest(self, sample_image_config_object):
+        _, cpu_architectures, registry_client = self._get_image_config(
+            {"linux/arm64": _image_manifest("sha256:arm64")},
+            sample_image_config_object,
+        )
+
+        assert cpu_architectures == {gpuhunt.CPUArchitecture.ARM}
+        registry_client.pull_blob.assert_called_once_with("sha256:arm64")
+
+    def test_index_ignores_unsupported_platforms(self, sample_image_config_object):
+        _, cpu_architectures, _ = self._get_image_config(
+            {
+                "linux/amd64": _image_manifest("sha256:amd64"),
+                "linux/386": _image_manifest("sha256:386"),
+                "linux/arm/v7": _image_manifest("sha256:armv7"),
+                "windows/amd64": _image_manifest("sha256:windows"),
+            },
+            sample_image_config_object,
+        )
+
+        assert cpu_architectures == {gpuhunt.CPUArchitecture.X86}
+
+    def test_rejects_index_without_supported_platforms(self, sample_image_config_object):
+        with pytest.raises(DockerRegistryError, match="No supported OS/architectures found"):
+            self._get_image_config(
+                {
+                    "linux/386": _image_manifest("sha256:386"),
+                    "windows/amd64": _image_manifest("sha256:windows"),
+                },
+                sample_image_config_object,
+            )
+
+    @pytest.mark.parametrize(
+        ["architecture", "expected_arch"],
+        [
+            ("amd64", gpuhunt.CPUArchitecture.X86),
+            ("arm64", gpuhunt.CPUArchitecture.ARM),
+        ],
+    )
+    def test_single_platform_image_uses_the_config_object_platform(
+        self,
+        sample_image_config_object,
+        architecture: str,
+        expected_arch: gpuhunt.CPUArchitecture,
+    ):
+        sample_image_config_object["architecture"] = architecture
+
+        _, cpu_architectures, _ = self._get_image_config(
+            _image_manifest("sha256:config"), sample_image_config_object
+        )
+
+        assert cpu_architectures == {expected_arch}
+
+    @pytest.mark.parametrize(
+        ["architecture", "os_name"],
+        [
+            ("386", "linux"),
+            ("amd64", "windows"),
+        ],
+    )
+    def test_rejects_single_platform_image_with_unsupported_platform(
+        self, sample_image_config_object, architecture: str, os_name: str
+    ):
+        sample_image_config_object["architecture"] = architecture
+        sample_image_config_object["os"] = os_name
+
+        with pytest.raises(DockerRegistryError, match="No supported OS/architectures found"):
+            self._get_image_config(_image_manifest("sha256:config"), sample_image_config_object)

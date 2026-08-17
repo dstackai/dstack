@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import cast
 from unittest.mock import AsyncMock, Mock, call, patch
 
+import gpuhunt
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -2626,8 +2627,8 @@ class TestJobSubmittedWorker:
             fleet=fleet,
             run_spec=run_spec,
         )
-        with patch.object(JobConfigurator, "_get_image_config") as m:
-            m.return_value = image_config_mock
+        with patch.object(JobConfigurator, "_get_image_config_and_cpu_architectures") as m:
+            m.return_value = (image_config_mock, {gpuhunt.CPUArchitecture.X86})
             job = await create_job(session=session, run=run, instance_assigned=True)
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
@@ -2684,8 +2685,8 @@ class TestJobSubmittedWorker:
             fleet=fleet,
             run_spec=run_spec,
         )
-        with patch.object(JobConfigurator, "_get_image_config") as m:
-            m.return_value = image_config_mock
+        with patch.object(JobConfigurator, "_get_image_config_and_cpu_architectures") as m:
+            m.return_value = (image_config_mock, {gpuhunt.CPUArchitecture.X86})
             job = await create_job(session=session, run=run, instance_assigned=True)
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)

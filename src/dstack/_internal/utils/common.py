@@ -161,8 +161,8 @@ def pretty_resources(
             cpu_arch_lower = str(cpu_arch.value).lower()
         elif isinstance(cpu_arch, str):
             cpu_arch_lower = cpu_arch.lower()
-        if cpu_arch_lower == "arm":
-            cpu_arch_prefix = "arm:"
+        if cpu_arch_lower is not None:
+            cpu_arch_prefix = f"{cpu_arch_lower}:"
         else:
             cpu_arch_prefix = ""
         parts.append(f"cpu={cpu_arch_prefix}{cpus}")
