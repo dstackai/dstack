@@ -3102,7 +3102,9 @@ class TestPrepareStartupContextClusterWait:
         job_model.submitted_at = datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
         sibling = MagicMock()
         sibling.job_spec.replica_num = 0
-        sibling.job_submissions = [MagicMock(status=JobStatus.SUBMITTED)]
+        sibling.job_submissions = [
+            MagicMock(status=JobStatus.SUBMITTED, job_provisioning_data=None)
+        ]
         job = MagicMock()
         job.job_spec.replica_num = 0
         job.job_spec.commands = ["echo ok"]

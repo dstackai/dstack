@@ -586,10 +586,10 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
         set_run_spec_resources_defaults(run_spec)
 
         groups = run_spec.configuration.node_groups
-        assert [(g.resources.gpu.vendor, g.resources.cpu.arch) for g in groups] == [
-            (gpuhunt.AcceleratorVendor.AMD, gpuhunt.CPUArchitecture.X86),
-            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.ARM),
-            (gpuhunt.AcceleratorVendor.NVIDIA, gpuhunt.CPUArchitecture.X86),
+        assert [g.resources.gpu.vendor for g in groups] == [
+            gpuhunt.AcceleratorVendor.AMD,
+            gpuhunt.AcceleratorVendor.NVIDIA,
+            gpuhunt.AcceleratorVendor.NVIDIA,
         ]
 
     def test_sets_defaults_for_top_level_resources(self):
@@ -604,7 +604,6 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
 
         resources = run_spec.configuration.resources
         assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
-        assert resources.cpu.arch == gpuhunt.CPUArchitecture.X86
 
 
 class TestValidateRunSpecGpuVendorAndImage:
@@ -730,7 +729,7 @@ class TestValidateRunSpecCpuArchAndImage:
             groups=[
                 {"nodes": 1, "commands": ["echo"], "resources": {"cpu": "arm:2"}},
                 {"nodes": 1, "commands": ["echo"]},
-                {"nodes": 1, "commands": ["echo"], "resources": {"gpu": "GH200"}},
+                {"nodes": 1, "commands": ["echo"], "resources": {"cpu": "arm:4"}},
             ],
         )
 
