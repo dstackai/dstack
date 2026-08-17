@@ -79,8 +79,8 @@ from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOf
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
-    GatewayComputeConfiguration,
-    GatewayProvisioningData,
+    GatewayReplicaConfiguration,
+    GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -462,10 +462,10 @@ class KubernetesCompute(
         if not all(deleted):
             raise ComputeError("Not all objects were deleted, check logs")
 
-    def create_gateway(
+    def create_gateway_replica(
         self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
+        configuration: GatewayReplicaConfiguration,
+    ) -> GatewayReplicaProvisioningData:
         cluster = self.region_cluster_map.get(configuration.region)
         if cluster is None:
             raise ComputeError(f"Unknown region: {configuration.region!r}")
@@ -577,19 +577,19 @@ class KubernetesCompute(
         if address is None:
             self.terminate_instance(instance_name, region=configuration.region)
             raise ComputeError(
-                "Failed to get gateway hostname. "
+                "Failed to get gateway replica hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
             )
-        return GatewayProvisioningData(
+        return GatewayReplicaProvisioningData(
             instance_id=instance_name,
             ip_address=address,
             region=cluster.region,
         )
 
-    def terminate_gateway(
+    def terminate_gateway_replica(
         self,
         instance_id: str,
-        configuration: GatewayComputeConfiguration,
+        configuration: GatewayReplicaConfiguration,
         backend_data: Optional[str] = None,
     ):
         region = configuration.region
@@ -600,7 +600,7 @@ class KubernetesCompute(
             if cluster is not None:
                 logger.warning(
                     (
-                        "Terminating gateway %s in unknown region %s."
+                        "Terminating gateway replica %s in unknown region %s."
                         " Assuming it was created before multi-cluster support was added"
                         " and is located in cluster %s"
                     ),

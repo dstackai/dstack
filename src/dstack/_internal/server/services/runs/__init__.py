@@ -56,7 +56,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services.gateways import get_gateway_compute_models
+from dstack._internal.server.services.gateways import get_gateway_replica_models
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     get_job_configured_volumes,
@@ -160,7 +160,7 @@ def gateway_registration_failed(run_model: RunModel) -> bool:
         return False
     running_gateway_replica_ids = {
         replica.id
-        for replica in get_gateway_compute_models(run_model.gateway)
+        for replica in get_gateway_replica_models(run_model.gateway)
         if replica.status == GatewayReplicaStatus.RUNNING
     }
     if not running_gateway_replica_ids:

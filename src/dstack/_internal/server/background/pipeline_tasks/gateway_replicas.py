@@ -36,8 +36,8 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
-    GatewayComputeModel,
     GatewayModel,
+    GatewayReplicaModel,
     InstanceModel,
     JobModel,
     ProjectModel,
@@ -49,9 +49,9 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
-    get_gateway_compute_configuration,
     get_gateway_configuration,
     get_gateway_lb_configuration,
+    get_gateway_replica_configuration,
 )
 from dstack._internal.server.services.gateways.client import GatewayClient
 from dstack._internal.server.services.gateways.connection import GatewayConnection
@@ -99,7 +99,7 @@ class GatewayReplicaPipeline(Pipeline[GatewayReplicaPipelineItem]):
             heartbeat_trigger=heartbeat_trigger,
         )
         self.__heartbeater = Heartbeater[GatewayReplicaPipelineItem](
-            model_type=GatewayComputeModel,
+            model_type=GatewayReplicaModel,
             lock_timeout=self._lock_timeout,
             heartbeat_trigger=self._heartbeat_trigger,
         )
@@ -121,7 +121,7 @@ class GatewayReplicaPipeline(Pipeline[GatewayReplicaPipelineItem]):
 
     @property
     def hint_fetch_model_name(self) -> str:
-        return GatewayComputeModel.__name__
+        return GatewayReplicaModel.__name__
 
     @property
     def _heartbeater(self) -> Heartbeater[GatewayReplicaPipelineItem]:
@@ -158,24 +158,24 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
     @tracing.instrument_pipeline_task("GatewayReplicaFetcher.fetch")
     async def fetch(self, limit: int) -> list[GatewayReplicaPipelineItem]:
         replica_lock, _ = get_locker(get_db().dialect_name).get_lockset(
-            GatewayComputeModel.__tablename__
+            GatewayReplicaModel.__tablename__
         )
         async with replica_lock:
             async with get_session_ctx() as session:
                 now = get_current_datetime()
                 res = await session.execute(
-                    select(GatewayComputeModel)
+                    select(GatewayReplicaModel)
                     .outerjoin(
                         GatewayModel,
                         or_(
-                            GatewayModel.id == GatewayComputeModel.gateway_id,
-                            GatewayModel.gateway_compute_id == GatewayComputeModel.id,
+                            GatewayModel.id == GatewayReplicaModel.gateway_id,
+                            GatewayModel.gateway_replica_id == GatewayReplicaModel.id,
                         ),
                     )
                     .where(
-                        GatewayComputeModel.deleted == False,
+                        GatewayReplicaModel.deleted == False,
                         or_(
-                            GatewayComputeModel.status.in_(
+                            GatewayReplicaModel.status.in_(
                                 [
                                     GatewayReplicaStatus.SUBMITTED,
                                     GatewayReplicaStatus.PROVISIONING,
@@ -185,29 +185,29 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                             ),
                         ),
                         or_(
-                            GatewayComputeModel.last_processed_at
+                            GatewayReplicaModel.last_processed_at
                             <= now - self._min_processing_interval,
-                            GatewayComputeModel.last_processed_at
-                            == GatewayComputeModel.created_at,
+                            GatewayReplicaModel.last_processed_at
+                            == GatewayReplicaModel.created_at,
                         ),
                         or_(
-                            GatewayComputeModel.lock_expires_at.is_(None),
-                            GatewayComputeModel.lock_expires_at < now,
+                            GatewayReplicaModel.lock_expires_at.is_(None),
+                            GatewayReplicaModel.lock_expires_at < now,
                         ),
                         or_(
-                            GatewayComputeModel.lock_owner.is_(None),
-                            GatewayComputeModel.lock_owner == GatewayReplicaPipeline.__name__,
+                            GatewayReplicaModel.lock_owner.is_(None),
+                            GatewayReplicaModel.lock_owner == GatewayReplicaPipeline.__name__,
                         ),
                     )
-                    .order_by(GatewayComputeModel.last_processed_at.asc())
+                    .order_by(GatewayReplicaModel.last_processed_at.asc())
                     .limit(limit)
-                    .with_for_update(skip_locked=True, key_share=True, of=GatewayComputeModel)
+                    .with_for_update(skip_locked=True, key_share=True, of=GatewayReplicaModel)
                     .options(
                         load_only(
-                            GatewayComputeModel.id,
-                            GatewayComputeModel.lock_token,
-                            GatewayComputeModel.lock_expires_at,
-                            GatewayComputeModel.status,
+                            GatewayReplicaModel.id,
+                            GatewayReplicaModel.lock_token,
+                            GatewayReplicaModel.lock_expires_at,
+                            GatewayReplicaModel.status,
                         )
                     )
                 )
@@ -222,7 +222,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                     replica_model.lock_owner = GatewayReplicaPipeline.__name__
                     items.append(
                         GatewayReplicaPipelineItem(
-                            __tablename__=GatewayComputeModel.__tablename__,
+                            __tablename__=GatewayReplicaModel.__tablename__,
                             id=replica_model.id,
                             lock_expires_at=lock_expires_at,
                             lock_token=lock_token,
@@ -271,10 +271,10 @@ class _GatewayReplicaUpdateMap(ItemUpdateMap, total=False):
 
 
 _REPLICA_FIELDS_MIN: list[InstrumentedAttribute[Any]] = [
-    GatewayComputeModel.id,
-    GatewayComputeModel.lock_token,
-    GatewayComputeModel.status,
-    GatewayComputeModel.replica_num,
+    GatewayReplicaModel.id,
+    GatewayReplicaModel.lock_token,
+    GatewayReplicaModel.status,
+    GatewayReplicaModel.replica_num,
 ]
 
 _GATEWAY_FIELDS_MIN: list[InstrumentedAttribute[Any]] = [
@@ -291,7 +291,7 @@ async def _load_gateway_replica(
     gateway_fields: list[InstrumentedAttribute[Any]],
     load_backends: bool = False,
     load_gateway_backend_type: bool = False,
-) -> Optional[GatewayComputeModel]:
+) -> Optional[GatewayReplicaModel]:
     def build_gateway_options(
         gateway_attr: InstrumentedAttribute[GatewayModel | None],
     ) -> list[ExecutableOption]:
@@ -309,15 +309,15 @@ async def _load_gateway_replica(
 
     async with get_session_ctx() as session:
         stmt = (
-            select(GatewayComputeModel)
+            select(GatewayReplicaModel)
             .where(
-                GatewayComputeModel.id == item.id,
-                GatewayComputeModel.lock_token == item.lock_token,
+                GatewayReplicaModel.id == item.id,
+                GatewayReplicaModel.lock_token == item.lock_token,
             )
             .options(
                 load_only(*replica_fields),
-                *build_gateway_options(GatewayComputeModel.gateway),
-                *build_gateway_options(GatewayComputeModel.legacy_gateway),
+                *build_gateway_options(GatewayReplicaModel.gateway),
+                *build_gateway_options(GatewayReplicaModel.legacy_gateway),
             )
         )
         res = await session.execute(stmt)
@@ -329,7 +329,7 @@ async def _load_gateway_replica(
     return replica_model
 
 
-def _get_loaded_gateway_model(replica_model: GatewayComputeModel) -> Optional[GatewayModel]:
+def _get_loaded_gateway_model(replica_model: GatewayReplicaModel) -> Optional[GatewayModel]:
     gateway_model = replica_model.gateway or replica_model.legacy_gateway
     if gateway_model is None:
         logger.error("Gateway replica %s is not attached to a gateway", replica_model.id)
@@ -337,7 +337,7 @@ def _get_loaded_gateway_model(replica_model: GatewayComputeModel) -> Optional[Ga
 
 
 def _mark_terminating_if_needed(
-    gateway_model: GatewayModel, replica_model: GatewayComputeModel
+    gateway_model: GatewayModel, replica_model: GatewayReplicaModel
 ) -> Optional[_GatewayReplicaUpdateMap]:
     if gateway_model.to_be_deleted or gateway_model.status == GatewayStatus.FAILED:
         status_message = None
@@ -368,7 +368,7 @@ def _mark_terminating_if_needed(
 # and apply phases instead of calling the `_commit_update()` helper from everywhere
 async def _commit_update(
     item: GatewayReplicaPipelineItem,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     update_map: _GatewayReplicaUpdateMap,
 ) -> None:
     async with get_session_ctx() as session:
@@ -378,7 +378,7 @@ async def _commit_update(
 async def _apply_update(
     session: AsyncSession,
     item: GatewayReplicaPipelineItem,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     update_map: _GatewayReplicaUpdateMap,
 ) -> bool:
     set_processed_update_map_fields(update_map)
@@ -386,13 +386,13 @@ async def _apply_update(
     now = get_current_datetime()
     resolve_now_placeholders(update_map, now=now)
     res = await session.execute(
-        update(GatewayComputeModel)
+        update(GatewayReplicaModel)
         .where(
-            GatewayComputeModel.id == replica_model.id,
-            GatewayComputeModel.lock_token == replica_model.lock_token,
+            GatewayReplicaModel.id == replica_model.id,
+            GatewayReplicaModel.lock_token == replica_model.lock_token,
         )
         .values(**update_map)
-        .returning(GatewayComputeModel.id)
+        .returning(GatewayReplicaModel.id)
     )
     updated_ids = list(res.scalars().all())
     if len(updated_ids) == 0:
@@ -417,10 +417,10 @@ async def _process_submitted_item(item: GatewayReplicaPipelineItem):
         item,
         replica_fields=_REPLICA_FIELDS_MIN
         + [
-            GatewayComputeModel.backend_id,
-            GatewayComputeModel.configuration,
-            GatewayComputeModel.ssh_public_key,
-            GatewayComputeModel.scale_in,
+            GatewayReplicaModel.backend_id,
+            GatewayReplicaModel.configuration,
+            GatewayReplicaModel.ssh_public_key,
+            GatewayReplicaModel.scale_in,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -446,7 +446,7 @@ async def _process_submitted_item(item: GatewayReplicaPipelineItem):
 
 async def _provision_gateway_replica(
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
     try:
         if replica_model.backend_id is None:  # unexpected
@@ -468,21 +468,21 @@ async def _provision_gateway_replica(
 
     compute = backend.compute()
     assert isinstance(compute, ComputeWithGatewaySupport)
-    compute_configuration = get_gateway_compute_configuration(replica_model, gateway_model)
+    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
 
     logger.debug(
-        "%s replica %d: creating gateway compute",
+        "%s replica %d: creating gateway replica",
         fmt(gateway_model),
         replica_model.replica_num,
     )
     try:
-        gpd = await run_async(compute.create_gateway, compute_configuration)
+        gpd = await run_async(compute.create_gateway_replica, replica_configuration)
     except BackendError as e:
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:
             status_message = str(e.args[0])
         logger.warning(
-            "%s replica %d: failed to create gateway compute: %s",
+            "%s replica %d: failed to create gateway replica: %s",
             fmt(gateway_model),
             replica_model.replica_num,
             status_message,
@@ -495,7 +495,7 @@ async def _provision_gateway_replica(
         )
     except Exception:
         logger.exception(
-            "%s replica %d: unexpected error when creating gateway compute",
+            "%s replica %d: unexpected error when creating gateway replica",
             fmt(gateway_model),
             replica_model.replica_num,
         )
@@ -507,7 +507,7 @@ async def _provision_gateway_replica(
         )
 
     logger.info(
-        "%s replica %d: gateway compute created",
+        "%s replica %d: gateway replica created",
         fmt(gateway_model),
         replica_model.replica_num,
     )
@@ -526,12 +526,12 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
         item,
         replica_fields=_REPLICA_FIELDS_MIN
         + [
-            GatewayComputeModel.ip_address,
-            GatewayComputeModel.ssh_private_key,
-            GatewayComputeModel.scale_in,
-            GatewayComputeModel.instance_id,
-            GatewayComputeModel.backend_id,
-            GatewayComputeModel.configuration,
+            GatewayReplicaModel.ip_address,
+            GatewayReplicaModel.ssh_private_key,
+            GatewayReplicaModel.scale_in,
+            GatewayReplicaModel.instance_id,
+            GatewayReplicaModel.backend_id,
+            GatewayReplicaModel.configuration,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -603,7 +603,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
 
 async def _register_replica_with_load_balancer(
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
 ) -> Optional[str]:
     """Registers the replica instance with the gateway's load balancer.
     Returns an error message on failure, None on success.
@@ -646,40 +646,41 @@ async def _register_replica_with_load_balancer(
 
 async def _connect_and_configure_gateway_replica(
     gateway_model: GatewayModel,
-    gateway_compute: GatewayComputeModel,
+    gateway_replica: GatewayReplicaModel,
 ) -> Optional[str]:
     """Returns an error message on failure, None on success."""
     logger.debug(
-        "%s replica %d: connecting to gateway compute",
+        "%s replica %d: connecting to gateway replica",
         fmt(gateway_model),
-        gateway_compute.replica_num,
+        gateway_replica.replica_num,
     )
     # TODO: do only one connection/configuration attempt per pipeline tick.
-    # Blocking on connect_to_gateway_with_retry and configure_gateway now has these cons:
+    # Blocking on connect_to_gateway_replica_with_retry and configure_gateway_replica now has
+    # these cons:
     # - cannot terminate the gateway replica before it is provisioned because the DB model is locked
     # - connection retry counter is reset on server restart
     # - only one server replica is processing the gateway replica
-    connection = await gateways_services.connect_to_gateway_with_retry(gateway_compute)
+    connection = await gateways_services.connect_to_gateway_replica_with_retry(gateway_replica)
     if connection is None:
         logger.warning(
-            "%s replica %d: failed to connect to gateway compute",
+            "%s replica %d: failed to connect to gateway replica",
             fmt(gateway_model),
-            gateway_compute.replica_num,
+            gateway_replica.replica_num,
         )
-        return "Failed to connect to gateway"
+        return "Failed to connect to gateway replica"
     try:
-        await gateways_services.configure_gateway(connection)
+        await gateways_services.configure_gateway_replica(connection)
     except Exception:
         logger.exception(
-            "%s replica %d: failed to configure gateway",
+            "%s replica %d: failed to configure gateway replica",
             fmt(gateway_model),
-            gateway_compute.replica_num,
+            gateway_replica.replica_num,
         )
-        return "Failed to configure gateway"
+        return "Failed to configure gateway replica"
     logger.info(
-        "%s replica %d: gateway compute connected and configured",
+        "%s replica %d: gateway replica connected and configured",
         fmt(gateway_model),
-        gateway_compute.replica_num,
+        gateway_replica.replica_num,
     )
     return None
 
@@ -689,9 +690,9 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         item,
         replica_fields=_REPLICA_FIELDS_MIN
         + [
-            GatewayComputeModel.scale_in,
-            GatewayComputeModel.ip_address,
-            GatewayComputeModel.ssh_private_key,
+            GatewayReplicaModel.scale_in,
+            GatewayReplicaModel.ip_address,
+            GatewayReplicaModel.ssh_private_key,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -801,7 +802,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
 async def _perform_state_sync(
     connection: GatewayConnection,
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     run_models_by_id: dict[uuid.UUID, RunModel],
     job_models_by_id: dict[uuid.UUID, JobModel],
     plan: "_StateSyncPlan",
@@ -1049,7 +1050,7 @@ class _ReconcileRegistrationRecordsResult:
 
 async def _reconcile_registration_records(
     session: AsyncSession,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     initially_registered: list[ServiceListItem],
     sync_result: "_StateSyncResult",
 ) -> _ReconcileRegistrationRecordsResult:
@@ -1168,7 +1169,7 @@ async def _reconcile_registration_records(
 async def _emit_state_sync_events(
     session,
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     run_models_by_id: dict[uuid.UUID, RunModel],
     job_models_by_id: dict[uuid.UUID, JobModel],
     sync_result: "_StateSyncResult",
@@ -1353,7 +1354,7 @@ async def _load_runs_and_jobs_for_state_sync(
 async def _register_service(
     client: GatewayClient,
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     run_model: RunModel,
 ) -> None:
     run_spec = get_run_spec(run_model)
@@ -1402,7 +1403,7 @@ async def _register_service(
 async def _register_replica(
     client: GatewayClient,
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
     run_model: RunModel,
     job_model: JobModel,
 ) -> None:
@@ -1533,12 +1534,12 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         item,
         replica_fields=_REPLICA_FIELDS_MIN
         + [
-            GatewayComputeModel.instance_id,
-            GatewayComputeModel.ip_address,
-            GatewayComputeModel.backend_id,
-            GatewayComputeModel.configuration,
-            GatewayComputeModel.backend_data,
-            GatewayComputeModel.ssh_public_key,
+            GatewayReplicaModel.instance_id,
+            GatewayReplicaModel.ip_address,
+            GatewayReplicaModel.backend_id,
+            GatewayReplicaModel.configuration,
+            GatewayReplicaModel.backend_data,
+            GatewayReplicaModel.ssh_public_key,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -1577,7 +1578,7 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         return
     compute = backend.compute()
     assert isinstance(compute, ComputeWithGatewaySupport)
-    compute_configuration = get_gateway_compute_configuration(replica_model, gateway_model)
+    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
     if replica_model.instance_id is None:
         logger.warning(
             "%s replica %d: instance_id is None, skipping gateway replica termination",
@@ -1594,20 +1595,20 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         await _deregister_gateway_replica_from_load_balancer(compute, gateway_model, replica_model)
 
     logger.debug(
-        "%s replica %d: terminating gateway compute",
+        "%s replica %d: terminating gateway replica",
         fmt(gateway_model),
         replica_model.replica_num,
     )
     try:
         await run_async(
-            compute.terminate_gateway,
+            compute.terminate_gateway_replica,
             replica_model.instance_id,
-            compute_configuration,
+            replica_configuration,
             replica_model.backend_data,
         )
     except Exception:
         logger.exception(
-            "%s replica %d: error when terminating gateway compute",
+            "%s replica %d: error when terminating gateway replica",
             fmt(gateway_model),
             replica_model.replica_num,
         )
@@ -1615,7 +1616,7 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         return
 
     logger.info(
-        "%s replica %d: gateway compute terminated",
+        "%s replica %d: gateway replica terminated",
         fmt(gateway_model),
         replica_model.replica_num,
     )
@@ -1629,7 +1630,7 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
 async def _deregister_gateway_replica_from_load_balancer(
     compute: ComputeWithGatewaySupport,
     gateway_model: GatewayModel,
-    replica_model: GatewayComputeModel,
+    replica_model: GatewayReplicaModel,
 ) -> None:
     if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
         logger.error(

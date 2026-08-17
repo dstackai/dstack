@@ -21,8 +21,8 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, RunModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import (
-    get_gateway_compute_models,
     get_gateway_configuration,
+    get_gateway_replica_models,
     get_project_default_gateway_model,
     get_project_gateway_model_by_reference,
 )
@@ -44,7 +44,7 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
             session=session,
             project=run_model.project,
             ref=gateway_reference,
-            load_gateway_compute=True,
+            load_gateway_replica=True,
             load_backend_type=True,
         )
         if gateway is None:
@@ -62,7 +62,7 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
         gateway = await get_project_default_gateway_model(
             session=session,
             project=run_model.project,
-            load_gateway_compute=True,
+            load_gateway_replica=True,
             load_backend_type=True,
         )
         if gateway is None and run_spec.configuration.gateway == True:
@@ -88,7 +88,7 @@ async def _register_service_in_gateway(
 ) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
 
-    if not get_gateway_compute_models(gateway):
+    if not get_gateway_replica_models(gateway):
         raise ServerClientError("Gateway has no instance associated with it")
 
     if gateway.status != GatewayStatus.RUNNING:

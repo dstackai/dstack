@@ -5,12 +5,12 @@ from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.proxy.gateway.schemas.stats import Stat
 from dstack._internal.server.services.gateways import (
     _merge_per_window_stats,
-    get_gateway_compute_models,
+    get_gateway_replica_models,
 )
 from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
-    create_gateway_compute,
+    create_gateway_replica,
     create_project,
 )
 
@@ -48,41 +48,41 @@ class TestMergePerWindowStats:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-class TestGetGatewayComputeModels:
-    async def test_new_style_returns_gateway_computes(self, test_db, session: AsyncSession):
+class TestGetGatewayReplicaModels:
+    async def test_new_style_returns_gateway_replicas(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
         gateway = await create_gateway(
             session=session, project_id=project.id, backend_id=backend.id
         )
-        compute = await create_gateway_compute(
+        replica = await create_gateway_replica(
             session=session, gateway_id=gateway.id, backend_id=backend.id
         )
-        await session.refresh(gateway, ["gateway_computes", "gateway_compute"])
-        result = get_gateway_compute_models(gateway)
+        await session.refresh(gateway, ["gateway_replicas", "gateway_replica"])
+        result = get_gateway_replica_models(gateway)
         assert len(result) == 1
-        assert result[0].id == compute.id
+        assert result[0].id == replica.id
 
-    async def test_old_style_returns_single_compute(self, test_db, session: AsyncSession):
+    async def test_old_style_returns_single_replica(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
-        compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        replica = await create_gateway_replica(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session, project_id=project.id, backend_id=backend.id
         )
-        gateway.gateway_compute_id = compute.id
+        gateway.gateway_replica_id = replica.id
         await session.commit()
-        await session.refresh(gateway, ["gateway_computes", "gateway_compute"])
-        result = get_gateway_compute_models(gateway)
+        await session.refresh(gateway, ["gateway_replicas", "gateway_replica"])
+        result = get_gateway_replica_models(gateway)
         assert len(result) == 1
-        assert result[0].id == compute.id
+        assert result[0].id == replica.id
 
-    async def test_no_computes_returns_empty(self, test_db, session: AsyncSession):
+    async def test_no_replicas_returns_empty(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
         gateway = await create_gateway(
             session=session, project_id=project.id, backend_id=backend.id
         )
-        await session.refresh(gateway, ["gateway_computes", "gateway_compute"])
-        result = get_gateway_compute_models(gateway)
+        await session.refresh(gateway, ["gateway_replicas", "gateway_replica"])
+        result = get_gateway_replica_models(gateway)
         assert result == []

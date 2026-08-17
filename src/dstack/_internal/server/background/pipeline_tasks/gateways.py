@@ -34,8 +34,8 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
-    GatewayComputeModel,
     GatewayModel,
+    GatewayReplicaModel,
     ProjectModel,
 )
 from dstack._internal.server.services import backends as backends_services
@@ -43,8 +43,8 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
     emit_gateway_status_change_event,
-    get_gateway_compute_models,
     get_gateway_lb_configuration,
+    get_gateway_replica_models,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -146,11 +146,11 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
             async with get_session_ctx() as session:
                 now = get_current_datetime()
                 active_replica_count_subquery = (
-                    select(func.count(GatewayComputeModel.id))
+                    select(func.count(GatewayReplicaModel.id))
                     .where(
                         or_(
-                            GatewayComputeModel.gateway_id == GatewayModel.id,
-                            GatewayComputeModel.id == GatewayModel.gateway_compute_id,
+                            GatewayReplicaModel.gateway_id == GatewayModel.id,
+                            GatewayReplicaModel.id == GatewayModel.gateway_replica_id,
                         ),
                         *_get_active_replica_filters(),
                     )
@@ -158,13 +158,13 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                     .scalar_subquery()
                 )
                 unmigrated_hostname_exists_subquery = (
-                    select(GatewayComputeModel.id)
+                    select(GatewayReplicaModel.id)
                     .where(
                         or_(
-                            GatewayComputeModel.gateway_id == GatewayModel.id,
-                            GatewayComputeModel.id == GatewayModel.gateway_compute_id,
+                            GatewayReplicaModel.gateway_id == GatewayModel.id,
+                            GatewayReplicaModel.id == GatewayModel.gateway_replica_id,
                         ),
-                        GatewayComputeModel.hostname_deprecated_readonly.is_not(None),
+                        GatewayReplicaModel.hostname_deprecated_readonly.is_not(None),
                     )
                     .correlate(GatewayModel)
                     .exists()
@@ -286,7 +286,7 @@ class _GatewayUpdateMap(ItemUpdateMap, total=False):
 @dataclass
 class _ReplicaScalingResult:
     needs_more_replicas: bool = False
-    new_gateway_compute_models: list[GatewayComputeModel] = field(default_factory=list)
+    new_gateway_replica_models: list[GatewayReplicaModel] = field(default_factory=list)
     scale_in_replica_ids: list[uuid.UUID] = field(default_factory=list)
     gateway_update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
     limit_reached: bool = False
@@ -427,16 +427,16 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             )
             .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
             .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-            .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.gateway_replica))
             .options(
-                selectinload(GatewayModel.gateway_computes).load_only(
-                    GatewayComputeModel.id,
-                    GatewayComputeModel.status,
-                    GatewayComputeModel.replica_num,
-                    GatewayComputeModel.created_at,
-                    GatewayComputeModel.scale_in,
-                    GatewayComputeModel.hostname_deprecated_readonly,
-                    GatewayComputeModel.backend_data,
+                selectinload(GatewayModel.gateway_replicas).load_only(
+                    GatewayReplicaModel.id,
+                    GatewayReplicaModel.status,
+                    GatewayReplicaModel.replica_num,
+                    GatewayReplicaModel.created_at,
+                    GatewayReplicaModel.scale_in,
+                    GatewayReplicaModel.hostname_deprecated_readonly,
+                    GatewayReplicaModel.backend_data,
                 )
             )
         )
@@ -483,18 +483,18 @@ class _ProvisioningResult:
 
 
 def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
-    gateway_computes = get_gateway_compute_models(gateway_model)
-    # Provisioning gateways must have compute.
-    assert len(gateway_computes) > 0
+    gateway_replicas = get_gateway_replica_models(gateway_model)
+    # Provisioning gateways must have a replica.
+    assert len(gateway_replicas) > 0
 
-    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_computes)
+    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
     statuses = {
-        gc.status
-        for gc in gateway_computes
-        if not gc.scale_in and gc.id not in scale_result.scale_in_replica_ids
+        replica.status
+        for replica in gateway_replicas
+        if not replica.scale_in and replica.id not in scale_result.scale_in_replica_ids
     }
     update_map = _migrate_hostname_and_backend_data_from_legacy_replica(
-        gateway_model, gateway_computes
+        gateway_model, gateway_replicas
     )
 
     if statuses & {GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED}:
@@ -535,16 +535,16 @@ async def _process_running_item(item: GatewayPipelineItem):
             )
             .options(joinedload(GatewayModel.project).load_only(ProjectModel.name))
             .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-            .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.gateway_replica))
             .options(
-                selectinload(GatewayModel.gateway_computes).load_only(
-                    GatewayComputeModel.id,
-                    GatewayComputeModel.status,
-                    GatewayComputeModel.replica_num,
-                    GatewayComputeModel.created_at,
-                    GatewayComputeModel.scale_in,
-                    GatewayComputeModel.hostname_deprecated_readonly,
-                    GatewayComputeModel.backend_data,
+                selectinload(GatewayModel.gateway_replicas).load_only(
+                    GatewayReplicaModel.id,
+                    GatewayReplicaModel.status,
+                    GatewayReplicaModel.replica_num,
+                    GatewayReplicaModel.created_at,
+                    GatewayReplicaModel.scale_in,
+                    GatewayReplicaModel.hostname_deprecated_readonly,
+                    GatewayReplicaModel.backend_data,
                 )
             )
         )
@@ -553,12 +553,12 @@ async def _process_running_item(item: GatewayPipelineItem):
             log_lock_token_mismatch(logger, item)
             return
 
-    gateway_computes = get_gateway_compute_models(gateway_model)
-    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_computes)
+    gateway_replicas = get_gateway_replica_models(gateway_model)
+    scale_result = _reconcile_gateway_replica_count(gateway_model, gateway_replicas)
 
     update_map = _GatewayUpdateMap()
     update_map.update(
-        _migrate_hostname_and_backend_data_from_legacy_replica(gateway_model, gateway_computes)
+        _migrate_hostname_and_backend_data_from_legacy_replica(gateway_model, gateway_replicas)
     )
     update_map.update(scale_result.gateway_update_map)
     set_processed_update_map_fields(update_map)
@@ -592,13 +592,13 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
             )
             .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-            .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.gateway_replica))
             .options(
-                selectinload(GatewayModel.gateway_computes).load_only(
-                    GatewayComputeModel.id,
-                    GatewayComputeModel.status,
-                    GatewayComputeModel.hostname_deprecated_readonly,
-                    GatewayComputeModel.backend_data,
+                selectinload(GatewayModel.gateway_replicas).load_only(
+                    GatewayReplicaModel.id,
+                    GatewayReplicaModel.status,
+                    GatewayReplicaModel.hostname_deprecated_readonly,
+                    GatewayReplicaModel.backend_data,
                 )
             )
         )
@@ -661,16 +661,16 @@ class _ProcessToBeDeletedResult:
 
 
 async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
-    gateway_computes = get_gateway_compute_models(gateway_model)
+    gateway_replicas = get_gateway_replica_models(gateway_model)
     if update_map := _migrate_hostname_and_backend_data_from_legacy_replica(
-        gateway_model, gateway_computes
+        gateway_model, gateway_replicas
     ):
         return _ProcessToBeDeletedResult(
             delete_gateway=False,
             update_map=update_map,
         )
     all_replicas_terminated = all(
-        gc.status == GatewayReplicaStatus.TERMINATED for gc in gateway_computes
+        replica.status == GatewayReplicaStatus.TERMINATED for replica in gateway_replicas
     )
     lb_terminated = True
     if all_replicas_terminated and gateway_model.hostname is not None:
@@ -714,7 +714,7 @@ REPLICA_SCALE_IN_PRIORITY: dict[GatewayReplicaStatus, int] = {
 }
 
 
-def _is_replica_active(replica: GatewayComputeModel) -> bool:
+def _is_replica_active(replica: GatewayReplicaModel) -> bool:
     # should match _get_active_replica_filters
     return not replica.scale_in and replica.status not in (
         GatewayReplicaStatus.TERMINATING,
@@ -725,8 +725,8 @@ def _is_replica_active(replica: GatewayComputeModel) -> bool:
 def _get_active_replica_filters() -> list[ColumnElement[bool]]:
     # should match _is_replica_active
     return [
-        GatewayComputeModel.scale_in == False,
-        GatewayComputeModel.status.not_in(
+        GatewayReplicaModel.scale_in == False,
+        GatewayReplicaModel.status.not_in(
             [GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED]
         ),
     ]
@@ -734,7 +734,7 @@ def _get_active_replica_filters() -> list[ColumnElement[bool]]:
 
 def _reconcile_gateway_replica_count(
     gateway_model: GatewayModel,
-    gateway_replicas: list[GatewayComputeModel],
+    gateway_replicas: list[GatewayReplicaModel],
 ) -> _ReplicaScalingResult:
     desired_replica_count = gateway_model.desired_replica_count
     if desired_replica_count is None:  # pre-0.21.0 gateway
@@ -769,8 +769,8 @@ def _reconcile_gateway_replica_count(
             r.replica_num for r in gateway_replicas if r.status != GatewayReplicaStatus.TERMINATED
         }
         new_nums = itertools.islice(get_lowest_unused_nums(used_nums), diff)
-        new_gateway_compute_models = [
-            gateways_services.create_gateway_compute_model(
+        new_gateway_replica_models = [
+            gateways_services.create_gateway_replica_model(
                 project_name=gateway_model.project.name,
                 configuration=configuration,
                 replica_num=replica_num,
@@ -788,7 +788,7 @@ def _reconcile_gateway_replica_count(
             0 if reset_replica_scale_attempt else gateway_model.replica_scale_attempt
         ) + 1
         return _ReplicaScalingResult(
-            new_gateway_compute_models=new_gateway_compute_models,
+            new_gateway_replica_models=new_gateway_replica_models,
             gateway_update_map={
                 "replica_scale_attempt": new_attempt,
                 "last_replica_scale_attempt_at": NOW_PLACEHOLDER,
@@ -863,14 +863,14 @@ async def _apply_replica_scaling(
     gateway_model: GatewayModel,
     scale_result: _ReplicaScalingResult,
 ) -> None:
-    for gateway_compute_model in scale_result.new_gateway_compute_models:
-        session.add(gateway_compute_model)
+    for gateway_replica_model in scale_result.new_gateway_replica_models:
+        session.add(gateway_replica_model)
     if scale_result.scale_in_replica_ids:
         # The gateway pipeline does not need to lock gateway replicas — it only mutates `scale_in`,
         # which can only ever be flipped from False to True, so no races are expected.
         await session.execute(
-            update(GatewayComputeModel)
-            .where(GatewayComputeModel.id.in_(scale_result.scale_in_replica_ids))
+            update(GatewayReplicaModel)
+            .where(GatewayReplicaModel.id.in_(scale_result.scale_in_replica_ids))
             .values(scale_in=True)
         )
     if scale_result.limit_reached:
@@ -888,24 +888,24 @@ async def _apply_replica_scaling(
 
 def _migrate_hostname_and_backend_data_from_legacy_replica(
     gateway_model: GatewayModel,
-    gateway_computes: list[GatewayComputeModel],
+    gateway_replicas: list[GatewayReplicaModel],
 ) -> _GatewayUpdateMap:
     """
-    Move `hostname` and `backend_data` from pre-0.21.0 GatewayComputeModel onto GatewayModel.
+    Move `hostname` and `backend_data` from pre-0.21.0 GatewayReplicaModel onto GatewayModel.
 
     Alembic migration ecc9e8a0bfac does the same thing. This function is a fallback in case any
     gateways are created by an older server replica after the migration passes.
     """
     if gateway_model.hostname is not None:
         return {}
-    for gateway_compute in gateway_computes:
-        if gateway_compute.hostname_deprecated_readonly is not None:
+    for gateway_replica in gateway_replicas:
+        if gateway_replica.hostname_deprecated_readonly is not None:
             update_map: _GatewayUpdateMap = {
-                "hostname": gateway_compute.hostname_deprecated_readonly,
-                # Pre-0.21.0 AWS ACM gateways used GatewayComputeModel.backend_data exclusively
+                "hostname": gateway_replica.hostname_deprecated_readonly,
+                # Pre-0.21.0 AWS ACM gateways used GatewayReplicaModel.backend_data exclusively
                 # for load-balancer related fields, and not for gateway replica instance fields.
-                # So GatewayComputeModel.backend_data is copied entirely.
-                "backend_data": gateway_compute.backend_data,
+                # So GatewayReplicaModel.backend_data is copied entirely.
+                "backend_data": gateway_replica.backend_data,
             }
             logger.info(
                 "%s: migrating hostname and backend_data onto GatewayModel", fmt(gateway_model)

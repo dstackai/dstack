@@ -32,10 +32,10 @@ def _get_connections_dir() -> Path:
 
 class GatewayConnection:
     """
-    `GatewayConnection` instances persist for the lifetime of the gateway.
+    `GatewayConnection` instances persist for the lifetime of the gateway replica.
 
-    The `GatewayConnection.tunnel` is responsible for establishing a bidirectional tunnel with the gateway.
-    The local tunnel is used for the gateway management.
+    The `GatewayConnection.tunnel` is responsible for establishing a bidirectional tunnel with the
+    gateway replica. The local tunnel is used for the gateway replica management.
     The reverse tunnel is used for authorizing dstack tokens.
     """
 

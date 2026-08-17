@@ -13,7 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     normalize_arch,
 )
 from dstack._internal.server.testing.common import (
-    get_gateway_compute_configuration,
+    get_gateway_replica_configuration,
     get_instance_configuration,
     get_volume,
 )
@@ -30,7 +30,7 @@ class TestGenerateUniqueInstanceName:
 
 class TestGenerateUniqueGatewayInstanceName:
     def test_generates_name(self):
-        configuration = get_gateway_compute_configuration(
+        configuration = get_gateway_replica_configuration(
             project_name="project1", instance_name="my-gateway"
         )
         name = generate_unique_gateway_instance_name(configuration, 60)

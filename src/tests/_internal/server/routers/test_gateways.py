@@ -15,7 +15,7 @@ from dstack._internal.server.testing.common import (
     create_backend,
     create_export,
     create_gateway,
-    create_gateway_compute,
+    create_gateway_replica,
     create_project,
     create_user,
     get_auth_headers,
@@ -32,14 +32,14 @@ class TestListAndGetGateways:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("legacy_replica", [False, True])
     @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_list(
         self,
         test_db,
         session: AsyncSession,
         client: AsyncClient,
-        legacy_compute: bool,
+        legacy_replica: bool,
         populate_configuration: bool,
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -54,15 +54,15 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             populate_configuration=populate_configuration,
         )
-        if legacy_compute:
-            gateway_compute = await create_gateway_compute(
+        if legacy_replica:
+            gateway_replica = await create_gateway_replica(
                 session=session,
                 backend_id=backend.id,
                 populate_configuration=populate_configuration,
             )
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
+            gateway.gateway_replica_id = gateway_replica.id  # pre-0.20.25 relationship style
         else:
-            gateway_compute = await create_gateway_compute(
+            gateway_replica = await create_gateway_replica(
                 session=session,
                 backend_id=backend.id,
                 gateway_id=gateway.id,
@@ -85,7 +85,7 @@ class TestListAndGetGateways:
                 "status_message": None,
                 "replicas": [
                     {
-                        "hostname": gateway_compute.ip_address,
+                        "hostname": gateway_replica.ip_address,
                         "replica_num": 0,
                         "backend": backend.type.value,
                         "region": "us",
@@ -118,14 +118,14 @@ class TestListAndGetGateways:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("legacy_replica", [False, True])
     @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_get(
         self,
         test_db,
         session: AsyncSession,
         client: AsyncClient,
-        legacy_compute: bool,
+        legacy_replica: bool,
         populate_configuration: bool,
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -140,15 +140,15 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             populate_configuration=populate_configuration,
         )
-        if legacy_compute:
-            gateway_compute = await create_gateway_compute(
+        if legacy_replica:
+            gateway_replica = await create_gateway_replica(
                 session=session,
                 backend_id=backend.id,
                 populate_configuration=populate_configuration,
             )
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
+            gateway.gateway_replica_id = gateway_replica.id  # pre-0.20.25 relationship style
         else:
-            gateway_compute = await create_gateway_compute(
+            gateway_replica = await create_gateway_replica(
                 session=session,
                 backend_id=backend.id,
                 gateway_id=gateway.id,
@@ -171,7 +171,7 @@ class TestListAndGetGateways:
             "status_message": None,
             "replicas": [
                 {
-                    "hostname": gateway_compute.ip_address,
+                    "hostname": gateway_replica.ip_address,
                     "replica_num": 0,
                     "backend": backend.type.value,
                     "region": "us",
@@ -218,7 +218,7 @@ class TestListAndGetGateways:
             project_id=project.id,
             backend_id=backend.id,
         )
-        gateway_compute = await create_gateway_compute(
+        gateway_replica = await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -230,9 +230,9 @@ class TestListAndGetGateways:
         assert response.status_code == 200
         assert len(response.json()) == 1
         gw = response.json()[0]
-        assert gw["ip_address"] == gateway_compute.ip_address
+        assert gw["ip_address"] == gateway_replica.ip_address
         assert gw["instance_id"] == ""
-        assert gw["hostname"] == gateway_compute.ip_address
+        assert gw["hostname"] == gateway_replica.ip_address
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -247,7 +247,7 @@ class TestListAndGetGateways:
             project_id=project.id,
             backend_id=backend.id,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -273,7 +273,7 @@ class TestListAndGetGateways:
             project_id=project.id,
             backend_id=backend.id,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -326,7 +326,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -369,7 +369,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -410,7 +410,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -457,7 +457,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -818,7 +818,7 @@ class TestDefaultGateway:
             name="first_gateway",
             populate_configuration=populate_configuration,
         )
-        gateway_compute = await create_gateway_compute(
+        gateway_replica = await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -847,7 +847,7 @@ class TestDefaultGateway:
             "status_message": None,
             "replicas": [
                 {
-                    "hostname": gateway_compute.ip_address,
+                    "hostname": gateway_replica.ip_address,
                     "replica_num": 0,
                     "backend": backend.type.value,
                     "region": "us",
@@ -887,7 +887,7 @@ class TestDefaultGateway:
             name="second_gateway",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=second_gateway.id,
@@ -994,7 +994,7 @@ class TestDefaultGateway:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -1038,7 +1038,7 @@ class TestDefaultGateway:
             backend_id=backend.id,
             name="exported-gateway",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         await create_export(
             session=session,
             exporter_project=exporter_project,
@@ -1095,7 +1095,7 @@ class TestDeleteGateway:
             name="gateway-aws",
             populate_configuration=populate_configuration,
         )
-        gateway_compute_aws = await create_gateway_compute(
+        gateway_replica_aws = await create_gateway_replica(
             session=session,
             backend_id=backend_aws.id,
             gateway_id=gateway_aws.id,
@@ -1108,7 +1108,7 @@ class TestDeleteGateway:
             name="gateway-gcp",
             populate_configuration=populate_configuration,
         )
-        gateway_compute_gcp = await create_gateway_compute(
+        gateway_replica_gcp = await create_gateway_replica(
             session=session,
             backend_id=backend_gcp.id,
             gateway_id=gateway_gcp.id,
@@ -1123,14 +1123,14 @@ class TestDeleteGateway:
 
         await session.refresh(gateway_aws)
         await session.refresh(gateway_gcp)
-        await session.refresh(gateway_compute_aws)
-        await session.refresh(gateway_compute_gcp)
+        await session.refresh(gateway_replica_aws)
+        await session.refresh(gateway_replica_gcp)
         assert gateway_aws.to_be_deleted is True
         assert gateway_gcp.to_be_deleted is True
-        assert gateway_compute_aws.active is True
-        assert gateway_compute_aws.deleted is False
-        assert gateway_compute_gcp.active is True
-        assert gateway_compute_gcp.deleted is False
+        assert gateway_replica_aws.active is True
+        assert gateway_replica_aws.deleted is False
+        assert gateway_replica_gcp.active is True
+        assert gateway_replica_gcp.deleted is False
 
         response = await client.post(
             f"/api/project/{project.name}/gateways/list",
@@ -1221,7 +1221,7 @@ class TestUpdateGateway:
             wildcard_domain="old.example",
             populate_configuration=populate_configuration,
         )
-        gateway_compute = await create_gateway_compute(
+        gateway_replica = await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1243,7 +1243,7 @@ class TestUpdateGateway:
             "default": False,
             "replicas": [
                 {
-                    "hostname": gateway_compute.ip_address,
+                    "hostname": gateway_replica.ip_address,
                     "replica_num": 0,
                     "backend": backend.type.value,
                     "region": "us",
@@ -1466,7 +1466,7 @@ class TestGetGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1512,7 +1512,7 @@ class TestGetGatewayPlan:
             wildcard_domain="old.example.com",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1560,7 +1560,7 @@ class TestGetGatewayPlan:
             status=GatewayStatus.FAILED,
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1604,7 +1604,7 @@ class TestGetGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1679,7 +1679,7 @@ class TestGetGatewayPlan:
             wildcard_domain="old.example.com",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -1963,7 +1963,7 @@ class TestApplyGatewayPlan:
             wildcard_domain="old.example.com",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2025,7 +2025,7 @@ class TestApplyGatewayPlan:
             wildcard_domain="old.example.com",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2080,7 +2080,7 @@ class TestApplyGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2128,7 +2128,7 @@ class TestApplyGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2182,7 +2182,7 @@ class TestApplyGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2229,7 +2229,7 @@ class TestApplyGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2277,7 +2277,7 @@ class TestApplyGatewayPlan:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2334,7 +2334,7 @@ class TestApplyGatewayPlan:
             wildcard_domain="old.example.com",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2399,7 +2399,7 @@ class TestApplyGatewayPlan:
             status=GatewayStatus.FAILED,
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2456,7 +2456,7 @@ class TestApplyGatewayPlanDefault:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session, backend_id=backend.id, gateway_id=first_gateway.id
         )
         second_gateway = await create_gateway(
@@ -2467,7 +2467,7 @@ class TestApplyGatewayPlanDefault:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session, backend_id=backend.id, gateway_id=second_gateway.id
         )
         response = await client.post(
@@ -2539,7 +2539,7 @@ class TestApplyGatewayPlanDefault:
             region="us-east-1",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
             json={"name": gateway.name},
@@ -2604,7 +2604,7 @@ class TestApplyGatewayPlanDefault:
             name="my-gateway",
             region="us-east-1",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         if initial_default:
             response = await client.post(
                 f"/api/project/{project.name}/gateways/set_default",
@@ -2669,7 +2669,7 @@ class TestApplyGatewayPlanDefault:
             name="my-gateway",
             region="us-east-1",
         )
-        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
         if initial_default:
             response = await client.post(
                 f"/api/project/{project.name}/gateways/set_default",

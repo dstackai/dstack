@@ -7,7 +7,7 @@ from dstack._internal.core.models.gateways import GatewayReplicaStatus
 from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec
 from dstack._internal.server.models import JobModel, RunModel
-from dstack._internal.server.services.gateways import get_gateway_compute_models
+from dstack._internal.server.services.gateways import get_gateway_replica_models
 from dstack._internal.server.services.jobs import (
     get_job_provisioning_data,
     get_job_spec,
@@ -170,7 +170,7 @@ def is_replica_receiving_traffic(run_model: RunModel, jobs: list[JobModel]) -> b
         return True
     running_gateway_replica_ids = {
         replica.id
-        for replica in get_gateway_compute_models(run_model.gateway)
+        for replica in get_gateway_replica_models(run_model.gateway)
         if replica.status == GatewayReplicaStatus.RUNNING
     }
     if not running_gateway_replica_ids:
