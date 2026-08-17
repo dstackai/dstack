@@ -14,13 +14,6 @@ import yaml
 from rich.table import Table
 from rich.text import Text
 
-from dstack._internal.cli.models.configurations import (
-    DEFAULT_DATASET,
-    PresetConfiguration,
-    PresetConstraints,
-    PresetDatasetConstraints,
-    PresetRandomConstraints,
-)
 from dstack._internal.cli.models.preset_agent import (
     PresetAgentFailure,
     PresetAgentSuccess,
@@ -84,6 +77,13 @@ from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
+from dstack._internal.core.models.presets import (
+    DEFAULT_DATASET,
+    PresetConfiguration,
+    PresetConstraints,
+    PresetDatasetConstraints,
+    PresetRandomConstraints,
+)
 from dstack._internal.core.models.runs import RunSpec
 from dstack.api import Client
 

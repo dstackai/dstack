@@ -10,7 +10,6 @@ from rich.console import Console
 from rich.theme import Theme
 
 from dstack._internal.cli.main import main
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import (
     PresetAgentSuccess,
     PresetSessionFinalize,
@@ -29,6 +28,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
 

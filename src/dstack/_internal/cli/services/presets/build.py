@@ -3,7 +3,6 @@ from typing import Any, Optional, TypeVar
 
 import gpuhunt
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.presets import (
     PRESET_EXCLUDED_FIELDS,
     PresetBenchmark,
@@ -13,6 +12,7 @@ from dstack._internal.cli.models.presets import (
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.instances import Resources
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.resources import (
     CPUSpec,
     DiskSpec,

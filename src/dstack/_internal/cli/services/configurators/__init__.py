@@ -4,9 +4,13 @@ from typing import Dict, Optional, Tuple, Type
 
 import yaml
 
-from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.configurators.base import (
+    APPLY_STDIN_NAME,
+    BaseApplyConfigurator,
+)
 from dstack._internal.cli.services.configurators.fleet import FleetConfigurator
 from dstack._internal.cli.services.configurators.gateway import GatewayConfigurator
+from dstack._internal.cli.services.configurators.preset import PresetConfigurator
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
     DevEnvironmentConfigurator,
@@ -21,9 +25,6 @@ from dstack._internal.core.models.configurations import (
     parse_apply_configuration,
 )
 
-APPLY_STDIN_NAME = "-"
-
-
 apply_configurators_mapping: Dict[
     ApplyConfigurationType, Type[BaseApplyConfigurator[AnyApplyConfiguration]]
 ] = {
@@ -35,6 +36,7 @@ apply_configurators_mapping: Dict[
         FleetConfigurator,
         GatewayConfigurator,
         VolumeConfigurator,
+        PresetConfigurator,
     ]
 }
 

@@ -5,12 +5,12 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
+from dstack._internal.core.models.presets import PresetConfiguration
 from tests._internal.cli.common import get_preset
 
 pytestmark = pytest.mark.windows
@@ -320,11 +320,13 @@ class TestPresetStore:
 
 class TestParsePresetConfiguration:
     @pytest.mark.parametrize("key", ["base", "repo"])
-    def test_rejects_nested_model_without_name(self, key: str):
+    def test_accepts_nested_model_without_name(self, key: str):
+        # The nested form is what stored presets use; user files may use it too.
         stream = StringIO(f"type: preset\nmodel:\n  {key}: Qwen/Qwen3.5-27B\n")
 
-        with pytest.raises(ConfigurationError, match=f"`{key}:`"):
-            store_module.parse_preset_configuration(stream)
+        configuration = store_module.parse_preset_configuration(stream)
+
+        assert getattr(configuration.model, key) == "Qwen/Qwen3.5-27B"
 
     def test_accepts_nested_model_with_name(self):
         stream = StringIO(

@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import (
     PresetSessionFinalize,
     PresetSessionProcess,
@@ -52,6 +51,7 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.common import (
     get_preset,
@@ -449,7 +449,9 @@ class TestEffectivePrevious:
         return args
 
     def test_flag_overrides_and_property_stands_without_it(self):
-        from dstack._internal.cli.commands.preset import _get_effective_configuration
+        from unittest.mock import MagicMock
+
+        from dstack._internal.cli.services.configurators.preset import PresetConfigurator
 
         def configuration():
             # A fresh object per call: the merger mutates its input.
@@ -457,10 +459,9 @@ class TestEffectivePrevious:
                 name="qwen", base="Qwen/Qwen3.5-27B", previous=["from-config"]
             )
 
-        overridden = _get_effective_configuration(
-            configuration(), self._args(["from-flag"]), require_name=False
-        )
-        kept = _get_effective_configuration(configuration(), self._args(None), require_name=False)
+        configurator = PresetConfigurator(api_client=MagicMock())
+        overridden = configurator.apply_args(configuration(), self._args(["from-flag"]))
+        kept = configurator.apply_args(configuration(), self._args(None))
 
         assert overridden.previous == ["from-flag"]
         assert kept.previous == ["from-config"]

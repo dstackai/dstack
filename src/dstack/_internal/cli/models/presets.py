@@ -11,9 +11,9 @@ from pydantic import (
 )
 from typing_extensions import Self
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 

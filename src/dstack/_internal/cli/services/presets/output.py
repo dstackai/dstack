@@ -4,11 +4,11 @@ from typing import Any, Optional
 
 from rich.table import Table
 
-from dstack._internal.cli.models.configurations import DEFAULT_DATASET
 from dstack._internal.cli.models.presets import (
     VerifiedPreset,
 )
 from dstack._internal.cli.utils.common import add_row_from_dict, console
+from dstack._internal.core.models.presets import DEFAULT_DATASET
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
@@ -210,12 +210,12 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
     if isinstance(best, dict):
         tps = _format_number(best["tok_s"])
         if objective:
-            # Lead with per-user tok/s: comparable across rows regardless of concurrency.
+            # Lead with per-user tps: comparable across rows regardless of concurrency.
             tpot_ms = best.get("tpot_ms")
             if isinstance(tpot_ms, (int, float)) and tpot_ms > 0:
-                parts.append(f"tok/s/user={_format_number(1000 / tpot_ms)}")
+                parts.append(f"tps/user={_format_number(1000 / tpot_ms)}")
             if verbose:
-                parts.append(f"tok/s={tps}")
+                parts.append(f"tps={tps}")
             ttft_ms = best.get("ttft_ms")
             if isinstance(ttft_ms, (int, float)):
                 parts.append(f"ttft={_format_duration_ms(ttft_ms)}")
@@ -324,10 +324,10 @@ def format_preset_benchmark(preset: VerifiedPreset, *, verbose: bool = False) ->
     benchmark = preset.benchmark
     metrics = benchmark.metrics
     parts = [
-        f"tok/s/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
+        f"tps/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
     ]
     if verbose:
-        parts.append(f"tok/s={_format_number(benchmark.effective_output_tok_per_s)}")
+        parts.append(f"tps={_format_number(benchmark.effective_output_tok_per_s)}")
     parts += [
         f"ttft={_format_duration_ms(metrics.ttft_ms.p50)}",
         f"ctx={_format_token_count(preset.context_length)}",

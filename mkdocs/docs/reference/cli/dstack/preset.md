@@ -20,6 +20,8 @@ $ dstack preset list --help
 
 ## dstack preset create
 
+> Deprecated: pass a preset configuration to [`dstack apply`](apply.md) instead.
+
 The `dstack preset create` command uses an agent to create and save a
 verified preset from a preset configuration.
 

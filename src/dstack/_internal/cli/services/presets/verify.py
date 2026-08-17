@@ -5,7 +5,6 @@ from typing import Annotated, Any, Optional, Sequence
 
 from pydantic import BeforeValidator, ConfigDict, TypeAdapter, ValidationError, ValidationInfo
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import (
     AnyPresetAgentResult,
     PresetAgentSuccess,
@@ -31,6 +30,7 @@ from dstack._internal.cli.services.presets.workspace import (
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 
 

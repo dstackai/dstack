@@ -35,7 +35,7 @@ class TestFormatPresetBenchmark:
         output = output_module.format_preset_benchmark(preset, verbose=True)
 
         # Per-user speed is 1/TPOT (p50 7.4ms), not the aggregate over concurrency.
-        assert output.startswith("tok/s/user=133 ")
+        assert output.startswith("tps/user=133 ")
         assert output_module.format_preset_objective(preset).startswith("[secondary]io=1K/128 ")
         assert "ctx=32K" in output
         assert "ttft=8.15s" in output
@@ -152,7 +152,7 @@ class TestSessionRow:
         assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](3/3)[/]"
         # Per-user speed is 1/TPOT, the same definition the preset row uses — not
         # the aggregate over concurrency, which would read 292 here.
-        assert row["BENCHMARK"].startswith("tok/s/user=292")
+        assert row["BENCHMARK"].startswith("tps/user=292")
         assert row["RESOURCES"] == "A40:48GB:1"
 
     def test_shows_the_shared_prefix_when_the_workload_has_one(self):
@@ -440,7 +440,7 @@ class TestFailedTrials:
         assert row["RESOURCES"] == "MI300X:192GB:1"
         # Marked, not just dimmed, so it does not read as a met constraint where
         # styling is absent or invisible to the reader.
-        assert "*tok/s/user" in row["BENCHMARK"]
+        assert "*tps/user" in row["BENCHMARK"]
 
 
 class TestFailedTrialSpark:

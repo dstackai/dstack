@@ -29,10 +29,12 @@ def _patched_create_preset(**create_kwargs):
     with (
         patch("dstack.api.Client.from_config"),
         patch(
-            "dstack._internal.cli.commands.preset.plan_preset",
+            "dstack._internal.cli.services.configurators.preset.plan_preset",
             return_value=("fleet-a",),
         ),
-        patch("dstack._internal.cli.commands.preset.create_preset", **create_kwargs) as create,
+        patch(
+            "dstack._internal.cli.services.configurators.preset.create_preset", **create_kwargs
+        ) as create,
     ):
         yield create
 
@@ -197,7 +199,7 @@ class TestPresetLocalCommands:
         # 42.1 is the aggregate, verbose-only; the default row shows per-user 1/TPOT.
         assert "133" in output
         assert "c=1" in "".join(output.split())
-        assert "tok/s/user=" in "".join(output.split())
+        assert "tps/user=" in "".join(output.split())
         assert "ttft=" in "".join(output.split())
         assert "ttft=[/]108" in "".join(output.split()) or "ttft=108" in "".join(output.split())
         assert "A6000:48GB:1" not in output
@@ -435,7 +437,10 @@ env:
 
         with (
             _patched_create_preset() as create,
-            patch("dstack._internal.cli.commands.preset.confirm_ask", return_value=False),
+            patch(
+                "dstack._internal.cli.services.configurators.preset.confirm_ask",
+                return_value=False,
+            ),
         ):
             exit_code = run_dstack_cli(
                 ["preset", "create", "-f", str(configuration_path)],
@@ -466,7 +471,8 @@ env:
         with (
             _patched_create_preset() as create,
             patch(
-                "dstack._internal.cli.commands.preset.confirm_ask", return_value=False
+                "dstack._internal.cli.services.configurators.preset.confirm_ask",
+                return_value=False,
             ) as confirm,
         ):
             exit_code = run_dstack_cli(
@@ -478,3 +484,93 @@ env:
         assert exit_code == 0
         confirm.assert_called_once_with("Create the preset?")
         create.assert_not_called()
+
+
+class TestApplyPresetConfiguration:
+    _CONFIGURATION = """type: preset
+name: file-name
+base: Qwen/Qwen3.5-27B
+trials: 1
+concurrency: 8
+max_ttft: 5000
+min_context_length: 8192
+"""
+
+    def _write_configuration(self, tmp_path):
+        path = tmp_path / "preset.dstack.yml"
+        path.write_text(self._CONFIGURATION)
+        return path
+
+    def test_creates_the_preset(self, tmp_path):
+        configuration_path = self._write_configuration(tmp_path)
+
+        with _patched_create_preset() as create:
+            exit_code = run_dstack_cli(
+                ["apply", "-y", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 0
+        configuration = create.call_args.kwargs["configuration"]
+        assert configuration.name == "file-name"
+        assert configuration.model.base == "Qwen/Qwen3.5-27B"
+
+    def test_accepts_creation_and_profile_arguments(self, tmp_path):
+        configuration_path = self._write_configuration(tmp_path)
+
+        with _patched_create_preset() as create:
+            exit_code = run_dstack_cli(
+                [
+                    "apply",
+                    "-y",
+                    "-f",
+                    str(configuration_path),
+                    "--name",
+                    "cli-name",
+                    "--trials",
+                    "7",
+                    "--backend",
+                    "gcp",
+                    "--debug",
+                ],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 0
+        configuration = create.call_args.kwargs["configuration"]
+        assert configuration.name == "cli-name"
+        assert configuration.trials == 7
+        assert configuration.backends == ["gcp"]
+        assert create.call_args.kwargs["debug"] is True
+
+    def test_rejects_detach(self, tmp_path, capsys):
+        configuration_path = self._write_configuration(tmp_path)
+
+        with _patched_create_preset() as create:
+            exit_code = run_dstack_cli(
+                ["apply", "-y", "-d", "-f", str(configuration_path)],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 1
+        create.assert_not_called()
+        captured = capsys.readouterr()
+        assert "--detach" in captured.out + captured.err
+
+    def test_rejects_unknown_arguments(self, tmp_path, capsys):
+        configuration_path = self._write_configuration(tmp_path)
+
+        with _patched_create_preset() as create:
+            exit_code = run_dstack_cli(
+                ["apply", "-y", "-f", str(configuration_path), "--nonsense"],
+                home_dir=tmp_path,
+                repo_dir=tmp_path,
+            )
+
+        assert exit_code == 1
+        create.assert_not_called()
+        captured = capsys.readouterr()
+        assert "Unrecognized arguments: --nonsense" in captured.out + captured.err

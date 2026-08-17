@@ -53,12 +53,12 @@ env:
 
 </div>
 
-To create the preset, pass the configuration to the `dstack preset create` command:
+To create the preset, pass the configuration to the `dstack apply` command:
 
 <div class="termy">
 
 ```shell
-$ dstack preset create -f preset.dstack.yml --fleet b200-fleet
+$ dstack apply -f preset.dstack.yml --fleet b200-fleet
 Create the preset dsv4-flash? [y/n]: y
 [2026-08-04 11:38:34] Starting preset creation for deepseek-ai/DeepSeek-V4-Flash. Allowed fleets: b200-fleet.
 [2026-08-04 12:31:19] Trial 3 switched from vLLM to SGLang: 319 tok/s per user, 2.2x the baseline.
@@ -69,7 +69,7 @@ Create the preset dsv4-flash? [y/n]: y
 </div>
 
 > It's highly recommended to specify the exact hardware you want the preset to use, so that the
-> optimization is done against that hardware. Point `dstack preset create` to a fleet configured
+> optimization is done against that hardware. Point `dstack apply` to a fleet configured
 > correspondingly, via `fleets` inside the preset configuration or via `--fleet` in the CLI.
 
 The command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark.
@@ -113,7 +113,7 @@ To stop a creation and its runs, use `dstack preset stop`.
 
 Set `fleets` to restrict creation and reuse to specific [fleets](fleets.md). It's highly recommended to specify a fleet with exactly the hardware that you'd like the preset to use.
 
-Alternatively, pass `--fleet` to `dstack preset create`.
+Alternatively, pass `--fleet` to `dstack apply`.
 
 > Profile settings such as `spot_policy`, `max_price`, and `backends` are ignored during preset
 > creation. Configure them on the fleet instead.
@@ -149,7 +149,7 @@ previous:
 
 </div>
 
-Alternatively, pass `--previous` (repeatable) to `dstack preset create`.
+Alternatively, pass `--previous` (repeatable) to `dstack apply`.
 
 ### Prompt
 
@@ -249,7 +249,7 @@ Use `dstack preset` to list presets:
 ```shell
 $ dstack preset list
  NAME              ID        BASE                           CONSTRAINTS      BENCHMARK                                STATUS          SUBMITTED
- dsv4-flash-b200   c83375b4  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=1  tok/s/user=309 ttft=213ms ctx=1M  ▂▁██▇  trialing (5/5)  2 min ago
+ dsv4-flash-b200   c83375b4  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M  ▂▁██▇  trialing (5/5)  2 min ago
 ```
 
 </div>
@@ -261,15 +261,15 @@ By default, `dstack preset` shows creations that are still running, or the most 
 ```shell
 $ dstack preset list -a
  NAME               ID        BASE                            CONSTRAINTS      BENCHMARK                                     STATUS          SUBMITTED
- dsv4-flash-b200    c83375b4  deepseek-ai/DeepSeek-V4-Flash   io=10K/1.5K c=1  tok/s/user=309 ttft=213ms ctx=1M   ▂▁██▇     trialing (5/5)  2 min ago
- qwen35-pro6000     092c792b  Qwen/Qwen3.5-397B-A17B          io=8K/1K c=64    tok/s/user=19.6 ttft=3.43s ctx=32K ▁▂▅▇█··   verified (7)    3 days ago
- qwen36-pro4500     9ab0fa65  Qwen/Qwen3.6-27B                io=1K/1K c=8     tok/s/user=57.1 ttft=499ms ctx=128K ▁▄██▆·█  verified (7)    4 days ago
- qwen3-32b-5090     f91d6b60  Qwen/Qwen3-32B                  io=1K/512 c=8    tok/s/user=85.8 ttft=368ms ctx=32K ▁▁▅▅▄▅▇▄▇█ verified (10)  2 weeks ago
+ dsv4-flash-b200    c83375b4  deepseek-ai/DeepSeek-V4-Flash   io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M   ▂▁██▇     trialing (5/5)  2 min ago
+ qwen35-pro6000     092c792b  Qwen/Qwen3.5-397B-A17B          io=8K/1K c=64    tps/user=19.6 ttft=3.43s ctx=32K ▁▂▅▇█··   verified (7)    3 days ago
+ qwen36-pro4500     9ab0fa65  Qwen/Qwen3.6-27B                io=1K/1K c=8     tps/user=57.1 ttft=499ms ctx=128K ▁▄██▆·█  verified (7)    4 days ago
+ qwen3-32b-5090     f91d6b60  Qwen/Qwen3-32B                  io=1K/512 c=8    tps/user=85.8 ttft=368ms ctx=32K ▁▁▅▅▄▅▇▄▇█ verified (10)  2 weeks ago
 ```
 
 </div>
 
-The `CONSTRAINTS` column is what the creation was asked for, and `BENCHMARK` is the best trial so far. `tok/s/user` is the steady decode rate, measured as one second divided by the median time per output token, so it excludes the time to the first token.
+The `CONSTRAINTS` column is what the creation was asked for, and `BENCHMARK` is the best trial so far. `tps/user` is the steady decode rate, measured as one second divided by the mean time per output token, so it excludes the time to the first token.
 
 The glyphs after the benchmark are one per trial: height is throughput, a yellow bar is a trial whose benchmark broke a constraint, and a red `·` is one that produced no benchmark at all. The shape shows whether a run converged or wandered.
 
@@ -292,12 +292,12 @@ $ dstack preset delete c83375b4
 
 ## Troubleshooting
 
-To trace the agent's activity, pass `--debug` to `dstack preset create`:
+To trace the agent's activity, pass `--debug` to `dstack apply`:
 
 <div class="termy">
 
 ```shell
-$ dstack preset create -f preset.dstack.yml --debug
+$ dstack apply -f preset.dstack.yml --debug
 ```
 
 </div>

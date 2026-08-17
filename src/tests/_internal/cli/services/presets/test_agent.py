@@ -13,7 +13,6 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.models.configurations import PresetConfiguration
 from dstack._internal.cli.models.preset_agent import PresetSessionProcess
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
@@ -49,6 +48,7 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.services.configs import ConfigManager
 from tests._internal.cli.common import get_session_run, get_session_state
 

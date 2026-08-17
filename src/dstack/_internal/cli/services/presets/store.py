@@ -7,16 +7,16 @@ from typing import TextIO
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.configurations import (
-    MAX_PROMPT_LENGTH,
-    PresetConfiguration,
-    PresetPromptFile,
-)
 from dstack._internal.cli.models.presets import PRESET_EXCLUDED_FIELDS, VerifiedPreset
 from dstack._internal.cli.services.presets.build import preset_to_yaml_dict
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.presets import (
+    MAX_PROMPT_LENGTH,
+    PresetConfiguration,
+    PresetPromptFile,
+)
 from dstack._internal.utils.common import get_dstack_dir
 
 
@@ -47,7 +47,7 @@ class PresetStore:
                 warn(str(e), stderr=True)
         if len(earlier_version_ids) == 1:
             warn(
-                f"VerifiedPreset {earlier_version_ids[0]} was created before dstack 0.21 and cannot"
+                f"Preset {earlier_version_ids[0]} was created before dstack 0.21 and cannot"
                 f" be read. Delete it with"
                 f" [code]dstack preset delete {earlier_version_ids[0]}[/], or recreate.",
                 stderr=True,
@@ -70,7 +70,7 @@ class PresetStore:
             return None
         preset = self._load(path)
         if preset.id != preset_id:
-            raise CLIError(f"VerifiedPreset file {path} does not match its path")
+            raise CLIError(f"Preset file {path} does not match its path")
         return preset
 
     def save(self, preset: VerifiedPreset) -> Path:
@@ -226,7 +226,7 @@ def _upgrade_pre_0_21_2_preset(data: dict, *, preset_id: str) -> dict:
 
 def _earlier_version_preset_error(preset_id: str) -> EarlierVersionPresetError:
     return EarlierVersionPresetError(
-        f"VerifiedPreset {preset_id} was created before dstack 0.21 and cannot be read."
+        f"Preset {preset_id} was created before dstack 0.21 and cannot be read."
         f" Delete it with `dstack preset delete {preset_id}`, or recreate it."
     )
 
@@ -260,13 +260,7 @@ def parse_preset_configuration(stream: TextIO) -> PresetConfiguration:
     try:
         data = yaml.safe_load(stream)
         if not isinstance(data, dict):
-            raise ConfigurationError("VerifiedPreset configuration must be a YAML object")
-        # Only checked here: a stored preset serializes `model` as an object, so
-        # the model itself has to keep accepting the form a file may not use.
-        model = data.get("model")
-        if isinstance(model, dict) and model.get("name") is None:
-            key = "base" if "base" in model else "repo"
-            raise ConfigurationError(f"Use top-level `{key}:` instead of nested `model.{key}`")
+            raise ConfigurationError("Preset configuration must be a YAML object")
         configuration = PresetConfiguration.model_validate(data)
     except ValidationError as e:
         raise ConfigurationError(e) from e
