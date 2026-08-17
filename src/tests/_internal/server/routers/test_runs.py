@@ -4005,6 +4005,13 @@ class TestSubmitService:
         res = await session.execute(select(RunModel))
         run = res.scalar_one()
         assert (run.gateway_id is not None) == is_gateway
+        event_messages = {e.message for e in await list_events(session)}
+        if is_gateway:
+            assert "Service assigned to gateway" in event_messages
+            assert "Service assigned to run without a gateway" not in event_messages
+        else:
+            assert "Service assigned to gateway" not in event_messages
+            assert "Service assigned to run without a gateway" in event_messages
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("populate_configuration", [True, False])

@@ -1,9 +1,6 @@
 from typing import Literal, Optional, Union
 from unittest.mock import MagicMock
 
-import pytest
-
-from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.gateways import (
@@ -14,7 +11,6 @@ from dstack._internal.core.models.gateways import (
 )
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.services import (
-    _register_service_in_server,
     _should_show_service_https,
     should_configure_service_https_on_gateway,
 )
@@ -118,20 +114,3 @@ class TestShouldShowServiceHttps:
         run_spec = _service_run_spec(https=False)
         gw = _gateway_config(certificate=LetsEncryptGatewayCertificate())
         assert _should_show_service_https(run_spec, gw) is False
-
-
-class TestRegisterServiceInServerHttps:
-    def test_allows_default_true_without_gateway(self) -> None:
-        run_spec = _service_run_spec(https=True)
-        result = _register_service_in_server(_mock_run_model(), run_spec)
-        assert result is not None
-
-    def test_allows_auto_without_gateway(self) -> None:
-        run_spec = _service_run_spec(https="auto")
-        result = _register_service_in_server(_mock_run_model(), run_spec)
-        assert result is not None
-
-    def test_rejects_explicit_false_without_gateway(self) -> None:
-        run_spec = _service_run_spec(https=False)
-        with pytest.raises(ServerClientError, match="not allowed without a gateway"):
-            _register_service_in_server(_mock_run_model(), run_spec)

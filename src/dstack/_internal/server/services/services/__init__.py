@@ -19,6 +19,7 @@ from dstack._internal.core.models.runs import RunSpec, ServiceModelSpec, Service
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, RunModel
+from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import (
     get_gateway_compute_models,
     get_gateway_configuration,
@@ -73,7 +74,7 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
         service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)
         run_model.gateway = gateway
     elif not settings.FORBID_SERVICES_WITHOUT_GATEWAY:
-        service_spec = _register_service_in_server(run_model, run_spec)
+        service_spec = _register_service_in_server(session, run_model, run_spec)
     else:
         raise ResourceNotExistsError(
             "This dstack-server installation forbids services without a gateway."
@@ -137,10 +138,18 @@ async def _register_service_in_gateway(
         service_url=service_url,
         model_url=model_url,
     )
+    events.emit(
+        session,
+        "Service assigned to gateway",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(run_model), events.Target.from_model(gateway)],
+    )
     return service_spec
 
 
-def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
+def _register_service_in_server(
+    session: AsyncSession, run_model: RunModel, run_spec: RunSpec
+) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
     if run_spec.configuration.https not in (
         None,
@@ -170,6 +179,12 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         model_url = service_url.rstrip("/") + run_spec.configuration.model.prefix
     else:
         model_url = f"/proxy/models/{run_model.project.name}/"
+    events.emit(
+        session,
+        "Service assigned to run without a gateway",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(run_model)],
+    )
     return _get_service_spec(
         configuration=run_spec.configuration,
         service_url=service_url,
