@@ -71,9 +71,12 @@ def _without_record_prefix(relative: Path) -> Path:
 
 def _collides(exported_paths: list[Path], record_paths: list[Path], destination: Path) -> bool:
     """Whether dropping the record prefixes would land two different files on
-    one exported path, or a file on the configuration itself; the full record
-    layout is kept in that case. Compared case-insensitively so an export
-    cannot silently overwrite itself on a case-insensitive filesystem."""
+    one exported path (`service/1/patches/fix.patch` and
+    `service/2/patches/fix.patch` both become `patches/fix.patch`), or a file
+    on the configuration itself; the caller keeps the full record layout then.
+    Case-insensitive: on a case-insensitive filesystem `Fix.patch` and
+    `fix.patch` are one file, and a case-sensitive check would let one copy
+    silently overwrite the other."""
     record_by_export: dict[str, Path] = {}
     for record_path, exported_path in zip(record_paths, exported_paths):
         key = exported_path.as_posix().casefold()
