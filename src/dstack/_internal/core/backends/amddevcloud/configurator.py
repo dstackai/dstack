@@ -16,7 +16,7 @@ from dstack._internal.core.models.backends.base import (
 class AMDDevCloudConfigurator(BaseDigitalOceanConfigurator):
     TYPE = BackendType.AMDDEVCLOUD
     BACKEND_CLASS = AMDDevCloudBackend
-    API_URL = "https://api-amd.digitalocean.com"
+    API_URL = "https://api.devcloud.amd.com"
 
     def get_backend(self, record: BackendRecord) -> BaseDigitalOceanBackend:
         config = self._get_config(record)
