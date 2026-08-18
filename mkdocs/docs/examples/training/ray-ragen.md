@@ -25,38 +25,53 @@ The task below runs a Ray cluster on an existing fleet:
 type: task
 name: ray-cluster
 
-nodes: 2
-
-env:
-- WANDB_API_KEY
 image: whatcanyousee/verl:ngc-cu124-vllm0.8.5-sglang0.4.6-mcore0.12.0-te2.2
-commands:
-  - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  - bash miniconda.sh -b -p /workflow/miniconda
-  - eval "$(/workflow/miniconda/bin/conda shell.bash hook)"
-  - git clone https://github.com/RAGEN-AI/RAGEN.git
-  - cd RAGEN
-  - bash scripts/setup_ragen.sh
-  - conda activate ragen
-  - cd verl
-  - pip install --no-deps -e .
-  - pip install hf_transfer hf_xet
-  - pip uninstall -y ray
-  - pip install -U "ray[default]"
-  - |
-    if [ $DSTACK_NODE_RANK = 0 ]; then 
-        ray start --head --port=6379;
-    else
-        ray start --address=$DSTACK_MASTER_NODE_IP:6379
-    fi
+env:
+  - WANDB_API_KEY
 
-# Expose Ray dashboard port
-ports:
-  - 8265
+groups:
+  - name: head # node group name is optional
+    nodes: 1
+    commands:
+      - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      - bash miniconda.sh -b -p /workflow/miniconda
+      - eval "$(/workflow/miniconda/bin/conda shell.bash hook)"
+      - git clone https://github.com/RAGEN-AI/RAGEN.git
+      - cd RAGEN
+      - bash scripts/setup_ragen.sh
+      - conda activate ragen
+      - cd verl
+      - pip install --no-deps -e .
+      - pip install hf_transfer hf_xet
+      - pip uninstall -y ray
+      - pip install -U "ray[default]"
+      - ray start --head --port=6379 --block
+    ports:
+      - 8265
+    resources:
+      gpu: 80GB:8
+      shm_size: 128GB
 
-resources:
-  gpu: 80GB:8
-  shm_size: 128GB
+  - name: workers
+    nodes: 1
+    commands:
+      - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      - bash miniconda.sh -b -p /workflow/miniconda
+      - eval "$(/workflow/miniconda/bin/conda shell.bash hook)"
+      - git clone https://github.com/RAGEN-AI/RAGEN.git
+      - cd RAGEN
+      - bash scripts/setup_ragen.sh
+      - conda activate ragen
+      - cd verl
+      - pip install --no-deps -e .
+      - pip install hf_transfer hf_xet
+      - pip uninstall -y ray
+      - pip install -U "ray[default]"
+      # groups[0].nodes[0] is the head node in the `head` group
+      - ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379 --block
+    resources:
+      gpu: 80GB:8
+      shm_size: 128GB
 
 # Save checkpoints on the instance
 volumes:

@@ -219,13 +219,78 @@ Commands in any group can reference the internal IP address of any node in the r
 `${{ groups[i].nodes[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
 the index of the node within that group.
 
-Node `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves
-to, and `startup_order` and `stop_criteria` apply to it across all groups.
+> Node `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves
+> to, and `startup_order` and `stop_criteria` apply to it across all groups.
 
-> Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.
-> Group `resources` are not inherited from the task's top-level `resources`. A group that
-> omits `resources` gets the default values.
-> Support for other properties is coming soon.
+Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
+
+??? info "Prefill/decode example"
+    Node groups can mix CPU and GPU roles. This SGLang prefill/decode split uses a CPU
+    router (`groups[0]`, the master) and GPU workers. `startup_order: workers-first`
+    starts prefill and decode before the router.
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    name: prefill-decode
+    image: lmsysorg/sglang:v0.5.10.post1
+    env:
+      - HF_TOKEN
+      - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+    startup_order: workers-first
+    groups:
+      # Router (CPU) — master node; wires prefill + decode by IP
+      - name: router
+        nodes: 1
+        commands:
+          - pip install smg
+          - |
+            echo "prefill=${{ groups[1].nodes[0].IP_ADDRESS }}"
+            echo "decode=${{ groups[2].nodes[0].IP_ADDRESS }}"
+            smg launch \
+              --pd-disaggregation \
+              --prefill http://${{ groups[1].nodes[0].IP_ADDRESS }}:8000 8998 \
+              --decode  http://${{ groups[2].nodes[0].IP_ADDRESS }}:8000 \
+              --prefill-policy cache_aware \
+              --host 0.0.0.0 --port 8000
+        ports:
+          - 8000
+        resources:
+          cpu: 4
+
+      - name: prefill
+        nodes: 1
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode prefill \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 --port 8000 \
+              --disaggregation-bootstrap-port 8998
+        resources:
+          gpu: H200
+
+      - name: decode
+        nodes: 1
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode decode \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 --port 8000
+        resources:
+          gpu: H200
+    ```
+
+    </div>
+
+!!! info "Examples"
+    See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
+    and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
 
 ### Resources
 

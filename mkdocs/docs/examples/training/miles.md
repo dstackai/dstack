@@ -24,61 +24,97 @@ Here we fine-tune `Qwen/Qwen2.5-32B-Instruct` on the
 
 ### Define a configuration
 
-The [task](../../concepts/tasks.md) below starts Ray on two nodes and prepares
-each node by downloading the model and dataset, then converting the checkpoint
-to Megatron's `torch_dist` format.
+The [task](../../concepts/tasks.md) below starts Ray on two GPU nodes using
+[node groups](../../concepts/tasks.md#node-groups) and prepares each node by
+downloading the model and dataset, then converting the checkpoint to Megatron's
+`torch_dist` format.
 
 <div editor-title="miles-qwen32b-h100.dstack.yml">
 
 ```yaml
 type: task
 name: miles-qwen32b-h100
-nodes: 2
 image: radixark/miles:sglang-miles-v0.5.12
 env:
   - WANDB_API_KEY
   - PYTHONPATH=/root/Megatron-LM
   - NCCL_DEBUG=INFO
   - MODEL_ID=Qwen/Qwen2.5-32B-Instruct
-commands:
-  # 1. Download the model and dataset.
-  - pip install -U "huggingface_hub[cli]"
-  - hf download "$MODEL_ID" --local-dir "/root/$(basename "$MODEL_ID")"
-  - hf download --repo-type dataset openai/gsm8k --local-dir /root/gsm8k
-  # 2. Convert the Hugging Face checkpoint to Megatron torch_dist.
-  - |
-    MODEL_NAME="$(basename "$MODEL_ID")"
-    cd /root/miles && python tools/convert_hf_to_torch_dist.py \
-      --swiglu \
-      --num-layers 64 \
-      --hidden-size 5120 \
-      --ffn-hidden-size 27648 \
-      --num-attention-heads 40 \
-      --use-rotary-position-embeddings \
-      --disable-bias-linear \
-      --add-qkv-bias \
-      --normalization RMSNorm \
-      --norm-epsilon 1e-5 \
-      --rotary-base 1000000 \
-      --group-query-attention \
-      --num-query-groups 8 \
-      --vocab-size 152064 \
-      --untie-embeddings-and-output-weights \
-      --hf-checkpoint "/root/$MODEL_NAME" \
-      --save "/root/${MODEL_NAME}_torch_dist"
-  # 3. Start Ray.
-  - |
-    if [ $DSTACK_NODE_RANK = 0 ]; then
-      ray start --head --port=6379
-    else
-      ray start --address=$DSTACK_MASTER_NODE_IP:6379
-    fi
-ports:
-  - 8265
-resources:
-  gpu: H100:8
-  shm_size: 32GB
-  disk: 1000GB..
+
+groups:
+  - name: head # node group name is optional
+    nodes: 1
+    commands:
+      # 1. Download the model and dataset.
+      - pip install -U "huggingface_hub[cli]"
+      - hf download "$MODEL_ID" --local-dir "/root/$(basename "$MODEL_ID")"
+      - hf download --repo-type dataset openai/gsm8k --local-dir /root/gsm8k
+      # 2. Convert the Hugging Face checkpoint to Megatron torch_dist.
+      - |
+        MODEL_NAME="$(basename "$MODEL_ID")"
+        cd /root/miles && python tools/convert_hf_to_torch_dist.py \
+          --swiglu \
+          --num-layers 64 \
+          --hidden-size 5120 \
+          --ffn-hidden-size 27648 \
+          --num-attention-heads 40 \
+          --use-rotary-position-embeddings \
+          --disable-bias-linear \
+          --add-qkv-bias \
+          --normalization RMSNorm \
+          --norm-epsilon 1e-5 \
+          --rotary-base 1000000 \
+          --group-query-attention \
+          --num-query-groups 8 \
+          --vocab-size 152064 \
+          --untie-embeddings-and-output-weights \
+          --hf-checkpoint "/root/$MODEL_NAME" \
+          --save "/root/${MODEL_NAME}_torch_dist"
+      # 3. Start Ray.
+      - ray start --head --port=6379 --block
+    ports:
+      - 8265
+    resources:
+      gpu: H100:8
+      shm_size: 32GB
+      disk: 1000GB..
+
+  - name: workers
+    nodes: 1
+    commands:
+      # 1. Download the model and dataset.
+      - pip install -U "huggingface_hub[cli]"
+      - hf download "$MODEL_ID" --local-dir "/root/$(basename "$MODEL_ID")"
+      - hf download --repo-type dataset openai/gsm8k --local-dir /root/gsm8k
+      # 2. Convert the Hugging Face checkpoint to Megatron torch_dist.
+      - |
+        MODEL_NAME="$(basename "$MODEL_ID")"
+        cd /root/miles && python tools/convert_hf_to_torch_dist.py \
+          --swiglu \
+          --num-layers 64 \
+          --hidden-size 5120 \
+          --ffn-hidden-size 27648 \
+          --num-attention-heads 40 \
+          --use-rotary-position-embeddings \
+          --disable-bias-linear \
+          --add-qkv-bias \
+          --normalization RMSNorm \
+          --norm-epsilon 1e-5 \
+          --rotary-base 1000000 \
+          --group-query-attention \
+          --num-query-groups 8 \
+          --vocab-size 152064 \
+          --untie-embeddings-and-output-weights \
+          --hf-checkpoint "/root/$MODEL_NAME" \
+          --save "/root/${MODEL_NAME}_torch_dist"
+      # 3. Start Ray.
+      # groups[0].nodes[0] is the head node in the `head` group
+      - ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379 --block
+    resources:
+      gpu: H100:8
+      shm_size: 32GB
+      disk: 1000GB..
+
 volumes:
   - /checkpoints:/checkpoints
 ```
@@ -104,7 +140,7 @@ While `dstack apply` is attached, you can submit Ray jobs through
 [`dstack attach`](../../reference/cli/dstack/attach.md) to re-attach and make
 the dashboard port accessible on `localhost`.
 
-> To run on a single node, remove `nodes` or set it to `1`, then submit the job
+> To run on a single node, use one group with `nodes: 1`, then submit the job
 > with `NUM_NODES=1`. In this case, `placement: cluster` is not required.
 
 ## Submit Ray jobs
