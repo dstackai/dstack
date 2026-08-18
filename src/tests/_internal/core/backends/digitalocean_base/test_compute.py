@@ -32,7 +32,7 @@ def compute() -> BaseDigitalOceanCompute:
     with patch("dstack._internal.core.backends.digitalocean_base.compute.DigitalOceanAPIClient"):
         return BaseDigitalOceanCompute(
             config=Mock(creds=Mock(api_key="key"), regions=None, project_name=None),
-            api_url="https://api-amd.digitalocean.com",
+            api_url="https://api.devcloud.amd.com",
             type=BackendType.AMDDEVCLOUD,
         )
 
