@@ -165,6 +165,11 @@ class PresetCommand(BaseCommand):
             dest="destination",
             help="The service configuration file to write",
         )
+        export_parser.add_argument(
+            "-n",
+            "--name",
+            help="The service name. Defaults to the preset name if set",
+        )
         export_parser.add_argument("--force", action="store_true", help="Overwrite existing files")
         export_parser.set_defaults(subfunc=self._export)
 
@@ -343,6 +348,7 @@ class PresetCommand(BaseCommand):
             preset_dir=store.root / preset.id,
             destination=Path(args.destination),
             force=args.force,
+            name=args.name,
         )
         console.print(
             f"Preset [code]{preset.id}[/] exported to [code]{args.destination}[/]"

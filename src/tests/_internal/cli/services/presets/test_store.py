@@ -29,8 +29,7 @@ class TestPresetStore:
         assert data["id"] == preset.id
         assert data["model"] == preset.model
         assert data["submitted_at"] == "2026-01-02T03:04:00Z"
-        # Wire-only: the stored file never carries `status`.
-        assert "status" not in data
+        assert data["status"] == "verified"
         assert "presets" not in data
         assert store.list() == [preset]
         assert store.get(preset.id) == preset
@@ -310,12 +309,12 @@ class TestPresetStore:
             }
         )
 
-        path = store.save(preset)
-        env = yaml.safe_load(path.read_text())["service"]["env"]
+        store.save(preset)
+        env = store.get(preset.id).service.env
 
-        assert "TOKENIZERS_PARALLELISM=false" in env
-        assert "MODEL_LABEL=monkey" in env
-        assert "HF_TOKEN" in env
+        assert env["TOKENIZERS_PARALLELISM"] == "false"
+        assert env["MODEL_LABEL"] == "monkey"
+        assert env["HF_TOKEN"] == EnvSentinel(key="HF_TOKEN")
 
 
 class TestParsePresetConfiguration:

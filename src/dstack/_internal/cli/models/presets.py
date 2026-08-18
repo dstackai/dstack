@@ -123,8 +123,12 @@ class VerifiedPreset(Preset):
     context_length: PositiveInt
     # The session's `trials/<n>` that won verification and became this preset.
     best_trial: PositiveInt
-    # The service that passed verification, stripped of this machine's deployment
-    # choices; `apply` submits it with the user's own name, gateway, and profile.
+    # The verified run's spec configuration, not the agent's files. The
+    # validator below keeps `name`, `gateway`, and profile params unset (the
+    # deployer's choices) and requires `model` and resources. Env keys the
+    # user declared as passthroughs hold `EnvSentinel` references, not the
+    # resolved secrets; other env values are stored as-is. `files` paths are
+    # stored relative to the preset directory, absolute after load.
     service: ServiceConfiguration
     benchmark: PresetBenchmark
     # The hardware it was verified on: the actual resources of every running

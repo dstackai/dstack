@@ -32,7 +32,6 @@ from dstack._internal.cli.services.presets.agent import (
     run_preset_agent,
     terminate_agent_process,
 )
-from dstack._internal.cli.services.presets.build import preset_to_yaml_dict
 from dstack._internal.cli.services.presets.prompt import get_preset_agent_system_prompt
 from dstack._internal.cli.services.presets.redaction import (
     contains_redacted_value,
@@ -585,7 +584,15 @@ async def _create_preset(
         [
             token,
             (setup.auth.api_key if setup.auth is not None else None) or "",
-            *preset_env.values(),
+            # Passthrough values are resolved from the caller's environment and
+            # are secrets; literal values are the user's own configuration text.
+            # The passthrough keys come from the source configuration, since
+            # `configuration` here is the resolved copy with no sentinels left.
+            *(
+                preset_env[key]
+                for key, value in source_configuration.env.items()
+                if isinstance(value, EnvSentinel) and key in preset_env
+            ),
             *get_sensitive_inherited_env_values(),
         ]
     )
@@ -670,7 +677,7 @@ async def _create_preset(
             name=_read_claimed_name(session),
             submitted_at=session.created_at,
         )
-        if contains_redacted_value(preset_to_yaml_dict(preset), redacted_values):
+        if contains_redacted_value(preset.model_dump(mode="json"), redacted_values):
             raise CLIError("Generated preset contains a secret value")
         preset_path = store.save(preset)
         creation_succeeded = True
