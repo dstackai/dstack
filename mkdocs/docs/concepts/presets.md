@@ -214,7 +214,7 @@ Preset c83375b4 exported to qwen.dstack.yml (16 files). Deploy it with `dstack a
 
 </div>
 
-The command writes the service configuration along with any files it references, such as patches. Set the service `name` and, optionally, a [gateway](gateways.md) in the exported configuration, then submit it with `dstack apply`:
+The command writes the service configuration along with any files it references, such as patches. The service is named after the preset; pass `-n` to override. Optionally, set a [gateway](gateways.md) in the exported configuration, then submit it with `dstack apply`:
 
 <div class="termy">
 

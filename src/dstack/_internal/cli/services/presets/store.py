@@ -8,7 +8,6 @@ import yaml
 from pydantic import ValidationError
 
 from dstack._internal.cli.models.presets import PRESET_EXCLUDED_FIELDS, VerifiedPreset
-from dstack._internal.cli.services.presets.build import preset_to_yaml_dict
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import ServiceConfiguration
@@ -84,7 +83,7 @@ class PresetStore:
         preset = preset.model_copy(deep=True)
         for mapping in preset.service.files:
             mapping.local_path = _relative_to_preset_dir(mapping.local_path, directory)
-        content = yaml.safe_dump(preset_to_yaml_dict(preset), sort_keys=False)
+        content = yaml.safe_dump(preset.model_dump(mode="json"), sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
             dir=directory,
             prefix=f".{preset.id}.",

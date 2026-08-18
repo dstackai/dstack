@@ -38,6 +38,8 @@ class TestExportPreset:
         ]
         data = yaml.safe_load(destination.read_text())
         assert data["type"] == "service"
+        # An unnamed preset exports an unnamed service.
+        assert data["name"] is None
         # Relative to the configuration file, which is how `dstack apply`
         # resolves `files` paths.
         assert data["files"] == [
@@ -47,6 +49,49 @@ class TestExportPreset:
             "--- a\n+++ b\n"
         )
         assert ServiceConfiguration.model_validate(data).model is not None
+
+    def test_names_the_service_after_the_preset(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset().model_copy(update={"name": "qwen-fast"})
+        preset_dir = store.save(preset).parent
+        destination = tmp_path / "qwen.dstack.yml"
+
+        export_preset(preset, preset_dir=preset_dir, destination=destination, force=False)
+
+        data = yaml.safe_load(destination.read_text())
+        assert data["name"] == "qwen-fast"
+
+    def test_names_the_service_after_the_name_option(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset().model_copy(update={"name": "qwen-fast"})
+        preset_dir = store.save(preset).parent
+        destination = tmp_path / "qwen.dstack.yml"
+
+        export_preset(
+            preset,
+            preset_dir=preset_dir,
+            destination=destination,
+            force=False,
+            name="qwen-prod",
+        )
+
+        assert yaml.safe_load(destination.read_text())["name"] == "qwen-prod"
+
+    def test_rejects_an_invalid_service_name(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        preset_dir = store.save(preset).parent
+        destination = tmp_path / "qwen.dstack.yml"
+
+        with pytest.raises(CLIError):
+            export_preset(
+                preset,
+                preset_dir=preset_dir,
+                destination=destination,
+                force=False,
+                name="Not_Valid!",
+            )
+        assert not destination.exists()
 
     def test_refuses_to_overwrite_without_force(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")

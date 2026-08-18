@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Optional, TypeVar
+from typing import Optional, TypeVar
 
 import gpuhunt
 
@@ -10,7 +10,7 @@ from dstack._internal.cli.models.presets import (
     VerifiedPreset,
 )
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.envs import Env, EnvSentinel
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import Resources
 from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.resources import (
@@ -57,34 +57,6 @@ def build_preset(
         benchmark=benchmark,
         verified_on=verification_replica_groups,
     )
-
-
-def preset_to_yaml_dict(preset: VerifiedPreset) -> dict[str, Any]:
-    """`VerifiedPreset` in the plain types `yaml.safe_dump` accepts."""
-    return {
-        # A saved preset is verified by definition; `status` is wire-only.
-        **preset.model_dump(mode="json", exclude_none=True, exclude={"status"}),
-        "service": service_configuration_to_yaml_dict(preset.service),
-    }
-
-
-def service_configuration_to_yaml_dict(
-    configuration: ServiceConfiguration,
-) -> dict[str, Any]:
-    """The service as a preset stores it.
-
-    Env is rewritten as `key=value` because dumping it writes a passthrough
-    variable as `HF_TOKEN: {key: HF_TOKEN}`, and this file is meant to be read."""
-    service = configuration.model_dump(
-        mode="json",
-        exclude={"type", *PRESET_EXCLUDED_FIELDS},
-        exclude_none=True,
-    )
-    if configuration.env:
-        service["env"] = [
-            _env_item_to_yaml(key, value) for key, value in sorted(configuration.env.items())
-        ]
-    return {field: value for field, value in service.items() if value not in ({}, [])}
 
 
 def resources_spec_from_instance_resources(resources: Resources) -> ResourcesSpec:
@@ -140,12 +112,6 @@ def set_service_gpu_vendor_from_verification(
 
 def _without_excluded_fields(configuration: ConfigurationT) -> ConfigurationT:
     return configuration.model_copy(deep=True, update=dict.fromkeys(PRESET_EXCLUDED_FIELDS))
-
-
-def _env_item_to_yaml(key: str, value: str | EnvSentinel) -> str:
-    if isinstance(value, EnvSentinel):
-        return key
-    return f"{key}={value}"
 
 
 def _get_verification_group_gpu_vendor(
