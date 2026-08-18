@@ -586,9 +586,11 @@ async def _create_preset(
             (setup.auth.api_key if setup.auth is not None else None) or "",
             # Passthrough values are resolved from the caller's environment and
             # are secrets; literal values are the user's own configuration text.
+            # The passthrough keys come from the source configuration, since
+            # `configuration` here is the resolved copy with no sentinels left.
             *(
                 preset_env[key]
-                for key, value in configuration.env.items()
+                for key, value in source_configuration.env.items()
                 if isinstance(value, EnvSentinel) and key in preset_env
             ),
             *get_sensitive_inherited_env_values(),

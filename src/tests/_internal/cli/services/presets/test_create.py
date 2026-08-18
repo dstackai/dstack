@@ -309,6 +309,40 @@ class TestCreatePreset:
 
         assert cleanup_calls == []
 
+    @pytest.mark.asyncio
+    async def test_redacts_resolved_passthrough_env_values(
+        self, creation_context, monkeypatch, tmp_path
+    ):
+        """A passthrough (`- LICENSE`) resolves from the caller's environment, so its
+        value is a secret and must reach the redactor. A literal must not: the saved
+        preset legitimately contains it."""
+        captured = {}
+
+        async def run_agent(**kwargs):
+            captured["redacted_values"] = kwargs["redacted_values"]
+            return PresetAgentProcessOutput(
+                report_data=json.loads(
+                    get_successful_preset_report(creation_context.run).model_dump_json()
+                )
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.run_preset_agent",
+            run_agent,
+        )
+
+        await _create_preset(
+            api=creation_context.api,
+            configuration=creation_context.configuration,
+            source_configuration=creation_context.source_configuration,
+            store=creation_context.store,
+            build_name="qwen-build",
+            session=_agent_session(tmp_path),
+        )
+
+        assert "license-secret" in captured["redacted_values"]
+        assert "false" not in captured["redacted_values"]
+
     @pytest.mark.parametrize(
         ("keep_service", "stopped_names"),
         [(False, ["qwen-build-2"]), (True, [])],
