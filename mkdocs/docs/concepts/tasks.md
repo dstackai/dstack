@@ -179,6 +179,118 @@ Jobs on each node communicate using their private IP addresses. Use `DSTACK_MAST
     For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
     For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
 
+### Node groups
+
+A task can define multiple node groups. Each group has its own `nodes` count,
+`resources`, `commands`, and `ports`.
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: task
+name: ray-cluster
+
+python: 3.12
+
+groups:
+  - name: head
+    nodes: 1
+    commands:
+      - pip uninstall -y ray && pip install -U "ray[default]"
+      - ray start --head --port=6379 --block
+    resources:
+      cpu: 2
+      memory: 4GB..
+    ports:
+      - 8265
+
+  - name: workers
+    nodes: 2
+    commands:
+      - pip uninstall -y ray && pip install -U "ray[default]"
+      - ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379 --block
+    resources:
+      gpu: H100:8
+```
+
+</div>
+
+Commands in any group can reference the internal IP address of any node in the run via
+`${{ groups[i].nodes[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
+the index of the node within that group.
+
+> `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves to.
+
+Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
+
+??? info "Prefill/decode example"
+    Node groups can mix CPU and GPU roles. This SGLang prefill/decode split uses a CPU
+    router (`groups[0]`, the master) and GPU workers. `startup_order: workers-first`
+    starts prefill and decode before the router.
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    name: prefill-decode
+    image: lmsysorg/sglang:v0.5.10.post1
+    env:
+      - HF_TOKEN
+      - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+    startup_order: workers-first
+    groups:
+      # Router (CPU) — master node; wires prefill + decode by IP
+      - name: router
+        nodes: 1
+        commands:
+          - pip install smg
+          - |
+            echo "prefill=${{ groups[1].nodes[0].IP_ADDRESS }}"
+            echo "decode=${{ groups[2].nodes[0].IP_ADDRESS }}"
+            smg launch \
+              --pd-disaggregation \
+              --prefill http://${{ groups[1].nodes[0].IP_ADDRESS }}:8000 8998 \
+              --decode  http://${{ groups[2].nodes[0].IP_ADDRESS }}:8000 \
+              --prefill-policy cache_aware \
+              --host 0.0.0.0 --port 8000
+        ports:
+          - 8000
+        resources:
+          cpu: 4
+
+      - name: prefill
+        nodes: 1
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode prefill \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 --port 8000 \
+              --disaggregation-bootstrap-port 8998
+        resources:
+          gpu: H200
+
+      - name: decode
+        nodes: 1
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode decode \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 --port 8000
+        resources:
+          gpu: H200
+    ```
+
+    </div>
+
+!!! info "Examples"
+    See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
+    and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
+
 ### Resources
 
 When you specify a resource value like `cpu` or `memory`,
@@ -460,7 +572,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
     | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                       |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
-    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile. The file lists GPU nodes as `<ip> slots=<gpus>` and CPU nodes as `<ip>` |
     | `DSTACK_WORKING_DIR`    | The working directory of the run                                 |
     | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any)                 |
 

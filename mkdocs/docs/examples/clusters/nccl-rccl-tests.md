@@ -12,7 +12,7 @@ This example shows how to run [NCCL](https://github.com/NVIDIA/nccl-tests) or [R
 
 ## Running as a task
 
-Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPUs (8 processes in total).
+Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPUs (8 processes in total), using [node groups](../../concepts/tasks.md#node-groups).
 
 === "NCCL tests"
 
@@ -22,33 +22,38 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     type: task
     name: nccl-tests
 
-    nodes: 2
-
     startup_order: workers-first
     stop_criteria: master-done
 
     env:
       - NCCL_DEBUG=INFO
-    commands:
-      - |
-        if [ $DSTACK_NODE_RANK -eq 0 ]; then
-          mpirun \
-            --allow-run-as-root \
-            --hostfile $DSTACK_MPI_HOSTFILE \
-            -n $DSTACK_GPUS_NUM \
-            -N $DSTACK_GPUS_PER_NODE \
-            --bind-to none \
-            /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
-        else
-          sleep infinity
-        fi
+
+    groups:
+      - name: master # The name property is optional
+        nodes: 1
+        commands:
+          - |
+            mpirun \
+              --allow-run-as-root \
+              --hostfile $DSTACK_MPI_HOSTFILE \
+              -n $DSTACK_GPUS_NUM \
+              -N $DSTACK_GPUS_PER_NODE \
+              --bind-to none \
+              /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g 1
+        resources:
+          gpu: nvidia:1..8
+          shm_size: 16GB
+
+      - name: workers
+        nodes: 1
+        commands:
+          - sleep infinity
+        resources:
+          gpu: nvidia:1..8
+          shm_size: 16GB
 
     # Uncomment if the `kubernetes` backend requires it for `/dev/infiniband` access
     #privileged: true
-
-    resources:
-      gpu: nvidia:1..8
-      shm_size: 16GB
     ```
 
     </div>
@@ -65,7 +70,6 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     type: task
     name: rccl-tests
 
-    nodes: 2
     startup_order: workers-first
     stop_criteria: master-done
 
@@ -77,35 +81,50 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     env:
       - NCCL_DEBUG=INFO
       - OPEN_MPI_HOME=/usr/lib/x86_64-linux-gnu/openmpi
-    commands:
-      # Setup MPI and build RCCL tests
-      - apt-get install -y git libopenmpi-dev openmpi-bin
-      - git clone https://github.com/ROCm/rccl-tests.git
-      - cd rccl-tests
-      - make MPI=1 MPI_HOME=$OPEN_MPI_HOME
 
-      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
-      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
+    groups:
+      - name: master # The name property is optional
+        nodes: 1
+        commands:
+          # Setup MPI and build RCCL tests
+          - apt-get install -y git libopenmpi-dev openmpi-bin
+          - git clone https://github.com/ROCm/rccl-tests.git
+          - cd rccl-tests
+          - make MPI=1 MPI_HOME=$OPEN_MPI_HOME
 
-      # Run RCCL tests via MPI
-      - |
-        if [ $DSTACK_NODE_RANK -eq 0 ]; then
-          mpirun --allow-run-as-root \
-            --hostfile $DSTACK_MPI_HOSTFILE \
-            -n $DSTACK_GPUS_NUM \
-            -N $DSTACK_GPUS_PER_NODE \
-            --mca btl_tcp_if_include ens41np0 \
-            -x LD_PRELOAD \
-            -x NCCL_IB_HCA=mlx5_0/1,bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7 \
-            -x NCCL_IB_GID_INDEX=3 \
-            -x NCCL_IB_DISABLE=0 \
-            ./build/all_reduce_perf -b 8M -e 8G -f 2 -g 1 -w 5 --iters 20 -c 0;
-        else
-          sleep infinity
-        fi
+          # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
+          - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
 
-    resources:
-      gpu: MI300X:8
+          # Run RCCL tests via MPI
+          - |
+            mpirun --allow-run-as-root \
+              --hostfile $DSTACK_MPI_HOSTFILE \
+              -n $DSTACK_GPUS_NUM \
+              -N $DSTACK_GPUS_PER_NODE \
+              --mca btl_tcp_if_include ens41np0 \
+              -x LD_PRELOAD \
+              -x NCCL_IB_HCA=mlx5_0/1,bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7 \
+              -x NCCL_IB_GID_INDEX=3 \
+              -x NCCL_IB_DISABLE=0 \
+              ./build/all_reduce_perf -b 8M -e 8G -f 2 -g 1 -w 5 --iters 20 -c 0;
+        resources:
+          gpu: MI300X:8
+
+      - name: workers
+        nodes: 1
+        commands:
+          # Setup MPI and build RCCL tests
+          - apt-get install -y git libopenmpi-dev openmpi-bin
+          - git clone https://github.com/ROCm/rccl-tests.git
+          - cd rccl-tests
+          - make MPI=1 MPI_HOME=$OPEN_MPI_HOME
+
+          # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
+          - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
+
+          - sleep infinity
+        resources:
+          gpu: MI300X:8
     ```
 
     </div>

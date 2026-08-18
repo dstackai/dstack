@@ -82,7 +82,7 @@ tasks, and services:
      ```
 
 - `DSTACK_NODES_IPS`{ #DSTACK_NODES_IPS } – The list of internal IP addresses of all nodes delimited by `"\n"`.
-- `DSTACK_MPI_HOSTFILE`{ #DSTACK_MPI_HOSTFILE } – The path to a pre-populated MPI hostfile that can be used directly as `mpirun --hostfile $DSTACK_MPI_HOSTFILE`.
+- `DSTACK_MPI_HOSTFILE`{ #DSTACK_MPI_HOSTFILE } – The path to a pre-populated MPI hostfile that can be used directly as `mpirun --hostfile $DSTACK_MPI_HOSTFILE`. The file lists GPU nodes as `<ip> slots=<gpus>` and CPU nodes as `<ip>`.
 
 ## Server
 
