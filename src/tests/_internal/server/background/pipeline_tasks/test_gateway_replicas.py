@@ -197,6 +197,33 @@ class TestGatewayReplicaFetcher:
         assert recent.lock_owner is None
         assert locked.lock_owner == "OtherPipeline"
 
+    async def test_fetch_includes_recent_replica_with_skip_min_processing_interval(
+        self, test_db, session: AsyncSession, fetcher: GatewayReplicaFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        now = get_current_datetime()
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.RUNNING,
+            last_processed_at=now,
+        )
+        replica.skip_min_processing_interval = True
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert [item.id for item in items] == [replica.id]
+        await session.refresh(replica)
+        assert not replica.skip_min_processing_interval
+
     @pytest.mark.parametrize(
         "gateway_status,to_be_deleted",
         [

@@ -694,6 +694,9 @@ class GatewayReplicaModel(PipelineModelMixin, BaseModel):
     )
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     status: Mapped[GatewayReplicaStatus] = mapped_column(EnumAsString(GatewayReplicaStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     scale_in: Mapped[bool] = mapped_column(Boolean, server_default=false())

@@ -79,7 +79,10 @@ from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_mounts,
     resolve_provisioning_image,
 )
-from dstack._internal.server.services.gateways import get_gateway_replica_models
+from dstack._internal.server.services.gateways import (
+    get_gateway_replica_models,
+    skip_gateway_replicas_min_processing_interval,
+)
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -331,6 +334,7 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
         await _apply_process_result(
             item=item,
             job_model=context.job_model,
+            run_model=context.run_model,
             result=result,
         )
         new_status = result.job_update_map.get("status")
@@ -339,6 +343,8 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
         # Hint run pipeline for fast run transition to RUNNING status.
         if new_status == JobStatus.RUNNING and context.job_model.run.status != RunStatus.RUNNING:
             self._pipeline_hinter.hint_fetch(RunModel.__name__)
+        if context.run_model.gateway_id is not None and result.job_update_map.get("registered"):
+            self._pipeline_hinter.hint_fetch(GatewayReplicaModel.__name__)
 
 
 @dataclass
@@ -1084,6 +1090,7 @@ def _server_access_enabled(context: _ProcessContext) -> bool:
 async def _apply_process_result(
     item: JobRunningPipelineItem,
     job_model: JobModel,
+    run_model: RunModel,
     result: _ProcessResult,
 ) -> None:
     set_processed_update_map_fields(result.job_update_map)
@@ -1120,6 +1127,9 @@ async def _apply_process_result(
                 .where(RunModel.id == job_model.run_id)
                 .values(skip_min_processing_interval=True)
             )
+
+        if run_model.gateway_id is not None and result.job_update_map.get("registered"):
+            await skip_gateway_replicas_min_processing_interval(session, run_model.gateway_id)
 
         _emit_result_events(session=session, job_model=job_model, result=result)
 
