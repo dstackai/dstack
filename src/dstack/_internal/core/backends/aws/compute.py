@@ -57,10 +57,10 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
-    GatewayComputeConfiguration,
     GatewayLoadBalancerConfiguration,
     GatewayLoadBalancerData,
-    GatewayProvisioningData,
+    GatewayReplicaConfiguration,
+    GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -524,10 +524,10 @@ class AWSCompute(
             return False
         return placement_group.configuration.region == instance_offer.region
 
-    def create_gateway(
+    def create_gateway_replica(
         self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
+        configuration: GatewayReplicaConfiguration,
+    ) -> GatewayReplicaProvisioningData:
         ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
@@ -587,7 +587,7 @@ class AWSCompute(
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address
         ip_address = _get_instance_ip(instance, configuration.public_ip)
-        return GatewayProvisioningData(
+        return GatewayReplicaProvisioningData(
             instance_id=instance.instance_id,
             region=configuration.region,
             availability_zone=availability_zone,
@@ -716,10 +716,10 @@ class AWSCompute(
             ).model_dump_json(),
         )
 
-    def terminate_gateway(
+    def terminate_gateway_replica(
         self,
         instance_id: str,
-        configuration: GatewayComputeConfiguration,
+        configuration: GatewayReplicaConfiguration,
         backend_data: Optional[str] = None,
     ):
         self.terminate_instance(

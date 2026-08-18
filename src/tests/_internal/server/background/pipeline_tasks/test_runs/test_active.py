@@ -41,7 +41,7 @@ from dstack._internal.server.testing.common import (
     create_backend,
     create_fleet,
     create_gateway,
-    create_gateway_compute,
+    create_gateway_replica,
     create_instance,
     create_job,
     create_project,
@@ -196,7 +196,7 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        gateway_replica = await create_gateway_replica(session=session, gateway_id=gateway.id)
         run = await create_run(
             session=session,
             project=project,
@@ -220,7 +220,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute.id,
+                gateway_replica_id=gateway_replica.id,
                 is_registered=False,
                 register_attempt=3,
                 register_status_message="Connection refused",
@@ -249,10 +249,10 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
-        gateway_compute_2 = await create_gateway_compute(
+        gateway_replica_2 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=1
         )
         run = await create_run(
@@ -278,7 +278,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=False,
                 register_attempt=3,
                 register_status_message="Connection refused",
@@ -287,7 +287,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute_2.id,
+                gateway_replica_id=gateway_replica_2.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -315,11 +315,11 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
         # Second running replica has not attempted registration yet (e.g. just came up).
-        await create_gateway_compute(session=session, gateway_id=gateway.id, replica_num=1)
+        await create_gateway_replica(session=session, gateway_id=gateway.id, replica_num=1)
         run = await create_run(
             session=session,
             project=project,
@@ -343,7 +343,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=False,
                 register_attempt=3,
                 register_status_message="Connection refused",
@@ -372,12 +372,12 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_running = await create_gateway_compute(
+        gateway_replica_running = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
         # Terminated replica successfully registered before going away — should be ignored,
         # since only currently running replicas count towards the predicate.
-        gateway_compute_terminating = await create_gateway_compute(
+        gateway_replica_terminating = await create_gateway_replica(
             session=session,
             gateway_id=gateway.id,
             replica_num=1,
@@ -406,7 +406,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute_running.id,
+                gateway_replica_id=gateway_replica_running.id,
                 is_registered=False,
                 register_attempt=3,
                 register_status_message="Connection refused",
@@ -415,7 +415,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute_terminating.id,
+                gateway_replica_id=gateway_replica_terminating.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -1407,10 +1407,10 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
-        gateway_compute_2 = await create_gateway_compute(
+        gateway_replica_2 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=1
         )
         run_spec = get_run_spec(
@@ -1457,7 +1457,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=old_job.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -1465,7 +1465,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=old_job.id,
-                gateway_replica_id=gateway_compute_2.id,
+                gateway_replica_id=gateway_replica_2.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -1474,7 +1474,7 @@ class TestRunActiveWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=new_job.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -1484,7 +1484,7 @@ class TestRunActiveWorker:
             session.add(
                 ServiceReplicaRegistrationModel(
                     job_id=new_job.id,
-                    gateway_replica_id=gateway_compute_2.id,
+                    gateway_replica_id=gateway_replica_2.id,
                     is_registered=False,
                     register_attempt=2,
                 )
@@ -1517,10 +1517,10 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
-        gateway_compute_2 = await create_gateway_compute(
+        gateway_replica_2 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=1
         )
         run_spec = get_run_spec(
@@ -1563,11 +1563,11 @@ class TestRunActiveWorker:
             ready=True,
             replica_num=1,
         )
-        for gateway_compute in (gateway_compute_1, gateway_compute_2):
+        for gateway_replica in (gateway_replica_1, gateway_replica_2):
             session.add(
                 ServiceReplicaRegistrationModel(
                     job_id=old_job.id,
-                    gateway_replica_id=gateway_compute.id,
+                    gateway_replica_id=gateway_replica.id,
                     is_registered=True,
                     register_attempt=0,
                 )
@@ -1575,7 +1575,7 @@ class TestRunActiveWorker:
             session.add(
                 ServiceReplicaRegistrationModel(
                     job_id=new_job.id,
-                    gateway_replica_id=gateway_compute.id,
+                    gateway_replica_id=gateway_replica.id,
                     is_registered=True,
                     register_attempt=0,
                 )

@@ -21,7 +21,7 @@ from dstack._internal.server.models import JobModel, ServiceRegistrationModel
 from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
-    create_gateway_compute,
+    create_gateway_replica,
     create_job,
     create_project,
     create_repo,
@@ -381,7 +381,7 @@ class TestRunPendingWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        gateway_replica = await create_gateway_replica(session=session, gateway_id=gateway.id)
         run_spec = get_run_spec(
             run_name="test-run",
             repo_id=repo.name,
@@ -409,7 +409,7 @@ class TestRunPendingWorker:
         session.add(
             ServiceRegistrationModel(
                 run_id=run.id,
-                gateway_replica_id=gateway_compute.id,
+                gateway_replica_id=gateway_replica.id,
                 is_registered=False,
                 register_attempt=3,
                 register_status_message="Connection refused",

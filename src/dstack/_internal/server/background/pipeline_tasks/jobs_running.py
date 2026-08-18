@@ -59,8 +59,8 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
-    GatewayComputeModel,
     GatewayModel,
+    GatewayReplicaModel,
     ImportModel,
     InstanceModel,
     JobModel,
@@ -79,7 +79,7 @@ from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_mounts,
     resolve_provisioning_image,
 )
-from dstack._internal.server.services.gateways import get_gateway_compute_models
+from dstack._internal.server.services.gateways import get_gateway_replica_models
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -731,12 +731,12 @@ async def _fetch_run_model(
     if include_gateway:
         query = query.options(
             joinedload(RunModel.gateway)
-            .selectinload(GatewayModel.gateway_computes)
-            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+            .selectinload(GatewayModel.gateway_replicas)
+            .load_only(GatewayReplicaModel.id, GatewayReplicaModel.status),
         ).options(
             joinedload(RunModel.gateway)
-            .joinedload(GatewayModel.gateway_compute)
-            .load_only(GatewayComputeModel.id, GatewayComputeModel.status),
+            .joinedload(GatewayModel.gateway_replica)
+            .load_only(GatewayReplicaModel.id, GatewayReplicaModel.status),
         )
     if replica_num is not None:
         assert run_spec is not None, "run_spec must be provided when replica_num is set"
@@ -1309,7 +1309,7 @@ def _job_gateway_registration_failed(gateway: GatewayModel | None, job_model: Jo
         return False
     running_gateway_replica_ids = {
         replica.id
-        for replica in get_gateway_compute_models(gateway)
+        for replica in get_gateway_replica_models(gateway)
         if replica.status == GatewayReplicaStatus.RUNNING
     }
     if not running_gateway_replica_ids:

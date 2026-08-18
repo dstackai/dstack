@@ -49,8 +49,8 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayCertificate,
-    GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayReplicaConfiguration,
     GatewayReplicaStatus,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
@@ -114,8 +114,8 @@ from dstack._internal.server.models import (
     ExportModel,
     FileArchiveModel,
     FleetModel,
-    GatewayComputeModel,
     GatewayModel,
+    GatewayReplicaModel,
     ImportModel,
     InstanceHealthCheckModel,
     InstanceModel,
@@ -709,7 +709,7 @@ async def create_gateway(
     return gateway
 
 
-async def create_gateway_compute(
+async def create_gateway_replica(
     session: AsyncSession,
     gateway_id: Optional[UUID] = None,
     backend_id: Optional[UUID] = None,
@@ -726,10 +726,10 @@ async def create_gateway_compute(
     populate_configuration: bool = True,
     hostname_deprecated_readonly: Optional[str] = None,
     backend_data: Optional[str] = None,
-) -> GatewayComputeModel:
+) -> GatewayReplicaModel:
     """
     Args:
-        populate_configuration: whether to populate GatewayComputeModel.configuration.
+        populate_configuration: whether to populate GatewayReplicaModel.configuration.
             True - 0.18.2+ gateways, False - legacy pre-0.18.2 gateways. Prefer
             testing against both in major test cases.
     """
@@ -740,7 +740,7 @@ async def create_gateway_compute(
             assert backend is not None
             backend_type = backend.type
         assert region is not None
-        configuration = GatewayComputeConfiguration(
+        configuration = GatewayReplicaConfiguration(
             project_name="test-project",
             instance_name=instance_id or "test-instance",
             backend=backend_type,
@@ -749,7 +749,7 @@ async def create_gateway_compute(
             ssh_key_pub=ssh_public_key,
             certificate=None,
         ).model_dump_json()
-    gateway_compute = GatewayComputeModel(
+    gateway_replica = GatewayReplicaModel(
         gateway_id=gateway_id,
         backend_id=backend_id,
         ip_address=ip_address,
@@ -765,19 +765,19 @@ async def create_gateway_compute(
         hostname_deprecated_readonly=hostname_deprecated_readonly,
         backend_data=backend_data,
     )
-    session.add(gateway_compute)
+    session.add(gateway_replica)
     await session.commit()
-    return gateway_compute
+    return gateway_replica
 
 
-def get_gateway_compute_configuration(
+def get_gateway_replica_configuration(
     project_name: str = "test-project",
     instance_name: str = "test-instance",
     backend: BackendType = BackendType.AWS,
     region: str = "us",
     public_ip: bool = True,
-) -> GatewayComputeConfiguration:
-    return GatewayComputeConfiguration(
+) -> GatewayReplicaConfiguration:
+    return GatewayReplicaConfiguration(
         project_name=project_name,
         instance_name=instance_name,
         backend=backend,

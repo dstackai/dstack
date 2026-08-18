@@ -656,25 +656,26 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     """Backend-specific load balancer resource data in JSON.
     """
 
-    gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("gateway_computes.id", ondelete="CASCADE")
+    gateway_replica_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        "gateway_compute_id",
+        ForeignKey("gateway_computes.id", ondelete="CASCADE"),
     )
-    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(
-        foreign_keys=[gateway_compute_id],
+    gateway_replica: Mapped[Optional["GatewayReplicaModel"]] = relationship(
+        foreign_keys=[gateway_replica_id],
         back_populates="legacy_gateway",
     )
     """
-    Relationship with gateway computes for pre-0.20.25 gateways.
-    Use `get_gateway_compute_models()` for version-agnostic gateway compute retrieval.
+    Relationship with the gateway replica for pre-0.20.25 gateways.
+    Use `get_gateway_replica_models()` for version-agnostic gateway replica retrieval.
     """
-    gateway_computes: Mapped[List["GatewayComputeModel"]] = relationship(
+    gateway_replicas: Mapped[List["GatewayReplicaModel"]] = relationship(
         back_populates="gateway",
-        foreign_keys="GatewayComputeModel.gateway_id",
+        foreign_keys="GatewayReplicaModel.gateway_id",
     )
     """
-    Relationship with gateway computes.
-    Pre-0.20.25 gateways can have an extra compute model referenced by `GatewayModel.gateway_compute`.
-    Use `get_gateway_compute_models()` for version-agnostic gateway compute retrieval.
+    Relationship with gateway replicas.
+    Pre-0.20.25 gateways can have an extra replica referenced by `GatewayModel.gateway_replica`.
+    Use `get_gateway_replica_models()` for version-agnostic gateway replica retrieval.
     """
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
@@ -684,11 +685,8 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     # TODO: Add pipeline index ("ix_gateways_pipeline_fetch_q") if gateways become soft-deleted.
 
 
-class GatewayComputeModel(PipelineModelMixin, BaseModel):
-    """A single gateway replica.
-    **TODO**: consider renaming to `GatewayReplicaModel`.
-    """
-
+class GatewayReplicaModel(PipelineModelMixin, BaseModel):
+    # "gateway compute" is a legacy term superseded by "gateway replica"
     __tablename__ = "gateway_computes"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -710,7 +708,7 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     """Replaced by GatewayModel.hostname since 0.21.0"""
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     """`configuration` is optional for compatibility with pre-0.18.2 gateways.
-    Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
+    Use `get_gateway_replica_configuration` to construct `configuration` for old gateways.
     """
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(100))
@@ -723,20 +721,20 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
         )
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship(
-        back_populates="gateway_computes",
+        back_populates="gateway_replicas",
         foreign_keys=[gateway_id],
     )
     """
-    Gateway. Can be None for pre-0.20.25 gateways, which use GatewayModel.gateway_compute_id to
+    Gateway. Can be None for pre-0.20.25 gateways, which use GatewayModel.gateway_replica_id to
     establish the relationship.
     """
     legacy_gateway: Mapped[Optional["GatewayModel"]] = relationship(
-        back_populates="gateway_compute",
-        foreign_keys="GatewayModel.gateway_compute_id",
+        back_populates="gateway_replica",
+        foreign_keys="GatewayModel.gateway_replica_id",
         viewonly=True,
     )
     """
-    Gateway for pre-0.20.25 gateways, where GatewayModel.gateway_compute_id points to this replica.
+    Gateway for pre-0.20.25 gateways, where GatewayModel.gateway_replica_id points to this replica.
     Use `gateway or legacy_gateway` to get the gateway regardless of version.
     """
 
@@ -786,7 +784,7 @@ class ServiceRegistrationModel(BaseModel):
     gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
     )
-    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+    gateway_replica: Mapped["GatewayReplicaModel"] = relationship(
         back_populates="service_registrations"
     )
     is_registered: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -820,7 +818,7 @@ class ServiceReplicaRegistrationModel(BaseModel):
     gateway_replica_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE"), index=True
     )
-    gateway_replica: Mapped["GatewayComputeModel"] = relationship(
+    gateway_replica: Mapped["GatewayReplicaModel"] = relationship(
         back_populates="service_replica_registrations"
     )
     is_registered: Mapped[bool] = mapped_column(Boolean, default=False)

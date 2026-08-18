@@ -57,8 +57,8 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.core.models.gateways import (
-    GatewayComputeConfiguration,
-    GatewayProvisioningData,
+    GatewayReplicaConfiguration,
+    GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -561,10 +561,10 @@ class GCPCompute(
         # Instead, we use the placement policy defined in reservation settings.
         return False
 
-    def create_gateway(
+    def create_gateway_replica(
         self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
+        configuration: GatewayReplicaConfiguration,
+    ) -> GatewayReplicaProvisioningData:
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_firewall_rules(
                 firewalls_client=self.firewalls_client,
@@ -628,7 +628,7 @@ class GCPCompute(
         instance = self.instances_client.get(
             project=self.config.project_id, zone=zone, instance=instance_name
         )
-        return GatewayProvisioningData(
+        return GatewayReplicaProvisioningData(
             instance_id=instance_name,
             region=configuration.region,  # used for instance termination
             availability_zone=zone,
@@ -636,10 +636,10 @@ class GCPCompute(
             backend_data=json.dumps({"zone": zone}),
         )
 
-    def terminate_gateway(
+    def terminate_gateway_replica(
         self,
         instance_id: str,
-        configuration: GatewayComputeConfiguration,
+        configuration: GatewayReplicaConfiguration,
         backend_data: Optional[str] = None,
     ):
         self.terminate_instance(

@@ -29,10 +29,10 @@ from dstack._internal.core.consts import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
-    GatewayComputeConfiguration,
     GatewayLoadBalancerConfiguration,
     GatewayLoadBalancerData,
-    GatewayProvisioningData,
+    GatewayReplicaConfiguration,
+    GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
@@ -556,25 +556,25 @@ class ComputeWithGatewaySupport(ABC):
     """
 
     @abstractmethod
-    def create_gateway(
+    def create_gateway_replica(
         self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
+        configuration: GatewayReplicaConfiguration,
+    ) -> GatewayReplicaProvisioningData:
         """
-        Creates a gateway instance.
+        Creates a gateway replica instance.
         """
         pass
 
     @abstractmethod
-    def terminate_gateway(
+    def terminate_gateway_replica(
         self,
         instance_id: str,
-        configuration: GatewayComputeConfiguration,
+        configuration: GatewayReplicaConfiguration,
         backend_data: Optional[str] = None,
     ):
         """
-        Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
-        but may perform additional work such as deleting a load balancer when a gateway has one.
+        Terminates a gateway replica instance. Generally, it passes the call to
+        `terminate_instance()`, but may perform additional work if necessary.
         """
         pass
 
@@ -631,7 +631,7 @@ class ComputeWithGatewayLoadBalancerSupport(ABC):
 class ComputeWithPrivateGatewaySupport:
     """
     Must be subclassed to support private gateways.
-    `create_gateway()` must be able to create private gateways.
+    `create_gateway_replica()` must be able to create private gateways.
     """
 
     pass
@@ -751,15 +751,15 @@ def generate_unique_instance_name_for_job(
 
 
 def generate_unique_gateway_instance_name(
-    gateway_compute_configuration: GatewayComputeConfiguration,
+    gateway_replica_configuration: GatewayReplicaConfiguration,
     max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
 ) -> str:
     """
     Generates a unique gateway instance name valid across all backends.
     """
     return generate_unique_backend_name(
-        resource_name=gateway_compute_configuration.instance_name,
-        project_name=gateway_compute_configuration.project_name,
+        resource_name=gateway_replica_configuration.instance_name,
+        project_name=gateway_replica_configuration.project_name,
         max_length=max_length,
     )
 

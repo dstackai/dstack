@@ -61,8 +61,8 @@ from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
-    GatewayComputeConfiguration,
-    GatewayProvisioningData,
+    GatewayReplicaConfiguration,
+    GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -233,10 +233,10 @@ class AzureCompute(
             instance_name=instance_id,
         )
 
-    def create_gateway(
+    def create_gateway_replica(
         self,
-        configuration: GatewayComputeConfiguration,
-    ) -> GatewayProvisioningData:
+        configuration: GatewayReplicaConfiguration,
+    ) -> GatewayReplicaProvisioningData:
         if configuration.instance_type is not None:
             # TODO: support instance_type. Requires selecting a VM image to avoid errors like this:
             # > The selected VM size 'Standard_E4s_v6' cannot boot Hypervisor Generation '1'
@@ -306,16 +306,16 @@ class AzureCompute(
             resource_group=self.config.resource_group,
             vm=vm,
         )
-        return GatewayProvisioningData(
+        return GatewayReplicaProvisioningData(
             instance_id=vm.name,
             ip_address=public_ip,
             region=configuration.region,
         )
 
-    def terminate_gateway(
+    def terminate_gateway_replica(
         self,
         instance_id: str,
-        configuration: GatewayComputeConfiguration,
+        configuration: GatewayReplicaConfiguration,
         backend_data: Optional[str] = None,
     ):
         self.terminate_instance(

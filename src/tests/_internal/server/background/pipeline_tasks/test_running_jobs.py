@@ -81,7 +81,7 @@ from dstack._internal.server.testing.common import (
     create_export,
     create_fleet,
     create_gateway,
-    create_gateway_compute,
+    create_gateway_replica,
     create_instance,
     create_job,
     create_job_metrics_point,
@@ -1888,7 +1888,7 @@ class TestJobRunningWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute = await create_gateway_compute(session=session, gateway_id=gateway.id)
+        gateway_replica = await create_gateway_replica(session=session, gateway_id=gateway.id)
         run = await create_run(
             session=session,
             project=project,
@@ -1920,7 +1920,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute.id,
+                gateway_replica_id=gateway_replica.id,
                 is_registered=False,
                 register_attempt=2,
                 register_status_message="Connection refused",
@@ -1966,10 +1966,10 @@ class TestJobRunningWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
-        gateway_compute_2 = await create_gateway_compute(
+        gateway_replica_2 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=1
         )
         run = await create_run(
@@ -2003,7 +2003,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=False,
                 register_attempt=2,
                 register_status_message="Connection refused",
@@ -2012,7 +2012,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute_2.id,
+                gateway_replica_id=gateway_replica_2.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -2057,11 +2057,11 @@ class TestJobRunningWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_1 = await create_gateway_compute(
+        gateway_replica_1 = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
         # Second running replica has not attempted registration yet (e.g. just came up).
-        await create_gateway_compute(session=session, gateway_id=gateway.id, replica_num=1)
+        await create_gateway_replica(session=session, gateway_id=gateway.id, replica_num=1)
         run = await create_run(
             session=session,
             project=project,
@@ -2093,7 +2093,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute_1.id,
+                gateway_replica_id=gateway_replica_1.id,
                 is_registered=False,
                 register_attempt=2,
                 register_status_message="Connection refused",
@@ -2139,12 +2139,12 @@ class TestJobRunningWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_compute_running = await create_gateway_compute(
+        gateway_replica_running = await create_gateway_replica(
             session=session, gateway_id=gateway.id, replica_num=0
         )
         # Terminated replica successfully registered before going away — should be ignored,
         # since only currently running replicas count towards the predicate.
-        gateway_compute_terminating = await create_gateway_compute(
+        gateway_replica_terminating = await create_gateway_replica(
             session=session,
             gateway_id=gateway.id,
             replica_num=1,
@@ -2181,7 +2181,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute_running.id,
+                gateway_replica_id=gateway_replica_running.id,
                 is_registered=False,
                 register_attempt=2,
                 register_status_message="Connection refused",
@@ -2190,7 +2190,7 @@ class TestJobRunningWorker:
         session.add(
             ServiceReplicaRegistrationModel(
                 job_id=job.id,
-                gateway_replica_id=gateway_compute_terminating.id,
+                gateway_replica_id=gateway_replica_terminating.id,
                 is_registered=True,
                 register_attempt=0,
             )
@@ -2442,7 +2442,7 @@ class TestJobRunningWorker:
             name="test-gateway",
             wildcard_domain="example.com",
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2526,7 +2526,7 @@ class TestJobRunningWorker:
             name="test-gateway",
             wildcard_domain="example.com",
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
@@ -2815,7 +2815,7 @@ class TestJobRunningWorker:
             name="test-gateway",
             wildcard_domain="example.com",
         )
-        await create_gateway_compute(
+        await create_gateway_replica(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,

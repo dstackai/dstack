@@ -187,7 +187,7 @@ class ApplyGatewayPlanInput(CoreModel):
     ] = None
 
 
-class GatewayComputeConfiguration(CoreModel):
+class GatewayReplicaConfiguration(CoreModel):
     project_name: str
     instance_name: str
     backend: BackendType
@@ -199,7 +199,7 @@ class GatewayComputeConfiguration(CoreModel):
     tags: Optional[Dict[str, str]] = None
 
 
-class GatewayProvisioningData(CoreModel):
+class GatewayReplicaProvisioningData(CoreModel):
     instance_id: str
     # TODO: rename `ip_address`; Kubernetes uses domain names here.
     ip_address: str
