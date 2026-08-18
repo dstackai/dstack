@@ -4015,12 +4015,14 @@ class TestSubmitService:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("populate_configuration", [True, False])
+    @pytest.mark.parametrize("legacy_replica", [False, True])
     async def test_submit_to_gateway_by_name(
         self,
         test_db,
         session: AsyncSession,
         client: AsyncClient,
         populate_configuration: bool,
+        legacy_replica: bool,
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user, name="test-project")
@@ -4038,12 +4040,21 @@ class TestSubmitService:
             wildcard_domain="my-gateway.example",
             populate_configuration=populate_configuration,
         )
-        await create_gateway_replica(
-            session=session,
-            backend_id=backend.id,
-            gateway_id=gateway.id,
-            populate_configuration=populate_configuration,
-        )
+        if legacy_replica:
+            gateway_replica = await create_gateway_replica(
+                session=session,
+                backend_id=backend.id,
+                populate_configuration=populate_configuration,
+            )
+            gateway.gateway_replica_id = gateway_replica.id
+            await session.commit()
+        else:
+            gateway_replica = await create_gateway_replica(
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
+                populate_configuration=populate_configuration,
+            )
         run_spec = get_service_run_spec(
             repo_id=repo.name,
             run_name="test-service",
@@ -4065,6 +4076,8 @@ class TestSubmitService:
         res = await session.execute(select(RunModel))
         run = res.scalar_one()
         assert run.gateway_id is not None
+        await session.refresh(gateway_replica)
+        assert gateway_replica.skip_min_processing_interval
 
     @pytest.mark.asyncio
     async def test_return_error_if_specified_gateway_not_exists(

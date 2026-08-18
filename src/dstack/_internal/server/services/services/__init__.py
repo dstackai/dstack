@@ -73,6 +73,9 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
     if gateway is not None:
         service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)
         run_model.gateway = gateway
+        # For faster registration
+        for replica_model in get_gateway_replica_models(gateway):
+            replica_model.skip_min_processing_interval = True
     elif not settings.FORBID_SERVICES_WITHOUT_GATEWAY:
         service_spec = _register_service_in_server(session, run_model, run_spec)
     else:

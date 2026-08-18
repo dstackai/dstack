@@ -189,6 +189,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                             <= now - self._min_processing_interval,
                             GatewayReplicaModel.last_processed_at
                             == GatewayReplicaModel.created_at,
+                            GatewayReplicaModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             GatewayReplicaModel.lock_expires_at.is_(None),
@@ -208,6 +209,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                             GatewayReplicaModel.lock_token,
                             GatewayReplicaModel.lock_expires_at,
                             GatewayReplicaModel.status,
+                            GatewayReplicaModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -220,6 +222,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                     replica_model.lock_expires_at = lock_expires_at
                     replica_model.lock_token = lock_token
                     replica_model.lock_owner = GatewayReplicaPipeline.__name__
+                    replica_model.skip_min_processing_interval = False
                     items.append(
                         GatewayReplicaPipelineItem(
                             __tablename__=GatewayReplicaModel.__tablename__,

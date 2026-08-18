@@ -868,6 +868,23 @@ def get_gateway_replica_models(gateway_model: GatewayModel) -> List[GatewayRepli
     return replicas
 
 
+async def skip_gateway_replicas_min_processing_interval(
+    session: AsyncSession, gateway_id: uuid.UUID
+) -> None:
+    await session.execute(
+        update(GatewayReplicaModel)
+        .where(
+            or_(
+                GatewayReplicaModel.gateway_id == gateway_id,
+                GatewayReplicaModel.id.in_(
+                    select(GatewayModel.gateway_replica_id).where(GatewayModel.id == gateway_id)
+                ),
+            )
+        )
+        .values(skip_min_processing_interval=True)
+    )
+
+
 def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
     if gateway_model.configuration is not None:
         return validate_json_extra_ignore(GatewayConfiguration, gateway_model.configuration)

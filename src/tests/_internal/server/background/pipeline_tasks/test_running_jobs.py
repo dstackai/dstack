@@ -2421,6 +2421,7 @@ class TestJobRunningWorker:
             assert not job.registered
             assert not events
 
+    @pytest.mark.parametrize("legacy_replica", [False, True])
     async def test_registers_service_replica_in_gateway(
         self,
         test_db,
@@ -2429,6 +2430,7 @@ class TestJobRunningWorker:
         ssh_tunnel_mock: Mock,
         shim_client_mock: Mock,
         runner_client_mock: Mock,
+        legacy_replica: bool,
     ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -2442,11 +2444,19 @@ class TestJobRunningWorker:
             name="test-gateway",
             wildcard_domain="example.com",
         )
-        await create_gateway_replica(
-            session=session,
-            backend_id=backend.id,
-            gateway_id=gateway.id,
-        )
+        if legacy_replica:
+            gateway_replica = await create_gateway_replica(
+                session=session,
+                backend_id=backend.id,
+            )
+            gateway.gateway_replica_id = gateway_replica.id
+            await session.commit()
+        else:
+            gateway_replica = await create_gateway_replica(
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
+            )
         run = await create_run(
             session=session,
             project=project,
@@ -2483,6 +2493,8 @@ class TestJobRunningWorker:
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
         assert job.registered
+        await session.refresh(gateway_replica)
+        assert gateway_replica.skip_min_processing_interval
         events = await list_events(session)
         assert {event.message for event in events} == {
             "Job status changed PULLING -> RUNNING",
