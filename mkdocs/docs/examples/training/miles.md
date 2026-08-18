@@ -42,7 +42,7 @@ env:
   - MODEL_ID=Qwen/Qwen2.5-32B-Instruct
 
 groups:
-  - name: head # node group name is optional
+  - name: head # The name property is optional
     nodes: 1
     commands:
       # 1. Download the model and dataset.

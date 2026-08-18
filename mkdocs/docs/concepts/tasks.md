@@ -219,8 +219,7 @@ Commands in any group can reference the internal IP address of any node in the r
 `${{ groups[i].nodes[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
 the index of the node within that group.
 
-> Node `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves
-> to, and `startup_order` and `stop_criteria` apply to it across all groups.
+> `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves to.
 
 Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
 
@@ -573,7 +572,7 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
     | `DSTACK_NODE_RANK`      | The rank of the node                                             |
     | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                       |
     | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
-    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile                         |
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile. The file lists GPU nodes as `<ip> slots=<gpus>` and CPU nodes as `<ip>` |
     | `DSTACK_WORKING_DIR`    | The working directory of the run                                 |
     | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any)                 |
 

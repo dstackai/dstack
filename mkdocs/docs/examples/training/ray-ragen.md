@@ -30,7 +30,7 @@ env:
   - WANDB_API_KEY
 
 groups:
-  - name: head # node group name is optional
+  - name: head # The name property is optional
     nodes: 1
     commands:
       - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh

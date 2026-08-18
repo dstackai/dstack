@@ -29,7 +29,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
       - NCCL_DEBUG=INFO
 
     groups:
-      - name: master # node group name is optional
+      - name: master # The name property is optional
         nodes: 1
         commands:
           - |
@@ -83,7 +83,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
       - OPEN_MPI_HOME=/usr/lib/x86_64-linux-gnu/openmpi
 
     groups:
-      - name: master # node group name is optional
+      - name: master # The name property is optional
         nodes: 1
         commands:
           # Setup MPI and build RCCL tests
