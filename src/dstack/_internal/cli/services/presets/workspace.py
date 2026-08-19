@@ -126,7 +126,9 @@ def remove_agent_workspace(session: PresetSession) -> None:
     if alias and alias != workspace and Path(alias).is_symlink():
         with suppress(OSError):
             os.unlink(alias)
-    if workspace:
+    # The recorded path is trusted only when it is the one this session created,
+    # so a hand-edited or copied `session.json` cannot point the delete elsewhere.
+    if workspace and Path(workspace) == session.path / "workspace":
         shutil.rmtree(workspace, ignore_errors=True)
 
 

@@ -8,8 +8,10 @@ from unittest.mock import patch
 import pytest
 
 from dstack._internal.cli.commands.preset import _check_stdin_configuration_confirmable
+from dstack._internal.cli.models.preset_agent import PresetSessionWorkspace
 from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
+from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import render_datetime_as_api
 from tests._internal.cli.common import (
@@ -229,6 +231,102 @@ class TestPresetLocalCommands:
             from_config.assert_not_called()
 
         assert PresetStore(tmp_path / ".dstack" / "presets").list() == []
+
+    def test_deletes_an_interrupted_creation_that_never_saved_a_preset(self, tmp_path, capsys):
+        session_dir = self._session(tmp_path, status="interrupted")
+
+        assert run_dstack_cli(["preset", "delete", "smoke", "-y"], home_dir=tmp_path) == 0
+
+        assert not session_dir.exists()
+        assert "Deleted preset ab12cd34" in capsys.readouterr().out
+
+    def test_refuses_to_delete_a_running_creation(self, tmp_path, capsys):
+        session_dir = self._session(tmp_path, status="running")
+
+        with patch(
+            "dstack._internal.cli.commands.preset.session_process_alive", return_value=True
+        ):
+            exit_code = run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path)
+
+        assert exit_code != 0
+        assert "Preset creation is in use" in capsys.readouterr().out
+        assert session_dir.exists()
+
+    def test_refuses_to_delete_an_orphaned_creation_that_recorded_runs(self, tmp_path, capsys):
+        # The agent died without stopping its runs: `runs.jsonl` is the only
+        # record of them, so deleting it would strand them.
+        session_dir = self._session(tmp_path, status="running")
+        session_dir.joinpath("runs.jsonl").write_text('{"name": "qwen-1"}\n')
+
+        exit_code = run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path)
+
+        assert exit_code != 0
+        assert "Preset creation was interrupted" in capsys.readouterr().out
+        assert session_dir.exists()
+
+    def test_deletes_an_orphaned_creation_without_runs(self, tmp_path):
+        session_dir = self._session(tmp_path, status="running")
+
+        assert run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path) == 0
+
+        assert not session_dir.exists()
+
+    def test_deletes_a_creation_whose_state_cannot_be_read(self, tmp_path):
+        session_dir = tmp_path / ".dstack" / "presets" / "ab12cd34"
+        session_dir.mkdir(parents=True)
+        session_dir.joinpath("session.json").write_text("{")
+
+        assert run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path) == 0
+
+        assert not session_dir.exists()
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="workspace alias symlinks are POSIX-only")
+    def test_delete_removes_the_workspace_alias_but_nothing_outside_the_session(self, tmp_path):
+        session_dir = self._session(tmp_path, status="interrupted")
+        workspace = session_dir / "workspace"
+        workspace.mkdir()
+        alias = tmp_path / "dpe-alias"
+        alias.symlink_to(workspace, target_is_directory=True)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "keep.txt").write_text("keep")
+        session_dir.joinpath("session.json").write_text(
+            json.dumps(
+                get_session_state(
+                    status="interrupted",
+                    run=get_session_run(
+                        workspace=PresetSessionWorkspace(path=str(outside), alias=str(alias))
+                    ),
+                ).model_dump(mode="json")
+            )
+        )
+
+        assert run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path) == 0
+
+        assert not session_dir.exists()
+        # A dangling symlink is gone from exists() but still on disk.
+        assert not alias.is_symlink()
+        # The recorded path pointed outside the session, so it must survive.
+        assert (outside / "keep.txt").read_text() == "keep"
+
+    def _session(self, tmp_path, *, status: str):
+        session_dir = tmp_path / ".dstack" / "presets" / "ab12cd34"
+        session_dir.mkdir(parents=True)
+        session_dir.joinpath("session.json").write_text(
+            json.dumps(
+                get_session_state(
+                    status=status,
+                    name="smoke",
+                    run=get_session_run(
+                        workspace=PresetSessionWorkspace(
+                            path=str(session_dir / "workspace"),
+                            alias=str(session_dir / "workspace"),
+                        )
+                    ),
+                ).model_dump(mode="json")
+            )
+        )
+        return session_dir
 
     def test_gets_complete_preset_as_json_without_api_client(self, tmp_path, capsys):
         preset = get_preset()
