@@ -56,7 +56,7 @@ class TestGetGatewayReplicaModels:
             session=session, project_id=project.id, backend_id=backend.id
         )
         replica = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, backend_id=backend.id
+            session=session, gateway_id=gateway.id, backend=backend
         )
         await session.refresh(gateway, ["gateway_replicas", "gateway_replica"])
         result = get_gateway_replica_models(gateway)
@@ -66,7 +66,7 @@ class TestGetGatewayReplicaModels:
     async def test_old_style_returns_single_replica(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
-        replica = await create_gateway_replica(session=session, backend_id=backend.id)
+        replica = await create_gateway_replica(session=session, backend=backend)
         gateway = await create_gateway(
             session=session, project_id=project.id, backend_id=backend.id
         )

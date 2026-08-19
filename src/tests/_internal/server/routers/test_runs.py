@@ -3976,7 +3976,7 @@ class TestSubmitService:
             )
             await create_gateway_replica(
                 session=session,
-                backend_id=backend.id,
+                backend=backend,
                 gateway_id=gateway.id,
             )
             if is_default:
@@ -4043,7 +4043,7 @@ class TestSubmitService:
         if legacy_replica:
             gateway_replica = await create_gateway_replica(
                 session=session,
-                backend_id=backend.id,
+                backend=backend,
                 populate_configuration=populate_configuration,
             )
             gateway.gateway_replica_id = gateway_replica.id
@@ -4051,7 +4051,7 @@ class TestSubmitService:
         else:
             gateway_replica = await create_gateway_replica(
                 session=session,
-                backend_id=backend.id,
+                backend=backend,
                 gateway_id=gateway.id,
                 populate_configuration=populate_configuration,
             )
@@ -4162,7 +4162,7 @@ class TestSubmitService:
             name="exported-gateway",
             wildcard_domain="exported-gateway.example",
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -4256,7 +4256,7 @@ class TestSubmitService:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         service_project = await create_project(session=session, owner=user, name="service-project")
         # The project's default_gateway_id may point to the gateway (e.g., if the gateway was
@@ -4316,7 +4316,7 @@ class TestSubmitService:
             name="exported-gateway",
             wildcard_domain="${{ run.project_name }}.example.com",
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -4380,7 +4380,7 @@ class TestSubmitService:
             name="exported-gateway",
             wildcard_domain="${{ run.unknown_variable }}.example.com",
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -4451,7 +4451,7 @@ class TestSubmitService:
             wildcard_domain="example.com",
             forbid_new_services=True,
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
         project.default_gateway_id = gateway.id
         await session.commit()
 
@@ -4495,7 +4495,7 @@ class TestSubmitService:
             wildcard_domain="example.com",
             forbid_new_services=True,
         )
-        await create_gateway_replica(session=session, backend_id=backend.id, gateway_id=gateway.id)
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
