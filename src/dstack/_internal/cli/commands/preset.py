@@ -33,16 +33,19 @@ from dstack._internal.cli.services.presets.create import (
 from dstack._internal.cli.services.presets.export import export_preset
 from dstack._internal.cli.services.presets.output import get_presets_table, print_presets
 from dstack._internal.cli.services.presets.session import (
+    get_presets_dir,
     list_preset_sessions,
     load_preset_session,
     load_resumable_session,
     resolve_session_ref,
+    session_process_alive,
 )
 from dstack._internal.cli.services.presets.store import (
     PresetStore,
     load_preset_configuration,
     parse_preset_configuration,
 )
+from dstack._internal.cli.services.presets.workspace import remove_agent_workspace
 from dstack._internal.cli.services.profile import (
     register_profile_args,
 )
@@ -367,10 +370,12 @@ class PresetCommand(BaseCommand):
                 preset_ids = [args.preset]
                 description = f"preset [code]{args.preset}[/]"
             else:
-                if preset is None:
-                    raise CLIError(f"Preset {args.preset!r} does not exist")
-                preset_ids = [preset.id]
-                description = f"preset [code]{preset.id}[/] for [code]{preset.base}[/]"
+                if preset is not None:
+                    preset_ids = [preset.id]
+                    description = f"preset [code]{preset.id}[/] for [code]{preset.base}[/]"
+                else:
+                    preset_ids = [_creation_id(args.preset)]
+                    description = f"preset [code]{preset_ids[0]}[/]"
         else:
             target = args.base or args.repo
             presets = _filter_presets(store.list(), base=args.base, repo=args.repo)
@@ -380,12 +385,50 @@ class PresetCommand(BaseCommand):
             preset_ids = [preset.id for preset in presets]
             count = f"{len(presets)} preset{'s' if len(presets) != 1 else ''}"
             description = f"{count} for [code]{target}[/]"
+        # Checked before the prompt, so a creation that cannot be deleted says
+        # so instead of asking first.
+        for preset_id in preset_ids:
+            _check_creation_not_in_use(preset_id)
         if not args.yes and not confirm_ask(f"Delete {description}?"):
             console.print("\nExiting...")
             return
         for preset_id in preset_ids:
+            # The workspace alias is a symlink outside the preset directory, so
+            # it has to go before the directory does.
+            with suppress(CLIError):
+                remove_agent_workspace(load_preset_session(preset_id))
             store.delete(preset_id)
         console.print(f"Deleted {description}")
+
+
+def _creation_id(ref: str) -> str:
+    """The creation a reference names. A directory whose state cannot be read
+    resolves too, since that is a state the user needs to delete."""
+    preset_id = resolve_session_ref(ref)
+    if not (get_presets_dir() / preset_id).is_dir():
+        raise CLIError(f"Preset {ref!r} does not exist")
+    return preset_id
+
+
+def _check_creation_not_in_use(preset_id: str) -> None:
+    """Raises while the creation's process is alive, and while its runs may still
+    be up, because deleting the session drops `runs.jsonl`, the only record of
+    which runs it started."""
+    try:
+        session = load_preset_session(preset_id)
+    except CLIError:
+        return
+    state = session.read_state()
+    if state is None or state.status != "running":
+        return
+    stop = f"Stop it with `dstack preset stop {preset_id}`"
+    if session_process_alive(state):
+        raise CLIError(f"Failed to delete preset {preset_id}. Preset creation is in use. {stop}")
+    if session.runs_path.is_file() and session.runs_path.stat().st_size > 0:
+        raise CLIError(
+            f"Failed to delete preset {preset_id}."
+            f" Preset creation was interrupted and its runs may still be active. {stop}"
+        )
 
 
 def _get_unfinished_preset(ref: str) -> Optional[Preset]:

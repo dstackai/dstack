@@ -7,7 +7,8 @@ import yaml
 
 from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.compat import IS_WINDOWS
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.presets import PresetConfiguration
@@ -45,15 +46,39 @@ class TestPresetStore:
 
         assert store.get(preset.id) == updated
 
-    def test_ignores_directories_without_a_preset_file(self, tmp_path: Path):
+    def test_ignores_directories_without_a_preset_file_but_keeps_them_deletable(
+        self, tmp_path: Path
+    ):
         root = tmp_path / "presets"
         store = PresetStore(root)
-        # A creation-session directory, or anything else that is not a preset.
+        # A creation session that never saved a preset.
         (root / "ab12cd34").mkdir(parents=True)
         (root / "ab12cd34" / "session.json").write_text("{}")
 
         assert store.list() == []
+        assert store.delete("ab12cd34") is True
+        assert not (root / "ab12cd34").exists()
         assert store.delete("ab12cd34") is False
+
+    def test_refuses_an_id_that_could_name_a_directory_outside_the_store(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+
+        # `D:x` is a drive-relative path on Windows, and `..` escapes anywhere.
+        for preset_id in ["D:x", "..", "../presets", "a/b"]:
+            with pytest.raises(CLIError, match="Invalid preset ID"):
+                store.delete(preset_id)
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="symlink creation requires privileges on Windows")
+    def test_refuses_to_delete_through_a_symlinked_directory(self, tmp_path: Path):
+        root = tmp_path / "presets"
+        root.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "keep.txt").write_text("keep")
+        (root / "ab12cd34").symlink_to(outside, target_is_directory=True)
+
+        assert PresetStore(root).delete("ab12cd34") is False
+        assert (outside / "keep.txt").read_text() == "keep"
 
     def test_skips_invalid_preset_on_list_but_keeps_it_deletable(self, tmp_path: Path, capsys):
         store = PresetStore(tmp_path / "presets")

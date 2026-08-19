@@ -120,12 +120,13 @@ class PresetStore:
         return detached
 
     def delete(self, preset_id: str) -> bool:
-        # Deletes by path so a corrupt preset file is still removable.
+        # Deletes by path so a corrupt preset file, or a creation that never
+        # saved one, is still removable.
         _validate_preset_id(preset_id)
         if not self.root.exists():
             return False
         directory = self.root / preset_id
-        if not (directory / "preset.yml").is_file():
+        if directory.parent != self.root or directory.is_symlink() or not directory.is_dir():
             return False
         shutil.rmtree(directory)
         return True
@@ -241,7 +242,9 @@ def _relative_to_preset_dir(local_path: str, directory: Path) -> str:
 
 
 def _validate_preset_id(preset_id: str) -> None:
-    if not preset_id or preset_id.startswith(".") or any(char in preset_id for char in "/\\"):
+    # `:` is rejected so a Windows drive-relative reference (`D:x`) cannot name a
+    # directory outside the store, or another one inside it.
+    if not preset_id or preset_id.startswith(".") or any(char in preset_id for char in "/\\:"):
         raise CLIError(f"Invalid preset ID: {preset_id!r}")
 
 
