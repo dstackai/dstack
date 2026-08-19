@@ -101,8 +101,12 @@ def get_gateways_table(
                 gateway.configuration.backend, gateway.configuration.region
             )
             gateway_row["HOSTNAME"] = gateway_row.get("HOSTNAME", gateway.ip_address)
-        if len(gateway.replicas) == 1:
-            # compact display for single-replica gateway
+        single_row_format = (
+            len(gateway.replicas) == 1
+            # gateway.hostname should not obscure replica.hostname in --verbose
+            and not (verbose and gateway.hostname)
+        )
+        if single_row_format:
             gateway_row["BACKEND"] = format_backend(
                 gateway.replicas[0].backend, gateway.replicas[0].region
             )
@@ -113,7 +117,7 @@ def get_gateways_table(
             )
         add_row_from_dict(table, gateway_row)
 
-        if len(gateway.replicas) > 1:
+        if not single_row_format:
             for replica in gateway.replicas:
                 replica_row = {
                     "NAME": f"   replica={replica.replica_num}",
