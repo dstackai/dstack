@@ -279,12 +279,37 @@ func TestWriteDstackProfile(t *testing.T) {
 	script := fmt.Sprintf(`. '%s'; printf '%%s' "$VAR"`, path)
 	for _, value := range testCases {
 		env := map[string]string{"VAR": value}
-		writeDstackProfile(env, path)
+		writeDstackProfile(t.Context(), env, path)
 		cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", script)
 		out, err := cmd.Output()
 		assert.NoError(t, err)
 		assert.Equal(t, value, string(out))
 	}
+}
+
+func TestWriteDstackProfile_NotShellIdentifiers(t *testing.T) {
+	tmp := t.TempDir()
+	path := tmp + "/dstack_profile"
+	script := fmt.Sprintf(`. '%s'; printf '%%s' "$VAR"`, path)
+	env := map[string]string{
+		"VAR":               "value",
+		"NOT-AN-IDENTIFIER": "value",
+		"0NOTANIDENTIFIER":  "value",
+		"NOT AN IDENTIFIER": "value",
+		"BASH_FUNC_foo%%":   "() {  echo hi\n}",
+	}
+
+	require.NoError(t, writeDstackProfile(t.Context(), env, path))
+
+	cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", script)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	// Some shells only complain about a bad name, others abort the profile altogether,
+	// leaving VAR unset
+	assert.NoError(t, err)
+	assert.Empty(t, stderr.String())
+	assert.Equal(t, "value", string(out))
 }
 
 func TestWriteMpiHostfile(t *testing.T) {

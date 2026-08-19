@@ -543,10 +543,11 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
 	// `env` interpolation feature is postponed to some future release
 	envMap.Update(ex.jobSpec.Env, false)
+	sanitizeEnv(ctx, envMap)
 
 	const profilePath = "/etc/profile"
 	dstackProfilePath := path.Join(ex.dstackDir, "profile")
-	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
+	if err := writeDstackProfile(ctx, envMap, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
 	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to include dstack_profile", "path", profilePath, "err", err)
@@ -815,7 +816,7 @@ func writeMpiHostfile(ctx context.Context, ips []string, slots []int, path strin
 	return nil
 }
 
-func writeDstackProfile(env map[string]string, pth string) error {
+func writeDstackProfile(ctx context.Context, env map[string]string, pth string) error {
 	if err := os.MkdirAll(path.Dir(pth), 0o755); err != nil {
 		return fmt.Errorf("create dstack profile directory: %w", err)
 	}
@@ -827,6 +828,12 @@ func writeDstackProfile(env map[string]string, pth string) error {
 	for key, value := range env {
 		switch key {
 		case "HOSTNAME", "USER", "HOME", "SHELL", "SHLVL", "PWD", "_":
+			continue
+		}
+		// `export not-an-identifier=value` is a syntax error that either pollutes stderr on
+		// every login or, depending on the shell, aborts the profile altogether.
+		if !isShellIdentifier(key) {
+			log.Warning(ctx, "Skipped env variable, name is not a valid shell identifier", "var", key)
 			continue
 		}
 		line := fmt.Sprintf("export %s='%s'\n", key, strings.ReplaceAll(value, `'`, `'"'"'`))
