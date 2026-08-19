@@ -1,8 +1,11 @@
 package executor
 
 import (
+	"context"
 	"fmt"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 type EnvMap map[string]string
@@ -45,6 +48,59 @@ func ParseEnvList(list []string) EnvMap {
 		}
 	}
 	return em
+}
+
+// sanitizeEnv removes variables that must not be propagated to `commands` and SSH sessions.
+func sanitizeEnv(ctx context.Context, env map[string]string) {
+	for name := range env {
+		// Exported Bash functions are automatically "imported" by child shells, even in
+		// POSIX mode. We remove such variables for consistency:
+		//
+		// * Even if we preserved them in `/dstack/profile`, they wouldn't work with
+		//   non-login SSH sessions (`ssh run-name command arg1 arg2 ...`),
+		//   as `/dstack/profile` is not sourced by non-login shells.
+		// * Swapping `image` (e.g, `ubuntu` to `fedora`) or `shell` (e.g., `bash` to `sh`)
+		//   in the run configuration should not change which functions are available in `commands`.
+		//   If functions are essential for `commands`, the user should source them explicitly.
+		//
+		// See: https://github.com/dstackai/dstack/issues/4161
+		if isBashFuncName(name) {
+			log.Info(ctx, "Removed Bash exported function variable", "var", name)
+			delete(env, name)
+		}
+	}
+}
+
+// isBashFuncName reports whether the variable name holds a body of a Bash function exported
+// via `export -f foo`. Bash mangles the name to keep such variables out of the way of regular
+// ones, the exact encoding depends on the version:
+//
+//   - `BASH_FUNC_foo%%` -- upstream Bash, that is, any reasonably modern distro.
+//   - `BASH_FUNC_foo()` -- Red Hat's Bash 4.1/4.2 patch, that is, RHEL/CentOS 7 and older.
+//
+// Both encodings were introduced by the Shellshock patches. Bash without them exports the
+// function as `foo`, which we deliberately don't detect: the name is indistinguishable from
+// a regular variable, and, being a valid shell identifier, it doesn't break `/dstack/profile`.
+func isBashFuncName(name string) bool {
+	if !strings.HasPrefix(name, "BASH_FUNC_") {
+		return false
+	}
+	return strings.HasSuffix(name, "%%") || strings.HasSuffix(name, "()")
+}
+
+// isShellIdentifier reports whether the variable name is a valid shell identifier, that is,
+// whether `export NAME=value` is a valid command. Variables with other names are perfectly
+// valid as far as execve(2) is concerned, but cannot be exported in `/dstack/profile`.
+func isShellIdentifier(name string) bool {
+	if name == "" || !isAlpha(name[0]) {
+		return false
+	}
+	for i := 1; i < len(name); i++ {
+		if !isAlphaNum(name[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // interpolateVariables expands variables as follows:
