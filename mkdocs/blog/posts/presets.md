@@ -1,7 +1,7 @@
 ---
 title: "Presets: a toolkit for agent-based inference optimization"
 date: 2026-08-20
-description: "A preview of presets: a toolkit that streamlines agent-based inference optimization, and a portable format that deploys the result to any cloud or datacenter."
+description: "A preview of presets: an open-source toolkit that streamlines inference optimization with agents, and a portable preset format."
 slug: presets
 image: https://dstack.ai/static-assets/static-assets/images/dstack-presets.png
 categories:
@@ -12,15 +12,13 @@ categories:
 
 Optimizing model inference is agent work now. Every inference provider does it inside its own process, on its own serving stack, with its own harness around the optimization agent. Despite the progress in open-source serving frameworks, what gets published is a benchmark, often without the workload, the concurrency, and the hardware behind it. The optimized deployment itself stays tied to the stack that produced it.
 
-Today we're introducing a preview of presets: an open-source toolkit that streamlines inference optimization with agents, and a portable preset format that can be deployed to any cloud, Kubernetes cluster, or bare-metal fleet.
+Today we're introducing a preview of presets: an open-source toolkit that streamlines inference optimization with agents, and a portable preset format.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-presets.png" width="650" />
 
 <!-- more -->
 
-Despite the progress in open-source serving frameworks, there is still no way to get optimization and deployment that delivers portable performance. That work happens inside each inference provider's own proprietary stack, with its own harness around the agent. This has to change.
-
-Deploying Kimi K3 should be as simple as deploying a Docker image, on any silicon and in any datacenter. Taking a model someone has already optimized and running it on your own hardware should not mean rebuilding the stack or repeating the optimization, whichever silicon you have.
+Deploying Kimi K3 to any cloud, Kubernetes cluster, or bare-metal fleet should be as simple as deploying a Docker image. Taking a model someone has already optimized and running it on your own hardware should not mean rebuilding the stack or repeating the optimization, whichever silicon you have.
 
 ## Toolkit and portable format
 
