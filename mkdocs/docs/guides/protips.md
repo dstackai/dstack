@@ -270,7 +270,8 @@ If the run is submitted to a fleet with `nodes` set to a range and a new instanc
 If the run reuses an existing fleet instance, only the fleet's
 [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) applies.
 
-If an instance remains `idle`, it is automatically terminated after `idle_duration`.
+If an instance remains `idle`, it is automatically terminated after `idle_duration`,
+unless the fleet is already at `nodes.min`.
 
 > Not applied for container-based backends (Kubernetes, Vast.ai, Runpod).
 
