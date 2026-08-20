@@ -18,6 +18,7 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
+    ServiceConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.gateways import GatewayReplicaStatus
@@ -117,6 +118,7 @@ from dstack._internal.server.services.runs.replicas import (
     get_router_env_for_job,
     get_router_replica_group,
 )
+from dstack._internal.server.services.runs.spec import run_spec_has_replica_ip_refs
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils import tracing
@@ -124,9 +126,12 @@ from dstack._internal.utils.common import get_current_datetime, get_or_error, ru
 from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nodes_interpolator import (
+    GroupsIpMember,
     find_groups_ip_refs,
     interpolate_groups_ip_address,
+    interpolate_groups_replica_ip_address,
     validate_groups_ref_bounds,
+    validate_groups_ref_member,
     validate_groups_refs,
 )
 
@@ -640,6 +645,12 @@ async def _prepare_startup_context(
     try:
         for c in commands:
             validate_groups_refs(c)
+        if not _substitute_groups_ip_refs(commands, context):
+            logger.debug(
+                "%s: waiting for referenced group IPs",
+                fmt(context.job_model),
+            )
+            return None
     except InterpolatorError as e:
         _terminate_job(
             job_model=context.job_model,
@@ -648,31 +659,6 @@ async def _prepare_startup_context(
             termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
         )
         return None
-
-    # Hetero commands may reference peer nodes via ${{ groups[i].nodes[j].IP_ADDRESS }}.
-    # Wait until every referenced node has an internal IP, then substitute placeholders
-    # in-place before the job is sent to the runner. Bad refs are rejected above;
-    # out-of-range or still-missing IPs terminate the job below.
-    if any(find_groups_ip_refs(c) for c in commands):
-        nodes_view = _build_nodes_ip_view(context.run.jobs, context.job.job_spec.replica_num)
-        try:
-            if not _referenced_ips_ready(commands, nodes_view):
-                logger.debug(
-                    "%s: waiting for referenced node group IPs",
-                    fmt(context.job_model),
-                )
-                return None
-            context.job.job_spec.commands = [
-                interpolate_groups_ip_address(c, nodes_view) for c in commands
-            ]
-        except InterpolatorError as e:
-            _terminate_job(
-                job_model=context.job_model,
-                job_update_map=result.job_update_map,
-                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
-                termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
-            )
-            return None
 
     return _StartupContext(
         cluster_info=cluster_info,
@@ -717,14 +703,11 @@ async def _fetch_run_model(
         replica_num: If None, skip loading jobs (for RUNNING jobs that don't need siblings).
             If set, load only latest-submission jobs for that replica (for PROVISIONING/PULLING
             jobs that need same-replica siblings for cluster coordination). When the run has
-            a Dynamo router replica group, all non-terminated latest-submission jobs for the
-            run are loaded so find_router_job can identify the router by replica-group
-            membership.
-        run_spec: Required whenever `replica_num` is set. Used only to detect
-            whether the run has a Dynamo router replica group. The caller is
-            expected to parse it once from the eager-loaded JobModel.run
-            (see _refetch_locked_job_model) so we don't issue a separate
-            query for it here.
+            a Dynamo router replica group, or any command contains
+            ${{ groups[i].replicas[j].IP_ADDRESS }}, all non-terminated latest-submission
+            jobs for the run are loaded so sibling replica IPs are visible.
+            run_spec: Required whenever `replica_num` is set. Used to detect whether the run
+            has a Dynamo router replica group or replica IP refs.
     """
     query = (
         select(RunModel)
@@ -752,6 +735,7 @@ async def _fetch_run_model(
             and router_group.router is not None
             and router_group.router.type == RouterType.DYNAMO
         )
+        load_all_replicas = is_dynamo or run_spec_has_replica_ip_refs(run_spec)
 
         latest_submissions_sq = (
             select(
@@ -762,9 +746,9 @@ async def _fetch_run_model(
             )
             .where(
                 JobModel.run_id == run_id,
-                # For Service with Dynamo router: load all replicas. For Non-Dynamo: only the worker's
-                # own replica.
-                true() if is_dynamo else JobModel.replica_num == replica_num,
+                # Dynamo and replica-IP interpolation need sibling replicas.
+                # Other services load only the worker's own replica.
+                true() if load_all_replicas else JobModel.replica_num == replica_num,
             )
             .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
             .subquery()
@@ -779,12 +763,12 @@ async def _fetch_run_model(
                     job_alias.replica_num == latest_submissions_sq.c.replica_num,
                     job_alias.job_num == latest_submissions_sq.c.job_num,
                     job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
-                    # For Dynamo runs, drop terminated rows so accumulated
-                    # scale-down history doesn't bloat the load. Non-Dynamo
-                    # runs are already restricted to the worker's own
-                    # replica above, so this filter is a no-op for them.
+                    # When loading all replicas, drop terminated rows so
+                    # accumulated scale-down history doesn't bloat the load.
+                    # Own-replica loads are already restricted above, so this
+                    # filter is a no-op for them.
                     or_(
-                        false() if is_dynamo else true(),
+                        false() if load_all_replicas else true(),
                         ~job_alias.status.in_(JobStatus.finished_statuses())
                         & (job_alias.status != JobStatus.TERMINATING),
                     ),
@@ -1797,6 +1781,41 @@ def _reset_disconnected_at(job_model: JobModel, result: _ProcessResult) -> None:
         result.job_update_map["disconnected_at"] = None
 
 
+def _substitute_groups_ip_refs(commands: list[str], context: _ProcessContext) -> bool:
+    """Wait for / substitute groups IP refs. Returns False if a min-slot IP is not ready."""
+    configuration = context.run.run_spec.configuration
+    has_replica_refs = any(
+        member == "replicas" for c in commands for _, member, _ in find_groups_ip_refs(c)
+    )
+    has_node_refs = any(
+        member == "nodes" for c in commands for _, member, _ in find_groups_ip_refs(c)
+    )
+    if isinstance(configuration, ServiceConfiguration):
+        for command in commands:
+            validate_groups_ref_member(command, "replicas")
+        if not has_replica_refs:
+            return True
+        replica_view = _build_replica_groups_ip_view(context.run.jobs, configuration)
+        if not _referenced_ips_ready(commands, replica_view, member="replicas"):
+            return False
+        context.job.job_spec.commands = [
+            interpolate_groups_replica_ip_address(c, replica_view) for c in commands
+        ]
+        return True
+    if has_replica_refs:
+        for command in commands:
+            validate_groups_ref_member(command, "nodes")
+    if not has_node_refs:
+        return True
+    nodes_view = _build_nodes_ip_view(context.run.jobs, context.job.job_spec.replica_num)
+    if not _referenced_ips_ready(commands, nodes_view):
+        return False
+    context.job.job_spec.commands = [
+        interpolate_groups_ip_address(c, nodes_view) for c in commands
+    ]
+    return True
+
+
 def _build_nodes_ip_view(jobs: list[Job], replica_num: int) -> list[list[str]]:
     replica_jobs = [job for job in jobs if job.job_spec.replica_num == replica_num]
     if not replica_jobs:
@@ -1808,22 +1827,60 @@ def _build_nodes_ip_view(jobs: list[Job], replica_num: int) -> list[list[str]]:
         local_index = job.job_spec.node_group_job_index
         while len(nodes[group_index]) <= local_index:
             nodes[group_index].append("")
-        ip = ""
-        if job.job_submissions:
-            jpd = job.job_submissions[-1].job_provisioning_data
-            if jpd is not None:
-                ip = jpd.internal_ip or ""
-        nodes[group_index][local_index] = ip
+        nodes[group_index][local_index] = _job_internal_ip(job)
     return nodes
 
 
-def _referenced_ips_ready(commands: list[str], nodes_view: list[list[str]]) -> bool:
+def _build_replica_groups_ip_view(
+    jobs: list[Job], configuration: ServiceConfiguration
+) -> list[list[str]]:
+    """Fixed-length rows of replicas.min; slot j is the j-th live job in that group."""
+    view: list[list[str]] = []
+    for group_index, group in enumerate(configuration.replica_groups):
+        size = group.replicas.min or 0
+        row = [""] * size
+        group_name = group.name if group.name is not None else str(group_index)
+        group_jobs = [
+            job
+            for job in jobs
+            if job.job_spec.replica_group == group_name and not _job_is_finished(job)
+        ]
+        group_jobs.sort(key=lambda job: job.job_spec.replica_num)
+        for slot, job in enumerate(group_jobs[:size]):
+            row[slot] = _job_internal_ip(job)
+        view.append(row)
+    return view
+
+
+def _job_internal_ip(job: Job) -> str:
+    if job.job_submissions:
+        jpd = job.job_submissions[-1].job_provisioning_data
+        if jpd is not None:
+            return jpd.internal_ip or ""
+    return ""
+
+
+def _job_is_finished(job: Job) -> bool:
+    if not job.job_submissions:
+        return False
+    status = job.job_submissions[-1].status
+    return status.is_finished() or status == JobStatus.TERMINATING
+
+
+def _referenced_ips_ready(
+    commands: list[str],
+    nodes_view: list[list[str]],
+    *,
+    member: GroupsIpMember = "nodes",
+) -> bool:
     group_sizes = [len(g) for g in nodes_view]
     for command in commands:
-        validate_groups_ref_bounds(command, group_sizes)
-        for group_index, node_index in find_groups_ip_refs(command):
+        validate_groups_ref_bounds(command, group_sizes, member=member)
+        for group_index, ref_member, index in find_groups_ip_refs(command):
+            if ref_member != member:
+                continue
             # Wait until every referenced slot has a non-empty internal IP.
-            if not nodes_view[group_index][node_index]:
+            if not nodes_view[group_index][index]:
                 return False
     return True
 

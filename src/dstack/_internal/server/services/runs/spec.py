@@ -30,7 +30,9 @@ from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nodes_interpolator import (
     contains_groups_ref,
+    find_groups_ip_refs,
     validate_groups_ref_bounds,
+    validate_groups_ref_member,
     validate_groups_refs,
 )
 
@@ -53,6 +55,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
     "service": [
         # in-place
         "replicas",
+        "groups",
         "scaling",
         # rolling deployment
         # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
@@ -120,7 +123,7 @@ def validate_run_spec_and_set_defaults(
         )
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.merged_profile.schedule and all(
-            group.count.min == 0 for group in run_spec.configuration.replica_groups
+            group.replicas.min == 0 for group in run_spec.configuration.replica_groups
         ):
             raise ServerClientError(
                 "Scheduled services with autoscaling to zero are not supported"
@@ -146,7 +149,7 @@ def validate_run_spec_and_set_defaults(
         and run_spec.configuration.nodes is None
     ):
         run_spec.configuration.nodes = 1
-    # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
+    # We do not reject top-level `resources` when `groups` is set. Adding strict checks
     # would be fragile because the spec may be changed later (for example by plugins).
     # Same for task `groups`: provisioning uses each group's resources; top-level is not banned.
     set_run_spec_resources_defaults(run_spec)
@@ -169,8 +172,8 @@ def set_run_spec_resources_defaults(run_spec: RunSpec) -> None:
         image=configuration.image,
         docker=configuration.docker,
     )
-    if configuration.type == "service" and isinstance(configuration.replicas, list):
-        for replica_group in configuration.replicas:
+    if configuration.type == "service" and configuration.groups is not None:
+        for replica_group in configuration.groups:
             image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
             _set_resources_defaults(
                 resources_spec=replica_group.resources,
@@ -214,9 +217,19 @@ def _validate_groups_ip_refs(run_spec: RunSpec) -> None:
         for command in _iter_configuration_commands(run_spec.configuration):
             validate_groups_refs(command)
         if isinstance(run_spec.configuration, TaskConfiguration):
+            for command in _iter_configuration_commands(run_spec.configuration):
+                validate_groups_ref_member(command, "nodes")
             group_sizes = [g.nodes for g in run_spec.configuration.node_groups]
             for command in _iter_configuration_commands(run_spec.configuration):
                 validate_groups_ref_bounds(command, group_sizes)
+        elif isinstance(run_spec.configuration, ServiceConfiguration):
+            for command in _iter_configuration_commands(run_spec.configuration):
+                validate_groups_ref_member(command, "replicas")
+            group_sizes = [
+                group.replicas.min or 0 for group in run_spec.configuration.replica_groups
+            ]
+            for command in _iter_configuration_commands(run_spec.configuration):
+                validate_groups_ref_bounds(command, group_sizes, member="replicas")
     except InterpolatorError as e:
         raise ServerClientError(e.args[0]) from e
 
@@ -233,13 +246,23 @@ def _iter_configuration_commands(configuration: AnyRunConfiguration):
             yield from group.commands
 
 
+def run_spec_has_replica_ip_refs(run_spec: RunSpec) -> bool:
+    """True if any service command contains ${{ groups[i].replicas[j].IP_ADDRESS }}."""
+    if not isinstance(run_spec.configuration, ServiceConfiguration):
+        return False
+    for command in _iter_configuration_commands(run_spec.configuration):
+        if any(member == "replicas" for _, member, _ in find_groups_ip_refs(command)):
+            return True
+    return False
+
+
 def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
     configuration = run_spec.configuration
     vendors: set[gpuhunt.AcceleratorVendor] = set()
     invalid_replicas: list[int] = []
     invalid_groups: list[int] = []
-    if configuration.type == "service" and isinstance(configuration.replicas, list):
-        for idx, replica_group in enumerate(configuration.replicas):
+    if configuration.type == "service" and configuration.groups is not None:
+        for idx, replica_group in enumerate(configuration.groups):
             image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
             _vendors = _detect_gpu_vendors_requiring_image(
                 gpu_spec=replica_group.resources.gpu,
@@ -273,7 +296,7 @@ def _validate_gpu_vendor_and_image(run_spec: RunSpec) -> None:
             f" the default image: {sorted_vendors}"
         )
         if invalid_replicas:
-            msg = f"replicas{invalid_replicas}: {msg}"
+            msg = f"groups{invalid_replicas}: {msg}"
         elif invalid_groups:
             msg = f"groups{invalid_groups}: {msg}"
         raise ServerClientError(msg)
@@ -310,10 +333,10 @@ def _validate_cpu_arch_and_image(run_spec: RunSpec) -> None:
     image_msg = "`image` must be set when ARM CPU requested"
     docker_msg = "`docker: true` is not supported on ARM CPU"
     configuration = run_spec.configuration
-    if configuration.type == "service" and isinstance(configuration.replicas, list):
+    if configuration.type == "service" and configuration.groups is not None:
         invalid_replicas_without_image: list[int] = []
         invalid_replicas_with_docker: list[int] = []
-        for idx, replica_group in enumerate(configuration.replicas):
+        for idx, replica_group in enumerate(configuration.groups):
             image, docker = _get_replica_group_image_and_docker(replica_group, configuration)
             if replica_group.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM:
                 if docker:
@@ -322,9 +345,9 @@ def _validate_cpu_arch_and_image(run_spec: RunSpec) -> None:
                     invalid_replicas_without_image.append(idx)
         errors: list[str] = []
         if invalid_replicas_without_image:
-            errors.append(f"replicas{invalid_replicas_without_image}: {image_msg}")
+            errors.append(f"groups{invalid_replicas_without_image}: {image_msg}")
         if invalid_replicas_with_docker:
-            errors.append(f"replicas{invalid_replicas_with_docker}: {docker_msg}")
+            errors.append(f"groups{invalid_replicas_with_docker}: {docker_msg}")
         if errors:
             raise ServerClientError("\n".join(errors))
     elif isinstance(configuration, TaskConfiguration) and configuration.groups is not None:
@@ -410,7 +433,7 @@ def _check_dynamo_in_place_update_compatibility(
     _router_affecting_top_level_fields = tuple(
         f
         for f in _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get("service", [])
-        if f not in ("replicas", "scaling")
+        if f not in ("replicas", "groups", "scaling")
     )
     for field in _router_affecting_top_level_fields:
         if getattr(current_cfg, field, None) != getattr(new_cfg, field, None):
@@ -476,7 +499,7 @@ def get_nodes_required_num(run_spec: RunSpec) -> int:
         nodes_required_num = run_spec.configuration.nodes_num
     elif run_spec.configuration.type == "service":
         nodes_required_num = sum(
-            group.count.min or 0 for group in run_spec.configuration.replica_groups
+            group.replicas.min or 0 for group in run_spec.configuration.replica_groups
         )
     return nodes_required_num
 

@@ -1,9 +1,12 @@
-from typing import Any, Optional
+from copy import deepcopy
+from typing import Any, Optional, Union
 
 import pytest
+from pydantic import model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfigurationParams,
     PythonVersion,
@@ -156,9 +159,8 @@ class TestParseConfiguration:
         }
         parsed = parse_run_configuration(conf)
         assert isinstance(parsed, ServiceConfiguration)
-        assert parsed.replicas is not None
-        assert isinstance(parsed.replicas, list)
-        router_g = next(g for g in parsed.replicas if g.name == "router")
+        assert parsed.groups is not None
+        router_g = next(g for g in parsed.groups if g.name == "router")
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
         assert router_g.router.type == "sglang"
 
@@ -242,7 +244,8 @@ class TestReplicaGroupContainerFields:
         }
         parsed = parse_run_configuration(conf)
         assert isinstance(parsed, ServiceConfiguration)
-        groups = {g.name: g for g in parsed.replicas}
+        assert parsed.groups is not None
+        groups = {g.name: g for g in parsed.groups}
         assert groups["a"].image == "nginx:latest"
         assert groups["b"].python == PythonVersion.PY312
         assert groups["c"].nvcc is True
@@ -263,7 +266,9 @@ class TestReplicaGroupContainerFields:
             ],
         }
         parsed = parse_run_configuration(conf)
-        assert parsed.replicas[0].privileged is True
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.groups is not None
+        assert parsed.groups[0].privileged is True
 
     @pytest.mark.parametrize(
         "yaml_value,expected",
@@ -282,7 +287,9 @@ class TestReplicaGroupContainerFields:
             "replicas": [{"count": 1, "python": yaml_value, "commands": ["x"]}],
         }
         parsed = parse_run_configuration(conf)
-        assert parsed.replicas[0].python == expected
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.groups is not None
+        assert parsed.groups[0].python == expected
 
     def test_replica_group_image_python_mutex(self):
         with pytest.raises(
@@ -354,8 +361,10 @@ class TestReplicaGroupContainerFields:
             ],
         }
         parsed = parse_run_configuration(conf)
-        assert parsed.replicas[0].python == PythonVersion.PY312
-        assert parsed.replicas[0].nvcc is True
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.groups is not None
+        assert parsed.groups[0].python == PythonVersion.PY312
+        assert parsed.groups[0].nvcc is True
 
     def test_replica_group_docker_with_privileged_false_rejected(self):
         with pytest.raises(
@@ -1082,3 +1091,143 @@ class TestNodeGroups:
         assert parsed.groups[0].resources == ResourcesSpec()
         assert parsed.resources.gpu is not None
         assert parsed.resources.gpu.name == ["H100"]
+
+
+class _Legacy021ReplicaGroup(CoreModel):
+    """0.21-shaped group: size is `count`, no `groups` parent field."""
+
+    count: Range[int]
+    commands: list[str] = []
+
+
+class _Legacy021Service(CoreModel):
+    """Stand-in for a 0.21 client that does not know `groups`."""
+
+    commands: list[str] = []
+    image: Optional[str] = None
+    replicas: Optional[Union[list[_Legacy021ReplicaGroup], Range[int]]] = None
+
+    @model_validator(mode="after")
+    def check_image_or_commands_present(self) -> Self:
+        if isinstance(self.replicas, list):
+            return self
+        if not self.commands and self.image is None:
+            raise ValueError("Either `commands` or `image` must be set")
+        return self
+
+
+class TestServiceGroupsPhase1:
+    def test_legacy_replicas_list_parses_to_groups(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "replicas": [{"count": 1, "commands": ["x"]}],
+            }
+        )
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.replicas is None
+        assert parsed.groups is not None
+        assert parsed.groups[0].replicas == Range(min=1, max=1)
+
+    def test_new_groups_syntax_parses_identically(self):
+        legacy = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "replicas": [{"count": 1, "commands": ["x"]}],
+            }
+        )
+        new = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "groups": [{"replicas": 1, "commands": ["x"]}],
+            }
+        )
+        assert isinstance(legacy, ServiceConfiguration)
+        assert isinstance(new, ServiceConfiguration)
+        assert legacy.replicas is None
+        assert new.replicas is None
+        assert legacy.groups == new.groups
+
+    def test_dump_is_legacy_canonical(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "groups": [{"replicas": 1, "commands": ["x"]}],
+            }
+        )
+        dumped = parsed.model_dump()
+        assert "groups" not in dumped
+        assert isinstance(dumped["replicas"], list)
+        assert "count" in dumped["replicas"][0]
+        assert "replicas" not in dumped["replicas"][0]
+        dumped_json = parsed.model_dump(mode="json")
+        assert "groups" not in dumped_json
+        assert "count" in dumped_json["replicas"][0]
+        assert "replicas" not in dumped_json["replicas"][0]
+
+    def test_dump_validate_is_fixed_point(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "groups": [{"replicas": 1, "commands": ["x"]}],
+            }
+        )
+        assert isinstance(parsed, ServiceConfiguration)
+        once = ServiceConfiguration.model_validate(parsed.model_dump())
+        twice = ServiceConfiguration.model_validate(once.model_dump())
+        assert once.model_dump() == twice.model_dump() == parsed.model_dump()
+
+    def test_dumped_json_parses_as_0_21_client(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "groups": [{"replicas": 1, "commands": ["x"]}],
+            }
+        )
+        dumped = parsed.model_dump()
+        validate_extra_ignore(_Legacy021Service, dumped)
+
+    def test_homogeneous_dump_has_no_groups_key(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "commands": ["x"],
+                "replicas": 2,
+            }
+        )
+        dumped = parsed.model_dump()
+        assert "groups" not in dumped
+        assert dumped["replicas"] == {"min": 2, "max": 2}
+
+    def test_replicas_and_groups_rejected(self):
+        with pytest.raises(ConfigurationError, match="mutually exclusive"):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "replicas": 2,
+                    "groups": [{"replicas": 1, "commands": ["x"]}],
+                }
+            )
+
+    def test_empty_groups_rejected(self):
+        with pytest.raises(ConfigurationError, match="empty"):
+            parse_run_configuration({"type": "service", "port": 8000, "groups": []})
+
+    def test_parse_does_not_mutate_caller_dict(self):
+        conf = {
+            "type": "service",
+            "port": 8000,
+            "replicas": [{"count": 1, "commands": ["x"]}],
+        }
+        original = deepcopy(conf)
+        parse_run_configuration(conf)
+        assert conf == original
+        assert conf["replicas"][0]["count"] == 1

@@ -19,6 +19,7 @@ from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
     check_can_update_run_spec,
+    run_spec_has_replica_ip_refs,
     set_run_spec_resources_defaults,
     validate_run_spec_and_set_defaults,
 )
@@ -64,6 +65,17 @@ def _service_configuration(
     if env is not None:
         data["env"] = env
     return ServiceConfiguration.model_validate(data)
+
+
+def _service_with_groups(groups: list[dict]) -> ServiceConfiguration:
+    return ServiceConfiguration.model_validate(
+        {
+            "type": "service",
+            "port": 8000,
+            "image": "debian",
+            "groups": groups,
+        }
+    )
 
 
 def _run_spec(configuration: ServiceConfiguration, **kwargs):
@@ -248,6 +260,225 @@ class TestValidateRunSpecGroupsIpRefs:
             validate_run_spec_and_set_defaults(
                 SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
             )
+
+    def test_rejects_replicas_member_in_task_commands(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+                    ),
+                ],
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="Illegal reference name"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_rejects_nodes_member_in_service_commands(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=ServiceConfiguration.model_validate(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "debian",
+                    "groups": [
+                        {
+                            "replicas": 1,
+                            "commands": ["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"],
+                        }
+                    ],
+                }
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="Illegal reference name"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_accepts_service_replicas_ref_on_fixed_and_min_slot(self):
+        for replicas in (1, "1..4"):
+            group = {
+                "replicas": replicas,
+                "commands": ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+            }
+            if replicas == "1..4":
+                group["scaling"] = {"metric": "rps", "target": 10}
+            run_spec = get_run_spec(
+                repo_id="test-repo",
+                configuration=_service_with_groups([group]),
+            )
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_accepts_service_replicas_indexes_for_fixed_count(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {
+                        "replicas": 2,
+                        "commands": [
+                            "echo ${{ groups[0].replicas[0].IP_ADDRESS }} "
+                            "${{ groups[0].replicas[1].IP_ADDRESS }}"
+                        ],
+                    }
+                ]
+            ),
+        )
+        validate_run_spec_and_set_defaults(
+            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+        )
+
+    def test_rejects_service_replicas_index_above_min(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {
+                        "replicas": "1..4",
+                        "scaling": {"metric": "rps", "target": 10},
+                        "commands": ["echo ${{ groups[0].replicas[1].IP_ADDRESS }}"],
+                    }
+                ]
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="out of range"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_rejects_service_replicas_ref_into_scale_to_zero_group(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {
+                        "replicas": "0..4",
+                        "scaling": {"metric": "rps", "target": 10},
+                        "commands": ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+                    }
+                ]
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="scales to zero"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_rejects_service_replicas_group_out_of_range(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {
+                        "replicas": 1,
+                        "commands": ["echo ${{ groups[7].replicas[9].IP_ADDRESS }}"],
+                    }
+                ]
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="out of range"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+    def test_accepts_service_ref_to_another_group_min_slot(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {
+                        "replicas": 1,
+                        "commands": [
+                            "smg --prefill http://${{ groups[1].replicas[0].IP_ADDRESS }}:8000"
+                        ],
+                    },
+                    {
+                        "replicas": 1,
+                        "commands": ["echo prefill"],
+                    },
+                ]
+            ),
+        )
+        validate_run_spec_and_set_defaults(
+            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+        )
+
+    def test_rejects_service_groups_ref_in_env(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=ServiceConfiguration.model_validate(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "debian",
+                    "commands": ["echo ok"],
+                    "env": {
+                        "PREFILL_URL": "http://${{ groups[1].replicas[0].IP_ADDRESS }}",
+                    },
+                }
+            ),
+        )
+
+        with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
+
+
+class TestRunSpecHasReplicaIpRefs:
+    def test_true_when_service_group_command_has_replica_ref(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [
+                    {"replicas": 1, "commands": ["echo router"]},
+                    {
+                        "replicas": 1,
+                        "commands": ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+                    },
+                ]
+            ),
+        )
+        assert run_spec_has_replica_ip_refs(run_spec)
+
+    def test_false_when_service_has_no_replica_refs(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=_service_with_groups(
+                [{"replicas": 1, "commands": ["echo ok"]}],
+            ),
+        )
+        assert not run_spec_has_replica_ip_refs(run_spec)
+
+    def test_false_for_task_node_refs(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                groups=[
+                    NodeGroup(
+                        name="head",
+                        nodes=1,
+                        commands=["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"],
+                    ),
+                ],
+            ),
+        )
+        assert not run_spec_has_replica_ip_refs(run_spec)
 
 
 class TestCheckCanUpdateConfigurationRouterType:
@@ -529,7 +760,8 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
-        groups = run_spec.configuration.replicas
+        groups = run_spec.configuration.groups
+        assert groups is not None
         assert [g.resources.gpu.vendor for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
             gpuhunt.AcceleratorVendor.NVIDIA,
@@ -557,7 +789,8 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.replicas[0].resources.gpu.vendor == expected_vendor
+        assert run_spec.configuration.groups is not None
+        assert run_spec.configuration.groups[0].resources.gpu.vendor == expected_vendor
 
     def test_sets_defaults_for_top_level_resources(self):
         # The top-level resources are ignored when replica groups are set, but they are still
@@ -649,7 +882,7 @@ class TestValidateRunSpecGpuVendorAndImage:
             ],
         )
 
-        with pytest.raises(ServerClientError, match=re.escape("replicas[0, 2]")):
+        with pytest.raises(ServerClientError, match=re.escape("groups[0, 2]")):
             _validate(run_spec)
 
     def test_allows_replica_group_with_its_own_image(self):
@@ -714,7 +947,7 @@ class TestValidateRunSpecCpuArchAndImage:
             ],
         )
 
-        with pytest.raises(ServerClientError, match=re.escape("replicas[0, 2]")):
+        with pytest.raises(ServerClientError, match=re.escape("groups[0, 2]")):
             _validate(run_spec)
 
     def test_allows_replica_group_with_its_own_image(self):

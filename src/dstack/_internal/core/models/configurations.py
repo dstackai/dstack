@@ -11,12 +11,13 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     RootModel,
-    Tag,
+    SerializerFunctionWrapHandler,
     ValidationError,
     ValidationInfo,
     conint,
     constr,
     field_validator,
+    model_serializer,
     model_validator,
 )
 from pydantic_core import CoreSchema, core_schema
@@ -707,10 +708,12 @@ class ConfigurationWithCommandsParams(CoreModel):
     @model_validator(mode="after")
     def check_image_or_commands_present(self) -> Self:
         # If replicas is list, skip validation - commands come from replica groups
+        # (legacy in-memory shape; after parse, service groups live on `groups`).
         replicas = getattr(self, "replicas", None)
         if isinstance(replicas, list):
             return self
         # If groups is set, skip validation - commands come from node groups
+        # or service replica groups.
         if getattr(self, "groups", None) is not None:
             return self
 
@@ -990,7 +993,7 @@ class ReplicaGroup(CoreModel):
             description="The name of the replica group. If not provided, defaults to '0', '1', etc. based on position."
         ),
     ] = None
-    count: Annotated[
+    replicas: Annotated[
         Range[int],
         Field(
             description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
@@ -999,7 +1002,7 @@ class ReplicaGroup(CoreModel):
     ]
     scaling: Annotated[
         Optional[ScalingSpec],
-        Field(description="The auto-scaling rules. Required if `count` is set to a range"),
+        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
 
     resources: Annotated[
@@ -1069,6 +1072,19 @@ class ReplicaGroup(CoreModel):
         ),
     ] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _alias_count_to_replicas(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if "replicas" in data:
+            data.pop("count", None)
+            return data
+        if "count" in data:
+            data["replicas"] = data.pop("count")
+        return data
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
@@ -1077,9 +1093,9 @@ class ReplicaGroup(CoreModel):
                 raise ValueError("Resource name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
         return v
 
-    @field_validator("count")
+    @field_validator("replicas")
     @classmethod
-    def convert_count(cls, v: Range[int]) -> Range[int]:
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
         return _validate_replica_range(v)
 
     @field_validator("python", mode="before")
@@ -1124,11 +1140,11 @@ class ReplicaGroup(CoreModel):
     @model_validator(mode="after")
     def validate_scaling(self) -> Self:
         scaling = self.scaling
-        count = self.count
-        if count and count.min != count.max and not scaling:
-            raise ValueError("When you set `count` to a range, ensure to specify `scaling`.")
-        if count and count.min == count.max and scaling:
-            raise ValueError("To use `scaling`, `count` must be set to a range.")
+        replicas = self.replicas
+        if replicas and replicas.min != replicas.max and not scaling:
+            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
+        if replicas and replicas.min == replicas.max and scaling:
+            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return self
 
 
@@ -1206,27 +1222,53 @@ class ServiceConfigurationParams(CoreModel):
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
-        Optional[
-            # `Tag` only names the arm in validation errors. Without it the `loc` of a bad
-            # `replicas` spells out the whole wrapped schema —
-            # `service.replicas.list[function-after[validate_scaling(), ReplicaGroup]].0` — which
-            # is what `dstack apply` shows the user.
-            Union[
-                Annotated[list[ReplicaGroup], Tag("ReplicaGroup")],
-                Annotated[Range[int], Tag("Range[int]")],
-            ]
-        ],
+        Optional[Range[int]],
         Field(
             description=(
-                "The number of replicas or a list of replica groups. "
-                "Can be an integer (e.g., `2`), a range (e.g., `0..4`), or a list of replica groups. "
-                "Each replica group defines replicas with shared configuration "
-                "(commands, resources, scaling). "
-                "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
-                "and `resources` are not allowed and must be specified in each replica group instead. "
+                "The number of replicas for a homogeneous service. "
+                "Can be an integer (e.g. `2`) or a range (e.g. `0..4`). "
+                "Mutually exclusive with `groups`."
             )
         ),
     ] = None
+    groups: Annotated[
+        Optional[List[ReplicaGroup]],
+        Field(
+            description=(
+                "A list of replica groups for heterogeneous services. "
+                "Mutually exclusive with `replicas`. "
+                "When `groups` is set, top-level `scaling` and `commands` are not allowed."
+            )
+        ),
+    ] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_replica_groups(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        replicas = data.get("replicas")
+        if data.get("groups") is None and isinstance(replicas, list):
+            data["groups"] = replicas
+            data.pop("replicas", None)
+        if data.get("groups") is not None and data.get("replicas") is not None:
+            raise ValueError("`replicas` and `groups` are mutually exclusive")
+        return data
+
+    @model_serializer(mode="wrap")
+    def _serialize_legacy_replica_groups(
+        self, handler: SerializerFunctionWrapHandler
+    ) -> Dict[str, Any]:
+        res = handler(self)
+        groups = res.pop("groups", None)
+        if groups is None:
+            return res
+        for group in groups:
+            if "replicas" in group:
+                group["count"] = group.pop("replicas")
+        res["replicas"] = groups
+        return res
 
     @field_validator("port")
     @classmethod
@@ -1280,31 +1322,28 @@ class ServiceConfigurationParams(CoreModel):
 
     @field_validator("replicas")
     @classmethod
-    def validate_replicas(
-        cls, v: Optional[Union[Range[int], List[ReplicaGroup]]]
-    ) -> Optional[Union[Range[int], List[ReplicaGroup]]]:
+    def validate_replicas(cls, v: Optional[Range[int]]) -> Optional[Range[int]]:
         if v is None:
             return v
-        if isinstance(v, Range):
-            return _validate_replica_range(v)
+        return _validate_replica_range(v)
 
-        if isinstance(v, list):
-            if not v:
-                raise ValueError("`replicas` cannot be an empty list")
-
-            # Assign default names to groups without names
-            for index, group in enumerate(v):
-                if group.name is None:
-                    group.name = str(index)
-
-            # Check for duplicate names
-            names = [group.name for group in v]
-            if len(names) != len(set(names)):
-                duplicates = [name for name in set(names) if names.count(name) > 1]
-                raise ValueError(
-                    f"Duplicate replica group names found: {duplicates}. "
-                    "Each replica group must have a unique name."
-                )
+    @field_validator("groups")
+    @classmethod
+    def validate_groups(cls, v: Optional[List[ReplicaGroup]]) -> Optional[List[ReplicaGroup]]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("`groups` cannot be an empty list")
+        for index, group in enumerate(v):
+            if group.name is None:
+                group.name = str(index)
+        counts = Counter(group.name for group in v)
+        duplicates = [name for name, count in counts.items() if count > 1]
+        if duplicates:
+            raise ValueError(
+                f"Duplicate replica group names found: {duplicates}. "
+                "Each replica group must have a unique name."
+            )
         return v
 
     @model_validator(mode="after")
@@ -1323,25 +1362,22 @@ class ServiceConfigurationParams(CoreModel):
 
     @model_validator(mode="after")
     def validate_top_level_properties_with_replica_groups(self) -> Self:
-        """
-        When replicas is a list of ReplicaGroup, forbid top-level scaling and commands.
-        """
-        replicas = self.replicas
-
-        if not isinstance(replicas, list):
+        """When groups is set, forbid top-level scaling and commands."""
+        groups = self.groups
+        if groups is None:
             return self
 
         scaling = self.scaling
         if scaling is not None:
             raise ValueError(
-                "Top-level `scaling` is not allowed when `replicas` is a list. "
+                "Top-level `scaling` is not allowed when `groups` is set. "
                 "Specify `scaling` in each replica group instead."
             )
 
         commands = getattr(self, "commands", None)
         if commands:
             raise ValueError(
-                "Top-level `commands` is not allowed when `replicas` is a list. "
+                "Top-level `commands` is not allowed when `groups` is set. "
                 "Specify `commands` in each replica group instead."
             )
 
@@ -1350,13 +1386,13 @@ class ServiceConfigurationParams(CoreModel):
     @model_validator(mode="after")
     def validate_no_mixed_service_and_group_container_fields(self) -> Self:
         """
-        When replicas is a list, certain fields may be set
+        When `groups` is set, certain fields may be set
         at the service level OR in replica groups, never both. Mixing is
         rejected — including partial mixing, where only some groups set a
         field the service also sets — because it leaves precedence ambiguous.
         """
-        replicas = self.replicas
-        if not isinstance(replicas, list):
+        groups = self.groups
+        if groups is None:
             return self
 
         checks = [
@@ -1399,7 +1435,7 @@ class ServiceConfigurationParams(CoreModel):
 
         for field, service_set, group_set in checks:
             if service_set:
-                conflicting = [g.name for g in replicas if group_set(g)]
+                conflicting = [g.name for g in groups if group_set(g)]
                 if conflicting:
                     raise ValueError(
                         f"`{field}` is set at both the service level and in "
@@ -1415,8 +1451,8 @@ class ServiceConfigurationParams(CoreModel):
         Image-source fields (`image`, `docker`, `python`, `nvcc`) cannot
         be mixed across service and group levels in conflicting ways.
         """
-        replicas = self.replicas
-        if not isinstance(replicas, list):
+        groups = self.groups
+        if groups is None:
             return self
 
         forbidden = [
@@ -1479,7 +1515,7 @@ class ServiceConfigurationParams(CoreModel):
 
         for s_field, s_set, g_field, g_pred in forbidden:
             if s_set:
-                conflicting = [g.name for g in replicas if g_pred(g)]
+                conflicting = [g.name for g in groups if g_pred(g)]
                 if conflicting:
                     raise ValueError(
                         f"Service-level `{s_field}` conflicts with group-level "
@@ -1491,19 +1527,18 @@ class ServiceConfigurationParams(CoreModel):
     @model_validator(mode="after")
     def validate_replica_groups_have_commands_or_image(self) -> Self:
         """
-        When replicas is a list, ensure each ReplicaGroup has something
+        When `groups` is set, ensure each ReplicaGroup has something
         to run. Mirrors the service-level rule: either explicit
         `commands` or an `image` (group-level or service-level) is
         required.
         """
-        replicas = self.replicas
-
-        if not isinstance(replicas, list):
+        groups = self.groups
+        if groups is None:
             return self
 
         service_has_image = getattr(self, "image", None) is not None
 
-        for group in replicas:
+        for group in groups:
             if not group.commands and group.image is None and not service_has_image:
                 raise ValueError(
                     f"Replica group '{group.name}': either `commands` or "
@@ -1515,16 +1550,16 @@ class ServiceConfigurationParams(CoreModel):
 
     @model_validator(mode="after")
     def validate_at_most_one_router_replica_group(self) -> Self:
-        replicas = self.replicas
-        if not isinstance(replicas, list):
+        groups = self.groups
+        if groups is None:
             return self
-        router_groups = [g for g in replicas if g.router is not None]
+        router_groups = [g for g in groups if g.router is not None]
         if len(router_groups) > 1:
             raise ValueError("At most one replica group may specify `router`.")
         if router_groups:
             router_group = router_groups[0]
-            if router_group.count.min != 1 or router_group.count.max != 1:
-                raise ValueError("For now replica group with `router` must have `count: 1`.")
+            if router_group.replicas.min != 1 or router_group.replicas.max != 1:
+                raise ValueError("For now replica group with `router` must have `replicas: 1`.")
         return self
 
 
@@ -1538,31 +1573,18 @@ class ServiceConfiguration(
 
     @property
     def replica_groups(self) -> List[ReplicaGroup]:
-        if self.replicas is None:
-            return [
-                ReplicaGroup(
-                    name=DEFAULT_REPLICA_GROUP_NAME,
-                    count=Range[int](min=1, max=1),
-                    commands=self.commands,
-                    resources=self.resources,
-                    scaling=self.scaling,
-                )
-            ]
-        if isinstance(self.replicas, list):
-            return self.replicas
-        if isinstance(self.replicas, Range):
-            return [
-                ReplicaGroup(
-                    name=DEFAULT_REPLICA_GROUP_NAME,
-                    count=self.replicas,
-                    commands=self.commands,
-                    resources=self.resources,
-                    scaling=self.scaling,
-                )
-            ]
-        raise ValueError(
-            f"Invalid replicas type: {type(self.replicas)}. Expected None, Range[int], or List[ReplicaGroup]"
-        )
+        if self.groups is not None:
+            return self.groups
+        replicas = self.replicas if self.replicas is not None else Range[int](min=1, max=1)
+        return [
+            ReplicaGroup(
+                name=DEFAULT_REPLICA_GROUP_NAME,
+                replicas=replicas,
+                commands=self.commands,
+                resources=self.resources,
+                scaling=self.scaling,
+            )
+        ]
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

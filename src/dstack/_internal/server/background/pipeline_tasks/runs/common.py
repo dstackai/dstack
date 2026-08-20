@@ -38,17 +38,17 @@ def compute_desired_replica_counts(
         and len(replica_groups) == 1
         and replica_groups[0].name == DEFAULT_REPLICA_GROUP_NAME
     ):
-        # Special case to avoid dropping the replica count to group.count.min
+        # Special case to avoid dropping the replica count to group.replicas.min
         # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
         # TODO: remove once most users upgrade to 0.20.7+.
         prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
     desired_counts: PerGroupDesiredCounts = {}
     total = 0
     for group in replica_groups:
-        scaler = get_service_scaler(group.count, group.scaling)
+        scaler = get_service_scaler(group.replicas, group.scaling)
         assert group.name is not None, "Group name is always set"
         group_desired = scaler.get_desired_count(
-            current_desired_count=prev_counts.get(group.name, group.count.min or 0),
+            current_desired_count=prev_counts.get(group.name, group.replicas.min or 0),
             stats=gateway_stats,
             last_scaled_at=last_scaled_at,
         )

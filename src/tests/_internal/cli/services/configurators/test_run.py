@@ -18,6 +18,7 @@ from dstack._internal.core.models.configurations import (
     BaseRunConfiguration,
     DevEnvironmentConfiguration,
     PortMapping,
+    ServiceConfiguration,
     TaskConfiguration,
 )
 from dstack._internal.core.models.envs import Env
@@ -107,6 +108,57 @@ class TestApplyArgs:
             username="test_user",
             password="test_password",
         )
+
+    def test_interpolates_service_group_commands(self):
+        conf = ServiceConfiguration.model_validate(
+            {
+                "type": "service",
+                "port": 8000,
+                "image": "debian",
+                "groups": [
+                    {
+                        "replicas": 1,
+                        "commands": [
+                            "echo ${{ run.args }} ${{ groups[0].replicas[0].IP_ADDRESS }}"
+                        ],
+                    }
+                ],
+            }
+        )
+        modified, _ = self.apply_args(conf, ["hello"])
+        assert modified.groups is not None
+        assert modified.groups[0].commands == [
+            "echo hello ${{ groups[0].replicas[0].IP_ADDRESS }}"
+        ]
+
+    def test_rejects_unknown_var_in_service_group_commands(self):
+        conf = ServiceConfiguration.model_validate(
+            {
+                "type": "service",
+                "port": 8000,
+                "image": "debian",
+                "groups": [
+                    {
+                        "replicas": 1,
+                        "commands": ["echo ${{ env.MISSING }}"],
+                    }
+                ],
+            }
+        )
+        with pytest.raises(ConfigurationError, match="missing vars"):
+            self.apply_args(conf, [])
+
+    def test_homogeneous_service_interpolates_commands_once(self):
+        conf = ServiceConfiguration.model_validate(
+            {
+                "type": "service",
+                "port": 8000,
+                "image": "debian",
+                "commands": ["echo $${{ env.FOO }}"],
+            }
+        )
+        modified, _ = self.apply_args(conf, [])
+        assert modified.commands == ["echo ${{ env.FOO }}"]
 
 
 class TestApplyConfiguration:
