@@ -318,12 +318,12 @@ Backend fleets allow you to set `backends` to specify which backends are allowed
 
 ### Idle duration
 
-By default, instances of a backend fleet stay `idle` for 3 days and can be reused within that time.
-If an instance is not reused within this period, it is automatically terminated.
+Instances of a backend fleet that aren't running any jobs are `idle` and can be reused by new runs.
+`dstack` terminates idle instances above [`nodes.min`](#nodes) after
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration), which defaults to 3 days.
 
-To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the fleet configuration (e.g., `0s`, `1m`, or `off` for
-unlimited).
+For `idle_duration` to have an effect, `nodes` must be a range. Set `min` to `0` and `target` to
+the number of instances to pre-provision:
 
 <div editor-title="fleet.dstack.yml">
     
@@ -331,7 +331,9 @@ unlimited).
 type: fleet
 name: my-fleet
 
-nodes: 2
+nodes:
+  min: 0
+  target: 2
 
 # Terminate instances idle for more than 1 hour
 idle_duration: 1h
@@ -341,6 +343,16 @@ resources:
 ```
 
 </div>
+
+`dstack apply` provisions `target` instances, and every instance that stays idle for
+`idle_duration` is terminated until the fleet is down to `min`. Set `idle_duration` to `0s` to
+terminate instances as soon as they become idle, or to `off` to never terminate them.
+
+!!! info "Fixed number of nodes"
+    Instances are never terminated on idle duration if the fleet is already at `nodes.min`, since
+    `dstack` would immediately provision new ones to maintain `min`. A fleet with a fixed size,
+    e.g. `nodes: 2`, has `min` equal to `2`, so it keeps its instances regardless of
+    `idle_duration`.
 
 ### Blocks
 

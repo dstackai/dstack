@@ -296,7 +296,8 @@ class BackendFleetConfiguraionProps(CoreModel):
         Field(
             description=(
                 "Time to wait before terminating idle instances."
-                " Instances are not terminated if the fleet is already at `nodes.min`."
+                " Only instances above `nodes.min` are terminated,"
+                " so a fleet with a fixed `nodes: N` keeps its instances."
                 " Defaults to `5m` for runs and `3d` for fleets."
                 " Use `off` for unlimited duration"
             )
