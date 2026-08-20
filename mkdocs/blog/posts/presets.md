@@ -130,15 +130,11 @@ It also produced a finding the later sessions reused: the vendor's own FP8 check
 
 ### Compound learning
 
-The second session started with no records from the first and chose vLLM instead. It capped at 125.27 tok/s, and across the first two sessions 13 trials produced nothing that met the constraints.
+Learning compounds when sessions are linked. Through `previous`, each session inherits the previous best, the findings behind it, and the patches, so nothing is re-derived.
 
-From the third session on, each one was seeded with the earlier sessions' records through `previous`. The third turned on the model's own speculation head, brought time to first token under the constraint, and reached 310.98 tok/s, the first result that met all of them.
+> 310.98 tok/s, then 433.31, then 440.91, each session starting where the last stopped. The first two, with no records to start from, produced nothing.
 
-The fourth found where the FP8 gain actually was: quantizing the bf16 checkpoint at load time, and an FP8 KV cache, which halves what every decode step reads. That reached 433.31 tok/s.
-
-The fifth ran out of configuration, went into the attention backend's source, and reached 440.91 tok/s with a single patched file.
-
-The sixth was told the previous agent had contradicted itself, and asked to attack the bottleneck harder through source patches:
+The toolkit automates the routine and leaves the steering to the engineer, through the prompt. The fifth session was told to attack the bottleneck only through patching source code, which is where the first patch came from. The sixth was told the previous agent had contradicted itself and that the bottleneck was still there:
 
 ??? info "Custom prompt"
 
@@ -179,7 +175,7 @@ The sixth was told the previous agent had contradicted itself, and asked to atta
 
     </div>
 
-Two more patches took the best trial to 495.03 tok/s, 1.6x the first result that met the constraints, on the same single MI300X.
+> 495.03 tok/s, 1.6x the first result that met the constraints, on the same single MI300X.
 
 ## Exporting a portable preset
 
