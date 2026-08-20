@@ -218,7 +218,7 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs(start_time=start_time)
         else:
-            job = self._find_job_for_logs(replica_num=replica_num, job_num=job_num)
+            job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
                 return
             next_token = None
@@ -273,7 +273,8 @@ class Run(ABC):
 
         Args:
             ssh_identity_file: SSH keypair to access instances.
-            replica_num: replica_num or None to attach to any running replica.
+            replica_num: replica_num or None to attach to any running replica, falling back to
+                the lowest-numbered replica if no replica is running.
 
         Raises:
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
@@ -420,25 +421,14 @@ class Run(ABC):
             self._ssh_attach.detach()
             self._ssh_attach = None
 
-    def _find_job_for_logs(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
-        # Unlike attaching, reading logs does not require a running replica,
-        # so fall back to the lowest-numbered replica if none is running.
-        job = self._find_job(replica_num=replica_num, job_num=job_num)
-        if job is not None or replica_num is not None:
-            return job
-        jobs = [j for j in self._run.jobs if j.job_spec.job_num == job_num]
-        return min(jobs, key=lambda j: j.job_spec.replica_num, default=None)
-
     def _find_job(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
-        for j in self._run.jobs:
-            if (
-                replica_num is not None
-                and j.job_spec.replica_num == replica_num
-                or replica_num is None
-                and j.job_submissions[-1].status == JobStatus.RUNNING
-            ) and j.job_spec.job_num == job_num:
-                return j
-        return None
+        jobs = [j for j in self._run.jobs if j.job_spec.job_num == job_num]
+        if replica_num is not None:
+            return next((j for j in jobs if j.job_spec.replica_num == replica_num), None)
+        running = [j for j in jobs if j.job_submissions[-1].status == JobStatus.RUNNING]
+        # Prefer a running replica, as attaching requires one. Fall back to the lowest-numbered
+        # replica so that logs remain readable once the run is finished.
+        return min(running or jobs, key=lambda j: j.job_spec.replica_num, default=None)
 
     def __str__(self) -> str:
         return f"<Run '{self.name}'>"
