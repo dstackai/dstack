@@ -711,8 +711,8 @@ async def create_gateway(
 
 async def create_gateway_replica(
     session: AsyncSession,
+    backend: BackendModel,
     gateway_id: Optional[UUID] = None,
-    backend_id: Optional[UUID] = None,
     ip_address: Optional[str] = "1.1.1.1",
     region: Optional[str] = "us",
     instance_id: Optional[str] = "i-1234567890",
@@ -734,16 +734,11 @@ async def create_gateway_replica(
             testing against both in major test cases.
     """
     if configuration is None and populate_configuration:
-        backend_type = BackendType.AWS
-        if backend_id is not None:
-            backend = await session.get(BackendModel, backend_id)
-            assert backend is not None
-            backend_type = backend.type
         assert region is not None
         configuration = GatewayReplicaConfiguration(
             project_name="test-project",
             instance_name=instance_id or "test-instance",
-            backend=backend_type,
+            backend=backend.type,
             region=region,
             public_ip=True,
             ssh_key_pub=ssh_public_key,
@@ -751,7 +746,7 @@ async def create_gateway_replica(
         ).model_dump_json()
     gateway_replica = GatewayReplicaModel(
         gateway_id=gateway_id,
-        backend_id=backend_id,
+        backend_id=backend.id,
         ip_address=ip_address,
         region=region,
         instance_id=instance_id,

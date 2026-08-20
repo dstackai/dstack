@@ -948,7 +948,7 @@ def gateway_model_to_gateway(
     all_replica_models = sorted(
         get_gateway_replica_models(gateway_model), key=lambda r: r.replica_num
     )
-    relevant_replica_models = []
+    relevant_replica_models: list[GatewayReplicaModel] = []
     for replica_num, replica_models_for_num in itertools.groupby(
         all_replica_models, key=lambda r: r.replica_num
     ):
@@ -959,7 +959,7 @@ def gateway_model_to_gateway(
             GatewayReplica(
                 hostname=replica_model.ip_address,
                 replica_num=replica_model.replica_num,
-                backend=replica_model.backend.type if replica_model.backend else None,
+                backend=replica_model.backend.type,
                 region=replica_model.region,
                 created_at=replica_model.created_at,
                 status=replica_model.status,

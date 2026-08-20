@@ -741,10 +741,8 @@ class GatewayReplicaModel(PipelineModelMixin, BaseModel):
     Use `gateway or legacy_gateway` to get the gateway regardless of version.
     """
 
-    backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("backends.id", ondelete="CASCADE")
-    )
-    backend: Mapped[Optional["BackendModel"]] = relationship()
+    backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
+    backend: Mapped["BackendModel"] = relationship()
 
     ssh_private_key: Mapped[str] = mapped_column(Text)
     """`ssh_private_key` is the key used to authorize the server with the gateway."""

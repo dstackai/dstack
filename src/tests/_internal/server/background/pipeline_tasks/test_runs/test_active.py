@@ -196,7 +196,9 @@ class TestRunActiveWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_replica = await create_gateway_replica(session=session, gateway_id=gateway.id)
+        gateway_replica = await create_gateway_replica(
+            session=session, gateway_id=gateway.id, backend=backend
+        )
         run = await create_run(
             session=session,
             project=project,
@@ -250,10 +252,10 @@ class TestRunActiveWorker:
             status=GatewayStatus.RUNNING,
         )
         gateway_replica_1 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=0
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
         gateway_replica_2 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=1
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=1
         )
         run = await create_run(
             session=session,
@@ -316,10 +318,12 @@ class TestRunActiveWorker:
             status=GatewayStatus.RUNNING,
         )
         gateway_replica_1 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=0
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
         # Second running replica has not attempted registration yet (e.g. just came up).
-        await create_gateway_replica(session=session, gateway_id=gateway.id, replica_num=1)
+        await create_gateway_replica(
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=1
+        )
         run = await create_run(
             session=session,
             project=project,
@@ -373,13 +377,14 @@ class TestRunActiveWorker:
             status=GatewayStatus.RUNNING,
         )
         gateway_replica_running = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=0
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
         # Terminated replica successfully registered before going away — should be ignored,
         # since only currently running replicas count towards the predicate.
         gateway_replica_terminating = await create_gateway_replica(
             session=session,
             gateway_id=gateway.id,
+            backend=backend,
             replica_num=1,
             status=GatewayReplicaStatus.TERMINATING,
         )
@@ -1408,10 +1413,10 @@ class TestRunActiveWorker:
             status=GatewayStatus.RUNNING,
         )
         gateway_replica_1 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=0
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
         gateway_replica_2 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=1
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=1
         )
         run_spec = get_run_spec(
             repo_id=repo.name,
@@ -1518,10 +1523,10 @@ class TestRunActiveWorker:
             status=GatewayStatus.RUNNING,
         )
         gateway_replica_1 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=0
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=0
         )
         gateway_replica_2 = await create_gateway_replica(
-            session=session, gateway_id=gateway.id, replica_num=1
+            session=session, gateway_id=gateway.id, backend=backend, replica_num=1
         )
         run_spec = get_run_spec(
             repo_id=repo.name,

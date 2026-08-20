@@ -381,7 +381,9 @@ class TestRunPendingWorker:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        gateway_replica = await create_gateway_replica(session=session, gateway_id=gateway.id)
+        gateway_replica = await create_gateway_replica(
+            session=session, gateway_id=gateway.id, backend=backend
+        )
         run_spec = get_run_spec(
             run_name="test-run",
             repo_id=repo.name,

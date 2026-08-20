@@ -452,8 +452,6 @@ async def _provision_gateway_replica(
     replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
     try:
-        if replica_model.backend_id is None:  # unexpected
-            raise BackendNotAvailable()
         (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
             project=gateway_model.project, backend_id=replica_model.backend_id
         )
@@ -614,8 +612,6 @@ async def _register_replica_with_load_balancer(
     if replica_model.instance_id is None:
         return "instance_id is None, cannot register with load balancer"
     try:
-        if replica_model.backend_id is None:
-            raise BackendNotAvailable()
         (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
             project=gateway_model.project, backend_id=replica_model.backend_id
         )
@@ -1565,8 +1561,6 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
         status=GatewayReplicaStatus.TERMINATED, active=False, deleted=True
     )
     try:
-        if replica_model.backend_id is None:  # unexpected
-            raise BackendNotAvailable()
         (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
             project=gateway_model.project,
             backend_id=replica_model.backend_id,
