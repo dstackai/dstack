@@ -208,6 +208,9 @@ class Run(ABC):
         Args:
             start_time: Minimal log timestamp.
             diagnose: Return runner logs if `True`.
+            replica_num: The replica number or `None` to use any running replica,
+                falling back to the lowest-numbered replica if no replica is running.
+            job_num: The job number inside the replica.
 
         Yields:
             Log messages.
@@ -215,9 +218,9 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs(start_time=start_time)
         else:
-            job = self._find_job(replica_num=replica_num, job_num=job_num)
+            job = self._find_job_for_logs(replica_num=replica_num, job_num=job_num)
             if job is None:
-                return []
+                return
             next_token = None
             while True:
                 resp = self._api_client.logs.poll(
@@ -416,6 +419,15 @@ class Run(ABC):
             logger.debug("Detaching from %s", self._ssh_attach.run_name)
             self._ssh_attach.detach()
             self._ssh_attach = None
+
+    def _find_job_for_logs(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
+        # Unlike attaching, reading logs does not require a running replica,
+        # so fall back to the lowest-numbered replica if none is running.
+        job = self._find_job(replica_num=replica_num, job_num=job_num)
+        if job is not None or replica_num is not None:
+            return job
+        jobs = [j for j in self._run.jobs if j.job_spec.job_num == job_num]
+        return min(jobs, key=lambda j: j.job_spec.replica_num, default=None)
 
     def _find_job(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
         for j in self._run.jobs:
