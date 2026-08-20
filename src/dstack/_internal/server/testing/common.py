@@ -733,11 +733,12 @@ async def create_gateway_replica(
             True - 0.18.2+ gateways, False - legacy pre-0.18.2 gateways. Prefer
             testing against both in major test cases.
     """
+    name = f"test-gateway-{replica_num}"
     if configuration is None and populate_configuration:
         assert region is not None
         configuration = GatewayReplicaConfiguration(
             project_name="test-project",
-            instance_name=instance_id or "test-instance",
+            instance_name=name,
             backend=backend.type,
             region=region,
             public_ip=True,
@@ -745,6 +746,7 @@ async def create_gateway_replica(
             certificate=None,
         ).model_dump_json()
     gateway_replica = GatewayReplicaModel(
+        name=name,
         gateway_id=gateway_id,
         backend_id=backend.id,
         ip_address=ip_address,
