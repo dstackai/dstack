@@ -29,8 +29,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
       - NCCL_DEBUG=INFO
 
     groups:
-      - name: master # The name property is optional
-        nodes: 1
+      - nodes: 1
         commands:
           - |
             mpirun \
@@ -44,8 +43,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
           gpu: nvidia:1..8
           shm_size: 16GB
 
-      - name: workers
-        nodes: 1
+      - nodes: 1
         commands:
           - sleep infinity
         resources:
@@ -83,8 +81,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
       - OPEN_MPI_HOME=/usr/lib/x86_64-linux-gnu/openmpi
 
     groups:
-      - name: master # The name property is optional
-        nodes: 1
+      - nodes: 1
         commands:
           # Setup MPI and build RCCL tests
           - apt-get install -y git libopenmpi-dev openmpi-bin
@@ -110,8 +107,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
         resources:
           gpu: MI300X:8
 
-      - name: workers
-        nodes: 1
+      - nodes: 1
         commands:
           # Setup MPI and build RCCL tests
           - apt-get install -y git libopenmpi-dev openmpi-bin

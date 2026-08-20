@@ -30,8 +30,7 @@ env:
   - WANDB_API_KEY
 
 groups:
-  - name: head # The name property is optional
-    nodes: 1
+  - nodes: 1
     commands:
       - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
       - bash miniconda.sh -b -p /workflow/miniconda
@@ -52,8 +51,7 @@ groups:
       gpu: 80GB:8
       shm_size: 128GB
 
-  - name: workers
-    nodes: 1
+  - nodes: 1
     commands:
       - wget -O miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
       - bash miniconda.sh -b -p /workflow/miniconda

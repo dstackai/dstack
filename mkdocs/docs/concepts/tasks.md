@@ -223,10 +223,10 @@ the index of the node within that group.
 
 Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
 
-??? info "Prefill/decode example"
-    Node groups can mix CPU and GPU roles. This SGLang prefill/decode split uses a CPU
+??? info "PD disaggregation"
+    While PD disaggregaton is mostly used with [services](services.md#pd-disaggregation), it also possible to run it as tasks. The example below runs  a CPU
     router (`groups[0]`, the master) and GPU workers. `startup_order: workers-first`
-    starts prefill and decode before the router.
+    instructs `dstack` to start prefill and decode workers before the router.
 
     <div editor-title=".dstack.yml">
 
@@ -241,8 +241,7 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
     startup_order: workers-first
     groups:
       # Router (CPU) — master node; wires prefill + decode by IP
-      - name: router
-        nodes: 1
+      - nodes: 1
         commands:
           - pip install smg
           - |
@@ -259,8 +258,7 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
         resources:
           cpu: 4
 
-      - name: prefill
-        nodes: 1
+      - nodes: 1
         commands:
           - |
             python -m sglang.launch_server \
@@ -272,8 +270,7 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
         resources:
           gpu: H200
 
-      - name: decode
-        nodes: 1
+      - nodes: 1
         commands:
           - |
             python -m sglang.launch_server \
@@ -287,9 +284,8 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
 
     </div>
 
-!!! info "Examples"
-    See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
-    and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
+> See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
+and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
 
 ### Resources
 
