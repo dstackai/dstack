@@ -10,42 +10,36 @@ categories:
 
 # Presets: a toolkit for agent-based inference optimization
 
-Optimizing model inference is agent work now. Every inference provider does it inside its own process, on its own serving stack, with its own harness around the optimization agent. Benchmarks rarely say which workload, concurrency, and hardware produced a number, so results cannot be reproduced. Deploying Kimi K3 on heterogeneous hardware should be as simple as deploying a Docker image.
+Optimizing model inference is agent work now. Every inference provider does it inside its own process, on its own serving stack, with its own harness around the optimization agent. Despite the progress in open-source serving frameworks, what gets published is a benchmark, often without the workload, the concurrency, and the hardware behind it. The optimized deployment itself stays tied to the stack that produced it.
 
-Today we're introducing a preview of presets: an open-source toolkit that streamlines inference optimization with agents, and a portable format that deploys the result to any cloud, Kubernetes cluster, or on-prem fleet.
+Today we're introducing a preview of presets: an open-source toolkit that streamlines inference optimization with agents, and a portable preset format that can be deployed to any cloud, Kubernetes cluster, or bare-metal fleet.
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-presets.png" width="750" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-presets.png" width="650" />
 
 <!-- more -->
 
-## The problem
+Despite the progress in open-source serving frameworks, there is still no way to get optimization and deployment that delivers portable performance. That work happens inside each inference provider's own proprietary stack, with its own harness around the agent. This has to change.
 
-Modern inference optimization is done with agents. Kernels, attention backends, KV cache transport, driver fixes and settings: work that until recently was done by hand.
+Deploying Kimi K3 should be as simple as deploying a Docker image, on any silicon and in any datacenter. Taking a model someone has already optimized and running it on your own hardware should not mean rebuilding the stack or repeating the optimization, whichever silicon you have.
 
-Each inference provider does it inside its own process, on its own inference stack, with its own harness around the agent.
-
-Despite the progress in open-source serving frameworks, the optimized inference stack stays fragmented and mostly proprietary, for NVIDIA, AMD, and other silicon alike. An optimized deployment cannot be moved to another provider or another silicon, and a published result cannot be reproduced by anyone else. Every new silicon vendor and every new provider adds another stack where that has to be done from the start. This has to change.
-
-Optimized inference on heterogeneous hardware should be as simple as deploying a normal application. Taking a model someone has already optimized and running it on your own hardware should cost no more than deploying an app: no rebuilding the stack, no repeating the optimization, whichever silicon you have.
-
-## A toolkit and a portable format
+## Toolkit and portable format
 
 Think of Docker images. Docker gives you a toolkit for building an image, and a format that deploys to any datacenter or cloud reproducibly.
 
-`dstack` introduces a similar concept applied to building optimized inference and its deployment. Presets offer two things: a toolkit that streamlines the optimization itself using agents, and a portable format that deploys the final preset to any cloud or datacenter.
+`dstack` introduces a similar concept applied to building optimized inference and its deployment. Presets offer two things: a toolkit that streamlines the optimization itself using agents, and a portable format that deploys the final preset to any cloud, Kubernetes cluster, or bare-metal fleet.
 
 These are the toolkit's main parts:
 
 | | |
 |---|---|
-| Constraints | An optimized deployment is always relative to a workload, a concurrency, and the hardware it runs on. The toolkit makes those explicit and enforces them, so what a configuration was built and verified against is visible rather than assumed |
-| Trials | A framework for experiments that are structured and measured. Every trial keeps its configuration, its patches, and what it produced, so a session leaves a record rather than a number |
-| Previous sessions | Real optimization builds on several sessions and on the engineer's curation between them. Sessions can be chained, so a new one starts from the earlier records and patches and pushes beyond them |
-| Baseline | The first trial is the baseline. Without previous sessions it is the configuration the serving engine itself recommends; with them it is the best result reached before. Every trial after it aims to go significantly beyond that |
-| Custom prompt | Presets are for optimization researchers and engineers, not a replacement for them. A prompt is how the engineer intervenes between sessions and gives the agent the feedback that matters |
-| Orchestration | Large models are deployed beyond a single GPU, so orchestration is part of the work. Presets use `dstack` to provision connected compute and to automate deployment during trials and verification |
+| **Constraints** | A result only holds for a workload, a concurrency, and the hardware it ran on |
+| **Trials** | The agent works inside a strict trial framework. Every trial is benchmarked, and what it learns pushes the next one further |
+| **Previous sessions** | Sessions can be chained, so the agent learns across sessions, not only within one |
+| **Baseline** | Every session first establishes the baseline, then pushes the performance beyond it |
+| **Custom prompt** | The harness does not replace the engineer's feedback. A prompt steers each session and carries that feedback into it |
+| **Orchestration** | Building a preset for a large model involves orchestration. The toolkit automates it through `dstack` |
 
-In addition to the toolkit, presets introduce an artifact format. A preset records the benchmark, the constraints and workload it was measured against, the exact hardware it ran on, and the serving configuration that produced it. That configuration is portable: it deploys to any datacenter or cloud.
+In addition to the toolkit, presets introduce a portable format. It holds the serving configuration that produced the result: how the model is served on a single replica, or across replica groups when prefill and decode are split apart. It also holds the benchmark it reached and the exact hardware it was verified on, so a number never travels without the machine it came from.
 
 ## How it works
 
@@ -53,9 +47,9 @@ In addition to the toolkit, presets introduce an artifact format. A preset recor
 
 | Use case | |
 |---|---|
-| An optimized baseline | Finding the best configuration reachable without changing source code |
-| Optimizing through patching | Optimizing the serving framework, kernels, libraries, and drivers through changes in the source code |
-| Supporting new hardware | Adding support and optimizing inference on new, untested hardware |
+| **An optimized baseline** | Finding the best configuration reachable without patching source code |
+| **Optimizing through patching** | Optimizing the serving framework, kernels, libraries, and drivers through patches to the source code |
+| **Supporting new hardware** | Adding support and optimizing inference on new, untested hardware |
 
 To create a preset, you define a model repo or a base model, a [fleet](../../docs/concepts/fleets.md) to deploy it to, the constraints, the number of trials, and the other [preset configuration options](../../docs/reference/dstack.yml/preset.md):
 
@@ -132,21 +126,23 @@ A small example of using presets: optimizing Qwen3.8-27B on a single MI300X. The
 
 ### An optimized baseline
 
-The first session was there to establish one. It settled on SGLang and reached 184.81 tok/s, but the lowest p50 time to first token it managed was 1834ms, above the 1500ms constraint, so nothing it produced qualified.
+The first session settled on SGLang and reached 184.81 tok/s. Its best p50 time to first token was 1834ms, above the 1500ms constraint, so no trial met the constraints.
 
-It also found something worth keeping: the vendor's own FP8 checkpoint was slower than bf16 on this card, which ruled out the obvious first move for every session after it.
+It also produced a finding the later sessions reused: the vendor's own FP8 checkpoint was slower than bf16 on this card.
 
-### Feedback pushes past the baseline
+### Compound learning
 
-The second session started with no records from the first and chose vLLM instead. It capped at 125.27 tok/s, and across the first two sessions 13 trials produced no qualifying result.
+The second session started with no records from the first and chose vLLM instead. It capped at 125.27 tok/s, and across the first two sessions 13 trials produced nothing that met the constraints.
 
-From the third session on, each one was seeded with the earlier sessions' records through `previous`. The third turned on the model's own speculation head and brought time to first token under the constraint: 310.98 tok/s, the first qualifying result. The fourth found where the FP8 gain actually was: quantizing the bf16 checkpoint at load time, and an FP8 KV cache, which halves what every decode step reads. That reached 433.31 tok/s.
+From the third session on, each one was seeded with the earlier sessions' records through `previous`. The third turned on the model's own speculation head, brought time to first token under the constraint, and reached 310.98 tok/s, the first result that met all of them.
+
+The fourth found where the FP8 gain actually was: quantizing the bf16 checkpoint at load time, and an FP8 KV cache, which halves what every decode step reads. That reached 433.31 tok/s.
 
 The fifth ran out of configuration, went into the attention backend's source, and reached 440.91 tok/s with a single patched file.
 
 The sixth was told the previous agent had contradicted itself, and asked to attack the bottleneck harder through source patches:
 
-??? info "preset.dstack.yml"
+??? info "Custom prompt"
 
     <div editor-title="preset.dstack.yml">
 
@@ -185,13 +181,11 @@ The sixth was told the previous agent had contradicted itself, and asked to atta
 
     </div>
 
-Two more patches took the best trial to 495.03 tok/s. Nine trials across both patching sessions, about five hours, about $10 of GPU time.
+Two more patches took the best trial to 495.03 tok/s, 1.6x the first result that met the constraints, on the same single MI300X.
 
-Neither patching session reached the 1.5x its prompt asked for, and both said so. And every number here is measured against the reproduction the session ran itself, because reproductions move: the same configuration came back at 341.9 tok/s where the earlier session had recorded 433.31.
+## Exporting a portable preset
 
-## Deploying a preset
-
-To deploy a preset, export it as a [service](../../docs/concepts/services.md) configuration and apply it:
+To export a preset as a [service](../../docs/concepts/services.md) configuration, pass its ID to `dstack preset export`:
 
 <div class="termy">
 
@@ -202,7 +196,9 @@ Preset 6900d9d7 exported to qwen38-service.dstack.yml (2 files). Deploy it with 
 
 </div>
 
-The export carries the serving configuration and the patches it depends on, applied before the server starts, so deploying the preset requires none of the knowledge that produced it.
+Exporting writes the portable format to disk: the serving configuration and the patch files it references. Both are plain files you can read, review, and keep in version control.
+
+> To deploy the built preset to a cloud, Kubernetes cluster, or a bare-metal fleet, run `dstack apply -f`. Export today produces a `dstack` service configuration only. Plain Docker and Kubernetes configurations are planned.
 
 ## Coming soon
 
@@ -210,13 +206,11 @@ The export carries the serving configuration and the patches it depends on, appl
 
 A preset today is measured at one fixed concurrency. A concurrency sweep lets the agent benchmark across a range of them, so a preset carries a curve instead of a single point.
 
-Export today produces a `dstack` service configuration. Plain Docker and Kubernetes configurations are planned.
-
 ### Registry
 
-Presets are stored locally, under `~/.dstack/presets`. You can export one and deploy it, but there is no way to publish it, or to pull a preset optimized in someone else's project.
+We plan to introduce a registry for presets. Today they are stored locally, under `~/.dstack/presets`, so there is no way to publish one, or to pull a preset optimized in someone else's project.
 
-A registry works the way a Docker registry does. A name such as `moonshot/kimi3` bundles presets for different hardware and workload profiles, and `dstack preset pull` fetches the one that matches your hardware, ready to deploy.
+It would work the way a Docker registry does. A name such as `moonshot/kimi3` would bundle presets for different hardware and workload profiles, and `dstack preset pull` would fetch the one that matches your hardware.
 
 ## What's next?
 
