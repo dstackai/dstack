@@ -1,10 +1,10 @@
-import { DOCS_URL } from '../routes';
+import { BLOG_URL } from '../routes';
 
 // Top announcement banner, mirroring the one on the MkDocs docs site. It sits above the top
 // nav; the two stick to the top together (see .site-header). Update the copy/href here when
 // the announcement changes.
-const BANNER_TEXT = 'Presets: agent-driven inference optimization';
-const BANNER_HREF = `${DOCS_URL}/concepts/presets/`;
+const BANNER_TEXT = 'Presets: a toolkit for agent-based inference optimization';
+const BANNER_HREF = `${BLOG_URL}/presets/`;
 
 export function SiteBanner() {
   return (
