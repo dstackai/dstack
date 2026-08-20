@@ -1,6 +1,7 @@
 import io
 import json
 import time
+import uuid
 from contextlib import contextmanager, nullcontext
 from textwrap import dedent
 from typing import Any, Dict, Generator, List, Optional
@@ -89,23 +90,53 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
         raise SSHProvisioningError(f"upload_envs failed: {e}") from e
 
 
-def run_pre_start_commands(
-    client: paramiko.SSHClient, shim_pre_start_commands: List[str], authorized_keys: List[str]
-) -> None:
+def add_authorized_keys(client: paramiko.SSHClient, authorized_keys: list[str]) -> None:
+    heredoc_lines: list[str] = []
+    for key in authorized_keys:
+        # Not using paramiko.pkey.PublicBlob.from_string() to avoid unnecessary parsing/validation
+        try:
+            key_type, key_blob, *key_comment_parts = key.split()
+        except ValueError as e:
+            logger.warning("Failed to parse authorized key: %r: %s", key, e)
+            continue
+        key_comment_parts.append("# added by dstack")
+        key_comment = " ".join(key_comment_parts)
+        heredoc_lines.append(f"{key_type}\t{key_blob}\t{key_comment}")
+    eof = f"EOF_{uuid.uuid4().hex}"
+    script_parts = [
+        f"""
+            set -eu
+            if [ ! -e ~/.ssh/authorized_keys ]; then
+                mkdir -p ~/.ssh
+                chmod 700 ~/.ssh
+                touch ~/.ssh/authorized_keys
+                chmod 600 ~/.ssh/authorized_keys
+            elif [ -n "$(tail -c1 ~/.ssh/authorized_keys)" ]; then
+                echo >> ~/.ssh/authorized_keys
+            fi
+            while IFS='\t' read -r type blob comment <&3; do
+                if ! grep -qF "$blob" ~/.ssh/authorized_keys; then
+                    echo "$type $blob $comment" >> ~/.ssh/authorized_keys
+                fi
+            done 3<<'{eof}'
+        """.strip(),
+        *heredoc_lines,
+        eof,
+    ]
+    script = "\n".join(script_parts)
     try:
-        authorized_keys_content = "\n".join(authorized_keys).strip()
-        _, stdout, stderr = client.exec_command(
-            f"echo '\n{authorized_keys_content}' >> ~/.ssh/authorized_keys", timeout=5
-        )
+        _, stdout, stderr = client.exec_command(script, timeout=5)
         out = stdout.read().strip().decode()
         err = stderr.read().strip().decode()
         if out or err:
             raise SSHProvisioningError(
-                f"The command 'authorized_keys' didn't work. stdout: {out}, stderr: {err}"
+                f"The command 'add_authorized_keys' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise SSHProvisioningError(f"upload authorized_keys failed: {e}") from e
+        raise SSHProvisioningError(f"add_authorized_keys failed: {e}") from e
 
+
+def run_pre_start_commands(client: paramiko.SSHClient, shim_pre_start_commands: list[str]) -> None:
     script = " && ".join(shim_pre_start_commands)
     try:
         _, stdout, stderr = client.exec_command(f"sudo sh -c '{script}'", timeout=120)

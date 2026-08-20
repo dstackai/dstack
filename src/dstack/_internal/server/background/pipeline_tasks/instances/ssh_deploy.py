@@ -42,6 +42,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import is_divisible_into_blocks
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.ssh_fleets.provisioning import (
+    add_authorized_keys,
     detect_cpu_arch,
     get_host_info,
     get_paramiko_connection,
@@ -261,8 +262,9 @@ def _deploy_instance(
         logger.debug("%s: CPU arch is %s", remote_details.host, arch)
 
         # Execute pre start commands
+        add_authorized_keys(client, authorized_keys)
         shim_pre_start_commands = get_shim_pre_start_commands(arch=arch)
-        run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
+        run_pre_start_commands(client, shim_pre_start_commands)
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
