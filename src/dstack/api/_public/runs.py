@@ -208,6 +208,9 @@ class Run(ABC):
         Args:
             start_time: Minimal log timestamp.
             diagnose: Return runner logs if `True`.
+            replica_num: The replica number or `None` to use any running replica,
+                falling back to the lowest-numbered replica if no replica is running.
+            job_num: The job number inside the replica.
 
         Yields:
             Log messages.
@@ -217,7 +220,7 @@ class Run(ABC):
         else:
             job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
-                return []
+                return
             next_token = None
             while True:
                 resp = self._api_client.logs.poll(
@@ -270,7 +273,8 @@ class Run(ABC):
 
         Args:
             ssh_identity_file: SSH keypair to access instances.
-            replica_num: replica_num or None to attach to any running replica.
+            replica_num: replica_num or None to attach to any running replica, falling back to
+                the lowest-numbered replica if no replica is running.
 
         Raises:
             dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
@@ -418,15 +422,13 @@ class Run(ABC):
             self._ssh_attach = None
 
     def _find_job(self, replica_num: Optional[int], job_num: int) -> Optional[Job]:
-        for j in self._run.jobs:
-            if (
-                replica_num is not None
-                and j.job_spec.replica_num == replica_num
-                or replica_num is None
-                and j.job_submissions[-1].status == JobStatus.RUNNING
-            ) and j.job_spec.job_num == job_num:
-                return j
-        return None
+        jobs = [j for j in self._run.jobs if j.job_spec.job_num == job_num]
+        if replica_num is not None:
+            return next((j for j in jobs if j.job_spec.replica_num == replica_num), None)
+        running = [j for j in jobs if j.job_submissions[-1].status == JobStatus.RUNNING]
+        # Prefer a running replica, as attaching requires one. Fall back to the lowest-numbered
+        # replica so that logs remain readable once the run is finished.
+        return min(running or jobs, key=lambda j: j.job_spec.replica_num, default=None)
 
     def __str__(self) -> str:
         return f"<Run '{self.name}'>"
