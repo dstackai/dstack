@@ -66,7 +66,6 @@ class PresetConfigurator(BaseApplyConfigurator[PresetConfiguration]):
                 configuration=conf,
                 store=store,
                 keep_service=configurator_args.keep_service,
-                debug=configurator_args.debug,
                 user_prompt=user_prompt,
                 allowed_fleets=allowed_fleets,
                 previous=previous,
@@ -130,11 +129,6 @@ def register_creation_args(parser: ArgsParser) -> None:
         type=int,
         metavar="N",
         help="The number of benchmarked trials before the best one is promoted",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Save the agent prompt and raw trace",
     )
     parser.add_argument(
         "--previous",

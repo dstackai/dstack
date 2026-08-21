@@ -485,7 +485,6 @@ env:
                     "0.75",
                     "--fleet",
                     "cli-fleet",
-                    "--debug",
                 ],
                 home_dir=tmp_path,
                 repo_dir=tmp_path,
@@ -499,7 +498,6 @@ env:
         assert configuration.max_price == 0.75
         assert configuration.spot_policy.value == "spot"
         assert [fleet.format() for fleet in configuration.fleets] == ["cli-fleet"]
-        assert create.call_args.kwargs["debug"] is True
 
     def test_create_detaches_the_name_from_the_old_preset(self, tmp_path):
         preset = get_preset().model_copy(update={"name": "qwen"})
@@ -630,7 +628,6 @@ min_context_length: 8192
                     "7",
                     "--backend",
                     "gcp",
-                    "--debug",
                 ],
                 home_dir=tmp_path,
                 repo_dir=tmp_path,
@@ -641,7 +638,6 @@ min_context_length: 8192
         assert configuration.name == "cli-name"
         assert configuration.trials == 7
         assert configuration.backends == ["gcp"]
-        assert create.call_args.kwargs["debug"] is True
 
     def test_rejects_detach(self, tmp_path, capsys):
         configuration_path = self._write_configuration(tmp_path)

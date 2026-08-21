@@ -49,9 +49,9 @@ Preset creation uses the existing `claude` login unless
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used. |
 
 Agent progress is written to `agent.log` under `~/.dstack/presets/<preset-id>/`,
-alongside the effective configuration (`preset.dstack.yml`) and the recorded
-trials (`trials.jsonl`). Pass `--debug` to also save the agent prompt
-(`prompt.md`) and raw trace (`trace.jsonl`).
+alongside the effective configuration (`preset.dstack.yml`), the recorded
+trials, the agent prompt (`prompt.md`), and the real-time trace
+(`trace.jsonl`).
 
 ## dstack preset logs
 

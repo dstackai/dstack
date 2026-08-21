@@ -133,7 +133,7 @@ def creation_context(tmp_path, monkeypatch):
 
 
 class TestCreatePreset:
-    def test_saves_agent_log_without_debug(self, tmp_path, monkeypatch):
+    def test_saves_agent_log_and_trace(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         preset = get_preset()
@@ -167,13 +167,14 @@ class TestCreatePreset:
             "agent.log",
             "session.json",
             "preset.dstack.yml",
+            "trace.jsonl",
         }
         state = json.loads((paths[0] / "session.json").read_text())
         assert state["status"] == "success"
         assert state["id"] == paths[0].name
         assert "testing preset" in (paths[0] / "agent.log").read_text()
 
-    def test_debug_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
+    def test_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
         monkeypatch.setenv("HF_TOKEN", "hf-secret")
@@ -211,7 +212,6 @@ class TestCreatePreset:
                 env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
             ),
             store=PresetStore(tmp_path / "presets"),
-            debug=True,
         )
 
         paths = _session_dirs(tmp_path)
@@ -228,7 +228,7 @@ class TestCreatePreset:
         assert "hf-secret" not in (paths[0] / "preset.dstack.yml").read_text()
         assert "Files remain at" in capsys.readouterr().out
 
-    def test_debug_finalization_does_not_mask_creation_error(self, tmp_path, monkeypatch):
+    def test_finalization_does_not_mask_creation_error(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
@@ -252,7 +252,6 @@ class TestCreatePreset:
                     base="Qwen/Qwen3.5-27B",
                 ),
                 store=PresetStore(tmp_path / "presets"),
-                debug=True,
             )
 
     @pytest.mark.asyncio
@@ -351,13 +350,12 @@ class TestCreatePreset:
     async def test_saves_preset_and_cleans_up_runs(
         self, creation_context, monkeypatch, keep_service, stopped_names, tmp_path
     ):
-        session_path = tmp_path / "debug-running"
+        session_path = tmp_path / "session-running"
         session_path.mkdir()
         (session_path / "agent.log").touch()
         (session_path / "trace.jsonl").touch()
         session = PresetSession(
             path=session_path,
-            debug=True,
             preset_id="ab12cd34",
         )
         session.write_state(get_session_state())
@@ -517,7 +515,7 @@ class TestCreateWithPrevious:
         )
         session_path = tmp_path / "fresh"
         session_path.mkdir()
-        session = PresetSession(path=session_path, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_path, preset_id="ab12cd34")
         session.write_state(get_session_state(previous=["8d3b01aa"]))
         seen = {}
 
@@ -550,7 +548,7 @@ class TestCreateWithPrevious:
         assert "## Previous Sessions" in seen["prompt"]
         assert "8d3b01aa" in seen["prompt"]
         assert session.read_state().previous == ["8d3b01aa"]
-        # constraints.json is a session record even without --debug.
+        # constraints.json is a persistent session record.
         assert (session_path / "constraints.json").is_file()
 
 
@@ -598,15 +596,13 @@ class TestCleanupRuns:
         assert runs.stopped_names == ["qwen-build-1"]
 
 
-def _agent_session(tmp_path, *, debug: bool = False) -> PresetSession:
+def _agent_session(tmp_path) -> PresetSession:
     path = tmp_path / "agent-running"
     path.mkdir()
     (path / "agent.log").touch()
-    if debug:
-        (path / "trace.jsonl").touch()
+    (path / "trace.jsonl").touch()
     session = PresetSession(
         path=path,
-        debug=debug,
         preset_id="ab12cd34",
     )
     session.write_state(get_session_state())
@@ -836,7 +832,7 @@ class TestSaveFinalReportCopy:
         workspace.final_report_path.write_text(
             '{"success": true, "note": "token dstack-secret"}', encoding="utf-8"
         )
-        session = _agent_session(tmp_path, debug=True)
+        session = _agent_session(tmp_path)
 
         _save_final_report_copy(
             workspace=workspace,
@@ -851,7 +847,7 @@ class TestSaveFinalReportCopy:
     def test_missing_report_is_no_op(self, tmp_path):
         workspace = PresetAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
         workspace.path.mkdir()
-        session = _agent_session(tmp_path, debug=True)
+        session = _agent_session(tmp_path)
 
         _save_final_report_copy(
             workspace=workspace,
@@ -894,7 +890,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
         session.write_state(get_session_state())
         workspace_root = tmp_path / "workspace"
         config_dir = workspace_root / "h" / ".dstack"
@@ -921,7 +917,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "sessions" / "fe98dc76"
         session_dir.mkdir(parents=True)
         (session_dir / "agent.log").touch()
-        session = PresetSession(path=session_dir, debug=False, preset_id="fe98dc76")
+        session = PresetSession(path=session_dir, preset_id="fe98dc76")
         session.write_state(get_session_state(id="fe98dc76"))
         workspace, workspace_record = create_agent_workspace(session)
         workspace.constraints_path.write_text(
@@ -970,7 +966,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab34ef12")
+        session = PresetSession(path=session_dir, preset_id="ab34ef12")
         session.write_state(get_session_state(id="ab34ef12"))
         captured = {}
 
@@ -1008,7 +1004,7 @@ class TestInterruptAndResume:
         session_dir = tmp_path / "ab34ef12"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab34ef12")
+        session = PresetSession(path=session_dir, preset_id="ab34ef12")
         session.write_state(get_session_state(id="ab34ef12"))
         workspace, workspace_record = create_agent_workspace(session)
         workspace.constraints_path.write_text(
@@ -1075,7 +1071,7 @@ class TestSessionLog:
         session_dir = tmp_path / preset_id
         session_dir.mkdir()
         (session_dir / "agent.log").write_text(log)
-        session = PresetSession(path=session_dir, debug=False, preset_id=preset_id)
+        session = PresetSession(path=session_dir, preset_id=preset_id)
         session.write_state(get_session_state(id=preset_id, status=status))
         return session
 
@@ -1126,7 +1122,7 @@ class TestFollowPreset:
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
         (session_dir / "preset.dstack.yml").write_text(configuration_yaml)
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
         workspace, workspace_record = create_agent_workspace(session)
         workspace.constraints_path.write_text('{"run_name_prefix": "qwen-build"}')
         session.write_state(
@@ -1336,7 +1332,7 @@ class TestStopActiveSessionRuns:
         (session_dir / "runs.jsonl").write_text(
             '{"name":"qwen-build-1","id":"a"}\n{"name":"qwen-build-2","id":"b"}\n'
         )
-        return PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        return PresetSession(path=session_dir, preset_id="ab12cd34")
 
     def _api(self, statuses: dict, stopped: list) -> SimpleNamespace:
         def get(project, name):
@@ -1484,7 +1480,7 @@ class TestReconcileDetachedSessions:
 class TestSessionClaim:
     def _session(self, tmp_path):
         (tmp_path / "sess").mkdir()
-        return PresetSession(path=tmp_path / "sess", debug=False, preset_id="sess")
+        return PresetSession(path=tmp_path / "sess", preset_id="sess")
 
     def test_claim_is_exclusive_and_releasable(self, tmp_path):
         session = self._session(tmp_path)
@@ -1533,7 +1529,7 @@ class TestSessionProcessAlive:
 class TestBeginRun:
     def test_records_the_run_whole_and_keeps_claude_state(self, tmp_path):
         (tmp_path / "s").mkdir()
-        session = PresetSession(path=tmp_path / "s", debug=False, preset_id="s")
+        session = PresetSession(path=tmp_path / "s", preset_id="s")
         workspace = PresetSessionWorkspace(path=str(tmp_path / "w"), alias=str(tmp_path / "w"))
         session.write_state(
             get_session_state(

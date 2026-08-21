@@ -122,7 +122,7 @@ Alternatively, pass `--fleet` to `dstack apply`.
 
 === "Base"
 
-    Set `base` to let the creation agent select any compatible variant of the base model, including a different precision, quantization, or trusted fork.
+    Set `base` to let the agent select any compatible variant of the base model, including a different precision, quantization, or trusted fork.
 
     ```yaml
     base: Qwen/Qwen2.5-7B-Instruct
@@ -240,6 +240,24 @@ Submit the run dsv4-flash? [y/n]: y
 
 ## Manage presets
 
+### Watch presets
+
+While a preset is being created, you can watch the progress of its trials and what the agent is doing.
+
+The `dstack preset logs` command shows the progress log: one line per milestone, such as a trial finishing or the final service being verified. Pass `-f` to follow a running creation:
+
+<div class="termy">
+
+```shell
+$ dstack preset logs -f c83375b4
+```
+
+</div>
+
+### Traces
+
+The agent subprocess writes real-time traces to `~/.dstack/presets/<id>/trace.jsonl`: the agent's messages and every tool call with its result. Traces are the main way to analyze a session in depth — see [Protips](#protips).
+
 ### List presets
 
 Use `dstack preset` to list presets:
@@ -290,19 +308,14 @@ $ dstack preset delete c83375b4
 !!! info "Reference"
     For command options and agent settings, see the [`dstack preset` CLI reference](../reference/cli/dstack/preset.md).
 
-## Troubleshooting
+## Protips
 
-To trace the agent's activity, pass `--debug` to `dstack apply`:
+Under the hood, presets run an agent as a subprocess, using the local `claude` CLI. This process writes a real-time trace to `~/.dstack/presets/<id>/trace.jsonl`. The subprocess is launched with a built-in harness: how to run trials, submit runs, benchmark, verify presets, and use `dstack`.
 
-<div class="termy">
+At the same time, it's recommended to create presets using your own agent — either via a CLI such as Claude Code, or inside your IDE. Your agent helps you design the preset configuration, formulate hypotheses, and — most importantly — analyze the session's traces as well as the trial results (stored under `~/.dstack/presets/<id>/trials/<n>/trial.json`), to decide what the next session can be and what instructions to give it via `prompt`.
 
-```shell
-$ dstack apply -f preset.dstack.yml --debug
-```
-
-</div>
-
-The trace is written to `~/.dstack/presets/<id>/trace.jsonl` while the session runs. It contains the agent's messages and every tool call with its result.
+> To help your agent use `dstack` and presets, install the [`dstack`](https://skills.sh/dstackai/dstack/dstack)
+> and [`dstack-presets`](https://skills.sh/dstackai/dstack/dstack-presets) skills with `npx skills add dstackai/dstack`.
 
 ## Limitations
 
