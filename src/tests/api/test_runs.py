@@ -1,7 +1,12 @@
 import base64
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
 
+import pytest
+
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.logs import JobSubmissionLogs, LogEvent, LogEventSource
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -17,6 +22,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack.api._public.runs import Run, RunCollection
+from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_NO_COMMENT
 
 
 class _RunsAPI:
@@ -33,6 +39,20 @@ class _RunsAPI:
 class _APIClient:
     def __init__(self):
         self.runs = _RunsAPI()
+
+
+class _PlansAPI:
+    def __init__(self):
+        self.run_specs: list[RunSpec] = []
+
+    def get_plan(self, project_name: str, run_spec: RunSpec, **kwargs) -> str:
+        self.run_specs.append(run_spec)
+        return "run-plan"
+
+
+class _PlansAPIClient:
+    def __init__(self):
+        self.runs = _PlansAPI()
 
 
 class TestRunCollectionList:
@@ -166,3 +186,65 @@ class TestRunLogs:
         run = _get_run(run_model, logs_api)
 
         assert b"".join(run.logs(replica_num=1)) == b"replica 1\n"
+
+
+class TestRunCollectionGetRunPlan:
+    def _get_run_plan(
+        self, ssh_identity_file: Optional[Path] = None, ssh_key_pub: Optional[str] = None
+    ) -> RunSpec:
+        api_client = _PlansAPIClient()
+        runs = RunCollection(api_client=api_client, project="main", client=None)
+
+        assert (
+            runs.get_run_plan(
+                configuration=TaskConfiguration(commands=["echo hello"], image="ubuntu:latest"),
+                ssh_identity_file=ssh_identity_file,
+                ssh_key_pub=ssh_key_pub,
+            )
+            == "run-plan"
+        )
+
+        return api_client.runs.run_specs[0]
+
+    def test_uses_public_key_file(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+        (tmp_path / "id_ed25519.pub").write_text(PUBLIC_KEY)
+
+        assert self._get_run_plan(private_key_path).ssh_key_pub == PUBLIC_KEY
+
+    def test_generates_public_key(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+
+        assert self._get_run_plan(private_key_path).ssh_key_pub == PUBLIC_KEY_NO_COMMENT
+
+    def test_accepts_public_key(self, tmp_path: Path):
+        public_key_path = tmp_path / "id_ed25519.pub"
+        public_key_path.write_text(PUBLIC_KEY)
+
+        assert self._get_run_plan(public_key_path).ssh_key_pub == PUBLIC_KEY
+
+    def test_uses_user_key_if_no_key_given(self):
+        assert self._get_run_plan().ssh_key_pub is None
+
+    def test_uses_public_key_as_is(self):
+        assert self._get_run_plan(ssh_key_pub=PUBLIC_KEY).ssh_key_pub == PUBLIC_KEY
+
+    def test_raises_if_both_public_key_and_identity_file_given(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+
+        with pytest.raises(ConfigurationError, match="mutually exclusive"):
+            self._get_run_plan(ssh_identity_file=private_key_path, ssh_key_pub=PUBLIC_KEY)
+
+    def test_raises_if_key_does_not_exist(self, tmp_path: Path):
+        with pytest.raises(ConfigurationError, match="Unable to read the SSH key"):
+            self._get_run_plan(tmp_path / "id_ed25519")
+
+    def test_raises_if_key_type_is_not_supported(self, tmp_path: Path):
+        key_path = tmp_path / "id_ed25519"
+        key_path.write_text("garbage")
+
+        with pytest.raises(ConfigurationError, match="Unsupported or invalid SSH key"):
+            self._get_run_plan(key_path)
