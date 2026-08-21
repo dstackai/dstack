@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
 import CloudscapeInput from '@cloudscape-design/components/input';
 import CloudscapeTextarea from '@cloudscape-design/components/textarea';
 
 import { Box, Button, ButtonWithConfirmation, FormField, Header, InfoLink, Modal, SpaceBetween, Table } from 'components';
 
-import { useBreadcrumbs, useCollection, useHelpPanel, useNotifications } from 'hooks';
+import { useCollection, useHelpPanel, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
-import { ROUTES } from 'routes';
 import { IPublicKey, useAddPublicKeyMutation, useDeletePublicKeysMutation, useListPublicKeysQuery } from 'services/publicKeys';
 
 import { SSH_KEYS_INFO } from './constants';
 
 export const PublicKeys: React.FC = () => {
     const { t } = useTranslation();
-    const params = useParams();
-    const paramUserName = params.userName ?? '';
     const [pushNotification] = useNotifications();
     const [openHelpPanel] = useHelpPanel();
 
@@ -28,21 +24,6 @@ export const PublicKeys: React.FC = () => {
     const { data: publicKeys = [], isLoading } = useListPublicKeysQuery();
     const [addPublicKey, { isLoading: isAdding }] = useAddPublicKeyMutation();
     const [deletePublicKeys, { isLoading: isDeleting }] = useDeletePublicKeysMutation();
-
-    useBreadcrumbs([
-        {
-            text: t('navigation.account'),
-            href: ROUTES.USER.LIST,
-        },
-        {
-            text: paramUserName,
-            href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
-        },
-        {
-            text: t('users.public_keys.title'),
-            href: ROUTES.USER.PUBLIC_KEYS.FORMAT(paramUserName),
-        },
-    ]);
 
     const { items, collectionProps } = useCollection(publicKeys, {
         selection: {},
