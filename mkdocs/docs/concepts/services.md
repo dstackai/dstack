@@ -291,7 +291,8 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 <span id="replica-groups"></span>
 
 ??? info "Replica groups"
-    A service can include multiple replica groups. Each group can define its own `commands`, `resources` requirements, and `scaling` rules.
+    A service can define multiple replica groups. Each group has its own `replicas` count (or range),
+    `resources`, `commands`, and `scaling` rules.
 
     <div editor-title="service.dstack.yml">
 
@@ -303,8 +304,8 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
-    replicas:
-      - count: 1..2
+    groups:
+      - replicas: 1..2
         scaling:
           metric: rps
           target: 10
@@ -317,7 +318,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
         resources:
           gpu: 48GB
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 5
@@ -336,7 +337,21 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
     </div>
 
-    > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
+    [`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
+
+    > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
+
+### Accessing replica IPs
+
+Commands in any group can reference the internal IP address of any replica in the run via
+`${{ groups[i].replicas[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
+the index of the replica within that group.
+
+> Only replicas guaranteed at start can be referenced:
+>
+> - `replicas: 2` → replica indexes `0` and `1` can be referenced
+> - `replicas: 1..4` → replica index `0` can be referenced
+> - `replicas: 0..4` → no replica indexes can be referenced
 
 ### PD disaggregation
 
@@ -363,9 +378,9 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       - HF_TOKEN
       - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-    replicas:
-      - count: 1
-        # For now replica group with router must have count: 1
+    groups:
+      - replicas: 1
+        # For now the router group must have replicas: 1
         commands:
           - pip install smg
           - |
@@ -379,7 +394,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: sglang
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 3
@@ -394,7 +409,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - count: 1..8
+      - replicas: 1..8
         scaling:
           metric: rps
           target: 2
@@ -437,8 +452,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       - HF_TOKEN
       - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-    replicas:
-      - count: 1
+    groups:
+      - replicas: 1
         docker: true
         commands:
           - apt-get update
@@ -460,7 +475,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: dynamo
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 3
@@ -489,7 +504,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - count: 1..8
+      - replicas: 1..8
         scaling:
           metric: rps
           target: 2
@@ -551,8 +566,8 @@ env:
   - RDMA_DEVICES=bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7
   - NCCL_IB_DISABLE=1
 
-replicas:
-  - count: 1
+groups:
+  - replicas: 1
     commands:
       - pip install smg
       - |
@@ -565,7 +580,7 @@ replicas:
     router:
       type: sglang
 
-  - count: 1..2
+  - replicas: 1..2
     scaling:
       metric: rps
       target: 300
@@ -591,7 +606,7 @@ replicas:
       cpu: 96..
       memory: 512GB..
 
-  - count: 1..4
+  - replicas: 1..4
     scaling:
       metric: rps
       target: 300

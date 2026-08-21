@@ -152,9 +152,9 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
       - HF_TOKEN
       - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-    replicas:
-      - count: 1
-        # For now replica group with router must have count: 1
+    groups:
+      - replicas: 1
+        # For now replica group with router must have replicas: 1
         commands:
           - pip install smg
           - |
@@ -168,7 +168,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         router:
           type: sglang
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 3
@@ -184,7 +184,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         resources:
           gpu: H200
 
-      - count: 1..8
+      - replicas: 1..8
         scaling:
           metric: rps
           target: 2
@@ -225,9 +225,9 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
           - HF_TOKEN
           - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-        replicas:
-          - count: 1
-            # For now replica group with router must have count: 1
+        groups:
+          - replicas: 1
+            # For now replica group with router must have replicas: 1
             python: "3.12"
             commands:
               - pip install smg
@@ -244,7 +244,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
             resources:
               cpu: 4
 
-          - count: 1..4
+          - replicas: 1..4
             scaling:
               metric: rps
               target: 3
@@ -262,7 +262,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
             resources:
               gpu: H200
 
-          - count: 1..8
+          - replicas: 1..8
             scaling:
               metric: rps
               target: 2
@@ -309,8 +309,8 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
       - RDMA_DEVICES=bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7
       - NCCL_IB_DISABLE=1
 
-    replicas:
-      - count: 1
+    groups:
+      - replicas: 1
         commands:
           - pip install smg
           - |
@@ -323,7 +323,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         router:
           type: sglang
 
-      - count: 1..2
+      - replicas: 1..2
         scaling:
           metric: rps
           target: 300
@@ -349,7 +349,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
           cpu: 96..
           memory: 512GB..
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 300
