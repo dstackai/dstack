@@ -27,7 +27,7 @@ def _previous_session(tmp_path, preset_id="8d3b01aa"):
     (root / "runs.jsonl").write_text("{}")
     (root / "trials" / "not-a-trial").mkdir()
     (root / "trials" / "not-a-trial" / "trial.json").write_text("{}")
-    return PresetSession(path=root, debug=False, preset_id=preset_id)
+    return PresetSession(path=root, preset_id=preset_id)
 
 
 def _workspace(tmp_path):
@@ -74,7 +74,7 @@ class TestInstallPreviousRecords:
         root = tmp_path / "store" / "empty000"
         root.mkdir(parents=True)
         (root / "session.json").write_text("{}")
-        session = PresetSession(path=root, debug=False, preset_id="empty000")
+        session = PresetSession(path=root, preset_id="empty000")
         workspace = _workspace(tmp_path)
 
         install_previous_records(workspace, [session])

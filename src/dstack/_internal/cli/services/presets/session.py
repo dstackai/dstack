@@ -56,7 +56,6 @@ class SessionBusyError(CLIError):
 @dataclass
 class PresetSession:
     path: Path
-    debug: bool
     preset_id: str
     # Background reconcile sets this False so finalizing a detached session stays
     # silent on the read command; agent.log is written regardless.
@@ -269,7 +268,6 @@ def create_preset_session(
     configuration: PresetConfiguration,
     *,
     previous: Sequence[str],
-    debug: bool,
 ) -> PresetSession:
     if configuration.name is None:
         raise CLIError("The service name is required to save agent output")
@@ -286,7 +284,8 @@ def create_preset_session(
                 continue
             break
         _write_private_text(path / "agent.log", "")
-        session = PresetSession(path=path, debug=debug, preset_id=preset_id)
+        _write_private_text(path / "trace.jsonl", "")
+        session = PresetSession(path=path, preset_id=preset_id)
         session.write_state(
             PresetSessionState(
                 id=preset_id,
@@ -295,7 +294,6 @@ def create_preset_session(
                 trials_num=configuration.trials,
                 previous=list(previous),
                 created_at=datetime.now(timezone.utc),
-                debug=debug,
                 status="running",
                 owner=_current_process(),
                 run=None,
@@ -311,8 +309,6 @@ def create_preset_session(
             path / "preset.dstack.yml",
             yaml.safe_dump(record, sort_keys=False),
         )
-        if debug:
-            _write_private_text(path / "trace.jsonl", "")
     except OSError as e:
         if path is not None:
             shutil.rmtree(path, ignore_errors=True)
@@ -322,7 +318,7 @@ def create_preset_session(
 
 def load_resumable_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    session = PresetSession(path=path, preset_id=preset_id)
     state = session.read_state()
     if not path.is_dir() or state is None:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -337,7 +333,6 @@ def load_resumable_session(preset_id: str) -> PresetSession:
         )
     if state.run is None or state.run.claude_session_id is None:
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
-    session.debug = state.debug
     return session
 
 
@@ -368,7 +363,7 @@ def session_process_alive(state: PresetSessionState) -> bool:
 
 def load_attachable_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    session = PresetSession(path=path, preset_id=preset_id)
     state = session.read_state()
     if not path.is_dir() or state is None:
         raise CLIError(f"Unknown preset: {preset_id}")
@@ -387,13 +382,12 @@ def load_attachable_session(preset_id: str) -> PresetSession:
             f"Preset {preset_id} is already being followed by another CLI (pid {owner.pid});"
             f" stop or detach it there with Ctrl+C"
         )
-    session.debug = state.debug
     return session
 
 
 def load_preset_session(preset_id: str) -> PresetSession:
     path = get_presets_dir() / preset_id
-    session = PresetSession(path=path, debug=False, preset_id=preset_id)
+    session = PresetSession(path=path, preset_id=preset_id)
     if not path.is_dir() or session.read_state() is None:
         raise CLIError(f"Unknown preset: {preset_id}")
     return session
@@ -476,7 +470,7 @@ def iter_preset_sessions() -> Iterator[PresetSession]:
         return
     for path in sorted(root.iterdir()):
         if path.is_dir() and not path.name.startswith((".", "models--")):
-            yield PresetSession(path=path, debug=False, preset_id=path.name)
+            yield PresetSession(path=path, preset_id=path.name)
 
 
 def find_session_name_claims(name: str) -> list[PresetSession]:
