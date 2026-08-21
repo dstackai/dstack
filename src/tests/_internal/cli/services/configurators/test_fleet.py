@@ -1,5 +1,6 @@
 import argparse
 from datetime import datetime, timezone
+from pathlib import Path
 from textwrap import dedent
 from typing import List, Optional, Tuple
 from unittest.mock import Mock
@@ -12,8 +13,9 @@ import dstack._internal.cli.services.configurators.fleet as fleet_configurator_m
 from dstack._internal.cli.services.configurators.fleet import (
     FleetConfigurator,
     _render_fleet_spec_diff,
+    _resolve_ssh_key,
 )
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
@@ -25,7 +27,9 @@ from dstack._internal.core.models.fleets import (
     FleetStatus,
     InstanceGroupPlacement,
 )
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
+from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_NO_COMMENT
 
 
 def create_conf() -> FleetConfiguration:
@@ -245,3 +249,43 @@ class TestRenderFleetSpecDiff:
         spec = get_cloud_fleet_spec()
 
         assert _render_fleet_spec_diff(spec, spec.model_copy(deep=True)) is None
+
+
+class TestResolveSSHKey:
+    def test_returns_none_if_no_path_given(self):
+        assert _resolve_ssh_key(None) is None
+
+    def test_uses_public_key_file(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+        (tmp_path / "id_ed25519.pub").write_text(PUBLIC_KEY)
+
+        assert _resolve_ssh_key(str(private_key_path)) == SSHKey(
+            public=PUBLIC_KEY, private=PRIVATE_KEY
+        )
+
+    def test_generates_public_key(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+
+        assert _resolve_ssh_key(str(private_key_path)) == SSHKey(
+            public=PUBLIC_KEY_NO_COMMENT, private=PRIVATE_KEY
+        )
+
+    def test_raises_if_public_key_given(self, tmp_path: Path):
+        public_key_path = tmp_path / "id_ed25519.pub"
+        public_key_path.write_text(PUBLIC_KEY)
+
+        with pytest.raises(CLIError, match="Expected a private key"):
+            _resolve_ssh_key(str(public_key_path))
+
+    def test_raises_if_key_does_not_exist(self, tmp_path: Path):
+        with pytest.raises(CLIError, match="Unable to read the SSH key"):
+            _resolve_ssh_key(str(tmp_path / "id_ed25519"))
+
+    def test_raises_if_key_type_is_not_supported(self, tmp_path: Path):
+        key_path = tmp_path / "id_ed25519"
+        key_path.write_text("garbage")
+
+        with pytest.raises(CLIError, match="Unsupported or invalid SSH key"):
+            _resolve_ssh_key(str(key_path))

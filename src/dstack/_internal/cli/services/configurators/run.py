@@ -75,6 +75,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.nodes_interpolator import is_valid_groups_ip_ref
 from dstack._internal.utils.path import is_absolute_posix_path
+from dstack._internal.utils.ssh import resolve_ssh_key
 from dstack.api._public.runs import Run
 
 _BIND_ADDRESS_ARG = "bind_address"
@@ -95,16 +96,19 @@ class BaseRunConfigurator(
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
     ):
+        ssh_key_pub, ssh_identity_file = self.get_ssh_key(configurator_args)
         run_plan, repo = self.get_plan(
             conf=conf,
             configuration_path=configuration_path,
             configurator_args=configurator_args,
+            ssh_key_pub=ssh_key_pub,
         )
         return self.apply_plan(
             run_plan=run_plan,
             repo=repo,
             command_args=command_args,
             configurator_args=configurator_args,
+            ssh_identity_file=ssh_identity_file,
         )
 
     def get_plan(
@@ -112,6 +116,7 @@ class BaseRunConfigurator(
         conf: RunConfigurationT,
         configuration_path: str,
         configurator_args: argparse.Namespace,
+        ssh_key_pub: Optional[str],
     ) -> tuple[RunPlan, Repo]:
         """Apply CLI arguments and validation, then return the run plan and its repo."""
         if configurator_args.repo and configurator_args.no_repo:
@@ -132,7 +137,7 @@ class BaseRunConfigurator(
                 repo=repo,
                 configuration_path=configuration_path,
                 profile=profile,
-                ssh_identity_file=configurator_args.ssh_identity_file,
+                ssh_key_pub=ssh_key_pub,
                 max_offers=configurator_args.max_offers,
                 full_offers=configurator_args.full_offers,
                 unallocated_resources=configurator_args.unallocated,
@@ -145,6 +150,7 @@ class BaseRunConfigurator(
         repo: Repo,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
+        ssh_identity_file: Optional[Path],
         plan_properties: Optional[Dict[str, str]] = None,
     ):
         """Apply a run plan using the standard CLI behavior."""
@@ -270,7 +276,10 @@ class BaseRunConfigurator(
                     )
                     try:
                         try:
-                            attached = run.attach(bind_address=bind_address)
+                            attached = run.attach(
+                                ssh_identity_file=ssh_identity_file,
+                                bind_address=bind_address,
+                            )
                         except PortUsedError as e:
                             console.print(
                                 f"[error]Failed to attach: port [code]{e.port}[/code] is already in use."
@@ -542,6 +551,23 @@ class BaseRunConfigurator(
             self.api.repos.init(repo=repo, creds=repo_creds)
 
         return repo
+
+    def get_ssh_key(
+        self, configurator_args: argparse.Namespace
+    ) -> tuple[Optional[str], Optional[Path]]:
+        """Resolve the `--ssh-identity` argument to a (public key, private key path) pair."""
+        ssh_identity_file: Optional[Path] = configurator_args.ssh_identity_file
+        if ssh_identity_file is None:
+            return None, None
+        try:
+            public_key, _, _, private_key_path = resolve_ssh_key(ssh_identity_file)
+        except OSError as e:
+            raise CLIError(f"Unable to read the SSH key at {ssh_identity_file}") from e
+        except ValueError as e:
+            raise CLIError(f"Unsupported or invalid SSH key at {ssh_identity_file}") from e
+        if private_key_path is None:
+            raise CLIError(f"Expected a private key at {ssh_identity_file}, got a public key")
+        return public_key, private_key_path
 
 
 class RunWithPortsConfiguratorMixin:

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -266,6 +267,58 @@ def pkey_from_str(private_string: str) -> PKey:
 def generate_public_key(private_key: PKey) -> str:
     public_key = f"{private_key.get_name()} {private_key.get_base64()}"
     return public_key
+
+
+def resolve_ssh_key(
+    path: PathLike,
+) -> Union[
+    tuple[str, Path, str, Path],
+    tuple[str, None, str, Path],
+    tuple[str, Path, None, None],
+]:
+    """
+    Resolves a private or public key path to key contents and paths.
+
+    If a private key is given, only supported private key types are allowed. PKCS#8 keys are
+    converted to PEM, so the returned private key may differ from the file contents. If a
+    corresponding ".pub" file exists, its contents is used as a public key without any validation
+    and its path is returned as the public key path, otherwise a public key is generated from the
+    private key and the public key path is None.
+
+    If a public key is given, any valid public key is allowed regardless of its type, and both
+    private key values are None. No corresponding private key (a file without ".pub" suffix) is
+    checked.
+
+    Args:
+        path: The private or public key path.
+
+    Returns:
+        A (public key, public key path, private key, private key path) tuple.
+
+    Raises:
+        OSError: Error reading key file(s).
+        ValueError: Unsupported or invalid private key or invalid public key.
+    """
+    path = Path(path).expanduser()
+    content = path.read_text()
+    private_key = convert_ssh_key_to_pem(content)
+    pkey: Optional[PKey] = None
+    with suppress(ValueError):
+        pkey = pkey_from_str(private_key)
+    if pkey is None:
+        # unsupported private key or public key or garbage
+        try:
+            PublicBlob.from_string(content)
+        except ValueError:
+            # unsupported private key or garbage
+            raise ValueError("Unsupported key type or invalid key")
+        # any valid public key, including unsupported (without matching SUPPORTED_KEY_TYPES PKey)
+        return content, path, None, None
+    # supported private key
+    public_key_path = path.with_name(path.name + ".pub")
+    if public_key_path.is_file():
+        return public_key_path.read_text(), public_key_path, private_key, path
+    return generate_public_key(pkey), None, private_key, path
 
 
 def check_required_ssh_version() -> bool:

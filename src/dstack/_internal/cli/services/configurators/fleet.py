@@ -38,7 +38,7 @@ from dstack._internal.core.services.diff import copy_model, diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
-from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
+from dstack._internal.utils.ssh import resolve_ssh_key
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -354,22 +354,15 @@ def _preprocess_spec(spec: FleetSpec):
 def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
     if ssh_key_path is None:
         return None
-    ssh_key_path_obj = Path(ssh_key_path).expanduser()
     try:
-        private_key = convert_ssh_key_to_pem(ssh_key_path_obj.read_text())
-        try:
-            pub_key = ssh_key_path_obj.with_suffix(".pub").read_text()
-        except FileNotFoundError:
-            pub_key = generate_public_key(pkey_from_str(private_key))
-        return SSHKey(public=pub_key, private=private_key)
+        public_key, _, private_key, _ = resolve_ssh_key(ssh_key_path)
     except OSError as e:
-        logger.debug("Got OSError: %s", repr(e))
-        console.print(f"[error]Unable to read the SSH key at {ssh_key_path}[/]")
-        exit()
+        raise CLIError(f"Unable to read the SSH key at {ssh_key_path}") from e
     except ValueError as e:
-        logger.debug("Key type is not supported", repr(e))
-        console.print("[error]Key type is not supported[/]")
-        exit()
+        raise CLIError(f"Unsupported or invalid SSH key at {ssh_key_path}") from e
+    if private_key is None:
+        raise CLIError(f"Expected a private key at {ssh_key_path}, got a public key")
+    return SSHKey(public=public_key, private=private_key)
 
 
 def _render_fleet_spec_diff(old_spec: FleetSpec, new_spec: FleetSpec) -> Optional[str]:

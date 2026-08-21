@@ -1,6 +1,7 @@
 import argparse
+from pathlib import Path
 from textwrap import dedent
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from unittest.mock import Mock
 
 import pytest
@@ -11,7 +12,7 @@ from dstack._internal.cli.services.configurators.run import (
     ServiceConfigurator,
     render_run_spec_diff,
 )
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
@@ -24,6 +25,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.server.testing.common import get_run_spec
+from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_NO_COMMENT
 
 _TENSTORRENT_ACCELERATOR_NAMES = tuple(
     sorted({gpu.name for gpu in KNOWN_TENSTORRENT_ACCELERATORS})
@@ -168,7 +170,8 @@ class TestApplyConfiguration:
         apply_plan = Mock()
         monkeypatch.setattr(ServiceConfigurator, "get_plan", get_plan)
         monkeypatch.setattr(ServiceConfigurator, "apply_plan", apply_plan)
-        conf, command_args, configurator_args = Mock(), Mock(), Mock()
+        conf, command_args = Mock(), Mock()
+        configurator_args = argparse.Namespace(ssh_identity_file=None)
 
         ServiceConfigurator(api_client=Mock()).apply_configuration(
             conf, "svc.dstack.yml", command_args, configurator_args
@@ -178,12 +181,14 @@ class TestApplyConfiguration:
             conf=conf,
             configuration_path="svc.dstack.yml",
             configurator_args=configurator_args,
+            ssh_key_pub=None,
         )
         apply_plan.assert_called_once_with(
             run_plan=run_plan,
             repo=repo,
             command_args=command_args,
             configurator_args=configurator_args,
+            ssh_identity_file=None,
         )
 
 
@@ -269,3 +274,45 @@ class TestRenderRunSpecDiff:
         old = get_run_spec(run_name="test", repo_id="test")
         new = get_run_spec(run_name="test", repo_id="test")
         assert render_run_spec_diff(old, new) is None
+
+
+class TestGetSSHKey:
+    def get_ssh_key(
+        self, ssh_identity_file: Optional[Path]
+    ) -> tuple[Optional[str], Optional[Path]]:
+        configurator_args = argparse.Namespace(ssh_identity_file=ssh_identity_file)
+        return ServiceConfigurator(api_client=Mock()).get_ssh_key(configurator_args)
+
+    def test_returns_none_if_not_specified(self):
+        assert self.get_ssh_key(None) == (None, None)
+
+    def test_uses_public_key_file(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+        (tmp_path / "id_ed25519.pub").write_text(PUBLIC_KEY)
+
+        assert self.get_ssh_key(private_key_path) == (PUBLIC_KEY, private_key_path)
+
+    def test_generates_public_key(self, tmp_path: Path):
+        private_key_path = tmp_path / "id_ed25519"
+        private_key_path.write_text(PRIVATE_KEY)
+
+        assert self.get_ssh_key(private_key_path) == (PUBLIC_KEY_NO_COMMENT, private_key_path)
+
+    def test_raises_if_public_key_given(self, tmp_path: Path):
+        public_key_path = tmp_path / "id_ed25519.pub"
+        public_key_path.write_text(PUBLIC_KEY)
+
+        with pytest.raises(CLIError, match="Expected a private key"):
+            self.get_ssh_key(public_key_path)
+
+    def test_raises_if_key_does_not_exist(self, tmp_path: Path):
+        with pytest.raises(CLIError, match="Unable to read the SSH key"):
+            self.get_ssh_key(tmp_path / "id_ed25519")
+
+    def test_raises_if_key_type_is_not_supported(self, tmp_path: Path):
+        key_path = tmp_path / "id_ed25519"
+        key_path.write_text("garbage")
+
+        with pytest.raises(CLIError, match="Unsupported or invalid SSH key"):
+            self.get_ssh_key(key_path)
