@@ -28,7 +28,7 @@ import { RunInspect } from 'pages/Runs/Details/Inspect';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
-import { UserBilling, UserEvents, UserProjects, UserPublicKeys, UserSettings } from 'pages/User/Details';
+import { UserBilling, UserEvents, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
@@ -280,8 +280,9 @@ export const router = createBrowserRouter([
                         element: <UserEvents />,
                     },
                     {
+                        // SSH keys moved to a section inside the Settings tab
                         path: ROUTES.USER.PUBLIC_KEYS.TEMPLATE,
-                        element: <UserPublicKeys />,
+                        element: <Navigate replace to=".." />,
                     },
                     process.env.UI_VERSION === 'sky' && {
                         path: ROUTES.USER.BILLING.LIST.TEMPLATE,
