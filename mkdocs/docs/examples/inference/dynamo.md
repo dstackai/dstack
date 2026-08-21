@@ -24,8 +24,8 @@ env:
   - HF_TOKEN
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-replicas:
-  - count: 1
+groups:
+  - replicas: 1
     docker: true
     commands:
       - apt-get update
@@ -47,7 +47,7 @@ replicas:
     router:
       type: dynamo
 
-  - count: 1..4
+  - replicas: 1..4
     scaling:
       metric: rps
       target: 3
@@ -76,7 +76,7 @@ replicas:
     resources:
       gpu: H200
 
-  - count: 1..8
+  - replicas: 1..8
     scaling:
       metric: rps
       target: 2

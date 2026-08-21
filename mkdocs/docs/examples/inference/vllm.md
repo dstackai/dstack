@@ -140,8 +140,8 @@ env:
   - HF_TOKEN
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-replicas:
-  - count: 1
+groups:
+  - replicas: 1
     python: "3.12"
     commands:
       - pip install smg
@@ -158,7 +158,7 @@ replicas:
     resources:
       cpu: 4
 
-  - count: 1..4
+  - replicas: 1..4
     scaling:
       metric: rps
       target: 3
@@ -173,7 +173,7 @@ replicas:
     resources:
       gpu: H200
 
-  - count: 1..8
+  - replicas: 1..8
     scaling:
       metric: rps
       target: 2
