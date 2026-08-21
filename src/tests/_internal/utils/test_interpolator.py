@@ -52,12 +52,14 @@ class TestVariablesInterpolator:
             get_interpolator().interpolate("${{ secrets.007 }}")
 
     def test_skips_groups_refs(self):
-        s = "ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379"
         interpolator = VariablesInterpolator(
             {"run": {"args": "x"}},
             skip={"groups": is_valid_groups_ip_ref},
         )
-        assert interpolator.interpolate(s) == s
+        nodes = "ray start --address=${{ groups[0].nodes[0].IP_ADDRESS }}:6379"
+        replicas = "python --host ${{ groups[0].replicas[0].IP_ADDRESS }}"
+        assert interpolator.interpolate(nodes) == nodes
+        assert interpolator.interpolate(replicas) == replicas
 
     def test_rejects_invalid_groups_refs(self):
         interpolator = VariablesInterpolator(

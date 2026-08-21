@@ -50,6 +50,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     JobRunningPipelineItem,
     JobRunningWorker,
     _build_nodes_ip_view,
+    _build_replica_groups_ip_view,
     _fetch_run_model,
     _get_cluster_info,
     _prepare_startup_context,
@@ -2964,6 +2965,7 @@ def _router_service_configuration(
     *,
     gateway: Optional[str] = None,
     probes: Optional[list[ProbeConfig]] = None,
+    router_commands: Optional[list[str]] = None,
 ) -> ServiceConfiguration:
     return ServiceConfiguration.model_validate(
         {
@@ -2977,7 +2979,7 @@ def _router_service_configuration(
                 {
                     "name": "router",
                     "router": {"type": router_type},
-                    "commands": ["echo router"],
+                    "commands": router_commands or ["echo router"],
                     "count": 1,
                 },
             ],
@@ -3345,6 +3347,136 @@ class TestPrepareStartupContextReplicaGate:
 
 
 @pytest.mark.asyncio
+class TestPrepareStartupContextReplicaIpWait:
+    def _service_configuration(self) -> ServiceConfiguration:
+        return ServiceConfiguration.model_validate(
+            {
+                "type": "service",
+                "port": 8000,
+                "image": "debian",
+                "groups": [
+                    {"name": "router", "replicas": 1, "commands": ["echo router"]},
+                    {
+                        "name": "worker",
+                        "replicas": 1,
+                        "commands": ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+                    },
+                ],
+            }
+        )
+
+    def _make_context(self, *, router_ip: str, commands: Optional[list[str]] = None):
+        job_model = MagicMock()
+        job_model.submitted_at = datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+        router = _replica_group_job(
+            replica_num=0,
+            replica_group="router",
+            internal_ip=router_ip,
+        )
+        job = MagicMock()
+        job.job_spec.replica_num = 1
+        job.job_spec.replica_group = "worker"
+        job.job_spec.commands = commands or ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"]
+        run = MagicMock()
+        run.jobs = [router]
+        run.run_spec.configuration = self._service_configuration()
+        return _ProcessContext(
+            job_model=job_model,
+            run_model=MagicMock(),
+            run=run,
+            job=job,
+            job_submission=MagicMock(job_runtime_data=None),
+            job_provisioning_data=MagicMock(),
+            instance_access_revoked=False,
+        )
+
+    def _patches(self):
+        @asynccontextmanager
+        async def _fake_session_ctx():
+            yield MagicMock()
+
+        return (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
+                return_value=None,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_session_ctx",
+                _fake_session_ctx,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_job_attached_volumes",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_repo_creds",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_project_secrets_mapping",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.repo_model_to_repo_head_with_creds",
+                return_value=MagicMock(repo_creds=None),
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running.interpolate_job_spec_secrets",
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_cluster_info",
+                return_value=ClusterInfo(
+                    job_ips=["10.0.0.1"], master_job_ip="10.0.0.1", gpus_per_job=0
+                ),
+            ),
+        )
+
+    @freeze_time("2023-01-01 12:00:00Z")
+    async def test_replica_ip_not_ready_defers(self):
+        context = self._make_context(router_ip="")
+        result = _ProcessResult()
+        with ExitStack() as stack:
+            for p in self._patches():
+                stack.enter_context(p)
+            out = await _prepare_startup_context(context=context, result=result)
+        assert out is None
+        assert result.job_update_map == {}
+        assert context.job.job_spec.commands == ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"]
+
+    @freeze_time("2023-01-01 12:00:00Z")
+    async def test_replica_ip_ready_substitutes(self):
+        context = self._make_context(router_ip="10.0.0.5")
+        result = _ProcessResult()
+        with ExitStack() as stack:
+            for p in self._patches():
+                stack.enter_context(p)
+            out = await _prepare_startup_context(context=context, result=result)
+        assert out is not None
+        assert context.job.job_spec.commands == ["echo 10.0.0.5"]
+
+    @freeze_time("2023-01-01 12:00:00Z")
+    async def test_nodes_ref_in_service_terminates(self):
+        context = self._make_context(
+            router_ip="10.0.0.5",
+            commands=["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"],
+        )
+        result = _ProcessResult()
+        with ExitStack() as stack:
+            for p in self._patches():
+                stack.enter_context(p)
+            out = await _prepare_startup_context(context=context, result=result)
+        assert out is None
+        assert result.job_update_map.get("status") == JobStatus.TERMINATING
+        assert "Illegal reference name" in (
+            result.job_update_map.get("termination_reason_message") or ""
+        )
+        assert context.job.job_spec.commands == ["echo ${{ groups[0].nodes[0].IP_ADDRESS }}"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestFetchRunModelDynamoBranch:
     async def test_dynamo_run_loads_all_non_terminated_replicas(
@@ -3420,6 +3552,129 @@ class TestFetchRunModelDynamoBranch:
         )
         assert {j.replica_num for j in run_model.jobs} == {0}
 
+    async def test_sglang_with_replica_ip_refs_loads_all_replicas(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=_router_service_configuration(
+                "sglang",
+                router_commands=["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+            ),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=0,
+            status=JobStatus.PROVISIONING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=1,
+            status=JobStatus.PROVISIONING,
+        )
+        run_id = run.id
+        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
+        await session.commit()
+        session.expire_all()
+        run_model = await _fetch_run_model(
+            session=session,
+            run_id=run_id,
+            replica_num=1,
+            run_spec=parsed,
+        )
+        assert {j.replica_num for j in run_model.jobs} == {0, 1}
+
+    async def test_sglang_without_replica_ip_refs_loads_only_own_replica(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=_router_service_configuration("sglang"),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=0,
+            status=JobStatus.PROVISIONING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=1,
+            status=JobStatus.PROVISIONING,
+        )
+        run_id = run.id
+        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
+        await session.commit()
+        session.expire_all()
+        run_model = await _fetch_run_model(
+            session=session,
+            run_id=run_id,
+            replica_num=1,
+            run_spec=parsed,
+        )
+        assert {j.replica_num for j in run_model.jobs} == {1}
+
+    async def test_sglang_with_replica_ip_refs_drops_terminated_replicas(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=_router_service_configuration(
+                "sglang",
+                router_commands=["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+            ),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=0,
+            status=JobStatus.PROVISIONING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=1,
+            status=JobStatus.PROVISIONING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            replica_num=2,
+            status=JobStatus.TERMINATED,
+        )
+        run_id = run.id
+        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
+        await session.commit()
+        session.expire_all()
+        run_model = await _fetch_run_model(
+            session=session,
+            run_id=run_id,
+            replica_num=1,
+            run_spec=parsed,
+        )
+        assert {j.replica_num for j in run_model.jobs} == {0, 1}
+
 
 def _node_group_job(
     *,
@@ -3444,6 +3699,35 @@ def _node_group_job(
                 job_provisioning_data=get_job_provisioning_data(
                     internal_ip=internal_ip,
                     gpu_count=gpu_count,
+                ),
+                job_runtime_data=None,
+            )
+        ],
+    )
+
+
+def _replica_group_job(
+    *,
+    replica_num: int,
+    replica_group: str,
+    internal_ip: str,
+    status: JobStatus = JobStatus.PROVISIONING,
+) -> Job:
+    return Job.model_construct(
+        job_spec=JobSpec.model_construct(
+            replica_num=replica_num,
+            job_num=0,
+            replica_group=replica_group,
+            commands=[],
+        ),
+        job_submissions=[
+            JobSubmission.model_construct(
+                id=uuid.uuid4(),
+                submitted_at=datetime.now(timezone.utc),
+                status=status,
+                job_provisioning_data=get_job_provisioning_data(
+                    internal_ip=internal_ip,
+                    gpu_count=1,
                 ),
                 job_runtime_data=None,
             )
@@ -3555,3 +3839,83 @@ class TestNodesIpView:
         nodes_view = [["10.0.0.1"]]
         with pytest.raises(InterpolatorError, match="out of range"):
             _referenced_ips_ready(["echo ${{ groups[1].nodes[0].IP_ADDRESS }}"], nodes_view)
+
+
+class TestReplicaGroupsIpView:
+    def _configuration(self, groups: list[dict]) -> ServiceConfiguration:
+        return ServiceConfiguration.model_validate(
+            {
+                "type": "service",
+                "port": 8000,
+                "image": "debian",
+                "groups": groups,
+            }
+        )
+
+    def test_builds_min_length_rows_by_group_order(self):
+        configuration = self._configuration(
+            [
+                {"name": "router", "replicas": 1, "commands": ["echo router"]},
+                {"name": "worker", "replicas": 1, "commands": ["echo worker"]},
+            ]
+        )
+        jobs = [
+            _replica_group_job(replica_num=0, replica_group="router", internal_ip="10.0.0.1"),
+            _replica_group_job(replica_num=1, replica_group="worker", internal_ip="10.0.0.2"),
+        ]
+        assert _build_replica_groups_ip_view(jobs, configuration) == [
+            ["10.0.0.1"],
+            ["10.0.0.2"],
+        ]
+
+    def test_row_length_is_min_not_live_count(self):
+        configuration = self._configuration(
+            [
+                {
+                    "name": "workers",
+                    "replicas": "1..4",
+                    "scaling": {"metric": "rps", "target": 10},
+                    "commands": ["echo worker"],
+                }
+            ]
+        )
+        jobs = [
+            _replica_group_job(replica_num=0, replica_group="workers", internal_ip="10.0.0.1"),
+            _replica_group_job(replica_num=1, replica_group="workers", internal_ip="10.0.0.2"),
+        ]
+        assert _build_replica_groups_ip_view(jobs, configuration) == [["10.0.0.1"]]
+
+    def test_skips_terminated_jobs(self):
+        configuration = self._configuration(
+            [{"name": "router", "replicas": 1, "commands": ["echo router"]}]
+        )
+        jobs = [
+            _replica_group_job(
+                replica_num=0,
+                replica_group="router",
+                internal_ip="10.0.0.9",
+                status=JobStatus.TERMINATED,
+            ),
+            _replica_group_job(replica_num=1, replica_group="router", internal_ip="10.0.0.1"),
+        ]
+        assert _build_replica_groups_ip_view(jobs, configuration) == [["10.0.0.1"]]
+
+    def test_empty_ip_when_not_provisioned(self):
+        configuration = self._configuration(
+            [{"name": "router", "replicas": 1, "commands": ["echo router"]}]
+        )
+        jobs = [_replica_group_job(replica_num=0, replica_group="router", internal_ip="")]
+        assert _build_replica_groups_ip_view(jobs, configuration) == [[""]]
+
+    def test_referenced_replica_ips_ready(self):
+        replica_view = [["10.0.0.1"], [""]]
+        assert _referenced_ips_ready(
+            ["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
+            replica_view,
+            member="replicas",
+        )
+        assert not _referenced_ips_ready(
+            ["echo ${{ groups[1].replicas[0].IP_ADDRESS }}"],
+            replica_view,
+            member="replicas",
+        )

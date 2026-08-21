@@ -677,6 +677,9 @@ class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator)
     def apply_args(self, conf: ServiceConfiguration, args: argparse.Namespace):
         super().apply_args(conf, args)
         self.apply_commands_args(conf, args)
+        if conf.groups is not None:
+            for group in conf.groups:
+                self._interpolate_commands(group.commands, args)
 
 
 def _get_ready_wait_interval(attempt: int) -> float:
