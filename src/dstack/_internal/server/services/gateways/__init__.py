@@ -183,21 +183,19 @@ async def get_gateway_by_name(
 
 
 def create_gateway_replica_model(
-    project_name: str,
-    configuration: GatewayConfiguration,
+    gateway_model: GatewayModel,
     replica_num: int,
-    gateway_id: uuid.UUID,
-    backend_id: uuid.UUID,
 ) -> GatewayReplicaModel:
-    assert configuration.name is not None
+    configuration = get_gateway_configuration(gateway_model)
+    replica_name = f"{gateway_model.name}-{replica_num}"
 
     private_bytes, public_bytes = crypto.generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
 
     replica_configuration = GatewayReplicaConfiguration(
-        project_name=project_name,
-        instance_name=f"{configuration.name}-{replica_num}",
+        project_name=gateway_model.project.name,
+        instance_name=replica_name,
         backend=configuration.backend,
         region=configuration.region,
         instance_type=configuration.instance_type,
@@ -209,8 +207,9 @@ def create_gateway_replica_model(
 
     now = get_current_datetime()
     return GatewayReplicaModel(
-        gateway_id=gateway_id,
-        backend_id=backend_id,
+        name=replica_name,
+        gateway_id=gateway_model.id,
+        backend_id=gateway_model.backend_id,
         replica_num=replica_num,
         configuration=replica_configuration.model_dump_json(),
         ssh_private_key=gateway_ssh_private_key,

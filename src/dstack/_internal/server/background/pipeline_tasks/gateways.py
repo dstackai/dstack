@@ -764,18 +764,14 @@ def _reconcile_gateway_replica_count(
             gateway_model
         ):
             return _ReplicaScalingResult(needs_more_replicas=True)
-        configuration = gateways_services.get_gateway_configuration(gateway_model)
         used_nums = {
             r.replica_num for r in gateway_replicas if r.status != GatewayReplicaStatus.TERMINATED
         }
         new_nums = itertools.islice(get_lowest_unused_nums(used_nums), diff)
         new_gateway_replica_models = [
             gateways_services.create_gateway_replica_model(
-                project_name=gateway_model.project.name,
-                configuration=configuration,
+                gateway_model=gateway_model,
                 replica_num=replica_num,
-                gateway_id=gateway_model.id,
-                backend_id=gateway_model.backend_id,
             )
             for replica_num in new_nums
         ]

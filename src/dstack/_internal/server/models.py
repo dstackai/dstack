@@ -692,6 +692,7 @@ class GatewayReplicaModel(PipelineModelMixin, BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+    name: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     skip_min_processing_interval: Mapped[bool] = mapped_column(
