@@ -1,18 +1,22 @@
 import shlex
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import gpuhunt
 from gpuhunt.providers.seeweb import SeewebProvider
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    DEFAULT_PRIVATE_SUBNETS,
     ComputeWithCreateInstanceSupport,
     ComputeWithFilteredOffersCached,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
-    get_shim_commands,
+    get_dstack_shim_binary_path,
+    get_setup_cloud_instance_commands,
+    get_shim_env,
+    get_shim_pre_start_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.seeweb.api_client import (
@@ -22,7 +26,7 @@ from dstack._internal.core.backends.seeweb.api_client import (
 from dstack._internal.core.backends.seeweb.models import SeewebConfig
 from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -37,10 +41,11 @@ logger = get_logger(__name__)
 # Seeweb auto-generates the server name; notes are limited, so keep the label short.
 MAX_INSTANCE_NAME_LEN = 60
 
-# Seeweb statuses that mean provisioning failed (matched case-insensitively).
-FAILED_SERVER_STATUSES = {"failed", "error", "deleted", "deleting"}
-FAILED_ACTION_STATUSES = {"failed", "error", "cancelled", "canceled"}
-COMPLETED_ACTION_STATUSES = {"completed", "complete", "success", "succeeded"}
+# Statuses from Seeweb's `ecsapi` SDK (`ServerStatusEnum`/`ActionStatusEnum`),
+# matched case-insensitively; the API reports them capitalized (e.g. "Fail").
+FAILED_SERVER_STATUSES = {"fail", "deleted", "deleting"}
+FAILED_ACTION_STATUSES = {"failed"}
+COMPLETED_ACTION_STATUSES = {"completed"}
 
 GPU_IMAGE_PREFERENCE = (
     "ubuntu-2204-uefi-nvidia-driver",
@@ -70,7 +75,7 @@ class SeewebCompute(
         return catalog
 
     def get_offers_by_requirements(
-        self, requirements: Requirements, full_offers: bool
+        self, requirements: Requirements, full_offers: bool, unallocated_resources: bool
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.SEEWEB,
@@ -111,13 +116,14 @@ class SeewebCompute(
             is_gpu=is_gpu,
         )
 
+        arch = instance_offer.instance.resources.cpu_arch
         commands = _setup_commands(authorized_keys=public_keys, is_gpu=is_gpu)
-        shim_commands = get_shim_commands(arch=instance_offer.instance.resources.cpu_arch)
-        # The Seeweb GPU image reboots after its first-boot package upgrade. Do not start
-        # the shim before that reboot, otherwise dstack can submit a GPU job while the
-        # userspace NVIDIA libraries no longer match the still-loaded kernel module.
-        commands += shim_commands[:-1]
-        commands += _persist_shim_commands()
+        commands += get_setup_cloud_instance_commands(
+            skip_firewall_setup=False,
+            firewall_allow_from_subnets=DEFAULT_PRIVATE_SUBNETS,
+        )
+        commands += get_shim_pre_start_commands(arch=arch)
+        commands += _persist_shim_commands(get_shim_env(arch=arch))
         user_customize = "#!/bin/bash\nset -euo pipefail\n" + "\n".join(commands)
 
         body = {
@@ -146,7 +152,7 @@ class SeewebCompute(
             ssh_port=22,
             ssh_proxy=None,
             dockerized=True,
-            backend_data=SeewebInstanceBackendData(action_id=action_id).json(),
+            backend_data=SeewebInstanceBackendData(action_id=action_id).model_dump_json(),
         )
 
     def update_provisioning_data(
@@ -253,8 +259,10 @@ def _install_nvidia_container_toolkit_commands() -> List[str]:
     ]
 
 
-def _persist_shim_commands() -> List[str]:
-    """Make the shim survive the reboot performed by Seeweb's GPU image updates."""
+def _persist_shim_commands(shim_env: Dict[str, str]) -> List[str]:
+    """Run the shim as a systemd service so it starts after Seeweb's first-boot reboot."""
+    env_lines = [f"{key}={value}" for key, value in shim_env.items()]
+    write_env = "printf '%s\\n' " + " ".join(map(shlex.quote, env_lines))
     unit_lines = [
         "[Unit]",
         "Description=dstack shim",
@@ -263,7 +271,7 @@ def _persist_shim_commands() -> List[str]:
         "",
         "[Service]",
         "EnvironmentFile=/etc/dstack-shim.env",
-        "ExecStart=/usr/local/bin/dstack-shim",
+        f"ExecStart={get_dstack_shim_binary_path()}",
         "Restart=always",
         "RestartSec=3",
         "",
@@ -272,12 +280,13 @@ def _persist_shim_commands() -> List[str]:
     ]
     write_unit = "printf '%s\\n' " + " ".join(map(shlex.quote, unit_lines))
     return [
-        "env | grep '^DSTACK_' > /etc/dstack-shim.env",
+        f"{write_env} > /etc/dstack-shim.env",
         "chmod 0600 /etc/dstack-shim.env",
         f"{write_unit} > /etc/systemd/system/dstack-shim.service",
         "systemctl daemon-reload",
-        # Do not start the service on the initial boot. Seeweb's GPU image performs an
-        # automatic reboot after cloud-init, and the service must become reachable only then.
+        # Only enable, never start: Seeweb's cloud-config unconditionally reboots the
+        # server at the end of first-boot cloud-init (`power_state`), and the service
+        # must become reachable only on that next boot.
         "systemctl enable dstack-shim.service",
     ]
 
@@ -289,4 +298,4 @@ class SeewebInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "SeewebInstanceBackendData":
         if raw is None:
             return cls()
-        return cls.__response__.parse_raw(raw)
+        return validate_json_extra_ignore(cls, raw)

@@ -2,7 +2,7 @@ import shlex
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gpuhunt import RawCatalogItem
+from gpuhunt import CatalogItem
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
@@ -41,8 +41,9 @@ def _compute(regions=None) -> SeewebCompute:
     return compute
 
 
-def _raw(name: str, gpu: str, location: str = "it-fr2") -> RawCatalogItem:
-    return RawCatalogItem(
+def _raw(name: str, gpu: str, location: str = "it-fr2") -> CatalogItem:
+    return CatalogItem(
+        provider="seeweb",
         instance_name=name,
         location=location,
         price=0.38,
@@ -98,7 +99,7 @@ def _provisioning_data(action_id: int | None = 35) -> JobProvisioningData:
         ssh_port=22,
         dockerized=True,
         ssh_proxy=None,
-        backend_data=SeewebInstanceBackendData(action_id=action_id).json(),
+        backend_data=SeewebInstanceBackendData(action_id=action_id).model_dump_json(),
     )
 
 
@@ -122,7 +123,7 @@ def test_get_offers_marks_only_creatable_as_available():
         ),
     ):
         offers = SeewebCompute(_config()).get_offers_by_requirements(
-            requirements=None, full_offers=False
+            requirements=None, full_offers=False, unallocated_resources=False
         )
 
     by_name = {offer.instance.name: offer for offer in offers}
@@ -148,7 +149,7 @@ def test_get_offers_filters_configured_regions():
         ),
     ):
         offers = SeewebCompute(_config(["it-mi2"])).get_offers_by_requirements(
-            requirements=None, full_offers=False
+            requirements=None, full_offers=False, unallocated_resources=False
         )
 
     assert [offer.region for offer in offers] == ["it-mi2"]
@@ -217,8 +218,12 @@ def test_create_instance_uses_allowed_image_and_quotes_ssh_key():
             return_value="dstack-seeweb-test",
         ),
         patch(
-            "dstack._internal.core.backends.seeweb.compute.get_shim_commands",
-            return_value=["prepare-shim", "start-shim"],
+            "dstack._internal.core.backends.seeweb.compute.get_shim_pre_start_commands",
+            return_value=["prepare-shim"],
+        ),
+        patch(
+            "dstack._internal.core.backends.seeweb.compute.get_shim_env",
+            return_value={"DSTACK_SHIM_HTTP_PORT": "10998"},
         ),
     ):
         provisioning_data = compute.create_instance(
@@ -233,7 +238,10 @@ def test_create_instance_uses_allowed_image_and_quotes_ssh_key():
     assert f"printf '%s\\n' {shlex.quote(public_key)}" in body["user_customize"]
     assert 'echo "ssh-' not in body["user_customize"]
     assert "prepare-shim" in body["user_customize"]
-    assert "start-shim" not in body["user_customize"]
+    # The shim must not be started on the first boot; systemd starts it after the reboot.
+    assert "nohup" not in body["user_customize"]
+    assert "DSTACK_SHIM_HTTP_PORT=10998" in body["user_customize"]
+    assert "> /etc/dstack-shim.env" in body["user_customize"]
     assert "EnvironmentFile=/etc/dstack-shim.env" in body["user_customize"]
     assert body["user_customize"].endswith("systemctl enable dstack-shim.service")
     assert provisioning_data.instance_id == "ec-test"
@@ -280,10 +288,10 @@ def test_update_provisioning_data_raises_for_failed_server():
     compute = _compute()
     compute.api_client.get_server.return_value = {
         "name": "ec-test",
-        "status": "Error",
+        "status": "Fail",
     }
 
-    with pytest.raises(ProvisioningError, match="entered status 'error'"):
+    with pytest.raises(ProvisioningError, match="entered status 'fail'"):
         compute.update_provisioning_data(_provisioning_data(action_id=None), "public", "private")
 
 
