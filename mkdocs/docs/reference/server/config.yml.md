@@ -341,6 +341,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=seeweb]` { #seeweb data-toc-label="seeweb" }
+
+#SCHEMA# dstack._internal.core.backends.seeweb.models.SeewebBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: seeweb-
+
+###### `projects[n].backends[type=seeweb].creds` { #seeweb-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.seeweb.models.SeewebAPITokenCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=amddevcloud]` { #amddevcloud data-toc-label="amddevcloud" }
 
 #SCHEMA# dstack._internal.core.backends.digitalocean_base.models.BaseDigitalOceanBackendConfigWithCreds

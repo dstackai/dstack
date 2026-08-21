@@ -13,6 +13,7 @@ declare type TBackendType =
     | 'remote'
     | 'oci'
     | 'runpod'
+    | 'seeweb'
     | 'tensordock'
     | 'vastai'
     | 'cloudrift'
