@@ -177,7 +177,7 @@ class TestAgentIsolation:
 def _session_workspace(tmp_path):
     session_dir = tmp_path / "session-under-test"
     session_dir.mkdir()
-    session = PresetSession(path=session_dir, debug=False, preset_id="abcd1234")
+    session = PresetSession(path=session_dir, preset_id="abcd1234")
     session.write_state(get_session_state(id="abcd1234"))
     workspace, _ = create_agent_workspace(session)
     return workspace
@@ -199,7 +199,7 @@ class TestAgentSession:
     def test_creates_private_session_with_log_and_manifest(self, tmp_path, monkeypatch, capsys):
         self._home(tmp_path, monkeypatch)
 
-        session = create_preset_session(self._configuration(), previous=(), debug=False)
+        session = create_preset_session(self._configuration(), previous=())
 
         assert session.path.parent == tmp_path / ".dstack" / "presets"
         assert session.path.name == session.preset_id
@@ -208,6 +208,7 @@ class TestAgentSession:
             "agent.log",
             "session.json",
             "preset.dstack.yml",
+            "trace.jsonl",
         }
         state = json.loads((session.path / "session.json").read_text())
         assert state["id"] == session.preset_id
@@ -222,26 +223,20 @@ class TestAgentSession:
             assert session.path.stat().st_mode & 0o777 == 0o700
             assert session.log_path.stat().st_mode & 0o777 == 0o600
 
-    def test_debug_session_saves_scrubbed_configuration_and_trace(self, tmp_path, monkeypatch):
+    def test_session_saves_scrubbed_configuration(self, tmp_path, monkeypatch):
         self._home(tmp_path, monkeypatch)
 
-        debug_session = create_preset_session(self._configuration(), previous=(), debug=True)
+        session = create_preset_session(self._configuration(), previous=())
 
-        data = yaml.safe_load((debug_session.path / "preset.dstack.yml").read_text())
-        assert {path.name for path in debug_session.path.iterdir()} == {
-            "agent.log",
-            "preset.dstack.yml",
-            "session.json",
-            "trace.jsonl",
-        }
+        data = yaml.safe_load((session.path / "preset.dstack.yml").read_text())
         assert data["max_price"] == 0.5
         assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
-        assert "false" not in (debug_session.path / "preset.dstack.yml").read_text()
+        assert "false" not in (session.path / "preset.dstack.yml").read_text()
 
     @pytest.mark.parametrize("status", ["success", "failed"])
     def test_finish_records_terminal_status(self, tmp_path, monkeypatch, status):
         self._home(tmp_path, monkeypatch)
-        session = create_preset_session(self._configuration(), previous=(), debug=False)
+        session = create_preset_session(self._configuration(), previous=())
 
         finished_path = session.finish(status)
 
@@ -254,7 +249,6 @@ class TestAgentSession:
         (session_dir / "agent.log").touch()
         session = PresetSession(
             path=session_dir,
-            debug=False,
             preset_id="ab12cd34",
         )
         session.write_state(get_session_state())
@@ -274,7 +268,7 @@ class TestAgentSession:
 
         with pytest.raises(CLIError, match="Could not create agent output"):
             create_preset_session(
-                PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"), previous=(), debug=False
+                PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"), previous=()
             )
 
     def test_log_write_failure_warns_once(self, tmp_path, capsys):
@@ -283,7 +277,6 @@ class TestAgentSession:
         (path / "agent.log").touch()
         session = PresetSession(
             path=path,
-            debug=False,
             preset_id="ab12cd34",
         )
         shutil.rmtree(path)
@@ -326,13 +319,12 @@ print(json.dumps({
         )
 
         workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
-        session_path = tmp_path / "debug-running"
+        session_path = tmp_path / "session-running"
         session_path.mkdir()
         (session_path / "agent.log").touch()
         (session_path / "trace.jsonl").touch()
         session = PresetSession(
             path=session_path,
-            debug=True,
             preset_id="ab12cd34",
         )
         output = await run_preset_agent(
@@ -385,7 +377,7 @@ print(json.dumps({"type": "result", "structured_output": {"ok": True}}))
         session_path = tmp_path / "session"
         session_path.mkdir()
         (session_path / "agent.log").touch()
-        session = PresetSession(path=session_path, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_path, preset_id="ab12cd34")
 
         output = await run_preset_agent(
             prompt="p",
@@ -434,7 +426,6 @@ print(json.dumps({
             redacted_values=(),
             session=PresetSession(
                 path=session_path,
-                debug=False,
                 preset_id="ab12cd34",
             ),
         )
@@ -450,7 +441,6 @@ print(json.dumps({
         (session_path / "agent.log").touch()
         session = PresetSession(
             path=session_path,
-            debug=False,
             preset_id="ab12cd34",
         )
 
@@ -637,7 +627,7 @@ class TestWriteAgentInfo:
         )
         session_dir = tmp_path / "session"
         session_dir.mkdir()
-        session = PresetSession(path=session_dir, debug=True, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
 
         session.write_agent_info(
             ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
@@ -654,7 +644,7 @@ class TestWriteAgentInfo:
 def _offsets(tmp_path):
     session_dir = tmp_path / "offsets-session"
     session_dir.mkdir(exist_ok=True)
-    return open_session_offsets(PresetSession(path=session_dir, debug=False, preset_id="offsets0"))
+    return open_session_offsets(PresetSession(path=session_dir, preset_id="offsets0"))
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -679,7 +669,6 @@ def _agent_setup(tmp_path):
     (session_path / "agent.log").touch()
     session = PresetSession(
         path=session_path,
-        debug=False,
         preset_id="ab12cd34",
     )
     session.write_state(get_session_state())
@@ -870,7 +859,7 @@ class TestWorkspaceLifecycle:
     def _session(self, tmp_path):
         session_dir = tmp_path / "sessions" / "ab12cd34"
         session_dir.mkdir(parents=True)
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
         session.write_state(get_session_state())
         return session
 
@@ -976,7 +965,7 @@ class TestOldFlatSessionState:
         session_dir = tmp_path / "30a012bf"
         session_dir.mkdir()
         (session_dir / "session.json").write_text(json.dumps(flat))
-        session = PresetSession(path=session_dir, debug=False, preset_id="30a012bf")
+        session = PresetSession(path=session_dir, preset_id="30a012bf")
 
         state = session.read_state()
 
@@ -1012,7 +1001,6 @@ class TestLoadResumableSession:
                 "id": "ab12cd34",
                 "status": "interrupted",
                 "run": get_session_run(claude_session_id="sid-1"),
-                "debug": True,
                 "created_at": "2026-07-20T10:00:00Z",
             },
         )
@@ -1020,7 +1008,6 @@ class TestLoadResumableSession:
         session = load_resumable_session("ab12cd34")
 
         assert session.preset_id == "ab12cd34"
-        assert session.debug is True
 
     def test_treats_dead_running_session_as_resumable(self, tmp_path, monkeypatch):
         self._write_session(
@@ -1246,7 +1233,7 @@ class TestStopOrDetach:
         session_dir = tmp_path / "ab12cd34"
         session_dir.mkdir()
         (session_dir / "agent.log").touch()
-        session = PresetSession(path=session_dir, debug=False, preset_id="ab12cd34")
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
         session.write_state(get_session_state())
         agent = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(300)"], start_new_session=True

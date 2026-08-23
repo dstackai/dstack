@@ -210,7 +210,6 @@ def get_session_state(**overrides: Any) -> PresetSessionState:
         "trials_num": None,
         "previous": [],
         "created_at": datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
-        "debug": False,
         "status": "running",
         "owner": None,
         "run": None,

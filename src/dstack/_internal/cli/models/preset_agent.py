@@ -118,7 +118,6 @@ class PresetSessionState(CoreModel):
     trials_num: Optional[int]
     previous: list[str]
     created_at: datetime
-    debug: bool
     status: PresetSessionStatus
     # None is a detached session.
     owner: Optional[PresetSessionProcess]

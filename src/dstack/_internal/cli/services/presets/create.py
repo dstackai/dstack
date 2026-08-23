@@ -400,7 +400,6 @@ def create_preset(
     store: PresetStore,
     keep_service: bool = False,
     build_name: Optional[str] = None,
-    debug: bool = False,
     resume_session: Optional[PresetSession] = None,
     user_prompt: Optional[str] = None,
     allowed_fleets: Optional[tuple[str, ...]] = None,
@@ -409,7 +408,6 @@ def create_preset(
     session = resume_session or create_preset_session(
         configuration,
         previous=tuple(session.preset_id for session in previous),
-        debug=debug,
     )
     try:
         resolved_configuration = _resolve_preset_env(configuration)
@@ -629,10 +627,9 @@ async def _create_preset(
         # A second, persistent copy: the workspace above is deleted with the run,
         # while the listing and `--previous` read constraints from the session dir.
         session.write_constraints(constraints_text)
-        if session.debug:
-            session.write_prompt(prompt)
-            if setup.auth is not None:
-                session.write_agent_info(setup.auth)
+        session.write_prompt(prompt)
+        if setup.auth is not None:
+            session.write_agent_info(setup.auth)
     try:
         if mode == "attach":
             process_output = await attach_preset_agent(
@@ -685,12 +682,11 @@ async def _create_preset(
         interrupted = True
         raise
     finally:
-        if session.debug:
-            _save_final_report_copy(
-                workspace=setup.workspace,
-                session=session,
-                redacted_values=redacted_values,
-            )
+        _save_final_report_copy(
+            workspace=setup.workspace,
+            session=session,
+            redacted_values=redacted_values,
+        )
         if not interrupted:
             keep_final_service = keep_service and creation_succeeded
             try:
@@ -1009,8 +1005,7 @@ async def _cleanup_runs(
                     pending.remove(name)
             if pending:
                 await asyncio.sleep(2)
-    if session.debug:
-        print_preset_progress("All preset creation runs stopped.", session=session)
+    print_preset_progress("All preset creation runs stopped.", session=session)
 
 
 def _load_submitted_run_names(path: Path) -> list[str]:

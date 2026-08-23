@@ -375,7 +375,7 @@ def _prepare_subprocess_command(command: list[str]) -> list[str]:
     return [comspec, "/d", "/s", "/c", subprocess.list2cmdline(command)]
 
 
-def _write_debug_trace(
+def _write_trace(
     session: PresetSession,
     *,
     stream_name: Literal["stdout", "stderr"],
@@ -523,7 +523,7 @@ async def _read_process_stream(
     redacted_values: Sequence[str],
     session: PresetSession,
 ) -> PresetAgentProcessOutput:
-    # stderr feeds the debug trace and advances the persisted offset, but only
+    # stderr feeds the trace and advances the persisted offset, but only
     # stdout can carry the report.
     parse_result = stream_name == "stdout"
     output = PresetAgentProcessOutput()
@@ -532,13 +532,12 @@ async def _read_process_stream(
         if not line:
             return output
         text = line.decode(errors="replace")
-        if session.debug:
-            _write_debug_trace(
-                session,
-                stream_name=stream_name,
-                text=text,
-                redacted_values=redacted_values,
-            )
+        _write_trace(
+            session,
+            stream_name=stream_name,
+            text=text,
+            redacted_values=redacted_values,
+        )
         if not parse_result:
             continue
         try:
