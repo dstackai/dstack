@@ -1,347 +1,295 @@
-from typing import Annotated, Any, Literal, Optional, Union
+import re
+from typing import Any, List, Literal, Optional, Sequence, Union
+from uuid import UUID
 
-from pydantic import (
-    ConfigDict,
-    Field,
-    PositiveInt,
-    field_validator,
-    model_validator,
-)
-from typing_extensions import Self
+from pydantic import Field, PositiveFloat, PositiveInt, field_validator, model_validator
+from typing_extensions import Annotated, Self
 
-from dstack._internal.core.models.common import (
-    CoreModel,
-    EntityReference,
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.configurations import (
+    PresetModelSpec,
+    ServiceConfiguration,
 )
-from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 
-DEFAULT_INPUT_TOKENS = 1024
-DEFAULT_OUTPUT_TOKENS = 1024
-DEFAULT_BASELINE = True
-DEFAULT_DATASET = "random"
+# These models cannot live in `core/models/presets.py`: `core/models/configurations.py`
+# imports `PresetConfiguration` from it, so importing `ServiceConfiguration` back would
+# be a cycle. Nothing imports this sibling module from `configurations.py`.
+
+# Enforced by the server; the client checks before pushing to fail fast. File
+# contents travel as file archives (the same mechanism run `files` use), so
+# their sizes are governed by the files service, not here.
+MAX_PRESET_SPEC_SIZE = 1 * 1024 * 1024
+MAX_PRESET_FILES = 100
+
+# The service name, the gateway, and the profile parameters are chosen by whoever
+# runs `dstack apply` with the preset, so a preset never carries them.
+PRESET_EXCLUDED_FIELDS = ("name", "gateway", *ProfileParams.model_fields)
+
+# The local store keeps the preset document at this path inside the preset
+# directory, so a pushed file must never claim it.
+_RESERVED_PRESET_FILE_PATHS = frozenset({"preset.yml"})
 
 
-class PresetModelRepo(CoreModel):
-    repo: Annotated[str, Field(description="The exact model repo or path to deploy")]
-    name: Annotated[
-        Optional[str], Field(description="The client-facing model name. Defaults to `repo`")
-    ] = None
+class PresetWorkload(CoreModel):
+    # A Literal, not a str: the agent-facing JSON schema is generated from this
+    # model, so the allowed values must be part of it.
+    api: Literal["chat_completions", "completions"]
+    dataset: str
+    num_requests: PositiveInt
+    input_tokens: PositiveInt
+    output_tokens: Annotated[int, Field(ge=2)]
+    concurrency: PositiveInt
+
+
+class PresetRandomWorkload(PresetWorkload):
+    # A Literal, not a defaulted str: `PresetBenchmark.workload` is a union with
+    # the base model, and only a literal `dataset` discriminates it.
+    dataset: Literal["random"] = "random"
+    shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
+
+
+class PresetBenchmarkLatency(CoreModel):
+    mean: Annotated[float, Field(ge=0)]
+    p50: Annotated[float, Field(ge=0)]
+    p99: Annotated[float, Field(ge=0)]
+
+
+class PresetBenchmarkMetrics(CoreModel):
+    successful_requests: Annotated[int, Field(ge=0)]
+    failed_requests: Annotated[int, Field(ge=0)]
+    duration_seconds: PositiveFloat
+    total_input_tokens: Annotated[int, Field(ge=0)]
+    total_output_tokens: Annotated[int, Field(ge=0)]
+    # Stored as reported, but never read back: `effective_*` recomputes both
+    # from the totals rather than trusting self-reported rates.
+    output_tok_per_s: PositiveFloat
+    per_user_tok_per_s: PositiveFloat
+    ttft_ms: PresetBenchmarkLatency
+    tpot_ms: PresetBenchmarkLatency
+
+
+class PresetBenchmark(CoreModel):
+    """The agent reports its benchmark in exactly this shape, and is forced to by
+    the schema generated from it. Changing a field here means also changing the
+    `## Benchmark` section of the system prompt, which tells it what to put there."""
+
+    tool: Annotated[str, Field(min_length=1)]
+    tool_version: Annotated[str, Field(min_length=1)]
+    command: Annotated[str, Field(min_length=1)]
+    # The subclass first: a report without `dataset` is a random workload, and a
+    # base-typed field would reject its `shared_prefix_tokens` as unknown.
+    workload: Union[PresetRandomWorkload, PresetWorkload]
+    metrics: PresetBenchmarkMetrics
 
     @property
-    def api_model_name(self) -> str:
-        return self.name or self.repo
+    def effective_output_tok_per_s(self) -> float:
+        return self.metrics.total_output_tokens / self.metrics.duration_seconds
 
     @property
-    def exact_repo(self) -> str:
-        return self.repo
+    def effective_per_user_tok_per_s(self) -> float:
+        return 1000 / self.metrics.tpot_ms.mean
 
-    @property
-    def allows_variant_selection(self) -> bool:
-        return False
-
-    @field_validator("repo")
+    @field_validator("command")
     @classmethod
-    def validate_repo(cls, value: str) -> str:
-        return _validate_model(value, field="repo")
-
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        return _validate_model(value, field="name")
-
-
-class PresetModelBase(CoreModel):
-    base: Annotated[
-        str,
-        Field(description="The base model for which the agent may select a compatible variant"),
-    ]
-
-    @property
-    def api_model_name(self) -> str:
-        return self.base
-
-    @property
-    def exact_repo(self) -> None:
-        return None
-
-    @property
-    def allows_variant_selection(self) -> bool:
-        return True
-
-    @field_validator("base")
-    @classmethod
-    def validate_base(cls, value: str) -> str:
-        return _validate_model(value, field="base")
-
-
-PresetModelSpec = Union[PresetModelRepo, PresetModelBase]
-
-MAX_PROMPT_LENGTH = 10_000
-
-
-class PresetPromptFile(CoreModel):
-    path: Annotated[
-        str,
-        Field(description="The path to a prompt file, relative to the configuration file"),
-    ]
-
-    @field_validator("path")
-    @classmethod
-    def validate_path(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("Prompt path must be a non-empty string")
+    def validate_command_has_no_bearer_token(cls, value: str) -> str:
+        for match in re.finditer(r"(?i)\bbearer\s+([^\s\"']+)", value):
+            token = match.group(1)
+            if token.startswith("$") or "redacted" in token.lower() or set(token) == {"*"}:
+                continue
+            # Prose such as "auth via bearer header from env" is not a
+            # credential: only credential-shaped values are rejected.
+            if len(token) < 16 or not any(char.isdigit() for char in token):
+                continue
+            raise ValueError("command must not contain a bearer token value")
         return value
 
-
-def _drop_model_from_required(schema: dict) -> None:
-    # `model` is synthesized from the top-level `base`/`repo` shorthand by a
-    # before-validator, which JSON Schema consumers never run.
-    required = [field for field in schema.get("required", []) if field != "model"]
-    if required:
-        schema["required"] = required
-    else:
-        schema.pop("required", None)
+    @model_validator(mode="after")
+    def validate_metrics(self) -> Self:
+        if self.metrics.failed_requests != 0:
+            raise ValueError("benchmark must not include failed requests")
+        if self.metrics.successful_requests != self.workload.num_requests:
+            raise ValueError("benchmark request count must match workload.num_requests")
+        return self
 
 
-class PresetConfiguration(
-    ProfileParams,
-):
-    model_config = ConfigDict(json_schema_extra=_drop_model_from_required)
+class PresetVerificationReplicaGroup(CoreModel):
+    # The service replica group this was measured for.
+    name: str
+    # One entry per replica that was running: its actual resources.
+    replicas: List[ResourcesSpec]
 
-    type: Annotated[Literal["preset"], Field(description="The configuration type")] = "preset"
-    # TODO: Generate a random name when omitted, like runs and fleets do
-    name: Annotated[
-        Optional[str],
-        Field(description="The preset name"),
-    ] = None
-    model: Annotated[
-        PresetModelSpec,
-        Field(
-            description=(
-                "The model to serve. Use a string or `repo` for an exact repo/path, "
-                "or `base` to allow compatible model variants. "
-                "Prefer the top-level `base`/`repo` shorthand unless a custom "
-                "client-facing model name is needed"
-            )
-        ),
-    ]
-    base: Annotated[
-        Optional[str],
-        Field(
-            description=(
-                "The base model repo; compatible variants are allowed. Shorthand for `model.base`"
-            )
-        ),
-    ] = None
-    repo: Annotated[
-        Optional[str],
-        Field(description="The exact model repo/path to serve. Shorthand for `model.repo`"),
-    ] = None
-    prompt: Annotated[
-        Optional[Union[str, PresetPromptFile]],
-        Field(
-            description=(
-                "Additional instructions for the preset creation agent, inline or as a file `path`"
-            )
-        ),
-    ] = None
-    min_context_length: Annotated[
-        Optional[PositiveInt],
-        Field(description="The minimum required context length. Required for creation"),
-    ] = None
-    max_ttft: Annotated[
-        Optional[PositiveInt],
-        Field(
-            description=(
-                "The maximum p50 time to first token, in milliseconds, that any benchmark"
-                " may report. Required for creation"
-            )
-        ),
-    ] = None
-    trials: Annotated[
-        Optional[PositiveInt],
-        Field(
-            description=(
-                "The number of benchmarked trials during preset creation"
-                " before the best one is promoted. Required for creation"
-            )
-        ),
-    ] = None
-    previous: Annotated[
-        Optional[list[str]],
-        Field(
-            description=(
-                "The IDs of previous presets whose creation results the agent"
-                " analyzes and improves on"
-            )
-        ),
-    ] = None
-    concurrency: Annotated[
-        Optional[PositiveInt],
-        Field(
-            description=(
-                "The number of simultaneous requests used for benchmarks during preset"
-                " creation. Required for creation"
-            )
-        ),
-    ] = None
-    input_tokens: Annotated[
-        Optional[PositiveInt],
-        Field(
-            description=(
-                "The number of input tokens per request used for benchmarks during"
-                f" preset creation. Defaults to `{DEFAULT_INPUT_TOKENS}`"
-            )
-        ),
-    ] = None
-    output_tokens: Annotated[
-        Optional[Annotated[int, Field(ge=2)]],
-        Field(
-            description=(
-                "The number of output tokens per request used for benchmarks during"
-                f" preset creation. Defaults to `{DEFAULT_OUTPUT_TOKENS}`"
-            )
-        ),
-    ] = None
-    shared_prefix_tokens: Annotated[
-        Optional[Annotated[int, Field(ge=0)]],
-        Field(
-            description=(
-                "How many of `input_tokens` are a prefix identical in every benchmark request,"
-                " as a repeated system prompt or conversation history would be. Defaults to `0`,"
-                " meaning every request is fully unique"
-            )
-        ),
-    ] = None
-    dataset: Annotated[
-        Optional[str],
-        Field(
-            description=(
-                "The benchmark dataset used during preset creation: `random` for synthetic"
-                " prompts shaped by `input_tokens` and `output_tokens`, a benchmark tool's"
-                " dataset name (e.g. `sharegpt`, `spec_bench`), or a Hugging Face dataset ID."
-                " Defaults to `random`"
-            )
-        ),
-    ] = None
-    baseline: Annotated[
-        Optional[bool],
-        Field(
-            description=(
-                "Whether the first trial must be a baseline that serves the model with the"
-                " serving framework's recommended defaults instead of an optimization attempt."
-                " Defaults to `true`"
-            )
-        ),
-    ] = None
-    gateway: Annotated[
-        Optional[Union[bool, EntityReference, str]],
-        Field(
-            union_mode="left_to_right",  # preserving pydantic v1 parsing behavior
-            description=(
-                "The name of the gateway. Specify boolean `false` to run without a gateway."
-                " Specify boolean `true` to run with the default gateway."
-                " Omit to run with the default gateway if there is one, or without a gateway otherwise"
-            ),
-        ),
-    ] = None
-    env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (
-        Env()
+
+class PortablePreset(CoreModel):
+    """A preset that carries everything needed to deploy it and nothing tied to
+    where it is stored."""
+
+    # The base model family.
+    base: Annotated[str, Field(min_length=1)]
+    # The exact repo/path the service loads, which `base` is a variant of. Not
+    # the client-facing API model name — that is `service.model`.
+    repo: Annotated[str, Field(min_length=1)]
+    # The largest context the service was verified to serve.
+    context_length: PositiveInt
+    # The verified run's spec configuration. The validator below keeps `name`,
+    # `gateway`, and profile params unset (the deployer's choices) and requires
+    # `model` and resources. Env keys the user declared as passthroughs hold
+    # `EnvSentinel` references, not the resolved secrets; other env values are
+    # stored as-is. `files` paths are stored relative to the preset directory,
+    # absolute after load.
+    service: ServiceConfiguration
+    benchmark: PresetBenchmark
+    # The hardware it was verified on: the actual resources of every running
+    # replica, by service replica group.
+    verified_on: List[PresetVerificationReplicaGroup]
+
+    @model_validator(mode="after")
+    def validate_artifact(self) -> Self:
+        service = self.service
+        if service.model is None:
+            raise ValueError("preset service must specify model")
+        if any(group.resources is None for group in service.replica_groups):
+            raise ValueError("preset service must specify resources")
+        for field in PRESET_EXCLUDED_FIELDS:
+            if getattr(service, field) is not None:
+                raise ValueError(f"preset service must not specify {field}")
+        if [group.name for group in self.verified_on] != [
+            group.name for group in service.replica_groups
+        ]:
+            raise ValueError("preset verification replica groups must match the service's")
+        for replica_group in self.verified_on:
+            if not replica_group.replicas:
+                raise ValueError("preset verification replica groups must not be empty")
+            for resources in replica_group.replicas:
+                _validate_exact_resources(resources)
+        return self
+
+
+def _validate_exact_resources(resources: ResourcesSpec) -> None:
+    cpu = resources.cpu
+    if not _is_exact(cpu.count) or not _is_exact(resources.memory):
+        raise ValueError("preset verification resources must be exact")
+    if resources.disk is None or not _is_exact(resources.disk.size):
+        raise ValueError("preset verification resources must be exact")
+    gpu = resources.gpu
+    if gpu is None or not _is_exact(gpu.count):
+        raise ValueError("preset verification resources must be exact")
+    if gpu.count.min == 0:
+        return
+    if gpu.name is None or len(gpu.name) != 1 or not _is_exact(gpu.memory):
+        raise ValueError("preset verification resources must be exact")
+
+
+def _is_exact(value: Optional[Range]) -> bool:
+    return (
+        value is not None
+        and value.min is not None
+        and value.max is not None
+        and value.min == value.max
     )
 
-    @property
-    def effective_input_tokens(self) -> int:
-        return self.input_tokens if self.input_tokens is not None else DEFAULT_INPUT_TOKENS
 
-    @property
-    def effective_output_tokens(self) -> int:
-        return self.output_tokens if self.output_tokens is not None else DEFAULT_OUTPUT_TOKENS
+def validate_preset_file_path(path: str) -> None:
+    """Raises ValueError. The push (server) and pull (client) sides share these
+    rules verbatim, so a preset the server accepts can always be pulled."""
+    if (
+        not path
+        or path.startswith("/")
+        or "\\" in path
+        # `:` covers Windows drive letters and is invalid on Windows targets.
+        or ":" in path
+        or any(part in ("", ".", "..") for part in path.split("/"))
+    ):
+        raise ValueError(f"Invalid preset file path {path!r}: must be a relative POSIX path")
+    if path in _RESERVED_PRESET_FILE_PATHS:
+        raise ValueError(f"Invalid preset file path {path!r}: the name is reserved")
 
-    @property
-    def effective_baseline(self) -> bool:
-        return self.baseline if self.baseline is not None else DEFAULT_BASELINE
 
-    @property
-    def effective_dataset(self) -> str:
-        return self.dataset if self.dataset is not None else DEFAULT_DATASET
+def validate_preset_file_paths(paths: Sequence[str]) -> None:
+    """Raises ValueError: per-path rules, duplicates, and file/directory prefix
+    conflicts (`a` and `a/b` cannot both materialize on one filesystem)."""
+    seen = set()
+    directories = set()
+    for path in paths:
+        validate_preset_file_path(path)
+        if path in seen:
+            raise ValueError(f"Duplicate preset file path {path!r}")
+        seen.add(path)
+        parts = path.split("/")
+        for index in range(1, len(parts)):
+            directories.add("/".join(parts[:index]))
+    conflicts = seen & directories
+    if conflicts:
+        raise ValueError(
+            f"PortablePreset file path {sorted(conflicts)[0]!r} is both a file and a directory"
+        )
 
-    @field_validator("dataset")
-    @classmethod
-    def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:
-        if value is None:
-            return None
-        # Stripped because the agent reports the dataset it actually loaded, and
-        # the two are compared for equality when the preset is verified.
-        value = value.strip()
-        if not value:
-            raise ValueError("dataset must be a non-empty string")
-        return value
 
-    @model_validator(mode="after")
-    def validate_dataset(self) -> Self:
-        if self.dataset in (None, DEFAULT_DATASET):
-            return self
-        set_fields = [
-            name
-            for name in ("input_tokens", "output_tokens", "shared_prefix_tokens")
-            if getattr(self, name) is not None
-        ]
-        if set_fields:
-            raise ValueError(
-                f"{', '.join(set_fields)} can only be set with the `random` dataset;"
-                " a custom dataset defines its own request shape"
+class PresetArchiveMapping(CoreModel):
+    """One file (or directory) of the preset, stored as a file archive — the
+    same mechanism run `files` use."""
+
+    id: Annotated[UUID, Field(description="The file archive ID")]
+    path: Annotated[
+        str,
+        Field(
+            description=(
+                "The preset-directory-relative POSIX path,"
+                " as referenced by the preset service's `files`"
             )
-        return self
+        ),
+    ]
 
-    @model_validator(mode="after")
-    def validate_shared_prefix_tokens(self) -> Self:
-        # The prefix is carved out of the request, so something has to be left
-        # to differ between requests.
-        if self.shared_prefix_tokens is None:
-            return self
-        input_tokens = self.input_tokens or DEFAULT_INPUT_TOKENS
-        if self.shared_prefix_tokens >= input_tokens:
-            raise ValueError(
-                f"shared_prefix_tokens must be less than input_tokens ({input_tokens})"
+
+class PresetSpec(CoreModel):
+    """A preset with its files, as `RunSpec` carries a configuration with its
+    file archives."""
+
+    preset: PortablePreset
+    file_archives: Annotated[
+        List[PresetArchiveMapping],
+        Field(
+            description=(
+                "The files referenced by the preset service's `files`, as uploaded file archives"
             )
-        return self
+        ),
+    ] = []
 
-    @model_validator(mode="before")
-    @classmethod
-    def apply_model_shorthand(cls, values: Any) -> Any:
-        if not isinstance(values, dict):
-            return values
-        base, repo = values.get("base"), values.get("repo")
-        if base and repo:
-            raise ValueError("`base` and `repo` are mutually exclusive")
-        if base or repo:
-            if values.get("model") is not None:
-                raise ValueError("`model` cannot be combined with the `base`/`repo` shorthand")
-            values = dict(values)
-            values.pop("base", None)
-            values.pop("repo", None)
-            values["model"] = {"base": base} if base else {"repo": repo}
-        return values
 
-    @field_validator("model", mode="before", json_schema_input_type=Union[PresetModelSpec, str])
-    @classmethod
-    def parse_model(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            return {"repo": _validate_model(value, field="model")}
-        return value
+def validate_preset_spec_files(spec: PresetSpec) -> None:
+    """Raises ValueError. The single owner of the file rules: push (server and
+    client) and pull all call this, so what one side accepts the other can
+    always materialize."""
+    validate_preset_file_paths([mapping.path for mapping in spec.file_archives])
+    referenced_paths = set()
+    for mapping in spec.preset.service.files:
+        local_path = mapping.local_path
+        validate_preset_file_path(local_path)
+        referenced_paths.add(local_path)
+    pushed_paths = {mapping.path for mapping in spec.file_archives}
+    missing_paths = referenced_paths - pushed_paths
+    if missing_paths:
+        raise ValueError(
+            f"Files referenced by the preset are missing from the push: {sorted(missing_paths)}"
+        )
+    unreferenced_paths = pushed_paths - referenced_paths
+    if unreferenced_paths:
+        raise ValueError(
+            f"Pushed files are not referenced by the preset: {sorted(unreferenced_paths)}"
+        )
 
-    @field_validator("prompt")
-    @classmethod
-    def validate_prompt(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            if not value.strip():
-                raise ValueError("Prompt must be a non-empty string")
-            if len(value) > MAX_PROMPT_LENGTH:
-                raise ValueError(f"Prompt must be at most {MAX_PROMPT_LENGTH} characters")
-        return value
+
+def validate_preset_spec_limits(spec: PresetSpec) -> None:
+    """Raises ValueError. Both sides measure the same object, so a spec the
+    client accepts is never rejected by the server for size."""
+    if len(spec.model_dump_json().encode("utf-8")) > MAX_PRESET_SPEC_SIZE:
+        raise ValueError(f"PortablePreset spec exceeds the {MAX_PRESET_SPEC_SIZE}-byte limit")
+    if len(spec.file_archives) > MAX_PRESET_FILES:
+        raise ValueError(f"PortablePreset has more than {MAX_PRESET_FILES} files")
+
+
+# Creation constraints
 
 
 class PresetConstraints(CoreModel):

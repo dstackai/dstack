@@ -1,13 +1,14 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 import pytest
 from rich.table import Table
 
-from dstack._internal.cli.models.presets import PresetWorkload
+from dstack._internal.cli.models.presets import PulledPreset
 from dstack._internal.cli.services.presets import output as output_module
 from dstack._internal.cli.services.presets.output import _add_session, _format_number
+from dstack._internal.core.models.presets import PortablePreset, PresetWorkload
 from tests._internal.cli.common import get_preset, plain_console
 
 pytestmark = pytest.mark.windows
@@ -83,6 +84,36 @@ class TestFormatPresetObjective:
         assert output_module.format_preset_objective(preset) == (
             "[secondary]data=spec_bench c=1[/]"
         )
+
+
+def _get_pulled_preset() -> PulledPreset:
+    verified = get_preset()
+    return PulledPreset(
+        id=verified.id,
+        name="main/qwen",
+        created_at=datetime(2026, 2, 3, 4, 5, tzinfo=timezone.utc),
+        **{field: getattr(verified, field) for field in PortablePreset.model_fields},
+    )
+
+
+class TestRemotePresetRow:
+    def test_objective_falls_back_to_the_measured_workload(self):
+        # A pulled preset carries no creation context; the benchmark workload is
+        # its record of the conditions the numbers hold for.
+        assert output_module.format_preset_objective(_get_pulled_preset()) == (
+            "[secondary]io=1K/128 c=1[/]"
+        )
+
+    def test_renders_a_pulled_preset_row(self, monkeypatch):
+        output = StringIO()
+        monkeypatch.setattr(output_module, "console", plain_console(output, width=200))
+
+        output_module.print_presets([_get_pulled_preset()])
+
+        text = output.getvalue()
+        assert "main/qwen" in text
+        assert "io=1K/128" in text
+        assert "ctx=32K" in text
 
 
 class TestPrintPresets:
@@ -237,7 +268,7 @@ class TestOrdering:
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         old = get_preset()
         new = old.model_copy(
-            update={"id": "11aa22bb", "submitted_at": old.submitted_at + timedelta(days=2)}
+            update={"id": "11aa22bb", "created_at": old.created_at + timedelta(days=2)}
         )
         sessions = [
             {

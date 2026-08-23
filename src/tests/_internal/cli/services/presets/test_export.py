@@ -61,6 +61,18 @@ class TestExportPreset:
         data = yaml.safe_load(destination.read_text())
         assert data["name"] == "qwen-fast"
 
+    def test_defaults_a_qualified_preset_name_to_its_registry_name(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        # A pulled copy is named `<project>/<name>`, which is not a valid
+        # resource name; the registry name after the `/` is.
+        preset = get_preset().model_copy(update={"name": "main-sky/qwen-fast"})
+        preset_dir = store.save(preset).parent
+        destination = tmp_path / "qwen.dstack.yml"
+
+        export_preset(preset, preset_dir=preset_dir, destination=destination, force=False)
+
+        assert yaml.safe_load(destination.read_text())["name"] == "qwen-fast"
+
     def test_names_the_service_after_the_name_option(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
         preset = get_preset().model_copy(update={"name": "qwen-fast"})

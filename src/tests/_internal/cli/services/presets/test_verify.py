@@ -17,9 +17,9 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
-from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from tests._internal.cli.common import (
     get_preset,
@@ -54,14 +54,14 @@ class TestBuildVerifiedPreset:
             service=base.service,
             verification_replica_groups=base.verified_on,
             base_model="Qwen/Qwen3.5-27B",
-            model="community/Qwen3.5-27B-GPTQ-Int4",
+            repo="community/Qwen3.5-27B-GPTQ-Int4",
             context_length=32768,
             benchmark=get_preset_benchmark(),
             configuration=configuration,
             best_trial=1,
             preset_id="8f3a12c4",
             name=None,
-            submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
         assert preset.configuration.min_context_length == 32768
@@ -97,13 +97,13 @@ class TestBuildVerifiedPreset:
             session_path=tmp_path,
             preset_id="ab12cd34",
             name=None,
-            submitted_at=created_at,
+            created_at=created_at,
         )
 
         assert preset.base == "Qwen/Qwen3.5-27B"
-        assert preset.model == "community/Qwen3.5-27B-GPTQ-Int4"
+        assert preset.repo == "community/Qwen3.5-27B-GPTQ-Int4"
         assert preset.context_length == 32768
-        assert preset.submitted_at == created_at
+        assert preset.created_at == created_at
         assert preset.service.name is None
         assert preset.service.gateway is None
         assert all(getattr(preset.service, field) is None for field in ProfileParams.model_fields)
@@ -138,7 +138,7 @@ class TestBuildVerifiedPreset:
             session_path=session,
             preset_id="ab12cd34",
             name=None,
-            submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
 
         assert preset.service.files[0].local_path == "service/1/patches"
@@ -167,7 +167,7 @@ class TestBuildVerifiedPreset:
                 session_path=session,
                 preset_id="ab12cd34",
                 name=None,
-                submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
     def test_rejects_benchmark_on_a_different_dataset(self, tmp_path):
@@ -188,7 +188,7 @@ class TestBuildVerifiedPreset:
                 session_path=tmp_path,
                 preset_id="ab12cd34",
                 name=None,
-                submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
     def test_rejects_variant_for_exact_model_request(self, tmp_path):
@@ -210,7 +210,7 @@ class TestBuildVerifiedPreset:
                 session_path=tmp_path,
                 preset_id="ab12cd34",
                 name=None,
-                submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
 

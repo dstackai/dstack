@@ -26,6 +26,7 @@ from dstack.api.server._gpus import GpusAPIClient
 from dstack.api.server._imports import ImportsAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._metrics import MetricsAPIClient
+from dstack.api.server._presets import PresetsAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
@@ -53,6 +54,7 @@ class APIClient:
         logs: operations with logs
         gateways: operations with gateways
         volumes: operations with volumes
+        presets: operations with registry presets
         exports: operations with exports
         files: operations with files
     """
@@ -131,6 +133,10 @@ class APIClient:
     @property
     def volumes(self) -> VolumesAPIClient:
         return VolumesAPIClient(self._request, self._logger)
+
+    @property
+    def presets(self) -> PresetsAPIClient:
+        return PresetsAPIClient(self._request, self._logger)
 
     @property
     def exports(self) -> ExportsAPIClient:

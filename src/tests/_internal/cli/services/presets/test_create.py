@@ -50,8 +50,8 @@ from dstack._internal.cli.services.presets.workspace import (
     remove_agent_workspace,
 )
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
-from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.common import (
     get_preset,

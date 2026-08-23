@@ -17,18 +17,18 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionState,
     PresetSessionWorkspace,
 )
-from dstack._internal.cli.models.presets import (
-    PresetBenchmark,
-    PresetVerificationReplicaGroup,
-    VerifiedPreset,
-)
+from dstack._internal.cli.models.presets import VerifiedPreset
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
+    PresetConfiguration,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.presets import (
+    PresetBenchmark,
+    PresetVerificationReplicaGroup,
+)
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
 
@@ -132,8 +132,8 @@ def get_preset(
         ),
         base="Qwen/Qwen3.5-27B",
         id=preset_id,
-        model="community/Qwen3.5-27B-GPTQ-Int4",
-        submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        repo="community/Qwen3.5-27B-GPTQ-Int4",
+        created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
         service=ServiceConfiguration.model_validate(
             {
                 "image": "vllm/vllm-openai:v0.11.0",

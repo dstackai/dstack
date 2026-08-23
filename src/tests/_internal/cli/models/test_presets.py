@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.presets import (
+from dstack._internal.core.models.presets import (
     PresetBenchmark,
 )
 from tests._internal.cli.common import get_preset_benchmark
