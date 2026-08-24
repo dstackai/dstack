@@ -290,59 +290,75 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 <span id="replica-groups"></span>
 
-??? info "Replica groups"
-    A service can include multiple replica groups. Each group can define its own `commands`, `resources` requirements, and `scaling` rules.
+### Replica groups
 
-    <div editor-title="service.dstack.yml">
+A service can define multiple replica groups. Each group has its own `replicas` count (or range),
+`resources`, `commands`, and `scaling` rules. For a common use case, see
+[PD disaggregation](#pd-disaggregation).
 
-    ```yaml
-    type: service
-    name: llama-8b-service
+<div editor-title="service.dstack.yml">
 
-    image: lmsysorg/sglang:v0.5.10.post1
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+```yaml
+type: service
+name: llama-8b-service
 
-    replicas:
-      - count: 1..2
-        scaling:
-          metric: rps
-          target: 10
-        commands:
-          - |
-            python -m sglang.launch_server \
-              --model-path $MODEL_ID \
-              --port 8000 \
-              --trust-remote-code
-        resources:
-          gpu: 48GB
+image: lmsysorg/sglang:v0.5.10.post1
+env:
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
-      - count: 1..4
-        scaling:
-          metric: rps
-          target: 5
-        commands:
-          - |
-            python -m sglang.launch_server \
-              --model-path $MODEL_ID \
-              --port 8000 \
-              --trust-remote-code
-        resources:
-          gpu: 24GB
+groups:
+  - replicas: 1..2
+    scaling:
+      metric: rps
+      target: 10
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --port 8000 \
+          --trust-remote-code
+    resources:
+      gpu: 48GB
 
-    port: 8000
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-    ```
+  - replicas: 1..4
+    scaling:
+      metric: rps
+      target: 5
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --port 8000 \
+          --trust-remote-code
+    resources:
+      gpu: 24GB
 
-    </div>
+port: 8000
+model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+```
 
-    > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
+</div>
+
+[`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
+
+> Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
+
+??? info "Accessing replica IPs"
+    Commands in any group can reference the internal IP address of any replica in the run via
+    `${{ groups[i].replicas[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
+    the index of the replica within that group.
+
+    > Only replicas guaranteed at start can be referenced:
+    >
+    > - `replicas: 2` → replica indexes `0` and `1` can be referenced
+    > - `replicas: 1..4` → replica index `0` can be referenced
+    > - `replicas: 0..4` → no replica indexes can be referenced
 
 ### PD disaggregation
 
 <!-- NOTE: this section is referenced from pre-0.21.0 CLIs. Prefer to keep the URL unchanged -->
 
-Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
+Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three [replica groups](#replica-groups): one for the router, one for prefill workers, and one for decode workers.
 
 `dstack` integrates with two routers for PD disaggregation: [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html) and [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
 
@@ -363,9 +379,9 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       - HF_TOKEN
       - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-    replicas:
-      - count: 1
-        # For now replica group with router must have count: 1
+    groups:
+      - replicas: 1
+        # For now the router group must have replicas: 1
         commands:
           - pip install smg
           - |
@@ -379,7 +395,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: sglang
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 3
@@ -394,7 +410,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - count: 1..8
+      - replicas: 1..8
         scaling:
           metric: rps
           target: 2
@@ -437,8 +453,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
       - HF_TOKEN
       - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-    replicas:
-      - count: 1
+    groups:
+      - replicas: 1
         docker: true
         commands:
           - apt-get update
@@ -460,7 +476,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: dynamo
 
-      - count: 1..4
+      - replicas: 1..4
         scaling:
           metric: rps
           target: 3
@@ -489,7 +505,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - count: 1..8
+      - replicas: 1..8
         scaling:
           metric: rps
           target: 2
@@ -551,8 +567,8 @@ env:
   - RDMA_DEVICES=bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7
   - NCCL_IB_DISABLE=1
 
-replicas:
-  - count: 1
+groups:
+  - replicas: 1
     commands:
       - pip install smg
       - |
@@ -565,7 +581,7 @@ replicas:
     router:
       type: sglang
 
-  - count: 1..2
+  - replicas: 1..2
     scaling:
       metric: rps
       target: 300
@@ -591,7 +607,7 @@ replicas:
       cpu: 96..
       memory: 512GB..
 
-  - count: 1..4
+  - replicas: 1..4
     scaling:
       metric: rps
       target: 300

@@ -82,9 +82,9 @@ The `service` configuration type allows running [services](../../concepts/servic
         required: true
 
 
-### `replicas`
+### `groups`
 
-#### `replicas[n]`
+#### `groups[n]`
 
 #SCHEMA# dstack._internal.core.models.configurations.ReplicaGroup
     overrides:
