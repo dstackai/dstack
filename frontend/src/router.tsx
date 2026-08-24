@@ -33,6 +33,7 @@ import { UserBilling, UserEvents, UserProjects, UserPublicKeys, UserSettings } f
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
 import { OfferList } from './pages/Offers';
+import { PresetDetails, PresetDetailsOverview, PresetInspect, PresetList, PresetVerifiedOn } from './pages/Presets';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
@@ -253,6 +254,32 @@ export const router = createBrowserRouter([
                 path: ROUTES.VOLUMES.LIST,
                 element: <VolumeList />,
             },
+
+            // Presets, which only a server with a registry serves
+            ...([
+                process.env.UI_VERSION === 'sky' && {
+                    path: ROUTES.PRESETS.LIST,
+                    element: <PresetList />,
+                },
+                process.env.UI_VERSION === 'sky' && {
+                    path: ROUTES.PRESETS.DETAILS.TEMPLATE,
+                    element: <PresetDetails />,
+                    children: [
+                        {
+                            index: true,
+                            element: <PresetDetailsOverview />,
+                        },
+                        {
+                            path: ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE,
+                            element: <PresetVerifiedOn />,
+                        },
+                        {
+                            path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE,
+                            element: <PresetInspect />,
+                        },
+                    ],
+                },
+            ].filter(Boolean) as RouteObject[]),
 
             // Users
             {
