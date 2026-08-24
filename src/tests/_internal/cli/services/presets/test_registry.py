@@ -97,15 +97,15 @@ class FakePresetsAPIClient:
             raise self.error
 
 
-def _registry_preset_info(*, name: str = "qwen38") -> PushPresetResponse:
+def _registry_preset_info(*, name: Optional[str] = "qwen38") -> PushPresetResponse:
     return PushPresetResponse(
         id=uuid4(),
         name=name,
+        project_name="main",
         base="Qwen/Qwen3.5-27B",
         repo="community/Qwen3.5-27B-GPTQ-Int4",
         created_at=datetime(2026, 8, 20, 12, 0),
         pushed_by="alice",
-        is_current=True,
     )
 
 
@@ -118,15 +118,14 @@ def _portable_preset() -> PortablePreset:
 
 def _registry_preset(
     *,
-    name: str = "qwen38",
+    name: Optional[str] = "qwen38",
     file_archives: Optional[list[FileArchiveMapping]] = None,
     file_mappings: Optional[list[FilePathMapping]] = None,
-    is_current: bool = True,
 ) -> GetPresetResponse:
     document = _portable_preset()
     if file_mappings is not None:
         document.service.files = file_mappings
-    info = _registry_preset_info(name=name).model_copy(update={"is_current": is_current})
+    info = _registry_preset_info(name=name)
     return GetPresetResponse(
         **info.model_dump(),
         spec=PresetSpec(preset=document, file_archives=file_archives or []),
@@ -506,7 +505,7 @@ class TestPullPresetFromRegistry:
 
         # An older version pulled by id lands untagged, like a Docker pull by
         # digest: the qualified name stays on the current version's copy.
-        stub_client.remote = _registry_preset(is_current=False)
+        stub_client.remote = _registry_preset(name=None)
         old_id = str(stub_client.remote.id)
         pull_preset_from_registry(store, f"main/{old_id}")
 
@@ -523,7 +522,7 @@ class TestPullPresetFromRegistry:
         preset_id = str(stub_client.remote.id)
         pull_preset_from_registry(store, "main/qwen38")
 
-        stub_client.remote = _registry_preset(is_current=False).model_copy(
+        stub_client.remote = _registry_preset(name=None).model_copy(
             update={"id": stub_client.remote.id}
         )
         pull_preset_from_registry(store, f"main/{preset_id}")

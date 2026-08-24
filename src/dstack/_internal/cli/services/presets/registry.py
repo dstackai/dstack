@@ -144,23 +144,24 @@ def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
         validate_preset_spec_files(remote.spec)
     except ValueError as e:
         raise CLIError(f"Preset {registry_ref!r} cannot be pulled: {e}") from e
-    # The local name is the qualified ref. It can never collide with a locally
-    # created preset (local names cannot contain `/`), so the only possible
-    # holder is an earlier pull; the name silently moves to the fresh copy,
-    # Docker-style. A non-current preset (pulled by id after the name was
-    # repointed) must not take the name from the current one — like a Docker
-    # pull by digest, it lands untagged.
-    qualified_name = f"{project}/{remote.name}"
-    local_name = qualified_name if remote.is_current else None
-    holder = store.find_by_name(qualified_name)
-    if local_name is not None:
+    # A preset carries its name only while the name resolves to it, so one
+    # pulled by id after the name moved on arrives without one and lands
+    # untagged, like a Docker pull by digest.
+    qualified_name = f"{project}/{remote.name}" if remote.name is not None else None
+    local_name = qualified_name
+    if qualified_name is not None:
+        # The qualified name can never collide with a locally created preset
+        # (local names cannot contain `/`), so the only possible holder is an
+        # earlier pull; the name silently moves to the fresh copy.
+        holder = store.find_by_name(qualified_name)
         if holder is not None and holder.id != preset_id:
             store.release_name(qualified_name)
-    elif holder is not None and holder.id == preset_id:
-        # This copy holds the name from an earlier pull, when it was current.
-        # Re-pulling it by id must not strip the name off the local store
-        # entirely, or local refs to it would stop resolving.
-        local_name = qualified_name
+    else:
+        # Re-pulling by id a copy that already holds the name from an earlier
+        # pull must not strip it off the local store, or local refs to it would
+        # stop resolving.
+        holder = store.get(preset_id)
+        local_name = holder.name if holder is not None else None
     pulled = PulledPreset(
         id=preset_id,
         name=local_name,
@@ -206,12 +207,7 @@ def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
         # interrupt - must not leave a directory without its preset document.
         if not saved:
             shutil.rmtree(directory, ignore_errors=True)
-    if local_name is not None:
-        console.print("OK")
-    else:
-        console.print(
-            f"Pulled [code]{preset_id}[/]; [code]{qualified_name}[/] now names a newer preset"
-        )
+    console.print("OK")
 
 
 def _upload_archive(client: APIClient, local_path: str) -> uuid.UUID:

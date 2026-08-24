@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import Field
@@ -24,24 +25,55 @@ class GetPresetFilesRequest(CoreModel):
     name_or_id: Annotated[str, Field(description="The preset id or name")]
 
 
+class ListPresetsRequest(CoreModel):
+    project_name: Annotated[
+        Optional[str], Field(description="Only list presets pushed to this project")
+    ] = None
+    username: Annotated[
+        Optional[str], Field(description="Only list presets pushed by this user")
+    ] = None
+    base: Annotated[Optional[str], Field(description="Only list presets for this base model")] = (
+        None
+    )
+    prev_created_at: Annotated[
+        Optional[datetime], Field(description="The `created_at` of the last preset of the page")
+    ] = None
+    prev_id: Annotated[
+        Optional[UUID], Field(description="The `id` of the last preset of the page")
+    ] = None
+    limit: Annotated[int, Field(description="The page size", ge=0, le=100)] = 100
+    ascending: bool = False
+
+
+class DeletePresetRequest(CoreModel):
+    id: Annotated[UUID, Field(description="The preset to delete")]
+
+
 class PushPresetResponse(CoreModel):
     """What `push` returns: the record the registry minted."""
 
     id: UUID
-    name: str
+    name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name while it resolves to this preset."
+                " A later push under the same name takes it over, and this is then unset"
+            )
+        ),
+    ]
+    project_name: str
     base: str
     repo: str
     created_at: datetime
     pushed_by: Annotated[str, Field(description="The username of the pusher")]
-    is_current: Annotated[
-        bool,
-        Field(
-            description=(
-                "Whether the name currently resolves to this preset."
-                " Derived when read: a later push under the same name takes it over"
-            )
-        ),
-    ]
+
+
+class ListPresetsResponse(CoreModel):
+    """What `list` returns: a record per preset, superseded ones included,
+    without the specs, which `get` reads one at a time."""
+
+    presets: List[PushPresetResponse]
 
 
 class GetPresetResponse(PushPresetResponse):
