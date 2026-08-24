@@ -19,6 +19,7 @@ class EventTargetType(str, Enum):
     VOLUME = "volume"
     GATEWAY = "gateway"
     SECRET = "secret"
+    PRESET = "preset"
 
 
 class EventTarget(CoreModel):
