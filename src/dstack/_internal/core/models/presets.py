@@ -1,6 +1,5 @@
 import re
 from typing import Any, List, Literal, Optional, Sequence, Union
-from uuid import UUID
 
 from pydantic import Field, PositiveFloat, PositiveInt, field_validator, model_validator
 from typing_extensions import Annotated, Self
@@ -10,6 +9,7 @@ from dstack._internal.core.models.configurations import (
     PresetModelSpec,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 
@@ -226,32 +226,18 @@ def validate_preset_file_paths(paths: Sequence[str]) -> None:
         )
 
 
-class PresetArchiveMapping(CoreModel):
-    """One file (or directory) of the preset, stored as a file archive — the
-    same mechanism run `files` use."""
-
-    id: Annotated[UUID, Field(description="The file archive ID")]
-    path: Annotated[
-        str,
-        Field(
-            description=(
-                "The preset-directory-relative POSIX path,"
-                " as referenced by the preset service's `files`"
-            )
-        ),
-    ]
-
-
 class PresetSpec(CoreModel):
     """A preset with its files, as `RunSpec` carries a configuration with its
     file archives."""
 
     preset: PortablePreset
     file_archives: Annotated[
-        List[PresetArchiveMapping],
+        List[FileArchiveMapping],
         Field(
             description=(
-                "The files referenced by the preset service's `files`, as uploaded file archives"
+                "The files referenced by the preset service's `files`, as uploaded file"
+                " archives, keyed by their path in the container exactly as `RunSpec`"
+                " carries them"
             )
         ),
     ] = []
@@ -261,19 +247,22 @@ def validate_preset_spec_files(spec: PresetSpec) -> None:
     """Raises ValueError. The single owner of the file rules: push (server and
     client) and pull all call this, so what one side accepts the other can
     always materialize."""
-    validate_preset_file_paths([mapping.path for mapping in spec.file_archives])
-    referenced_paths = set()
-    for mapping in spec.preset.service.files:
-        local_path = mapping.local_path
-        validate_preset_file_path(local_path)
-        referenced_paths.add(local_path)
-    pushed_paths = {mapping.path for mapping in spec.file_archives}
-    missing_paths = referenced_paths - pushed_paths
+    # `local_path` is what pull writes to disk, so it carries the rules. The
+    # archives are keyed by the container path, as they are for a run, and only
+    # have to line up with the service's files.
+    local_paths = [mapping.local_path for mapping in spec.preset.service.files]
+    validate_preset_file_paths(sorted(set(local_paths)))
+    referenced_paths = {mapping.path for mapping in spec.preset.service.files}
+    pushed_paths = [mapping.path for mapping in spec.file_archives]
+    duplicate_paths = {path for path in pushed_paths if pushed_paths.count(path) > 1}
+    if duplicate_paths:
+        raise ValueError(f"Duplicate pushed files: {sorted(duplicate_paths)}")
+    missing_paths = referenced_paths - set(pushed_paths)
     if missing_paths:
         raise ValueError(
             f"Files referenced by the preset are missing from the push: {sorted(missing_paths)}"
         )
-    unreferenced_paths = pushed_paths - referenced_paths
+    unreferenced_paths = set(pushed_paths) - referenced_paths
     if unreferenced_paths:
         raise ValueError(
             f"Pushed files are not referenced by the preset: {sorted(unreferenced_paths)}"

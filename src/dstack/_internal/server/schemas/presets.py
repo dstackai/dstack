@@ -20,11 +20,8 @@ class GetPresetRequest(CoreModel):
     ]
 
 
-class GetPresetFileRequest(CoreModel):
+class GetPresetFilesRequest(CoreModel):
     name_or_id: Annotated[str, Field(description="The preset id or name")]
-    path: Annotated[
-        str, Field(description="The preset-directory-relative path of the file to download")
-    ]
 
 
 class PushPresetResponse(CoreModel):
@@ -48,7 +45,14 @@ class PushPresetResponse(CoreModel):
 
 
 class GetPresetResponse(PushPresetResponse):
-    """What `get` returns: the record plus the stored spec. File contents are
-    downloaded separately per archive mapping."""
+    """What `get` returns: the record plus the stored spec. File contents come
+    from `get_files`, which streams them all in one response."""
 
     spec: PresetSpec
+
+
+# `get_files` streams archives back to back, each framed by its path and length,
+# so neither side ever holds more than one archive: a 4-byte path length, the
+# UTF-8 path, an 8-byte content length, then the archive.
+PRESET_FILES_PATH_LENGTH_BYTES = 4
+PRESET_FILES_CONTENT_LENGTH_BYTES = 8

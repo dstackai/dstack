@@ -16,9 +16,9 @@ from dstack._internal.core.errors import (
     ServerClientError,
     URLNotFoundError,
 )
+from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.presets import (
     PortablePreset,
-    PresetArchiveMapping,
     PresetSpec,
     validate_preset_spec_files,
     validate_preset_spec_limits,
@@ -84,20 +84,26 @@ def push_preset_to_registry(store: PresetStore, local_ref: str, registry_ref: st
     artifact = PortablePreset(
         **{field: getattr(preset, field) for field in PortablePreset.model_fields}
     ).model_copy(deep=True)
+    # A pushed preset must carry file paths that mean something on the machine
+    # that pulls it, so the local side is re-rooted at the preset directory.
     sources: dict[str, str] = {}
     for mapping in artifact.service.files:
         relative = _relative_pushed_path(mapping.local_path, preset_dir)
         sources.setdefault(relative, mapping.local_path)
         mapping.local_path = relative
     client = resolve_registry_client(project)
-    # File contents travel as file archives, the same mechanism run `files`
-    # use: content-addressed, deduplicated per user, off-loaded to blob storage
-    # where the server has one.
+    # File contents travel as file archives, keyed by the path in the container,
+    # exactly as a run submits them - the same content-addressed, per-user
+    # deduplicated, storage-offloaded mechanism. Uploading once per distinct file
+    # is the only difference: a preset may mount one file at several paths.
+    archive_ids = {
+        relative: _upload_archive(client, local_path) for relative, local_path in sources.items()
+    }
     spec = PresetSpec(
         preset=artifact,
         file_archives=[
-            PresetArchiveMapping(id=_upload_archive(client, local_path), path=relative)
-            for relative, local_path in sources.items()
+            FileArchiveMapping(id=archive_ids[mapping.local_path], path=mapping.path)
+            for mapping in artifact.service.files
         ],
     )
     # The same rules the server enforces, checked here to fail before pushing.
@@ -131,7 +137,6 @@ def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
     # The local identity of a pulled preset is its registry id, so re-pulling
     # the same preset overwrites its own copy in place.
     preset_id = str(remote.id)
-    file_archives = remote.spec.file_archives
     # The same rules the server enforces on push, re-checked before anything is
     # written locally: relative POSIX, no traversal, no reserved names, no
     # file/directory conflicts, and files and references matching exactly.
@@ -170,11 +175,24 @@ def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
         # carries must not survive into the next push.
         shutil.rmtree(directory, ignore_errors=True)
         directory.mkdir(parents=True)
-        for mapping in file_archives:
-            # Downloaded by id, not by the pulled ref: a name may repoint
-            # between requests, and the files must be this preset's.
-            blob = client.presets.get_file(project, preset_id, mapping.path)
-            _extract_archive(blob, directory / PurePosixPath(mapping.path))
+        # Downloaded by id, not by the pulled ref: a name may repoint between
+        # requests, and the files must be this preset's. One request streams
+        # them all, and each is extracted as it arrives.
+        #
+        # Archives arrive keyed by their path in the container, as a run's are;
+        # where each lands on disk is what the preset's `files` already say.
+        local_paths = {mapping.path: mapping.local_path for mapping in pulled.service.files}
+        expected = set(local_paths)
+        for path, blob in client.presets.get_files(project, preset_id):
+            local_path = local_paths.get(path)
+            if local_path is None:
+                raise CLIError(f"Preset {registry_ref!r} carries an unexpected file {path!r}")
+            expected.discard(path)
+            _extract_archive(blob, directory / PurePosixPath(local_path))
+        if expected:
+            raise CLIError(
+                f"Preset {registry_ref!r} is missing files: {', '.join(sorted(expected))}"
+            )
         # Absolute paths under the preset directory, as after a load; save
         # re-relativizes them so the stored file stays portable.
         for mapping in pulled.service.files:

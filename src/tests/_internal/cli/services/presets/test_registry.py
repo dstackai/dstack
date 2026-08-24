@@ -26,10 +26,13 @@ from dstack._internal.core.errors import (
     URLNotFoundError,
 )
 from dstack._internal.core.models.common import RegistryAuth
-from dstack._internal.core.models.files import FileArchive, FilePathMapping
+from dstack._internal.core.models.files import (
+    FileArchive,
+    FileArchiveMapping,
+    FilePathMapping,
+)
 from dstack._internal.core.models.presets import (
     PortablePreset,
-    PresetArchiveMapping,
     PresetSpec,
 )
 from dstack._internal.server.schemas.presets import (
@@ -59,7 +62,7 @@ class FakePresetsAPIClient:
         self.remote = remote
         self.push_requests: list[SimpleNamespace] = []
         self.file_requests: list[SimpleNamespace] = []
-        # Blobs served by `get_file`, keyed by the archive mapping path.
+        # Blobs streamed by `get_files`, keyed by the archive mapping path.
         self.file_blobs: dict[str, bytes] = {}
         self.files = FakeFilesAPIClient()
         self.error: Optional[Exception] = None
@@ -76,12 +79,18 @@ class FakePresetsAPIClient:
         # that re-roots the returned document cannot leak into the next pull.
         return self.remote.model_copy(deep=True)
 
-    def get_file(self, project_name, name_or_id, path):
+    def get_files(self, project_name, name_or_id):
         self._raise_if_failing()
         self.file_requests.append(
-            SimpleNamespace(project_name=project_name, name_or_id=name_or_id, path=path)
+            SimpleNamespace(project_name=project_name, name_or_id=name_or_id)
         )
-        return self.file_blobs[path]
+        assert self.remote is not None
+        # The server streams the archives the stored spec lists, not every blob
+        # it happens to hold.
+        return iter(
+            (mapping.path, self.file_blobs[mapping.path])
+            for mapping in self.remote.spec.file_archives
+        )
 
     def _raise_if_failing(self):
         if self.error is not None:
@@ -110,7 +119,7 @@ def _portable_preset() -> PortablePreset:
 def _registry_preset(
     *,
     name: str = "qwen38",
-    file_archives: Optional[list[PresetArchiveMapping]] = None,
+    file_archives: Optional[list[FileArchiveMapping]] = None,
     file_mappings: Optional[list[FilePathMapping]] = None,
     is_current: bool = True,
 ) -> GetPresetResponse:
@@ -256,7 +265,7 @@ class TestPresetsAPIClient:
         calls: list[SimpleNamespace] = []
 
         def request(path, body=None, **kwargs):
-            calls.append(SimpleNamespace(path=path, body=body))
+            calls.append(SimpleNamespace(path=path, body=body, kwargs=kwargs))
             return response
 
         return PresetsAPIClient(request, logging.getLogger(__name__)), calls
@@ -266,7 +275,7 @@ class TestPresetsAPIClient:
         client, calls = self._client(SimpleNamespace(json=lambda: info.model_dump(mode="json")))
         spec = PresetSpec(
             preset=_portable_preset(),
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
         )
 
         pushed = client.push("main", name="qwen", spec=spec)
@@ -295,14 +304,27 @@ class TestPresetsAPIClient:
         assert got.spec.preset.repo == "community/Qwen3.5-27B-GPTQ-Int4"
         assert got.id == remote.id
 
-    def test_get_file_returns_the_raw_archive_bytes(self):
-        client, calls = self._client(SimpleNamespace(content=b"tar-bytes"))
+    def test_get_files_reads_the_framed_stream(self):
+        def frame(path: str, blob: bytes) -> bytes:
+            return (
+                len(path.encode()).to_bytes(4, "big")
+                + path.encode()
+                + len(blob).to_bytes(8, "big")
+                + blob
+            )
 
-        blob = client.get_file("main", "qwen38", "patch/a.txt")
+        stream = frame("patch/a.txt", b"tar-a") + frame("run.sh", b"tar-b")
+        # Framed values are read across chunk boundaries, so a chunk size that
+        # splits every frame is what proves the reader, not the framing.
+        chunks = [stream[i : i + 3] for i in range(0, len(stream), 3)]
+        client, calls = self._client(SimpleNamespace(iter_content=lambda chunk_size: iter(chunks)))
+
+        got = list(client.get_files("main", "qwen38"))
 
         (call,) = calls
-        assert call.path == "/api/project/main/presets/get_file"
-        assert blob == b"tar-bytes"
+        assert call.path == "/api/project/main/presets/get_files"
+        assert call.kwargs["stream"] is True
+        assert got == [("patch/a.txt", b"tar-a"), ("run.sh", b"tar-b")]
 
 
 class TestPushPresetToRegistry:
@@ -329,7 +351,7 @@ class TestPushPresetToRegistry:
         # File contents travel as uploaded archives, referenced by id.
         (upload,) = stub_client.files.uploads
         assert request.spec.file_archives == [
-            PresetArchiveMapping(id=upload.archive.id, path="patch/a.txt")
+            FileArchiveMapping(id=upload.archive.id, path="/app/a.txt")
         ]
         assert _archive_member_texts(upload.content) == {"a.txt": "hello"}
         document = request.spec.preset.model_dump(mode="json")
@@ -420,10 +442,10 @@ class TestPullPresetFromRegistry:
     def test_materializes_the_preset_under_its_qualified_name(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
             file_mappings=[FilePathMapping(local_path="patch/a.txt", path="/app/a.txt")],
         )
-        stub_client.file_blobs["patch/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
+        stub_client.file_blobs["/app/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
         preset_id = str(stub_client.remote.id)
 
         pull_preset_from_registry(store, "main/qwen38")
@@ -440,10 +462,9 @@ class TestPullPresetFromRegistry:
         )
         assert (store.root / preset_id / "patch" / "a.txt").read_text() == "hello"
         # Files are downloaded by id, not by the pulled ref: a name may repoint
-        # between requests.
+        # between requests. One request brings them all, however many there are.
         (file_request,) = stub_client.file_requests
         assert file_request.name_or_id == preset_id
-        assert file_request.path == "patch/a.txt"
         # The saved file keeps the path relative, like any locally created preset.
         saved = yaml.safe_load((store.root / preset_id / "preset.yml").read_text())
         assert saved["service"]["files"] == [{"local_path": "patch/a.txt", "path": "/app/a.txt"}]
@@ -513,14 +534,14 @@ class TestPullPresetFromRegistry:
     def test_repulling_the_same_version_overwrites_in_place(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
             file_mappings=[FilePathMapping(local_path="patch/a.txt", path="/app/a.txt")],
         )
-        stub_client.file_blobs["patch/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
+        stub_client.file_blobs["/app/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
         preset_id = str(stub_client.remote.id)
         pull_preset_from_registry(store, "main/qwen38")
 
-        stub_client.file_blobs["patch/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "fresh")
+        stub_client.file_blobs["/app/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "fresh")
         pull_preset_from_registry(store, "main/qwen38")
 
         assert store.get(preset_id).name == "main/qwen38"
@@ -536,22 +557,22 @@ class TestPullPresetFromRegistry:
         remote_id = uuid4()
         stub_client.remote = _registry_preset(
             file_archives=[
-                PresetArchiveMapping(id=uuid4(), path="patch/a.txt"),
-                PresetArchiveMapping(id=uuid4(), path="patch/b.txt"),
+                FileArchiveMapping(id=uuid4(), path="/app/a.txt"),
+                FileArchiveMapping(id=uuid4(), path="/app/b.txt"),
             ],
             file_mappings=[
                 FilePathMapping(local_path="patch/a.txt", path="/app/a.txt"),
                 FilePathMapping(local_path="patch/b.txt", path="/app/b.txt"),
             ],
         ).model_copy(update={"id": remote_id})
-        stub_client.file_blobs["patch/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
-        stub_client.file_blobs["patch/b.txt"] = _file_archive_blob(tmp_path, "b.txt", "stale")
+        stub_client.file_blobs["/app/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "hello")
+        stub_client.file_blobs["/app/b.txt"] = _file_archive_blob(tmp_path, "b.txt", "stale")
         pull_preset_from_registry(store, "main/qwen38")
         preset_id = str(remote_id)
         assert (store.root / preset_id / "patch" / "b.txt").exists()
 
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
             file_mappings=[FilePathMapping(local_path="patch/a.txt", path="/app/a.txt")],
         ).model_copy(update={"id": remote_id})
         pull_preset_from_registry(store, "main/qwen38")
@@ -564,7 +585,7 @@ class TestPullPresetFromRegistry:
     def test_rejects_a_traversing_file_path_before_writing(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="../evil.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
             file_mappings=[FilePathMapping(local_path="../evil.txt", path="/app/a.txt")],
         )
 
@@ -592,7 +613,14 @@ class TestPullPresetFromRegistry:
     ):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path=path) for path in paths],
+            file_archives=[
+                FileArchiveMapping(id=uuid4(), path=f"/app/{index}")
+                for index, _ in enumerate(paths)
+            ],
+            file_mappings=[
+                FilePathMapping(local_path=path, path=f"/app/{index}")
+                for index, path in enumerate(paths)
+            ],
         )
 
         with pytest.raises(CLIError, match=error):
@@ -612,7 +640,7 @@ class TestPullPresetFromRegistry:
     def test_rejects_a_pulled_file_the_preset_does_not_reference(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/orphan.txt")],
         )
 
         with pytest.raises(CLIError, match="not referenced"):
@@ -654,10 +682,10 @@ class TestPulledArchiveMembers:
     def _pull_hostile(self, tmp_path, stub_client, blob: bytes) -> PresetStore:
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
-            file_archives=[PresetArchiveMapping(id=uuid4(), path="patch/a.txt")],
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
             file_mappings=[FilePathMapping(local_path="patch/a.txt", path="/app/a.txt")],
         )
-        stub_client.file_blobs["patch/a.txt"] = blob
+        stub_client.file_blobs["/app/a.txt"] = blob
         return store
 
     def _assert_nothing_escaped(self, tmp_path, store: PresetStore, stub_client) -> None:
