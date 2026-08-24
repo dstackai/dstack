@@ -13,6 +13,8 @@ import { GlobalUserRole } from 'types';
 
 import { selectUserData } from 'App/slice';
 
+import { PublicKeys } from '../PublicKeys';
+
 import styles from './styles.module.scss';
 
 export const Settings: React.FC = () => {
@@ -51,62 +53,66 @@ export const Settings: React.FC = () => {
     };
 
     return (
-        <Container
-            header={
-                <Header
-                    variant="h2"
-                    actions={
-                        <Button onClick={editUserHandler} disabled={isDisabledUserEditing()}>
-                            {t('common.edit')}
-                        </Button>
-                    }
-                >
-                    {t('users.account_settings')}
-                </Header>
-            }
-        >
-            {isLoading && <Loader />}
+        <SpaceBetween size="l">
+            <Container
+                header={
+                    <Header
+                        variant="h2"
+                        actions={
+                            <Button onClick={editUserHandler} disabled={isDisabledUserEditing()}>
+                                {t('common.edit')}
+                            </Button>
+                        }
+                    >
+                        {t('users.account_settings')}
+                    </Header>
+                }
+            >
+                {isLoading && <Loader />}
 
-            {data && (
-                <ColumnLayout columns={2} variant="text-grid">
-                    <SpaceBetween size="l">
-                        {/*<div>*/}
-                        {/*    <Box variant="awsui-key-label">{t('users.user_name')}</Box>*/}
-                        {/*    <div>{data.user_name}</div>*/}
-                        {/*</div>*/}
+                {data && (
+                    <ColumnLayout columns={2} variant="text-grid">
+                        <SpaceBetween size="l">
+                            {/*<div>*/}
+                            {/*    <Box variant="awsui-key-label">{t('users.user_name')}</Box>*/}
+                            {/*    <div>{data.user_name}</div>*/}
+                            {/*</div>*/}
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('users.email')}</Box>
-                            <div>{data.email ? <Link href={`mailto:${data.email}`}>{data.email}</Link> : '-'}</div>
-                        </div>
-
-                        <PermissionGuard allowedGlobalRoles={[GlobalUserRole.ADMIN]}>
                             <div>
-                                <Box variant="awsui-key-label">{t('users.global_role')}</Box>
-                                <div>{t(`roles.${data.global_role}`)}</div>
+                                <Box variant="awsui-key-label">{t('users.email')}</Box>
+                                <div>{data.email ? <Link href={`mailto:${data.email}`}>{data.email}</Link> : '-'}</div>
                             </div>
-                        </PermissionGuard>
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('users.token')}</Box>
+                            <PermissionGuard allowedGlobalRoles={[GlobalUserRole.ADMIN]}>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('users.global_role')}</Box>
+                                    <div>{t(`roles.${data.global_role}`)}</div>
+                                </div>
+                            </PermissionGuard>
 
-                            <div className={styles.token}>
-                                <Popover
-                                    dismissButton={false}
-                                    position="top"
-                                    size="small"
-                                    triggerType="custom"
-                                    content={<StatusIndicator type="success">{t('users.token_copied')}</StatusIndicator>}
-                                >
-                                    <Button formAction="none" iconName="copy" variant="link" onClick={onCopyToken} />
-                                </Popover>
+                            <div>
+                                <Box variant="awsui-key-label">{t('users.token')}</Box>
 
-                                <div>{data.creds.token}</div>
+                                <div className={styles.token}>
+                                    <Popover
+                                        dismissButton={false}
+                                        position="top"
+                                        size="small"
+                                        triggerType="custom"
+                                        content={<StatusIndicator type="success">{t('users.token_copied')}</StatusIndicator>}
+                                    >
+                                        <Button formAction="none" iconName="copy" variant="link" onClick={onCopyToken} />
+                                    </Popover>
+
+                                    <div>{data.creds.token}</div>
+                                </div>
                             </div>
-                        </div>
-                    </SpaceBetween>
-                </ColumnLayout>
-            )}
-        </Container>
+                        </SpaceBetween>
+                    </ColumnLayout>
+                )}
+            </Container>
+
+            <PublicKeys />
+        </SpaceBetween>
     );
 };
