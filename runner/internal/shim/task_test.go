@@ -1,8 +1,11 @@
 package shim
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -43,35 +46,93 @@ func TestTaskStorage_Add_AlreadyExists(t *testing.T) {
 	assert.Equal(t, storedTask, storage.tasks["1"])
 }
 
-func TestTaskStorage_Update_OK(t *testing.T) {
+func TestTaskStorage_Modify_OK(t *testing.T) {
 	storage := NewTaskStorage()
-	storedTask := Task{ID: "1", Status: TaskStatusRunning}
-	storage.tasks["1"] = storedTask
-	updatedTask := Task{ID: "1", Status: TaskStatusTerminated}
+	storage.tasks["1"] = Task{ID: "1", Status: TaskStatusRunning}
 
-	err := storage.Update(updatedTask)
-	assert.Nil(t, err)
-	assert.Equal(t, updatedTask, storage.tasks["1"])
+	task, err := storage.Modify("1", func(t *Task) error {
+		t.SetStatusTerminated("container_exited_with_error", "oom")
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, TaskStatusTerminated, task.Status)
+	assert.Equal(t, "container_exited_with_error", task.TerminationReason)
+	assert.Equal(t, task, storage.tasks["1"])
 }
 
-func TestTaskStorage_Update_DoesNotExist(t *testing.T) {
+// The transition is not checked unless the status changes, so that the internal
+// state of a task can be committed at any time
+func TestTaskStorage_Modify_NoStatusChange(t *testing.T) {
+	storage := NewTaskStorage()
+	storage.tasks["1"] = Task{ID: "1", Status: TaskStatusRunning}
+	ports := []PortMapping{{Host: 30000, Container: 10999}}
+
+	task, err := storage.Modify("1", func(t *Task) error {
+		t.ports = ports
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, TaskStatusRunning, task.Status)
+	assert.Equal(t, ports, storage.tasks["1"].ports)
+}
+
+func TestTaskStorage_Modify_DoesNotExist(t *testing.T) {
 	storage := NewTaskStorage()
 
-	err := storage.Update(Task{ID: "1", Status: TaskStatusPending})
+	_, err := storage.Modify("1", func(t *Task) error {
+		t.SetStatusPreparing()
+		return nil
+	})
 	assert.ErrorIs(t, err, ErrNotFound)
-	assert.Equal(t, 0, len(storage.tasks))
+	assert.Empty(t, storage.tasks)
 }
 
-func TestTaskStorage_Update_TransitionNotAllowed(t *testing.T) {
+func TestTaskStorage_Modify_TransitionNotAllowed(t *testing.T) {
 	storage := NewTaskStorage()
 	storedTask := Task{ID: "1", Status: TaskStatusPending}
 	storage.tasks["1"] = storedTask
-	updatedTask := Task{ID: "1", Status: TaskStatusRunning}
 
-	err := storage.Update(updatedTask)
+	_, err := storage.Modify("1", func(t *Task) error {
+		t.SetStatusRunning()
+		return nil
+	})
 	assert.ErrorIs(t, err, ErrRequest)
-	assert.ErrorContains(t, err, fmt.Sprintf("%s -> %s", storedTask.Status, updatedTask.Status))
+	assert.ErrorContains(t, err, fmt.Sprintf("%s -> %s", TaskStatusPending, TaskStatusRunning))
 	assert.Equal(t, storedTask, storage.tasks["1"])
+}
+
+// A partially applied function must not reach the storage
+func TestTaskStorage_Modify_Error(t *testing.T) {
+	storage := NewTaskStorage()
+	storedTask := Task{ID: "1", Status: TaskStatusPulling}
+	storage.tasks["1"] = storedTask
+	errFailed := errors.New("failed")
+
+	_, err := storage.Modify("1", func(t *Task) error {
+		t.SetStatusCreating()
+		return errFailed
+	})
+	assert.ErrorIs(t, err, errFailed)
+	assert.Equal(t, storedTask, storage.tasks["1"])
+}
+
+func TestTaskStorage_Modify_TerminationReasonNotOverridden(t *testing.T) {
+	storage := NewTaskStorage()
+	storage.tasks["1"] = Task{
+		ID:                 "1",
+		Status:             TaskStatusTerminated,
+		TerminationReason:  "container_exited_with_error",
+		TerminationMessage: "oom",
+	}
+
+	task, err := storage.Modify("1", func(t *Task) error {
+		t.SetStatusTerminated("terminated_by_server", "")
+		return nil
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "container_exited_with_error", task.TerminationReason)
+	assert.Equal(t, "oom", task.TerminationMessage)
+	assert.Equal(t, "container_exited_with_error", storage.tasks["1"].TerminationReason)
 }
 
 func TestTaskStorage_Delete(t *testing.T) {
@@ -83,6 +144,42 @@ func TestTaskStorage_Delete(t *testing.T) {
 
 	storage.Delete("1")
 	assert.Equal(t, 0, len(storage.tasks))
+}
+
+func TestTask_TryLock(t *testing.T) {
+	ctx := t.Context()
+	task := Task{ID: "1", mu: &sync.Mutex{}}
+
+	assert.True(t, task.TryLock(ctx))
+	assert.False(t, task.TryLock(ctx))
+
+	task.Release(ctx)
+	assert.True(t, task.TryLock(ctx))
+}
+
+func TestTask_Lock_WaitsForRelease(t *testing.T) {
+	ctx := t.Context()
+	task := Task{ID: "1", mu: &sync.Mutex{}}
+	task.Lock(ctx)
+
+	locked := make(chan struct{})
+	go func() {
+		task.Lock(ctx)
+		close(locked)
+	}()
+
+	select {
+	case <-locked:
+		t.Fatal("Lock did not wait for Release")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	task.Release(ctx)
+	select {
+	case <-locked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Lock did not acquire the lock after Release")
+	}
 }
 
 func TestTask_IsTransitionAllowed_true(t *testing.T) {
@@ -97,7 +194,6 @@ func TestTask_IsTransitionAllowed_true(t *testing.T) {
 		{TaskStatusPulling, TaskStatusTerminated},
 		{TaskStatusCreating, TaskStatusRunning},
 		{TaskStatusCreating, TaskStatusTerminated},
-		{TaskStatusRunning, TaskStatusRunning},
 		{TaskStatusRunning, TaskStatusTerminated},
 		{TaskStatusTerminated, TaskStatusTerminated},
 	}
@@ -115,6 +211,7 @@ func TestTask_IsTransitionAllowed_false(t *testing.T) {
 		{TaskStatusPending, TaskStatusPending},
 		{TaskStatusPending, TaskStatusRunning},
 		{TaskStatusPulling, TaskStatusPending},
+		{TaskStatusRunning, TaskStatusRunning},
 	}
 	for _, tc := range testCases {
 		task := Task{ID: "1", Status: tc.oldStatus}
