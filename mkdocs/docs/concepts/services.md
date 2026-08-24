@@ -290,74 +290,75 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 <span id="replica-groups"></span>
 
-??? info "Replica groups"
-    A service can define multiple replica groups. Each group has its own `replicas` count (or range),
-    `resources`, `commands`, and `scaling` rules.
+### Replica groups
 
-    <div editor-title="service.dstack.yml">
+A service can define multiple replica groups. Each group has its own `replicas` count (or range),
+`resources`, `commands`, and `scaling` rules. For a common use case, see
+[PD disaggregation](#pd-disaggregation).
 
-    ```yaml
-    type: service
-    name: llama-8b-service
+<div editor-title="service.dstack.yml">
 
-    image: lmsysorg/sglang:v0.5.10.post1
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+```yaml
+type: service
+name: llama-8b-service
 
-    groups:
-      - replicas: 1..2
-        scaling:
-          metric: rps
-          target: 10
-        commands:
-          - |
-            python -m sglang.launch_server \
-              --model-path $MODEL_ID \
-              --port 8000 \
-              --trust-remote-code
-        resources:
-          gpu: 48GB
+image: lmsysorg/sglang:v0.5.10.post1
+env:
+  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
-      - replicas: 1..4
-        scaling:
-          metric: rps
-          target: 5
-        commands:
-          - |
-            python -m sglang.launch_server \
-              --model-path $MODEL_ID \
-              --port 8000 \
-              --trust-remote-code
-        resources:
-          gpu: 24GB
+groups:
+  - replicas: 1..2
+    scaling:
+      metric: rps
+      target: 10
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --port 8000 \
+          --trust-remote-code
+    resources:
+      gpu: 48GB
 
-    port: 8000
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-    ```
+  - replicas: 1..4
+    scaling:
+      metric: rps
+      target: 5
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --port 8000 \
+          --trust-remote-code
+    resources:
+      gpu: 24GB
 
-    </div>
+port: 8000
+model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+```
 
-    [`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
+</div>
 
-    > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
+[`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
 
-### Accessing replica IPs
+> Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
-Commands in any group can reference the internal IP address of any replica in the run via
-`${{ groups[i].replicas[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
-the index of the replica within that group.
+??? info "Accessing replica IPs"
+    Commands in any group can reference the internal IP address of any replica in the run via
+    `${{ groups[i].replicas[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
+    the index of the replica within that group.
 
-> Only replicas guaranteed at start can be referenced:
->
-> - `replicas: 2` → replica indexes `0` and `1` can be referenced
-> - `replicas: 1..4` → replica index `0` can be referenced
-> - `replicas: 0..4` → no replica indexes can be referenced
+    > Only replicas guaranteed at start can be referenced:
+    >
+    > - `replicas: 2` → replica indexes `0` and `1` can be referenced
+    > - `replicas: 1..4` → replica index `0` can be referenced
+    > - `replicas: 0..4` → no replica indexes can be referenced
 
 ### PD disaggregation
 
 <!-- NOTE: this section is referenced from pre-0.21.0 CLIs. Prefer to keep the URL unchanged -->
 
-Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
+Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three [replica groups](#replica-groups): one for the router, one for prefill workers, and one for decode workers.
 
 `dstack` integrates with two routers for PD disaggregation: [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html) and [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
 
