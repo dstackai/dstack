@@ -59,6 +59,16 @@ class TestSystemPrompt:
         assert "shared_prefix_tokens" in text
         assert "`dataset`" not in text
 
+    def test_asks_a_random_dataset_session_for_the_prefix_and_the_tool_s_name(self):
+        text = get_preset_agent_system_prompt(
+            user_prompt=None, baseline=False, previous=(), custom_dataset=False
+        )
+
+        # Both facts fit the benchmark schema, so the prompt asks for both: the
+        # prefix the request fixed, and whatever the tool calls the data it made.
+        assert "Set `workload.shared_prefix_tokens` to `shared_prefix_tokens`" in text
+        assert "`workload.dataset` to the name the benchmark tool gives" in text
+
     def test_fails_loudly_when_the_prompt_has_no_directives(self, tmp_path, monkeypatch):
         plain = tmp_path / "system_prompt.md"
         plain.write_text("# Objective\n\nA prompt without directives.\n")

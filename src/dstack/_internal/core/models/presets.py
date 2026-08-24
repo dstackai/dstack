@@ -268,6 +268,14 @@ class PresetConfiguration(
     def effective_dataset(self) -> str:
         return self.dataset if self.dataset is not None else DEFAULT_DATASET
 
+    @property
+    def has_custom_dataset(self) -> bool:
+        """Whether a named dataset provides the benchmark requests. The default
+        `random` is not one: it is dstack's own name for synthetic prompts shaped by
+        `input_tokens` and `output_tokens`, and every benchmark tool has its own name
+        for the data it generates."""
+        return self.effective_dataset != DEFAULT_DATASET
+
     @field_validator("dataset")
     @classmethod
     def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:

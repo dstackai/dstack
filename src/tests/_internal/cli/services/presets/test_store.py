@@ -187,7 +187,8 @@ class TestPresetStore:
             group.name for group in preset.service.replica_groups
         ]
         assert preset.verified_on[0].replicas[0].gpu.name == ["MI300X"]
-        assert preset.benchmark.workload.dataset == "random"
+        # The old format never recorded a dataset name for a synthetic workload.
+        assert preset.benchmark.workload.dataset is None
         assert store.list() == [preset]
 
     def test_upgrade_maps_validation_replicas_to_replica_groups(self, tmp_path: Path):

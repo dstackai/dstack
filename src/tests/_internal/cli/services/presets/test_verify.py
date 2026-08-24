@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.preset_agent import AnyPresetAgentResult
+from dstack._internal.cli.models.preset_agent import AnyPresetAgentResult, PresetAgentSuccess
+from dstack._internal.cli.models.presets import PresetWorkload
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
 )
@@ -21,7 +23,9 @@ from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.presets import PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
+from dstack._internal.core.models.runs import Run
 from tests._internal.cli.common import (
+    SHARED_PREFIX_WORKLOAD,
     get_preset,
     get_preset_benchmark,
     get_running_service_run,
@@ -170,12 +174,94 @@ class TestBuildVerifiedPreset:
                 submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
-    def test_rejects_benchmark_on_a_different_dataset(self, tmp_path):
+    def test_verifies_a_shared_prefix_benchmark_named_by_the_benchmark_tool(self, tmp_path):
+        # `random` is dstack's own name for a synthetic workload; the report carries
+        # the benchmark tool's name for the data it generated, which is
+        # `generated-shared-prefix` for SGLang and `random` only for vLLM. Comparing
+        # the two rejected a benchmark that answered the request exactly.
         run = get_running_service_run()
 
-        # The report's workload defaults to `random`, but the configuration
-        # demanded a custom dataset: the benchmark does not match the contract.
-        with pytest.raises(CLIError, match="dataset does not match"):
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=_shared_prefix_configuration(),
+            report=_shared_prefix_report(run),
+            workspace_path=tmp_path,
+            session_path=tmp_path,
+            preset_id="ab12cd34",
+            name=None,
+            submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        assert preset.benchmark.workload.dataset == "generated-shared-prefix"
+        # The prefix the request asked for survives into the stored record.
+        assert preset.benchmark.workload.shared_prefix_tokens == 130048
+
+    def test_rejects_a_benchmark_without_the_requested_shared_prefix(self, tmp_path):
+        run = get_running_service_run()
+
+        with pytest.raises(
+            CLIError, match="shared prefix of 0 tokens does not match the requested 130048"
+        ):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_shared_prefix_configuration(),
+                report=_shared_prefix_report(run, shared_prefix_tokens=0),
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    def test_rejects_a_benchmark_at_another_concurrency(self, tmp_path):
+        run = get_running_service_run()
+
+        with pytest.raises(
+            CLIError, match="concurrency of 8 does not match the requested concurrency of 4"
+        ):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_shared_prefix_configuration(),
+                report=_shared_prefix_report(run, concurrency=8),
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    def test_verifies_a_benchmark_on_the_requested_dataset(self, tmp_path):
+        run = get_running_service_run()
+        report = _dataset_report(run, dataset="spec_bench")
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=PresetConfiguration(
+                name="qwen-build",
+                base="Qwen/Qwen3.5-27B",
+                dataset="spec_bench",
+            ),
+            report=report,
+            workspace_path=tmp_path,
+            session_path=tmp_path,
+            preset_id="ab12cd34",
+            name=None,
+            submitted_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        assert preset.benchmark.workload.dataset == "spec_bench"
+
+    # A named dataset is the one dataset name the report and the request share, so
+    # the report either echoes it or does not answer the request.
+    @pytest.mark.parametrize("reported", ["sharegpt", None])
+    def test_rejects_benchmark_on_a_different_dataset(self, tmp_path, reported):
+        run = get_running_service_run()
+
+        # Both values are named: "does not match" alone leaves nothing to act on.
+        with pytest.raises(
+            CLIError,
+            match=f"dataset {reported!r} does not match the requested dataset 'spec_bench'",
+        ):
             build_verified_preset(
                 run=run,
                 preset_configuration=PresetConfiguration(
@@ -183,7 +269,7 @@ class TestBuildVerifiedPreset:
                     base="Qwen/Qwen3.5-27B",
                     dataset="spec_bench",
                 ),
-                report=get_successful_preset_report(run),
+                report=_dataset_report(run, dataset=reported),
                 workspace_path=tmp_path,
                 session_path=tmp_path,
                 preset_id="ab12cd34",
@@ -262,3 +348,45 @@ class TestLoadPresetAgentReport:
 
         assert report.benchmark is not None
         assert "bearer header" in report.benchmark.command
+
+
+def _shared_prefix_configuration() -> PresetConfiguration:
+    """The configuration from dstackai/dstack#4198: a shared prefix and no dataset."""
+    return PresetConfiguration.model_validate(
+        {
+            "type": "preset",
+            "base": "Qwen/Qwen3.5-27B",
+            "min_context_length": 262144,
+            "max_ttft": 5000,
+            "trials": 4,
+            "concurrency": 4,
+            "input_tokens": 131072,
+            "output_tokens": 512,
+            "shared_prefix_tokens": 130048,
+        }
+    )
+
+
+def _shared_prefix_report(run: Run, **workload: Any) -> PresetAgentSuccess:
+    return _report_with_workload(run, {**SHARED_PREFIX_WORKLOAD, **workload})
+
+
+def _dataset_report(run: Run, **workload: Any) -> PresetAgentSuccess:
+    # A dataset defines the request shape, so the workload records what it measured.
+    return _report_with_workload(
+        run,
+        {
+            "api": "chat_completions",
+            "num_requests": 16,
+            "input_tokens": 347,
+            "output_tokens": 2451,
+            "concurrency": 4,
+            **workload,
+        },
+    )
+
+
+def _report_with_workload(run: Run, workload: dict[str, Any]) -> PresetAgentSuccess:
+    benchmark = get_preset_benchmark()
+    benchmark.workload = PresetWorkload.model_validate(workload)
+    return get_successful_preset_report(run).model_copy(update={"benchmark": benchmark})

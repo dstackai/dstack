@@ -99,7 +99,8 @@ def creation_context(tmp_path, monkeypatch):
         base="Qwen/Qwen3.5-27B",
         min_context_length=8192,
         max_ttft=5000,
-        concurrency=8,
+        # Matches the fixture report's benchmark concurrency, which verification compares.
+        concurrency=1,
         trials=1,
         fleets=["gpu-fleet"],
         env={"LICENSE": "license-secret", "TOKENIZERS_PARALLELISM": "false"},
@@ -109,7 +110,7 @@ def creation_context(tmp_path, monkeypatch):
         base="Qwen/Qwen3.5-27B",
         min_context_length=8192,
         max_ttft=5000,
-        concurrency=8,
+        concurrency=1,
         trials=1,
         fleets=["gpu-fleet"],
         env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],

@@ -77,7 +77,6 @@ from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.presets import (
-    DEFAULT_DATASET,
     PresetConfiguration,
     PresetConstraints,
     PresetDatasetConstraints,
@@ -613,7 +612,7 @@ async def _create_preset(
         user_prompt=setup.user_prompt,
         baseline=configuration.effective_baseline,
         previous=setup.previous,
-        custom_dataset=configuration.effective_dataset != DEFAULT_DATASET,
+        custom_dataset=configuration.has_custom_dataset,
     )
     if setup.write_constraints:
         if setup.user_prompt:
@@ -914,8 +913,7 @@ def _build_constraints(
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
-    dataset = configuration.effective_dataset
-    if dataset == DEFAULT_DATASET:
+    if not configuration.has_custom_dataset:
         constraints: PresetConstraints = PresetRandomConstraints(
             run_name_prefix=build_name,
             model=configuration.model,
@@ -938,7 +936,7 @@ def _build_constraints(
             max_ttft=configuration.max_ttft,
             trials_num=configuration.trials,
             concurrency=configuration.concurrency,
-            dataset=dataset,
+            dataset=configuration.effective_dataset,
             baseline=configuration.effective_baseline,
             fleets=list(allowed_fleets),
             env=list(configuration.env),

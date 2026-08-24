@@ -8,7 +8,6 @@ from dstack._internal.cli.models.presets import (
     VerifiedPreset,
 )
 from dstack._internal.cli.utils.common import add_row_from_dict, console
-from dstack._internal.core.models.presets import DEFAULT_DATASET
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
@@ -291,7 +290,7 @@ def format_preset_objective(
     configuration = preset.configuration
     workload = preset.benchmark.workload
     parts = []
-    if configuration.effective_dataset != DEFAULT_DATASET:
+    if configuration.has_custom_dataset:
         parts.append(f"data={configuration.effective_dataset}")
     else:
         input_tokens = configuration.effective_input_tokens

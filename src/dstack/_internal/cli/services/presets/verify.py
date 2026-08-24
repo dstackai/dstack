@@ -11,6 +11,7 @@ from dstack._internal.cli.models.preset_agent import (
 )
 from dstack._internal.cli.models.presets import (
     PresetVerificationReplicaGroup,
+    PresetWorkload,
     VerifiedPreset,
 )
 from dstack._internal.cli.services.presets.agent import (
@@ -134,16 +135,45 @@ def _verified_run_service(run: Run, report: PresetAgentSuccess) -> ServiceConfig
 def _check_report_answers_request(
     report: PresetAgentSuccess, configuration: PresetConfiguration
 ) -> None:
-    """The report must answer what the configuration asked: the same dataset, and
-    the requested model — exactly when it was exact, any variant of the base
-    otherwise."""
-    if report.benchmark.workload.dataset != configuration.effective_dataset:
-        raise CLIError("Claude final benchmark dataset does not match the requested dataset")
+    """The report must answer what the configuration asked: the same benchmark
+    workload, and the requested model — exactly when it was exact, any variant of
+    the base otherwise."""
+    _check_workload_answers_request(report.benchmark.workload, configuration)
     if configuration.model.allows_variant_selection:
         if report.base != configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the requested model")
     elif report.model != configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
+
+
+def _check_workload_answers_request(
+    workload: PresetWorkload, configuration: PresetConfiguration
+) -> None:
+    """Only what the configuration specifies exactly is compared. A named dataset is
+    compared by name, because the request and the report both use the dataset's own
+    name. A synthetic workload has no such shared name: `random` is dstack's name for
+    it, while the report carries the benchmark tool's, so the shared prefix it was run
+    with is compared instead. `input_tokens` and `output_tokens` are what the
+    benchmark measured rather than an echo of the request, so they are not
+    compared."""
+    if configuration.has_custom_dataset:
+        if workload.dataset != configuration.effective_dataset:
+            raise CLIError(
+                f"Claude final benchmark dataset {workload.dataset!r} does not match the"
+                f" requested dataset {configuration.effective_dataset!r}"
+            )
+    else:
+        shared_prefix_tokens = configuration.shared_prefix_tokens or 0
+        if workload.shared_prefix_tokens != shared_prefix_tokens:
+            raise CLIError(
+                f"Claude final benchmark shared prefix of {workload.shared_prefix_tokens}"
+                f" tokens does not match the requested {shared_prefix_tokens}"
+            )
+    if configuration.concurrency is not None and workload.concurrency != configuration.concurrency:
+        raise CLIError(
+            f"Claude final benchmark concurrency of {workload.concurrency} does not match the"
+            f" requested concurrency of {configuration.concurrency}"
+        )
 
 
 def _portable_service(

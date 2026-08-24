@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal, Optional
 
 from pydantic import (
     Field,
@@ -24,16 +24,19 @@ PRESET_EXCLUDED_FIELDS = ("name", "gateway", *ProfileParams.model_fields)
 
 class PresetWorkload(CoreModel):
     api: Literal["chat_completions", "completions"]
-    dataset: str
+    dataset: Optional[str] = None
+    """The benchmark tool's own name for the data it served. It is the requested
+    dataset when the configuration named one; for the synthetic `random` workload it
+    is whatever the tool calls the data it generates (`random`,
+    `generated-shared-prefix`, ...), recorded but never compared with dstack's own
+    `random`."""
     num_requests: PositiveInt
     input_tokens: PositiveInt
     output_tokens: Annotated[int, Field(ge=2)]
     concurrency: PositiveInt
-
-
-class PresetRandomWorkload(PresetWorkload):
-    dataset: Literal["random"] = "random"
     shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
+    """How many leading tokens every measured request shared. Only a synthetic
+    workload has one: a named dataset defines its own requests."""
 
 
 class PresetBenchmarkLatency(CoreModel):
@@ -64,9 +67,7 @@ class PresetBenchmark(CoreModel):
     tool: Annotated[str, Field(min_length=1)]
     tool_version: Annotated[str, Field(min_length=1)]
     command: Annotated[str, Field(min_length=1)]
-    # The subclass first: a report without `dataset` is a random workload, and a
-    # base-typed field would reject its `shared_prefix_tokens` as unknown.
-    workload: Union[PresetRandomWorkload, PresetWorkload]
+    workload: PresetWorkload
     metrics: PresetBenchmarkMetrics
 
     @property

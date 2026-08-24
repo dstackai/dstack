@@ -361,7 +361,7 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
   "tool_version": "0.11.0",
   "command": "vllm bench serve ...",<!--?if dataset-->
   "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "dataset": "sharegpt"},<!--?else-->
-  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "shared_prefix_tokens": 768},<!--?end-->
+  "workload": {"api": "chat_completions", "num_requests": 16, "input_tokens": 1024, "output_tokens": 128, "concurrency": 8, "shared_prefix_tokens": 768, "dataset": "random"},<!--?end-->
   "metrics": {
     "successful_requests": 16, "failed_requests": 0, "duration_seconds": 4.0,
     "total_input_tokens": 16384, "total_output_tokens": 2048,
@@ -376,6 +376,11 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 Set `workload.dataset` to `dataset` from `constraints.json`, and compute
 `workload.input_tokens` and `workload.output_tokens` as the measured mean
 input and output token counts of the benchmark, rounded to whole tokens.
+<!--?else-->
+Set `workload.shared_prefix_tokens` to `shared_prefix_tokens` from
+`constraints.json`, and `workload.dataset` to the name the benchmark tool gives
+the data it generated, whatever that name is. It records what ran and is never
+required to be a particular value.
 <!--?end-->
 Compute `output_tok_per_s` as `total_output_tokens / duration_seconds` and
 `per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`. These are
