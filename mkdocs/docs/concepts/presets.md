@@ -5,11 +5,7 @@ description: Creating and reusing optimized model inference configurations
 
 # Presets
 
-A preset configuration lets you use an agent to create a preset: a verified and optimized model inference configuration. Once created, the preset can be reused to deploy model inference on verified hardware without an agent.
-
-The value of presets comes from combining two fundamental features: agent-driven model inference optimization and the `dstack` [service](services.md) primitive, which can deploy model inference to any cloud, Kubernetes, or on-prem cluster.
-
-To get the best performance for the given model, hardware, and other constraints, the agent selects the serving framework, quantization, and serving parameters, and can patch the framework's source code, generate custom kernels, and patch drivers.
+Presets offer a toolkit that streamlines agent-based model inference optimization and a portable format to deploy the optimized inference endpoint to any cloud, Kubernetes cluster, or on-prem fleet.
 
 > The presets feature is experimental and may change.
 
@@ -201,6 +197,53 @@ When the session builds on `previous`, the baseline trial reproduces the best co
 !!! info "Reference"
     The `preset` configuration supports many more options. See the [`.dstack.yml` reference](../reference/dstack.yml/preset.md).
 
+## Push and pull a preset
+
+To share a preset, push it to the registry:
+
+<div class="termy">
+
+```shell
+$ dstack preset push dsv4-flash-b200 main/dsv4-flash-b200
+OK
+```
+
+</div>
+
+Pull it wherever you want to use it:
+
+<div class="termy">
+
+```shell
+$ dstack preset pull main/dsv4-flash-b200
+OK
+```
+
+</div>
+
+Push shares everything needed to deploy the preset. The prompt and trials that produced it stay on your machine.
+
+A pulled preset works like any other, and is named `<project>/<name>`:
+
+<div class="termy">
+
+```shell
+$ dstack preset list -a
+ NAME                    ID        BASE                           CONSTRAINTS      BENCHMARK                       STATUS          SUBMITTED
+ main/dsv4-flash-b200    8f065dde  deepseek-ai/DeepSeek-V4-Flash  io=10K/1.5K c=1  tps/user=309 ttft=213ms ctx=1M  pulled          2 min ago
+ qwen35-pro6000          092c792b  Qwen/Qwen3.5-397B-A17B         io=8K/1K c=64    tps/user=19.6 ttft=3.43s ctx=32K  verified (7)  3 days ago
+```
+
+</div>
+
+Pushing the same name again moves the name to the new preset. The previous one stays available as `<project>/<id>`.
+
+### Registry
+
+Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). To share a preset, create a project there, add the people you want to share it with, and push the preset to that project. To push or pull a preset from a project, you have to be its member.
+
+A self-hosted registry is part of [dstack Enterprise](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
+
 ## Export a preset
 
 To deploy a preset, export it as a service configuration with `dstack preset export`:
@@ -209,7 +252,7 @@ To deploy a preset, export it as a service configuration with `dstack preset exp
 
 ```shell
 $ dstack preset export c83375b4 -f qwen.dstack.yml
-Preset c83375b4 exported to qwen.dstack.yml (16 files). Deploy it with `dstack apply -f qwen.dstack.yml`
+OK
 ```
 
 </div>
@@ -240,7 +283,7 @@ Submit the run dsv4-flash? [y/n]: y
 
 ## Manage presets
 
-### Watch presets
+### Monitor presets
 
 While a preset is being created, you can watch the progress of its trials and what the agent is doing.
 
@@ -254,9 +297,8 @@ $ dstack preset logs -f c83375b4
 
 </div>
 
-### Traces
-
-The agent subprocess writes real-time traces to `~/.dstack/presets/<id>/trace.jsonl`: the agent's messages and every tool call with its result. Traces are the main way to analyze a session in depth — see [Protips](#protips).
+!!! info "Traces"
+    The agent subprocess writes real-time traces to `~/.dstack/presets/<id>/trace.jsonl`: the agent's messages and every tool call with its result. Traces are the main way to analyze a session in depth — see [Protips](#protips).
 
 ### List presets
 
@@ -321,7 +363,7 @@ At the same time, it's recommended to create presets using your own agent — ei
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
 * Doesn't support PD disaggregation (coming soon)
-* Presets are saved locally (a preset registry is coming soon)
+* The registry doesn't support public presets (coming soon)
 * Doesn't support ranges for `concurrency`
 
 > Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).

@@ -11,9 +11,9 @@ from pydantic import (
     WrapValidator,
 )
 
-from dstack._internal.cli.models.presets import PresetBenchmark
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.presets import PresetBenchmark
 
 
 class PresetAgentInvalidService(CoreModel):

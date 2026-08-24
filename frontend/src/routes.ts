@@ -186,6 +186,25 @@ export const ROUTES = {
         LIST: '/volumes',
     },
 
+    PRESETS: {
+        LIST: '/presets',
+        DETAILS: {
+            TEMPLATE: `/presets/:projectName/:presetId`,
+            FORMAT: (projectName: string, presetId: string) =>
+                buildRoute(ROUTES.PRESETS.DETAILS.TEMPLATE, { projectName, presetId }),
+            VERIFIED_ON: {
+                TEMPLATE: `/presets/:projectName/:presetId/verified-on`,
+                FORMAT: (projectName: string, presetId: string) =>
+                    buildRoute(ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE, { projectName, presetId }),
+            },
+            INSPECT: {
+                TEMPLATE: `/presets/:projectName/:presetId/inspect`,
+                FORMAT: (projectName: string, presetId: string) =>
+                    buildRoute(ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE, { projectName, presetId }),
+            },
+        },
+    },
+
     USER: {
         LIST: '/users',
         ADD: '/users/add',

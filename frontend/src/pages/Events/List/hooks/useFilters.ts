@@ -28,6 +28,7 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     TARGET_VOLUMES: 'target_volumes',
     TARGET_GATEWAYS: 'target_gateways',
     TARGET_SECRETS: 'target_secrets',
+    TARGET_PRESETS: 'target_presets',
     WITHIN_PROJECTS: 'within_projects',
     WITHIN_FLEETS: 'within_fleets',
     WITHIN_RUNS: 'within_runs',
@@ -47,6 +48,7 @@ const multipleChoiseKeys: RequestParamsKeys[] = [
     'target_volumes',
     'target_gateways',
     'target_secrets',
+    'target_presets',
     'within_projects',
     'within_fleets',
     'within_runs',
@@ -64,6 +66,7 @@ const targetTypes = [
     { label: 'Volume', value: 'volume' },
     { label: 'Gateway', value: 'gateway' },
     { label: 'Secret', value: 'secret' },
+    { label: 'Preset', value: 'preset' },
 ];
 
 const baseFilteringProperties = [
@@ -120,6 +123,12 @@ const baseFilteringProperties = [
         operators: ['='],
         propertyLabel: 'Target secret IDs',
         groupValuesLabel: 'Secret ids',
+    },
+    {
+        key: filterKeys.TARGET_PRESETS,
+        operators: ['='],
+        propertyLabel: 'Target preset IDs',
+        groupValuesLabel: 'Preset ids',
     },
 
     {

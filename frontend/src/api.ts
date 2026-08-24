@@ -106,6 +106,10 @@ export const API = {
         // Fleets
         VOLUMES_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/volumes/delete`,
 
+        // PRESETS
+        PRESETS_GET: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/presets/get`,
+        PRESETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/presets/delete`,
+
         // METRICS
         JOB_METRICS: (projectName: IProject['project_name'], runName: IRun['run_spec']['run_name']) =>
             `${API.BASE()}/project/${projectName}/metrics/job/${runName}`,
@@ -181,6 +185,11 @@ export const API = {
     VOLUME: {
         BASE: () => `${API.BASE()}/volumes`,
         LIST: () => `${API.VOLUME.BASE()}/list`,
+    },
+
+    PRESET: {
+        BASE: () => `${API.BASE()}/presets`,
+        LIST: () => `${API.PRESET.BASE()}/list`,
     },
 
     USER_PUBLIC_KEYS: {

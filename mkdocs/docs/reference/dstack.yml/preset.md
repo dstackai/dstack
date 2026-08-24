@@ -5,7 +5,7 @@ used to create or apply a [preset](../../concepts/presets.md).
 
 ## Root reference
 
-#SCHEMA# dstack._internal.core.models.presets.PresetConfiguration
+#SCHEMA# dstack._internal.core.models.configurations.PresetConfiguration
     overrides:
       show_root_heading: false
       type:
@@ -17,7 +17,7 @@ used to create or apply a [preset](../../concepts/presets.md).
 
     Allows the creation agent to select a compatible model variant.
 
-    #SCHEMA# dstack._internal.core.models.presets.PresetModelBase
+    #SCHEMA# dstack._internal.core.models.configurations.PresetModelBase
         overrides:
           show_root_heading: false
 
@@ -26,7 +26,7 @@ used to create or apply a [preset](../../concepts/presets.md).
     Requires an exact model repo or path and optionally sets another
     client-facing model name.
 
-    #SCHEMA# dstack._internal.core.models.presets.PresetModelRepo
+    #SCHEMA# dstack._internal.core.models.configurations.PresetModelRepo
         overrides:
           show_root_heading: false
 
@@ -34,7 +34,7 @@ used to create or apply a [preset](../../concepts/presets.md).
 
 Custom agent instructions. Set to an inline string, or to a file:
 
-#SCHEMA# dstack._internal.core.models.presets.PresetPromptFile
+#SCHEMA# dstack._internal.core.models.configurations.PresetPromptFile
     overrides:
       show_root_heading: false
 

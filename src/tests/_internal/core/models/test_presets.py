@@ -1,113 +1,137 @@
+from typing import Any, Dict, List, Optional
+
 import pytest
 from pydantic import ValidationError
 
 from dstack._internal.core.models.presets import (
-    PresetConfiguration,
-    PresetModelBase,
-    PresetModelRepo,
+    PresetBenchmark,
+    PresetRandomWorkload,
+    PresetWorkload,
+    validate_preset_file_path,
+    validate_preset_file_paths,
 )
 
-pytestmark = pytest.mark.windows
+
+def get_benchmark_data(workload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "tool": "vllm bench serve",
+        "tool_version": "0.11.0",
+        "command": "vllm bench serve --base-url $SERVICE_URL",
+        "workload": workload,
+        "metrics": {
+            "successful_requests": 16,
+            "failed_requests": 0,
+            "duration_seconds": 48.64,
+            "total_input_tokens": 16384,
+            "total_output_tokens": 2048,
+            "output_tok_per_s": 42.1,
+            "per_user_tok_per_s": 42.1,
+            "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+            "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1},
+        },
+    }
 
 
-class TestPresetConfiguration:
-    def test_schema_documents_supported_input(self):
-        assert all(field.description for field in PresetConfiguration.model_fields.values())
-        assert all(field.description for field in PresetModelBase.model_fields.values())
-        assert all(field.description for field in PresetModelRepo.model_fields.values())
-        assert {"type": "string"} in PresetConfiguration.model_json_schema()["properties"][
-            "model"
-        ]["anyOf"]
+def get_workload_data(**overrides: Any) -> Dict[str, Any]:
+    workload: Dict[str, Any] = {
+        "api": "chat_completions",
+        "num_requests": 16,
+        "input_tokens": 1024,
+        "output_tokens": 128,
+        "concurrency": 1,
+    }
+    workload.update(overrides)
+    return workload
 
-    def test_parses_string_as_exact_repo(self):
-        configuration = PresetConfiguration(model="Qwen/Qwen3.5-27B")
 
-        assert isinstance(configuration.model, PresetModelRepo)
-        assert configuration.model.exact_repo == "Qwen/Qwen3.5-27B"
-        assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
-        assert not configuration.model.allows_variant_selection
+class TestValidatePresetFilePaths:
+    """The single owner of the preset file rules: push (client and server) and
+    pull all go through it, so every rule is pinned here once."""
 
-    def test_parses_base_model(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+    @pytest.mark.parametrize(
+        ("paths", "error"),
+        [
+            # Per-path rules.
+            pytest.param([""], "must be a relative POSIX path", id="empty-path"),
+            pytest.param(["/etc/passwd"], "must be a relative POSIX path", id="absolute"),
+            pytest.param(["patch\\a.txt"], "must be a relative POSIX path", id="backslash"),
+            # `:` covers Windows drive letters and is invalid on Windows targets.
+            pytest.param(["c:a.txt"], "must be a relative POSIX path", id="colon"),
+            pytest.param(["../a.txt"], "must be a relative POSIX path", id="leading-parent"),
+            pytest.param(["patch/../a.txt"], "must be a relative POSIX path", id="inner-parent"),
+            pytest.param(["./a.txt"], "must be a relative POSIX path", id="leading-current"),
+            pytest.param(["patch/./a.txt"], "must be a relative POSIX path", id="inner-current"),
+            pytest.param(["patch//a.txt"], "must be a relative POSIX path", id="empty-segment"),
+            pytest.param(["patch/"], "must be a relative POSIX path", id="trailing-slash"),
+            # The local store keeps the preset document at this path.
+            pytest.param(["preset.yml"], "the name is reserved", id="reserved"),
+            # Whole-list rules.
+            pytest.param(
+                ["patch/a.txt", "patch/a.txt"],
+                "Duplicate preset file path",
+                id="duplicate",
+            ),
+            # `a` and `a/b` cannot both materialize on one filesystem, in either
+            # order.
+            pytest.param(
+                ["patch", "patch/a.txt"],
+                "both a file and a directory",
+                id="file-before-directory",
+            ),
+            pytest.param(
+                ["patch/a.txt", "patch"],
+                "both a file and a directory",
+                id="directory-before-file",
+            ),
+            # Accepted.
+            pytest.param([], None, id="accepts-no-files"),
+            pytest.param(["a.txt"], None, id="accepts-plain-file"),
+            pytest.param(["patch/nested/a.txt"], None, id="accepts-nested-file"),
+            pytest.param([".env"], None, id="accepts-dotfile"),
+            pytest.param(["patch/a.txt", "patch/b.txt"], None, id="accepts-siblings"),
+            # Only the exact reserved path is reserved.
+            pytest.param(["preset.yaml", "patch/preset.yml"], None, id="accepts-near-reserved"),
+        ],
+    )
+    def test_applies_every_rule(self, paths: List[str], error: Optional[str]):
+        if error is None:
+            validate_preset_file_paths(paths)
+            for path in paths:
+                validate_preset_file_path(path)
+            return
+        with pytest.raises(ValueError, match=error):
+            validate_preset_file_paths(paths)
+        if len(paths) == 1:
+            # A per-path rule must reject through either entry point, since push
+            # checks single paths (`service.files`) and lists (the archives).
+            with pytest.raises(ValueError, match=error):
+                validate_preset_file_path(paths[0])
 
-        assert isinstance(configuration.model, PresetModelBase)
-        assert configuration.model.exact_repo is None
-        assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
-        assert configuration.model.allows_variant_selection
 
-    def test_parses_exact_repo_with_client_facing_name(self):
-        configuration = PresetConfiguration(
-            model={
-                "repo": "community/Qwen3.5-27B-GPTQ-Int4",
-                "name": "Qwen/Qwen3.5-27B",
-            }
-        )
+class TestPresetBenchmarkWorkload:
+    """`api` and `dataset` are Literals, not plain strings: the agent-facing JSON
+    schema is generated from these models, and `dataset` is what discriminates
+    the workload union."""
 
-        assert configuration.model.exact_repo == "community/Qwen3.5-27B-GPTQ-Int4"
-        assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
+    def test_rejects_an_unsupported_api(self):
+        data = get_benchmark_data(get_workload_data(api="embeddings"))
 
-    def test_rejects_ambiguous_model_object(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model={"base": "Qwen/base", "repo": "Qwen/repo"})
+            PresetBenchmark.model_validate(data)
 
-    def test_parses_top_level_base_shorthand(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+    def test_parses_a_dataset_workload_as_the_base_type(self):
+        data = get_benchmark_data(get_workload_data(dataset="sharegpt"))
 
-        assert isinstance(configuration.model, PresetModelBase)
-        assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
-        assert configuration.base is None
+        benchmark = PresetBenchmark.model_validate(data)
 
-    def test_parses_top_level_repo_shorthand(self):
-        configuration = PresetConfiguration(repo="community/Qwen3.5-27B-GPTQ-Int4")
+        assert type(benchmark.workload) is PresetWorkload
+        assert benchmark.workload.dataset == "sharegpt"
 
-        assert isinstance(configuration.model, PresetModelRepo)
-        assert configuration.model.exact_repo == "community/Qwen3.5-27B-GPTQ-Int4"
-        assert configuration.repo is None
+    def test_parses_a_workload_without_a_dataset_as_random(self):
+        data = get_benchmark_data(get_workload_data())
 
-    def test_shorthand_round_trips_through_dict(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        benchmark = PresetBenchmark.model_validate(data)
 
-        round_tripped = PresetConfiguration.model_validate(configuration.model_dump())
-
-        assert round_tripped.model == configuration.model
-
-    def test_rejects_combined_base_and_repo_shorthand(self):
-        with pytest.raises(ValidationError):
-            PresetConfiguration(base="Qwen/base", repo="Qwen/repo")
-
-    def test_rejects_shorthand_combined_with_model(self):
-        with pytest.raises(ValidationError, match="cannot be combined"):
-            PresetConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
-
-    def test_requires_model(self):
-        with pytest.raises(ValidationError):
-            PresetConfiguration()
-
-    @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
-    def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
-        with pytest.raises(ValidationError, match="only be set with the `random` dataset"):
-            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
-
-    def test_allows_request_shape_fields_with_the_random_dataset(self):
-        configuration = PresetConfiguration(
-            base="Qwen/Qwen3.5-27B", dataset="random", input_tokens=1024, output_tokens=256
-        )
-
-        assert configuration.input_tokens == 1024
-        assert configuration.output_tokens == 256
-
-    def test_defaults_to_the_random_dataset(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
-
-        assert configuration.dataset is None
-        assert configuration.effective_dataset == "random"
-
-
-class TestPresetConfigurationSchema:
-    def test_schema_does_not_require_model(self):
-        # `model` is filled from the `base`/`repo` shorthand by a before-validator,
-        # which JSON Schema consumers (IDEs) never run.
-        schema = PresetConfiguration.model_json_schema()
-        assert "model" not in schema.get("required", [])
-        for field in ("model", "base", "repo"):
-            assert field in schema["properties"]
+        assert type(benchmark.workload) is PresetRandomWorkload
+        assert benchmark.workload.dataset == "random"
+        assert benchmark.workload.shared_prefix_tokens == 0

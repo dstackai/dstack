@@ -3,14 +3,14 @@ from pathlib import Path
 
 import yaml
 
-from dstack._internal.cli.models.presets import VerifiedPreset
+from dstack._internal.cli.models.presets import AnyStoredPreset
 from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.services import validate_dstack_resource_name
 
 
 # TODO: Human-readable service serialization: short syntax, defaults dropped
 def export_preset(
-    preset: VerifiedPreset,
+    preset: AnyStoredPreset,
     *,
     preset_dir: Path,
     destination: Path,
@@ -19,13 +19,18 @@ def export_preset(
 ) -> list[Path]:
     """Writes the exact dump of the service at `destination`, changing only
     `name` (from `name` or the preset's name) and the `files` paths; `gateway`
-    and profile params are unset by `VerifiedPreset`, not stripped here.
+    and profile params are unset by `PortablePreset`, not stripped here.
     Files under `preset_dir` are copied next to `destination` at their
     `preset_dir`-relative paths and `files` is rewritten to match; other files
     pass through absolute. Fails before any write: invalid name, or existing
     targets without `force`. Returns written paths."""
     if name is None:
         name = preset.name
+        if name is not None and "/" in name:
+            # A pulled copy's local name is the qualified `<project>/<name>`;
+            # the registry name after the `/` is a valid resource name by
+            # construction, while the qualified form never is.
+            name = name.split("/", 1)[1]
     if name is not None:
         try:
             validate_dstack_resource_name(name)
@@ -52,5 +57,10 @@ def export_preset(
     destination.write_text(yaml.safe_dump(service.model_dump(mode="json"), sort_keys=False))
     for source, target in copies:
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        if source.is_dir():
+            # `files` may mount a directory, and a preset carrying one exports
+            # like any other.
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
     return written

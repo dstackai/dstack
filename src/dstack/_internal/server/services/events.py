@@ -262,6 +262,7 @@ async def list_events(
     target_volumes: Optional[list[uuid.UUID]],
     target_gateways: Optional[list[uuid.UUID]],
     target_secrets: Optional[list[uuid.UUID]],
+    target_presets: Optional[list[uuid.UUID]],
     within_projects: Optional[list[uuid.UUID]],
     within_fleets: Optional[list[uuid.UUID]],
     within_runs: Optional[list[uuid.UUID]],
@@ -351,6 +352,13 @@ async def list_events(
             and_(
                 EventTargetModel.entity_type == EventTargetType.SECRET,
                 EventTargetModel.entity_id.in_(target_secrets),
+            )
+        )
+    if target_presets is not None:
+        target_filters.append(
+            and_(
+                EventTargetModel.entity_type == EventTargetType.PRESET,
+                EventTargetModel.entity_id.in_(target_presets),
             )
         )
     if within_projects is not None:

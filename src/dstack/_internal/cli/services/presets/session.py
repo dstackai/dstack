@@ -29,7 +29,7 @@ from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.utils.common import get_dstack_dir
 
 if TYPE_CHECKING:

@@ -12,9 +12,9 @@ from rich.live import Live
 
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.models.presets import (
-    Preset,
+    AnyStoredPreset,
     PresetListOutput,
-    VerifiedPreset,
+    UnverifiedPreset,
 )
 from dstack._internal.cli.services.completion import ProjectNameCompleter
 from dstack._internal.cli.services.configurators import APPLY_STDIN_NAME
@@ -32,6 +32,10 @@ from dstack._internal.cli.services.presets.create import (
 )
 from dstack._internal.cli.services.presets.export import export_preset
 from dstack._internal.cli.services.presets.output import get_presets_table, print_presets
+from dstack._internal.cli.services.presets.registry import (
+    pull_preset_from_registry,
+    push_preset_to_registry,
+)
 from dstack._internal.cli.services.presets.session import (
     get_presets_dir,
     list_preset_sessions,
@@ -57,7 +61,7 @@ from dstack._internal.cli.utils.common import (
     warn,
 )
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack.api import Client
 
 
@@ -176,6 +180,31 @@ class PresetCommand(BaseCommand):
         export_parser.add_argument("--force", action="store_true", help="Overwrite existing files")
         export_parser.set_defaults(subfunc=self._export)
 
+        push_parser = preset_subparsers.add_parser(
+            "push",
+            help="Push a preset to the registry",
+            formatter_class=self._parser.formatter_class,
+        )
+        push_parser.add_argument("preset", metavar="ID", help="The local preset ID or name")
+        push_parser.add_argument(
+            "ref",
+            metavar="PROJECT/NAME",
+            help="The name to push it under in the registry, prefixed by the project",
+        )
+        push_parser.set_defaults(subfunc=self._push)
+
+        pull_parser = preset_subparsers.add_parser(
+            "pull",
+            help="Pull a preset from the registry",
+            formatter_class=self._parser.formatter_class,
+        )
+        pull_parser.add_argument(
+            "ref",
+            metavar="PROJECT/NAME",
+            help="The preset name or ID in the registry, prefixed by the project",
+        )
+        pull_parser.set_defaults(subfunc=self._pull)
+
         delete_parser = preset_subparsers.add_parser(
             "delete",
             help="Delete presets",
@@ -259,12 +288,12 @@ class PresetCommand(BaseCommand):
 
     def _list_presets_and_sessions(
         self, *, base: str | None, repo: str | None
-    ) -> tuple[list[VerifiedPreset], list[dict]]:
+    ) -> tuple[list[AnyStoredPreset], list[dict]]:
         self._reconcile()
         presets = PresetStore().list()
         sessions = list_preset_sessions()
         if base or repo:
-            repo_to_base = {preset.model: preset.base for preset in presets}
+            repo_to_base = {preset.repo: preset.base for preset in presets}
             presets = _filter_presets(presets, base=base, repo=repo)
             sessions = [
                 session
@@ -335,7 +364,9 @@ class PresetCommand(BaseCommand):
     def _get(self, args: argparse.Namespace) -> None:
         self._reconcile()
         preset = PresetStore().find_by_id_or_name(args.preset)
-        if preset is None:
+        if preset is None and "/" not in args.preset:
+            # A qualified `<project>/<name|id>` ref never names a creation
+            # session, only a pulled copy.
             preset = _get_unfinished_preset(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
@@ -346,18 +377,20 @@ class PresetCommand(BaseCommand):
         preset = store.find_by_id_or_name(args.preset)
         if preset is None:
             raise CLIError(f"Preset {args.preset!r} does not exist")
-        written = export_preset(
+        export_preset(
             preset,
             preset_dir=store.root / preset.id,
             destination=Path(args.destination),
             force=args.force,
             name=args.name,
         )
-        console.print(
-            f"Preset [code]{preset.id}[/] exported to [code]{args.destination}[/]"
-            f" ({len(written)} files). Deploy it with"
-            f" [code]dstack apply -f {args.destination}[/]"
-        )
+        console.print("OK")
+
+    def _push(self, args: argparse.Namespace) -> None:
+        push_preset_to_registry(PresetStore(), args.preset, args.ref)
+
+    def _pull(self, args: argparse.Namespace) -> None:
+        pull_preset_from_registry(PresetStore(), args.ref)
 
     def _delete(self, args: argparse.Namespace) -> None:
         store = PresetStore()
@@ -373,6 +406,11 @@ class PresetCommand(BaseCommand):
                 if preset is not None:
                     preset_ids = [preset.id]
                     description = f"preset [code]{preset.id}[/] for [code]{preset.base}[/]"
+                elif "/" in args.preset:
+                    # A qualified ref only ever names a pulled copy; it can
+                    # never be a creation session, so the session fallback
+                    # would just manufacture a confusing error.
+                    raise CLIError(f"Preset {args.preset!r} does not exist")
                 else:
                     preset_ids = [_creation_id(args.preset)]
                     description = f"preset [code]{preset_ids[0]}[/]"
@@ -398,7 +436,7 @@ class PresetCommand(BaseCommand):
             with suppress(CLIError):
                 remove_agent_workspace(load_preset_session(preset_id))
             store.delete(preset_id)
-        console.print(f"Deleted {description}")
+        console.print("OK")
 
 
 def _creation_id(ref: str) -> str:
@@ -431,7 +469,7 @@ def _check_creation_not_in_use(preset_id: str) -> None:
         )
 
 
-def _get_unfinished_preset(ref: str) -> Optional[Preset]:
+def _get_unfinished_preset(ref: str) -> Optional[UnverifiedPreset]:
     """The preset as its creation session knows it, for any state but verified."""
     try:
         session = load_preset_session(resolve_session_ref(ref))
@@ -440,12 +478,12 @@ def _get_unfinished_preset(ref: str) -> Optional[Preset]:
     state = session.read_state()
     if state is None or state.status == "success":
         return None
-    return Preset(
+    return UnverifiedPreset(
         status=state.status,
         id=state.id,
         name=state.name,
         configuration=load_session_configuration(session),
-        submitted_at=state.created_at,
+        created_at=state.created_at,
     )
 
 
@@ -508,15 +546,15 @@ def _add_list_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _filter_presets(
-    presets: list[VerifiedPreset],
+    presets: list[AnyStoredPreset],
     *,
     base: str | None,
     repo: str | None,
-) -> list[VerifiedPreset]:
+) -> list[AnyStoredPreset]:
     return [
         preset
         for preset in presets
-        if (base is None or preset.base == base) and (repo is None or preset.model == repo)
+        if (base is None or preset.base == base) and (repo is None or preset.repo == repo)
     ]
 
 

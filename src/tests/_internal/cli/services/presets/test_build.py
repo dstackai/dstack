@@ -1,12 +1,12 @@
 import gpuhunt
 import pytest
 
-from dstack._internal.cli.models.presets import PresetVerificationReplicaGroup
 from dstack._internal.cli.services.presets.build import set_service_gpu_vendor_from_verification
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.presets import PresetVerificationReplicaGroup
 from dstack._internal.core.models.resources import ResourcesSpec
 
 pytestmark = pytest.mark.windows

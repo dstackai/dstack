@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -5,16 +6,28 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+from dstack._internal.cli.models.presets import PulledPreset, VerifiedPreset
 from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.presets import PortablePreset
 from tests._internal.cli.common import get_preset
 
 pytestmark = pytest.mark.windows
+
+
+def _get_pulled_preset() -> PulledPreset:
+    verified = get_preset()
+    return PulledPreset(
+        id="0b2b7b1e-9c1a-4a58-9d5a-3f6a1b2c3d4e",
+        name="main/qwen",
+        created_at=datetime(2026, 2, 3, 4, 5, tzinfo=timezone.utc),
+        **{field: getattr(verified, field) for field in PortablePreset.model_fields},
+    )
 
 
 class TestPresetStore:
@@ -28,13 +41,154 @@ class TestPresetStore:
         data = yaml.safe_load(path.read_text())
         assert data["base"] == preset.base
         assert data["id"] == preset.id
-        assert data["model"] == preset.model
-        assert data["submitted_at"] == "2026-01-02T03:04:00Z"
+        assert data["repo"] == preset.repo
+        assert data["created_at"] == "2026-01-02T03:04:00Z"
         assert data["status"] == "verified"
         assert "presets" not in data
         assert store.list() == [preset]
         assert store.get(preset.id) == preset
         assert not list(path.parent.glob("*.tmp"))
+
+    def test_a_verified_document_loads_as_a_verified_preset(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        store.save(get_preset())
+
+        loaded = store.get(get_preset().id)
+
+        assert isinstance(loaded, VerifiedPreset)
+        assert loaded.status == "verified"
+
+    def test_loads_a_preset_written_by_0_21(self, tmp_path: Path):
+        # A preset the released version wrote: the served repo under `model`,
+        # the date under `submitted_at`, and a `status` that already tagged it.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        data["model"] = data.pop("repo")
+        data["submitted_at"] = data.pop("created_at")
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(preset.id)
+
+        assert loaded == preset
+
+    def test_loads_a_preset_that_predates_the_repo_field(self, tmp_path: Path):
+        # Presets written before the rename store the served repo as `model`.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        data["model"] = data.pop("repo")
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(preset.id)
+
+        assert loaded is not None
+        assert loaded.repo == preset.repo
+        assert loaded == preset
+        # The service's own client-facing model name is untouched by the upgrade.
+        assert loaded.service.model == preset.service.model
+        # Re-saving migrates the file to the current field name.
+        store.save(loaded)
+        assert "model" not in yaml.safe_load(path.read_text())
+
+    def test_keeps_repo_when_the_file_already_uses_it(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+
+        loaded = store.get(preset.id)
+
+        assert loaded is not None
+        assert loaded.repo == preset.repo
+
+    def test_a_pulled_document_roundtrips_as_a_pulled_preset(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        pulled = _get_pulled_preset()
+
+        store.save(pulled)
+        loaded = store.get(pulled.id)
+
+        # `status` tags the document as a pulled copy, so it loads as one.
+        assert isinstance(loaded, PulledPreset)
+        assert loaded == pulled
+        assert store.list() == [pulled]
+        data = yaml.safe_load((tmp_path / "presets" / pulled.id / "preset.yml").read_text())
+        assert "configuration" not in data
+        assert "best_trial" not in data
+        assert data["status"] == "pulled"
+
+    def test_loads_a_preset_that_predates_the_created_at_field(self, tmp_path: Path):
+        # Presets written before the date was named for what it is store it as
+        # `submitted_at`.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        data["submitted_at"] = data.pop("created_at")
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(preset.id)
+
+        assert loaded is not None
+        assert loaded.created_at == preset.created_at
+        assert loaded == preset
+
+    def test_loads_a_pulled_copy_written_before_the_status_tag(self, tmp_path: Path):
+        # Pulled copies predate the tag too, so the tag cannot simply default to
+        # "verified": it is inferred from whether the creation context is there.
+        store = PresetStore(tmp_path / "presets")
+        pulled = _get_pulled_preset()
+        store.save(pulled)
+        path = tmp_path / "presets" / pulled.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        del data["status"]
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(pulled.id)
+
+        assert isinstance(loaded, PulledPreset)
+        assert loaded == pulled
+
+    def test_loads_a_preset_written_before_the_status_tag(self, tmp_path: Path):
+        # Only local creations could be stored before `status` tagged the union.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        del data["status"]
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(preset.id)
+
+        assert isinstance(loaded, VerifiedPreset)
+        assert loaded == preset
+
+    def test_reports_one_arms_errors_for_an_unreadable_preset(self, tmp_path: Path):
+        # An untagged union reported both arms' errors, which buried the actual
+        # problem in a wall of text about the shape the file never claimed to be.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        del data["benchmark"]
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        with pytest.raises(CLIError) as excinfo:
+            store.get(preset.id)
+
+        message = str(excinfo.value)
+        # Every reported error is located under the tag the file claims; the
+        # untagged union used to add the other arm's errors on top.
+        assert "1 validation error for" in message
+        assert "verified.benchmark" in message
+        assert "published." not in message
 
     def test_saving_same_id_overwrites_existing_preset(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
@@ -425,3 +579,22 @@ class TestPresetNames:
         assert released.id == named.id
         assert store.find_by_name("qwen") is None
         assert store.get(named.id).name is None
+
+    def test_find_by_id_or_name_resolves_a_pulled_qualified_name(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        # A pulled copy: UUID-named directory, qualified `<project>/<name>` name.
+        pulled = get_preset(preset_id="0b2b7b1e-9c1a-4a58-9d5a-3f6a1b2c3d4e").model_copy(
+            update={"name": "main/qwen"}
+        )
+        store.save(pulled)
+
+        # A qualified name is never id-shaped, so the id lookup must not
+        # reject it before the name lookup runs.
+        assert store.find_by_id_or_name("main/qwen").id == pulled.id
+        assert store.find_by_id_or_name(pulled.id) == store.get(pulled.id)
+
+    def test_find_by_id_or_name_returns_none_for_an_unknown_qualified_ref(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        store.save(get_preset())
+
+        assert store.find_by_id_or_name("main/unknown") is None

@@ -2,20 +2,21 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 import yaml
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
-from dstack._internal.cli.models.presets import PRESET_EXCLUDED_FIELDS, VerifiedPreset
+from dstack._internal.cli.models.presets import AnyStoredPreset
 from dstack._internal.cli.utils.common import warn
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.presets import (
+from dstack._internal.core.models.configurations import (
     MAX_PROMPT_LENGTH,
     PresetConfiguration,
     PresetPromptFile,
+    ServiceConfiguration,
 )
+from dstack._internal.core.models.presets import PRESET_EXCLUDED_FIELDS
 from dstack._internal.utils.common import get_dstack_dir
 
 
@@ -24,13 +25,18 @@ class EarlierVersionPresetError(CLIError):
     record the winning trial."""
 
 
+# `status` tags which shape a stored document is: `verified` for a local
+# creation, `pulled` for a copy from the registry.
+_STORED_PRESET_ADAPTER: TypeAdapter = TypeAdapter(AnyStoredPreset)
+
+
 class PresetStore:
     """One `<root>/<id>/preset.yml` per preset."""
 
     def __init__(self, root: Path | None = None) -> None:
         self.root = root or get_dstack_dir() / "presets"
 
-    def list(self) -> list[VerifiedPreset]:
+    def list(self) -> list[AnyStoredPreset]:
         if not self.root.exists():
             return []
         presets = []
@@ -60,7 +66,7 @@ class PresetStore:
             )
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 
-    def get(self, preset_id: str) -> VerifiedPreset | None:
+    def get(self, preset_id: str) -> AnyStoredPreset | None:
         _validate_preset_id(preset_id)
         if not self.root.exists():
             return None
@@ -72,7 +78,7 @@ class PresetStore:
             raise CLIError(f"Preset file {path} does not match its path")
         return preset
 
-    def save(self, preset: VerifiedPreset) -> Path:
+    def save(self, preset: AnyStoredPreset) -> Path:
         _validate_preset_id(preset.id)
         directory = self.root / preset.id
         directory.mkdir(parents=True, exist_ok=True)
@@ -102,16 +108,21 @@ class PresetStore:
                 pass
         return path
 
-    def find_by_name(self, name: str) -> VerifiedPreset | None:
+    def find_by_name(self, name: str) -> AnyStoredPreset | None:
         for preset in self.list():
             if preset.name == name:
                 return preset
         return None
 
-    def find_by_id_or_name(self, ref: str) -> VerifiedPreset | None:
-        return self.get(ref) or self.find_by_name(ref)
+    def find_by_id_or_name(self, ref: str) -> AnyStoredPreset | None:
+        # Only an id-shaped ref is looked up as an id, so a name that could
+        # never be one — e.g. a pulled copy's qualified `<project>/<name>` —
+        # reaches the name lookup instead of failing id validation. A corrupt
+        # preset file for a valid id still raises (deletion relies on that).
+        preset = self.get(ref) if _is_valid_preset_id(ref) else None
+        return preset or self.find_by_name(ref)
 
-    def release_name(self, name: str) -> VerifiedPreset | None:
+    def release_name(self, name: str) -> AnyStoredPreset | None:
         preset = self.find_by_name(name)
         if preset is None:
             return None
@@ -131,7 +142,7 @@ class PresetStore:
         shutil.rmtree(directory)
         return True
 
-    def _load(self, path: Path) -> VerifiedPreset:
+    def _load(self, path: Path) -> AnyStoredPreset:
         data = None
         try:
             with path.open(encoding="utf-8") as f:
@@ -141,7 +152,10 @@ class PresetStore:
             # stores `verified_on`.
             if isinstance(data, dict) and "validations" in data:
                 upgraded = _upgrade_pre_0_21_2_preset(data, preset_id=path.parent.name)
-            preset = VerifiedPreset.model_validate(upgraded)
+            upgraded = _upgrade_model_field(upgraded)
+            upgraded = _upgrade_submitted_at(upgraded)
+            upgraded = _upgrade_untagged_preset(upgraded)
+            preset = _STORED_PRESET_ADAPTER.validate_python(upgraded)
         except (OSError, ValidationError, yaml.YAMLError) as e:
             if isinstance(data, dict) and "validations" in data:
                 raise _earlier_version_preset_error(path.parent.name) from e
@@ -153,6 +167,39 @@ class PresetStore:
             if not Path(mapping.local_path).is_absolute():
                 mapping.local_path = str(path.parent / mapping.local_path)
         return preset
+
+
+# TODO: Remove in 0.22
+def _upgrade_submitted_at(data: Any) -> Any:
+    """Presets written before the date was named for what it is store it as
+    `submitted_at`."""
+    if not isinstance(data, dict) or "submitted_at" not in data or "created_at" in data:
+        return data
+    data = dict(data)
+    data["created_at"] = data.pop("submitted_at")
+    return data
+
+
+# TODO: Remove in 0.22
+def _upgrade_model_field(data: Any) -> Any:
+    """Presets written before the field was renamed store the served repo as
+    `model`, which now names nothing (the client-facing name is `service.model`)."""
+    if not isinstance(data, dict) or "model" not in data or "repo" in data:
+        return data
+    data = dict(data)
+    data["repo"] = data.pop("model")
+    return data
+
+
+# TODO: Remove in 0.22
+def _upgrade_untagged_preset(data: Any) -> Any:
+    """A preset file written before `status` tagged the stored union carries no
+    `status`, so the tag is inferred from the shape: only a local creation has
+    the creation context, a pulled copy is the bare artifact."""
+    if not isinstance(data, dict) or "status" in data:
+        return data
+    status = "verified" if "configuration" in data else "pulled"
+    return {**data, "status": status}
 
 
 # TODO: Remove in 0.22
@@ -208,12 +255,13 @@ def _upgrade_pre_0_21_2_preset(data: dict, *, preset_id: str) -> dict:
             "name": data.get("name"),
             "configuration": configuration,
             "base": data["base"],
-            "model": data["model"],
+            # The old format called the exact loaded repo `model`.
+            "repo": data["model"],
             "context_length": data["context_length"],
             "best_trial": data["trial"],
             # The old format stamped this at save time; the closest fact it
             # recorded for the submission moment.
-            "submitted_at": data["created_at"],
+            "created_at": data["created_at"],
             "service": service,
             "benchmark": benchmark,
             "verified_on": verified_on,
@@ -241,10 +289,18 @@ def _relative_to_preset_dir(local_path: str, directory: Path) -> str:
     return local_path
 
 
-def _validate_preset_id(preset_id: str) -> None:
+def _is_valid_preset_id(preset_id: str) -> bool:
     # `:` is rejected so a Windows drive-relative reference (`D:x`) cannot name a
     # directory outside the store, or another one inside it.
-    if not preset_id or preset_id.startswith(".") or any(char in preset_id for char in "/\\:"):
+    return bool(
+        preset_id
+        and not preset_id.startswith(".")
+        and not any(char in preset_id for char in "/\\:")
+    )
+
+
+def _validate_preset_id(preset_id: str) -> None:
+    if not _is_valid_preset_id(preset_id):
         raise CLIError(f"Invalid preset ID: {preset_id!r}")
 
 

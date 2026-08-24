@@ -114,6 +114,17 @@ class ListEventsRequest(CoreModel):
             max_length=MAX_FILTER_ITEMS,
         ),
     ] = None
+    target_presets: Annotated[
+        Optional[list[uuid.UUID]],
+        Field(
+            description=(
+                "List of preset IDs."
+                " The response will only include events that target the specified presets"
+            ),
+            min_length=MIN_FILTER_ITEMS,
+            max_length=MAX_FILTER_ITEMS,
+        ),
+    ] = None
     within_projects: Annotated[
         Optional[list[uuid.UUID]],
         Field(

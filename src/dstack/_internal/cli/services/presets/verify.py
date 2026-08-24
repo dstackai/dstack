@@ -9,10 +9,7 @@ from dstack._internal.cli.models.preset_agent import (
     AnyPresetAgentResult,
     PresetAgentSuccess,
 )
-from dstack._internal.cli.models.presets import (
-    PresetVerificationReplicaGroup,
-    VerifiedPreset,
-)
+from dstack._internal.cli.models.presets import VerifiedPreset
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
 )
@@ -28,9 +25,9 @@ from dstack._internal.cli.services.presets.workspace import (
     PresetAgentWorkspace,
 )
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration, ServiceConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.presets import PresetVerificationReplicaGroup
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 
 
@@ -87,7 +84,7 @@ def build_verified_preset(
     session_path: Path,
     preset_id: str,
     name: Optional[str],
-    submitted_at: datetime,
+    created_at: datetime,
 ) -> VerifiedPreset:
     """Cross-checks the agent's self-reported final report against the actual run
     and service state before trusting it to build a preset. The preset's service is
@@ -108,13 +105,16 @@ def build_verified_preset(
         ),
         verification_replica_groups=_get_verification_replica_groups(run, service),
         base_model=report.base,
-        model=report.model,
+        # The agent reports the served repo as `model`, the name the system
+        # prompt has always used; the preset document calls it `repo`, so that
+        # it cannot be confused with the service's client-facing model name.
+        repo=report.model,
         context_length=report.context_length,
         benchmark=report.benchmark,
         best_trial=report.trial,
         configuration=preset_configuration,
         preset_id=preset_id,
-        submitted_at=submitted_at,
+        created_at=created_at,
     )
 
 

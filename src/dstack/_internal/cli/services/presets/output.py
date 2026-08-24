@@ -1,18 +1,18 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from rich.table import Table
 
-from dstack._internal.cli.models.presets import (
-    VerifiedPreset,
-)
+from dstack._internal.cli.models.presets import AnyStoredPreset, VerifiedPreset
 from dstack._internal.cli.utils.common import add_row_from_dict, console
-from dstack._internal.core.models.presets import DEFAULT_DATASET
+from dstack._internal.core.models.configurations import DEFAULT_DATASET, PresetConfiguration
+from dstack._internal.core.models.presets import PresetWorkload
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
-    "ready": ("verified", "secondary"),
+    "verified": ("verified", "secondary"),
+    "pulled": ("pulled", "secondary"),
     "running": ("trialing", "bold sea_green3"),
     "verifying": ("verifying", "bold deep_sky_blue1"),
     "interrupted": ("interrupted", "secondary"),
@@ -83,7 +83,7 @@ def _format_trial_progress(session: Optional[dict[str, Any]], *, in_flight: bool
 
 
 def print_presets(
-    presets: list[VerifiedPreset],
+    presets: Sequence[AnyStoredPreset],
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
     all_presets: bool = False,
@@ -98,7 +98,7 @@ def print_presets(
 
 
 def get_presets_table(
-    presets: list[VerifiedPreset],
+    presets: Sequence[AnyStoredPreset],
     sessions: Optional[list[dict[str, Any]]] = None,
     verbose: bool = False,
     all_presets: bool = False,
@@ -115,11 +115,11 @@ def get_presets_table(
     table.add_column("", no_wrap=True)
     table.add_column("STATUS")
     table.add_column("SUBMITTED", style="secondary")
-    presets_by_base: dict[str, list[VerifiedPreset]] = defaultdict(list)
+    presets_by_base: dict[str, list[AnyStoredPreset]] = defaultdict(list)
     repo_to_base: dict[str, str] = {}
     for preset in presets:
         presets_by_base[preset.base].append(preset)
-        repo_to_base[preset.model] = preset.base
+        repo_to_base[preset.repo] = preset.base
     sessions_by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
     creations_by_id: dict[str, dict[str, Any]] = {}
     for session in sessions or []:
@@ -134,7 +134,7 @@ def get_presets_table(
     # so different models interleave); active-only by default, else the latest row.
     rows: list[tuple[str, Any, bool]] = []
     for preset_list in presets_by_base.values():
-        rows += [(preset.submitted_at.isoformat(), preset, True) for preset in preset_list]
+        rows += [(preset.created_at.isoformat(), preset, True) for preset in preset_list]
     for session_list in sessions_by_model.values():
         rows += [
             (str(session.get("created_at") or ""), session, False) for session in session_list
@@ -248,7 +248,7 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
 
 def _add_preset(
     table: Table,
-    preset: VerifiedPreset,
+    preset: AnyStoredPreset,
     *,
     verbose: bool,
     creation: Optional[dict[str, Any]] = None,
@@ -259,17 +259,17 @@ def _add_preset(
         "NAME": preset.name or "",
         "RESOURCES": _format_resources(groups[0].resources, verbose=verbose),
         "BASE": preset.base,
-        "STATUS": _format_status("ready") + _format_trial_progress(creation),
+        "STATUS": _format_status(preset.status) + _format_trial_progress(creation),
         "": _format_trial_spark(creation),
         "CONSTRAINTS": format_preset_objective(
             preset,
             verbose=verbose,
         ),
         "BENCHMARK": format_preset_benchmark(preset, verbose=verbose),
-        "SUBMITTED": pretty_date(preset.submitted_at),
+        "SUBMITTED": pretty_date(preset.created_at),
     }
-    if verbose and preset.model != preset.base:
-        row["BASE"] = f"[secondary]  repo={preset.model}[/]"
+    if verbose and preset.repo != preset.base:
+        row["BASE"] = f"[secondary]  repo={preset.repo}[/]"
     add_row_from_dict(table, row)
     if len(groups) > 1:
         for group in groups:
@@ -284,12 +284,34 @@ def _add_preset(
 
 
 def format_preset_objective(
-    preset: VerifiedPreset,
+    preset: AnyStoredPreset,
     *,
     verbose: bool = False,
 ) -> str:
-    configuration = preset.configuration
     workload = preset.benchmark.workload
+    if isinstance(preset, VerifiedPreset):
+        return _format_creation_objective(preset.configuration, workload, verbose=verbose)
+    # A pulled preset carries no creation context; the measured workload is its
+    # honest record of the conditions the numbers hold for.
+    parts = []
+    if workload.dataset != DEFAULT_DATASET:
+        parts.append(f"data={workload.dataset}")
+    else:
+        parts.append(
+            f"io={_format_token_count(workload.input_tokens)}"
+            f"/{_format_token_count(workload.output_tokens)}"
+        )
+        shared_prefix_tokens = getattr(workload, "shared_prefix_tokens", 0)
+        share = round(100 * shared_prefix_tokens / workload.input_tokens)
+        if share:
+            parts.append(f"prefix={share}%")
+    parts.append(f"c={workload.concurrency}")
+    return f"[secondary]{' '.join(parts)}[/]"
+
+
+def _format_creation_objective(
+    configuration: PresetConfiguration, workload: PresetWorkload, *, verbose: bool
+) -> str:
     parts = []
     if configuration.effective_dataset != DEFAULT_DATASET:
         parts.append(f"data={configuration.effective_dataset}")
@@ -310,7 +332,10 @@ def format_preset_objective(
     return f"[secondary]{' '.join(parts)}[/]"
 
 
-def _breaches_constraints(preset: VerifiedPreset) -> bool:
+def _breaches_constraints(preset: AnyStoredPreset) -> bool:
+    if not isinstance(preset, VerifiedPreset):
+        # A pulled preset carries no requested constraints to breach.
+        return False
     configuration = preset.configuration
     metrics = preset.benchmark.metrics
     if configuration.max_ttft is not None and metrics.ttft_ms.p50 > configuration.max_ttft:
@@ -320,7 +345,7 @@ def _breaches_constraints(preset: VerifiedPreset) -> bool:
     )
 
 
-def format_preset_benchmark(preset: VerifiedPreset, *, verbose: bool = False) -> str:
+def format_preset_benchmark(preset: AnyStoredPreset, *, verbose: bool = False) -> str:
     benchmark = preset.benchmark
     metrics = benchmark.metrics
     parts = [

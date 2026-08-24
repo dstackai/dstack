@@ -87,7 +87,8 @@
         "volumes": "Volumes",
         "instances": "Instances",
         "offers": "Offers",
-        "events": "Events"
+        "events": "Events",
+        "presets": "Presets"
     },
 
     "backend": {
@@ -834,5 +835,49 @@
     "confirm_dialog": {
         "title": "Confirm delete",
         "message": "Are you sure you want to delete?"
+    },
+    "presets": {
+        "list_page_title": "Presets",
+        "empty_message_title": "No presets",
+        "empty_message_text": "Presets are created and pushed with the CLI.",
+        "documentation": "Documentation",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+        "filter_property_placeholder": "Filter by properties",
+        "name": "Name",
+        "id": "ID",
+        "project": "Project",
+        "base": "Base",
+        "repo": "Repo",
+        "user": "User",
+        "created_at": "Created",
+        "context_length": "Context length",
+        "benchmark": "Benchmark",
+        "details": "Details",
+        "inspect": "Inspect",
+        "delete_confirm_title": "Delete presets",
+        "delete_confirm_message": "Are you sure you want to delete these presets?",
+        "verified_on": "Verified on",
+        "replica_group": "Replica group {{name}}",
+        "step_pull": "Pull",
+        "step_pull_description": "Pull the preset to your machine.",
+        "step_export": "Export",
+        "step_export_description": "Export it as a service configuration, along with the files it references.",
+        "step_apply": "Apply",
+        "step_apply_description": "Deploy the service to any cloud, Kubernetes cluster, or on-prem fleet.",
+        "replica": "Replica {{index}}",
+        "deploy": "Deploy",
+        "no_cli": "No CLI installed?",
+        "no_cli_description": "To use dstack, install the CLI on your local machine.",
+        "constraints": "Constraints",
+        "concurrency": "Concurrency",
+        "dataset": "Dataset",
+        "input_tokens": "Input tokens",
+        "output_tokens": "Output tokens",
+        "shared_prefix": "Shared prefix",
+        "no_fleet_description": "Deploying the service requires a fleet with matching resources.",
+        "fleets": "Fleets",
+        "superseded_alert": "A later push took this preset's name. It stays available by ID.",
+        "fleets_link": "How to create a fleet"
     }
 }

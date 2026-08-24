@@ -25,8 +25,7 @@ from dstack._internal.cli.services.profile import (
 )
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
-from dstack._internal.core.models.configurations import ApplyConfigurationType
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.configurations import ApplyConfigurationType, PresetConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.services import validate_dstack_resource_name
 

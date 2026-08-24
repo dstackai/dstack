@@ -1,7 +1,12 @@
 # dstack preset
 
 The `dstack preset` commands create, list, export, and delete local
-[presets](../../../concepts/presets.md).
+[presets](../../../concepts/presets.md), and push them to and pull them from a
+registry.
+
+The commands that take a preset — `get`, `export`, and `delete` — accept its ID
+or name. A pulled preset's name includes the project it came from, e.g.
+`main/qwen38-27b-mi300x`.
 
 ## dstack preset list
 
@@ -125,6 +130,38 @@ configuration that `dstack apply` deploys.
 
 ```shell
 $ dstack preset export --help
+#GENERATE#
+```
+
+</div>
+
+## dstack preset push
+
+The `dstack preset push` command pushes a local preset to the registry as
+`<project>/<name>`.
+
+##### Usage
+
+<div class="termy">
+
+```shell
+$ dstack preset push --help
+#GENERATE#
+```
+
+</div>
+
+## dstack preset pull
+
+The `dstack preset pull` command pulls `<project>/<name>` or `<project>/<id>`
+from the registry and stores it locally.
+
+##### Usage
+
+<div class="termy">
+
+```shell
+$ dstack preset pull --help
 #GENERATE#
 ```
 

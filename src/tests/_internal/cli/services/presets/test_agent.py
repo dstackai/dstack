@@ -48,7 +48,7 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.presets import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.services.configs import ConfigManager
 from tests._internal.cli.common import get_session_run, get_session_state
 

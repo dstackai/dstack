@@ -22,7 +22,7 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionStatus,
     PresetSessionWorkspace,
 )
-from dstack._internal.cli.models.presets import Preset
+from dstack._internal.cli.models.presets import VerifiedPreset
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     PresetAgentProcessOutput,
@@ -73,12 +73,14 @@ from dstack._internal.cli.services.presets.workspace import (
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, confirm_ask, console, warn
 from dstack._internal.cli.utils.offers import print_offers_table
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    DEFAULT_DATASET,
+    PresetConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.envs import Env, EnvSentinel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.presets import (
-    DEFAULT_DATASET,
-    PresetConfiguration,
     PresetConstraints,
     PresetDatasetConstraints,
     PresetRandomConstraints,
@@ -92,7 +94,7 @@ _NO_FLEETS_ERROR = "The project has no fleets. Create one before creating a pres
 
 @dataclass(frozen=True)
 class PresetCreateResult:
-    preset: Preset
+    preset: VerifiedPreset
     path: Path
     final_run_id: uuid.UUID
     final_run_name: str
@@ -596,7 +598,7 @@ async def _create_preset(
     )
     env: dict[str, str] = {}
     report: Optional[PresetAgentSuccess] = None
-    preset: Optional[Preset] = None
+    preset: Optional[VerifiedPreset] = None
     preset_path: Optional[Path] = None
     creation_succeeded = False
     interrupted = False
@@ -672,7 +674,7 @@ async def _create_preset(
             session_path=session.path,
             preset_id=session.preset_id,
             name=_read_claimed_name(session),
-            submitted_at=session.created_at,
+            created_at=session.created_at,
         )
         if contains_redacted_value(preset.model_dump(mode="json"), redacted_values):
             raise CLIError("Generated preset contains a secret value")
@@ -828,7 +830,7 @@ class PresetNameHolders:
     creation sessions claiming it (excluding the holder preset's own session)."""
 
     name: str
-    preset: Optional[Preset]
+    preset: Optional[VerifiedPreset]
     sessions: list[PresetSession]
 
     @property
