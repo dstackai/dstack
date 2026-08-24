@@ -124,7 +124,7 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-Dev environments support many [diffrent options](../../docs/concepts/dev-environments.md), including a custom Docker image, mounted repositories, idle timeout, min GPU utilization, and more.
+Dev environments support many [different options](../../docs/concepts/dev-environments.md), including a custom Docker image, mounted repositories, idle timeout, min GPU utilization, and more.
 
 ## Running distributed training
 

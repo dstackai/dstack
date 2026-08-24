@@ -49,7 +49,7 @@ description: Quick guide to creating fleets and submitting runs
     Create the fleet? [y/n]: y
 
       FLEET    INSTANCE  BACKEND  RESOURCES  PRICE  STATUS  CREATED 
-      defalut  -         -        -          -      -       10:36
+      default  -         -        -          -      -       10:36
     ```
 
     </div>
