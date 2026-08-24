@@ -14,6 +14,26 @@ pytestmark = pytest.mark.windows
 
 
 class TestExportPreset:
+    def test_exports_a_directory_the_service_mounts(self, tmp_path: Path):
+        # `files` may mount a whole directory, so export copies the tree rather
+        # than failing on it.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        preset.service.files = [FilePathMapping(local_path="service/1/patches", path="/patches")]
+        preset_dir = store.save(preset).parent
+        (preset_dir / "service" / "1" / "patches" / "nested").mkdir(parents=True)
+        (preset_dir / "service" / "1" / "patches" / "fix.patch").write_text("--- a\n+++ b\n")
+        (preset_dir / "service" / "1" / "patches" / "nested" / "more.patch").write_text("--- c\n")
+        destination = tmp_path / "deploy" / "qwen.dstack.yml"
+
+        export_preset(
+            store.get(preset.id), preset_dir=preset_dir, destination=destination, force=False
+        )
+
+        exported = destination.parent / "service" / "1" / "patches"
+        assert (exported / "fix.patch").read_text() == "--- a\n+++ b\n"
+        assert (exported / "nested" / "more.patch").read_text() == "--- c\n"
+
     def test_exports_a_deployable_service_configuration_with_its_files(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
         preset = get_preset()

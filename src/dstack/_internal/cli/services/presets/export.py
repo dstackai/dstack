@@ -57,5 +57,10 @@ def export_preset(
     destination.write_text(yaml.safe_dump(service.model_dump(mode="json"), sort_keys=False))
     for source, target in copies:
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target)
+        if source.is_dir():
+            # `files` may mount a directory, and a preset carrying one exports
+            # like any other.
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
     return written
