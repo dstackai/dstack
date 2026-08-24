@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/common/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,6 +43,7 @@ func TestDocker_SSHServer(t *testing.T) {
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
 	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assertTaskDone(t, dockerRunner, taskConfig.ID)
 }
 
 func TestDocker_ShmNoexecByDefault(t *testing.T) {
@@ -67,6 +69,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
 	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assertTaskDone(t, dockerRunner, taskConfig.ID)
 }
 
 func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
@@ -93,6 +96,7 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
 	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assertTaskDone(t, dockerRunner, taskConfig.ID)
 }
 
 func TestConfigureGpus_Nvidia(t *testing.T) {
@@ -191,6 +195,16 @@ func generateID(t *testing.T) string {
 	_, err := randSrc.Read(b)
 	require.Nil(t, err)
 	return hex.EncodeToString(b)[:idLen]
+}
+
+// assertTaskDone asserts that the final state of a successfully executed task
+// is committed to the storage
+func assertTaskDone(t *testing.T, runner *DockerRunner, taskID string) {
+	t.Helper()
+	taskInfo := runner.TaskInfo(taskID)
+	assert.Equal(t, TaskStatusTerminated, taskInfo.Status)
+	assert.Equal(t, string(types.TerminationReasonDoneByRunner), taskInfo.TerminationReason)
+	assert.Empty(t, taskInfo.TerminationMessage)
 }
 
 func createTaskConfig(t *testing.T) TaskConfig {

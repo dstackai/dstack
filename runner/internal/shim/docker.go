@@ -148,7 +148,7 @@ func (t *PullTracker) Progress() *ImagePullProgress {
 }
 
 type DockerRunner struct {
-	client       *docker.Client
+	client       docker.APIClient
 	dockerParams DockerParameters
 	dockerInfo   dockersystem.Info
 	baseEnv      []string
@@ -366,6 +366,37 @@ func (d *DockerRunner) Submit(ctx context.Context, cfg TaskConfig) error {
 	return nil
 }
 
+// commit applies mutate to the stored task and, on success, updates the local copy
+// of the task accordingly. mutate is called before the local copy is updated, so it
+// can read the local copy to publish fields set by the caller, e.g., containerID.
+// The local copy is left intact if the update is rejected.
+func (d *DockerRunner) commit(task *Task, mutate func(*Task)) error {
+	updatedTask, err := d.tasks.Modify(task.ID, func(t *Task) error {
+		mutate(t)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	*task = updatedTask
+	return nil
+}
+
+// commitTerminated commits the terminated status set on the local copy of the task.
+// Used by operations that set the status on their failure paths, where committing it
+// at every such path would be too verbose.
+func (d *DockerRunner) commitTerminated(ctx context.Context, task *Task) {
+	if task.Status != TaskStatusTerminated {
+		// the last successful commit is the actual state, nothing to commit
+		return
+	}
+	if err := d.commit(task, func(t *Task) {
+		t.SetStatusTerminated(task.TerminationReason, task.TerminationMessage)
+	}); err != nil && !errors.Is(err, ErrNotFound) {
+		log.Error(ctx, "failed to commit terminated status", "task", task.ID, "err", err)
+	}
+}
+
 func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	task, ok := d.tasks.Get(taskID)
 	if !ok {
@@ -377,17 +408,9 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("%w: cannot run task %s with %s status", ErrRequest, task.ID, task.Status)
 	}
 
-	defer func() {
-		if err := d.tasks.Update(task); err != nil {
-			if currentTask, ok := d.tasks.Get(task.ID); ok && currentTask.Status != task.Status {
-				// ignore error if task is gone or status has not changed, e.g., terminated -> terminated
-				log.Error(ctx, "failed to update", "task", task.ID, "err", err)
-			}
-		}
-	}()
+	defer func() { d.commitTerminated(ctx, &task) }()
 
-	task.SetStatusPreparing()
-	if err := d.tasks.Update(task); err != nil {
+	if err := d.commit(&task, func(t *Task) { t.SetStatusPreparing() }); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 
@@ -398,25 +421,32 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err != nil {
 		return fmt.Errorf("make runner dir: %w", err)
 	}
-	task.runnerDir = runnerDir
 	log.Debug(ctx, "runner dir", "task", task.ID, "path", runnerDir)
+	// Resources are committed as soon as they are acquired, so that they are not
+	// lost if the task is updated by another goroutine, e.g., terminated by the server
+	if err := d.commit(&task, func(t *Task) { t.runnerDir = runnerDir }); err != nil {
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+	}
 
+	var gpuIDs []string
 	if cfg.GPU != 0 {
-		gpuIDs, err := d.gpuLock.Acquire(ctx, cfg.GPU)
+		gpuIDs, err = d.gpuLock.Acquire(ctx, cfg.GPU)
 		if err != nil {
 			log.Error(ctx, err.Error())
 			task.SetStatusTerminated(string(types.TerminationReasonExecutorError), err.Error())
 			return fmt.Errorf("acquire GPU: %w", err)
 		}
-		task.gpuIDs = gpuIDs
 		log.Debug(ctx, "acquired GPU(s)", "task", task.ID, "gpus", gpuIDs)
 
 		defer func() {
-			releasedGpuIDs := d.gpuLock.Release(ctx, task.gpuIDs)
+			releasedGpuIDs := d.gpuLock.Release(ctx, gpuIDs)
 			log.Debug(ctx, "released GPU(s)", "task", task.ID, "gpus", releasedGpuIDs)
 		}()
 	} else {
-		task.gpuIDs = []string{}
+		gpuIDs = []string{}
+	}
+	if err := d.commit(&task, func(t *Task) { t.gpuIDs = gpuIDs }); err != nil {
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 
 	if len(cfg.HostSshKeys) > 0 {
@@ -458,8 +488,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	log.Debug(ctx, "Pulling image")
 	pullCtx, cancelPull := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancelPull()
-	task.SetStatusPulling(cancelPull)
-	if err := d.tasks.Update(task); err != nil {
+	if err := d.commit(&task, func(t *Task) { t.SetStatusPulling(cancelPull) }); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	// Although it's called "runner dir", we also use it for shim task-related data.
@@ -473,8 +502,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	}
 
 	log.Debug(ctx, "Creating container", "task", task.ID, "name", task.containerName)
-	task.SetStatusCreating()
-	if err := d.tasks.Update(task); err != nil {
+	if err := d.commit(&task, func(t *Task) { t.SetStatusCreating() }); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	if err := d.createContainer(ctx, &task, createContainerOptions{}); err != nil {
@@ -485,8 +513,11 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	}
 
 	log.Debug(ctx, "Running container", "task", task.ID, "name", task.containerName)
-	task.SetStatusRunning()
-	if err := d.tasks.Update(task); err != nil {
+	if err := d.commit(&task, func(t *Task) {
+		// createContainer sets the containerID field
+		t.containerID = task.containerID
+		t.SetStatusRunning()
+	}); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	err = d.startContainer(ctx, &task)
@@ -506,8 +537,12 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		}
 	}
 	if err == nil {
-		// startContainer sets `ports` field, committing update
-		if err := d.tasks.Update(task); err != nil {
+		if err := d.commit(&task, func(t *Task) {
+			// startContainer sets the ports field, the retry above may have
+			// replaced the container
+			t.containerID = task.containerID
+			t.ports = task.ports
+		}); err != nil {
 			return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 		}
 		err = d.waitContainer(ctx, &task)
@@ -541,11 +576,7 @@ func (d *DockerRunner) Terminate(ctx context.Context, taskID string, timeout uin
 	}
 	task.Lock(ctx)
 	defer func() { task.Release(ctx) }()
-	defer func() {
-		if err := d.tasks.Update(task); err != nil {
-			log.Error(ctx, "failed to update task", "task", task.ID, "err", err)
-		}
-	}()
+	defer func() { d.commitTerminated(ctx, &task) }()
 	return d.terminate(ctx, &task, timeout, reason, message)
 }
 
