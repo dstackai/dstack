@@ -7,8 +7,6 @@ import { Box, ColumnLayout, Container, Header, Loader } from 'components';
 import { formatTokenCount } from 'libs/presets';
 import { useGetPresetQuery } from 'services/preset';
 
-const DEFAULT_DATASET = 'random';
-
 export const PresetConstraints: FC = () => {
     const { t } = useTranslation();
     const params = useParams();
@@ -37,10 +35,12 @@ export const PresetConstraints: FC = () => {
     return (
         <Container header={<Header variant="h2">{t('presets.constraints')}</Header>}>
             <ColumnLayout columns={4} variant="text-grid">
-                <div>
-                    <Box variant="awsui-key-label">{t('presets.dataset')}</Box>
-                    <div>{dataset ?? DEFAULT_DATASET}</div>
-                </div>
+                {dataset && (
+                    <div>
+                        <Box variant="awsui-key-label">{t('presets.dataset')}</Box>
+                        <div>{dataset}</div>
+                    </div>
+                )}
                 <div>
                     <Box variant="awsui-key-label">{t('presets.input_tokens')}</Box>
                     <div>{formatTokenCount(inputTokens)}</div>

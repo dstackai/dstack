@@ -5,8 +5,6 @@ from pydantic import ValidationError
 
 from dstack._internal.core.models.presets import (
     PresetBenchmark,
-    PresetRandomWorkload,
-    PresetWorkload,
     validate_preset_file_path,
     validate_preset_file_paths,
 )
@@ -109,9 +107,9 @@ class TestValidatePresetFilePaths:
 
 
 class TestPresetBenchmarkWorkload:
-    """`api` and `dataset` are Literals, not plain strings: the agent-facing JSON
-    schema is generated from these models, and `dataset` is what discriminates
-    the workload union."""
+    """`api` is a Literal, not a plain string: the agent-facing JSON schema is
+    generated from these models. `dataset` states the requested dataset, and its
+    absence states that none was — a synthetic workload."""
 
     def test_rejects_an_unsupported_api(self):
         data = get_benchmark_data(get_workload_data(api="embeddings"))
@@ -119,19 +117,38 @@ class TestPresetBenchmarkWorkload:
         with pytest.raises(ValidationError):
             PresetBenchmark.model_validate(data)
 
-    def test_parses_a_dataset_workload_as_the_base_type(self):
+    def test_parses_a_dataset_workload(self):
         data = get_benchmark_data(get_workload_data(dataset="sharegpt"))
 
         benchmark = PresetBenchmark.model_validate(data)
 
-        assert type(benchmark.workload) is PresetWorkload
         assert benchmark.workload.dataset == "sharegpt"
 
-    def test_parses_a_workload_without_a_dataset_as_random(self):
+    def test_parses_a_workload_without_a_dataset_as_synthetic(self):
         data = get_benchmark_data(get_workload_data())
 
         benchmark = PresetBenchmark.model_validate(data)
 
-        assert type(benchmark.workload) is PresetRandomWorkload
-        assert benchmark.workload.dataset == "random"
+        assert benchmark.workload.dataset is None
         assert benchmark.workload.shared_prefix_tokens == 0
+
+    def test_upgrades_a_stored_synthetic_workload(self):
+        # Synthetic workloads used to be stored as the literal `random` next to
+        # their shared prefix. The combination can mean nothing else: `random` is
+        # rejected as a configuration dataset, and a dataset workload never
+        # records a prefix.
+        data = get_benchmark_data(get_workload_data(dataset="random", shared_prefix_tokens=768))
+
+        benchmark = PresetBenchmark.model_validate(data)
+
+        assert benchmark.workload.dataset is None
+        assert benchmark.workload.shared_prefix_tokens == 768
+
+    def test_keeps_a_dataset_named_random_without_a_prefix(self):
+        # Only the legacy combination is rewritten: a dataset workload never
+        # carries the prefix key, so one that names `random` stays as written.
+        data = get_benchmark_data(get_workload_data(dataset="random"))
+
+        benchmark = PresetBenchmark.model_validate(data)
+
+        assert benchmark.workload.dataset == "random"

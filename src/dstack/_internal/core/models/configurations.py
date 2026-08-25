@@ -1593,7 +1593,6 @@ class ServiceConfiguration(
 DEFAULT_INPUT_TOKENS = 1024
 DEFAULT_OUTPUT_TOKENS = 1024
 DEFAULT_BASELINE = True
-DEFAULT_DATASET = "random"
 
 
 class PresetModelRepo(CoreModel):
@@ -1794,10 +1793,9 @@ class PresetConfiguration(
         Optional[str],
         Field(
             description=(
-                "The benchmark dataset used during preset creation: `random` for synthetic"
-                " prompts shaped by `input_tokens` and `output_tokens`, a benchmark tool's"
-                " dataset name (e.g. `sharegpt`, `spec_bench`), or a Hugging Face dataset ID."
-                " Defaults to `random`"
+                "The benchmark dataset used during preset creation: a benchmark tool's"
+                " dataset name (e.g. `sharegpt`, `spec_bench`) or a Hugging Face dataset ID."
+                " Omit for synthetic prompts shaped by `input_tokens` and `output_tokens`"
             )
         ),
     ] = None
@@ -1838,10 +1836,6 @@ class PresetConfiguration(
     def effective_baseline(self) -> bool:
         return self.baseline if self.baseline is not None else DEFAULT_BASELINE
 
-    @property
-    def effective_dataset(self) -> str:
-        return self.dataset if self.dataset is not None else DEFAULT_DATASET
-
     @field_validator("dataset")
     @classmethod
     def validate_dataset_name(cls, value: Optional[str]) -> Optional[str]:
@@ -1852,11 +1846,15 @@ class PresetConfiguration(
         value = value.strip()
         if not value:
             raise ValueError("dataset must be a non-empty string")
+        if value == "random":
+            # The retired alias for the default. A set dataset now always means a
+            # real one; synthetic prompts are requested by omitting it.
+            raise ValueError("`random` is not a dataset; omit `dataset` for synthetic prompts")
         return value
 
     @model_validator(mode="after")
     def validate_dataset(self) -> Self:
-        if self.dataset in (None, DEFAULT_DATASET):
+        if self.dataset is None:
             return self
         set_fields = [
             name
@@ -1865,8 +1863,8 @@ class PresetConfiguration(
         ]
         if set_fields:
             raise ValueError(
-                f"{', '.join(set_fields)} can only be set with the `random` dataset;"
-                " a custom dataset defines its own request shape"
+                f"{', '.join(set_fields)} shape synthetic prompts and cannot be set"
+                " together with `dataset`; a dataset defines its own request shape"
             )
         return self
 

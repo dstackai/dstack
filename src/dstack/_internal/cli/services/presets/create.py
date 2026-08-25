@@ -74,7 +74,6 @@ from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, confirm_ask, co
 from dstack._internal.cli.utils.offers import print_offers_table
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import (
-    DEFAULT_DATASET,
     PresetConfiguration,
     TaskConfiguration,
 )
@@ -176,9 +175,12 @@ def load_session_configuration(session: PresetSession) -> PresetConfiguration:
             f" followed; run `dstack preset resume {session.preset_id}` instead"
         )
     try:
-        return PresetConfiguration.model_validate(
-            yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
-        )
+        data = yaml.safe_load(configuration_path.read_text(encoding="utf-8"))
+        # A session started before the `random` alias was retired legally saved
+        # it; the rejection is for fresh configurations, not this record.
+        if isinstance(data, dict) and data.get("dataset") == "random":
+            data = {key: value for key, value in data.items() if key != "dataset"}
+        return PresetConfiguration.model_validate(data)
     except (OSError, ValueError) as e:
         raise CLIError(f"Could not read the preset configuration: {e}") from e
 
@@ -615,7 +617,7 @@ async def _create_preset(
         user_prompt=setup.user_prompt,
         baseline=configuration.effective_baseline,
         previous=setup.previous,
-        custom_dataset=configuration.effective_dataset != DEFAULT_DATASET,
+        custom_dataset=configuration.dataset is not None,
     )
     if setup.write_constraints:
         if setup.user_prompt:
@@ -916,8 +918,7 @@ def _build_constraints(
     build_name: str,
     allowed_fleets: Sequence[str],
 ) -> str:
-    dataset = configuration.effective_dataset
-    if dataset == DEFAULT_DATASET:
+    if configuration.dataset is None:
         constraints: PresetConstraints = PresetRandomConstraints(
             run_name_prefix=build_name,
             model=configuration.model,
@@ -940,7 +941,7 @@ def _build_constraints(
             max_ttft=configuration.max_ttft,
             trials_num=configuration.trials,
             concurrency=configuration.concurrency,
-            dataset=dataset,
+            dataset=configuration.dataset,
             baseline=configuration.effective_baseline,
             fleets=list(allowed_fleets),
             env=list(configuration.env),

@@ -74,6 +74,28 @@ class TestPresetStore:
 
         assert loaded == preset
 
+    def test_loads_a_preset_that_requested_the_random_dataset(self, tmp_path: Path):
+        # A synthetic preset the released version wrote with an explicit
+        # `dataset: random` — the alias its own validator used to suggest. The
+        # retired alias is rejected in a fresh configuration, but cannot
+        # invalidate a record it was legal in: it reads back as what it meant,
+        # a synthetic workload with no requested dataset.
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        store.save(preset)
+        path = tmp_path / "presets" / preset.id / "preset.yml"
+        data = yaml.safe_load(path.read_text())
+        data["configuration"]["dataset"] = "random"
+        data["benchmark"]["workload"]["dataset"] = "random"
+        data["benchmark"]["workload"]["shared_prefix_tokens"] = 0
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+
+        loaded = store.get(preset.id)
+
+        assert loaded is not None
+        assert loaded.configuration.dataset is None
+        assert loaded.benchmark.workload.dataset is None
+
     def test_loads_a_preset_that_predates_the_repo_field(self, tmp_path: Path):
         # Presets written before the rename store the served repo as `model`.
         store = PresetStore(tmp_path / "presets")
@@ -341,7 +363,8 @@ class TestPresetStore:
             group.name for group in preset.service.replica_groups
         ]
         assert preset.verified_on[0].replicas[0].gpu.name == ["MI300X"]
-        assert preset.benchmark.workload.dataset == "random"
+        # The old format never recorded a dataset name for a synthetic workload.
+        assert preset.benchmark.workload.dataset is None
         assert store.list() == [preset]
 
     def test_upgrade_maps_validation_replicas_to_replica_groups(self, tmp_path: Path):

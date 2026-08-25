@@ -155,6 +155,7 @@ class PresetStore:
             upgraded = _upgrade_model_field(upgraded)
             upgraded = _upgrade_submitted_at(upgraded)
             upgraded = _upgrade_untagged_preset(upgraded)
+            upgraded = _upgrade_random_dataset_alias(upgraded)
             preset = _STORED_PRESET_ADAPTER.validate_python(upgraded)
         except (OSError, ValidationError, yaml.YAMLError) as e:
             if isinstance(data, dict) and "validations" in data:
@@ -200,6 +201,20 @@ def _upgrade_untagged_preset(data: Any) -> Any:
         return data
     status = "verified" if "configuration" in data else "pulled"
     return {**data, "status": status}
+
+
+# TODO: Remove in 0.22
+def _upgrade_random_dataset_alias(data: Any) -> Any:
+    """`random` used to be the explicit way to request synthetic prompts, and its
+    own validator suggested writing it; the retired alias is rejected in a fresh
+    configuration but cannot invalidate a record it was legal in."""
+    configuration = data.get("configuration") if isinstance(data, dict) else None
+    if not isinstance(configuration, dict) or configuration.get("dataset") != "random":
+        return data
+    return {
+        **data,
+        "configuration": {key: value for key, value in configuration.items() if key != "dataset"},
+    }
 
 
 # TODO: Remove in 0.22

@@ -1311,22 +1311,27 @@ class TestPresetConfiguration:
 
     @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
     def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
-        with pytest.raises(ValidationError, match="only be set with the `random` dataset"):
+        with pytest.raises(ValidationError, match="cannot be set together with `dataset`"):
             PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
 
-    def test_allows_request_shape_fields_with_the_random_dataset(self):
+    def test_allows_request_shape_fields_without_a_dataset(self):
         configuration = PresetConfiguration(
-            base="Qwen/Qwen3.5-27B", dataset="random", input_tokens=1024, output_tokens=256
+            base="Qwen/Qwen3.5-27B", input_tokens=1024, output_tokens=256
         )
 
         assert configuration.input_tokens == 1024
         assert configuration.output_tokens == 256
 
-    def test_defaults_to_the_random_dataset(self):
+    def test_rejects_the_retired_random_alias(self):
+        # `random` used to be the explicit way to ask for synthetic prompts;
+        # now a set dataset always means a real one.
+        with pytest.raises(ValidationError, match="omit `dataset` for synthetic prompts"):
+            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="random")
+
+    def test_defaults_to_a_synthetic_workload(self):
         configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
 
         assert configuration.dataset is None
-        assert configuration.effective_dataset == "random"
 
 
 class TestPresetConfigurationSchema:

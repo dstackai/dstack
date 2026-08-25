@@ -79,6 +79,20 @@ def run_dstack_cli(
     return exit_code
 
 
+# The trial workload from the SGLang session in dstackai/dstack#4198: a synthetic
+# shared-prefix benchmark run with a tool that does not call its generated data
+# `random`. It used to match neither of the two workload models the schema offered.
+SHARED_PREFIX_WORKLOAD = {
+    "api": "completions",
+    "dataset": "generated-shared-prefix",
+    "num_requests": 16,
+    "input_tokens": 131072,
+    "output_tokens": 512,
+    "concurrency": 4,
+    "shared_prefix_tokens": 130048,
+}
+
+
 def get_preset_benchmark() -> PresetBenchmark:
     benchmark = PresetBenchmark(
         tool="vllm bench serve",
