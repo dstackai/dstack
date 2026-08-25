@@ -53,6 +53,7 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
+from dstack._internal.utils import power
 from tests._internal.cli.common import (
     get_preset,
     get_running_service_run,
@@ -71,6 +72,24 @@ def _claude_auth() -> ClaudeAuth:
         effort=None,
         model="claude-test",
     )
+
+
+class _FakeInhibitor:
+    """Stands in for the spawned `caffeinate`, so no test spawns a real one."""
+
+    def __init__(self) -> None:
+        self.returncode = None
+        self.terminated = False
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def wait(self, timeout=None):
+        return self.returncode
 
 
 def _session_dirs(tmp_path):
@@ -253,6 +272,92 @@ class TestCreatePreset:
                 ),
                 store=PresetStore(tmp_path / "presets"),
             )
+
+    def test_holds_an_idle_sleep_inhibitor_for_the_session(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.setattr(power, "IS_MACOS", True)
+        inhibitor = _FakeInhibitor()
+        monkeypatch.setattr(power, "_start_macos_inhibitor", lambda: inhibitor)
+        preset = get_preset()
+
+        async def create(**kwargs):
+            assert not inhibitor.terminated
+            return PresetCreateResult(
+                preset=preset,
+                path=tmp_path / "preset.yml",
+                final_run_id=uuid.uuid4(),
+                final_run_name="qwen-build-2",
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._create_preset",
+            create,
+        )
+
+        create_preset(
+            api=SimpleNamespace(),
+            configuration=PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"),
+            store=PresetStore(tmp_path / "presets"),
+        )
+
+        assert inhibitor.terminated
+        log = (_session_dirs(tmp_path)[0] / "agent.log").read_text()
+        assert "Preventing the system from going to sleep" in log
+
+    def test_releases_the_idle_sleep_inhibitor_on_error(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.setattr(power, "IS_MACOS", True)
+        inhibitor = _FakeInhibitor()
+        monkeypatch.setattr(power, "_start_macos_inhibitor", lambda: inhibitor)
+
+        async def create(**kwargs):
+            raise RuntimeError("creation failed")
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._create_preset",
+            create,
+        )
+
+        with pytest.raises(RuntimeError, match="creation failed"):
+            create_preset(
+                api=SimpleNamespace(),
+                configuration=PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"),
+                store=PresetStore(tmp_path / "presets"),
+            )
+
+        assert inhibitor.terminated
+
+    def test_creates_a_preset_without_an_idle_sleep_inhibitor(self, tmp_path, monkeypatch):
+        """`no_idle_sleep_inhibitor` leaves the mechanism unavailable, as on a
+        non-macOS host or when `caffeinate` cannot be spawned."""
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        preset = get_preset()
+
+        async def create(**kwargs):
+            return PresetCreateResult(
+                preset=preset,
+                path=tmp_path / "preset.yml",
+                final_run_id=uuid.uuid4(),
+                final_run_name="qwen-build-2",
+            )
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._create_preset",
+            create,
+        )
+
+        result = create_preset(
+            api=SimpleNamespace(),
+            configuration=PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"),
+            store=PresetStore(tmp_path / "presets"),
+        )
+
+        assert result.preset == preset
+        log = (_session_dirs(tmp_path)[0] / "agent.log").read_text()
+        assert "going to sleep" not in log
 
     @pytest.mark.asyncio
     async def test_checks_active_fleets_before_claude_auth(self, tmp_path, monkeypatch):

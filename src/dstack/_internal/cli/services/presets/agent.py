@@ -51,6 +51,7 @@ _CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
 _TERMINATE_GRACE_SECONDS = 3
+_AGENT_ERROR_MAX_LENGTH = 200
 _RESUME_PROMPT = (
     "The previous agent process was interrupted. Continue where you left off. "
     "Re-check the states of your runs before relying on them: time may have "
@@ -228,9 +229,10 @@ async def run_preset_agent(
             )
             if output.report_data is None and returncode != 0:
                 output.error = output.error or f"Claude exited with return code {returncode}"
+            error = output.error
             # Retry any process death without a submitted report; a terminal
             # failure report from the agent returns immediately.
-            if output.report_data is not None or output.error is None:
+            if output.report_data is not None or error is None:
                 return output
             # Only reset the retry budget when the last attempt made progress; a
             # run that keeps stalling exhausts its retries instead of retrying a
@@ -252,7 +254,8 @@ async def run_preset_agent(
             else:
                 action = "retrying"
             print_preset_progress(
-                f"Agent process exited without a report; {action} in {delay}s.",
+                f"Agent process exited without a report: {_format_agent_error(error)};"
+                f" {action} in {delay}s.",
                 session=session,
             )
             await asyncio.sleep(delay)
@@ -373,6 +376,15 @@ def _prepare_subprocess_command(command: list[str]) -> list[str]:
     if comspec is None:
         raise CLIError("Cannot run the Claude batch launcher because cmd.exe was not found")
     return [comspec, "/d", "/s", "/c", subprocess.list2cmdline(command)]
+
+
+def _format_agent_error(error: str) -> str:
+    """Squashes the agent's error onto one progress line. The error is redacted
+    where it is captured; collapsing whitespace and truncating cannot undo that."""
+    text = " ".join(error.split())
+    if len(text) > _AGENT_ERROR_MAX_LENGTH:
+        text = text[:_AGENT_ERROR_MAX_LENGTH].rstrip() + "..."
+    return text
 
 
 def _write_trace(

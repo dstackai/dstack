@@ -86,6 +86,7 @@ from dstack._internal.core.models.presets import (
     PresetRandomConstraints,
 )
 from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.utils.power import prevent_idle_sleep
 from dstack.api import Client
 
 _RUN_STOP_TIMEOUT_SECONDS = 10 * 60
@@ -413,21 +414,30 @@ def create_preset(
     )
     try:
         resolved_configuration = _resolve_preset_env(configuration)
-        result = asyncio.run(
-            _create_preset(
-                api=api,
-                configuration=resolved_configuration,
-                source_configuration=configuration,
-                store=store,
-                keep_service=keep_service,
-                build_name=build_name,
-                session=session,
-                mode="resume" if resume_session is not None else "fresh",
-                user_prompt=user_prompt,
-                allowed_fleets=allowed_fleets,
-                previous=previous,
+        # A creation session runs unattended for hours; an idling machine would
+        # freeze the agent and the process supervising it alike.
+        with prevent_idle_sleep() as idle_sleep_prevented:
+            if idle_sleep_prevented:
+                print_preset_progress(
+                    "Preventing the system from going to sleep while the session runs;"
+                    " a closed laptop lid still sleeps.",
+                    session=session,
+                )
+            result = asyncio.run(
+                _create_preset(
+                    api=api,
+                    configuration=resolved_configuration,
+                    source_configuration=configuration,
+                    store=store,
+                    keep_service=keep_service,
+                    build_name=build_name,
+                    session=session,
+                    mode="resume" if resume_session is not None else "fresh",
+                    user_prompt=user_prompt,
+                    allowed_fleets=allowed_fleets,
+                    previous=previous,
+                )
             )
-        )
     except KeyboardInterrupt:
         _stop_or_detach_agent_session(session, api)
         raise

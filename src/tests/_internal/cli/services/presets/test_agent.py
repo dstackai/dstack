@@ -17,6 +17,7 @@ from dstack._internal.cli.models.preset_agent import PresetSessionProcess
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     _build_claude_command,
+    _format_agent_error,
     _prepare_subprocess_command,
     _terminate_process,
     build_preset_agent_env,
@@ -733,7 +734,11 @@ else:
         assert calls[0]["prompt"] == "system prompt"
         assert calls[1]["args"] == ["--resume", "sid-123"]
         assert "The previous agent process was interrupted" in calls[1]["prompt"]
-        assert "resuming" in capsys.readouterr().out
+        # The agent's own reason belongs in the progress line, not just a generic
+        # "exited without a report".
+        progress = capsys.readouterr().out
+        assert "resuming" in progress
+        assert "API Error: Unable to connect to API (ENOTFOUND)" in progress
 
     @pytest.mark.asyncio
     async def test_resumes_on_any_unreported_death(self, tmp_path, monkeypatch):
@@ -770,6 +775,26 @@ else:
 
         assert output.report_data == {"recovered": True}
         assert len((tmp_path / "calls.jsonl").read_text().splitlines()) == 2
+
+
+class TestFormatAgentError:
+    def test_squashes_the_error_onto_one_line(self):
+        assert (
+            _format_agent_error("API Error: Your computer went\n  to sleep mid-response.\n")
+            == "API Error: Your computer went to sleep mid-response."
+        )
+
+    def test_truncates_a_long_error(self, monkeypatch):
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._AGENT_ERROR_MAX_LENGTH", 10
+        )
+
+        assert _format_agent_error("0123456789abcdef") == "0123456789..."
+
+    def test_keeps_redaction_intact(self):
+        redacted = redact("API Error: token dstack-secret rejected", ("dstack-secret",))
+
+        assert _format_agent_error(redacted) == "API Error: token [redacted] rejected"
 
 
 class TestConnectionRetryExhaustion:
