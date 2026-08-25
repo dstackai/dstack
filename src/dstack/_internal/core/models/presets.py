@@ -1,5 +1,5 @@
 import re
-from typing import Any, List, Literal, Optional, Sequence, Union
+from typing import Any, List, Literal, Optional, Sequence
 
 from pydantic import Field, PositiveFloat, PositiveInt, field_validator, model_validator
 from typing_extensions import Annotated, Self
@@ -36,18 +36,34 @@ class PresetWorkload(CoreModel):
     # A Literal, not a str: the agent-facing JSON schema is generated from this
     # model, so the allowed values must be part of it.
     api: Literal["chat_completions", "completions"]
-    dataset: str
+    dataset: Optional[str] = None
+    """The dataset the configuration requested, which the benchmark served.
+    Absent for a synthetic workload: no dataset was requested, and the name the
+    benchmark tool gives the data it generates is its own affair, on record in
+    `command`."""
     num_requests: PositiveInt
     input_tokens: PositiveInt
     output_tokens: Annotated[int, Field(ge=2)]
     concurrency: PositiveInt
-
-
-class PresetRandomWorkload(PresetWorkload):
-    # A Literal, not a defaulted str: `PresetBenchmark.workload` is a union with
-    # the base model, and only a literal `dataset` discriminates it.
-    dataset: Literal["random"] = "random"
     shared_prefix_tokens: Annotated[int, Field(ge=0)] = 0
+    """How many leading tokens every measured request shared. Only a synthetic
+    workload has one: a named dataset defines its own requests."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_legacy_random_dataset(cls, data: Any) -> Any:
+        # Before the dataset meant the requested one, every synthetic workload
+        # was stored as the literal `random` next to its shared prefix. The
+        # combination can mean nothing else: `random` is rejected as a
+        # configuration dataset, and a dataset defines its own requests, so a
+        # dataset workload never records a prefix.
+        if (
+            isinstance(data, dict)
+            and data.get("dataset") == "random"
+            and "shared_prefix_tokens" in data
+        ):
+            data = {key: value for key, value in data.items() if key != "dataset"}
+        return data
 
 
 class PresetBenchmarkLatency(CoreModel):
@@ -78,9 +94,7 @@ class PresetBenchmark(CoreModel):
     tool: Annotated[str, Field(min_length=1)]
     tool_version: Annotated[str, Field(min_length=1)]
     command: Annotated[str, Field(min_length=1)]
-    # The subclass first: a report without `dataset` is a random workload, and a
-    # base-typed field would reject its `shared_prefix_tokens` as unknown.
-    workload: Union[PresetRandomWorkload, PresetWorkload]
+    workload: PresetWorkload
     metrics: PresetBenchmarkMetrics
 
     @property

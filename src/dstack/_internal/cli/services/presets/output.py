@@ -6,7 +6,7 @@ from rich.table import Table
 
 from dstack._internal.cli.models.presets import AnyStoredPreset, VerifiedPreset
 from dstack._internal.cli.utils.common import add_row_from_dict, console
-from dstack._internal.core.models.configurations import DEFAULT_DATASET, PresetConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.presets import PresetWorkload
 from dstack._internal.utils.common import pretty_date, pretty_resources
 
@@ -294,15 +294,14 @@ def format_preset_objective(
     # A pulled preset carries no creation context; the measured workload is its
     # honest record of the conditions the numbers hold for.
     parts = []
-    if workload.dataset != DEFAULT_DATASET:
+    if workload.dataset is not None:
         parts.append(f"data={workload.dataset}")
     else:
         parts.append(
             f"io={_format_token_count(workload.input_tokens)}"
             f"/{_format_token_count(workload.output_tokens)}"
         )
-        shared_prefix_tokens = getattr(workload, "shared_prefix_tokens", 0)
-        share = round(100 * shared_prefix_tokens / workload.input_tokens)
+        share = round(100 * workload.shared_prefix_tokens / workload.input_tokens)
         if share:
             parts.append(f"prefix={share}%")
     parts.append(f"c={workload.concurrency}")
@@ -313,8 +312,8 @@ def _format_creation_objective(
     configuration: PresetConfiguration, workload: PresetWorkload, *, verbose: bool
 ) -> str:
     parts = []
-    if configuration.effective_dataset != DEFAULT_DATASET:
-        parts.append(f"data={configuration.effective_dataset}")
+    if configuration.dataset is not None:
+        parts.append(f"data={configuration.dataset}")
     else:
         input_tokens = configuration.effective_input_tokens
         parts.append(
