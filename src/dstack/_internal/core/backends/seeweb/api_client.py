@@ -26,8 +26,8 @@ class SeewebPlanAvailability:
 class SeewebApiClient:
     """Minimal client for the Seeweb ECS REST API (https://api.seeweb.it/ecs/v2).
 
-    Uses ``requests`` directly instead of the ``ecsapi`` SDK: ``ecsapi`` requires pydantic v2,
-    while dstack is pinned to pydantic v1, so the two cannot share an environment.
+    Uses ``requests`` directly instead of the ``ecsapi`` SDK to avoid an extra dependency
+    for the handful of endpoints dstack needs.
     """
 
     def __init__(self, api_token: str):

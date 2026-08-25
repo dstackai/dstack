@@ -997,7 +997,7 @@ projects:
 ### Seeweb
 
 Log into the [Seeweb](https://www.seeweb.it/en) control panel, go to the
-`Calculation` section, open `API Token`, and click `New token` to generate one.
+`Compute` section, open `API Token`, and click `New token` to generate one.
 
 Then, go ahead and configure the backend:
 
@@ -1017,10 +1017,6 @@ projects:
 
 By default, `dstack` uses all Seeweb regions. To limit them, specify `regions`
 (for example, `it-fr2`).
-
-`dstack` checks [live plan capacity](https://docs.seeweb.it/en/hosting/cloudserver/rest-api/API-Endpoints/Plan/)
-before provisioning. A compatible NVIDIA driver image is selected from the images allowed by the
-chosen plan.
 
 ### OCI
 
