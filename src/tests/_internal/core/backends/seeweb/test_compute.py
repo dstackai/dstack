@@ -2,7 +2,7 @@ import shlex
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gpuhunt import RawCatalogItem
+from gpuhunt import CatalogItem
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
@@ -41,8 +41,9 @@ def _compute(regions=None) -> SeewebCompute:
     return compute
 
 
-def _raw(name: str, gpu: str, location: str = "it-fr2") -> RawCatalogItem:
-    return RawCatalogItem(
+def _raw(name: str, gpu: str, location: str = "it-fr2") -> CatalogItem:
+    return CatalogItem(
+        provider="seeweb",
         instance_name=name,
         location=location,
         price=0.38,
