@@ -111,8 +111,8 @@ func (s *ShimServer) TaskSubmitHandler(w http.ResponseWriter, r *http.Request) (
 
 	ctx = log.WithLogger(context.Background(), log.GetLogger(ctx))
 	go func() {
-		if err := s.runner.Run(ctx, taskConfig.ID); err != nil {
-			log.Error(ctx, "failed to run", "task", taskConfig.ID, "err", err)
+		if err := s.runner.Start(ctx, taskConfig.ID); err != nil {
+			log.Error(ctx, "failed to start", "task", taskConfig.ID, "err", err)
 		}
 	}()
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/dstackai/dstack/runner/internal/common/api"
 	"github.com/dstackai/dstack/runner/internal/common/log"
@@ -16,11 +17,16 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
+// taskProcessingInterval is how often task containers are inspected to detect
+// finished tasks
+const taskProcessingInterval = 1 * time.Second
+
 type TaskRunner interface {
 	Submit(context.Context, shim.TaskConfig) error
-	Run(ctx context.Context, taskID string) error
+	Start(ctx context.Context, taskID string) error
 	Terminate(ctx context.Context, taskID string, timeout uint, reason string, message string) error
 	Remove(ctx context.Context, taskID string) error
+	ProcessTasks(ctx context.Context)
 
 	Resources(context.Context) shim.Resources
 	Gpus(context.Context) []host.GpuInfo
@@ -101,10 +107,27 @@ func NewShimServer(
 }
 
 func (s *ShimServer) Serve() error {
+	// Started before serving requests, so that tasks whose containers exited while
+	// the shim was not running are processed before the server reports their status
+	s.bgJobsGroup.Go(func() { s.processTasks(s.bgJobsCtx) })
 	if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+// processTasks processes tasks periodically until ctx is cancelled by Shutdown()
+func (s *ShimServer) processTasks(ctx context.Context) {
+	ticker := time.NewTicker(taskProcessingInterval)
+	defer ticker.Stop()
+	for {
+		s.runner.ProcessTasks(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func (s *ShimServer) Shutdown(ctx context.Context, force bool) error {

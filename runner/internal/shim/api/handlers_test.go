@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	commonapi "github.com/dstackai/dstack/runner/internal/common/api"
 	"github.com/dstackai/dstack/runner/internal/common/gpu"
@@ -97,5 +98,35 @@ func TestTaskSubmit(t *testing.T) {
 	secondSubmitPost(responseRecorder, request)
 	if responseRecorder.Code != 409 {
 		t.Errorf("Want status '%d', got '%d'", 409, responseRecorder.Code)
+	}
+}
+
+// TestServeProcessesTasks covers the background job that processes tasks
+func TestServeProcessesTasks(t *testing.T) {
+	runner := NewDummyRunner()
+	server := NewShimServer(context.Background(), "localhost:12348", "0.0.1.dev2", runner, nil, nil, nil, nil)
+	go func() { _ = server.Serve() }()
+
+	// Tasks are processed immediately, without waiting for the first tick
+	deadline := time.After(5 * time.Second)
+	for runner.processed.Load() == 0 {
+		select {
+		case <-deadline:
+			t.Fatal("Tasks have not been processed")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	// Shutdown waits for the background job to stop, therefore it hangs if the job
+	// ignores the cancelled context
+	shutdown := make(chan error, 1)
+	go func() { shutdown <- server.Shutdown(context.Background(), false) }()
+	select {
+	case err := <-shutdown:
+		if err != nil {
+			t.Errorf("Shutdown: %s", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Shutdown has not stopped the task processing job")
 	}
 }
