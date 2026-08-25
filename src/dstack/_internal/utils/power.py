@@ -22,9 +22,6 @@ def prevent_idle_sleep() -> Iterator[bool]:
     Yields whether an inhibitor was acquired. Implemented on macOS only; on any
     other platform, and whenever the mechanism is unavailable, this is a no-op
     that yields False, since the caller has to work the same either way.
-
-    Idle sleep only: a machine left open stays awake, while closing a laptop lid
-    still puts it to sleep.
     """
     process = _start_macos_inhibitor() if IS_MACOS else None
     try:

@@ -416,13 +416,7 @@ def create_preset(
         resolved_configuration = _resolve_preset_env(configuration)
         # A creation session runs unattended for hours; an idling machine would
         # freeze the agent and the process supervising it alike.
-        with prevent_idle_sleep() as idle_sleep_prevented:
-            if idle_sleep_prevented:
-                print_preset_progress(
-                    "Preventing the system from going to sleep while the session runs;"
-                    " a closed laptop lid still sleeps.",
-                    session=session,
-                )
+        with prevent_idle_sleep():
             result = asyncio.run(
                 _create_preset(
                     api=api,
