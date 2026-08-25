@@ -994,6 +994,30 @@ projects:
 
 </div>
 
+### Seeweb
+
+Log into the [Seeweb](https://www.seeweb.it/en) control panel, go to the
+`Compute` section, open `API Token`, and click `New token` to generate one.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: seeweb
+        creds:
+          type: api_token
+          api_token: ...
+```
+
+</div>
+
+By default, `dstack` uses all Seeweb regions. To limit them, specify `regions`
+(for example, `it-fr2`).
+
 ### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.

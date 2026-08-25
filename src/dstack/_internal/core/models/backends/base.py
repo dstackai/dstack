@@ -21,6 +21,7 @@ class BackendType(str, enum.Enum):
         NEBIUS (BackendType): Nebius AI Cloud
         OCI (BackendType): Oracle Cloud Infrastructure
         RUNPOD (BackendType): Runpod Cloud
+        SEEWEB (BackendType): Seeweb Cloud Server GPU
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
         VERDA (BackendType): Verda Cloud
@@ -47,6 +48,7 @@ class BackendType(str, enum.Enum):
     NEBIUS = "nebius"
     OCI = "oci"
     RUNPOD = "runpod"
+    SEEWEB = "seeweb"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
     VERDA = "verda"

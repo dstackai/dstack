@@ -68,6 +68,10 @@ from dstack._internal.core.backends.runpod.models import (
     RunpodBackendConfig,
     RunpodBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.seeweb.models import (
+    SeewebBackendConfig,
+    SeewebBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.slurm.models import (
     SlurmBackendConfig,
     SlurmBackendConfigWithCreds,
@@ -107,6 +111,7 @@ AnyBackendConfigWithoutCreds = Union[
     NebiusBackendConfig,
     OCIBackendConfig,
     RunpodBackendConfig,
+    SeewebBackendConfig,
     TensorDockBackendConfig,
     VastAIBackendConfig,
     VerdaBackendConfig,
@@ -135,6 +140,7 @@ AnyBackendConfigWithCreds = Union[
     OCIBackendConfigWithCreds,
     NebiusBackendConfigWithCreds,
     RunpodBackendConfigWithCreds,
+    SeewebBackendConfigWithCreds,
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
     VultrBackendConfigWithCreds,
@@ -178,6 +184,7 @@ AnyBackendFileConfigWithCreds = Union[
     OCIBackendConfigWithCreds,
     NebiusBackendFileConfigWithCreds,
     RunpodBackendConfigWithCreds,
+    SeewebBackendConfigWithCreds,
     TensorDockBackendConfigWithCreds,
     VastAIBackendConfigWithCreds,
     VultrBackendConfigWithCreds,
