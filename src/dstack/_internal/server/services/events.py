@@ -15,6 +15,7 @@ from dstack._internal.server.models import (
     EventTargetModel,
     FleetModel,
     GatewayModel,
+    GatewayReplicaModel,
     InstanceModel,
     JobModel,
     MemberModel,
@@ -78,6 +79,7 @@ class Target:
     name: str
     run_id: Optional[uuid.UUID] = None
     fleet_id: Optional[uuid.UUID] = None
+    gateway_id: Optional[uuid.UUID] = None
 
     def __post_init__(self):
         if self.type == EventTargetType.USER and self.project_id is not None:
@@ -92,12 +94,17 @@ class Target:
             raise ValueError("Run target id must be equal to run_id")
         if self.type == EventTargetType.FLEET and self.id != self.fleet_id:
             raise ValueError("Fleet target id must be equal to fleet_id")
+        if self.type == EventTargetType.GATEWAY_REPLICA and self.gateway_id is None:
+            raise ValueError(f"{self.type} target must have gateway_id")
+        if self.type == EventTargetType.GATEWAY and self.id != self.gateway_id:
+            raise ValueError("Gateway target id must be equal to gateway_id")
 
     @staticmethod
     def from_model(
         model: Union[
             FleetModel,
             GatewayModel,
+            GatewayReplicaModel,
             InstanceModel,
             JobModel,
             ProjectModel,
@@ -121,6 +128,20 @@ class Target:
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,
+                gateway_id=model.id,
+            )
+        if isinstance(model, GatewayReplicaModel):
+            gateway: GatewayModel | None = model.__dict__.get("gateway") or model.__dict__.get(
+                "legacy_gateway"
+            )
+            if gateway is None:
+                raise ValueError("GatewayReplicaModel.gateway (or legacy_gateway) must be loaded")
+            return Target(
+                type=EventTargetType.GATEWAY_REPLICA,
+                project_id=gateway.project_id or gateway.project.id,
+                id=model.id,
+                name=model.name,
+                gateway_id=gateway.id,
             )
         if isinstance(model, InstanceModel):
             fleet_id = model.fleet_id
@@ -245,6 +266,7 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Tar
                 entity_name=target.name,
                 entity_run_id=target.run_id,
                 entity_fleet_id=target.fleet_id,
+                entity_gateway_id=target.gateway_id,
             )
         )
     session.add(event)
@@ -261,11 +283,13 @@ async def list_events(
     target_jobs: Optional[list[uuid.UUID]],
     target_volumes: Optional[list[uuid.UUID]],
     target_gateways: Optional[list[uuid.UUID]],
+    target_gateway_replicas: Optional[list[uuid.UUID]],
     target_secrets: Optional[list[uuid.UUID]],
     target_presets: Optional[list[uuid.UUID]],
     within_projects: Optional[list[uuid.UUID]],
     within_fleets: Optional[list[uuid.UUID]],
     within_runs: Optional[list[uuid.UUID]],
+    within_gateways: Optional[list[uuid.UUID]],
     include_target_types: Optional[list[EventTargetType]],
     actors: Optional[list[Optional[uuid.UUID]]],
     prev_recorded_at: Optional[datetime],
@@ -347,6 +371,13 @@ async def list_events(
                 EventTargetModel.entity_id.in_(target_gateways),
             )
         )
+    if target_gateway_replicas is not None:
+        target_filters.append(
+            and_(
+                EventTargetModel.entity_type == EventTargetType.GATEWAY_REPLICA,
+                EventTargetModel.entity_id.in_(target_gateway_replicas),
+            )
+        )
     if target_secrets is not None:
         target_filters.append(
             and_(
@@ -367,6 +398,8 @@ async def list_events(
         target_filters.append(EventTargetModel.entity_fleet_id.in_(within_fleets))
     if within_runs is not None:
         target_filters.append(EventTargetModel.entity_run_id.in_(within_runs))
+    if within_gateways is not None:
+        target_filters.append(EventTargetModel.entity_gateway_id.in_(within_gateways))
     if include_target_types is not None:
         target_filters.append(EventTargetModel.entity_type.in_(include_target_types))
 

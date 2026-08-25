@@ -7,6 +7,7 @@ declare type TEventTargetType =
     | 'job'
     | 'volume'
     | 'gateway'
+    | 'gateway-replica'
     | 'secret'
     | 'preset';
 
@@ -20,11 +21,13 @@ declare type TEventListFilters = {
     target_jobs?: string[];
     target_volumes?: string[];
     target_gateways?: string[];
+    target_gateway_replicas?: string[];
     target_secrets?: string[];
     target_presets?: string[];
     within_projects?: string[];
     within_fleets?: string[];
     within_runs?: string[];
+    within_gateways?: string[];
     include_target_types?: TEventTargetType[];
     actors?: string[];
 };

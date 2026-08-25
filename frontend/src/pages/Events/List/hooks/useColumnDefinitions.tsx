@@ -141,6 +141,19 @@ export const useColumnsDefinitions = () => {
                                 </div>
                             );
 
+                        case 'gateway-replica':
+                            return (
+                                <div>
+                                    Gateway replica{' '}
+                                    {target.project_name && (
+                                        <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
+                                            {target.project_name}
+                                        </NavigateLink>
+                                    )}
+                                    /{target.name}
+                                </div>
+                            );
+
                         case 'secret':
                             return (
                                 <div>

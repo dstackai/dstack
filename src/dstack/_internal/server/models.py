@@ -1301,6 +1301,11 @@ class EventTargetModel(BaseModel):
     )
     entity_fleet: Mapped[Optional["FleetModel"]] = relationship()
 
+    entity_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUIDType(binary=False), nullable=True, index=True
+    )
+    """Not a foreign key, to preserve events after gateway hard-deletion."""
+
     entity_type: Mapped[EventTargetType] = mapped_column(
         EnumAsString(EventTargetType, 100), index=True
     )

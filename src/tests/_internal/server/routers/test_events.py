@@ -10,12 +10,15 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import InstanceModel, JobModel
+from dstack._internal.server.models import GatewayModel, InstanceModel, JobModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_backend,
     create_export,
     create_fleet,
+    create_gateway,
+    create_gateway_replica,
     create_instance,
     create_job,
     create_project,
@@ -725,6 +728,55 @@ class TestListEventsFilters:
         resp.raise_for_status()
         assert len(resp.json()) == 2
 
+    async def test_target_gateway_replicas(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id
+        )
+        replica_a = await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway.id, replica_num=0
+        )
+        replica_b = await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway.id, replica_num=1
+        )
+        # Target.from_model requires the gateway relationship to be loaded.
+        replica_a.gateway = gateway
+        replica_b.gateway = gateway
+        events.emit(
+            session,
+            "Gateway replica provisioned",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(replica_a)],
+        )
+        events.emit(
+            session,
+            "Gateway replica provisioned",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(replica_b)],
+        )
+        await session.commit()
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"target_gateway_replicas": [str(replica_a.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["targets"][0]["id"] == str(replica_a.id)
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"target_gateway_replicas": [str(replica_a.id), str(replica_b.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 2
+
     async def test_within_projects(self, session: AsyncSession, client: AsyncClient) -> None:
         user = await create_user(session=session)
         project_a = await create_project(session=session, name="project_a", owner=user)
@@ -983,6 +1035,108 @@ class TestListEventsFilters:
         )
         resp.raise_for_status()
         assert len(resp.json()) == 1
+
+    async def test_within_gateways(self, session: AsyncSession, client: AsyncClient) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_a = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway_a"
+        )
+        gateway_b = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway_b"
+        )
+        replica_a = await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway_a.id, replica_num=0
+        )
+        replica_a.gateway = gateway_a
+        events.emit(
+            session,
+            "Project created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(project)],
+        )
+        events.emit(
+            session,
+            "Gateway created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(gateway_a)],
+        )
+        events.emit(
+            session,
+            "Gateway created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(gateway_b)],
+        )
+        events.emit(
+            session,
+            "Gateway replica provisioned",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(replica_a)],
+        )
+        await session.commit()
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"within_gateways": [str(gateway_a.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 2
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"within_gateways": [str(gateway_b.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 1
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"within_gateways": [str(gateway_a.id), str(gateway_b.id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 3
+
+    async def test_within_gateways_finds_events_of_hard_deleted_gateway(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id
+        )
+        replica = await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway.id
+        )
+        replica.gateway = gateway
+        events.emit(
+            session,
+            "Gateway created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(gateway)],
+        )
+        events.emit(
+            session,
+            "Gateway replica provisioned",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(replica)],
+        )
+        await session.commit()
+        gateway_id = gateway.id
+        await session.execute(delete(GatewayModel).where(GatewayModel.id == gateway_id))
+        await session.commit()
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={"within_gateways": [str(gateway_id)]},
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 2
 
     async def test_include_target_types(self, session: AsyncSession, client: AsyncClient) -> None:
         user = await create_user(session=session)

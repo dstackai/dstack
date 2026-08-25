@@ -970,7 +970,8 @@ class TestGatewayWorkerProvisioning:
         assert gateway.replica_scale_attempt == 1
         assert gateway.last_replica_scale_attempt_at is not None
         events = await list_events(session)
-        assert len(events) == 0
+        assert len(events) == 1
+        assert events[0].message == "Gateway replica created. Status: SUBMITTED"
 
     async def test_provisioning_to_running_when_scale_in_removes_surplus_replicas(
         self, test_db, session: AsyncSession, worker: GatewayWorker
@@ -1462,8 +1463,10 @@ class TestGatewayWorkerRunning:
         assert len(replicas) == 2
         assert gateway.replica_scale_attempt == _MAX_REPLICA_SCALE_ATTEMPTS
         events = await list_events(session)
-        assert len(events) == 1
-        assert "final replica scale-out attempt" in events[0].message
+        assert len(events) == 2
+        messages = [e.message for e in events]
+        assert any("final replica scale-out attempt" in m for m in messages)
+        assert "Gateway replica created. Status: SUBMITTED" in messages
 
     async def test_attempt_counter_not_reset_while_replacement_replica_still_provisioning(
         self, test_db, session: AsyncSession, worker: GatewayWorker
