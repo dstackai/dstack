@@ -42,7 +42,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	defer dockerRunner.Remove(t.Context(), taskConfig.ID)
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
-	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assert.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
 	assertTaskDone(t, dockerRunner, taskConfig.ID)
 }
 
@@ -68,7 +68,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	defer dockerRunner.Remove(t.Context(), taskConfig.ID)
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
-	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assert.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
 	assertTaskDone(t, dockerRunner, taskConfig.ID)
 }
 
@@ -95,8 +95,72 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	defer dockerRunner.Remove(t.Context(), taskConfig.ID)
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
-	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+	assert.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
 	assertTaskDone(t, dockerRunner, taskConfig.ID)
+}
+
+func TestDocker_ContainerExitedWithError(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	params := &dockerParametersMock{
+		commands:  []string{"echo failed for a reason", "exit 3"},
+		runnerDir: t.TempDir(),
+	}
+
+	timeout := 180 // seconds
+	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
+	taskConfig := createTaskConfig(t)
+	defer dockerRunner.Remove(t.Context(), taskConfig.ID)
+
+	require.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	require.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
+
+	taskInfo := waitTaskTerminated(t, dockerRunner, taskConfig.ID)
+	assert.Equal(t, string(types.TerminationReasonContainerExitedWithError), taskInfo.TerminationReason)
+	assert.Contains(t, taskInfo.TerminationMessage, "failed for a reason")
+}
+
+// TestDocker_RestoredTaskIsTerminated simulates a shim restart: since Start() does
+// not wait for the container to exit, a task started by one runner must be terminated
+// by another runner that restored it from the container
+func TestDocker_RestoredTaskIsTerminated(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	params := &dockerParametersMock{
+		commands:  []string{"sleep 3", "exit 7"},
+		runnerDir: t.TempDir(),
+	}
+
+	timeout := 180 // seconds
+	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
+	taskConfig := createTaskConfig(t)
+	require.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	require.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
+
+	// The restarted shim restores the task from its container
+	restartedRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+	defer restartedRunner.Remove(t.Context(), taskConfig.ID)
+	require.Equal(t, taskConfig.ID, restartedRunner.TaskInfo(taskConfig.ID).ID)
+
+	taskInfo := waitTaskTerminated(t, restartedRunner, taskConfig.ID)
+	assert.Equal(t, string(types.TerminationReasonContainerExitedWithError), taskInfo.TerminationReason)
 }
 
 func TestConfigureGpus_Nvidia(t *testing.T) {
@@ -197,14 +261,26 @@ func generateID(t *testing.T) string {
 	return hex.EncodeToString(b)[:idLen]
 }
 
-// assertTaskDone asserts that the final state of a successfully executed task
-// is committed to the storage
+// assertTaskDone waits until the task is terminated and asserts that its container
+// exited successfully
 func assertTaskDone(t *testing.T, runner *DockerRunner, taskID string) {
 	t.Helper()
-	taskInfo := runner.TaskInfo(taskID)
-	assert.Equal(t, TaskStatusTerminated, taskInfo.Status)
+	taskInfo := waitTaskTerminated(t, runner, taskID)
 	assert.Equal(t, string(types.TerminationReasonDoneByRunner), taskInfo.TerminationReason)
 	assert.Empty(t, taskInfo.TerminationMessage)
+}
+
+// waitTaskTerminated processes tasks until the task is terminated, as Start() only
+// starts the container and does not wait for it to exit
+func waitTaskTerminated(t *testing.T, runner *DockerRunner, taskID string) TaskInfo {
+	t.Helper()
+	var taskInfo TaskInfo
+	require.Eventually(t, func() bool {
+		runner.ProcessTasks(t.Context())
+		taskInfo = runner.TaskInfo(taskID)
+		return taskInfo.Status == TaskStatusTerminated
+	}, 60*time.Second, 200*time.Millisecond)
+	return taskInfo
 }
 
 func createTaskConfig(t *testing.T) TaskConfig {

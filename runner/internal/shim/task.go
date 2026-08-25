@@ -41,6 +41,14 @@ type Task struct {
 	gpuIDs        []string
 	ports         []PortMapping
 	runnerDir     string // path on host mapped to consts.RunnerDir in container
+	// startInFlight is true while Start() is working on the task. Start() owns the
+	// task resources until it returns, therefore ProcessTasks() skips such tasks.
+	// Tasks restored from containers are never in flight.
+	startInFlight bool
+	// cleanedUp is true once the resources acquired for the task (host SSH keys,
+	// volumes, GPUs) are released. Resources are released only after the container
+	// is not running anymore.
+	cleanedUp bool
 
 	pullTracker *PullTracker
 
