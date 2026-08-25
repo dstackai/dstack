@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/user"
@@ -161,13 +162,103 @@ func TestAppendKey(t *testing.T) {
 	err = os.WriteFile(filePath, []byte(key), os.ModePerm)
 	require.NoError(t, err)
 
-	commentLine := "# comment line"
-	err = ak.AppendPublicKeys([]string{commentLine})
+	newKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj user@host"
+	err = ak.AppendPublicKeys(context.Background(), []string{newKey})
 	require.NoError(t, err)
 
 	b, err := os.ReadFile(filePath)
 	require.NoError(t, err)
-	require.Contains(t, string(b), commentLine)
+	require.Contains(t, string(b), key)
+	require.Contains(t, string(b), newKey+" # added by dstack-shim")
+}
+
+func TestAppendKeySkipsInvalid(t *testing.T) {
+	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
+	filePath, err := ak.GetAuthorizedKeysPath()
+	require.NoError(t, err)
+
+	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
+	require.NoError(t, err)
+	err = os.WriteFile(filePath, []byte{}, os.ModePerm)
+	require.NoError(t, err)
+
+	first := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj first"
+	second := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuLmyPGV/gcatBaZFxRPKGQVJ4vBjuqEsHIkKGrGZKS second"
+
+	// authorized_keys is line-based, therefore an entry must hold exactly one key
+	err = ak.AppendPublicKeys(context.Background(), []string{first + "\n" + second, first})
+	require.NoError(t, err)
+
+	b, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.NotContains(t, string(b), second)
+	require.Equal(t, first+" # added by dstack-shim\n", string(b))
+}
+
+func TestCanonicalizePublicKey(t *testing.T) {
+	const blob = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj"
+
+	testCases := []struct {
+		name     string
+		key      string
+		expected string
+		isError  bool
+	}{
+		{
+			name:     "with comment",
+			key:      blob + " user@host",
+			expected: blob + " user@host # added by dstack-shim",
+		},
+		{
+			name:     "without comment",
+			key:      blob,
+			expected: blob + " # added by dstack-shim",
+		},
+		{
+			name:     "surrounding whitespace",
+			key:      "  " + blob + "\tuser@host \r\n",
+			expected: blob + " user@host # added by dstack-shim",
+		},
+		{
+			name:    "two keys in one entry",
+			key:     blob + " user@host\n" + blob + " user@host",
+			isError: true,
+		},
+		{
+			name: "authorized_keys options",
+			// options are not part of the on-disk public key format
+			key:     `restrict,command="/bin/false" ` + blob + " user@host",
+			isError: true,
+		},
+		{
+			name:    "comment line",
+			key:     "# comment line",
+			isError: true,
+		},
+		{
+			name:    "malformed",
+			key:     "ssh-ed25519 AAAAP66um5MadfhB5dSnEM=",
+			isError: true,
+		},
+		{
+			name:    "empty",
+			key:     "",
+			isError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			line, err := canonicalizePublicKey(tc.key)
+			if tc.isError {
+				require.Error(t, err)
+				require.Empty(t, line)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, line)
+			}
+		})
+	}
 }
 
 func TestRemoveKey(t *testing.T) {
@@ -234,7 +325,7 @@ func TestAppendTwoKey(t *testing.T) {
 	err = os.WriteFile(filePath, []byte(first), os.ModePerm)
 	require.NoError(t, err)
 
-	err = ak.AppendPublicKeys([]string{second, third})
+	err = ak.AppendPublicKeys(context.Background(), []string{second, third})
 	require.NoError(t, err)
 
 	b, err := os.ReadFile(filePath)

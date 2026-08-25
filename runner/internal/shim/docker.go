@@ -488,7 +488,7 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 
 	if len(cfg.HostSshKeys) > 0 {
 		ak := AuthorizedKeys{user: cfg.HostSshUser, lookup: user.Lookup}
-		if err := ak.AppendPublicKeys(cfg.HostSshKeys); err != nil {
+		if err := ak.AppendPublicKeys(ctx, cfg.HostSshKeys); err != nil {
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
 			log.Error(ctx, errMessage)
 			task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
