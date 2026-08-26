@@ -9,10 +9,14 @@ import (
 	"testing"
 	"time"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	docker "github.com/docker/docker/client"
+	"github.com/dstackai/dstack/runner/internal/common/consts"
 	"github.com/dstackai/dstack/runner/internal/common/gpu"
 	"github.com/dstackai/dstack/runner/internal/common/types"
+	"github.com/dstackai/dstack/runner/internal/shim/host"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -442,4 +446,115 @@ func TestPullTracker_NonBytesExtractingUnit(t *testing.T) {
 	assert.Equal(t, uint64(200), p.ExtractedBytes) // pull complete => extracted == total
 	assert.Equal(t, uint64(200), p.TotalBytes)
 	assert.True(t, p.IsTotalBytesFinal)
+}
+
+/* restoreStateFromContainers */
+
+// restoreClientMock implements the only two docker.APIClient methods used by
+// restoreStateFromContainers, letting it run without a Docker daemon.
+// Any other method panics with a nil pointer dereference, which is intentional:
+// this mock must be updated if restoreStateFromContainers starts using them
+type restoreClientMock struct {
+	docker.APIClient
+	containers []dockertypes.Container
+	inspect    map[string]dockertypes.ContainerJSON
+}
+
+func (c *restoreClientMock) ContainerList(
+	context.Context, container.ListOptions,
+) ([]dockertypes.Container, error) {
+	return c.containers, nil
+}
+
+func (c *restoreClientMock) ContainerInspect(
+	_ context.Context, containerID string,
+) (dockertypes.ContainerJSON, error) {
+	return c.inspect[containerID], nil
+}
+
+// nvidiaContainer returns a task container summary and its inspection response
+// with the given GPU IDs requested
+func nvidiaContainer(containerID, taskID string, gpuIDs []string) (dockertypes.Container, dockertypes.ContainerJSON) {
+	summary := dockertypes.Container{
+		ID:     containerID,
+		Names:  []string{"/" + containerID},
+		State:  containerStateRunning,
+		Labels: map[string]string{LabelKeyIsTask: LabelValueTrue, LabelKeyTaskID: taskID},
+		Mounts: []dockertypes.MountPoint{
+			{Destination: consts.RunnerTempDir, Source: "/root/.dstack/runners/" + containerID},
+		},
+	}
+	inspection := dockertypes.ContainerJSON{
+		ContainerJSONBase: &dockertypes.ContainerJSONBase{
+			HostConfig: &container.HostConfig{
+				Resources: container.Resources{
+					DeviceRequests: []container.DeviceRequest{{DeviceIDs: gpuIDs}},
+				},
+			},
+		},
+		Config:          &container.Config{},
+		NetworkSettings: &dockertypes.NetworkSettings{},
+	}
+	return summary, inspection
+}
+
+func newRestoreRunner(t *testing.T, gpuIDs []string, containers ...dockertypes.Container) *DockerRunner {
+	t.Helper()
+	gpus := make([]host.GpuInfo, 0, len(gpuIDs))
+	for _, id := range gpuIDs {
+		gpus = append(gpus, host.GpuInfo{Vendor: gpu.GpuVendorNvidia, ID: id})
+	}
+	gpuLock, err := NewGpuLock(gpus)
+	require.NoError(t, err)
+	return &DockerRunner{
+		client:    &restoreClientMock{containers: containers, inspect: map[string]dockertypes.ContainerJSON{}},
+		gpuVendor: gpu.GpuVendorNvidia,
+		gpuLock:   gpuLock,
+		tasks:     NewTaskStorage(),
+	}
+}
+
+// TestRestoreState_GpuLockedByAnotherTaskIsNotOwned checks that a task restored with
+// a GPU already locked by another restored task does not claim that GPU, so that
+// releasing the task's resources does not release a GPU still in use
+func TestRestoreState_GpuLockedByAnotherTaskIsNotOwned(t *testing.T) {
+	firstShort, firstFull := nvidiaContainer("container-1", "task-1", []string{"GPU-beef"})
+	// Should not happen, but if it does, the second task must not take over the GPU
+	secondShort, secondFull := nvidiaContainer("container-2", "task-2", []string{"GPU-beef", "GPU-f00d"})
+	runner := newRestoreRunner(t, []string{"GPU-beef", "GPU-f00d"}, firstShort, secondShort)
+	mock := runner.client.(*restoreClientMock)
+	mock.inspect["container-1"] = firstFull
+	mock.inspect["container-2"] = secondFull
+
+	require.NoError(t, runner.restoreStateFromContainers(t.Context()))
+
+	firstTask, ok := runner.tasks.Get("task-1")
+	require.True(t, ok)
+	assert.Equal(t, []string{"GPU-beef"}, firstTask.gpuIDs)
+	secondTask, ok := runner.tasks.Get("task-2")
+	require.True(t, ok)
+	assert.Equal(t, []string{"GPU-f00d"}, secondTask.gpuIDs, "GPU-beef is owned by task-1")
+
+	// Releasing the second task must not free the GPU owned by the first one
+	runner.gpuLock.Release(t.Context(), secondTask.gpuIDs)
+	assert.True(t, runner.gpuLock.lock["GPU-beef"], "GPU-beef")
+	assert.False(t, runner.gpuLock.lock["GPU-f00d"], "GPU-f00d")
+}
+
+// TestRestoreState_DuplicateTaskReleasesGpus checks that the GPUs locked for a task
+// that cannot be stored are released, as nothing else will release them
+func TestRestoreState_DuplicateTaskReleasesGpus(t *testing.T) {
+	firstShort, firstFull := nvidiaContainer("container-1", "task-1", []string{"GPU-beef"})
+	// Two containers reporting the same task ID: the second one is not stored
+	secondShort, secondFull := nvidiaContainer("container-2", "task-1", []string{"GPU-f00d"})
+	runner := newRestoreRunner(t, []string{"GPU-beef", "GPU-f00d"}, firstShort, secondShort)
+	mock := runner.client.(*restoreClientMock)
+	mock.inspect["container-1"] = firstFull
+	mock.inspect["container-2"] = secondFull
+
+	require.NoError(t, runner.restoreStateFromContainers(t.Context()))
+
+	assert.Len(t, runner.tasks.List(), 1)
+	assert.True(t, runner.gpuLock.lock["GPU-beef"], "GPU-beef")
+	assert.False(t, runner.gpuLock.lock["GPU-f00d"], "GPU-f00d is not owned by any task")
 }

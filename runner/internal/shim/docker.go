@@ -283,6 +283,13 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 				break
 			}
 		}
+		if len(gpuIDs) > 0 {
+			// A GPU already locked by another restored task is not locked again and,
+			// therefore, is not owned by this task -- otherwise, cleaning up this task
+			// would release a GPU that the other one is still using
+			gpuIDs = d.gpuLock.Lock(ctx, gpuIDs)
+			log.Debug(ctx, "locked GPU(s) due to running task", "task", taskID, "gpus", gpuIDs)
+		}
 		// Tasks are restored as running regardless of the container state, letting
 		// ProcessTasks() decide whether the container is still running and, if it is
 		// not, why it finished. This way, the termination reason of a task that
@@ -290,13 +297,11 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 		task := NewTask(taskID, TaskStatusRunning, containerName, containerID, gpuIDs, ports, runnerDir)
 		if !d.tasks.Add(task) {
 			log.Error(ctx, "duplicate restored task", "task", taskID)
-		} else {
-			log.Debug(ctx, "restored task", "task", taskID, "state", containerShort.State, "gpus", gpuIDs)
+			// Nothing will release the GPUs of a task that is not stored
+			d.gpuLock.Release(ctx, gpuIDs)
+			continue
 		}
-		if len(gpuIDs) > 0 {
-			lockedGpuIDs := d.gpuLock.Lock(ctx, gpuIDs)
-			log.Debug(ctx, "locked GPU(s) due to running task", "task", taskID, "gpus", lockedGpuIDs)
-		}
+		log.Debug(ctx, "restored task", "task", taskID, "state", containerShort.State, "gpus", gpuIDs)
 	}
 	return nil
 }
