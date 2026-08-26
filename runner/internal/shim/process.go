@@ -88,7 +88,7 @@ func (d *DockerRunner) processTask(ctx context.Context, taskID string, container
 	// the same lock
 	if !task.TryLock(ctx) {
 		// The task is busy, e.g., being terminated or removed. Try again on the next call
-		log.Debug(ctx, "skip processing: task is busy", "task", taskID)
+		log.Trace(ctx, "skip processing: task is busy", "task", taskID)
 		return
 	}
 	defer func() { task.Release(ctx) }()

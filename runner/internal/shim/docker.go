@@ -463,7 +463,7 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 	if err != nil {
 		return fmt.Errorf("make runner dir: %w", err)
 	}
-	log.Debug(ctx, "runner dir", "task", task.ID, "path", runnerDir)
+	log.Trace(ctx, "runner dir", "task", task.ID, "path", runnerDir)
 	// Resources are committed as soon as they are acquired, so that they are not
 	// lost if the task is updated by another goroutine, e.g., terminated by the server
 	if err := d.commit(&task, func(t *Task) { t.runnerDir = runnerDir }); err != nil {
@@ -496,7 +496,6 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 		}
 	}
 
-	log.Debug(ctx, "Preparing volumes")
 	// Volumes mounted by a failed prepareVolumes() call are unmounted by cleanupLocked()
 	err = prepareVolumes(ctx, cfg)
 	if err != nil {
@@ -540,7 +539,7 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 		return fmt.Errorf("create container: %w", err)
 	}
 
-	log.Debug(ctx, "Running container", "task", task.ID, "name", task.containerName)
+	log.Debug(ctx, "Starting container", "task", task.ID, "name", task.containerName)
 	err = d.startContainer(ctx, &task)
 	if len(task.config.GPUDevices) == 0 &&
 		shouldRetryWithoutNvidiaDisplayCapability(d.gpuVendor, err) {
@@ -582,7 +581,7 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 	}
 	started = true
 
-	log.Debug(ctx, "Container is running", "task", task.ID, "name", task.containerName)
+	log.Debug(ctx, "Task started", "task", task.ID, "name", task.containerName)
 
 	return nil
 }
@@ -677,7 +676,9 @@ func (d *DockerRunner) terminate(ctx context.Context, task *Task, timeout uint, 
 		d.cleanupLocked(ctx, task)
 	}
 	task.SetStatusTerminated(reason, message)
-	log.Debug(ctx, "terminated", "task", task.ID)
+	// Logged a level below the spontaneous termination reported by ProcessTasks():
+	// this one is requested by the caller, which reports it on its own
+	log.Debug(ctx, "terminated", "task", task.ID, "reason", reason)
 	return nil
 }
 
