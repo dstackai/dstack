@@ -139,6 +139,22 @@ def get_gateway_status_change_message(
     return msg
 
 
+def emit_gateway_replica_status_change_event(
+    session: AsyncSession,
+    replica_model: GatewayReplicaModel,
+    old_status: GatewayReplicaStatus,
+    new_status: GatewayReplicaStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = f"Gateway replica status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(replica_model)])
+
+
 GATEWAY_CONNECT_ATTEMPTS = 30
 GATEWAY_CONNECT_DELAY = 10
 GATEWAY_CONFIGURE_ATTEMPTS = 50
@@ -207,8 +223,10 @@ def create_gateway_replica_model(
 
     now = get_current_datetime()
     return GatewayReplicaModel(
+        id=uuid.uuid4(),
         name=replica_name,
         gateway_id=gateway_model.id,
+        gateway=gateway_model,
         backend_id=gateway_model.backend_id,
         replica_num=replica_num,
         configuration=replica_configuration.model_dump_json(),

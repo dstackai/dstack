@@ -3,6 +3,7 @@ from typing import Union
 
 from dstack._internal.server.models import (
     GatewayModel,
+    GatewayReplicaModel,
     InstanceModel,
     JobModel,
     ProbeModel,
@@ -10,7 +11,16 @@ from dstack._internal.server.models import (
 )
 
 
-def fmt(model: Union[RunModel, JobModel, InstanceModel, GatewayModel, ProbeModel]) -> str:
+def fmt(
+    model: Union[
+        RunModel,
+        JobModel,
+        InstanceModel,
+        GatewayModel,
+        GatewayReplicaModel,
+        ProbeModel,
+    ],
+) -> str:
     """Consistent string representation of a model for logging."""
     if isinstance(model, RunModel):
         return fmt_entity("run", model.id, model.run_name)
@@ -20,6 +30,8 @@ def fmt(model: Union[RunModel, JobModel, InstanceModel, GatewayModel, ProbeModel
         return fmt_entity("instance", model.id, model.name)
     if isinstance(model, GatewayModel):
         return fmt_entity("gateway", model.id, model.name)
+    if isinstance(model, GatewayReplicaModel):
+        return fmt_entity("gateway-replica", model.id, model.name)
     if isinstance(model, ProbeModel):
         return fmt_entity("probe", model.id, model.name)
     return str(model)

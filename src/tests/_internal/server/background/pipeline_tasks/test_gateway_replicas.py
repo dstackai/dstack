@@ -901,8 +901,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events = await list_events(session)
         assert {e.message for e in events} == {
-            f"Service registered on gateway replica {replica.replica_num}",
-            f"Service replica registered on gateway replica {replica.replica_num}",
+            "Service registered",
+            "Service replica registered",
         }
 
     async def test_unregisters_dangling_service_and_stale_replica(
@@ -1015,8 +1015,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events = await list_events(session)
         assert {e.message for e in events} == {
-            f"Service unregistered from gateway replica {replica.replica_num}",
-            f"Service replica unregistered from gateway replica {replica.replica_num}",
+            "Service unregistered",
+            "Service replica unregistered",
         }
 
     async def test_deletes_registration_models_for_unregistered_service_and_replica(
@@ -1250,8 +1250,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events = await list_events(session)
         assert {e.message for e in events} == {
-            f"Service unregistered from gateway replica {replica.replica_num}",
-            f"Service replica unregistered from gateway replica {replica.replica_num}",
+            "Service unregistered",
+            "Service replica unregistered",
         }
 
     async def test_no_gateway_calls_when_state_already_in_sync(
@@ -1471,8 +1471,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
         # be tied to a run for event targeting (only the fresh registration is).
         events = await list_events(session)
         assert {e.message for e in events} == {
-            f"Service registered on gateway replica {replica.replica_num}",
-            f"Service replica registered on gateway replica {replica.replica_num}",
+            "Service registered",
+            "Service replica registered",
         }
 
     async def test_does_nothing_when_in_sync_and_registrations_already_exist(
@@ -1793,14 +1793,11 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events = await list_events(session)
         assert {e.message for e in events} == {
-            f"Service registered on gateway replica {replica.replica_num}",
+            "Service registered",
+            f"Encountered service registration error: {expected_service_register_status_message}",
             (
-                f"Encountered service registration error on gateway replica "
-                f"{replica.replica_num}: {expected_service_register_status_message}"
-            ),
-            (
-                f"Encountered service replica registration error on gateway replica "
-                f"{replica.replica_num}: {expected_replica_register_status_message}"
+                "Encountered service replica registration error: "
+                f"{expected_replica_register_status_message}"
             ),
         }
 
@@ -1852,10 +1849,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         assert replica_registration.register_attempt == 1
         assert replica_registration.register_status_message == "boom replica"
 
-        error_message = (
-            f"Encountered service replica registration error on gateway replica "
-            f"{replica.replica_num}: boom replica"
-        )
+        error_message = "Encountered service replica registration error: boom replica"
         events_after_first_tick = await list_events(session)
         assert [e.message for e in events_after_first_tick].count(error_message) == 1
 
@@ -1997,14 +1991,8 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
         events = await list_events(session)
         assert {e.message for e in events} == {
-            (
-                f"Encountered service unregistration error on gateway replica "
-                f"{replica.replica_num}: {expected_service_status_message}"
-            ),
-            (
-                f"Encountered service replica unregistration error on gateway replica "
-                f"{replica.replica_num}: {expected_replica_status_message}"
-            ),
+            f"Encountered service unregistration error: {expected_service_status_message}",
+            f"Encountered service replica unregistration error: {expected_replica_status_message}",
         }
 
     async def test_does_not_emit_duplicate_unregistration_error_event_for_unchanged_error(
@@ -2072,10 +2060,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         assert replica_registration.unregister_attempt == 1
         assert replica_registration.unregister_status_message == "boom replica"
 
-        error_message = (
-            f"Encountered service replica unregistration error on gateway replica "
-            f"{replica.replica_num}: boom replica"
-        )
+        error_message = "Encountered service replica unregistration error: boom replica"
         events_after_first_tick = await list_events(session)
         assert [e.message for e in events_after_first_tick].count(error_message) == 1
 

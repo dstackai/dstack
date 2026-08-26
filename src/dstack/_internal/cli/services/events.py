@@ -23,6 +23,7 @@ class EventListFilters:
     within_projects: Optional[list[uuid.UUID]] = None
     within_fleets: Optional[list[uuid.UUID]] = None
     within_runs: Optional[list[uuid.UUID]] = None
+    within_gateways: Optional[list[uuid.UUID]] = None
     include_target_types: Optional[list[EventTargetType]] = None
 
 

@@ -102,6 +102,14 @@ class EventCommand(APIBaseCommand):
                 dest="within_runs",
                 help="Only show events that target the specified runs or jobs within those runs",
             )
+            within_filters_group.add_argument(
+                "--within-gateway",
+                action="append",
+                metavar="NAME",
+                dest="within_gateways",
+                type=EntityReference.parse,
+                help="Only show events that target the specified gateways or replicas within those gateways",
+            )
             parser.add_argument(
                 "--include-target-type",
                 action="append",
@@ -174,6 +182,11 @@ def _build_filters(args: argparse.Namespace, api: Client) -> EventListFilters:
     elif args.within_runs:
         filters.within_runs = [
             api.client.runs.get(api.project, name).id for name in args.within_runs
+        ]
+    elif args.within_gateways:
+        filters.within_gateways = [
+            api.client.gateways.get(ref.project or api.project, ref.name).id
+            for ref in args.within_gateways
         ]
     elif not has_target_filters:
         # default - limit to current project,

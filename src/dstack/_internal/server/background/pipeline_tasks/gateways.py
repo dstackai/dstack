@@ -861,6 +861,12 @@ async def _apply_replica_scaling(
 ) -> None:
     for gateway_replica_model in scale_result.new_gateway_replica_models:
         session.add(gateway_replica_model)
+        events.emit(
+            session,
+            f"Gateway replica created. Status: {gateway_replica_model.status.upper()}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(gateway_replica_model)],
+        )
     if scale_result.scale_in_replica_ids:
         # The gateway pipeline does not need to lock gateway replicas — it only mutates `scale_in`,
         # which can only ever be flipped from False to True, so no races are expected.
