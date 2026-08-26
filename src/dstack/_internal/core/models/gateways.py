@@ -36,7 +36,13 @@ class LetsEncryptGatewayCertificate(CoreModel):
 
 class ACMGatewayCertificate(CoreModel):
     type: Annotated[
-        Literal["acm"], Field(description="Certificates by AWS Certificate Manager (ACM)")
+        Literal["acm"],
+        Field(
+            description=(
+                "Certificates by AWS Certificate Manager (ACM)."
+                " Implies `load_balancer: { type: alb }`"
+            )
+        ),
     ] = "acm"
     arn: Annotated[
         str, Field(description="The ARN of the wildcard ACM certificate for the domain")
@@ -50,6 +56,13 @@ AnyGatewayCertificate = Union[LetsEncryptGatewayCertificate, ACMGatewayCertifica
 
 class GatewayCertificate(RootModel[Annotated[AnyGatewayCertificate, Field(discriminator="type")]]):
     pass
+
+
+class ALBGatewayLoadBalancer(CoreModel):
+    type: Annotated[Literal["alb"], Field(description="AWS Application Load Balancer")] = "alb"
+
+
+AnyGatewayLoadBalancer = Union[ALBGatewayLoadBalancer]
 
 
 class GatewayConfiguration(CoreModel):
@@ -92,6 +105,16 @@ class GatewayConfiguration(CoreModel):
         ),
     ] = None
     public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
+    load_balancer: Annotated[
+        Optional[AnyGatewayLoadBalancer],
+        Field(
+            discriminator="type",
+            description=(
+                "The load balancer configuration."
+                " Set to `type: alb` to front the gateway with an AWS Application Load Balancer"
+            ),
+        ),
+    ] = None
     certificate: Annotated[
         Optional[AnyGatewayCertificate],
         Field(

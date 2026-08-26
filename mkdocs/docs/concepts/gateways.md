@@ -55,7 +55,7 @@ Provisioning...
 
 A gateway requires a `domain` to be specified in the configuration before creation. The domain is used to generate service endpoints (e.g. `<run name>.<gateway domain>`).
 
-Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (some private gateways and Kubernetes).
+Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (load balancers, Kubernetes).
 
 ??? info "Project name interpolation"
     You can use the `${{ run.project_name }}` variable to include the service’s project name in the domain name. This is especially useful when [exporting](exports.md) the gateway to multiple projects, as it ensures each importer receives a unique domain name.
@@ -76,6 +76,51 @@ You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends
     Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
     For self-hosted Kubernetes, you must provide a load balancer by yourself.
 
+### Load balancer
+
+The optional `load_balancer` property allows you to provision a load balancer in front of the gateway, which is useful for balancing requests between multiple gateway [replicas](#replicas), or for using certain [certificate](#certificate) types, such as AWS ACM.
+
+Currently, only AWS Application Load Balancer (ALB) is supported:
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+backend: aws
+region: eu-west-1
+domain: example.com
+replicas: 2
+load_balancer:
+  type: alb
+certificate:
+  type: acm
+  arn: arn:aws:acm:eu-west-1:164099421079:certificate/3670388f-f43b-4872-aaf8-907b107a170d
+```
+
+</div>
+
+??? info "Requirements"
+    An ALB gateway requires:
+
+    - The `aws` backend.
+    - Either `certificate: { type: acm, ... }` or `certificate: null`.
+    - A VPC with at least two subnets in different availability zones. If `public_ip: False`, subnets must be private and have a route to a NAT gateway.
+
+The provisioned load balancer provides a hostname you can add to your DNS records. Replica hostnames do not need to be added to DNS.
+
+<div class="termy">
+
+```
+$ dstack gateway list
+ NAME             BACKEND          HOSTNAME                                                  DOMAIN       DEFAULT  STATUS
+ example-gateway                   dstack-6t7i1b03-lb-338524206.eu-west-1.elb.amazonaws.com  example.com  ✓        running
+    replica=0     aws (eu-west-1)  34.246.162.72                                                                   running
+    replica=1     aws (eu-west-1)  52.18.222.190                                                                   running
+```
+
+</div>
+
 ### Certificate
 
 By default, when you run a service with a gateway, `dstack` provisions an SSL certificate via Let's Encrypt for the configured domain. This automatically enables HTTPS for the service endpoint.
@@ -89,7 +134,7 @@ If you disable [public IP](#public-ip) (e.g. to make the gateway private) or if 
 
     * `lets-encrypt` (default) — Automatic certificates via [Let's Encrypt](https://letsencrypt.org/). Requires a [public IP](#public-ip).
     * `acm` — Certificates managed by [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/). AWS-only. TLS is terminated at the load balancer, not at the gateway, and HTTP requests are redirected to HTTPS by the ALB.
-      Requires a VPC with at least two subnets in different availability zones to provision a load balancer. If `public_ip: False`, subnets must be private and have a route to NAT gateway.
+      Implies `load_balancer: { type: alb }`.
     * `null` — No certificate. Services will use HTTP.
 
 ### Public IP
@@ -155,7 +200,7 @@ replicas: 2
 
 </div>
 
-To balance requests between gateway replicas, add DNS records for each replica or set up a load balancer outside of `dstack`. Replica hostnames are displayed in `dstack` CLI and UI.
+To balance requests between gateway replicas, add DNS records for each replica, use a natively-supported [load balancer](#load-balancer), or set up a load balancer outside of `dstack`. Replica hostnames are displayed in `dstack` CLI and UI.
 
 <div class="termy">
 

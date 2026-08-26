@@ -94,7 +94,11 @@ class AWSGatewayBackendData(CoreModel):
     lb_arn: str
     tg_arn: str
     listener_arn: str
-    http_listener_arn: Optional[str] = None  # None for old gateways
+    """Primary listener"""
+    http_listener_arn: Optional[str] = None
+    """Listener for the HTTP->HTTPS redirection.
+    `None` for `certificate: null` gateways and for pre-0.20.17 gateways that have no redirection
+    """
 
 
 class AWSVolumeBackendData(CoreModel):
@@ -598,9 +602,8 @@ class AWSCompute(
         self,
         configuration: GatewayLoadBalancerConfiguration,
     ) -> GatewayLoadBalancerData:
-        """Creates an ALB, target group, and listeners for a gateway with an ACM certificate."""
-        assert configuration.certificate is not None
-        assert configuration.certificate.type == "acm"
+        """Creates an ALB, target group, and listeners for a gateway."""
+        assert configuration.certificate is None or configuration.certificate.type == "acm"
 
         ec2_client = self.session.client("ec2", region_name=configuration.region)
         elb_client = self.session.client("elbv2", region_name=configuration.region)
@@ -636,7 +639,8 @@ class AWSCompute(
         )
         if len(lb_subnets_ids) < 2:
             raise ComputeError(
-                "Deploying gateway with ACM certificate requires at least two subnets in different AZs"
+                "Deploying a gateway with a load balancer requires at least two subnets"
+                " in different AZs"
             )
 
         # Using short names as LB and target groups have length limit of 32.
@@ -668,43 +672,66 @@ class AWSCompute(
         tg_arn = response["TargetGroups"][0]["TargetGroupArn"]
         logger.debug("Created Target Group for gateway %s", configuration.gateway_name)
 
-        logger.debug("Creating HTTPS ALB listener for gateway %s...", configuration.gateway_name)
-        response = elb_client.create_listener(
-            LoadBalancerArn=lb_arn,
-            Protocol="HTTPS",
-            Port=443,
-            SslPolicy="ELBSecurityPolicy-2016-08",
-            Certificates=[
-                {"CertificateArn": configuration.certificate.arn},
-            ],
-            DefaultActions=[
-                {
-                    "Type": "forward",
-                    "TargetGroupArn": tg_arn,
-                }
-            ],
-        )
-        listener_arn = response["Listeners"][0]["ListenerArn"]
-        logger.debug("Created HTTPS ALB listener for gateway %s", configuration.gateway_name)
+        if configuration.certificate is not None:
+            logger.debug(
+                "Creating HTTPS ALB listener for gateway %s...", configuration.gateway_name
+            )
+            response = elb_client.create_listener(
+                LoadBalancerArn=lb_arn,
+                Protocol="HTTPS",
+                Port=443,
+                SslPolicy="ELBSecurityPolicy-2016-08",
+                Certificates=[
+                    {"CertificateArn": configuration.certificate.arn},
+                ],
+                DefaultActions=[
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": tg_arn,
+                    }
+                ],
+            )
+            listener_arn = response["Listeners"][0]["ListenerArn"]
+            logger.debug("Created HTTPS ALB listener for gateway %s", configuration.gateway_name)
 
-        logger.debug("Creating HTTP ALB listener for gateway %s...", configuration.gateway_name)
-        response = elb_client.create_listener(
-            LoadBalancerArn=lb_arn,
-            Protocol="HTTP",
-            Port=80,
-            DefaultActions=[
-                {
-                    "Type": "redirect",
-                    "RedirectConfig": {
-                        "Protocol": "HTTPS",
-                        "Port": "443",
-                        "StatusCode": "HTTP_301",
-                    },
-                }
-            ],
-        )
-        http_listener_arn = response["Listeners"][0]["ListenerArn"]
-        logger.debug("Created HTTP ALB listener for gateway %s", configuration.gateway_name)
+            logger.debug(
+                "Creating HTTP ALB listener for gateway %s...", configuration.gateway_name
+            )
+            response = elb_client.create_listener(
+                LoadBalancerArn=lb_arn,
+                Protocol="HTTP",
+                Port=80,
+                DefaultActions=[
+                    {
+                        "Type": "redirect",
+                        "RedirectConfig": {
+                            "Protocol": "HTTPS",
+                            "Port": "443",
+                            "StatusCode": "HTTP_301",
+                        },
+                    }
+                ],
+            )
+            http_listener_arn = response["Listeners"][0]["ListenerArn"]
+            logger.debug("Created HTTP ALB listener for gateway %s", configuration.gateway_name)
+        else:
+            logger.debug(
+                "Creating HTTP ALB listener for gateway %s...", configuration.gateway_name
+            )
+            response = elb_client.create_listener(
+                LoadBalancerArn=lb_arn,
+                Protocol="HTTP",
+                Port=80,
+                DefaultActions=[
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": tg_arn,
+                    }
+                ],
+            )
+            listener_arn = response["Listeners"][0]["ListenerArn"]
+            http_listener_arn = None
+            logger.debug("Created HTTP ALB listener for gateway %s", configuration.gateway_name)
 
         return GatewayLoadBalancerData(
             hostname=lb_dns_name,
