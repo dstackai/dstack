@@ -137,6 +137,33 @@ class TestFilterInstances:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_instances_matching_zone_ignoring_case(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        matching_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            region="eu-west-1",
+            availability_zone="eu-west-1a",
+        )
+        other_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            region="eu-west-1",
+            availability_zone="eu-west-1b",
+        )
+        res = instances_services.filter_instances(
+            instances=[matching_instance, other_instance],
+            profile=Profile(name="test", availability_zones=["EU-West-1a"]),
+        )
+        assert res == [matching_instance]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_volume_instances(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)

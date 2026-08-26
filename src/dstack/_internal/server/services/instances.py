@@ -581,7 +581,7 @@ def instance_matches_constraints(
         if (
             jpd.availability_zone is not None
             and zones is not None
-            and jpd.availability_zone not in zones
+            and jpd.availability_zone.lower() not in [z.lower() for z in zones]
         ):
             return False
 
