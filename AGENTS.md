@@ -49,4 +49,3 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Commit messages follow the existing style: short, imperative summaries (e.g., “Fix exclude_not_available ignored”); include rationale in the body if needed.
 - For PRs, describe behavior changes and link related issues.
 - Include screenshots or terminal output when touching UX/CLI messages or frontend flows.
-- Always disclose AI Assistance in PRs.
