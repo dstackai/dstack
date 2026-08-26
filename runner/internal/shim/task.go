@@ -61,17 +61,17 @@ type Task struct {
 // being processed in the background.
 func (t *Task) Lock(ctx context.Context) {
 	t.mu.Lock()
-	log.Debug(ctx, "locked", "task", t.ID)
+	log.Trace(ctx, "locked", "task", t.ID)
 }
 
 // TryLock is a non-blocking version of Lock. It reports whether the lock has
 // been acquired, so that the caller can retry later instead of waiting.
 func (t *Task) TryLock(ctx context.Context) bool {
 	if !t.mu.TryLock() {
-		log.Debug(ctx, "already locked", "task", t.ID)
+		log.Trace(ctx, "already locked", "task", t.ID)
 		return false
 	}
-	log.Debug(ctx, "locked", "task", t.ID)
+	log.Trace(ctx, "locked", "task", t.ID)
 	return true
 }
 
@@ -80,7 +80,7 @@ func (t *Task) TryLock(ctx context.Context) bool {
 // looks like lock: https://github.com/golang/go/issues/18451
 func (t *Task) Release(ctx context.Context) {
 	t.mu.Unlock()
-	log.Debug(ctx, "unlocked", "task", t.ID)
+	log.Trace(ctx, "unlocked", "task", t.ID)
 }
 
 func (t *Task) IsTransitionAllowed(toStatus TaskStatus) bool {

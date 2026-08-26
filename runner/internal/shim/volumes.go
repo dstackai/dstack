@@ -17,6 +17,10 @@ import (
 )
 
 func prepareVolumes(ctx context.Context, taskConfig TaskConfig) error {
+	if len(taskConfig.Volumes) == 0 {
+		return nil
+	}
+	log.Debug(ctx, "Preparing volumes...")
 	for _, volume := range taskConfig.Volumes {
 		err := formatAndMountVolume(ctx, volume)
 		if err != nil {

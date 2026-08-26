@@ -55,7 +55,7 @@ func (e *AWSBackend) GetRealDeviceName(ctx context.Context, volumeID, deviceName
 		if time.Now().After(deadline) {
 			return "", fmt.Errorf("volume %s not found among block devices after %s", volumeID, deviceResolveTimeout)
 		}
-		log.Debug(ctx, "volume not yet visible among block devices, retrying", "volume", volumeID)
+		log.Trace(ctx, "volume not yet visible among block devices, retrying", "volume", volumeID)
 		time.Sleep(deviceResolveInterval)
 	}
 
