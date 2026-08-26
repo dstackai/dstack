@@ -31,11 +31,13 @@ def combine_fleet_and_run_profiles(
     try:
         return Profile(
             backends=_intersect_lists_optional(fleet_profile.backends, run_profile.backends),
-            regions=_intersect_lists_optional(fleet_profile.regions, run_profile.regions),
-            availability_zones=_intersect_lists_optional(
+            regions=_intersect_lists_case_insensitive_optional(
+                fleet_profile.regions, run_profile.regions
+            ),
+            availability_zones=_intersect_lists_case_insensitive_optional(
                 fleet_profile.availability_zones, run_profile.availability_zones
             ),
-            instance_types=_intersect_lists_optional(
+            instance_types=_intersect_lists_case_insensitive_optional(
                 fleet_profile.instance_types, run_profile.instance_types
             ),
             reservation=get_single_value_optional(
@@ -121,12 +123,25 @@ def _intersect_lists_optional(
     return [x for x in list1 if x in list2]
 
 
-def _get_min(value1: _CompT, value2: _CompT) -> _CompT:
-    return min(value1, value2)
+def _intersect_lists_case_insensitive_optional(
+    list1: Optional[list[str]], list2: Optional[list[str]]
+) -> Optional[list[str]]:
+    if list1 is None:
+        if list2 is None:
+            return None
+        return list2.copy()
+    if list2 is None:
+        return list1.copy()
+    list2_lowered = {x.lower() for x in list2}
+    return [x for x in list1 if x.lower() in list2_lowered]
 
 
 def _get_min_optional(value1: Optional[_CompT], value2: Optional[_CompT]) -> Optional[_CompT]:
-    return combine_optional(value1, value2, _get_min)
+    return combine_optional(value1, value2, min)
+
+
+def _get_max_optional(value1: Optional[_CompT], value2: Optional[_CompT]) -> Optional[_CompT]:
+    return combine_optional(value1, value2, max)
 
 
 def _combine_spot_policy(value1: SpotPolicy, value2: SpotPolicy) -> SpotPolicy:
@@ -199,11 +214,11 @@ def _combine_shm_size_optional(
 def _combine_gpu(value1: GPUSpec, value2: GPUSpec) -> GPUSpec:
     return GPUSpec(
         vendor=get_single_value_optional(value1.vendor, value2.vendor),
-        name=_intersect_lists_optional(value1.name, value2.name),
+        name=_intersect_lists_case_insensitive_optional(value1.name, value2.name),
         count=_combine_range(value1.count, value2.count),
         memory=_combine_range_optional(value1.memory, value2.memory),
         total_memory=_combine_range_optional(value1.total_memory, value2.total_memory),
-        compute_capability=_get_min_optional(value1.compute_capability, value2.compute_capability),
+        compute_capability=_get_max_optional(value1.compute_capability, value2.compute_capability),
     )
 
 
