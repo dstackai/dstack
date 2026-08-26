@@ -28,6 +28,7 @@ from dstack._internal.server.services.requirements.combine import (
     _combine_idle_duration_optional,
     _combine_resources,
     _combine_spot_policy_optional,
+    _intersect_lists_case_insensitive_optional,
     _intersect_lists_optional,
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
@@ -95,6 +96,24 @@ class TestCombineFleetAndRunProfiles:
                     tags={"tag1": "value1", "tag2": "value2"},
                 ),
                 id="compatible_profiles",
+            ),
+            pytest.param(
+                Profile(
+                    regions=["US-East-1"],
+                    availability_zones=["US-East-1a"],
+                    instance_types=["P4d.24xlarge"],
+                ),
+                Profile(
+                    regions=["us-east-1"],
+                    availability_zones=["us-east-1a"],
+                    instance_types=["p4d.24xlarge"],
+                ),
+                Profile(
+                    regions=["US-East-1"],
+                    availability_zones=["US-East-1a"],
+                    instance_types=["P4d.24xlarge"],
+                ),
+                id="locations_differing_in_case",
             ),
             pytest.param(
                 Profile(
@@ -276,6 +295,44 @@ class TestIntersectLists:
         result = _intersect_lists_optional(list1, list2)
         assert result == ["a", "a", "c"]
 
+    def test_intersection_is_case_sensitive(self):
+        assert _intersect_lists_optional(["A"], ["a"]) == []
+
+
+class TestIntersectListsCaseInsensitive:
+    def test_both_none_returns_none(self):
+        assert _intersect_lists_case_insensitive_optional(None, None) is None
+
+    def test_first_none_returns_copy_of_second(self):
+        list2 = ["a", "b", "c"]
+        result = _intersect_lists_case_insensitive_optional(None, list2)
+        assert result == list2
+        assert result is not list2  # Should be a copy
+
+    def test_second_none_returns_copy_of_first(self):
+        list1 = ["x", "y", "z"]
+        result = _intersect_lists_case_insensitive_optional(list1, None)
+        assert result == list1
+        assert result is not list1  # Should be a copy
+
+    def test_intersection_ignores_case(self):
+        list1 = ["us-east-1", "EU-WEST-1", "ap-south-1"]
+        list2 = ["US-EAST-1", "eu-west-1"]
+        result = _intersect_lists_case_insensitive_optional(list1, list2)
+        assert result == ["us-east-1", "EU-WEST-1"]
+
+    def test_intersection_of_non_overlapping_lists(self):
+        result = _intersect_lists_case_insensitive_optional(["a", "b"], ["c", "d"])
+        assert result == []
+
+    def test_intersection_preserves_order_from_first_list(self):
+        result = _intersect_lists_case_insensitive_optional(["C", "A", "B"], ["a", "b", "c"])
+        assert result == ["C", "A", "B"]
+
+    def test_intersection_with_duplicates(self):
+        result = _intersect_lists_case_insensitive_optional(["a", "b", "A", "c"], ["A", "c", "d"])
+        assert result == ["a", "A", "c"]
+
 
 class TestCombineOptionalIdleDuration:
     def test_both_none_returns_none(self):
@@ -454,8 +511,24 @@ class TestCombineGpu:
             name=["V100"],
             count=Range(min=2, max=3),
             memory=Range(min=Memory(16), max=Memory(24)),
-            compute_capability=ComputeCapability((7, 0)),
+            compute_capability=ComputeCapability((7, 8)),
         )
+
+    def test_intersects_names_case_insensitively(self):
+        gpu1 = GPUSpec(name=["MI300X", "H100"], count=Range(min=1, max=1))
+        gpu2 = GPUSpec(name=["mi300x"], count=Range(min=1, max=1))
+        result = _combine_gpu_optional(gpu1, gpu2)
+        assert result is not None
+        assert result.name == ["MI300X"]
+
+    def test_takes_the_highest_compute_capability(self):
+        # compute_capability is a lower bound, so the stricter of the two must win.
+        higher = GPUSpec(count=Range(min=1, max=1), compute_capability=ComputeCapability((8, 0)))
+        lower = GPUSpec(count=Range(min=1, max=1), compute_capability=ComputeCapability((7, 0)))
+        for gpu1, gpu2 in [(higher, lower), (lower, higher)]:
+            result = _combine_gpu_optional(gpu1, gpu2)
+            assert result is not None
+            assert result.compute_capability == ComputeCapability((8, 0))
 
     def test_incompatible_vendors_raises_error(self):
         gpu1 = GPUSpec(vendor=gpuhunt.AcceleratorVendor.NVIDIA, count=Range(min=1, max=2))
