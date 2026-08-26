@@ -17,6 +17,7 @@ from dstack._internal.core.models.runs import Requirements
 from dstack._internal.utils.combine import (
     CombineError,
     combine_optional,
+    get_max_optional,
     get_single_value_optional,
 )
 from dstack._internal.utils.typing import SupportsRichComparison
@@ -140,10 +141,6 @@ def _get_min_optional(value1: Optional[_CompT], value2: Optional[_CompT]) -> Opt
     return combine_optional(value1, value2, min)
 
 
-def _get_max_optional(value1: Optional[_CompT], value2: Optional[_CompT]) -> Optional[_CompT]:
-    return combine_optional(value1, value2, max)
-
-
 def _combine_spot_policy(value1: SpotPolicy, value2: SpotPolicy) -> SpotPolicy:
     if value1 == SpotPolicy.AUTO:
         return value2
@@ -218,7 +215,7 @@ def _combine_gpu(value1: GPUSpec, value2: GPUSpec) -> GPUSpec:
         count=_combine_range(value1.count, value2.count),
         memory=_combine_range_optional(value1.memory, value2.memory),
         total_memory=_combine_range_optional(value1.total_memory, value2.total_memory),
-        compute_capability=_get_max_optional(value1.compute_capability, value2.compute_capability),
+        compute_capability=get_max_optional(value1.compute_capability, value2.compute_capability),
     )
 
 
