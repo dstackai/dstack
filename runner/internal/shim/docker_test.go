@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -36,7 +38,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	params := &dockerParametersMock{
 		commands:         []string{"/usr/sbin/sshd -V 2>&1 | grep OpenSSH"},
 		sshShellCommands: true,
-		runnerDir:        t.TempDir(),
+		runnersDir:       t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -60,8 +62,8 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:  []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
-		runnerDir: t.TempDir(),
+		commands:   []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		runnersDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -85,8 +87,8 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:  []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
-		runnerDir: t.TempDir(),
+		commands:   []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		runnersDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -111,8 +113,8 @@ func TestDocker_ContainerExitedWithError(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:  []string{"echo failed for a reason", "exit 3"},
-		runnerDir: t.TempDir(),
+		commands:   []string{"echo failed for a reason", "exit 3"},
+		runnersDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -142,8 +144,8 @@ func TestDocker_RestoredTaskIsTerminated(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:  []string{"sleep 3", "exit 7"},
-		runnerDir: t.TempDir(),
+		commands:   []string{"sleep 3", "exit 7"},
+		runnersDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -165,6 +167,54 @@ func TestDocker_RestoredTaskIsTerminated(t *testing.T) {
 
 	taskInfo := waitTaskTerminated(t, restartedRunner, taskConfig.ID)
 	assert.Equal(t, string(types.TerminationReasonContainerExitedWithError), taskInfo.TerminationReason)
+}
+
+// TestDocker_RestoredTaskKeepsTerminationReason covers the task state file: why a task
+// was terminated cannot be recovered from its container
+func TestDocker_RestoredTaskKeepsTerminationReason(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	params := &dockerParametersMock{
+		commands:   []string{"sleep 60"},
+		runnersDir: t.TempDir(),
+	}
+
+	timeout := 180 // seconds
+	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	dockerRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+
+	taskConfig := createTaskConfig(t)
+	require.NoError(t, dockerRunner.Submit(ctx, taskConfig))
+	require.NoError(t, dockerRunner.Start(ctx, taskConfig.ID))
+	require.NoError(t, dockerRunner.Terminate(
+		ctx, taskConfig.ID, 0, string(types.TerminationReasonTerminatedByUser), "bye",
+	))
+
+	// The restarted shim restores the task from its container and its state file
+	restartedRunner, err := NewDockerRunner(ctx, params)
+	require.NoError(t, err)
+	defer cleanupTask(t, restartedRunner, taskConfig.ID)
+
+	taskInfo := restartedRunner.TaskInfo(taskConfig.ID)
+	assert.Equal(t, TaskStatusTerminated, taskInfo.Status)
+	assert.Equal(t, string(types.TerminationReasonTerminatedByUser), taskInfo.TerminationReason)
+	assert.Equal(t, "bye", taskInfo.TerminationMessage)
+}
+
+func TestVolumesFromMounts(t *testing.T) {
+	mounts := []dockertypes.MountPoint{
+		{Source: "/root/.dstack/runners/task-0-0-1234abcd", Destination: consts.RunnerTempDir},
+		{Source: "/mnt/disks/dstack-volumes/volume-1", Destination: "/volume"},
+		{Source: "/home/dstack/data", Destination: "/instance-data"},
+	}
+
+	assert.Equal(t, []VolumeInfo{{Name: "volume-1"}}, volumesFromMounts(mounts))
+	assert.Nil(t, volumesFromMounts(nil))
 }
 
 func TestConfigureGpus_Nvidia(t *testing.T) {
@@ -212,7 +262,8 @@ func TestShouldRetryWithoutNvidiaDisplayCapability(t *testing.T) {
 type dockerParametersMock struct {
 	commands         []string
 	sshShellCommands bool
-	runnerDir        string
+	// runnersDir is the parent dir of all task runner dirs
+	runnersDir string
 }
 
 func (c *dockerParametersMock) DockerPrivileged() bool {
@@ -240,12 +291,24 @@ func (c *dockerParametersMock) DockerPorts() []int {
 	return []int{}
 }
 
-func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
-	return nil, nil
+func (c *dockerParametersMock) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
+	// The runner dir mount is how a restarted shim finds the dir of a restored task,
+	// and with it the task state file
+	return []mount.Mount{
+		{Type: mount.TypeBind, Source: hostRunnerDir, Target: consts.RunnerTempDir},
+	}, nil
 }
 
-func (c *dockerParametersMock) MakeRunnerDir(string) (string, error) {
-	return c.runnerDir, nil
+func (c *dockerParametersMock) RunnersDir() string {
+	return c.runnersDir
+}
+
+func (c *dockerParametersMock) MakeRunnerDir(name string) (string, error) {
+	runnerDir := filepath.Join(c.runnersDir, name)
+	if err := os.MkdirAll(runnerDir, 0o755); err != nil {
+		return "", err
+	}
+	return runnerDir, nil
 }
 
 /* Utilities */

@@ -214,7 +214,7 @@ func newTestRunner(t *testing.T, client docker.APIClient) *DockerRunner {
 	t.Helper()
 	return &DockerRunner{
 		client:       client,
-		dockerParams: &dockerParametersMock{runnerDir: t.TempDir()},
+		dockerParams: &dockerParametersMock{runnersDir: t.TempDir()},
 		gpuLock:      newTestGpuLock(t),
 		tasks:        NewTaskStorage(),
 	}
@@ -230,7 +230,10 @@ func newTestGpuLock(t *testing.T, ids ...string) *GpuLock {
 }
 
 func newRunningTask(taskID string, containerID string) Task {
-	return NewTask(taskID, TaskStatusRunning, taskID+"-name", containerID, nil, nil, "")
+	task := NewTask(taskID, TaskStatusRunning)
+	task.containerName = taskID + "-name"
+	task.containerID = containerID
+	return task
 }
 
 func addTask(runner *DockerRunner, task Task) {

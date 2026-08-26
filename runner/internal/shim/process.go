@@ -179,7 +179,7 @@ func (d *DockerRunner) finalizeLocked(
 	ctx context.Context, task *Task, reason types.TerminationReason, message string,
 ) {
 	d.cleanupLocked(ctx, task)
-	if err := d.commit(task, func(t *Task) {
+	if err := d.commit(ctx, task, func(t *Task) {
 		t.SetStatusTerminated(string(reason), message)
 	}); err != nil {
 		log.Error(ctx, "failed to commit terminated status", "task", task.ID, "err", err)
