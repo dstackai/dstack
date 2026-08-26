@@ -215,6 +215,8 @@ def _filter_offers(
         regions = [r.lower() for r in regions]
     if instance_types is not None:
         instance_types = [i.lower() for i in instance_types]
+    if availability_zones is not None:
+        availability_zones = [z.lower() for z in availability_zones]
 
     for b, offer in offers:
         if backend_types is not None and offer.backend not in backend_types:
@@ -234,7 +236,7 @@ def _filter_offers(
                 continue
             new_offer = offer.model_copy()
             new_offer.availability_zones = [
-                z for z in offer.availability_zones if z in availability_zones
+                z for z in offer.availability_zones if z.lower() in availability_zones
             ]
             if not new_offer.availability_zones:
                 continue
