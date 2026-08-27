@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -13,6 +14,7 @@ from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
     ACMGatewayCertificate,
+    ALBGatewayLoadBalancer,
     GatewayLoadBalancerData,
     GatewayReplicaStatus,
     GatewayStatus,
@@ -494,8 +496,29 @@ class TestGatewayWorkerSubmitted:
         assert replicas[1].replica_num == 1
         assert all(r.ip_address is None for r in replicas)
 
-    async def test_submitted_to_provisioning_creates_load_balancer_for_acm_gateway(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
+    @pytest.mark.parametrize(
+        "certificate,load_balancer",
+        [
+            pytest.param(None, ALBGatewayLoadBalancer(), id="alb-without-certificate"),
+            pytest.param(
+                ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+                ALBGatewayLoadBalancer(),
+                id="alb-with-acm",
+            ),
+            pytest.param(
+                ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+                None,
+                id="acm-with-implicit-alb",
+            ),
+        ],
+    )
+    async def test_submitted_to_provisioning_creates_load_balancer(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        certificate: Optional[ACMGatewayCertificate],
+        load_balancer: Optional[ALBGatewayLoadBalancer],
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -504,7 +527,8 @@ class TestGatewayWorkerSubmitted:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.SUBMITTED,
-            certificate=ACMGatewayCertificate(arn="arn:aws:acm:us:1:certificate/x"),
+            certificate=certificate,
+            load_balancer=load_balancer,
         )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -528,6 +552,7 @@ class TestGatewayWorkerSubmitted:
             create_lb_mock = backend_mock.compute.return_value.create_gateway_load_balancer
             create_lb_mock.assert_called_once()
             assert create_lb_mock.call_args.args[0].gateway_name == gateway.name
+            assert create_lb_mock.call_args.args[0].certificate == certificate
 
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.PROVISIONING

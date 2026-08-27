@@ -16,6 +16,7 @@ from dstack._internal.core.models.gateways import (
     GatewayReplicaStatus,
     GatewayStatus,
 )
+from dstack._internal.core.services.gateways import get_effective_load_balancer
 from dstack._internal.server.background.pipeline_tasks.base import (
     NOW_PLACEHOLDER,
     Fetcher,
@@ -349,7 +350,7 @@ class _SubmittedResult:
 async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedResult:
     configuration = gateways_services.get_gateway_configuration(gateway_model)
     update_map: _GatewayUpdateMap = {}
-    if configuration.certificate is not None and configuration.certificate.type == "acm":
+    if get_effective_load_balancer(configuration) is not None:
         try:
             (
                 _,

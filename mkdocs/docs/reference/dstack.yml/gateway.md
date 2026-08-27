@@ -29,3 +29,13 @@ Set to `null` to disable certificates (e.g. for [private gateways](../../concept
           show_root_heading: false
           type:
             required: true
+
+### `load_balancer`
+
+=== "ALB"
+
+    #SCHEMA# dstack._internal.core.models.gateways.ALBGatewayLoadBalancer
+        overrides:
+          show_root_heading: false
+          type:
+            required: true

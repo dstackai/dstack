@@ -49,6 +49,7 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayCertificate,
+    AnyGatewayLoadBalancer,
     GatewayConfiguration,
     GatewayReplicaConfiguration,
     GatewayReplicaStatus,
@@ -669,6 +670,7 @@ async def create_gateway(
     forbid_new_services: bool = False,
     populate_configuration: bool = True,
     certificate: Optional[AnyGatewayCertificate] = LetsEncryptGatewayCertificate(),
+    load_balancer: Optional[AnyGatewayLoadBalancer] = None,
     hostname: Optional[str] = None,
     backend_data: Optional[str] = None,
 ) -> GatewayModel:
@@ -689,6 +691,7 @@ async def create_gateway(
             domain=wildcard_domain,
             replicas=replicas,
             certificate=certificate,
+            load_balancer=load_balancer,
         ).model_dump_json()
     gateway = GatewayModel(
         project_id=project_id,
