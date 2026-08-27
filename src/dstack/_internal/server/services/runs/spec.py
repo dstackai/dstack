@@ -57,6 +57,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         "replicas",
         "groups",
         "scaling",
+        "gateway",
         # rolling deployment
         # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
         "port",
@@ -433,7 +434,7 @@ def _check_dynamo_in_place_update_compatibility(
     _router_affecting_top_level_fields = tuple(
         f
         for f in _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get("service", [])
-        if f not in ("replicas", "groups", "scaling")
+        if f not in ("replicas", "groups", "scaling", "gateway")
     )
     for field in _router_affecting_top_level_fields:
         if getattr(current_cfg, field, None) != getattr(new_cfg, field, None):

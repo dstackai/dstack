@@ -1534,7 +1534,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 
     Rolling deployment supports changes to the following properties: `port`, `probes`, `resources`, `volumes`, `docker`, `files`, `image`, `user`, `privileged`, `entrypoint`, `working_dir`, `python`, `nvcc`, `single_branch`, `env`, `shell`, `commands`, as well as changes to [repo](#repos) or [file](#files) contents.
 
-    Changes to `replicas` and `scaling` can be applied without redeploying replicas.
+    Changes to `priority`, `replicas`, `scaling`, and `gateway` can be applied without redeploying replicas.
 
     Changes to other properties require a full service restart.
 
