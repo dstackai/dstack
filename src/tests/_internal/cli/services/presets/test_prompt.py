@@ -27,7 +27,7 @@ class TestSystemPrompt:
         assert "TODO" not in text
         assert "{prompt}" not in text
 
-    def test_injects_user_prompt_with_escape_clause(self):
+    def test_injects_user_prompt(self):
         text = get_preset_agent_system_prompt(
             user_prompt="Optimize for RAG traffic.",
             baseline=False,
@@ -35,11 +35,10 @@ class TestSystemPrompt:
             custom_dataset=False,
         )
 
-        clause_at = text.index("unless `## Additional instructions` explicitly allows it.")
         section_at = text.index(
             "## Additional instructions\n\n```\nOptimize for RAG traffic.\n```"
         )
-        assert clause_at < section_at < text.index("## CLI And Skills")
+        assert section_at < text.index("## CLI And Skills")
         assert "<!--?" not in text
 
     def test_renders_only_the_custom_dataset_branch(self):

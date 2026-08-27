@@ -222,7 +222,7 @@ resources:
 
 **Port forwarding:** When you specify `ports`, `dstack apply` forwards them to `localhost` while attached. Use `dstack attach <run name>` to reconnect and restore port forwarding. The run name becomes an SSH alias (e.g., `ssh <run name>`) for direct access.
 
-**Distributed training:** Multi-node tasks are supported (e.g., via `nodes`) and require fleets that support inter-node communication (see `placement: cluster` in fleets).
+**Distributed training:** Multi-node tasks are supported (e.g., via `nodes`, or via `groups` for heterogeneous multi-node tasks) and require fleets that support inter-node communication (see `placement: cluster` in fleets).
 
 [Concept documentation](https://dstack.ai/docs/concepts/tasks.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/task.md)
 

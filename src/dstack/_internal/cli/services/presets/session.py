@@ -642,8 +642,34 @@ def _trial_entry(
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+    """A trial on one instance records a flat `resources` object; a trial that
+    used node groups records `groups` instead."""
+    counts: dict[str, int] = {}
+    for node in _trial_nodes(record):
+        spec = _format_gpu(node.get("gpu"))
+        if spec:
+            # Insertion order is group order, so the roles read in the order they ran.
+            counts[spec] = counts.get(spec, 0) + 1
+    if not counts:
+        return None
+    return " + ".join(spec if n == 1 else f"{spec} x{n}" for spec, n in counts.items())
+
+
+def _trial_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
+    groups = record.get("groups")
+    if isinstance(groups, list):
+        return [
+            node
+            for group in groups
+            if isinstance(group, list)
+            for node in group
+            if isinstance(node, dict)
+        ]
     resources = record.get("resources")
-    gpu = resources.get("gpu") if isinstance(resources, dict) else None
+    return [resources] if isinstance(resources, dict) else []
+
+
+def _format_gpu(gpu: Any) -> Optional[str]:
     if not isinstance(gpu, dict) or not gpu.get("name"):
         return None
     text = str(gpu["name"])

@@ -62,15 +62,6 @@ Docker image and dependencies, the serving framework parameters, patch the
 serving framework source code, generate custom kernels, and patch drivers.
 
 <!--?if prompt-->
-  Do not use P/D disaggregation setups,
-  unless `## Additional instructions` explicitly allows it.
-<!--?else-->
-  Do not use P/D disaggregation setups.
-<!--?end-->
-<!--!TODO: allow P/D disaggregation and multi-node once tasks support node
-groups.-->
-
-<!--?if prompt-->
   ## Additional instructions
 
   ```
@@ -263,7 +254,7 @@ mindful of which specific change was the root cause.
 `trials/<n>/trial.json` is one JSON object with these fields and no others:
 
 ```
-{"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
+{"resources": {...} or "groups": [...], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -274,6 +265,10 @@ mindful of which specific change was the root cause.
   `dstack run get <run name> --json`, converting MiB values to GB and the
   `gpus` list into one `gpu` object with the GPU `name`, per-GPU `memory`,
   and `count`.
+- `groups`: replaces `resources` when the task used node groups. One entry per
+  group, in the order the groups appear in the task configuration; each entry
+  is the list of that group's nodes, one object per node, in the same syntax as
+  `resources` and read the same way.
 - `context_length`: the largest context the trial's configuration handles,
   found as described in `## Benchmark`; `null` only when the benchmark couldn't
   be done at all.
@@ -301,6 +296,10 @@ During trials, run benchmarks via SSH inside the task, directly against the
 serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`concurrency`, `input_tokens`, `output_tokens`, and
 `shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
+
+When the configuration serves through a router, as PD disaggregation does, the
+router is the serving endpoint: run the benchmark there, against the router's
+own API port, never against a prefill or decode worker.
 <!--?if dataset-->
 Before any benchmark, reset the serving engine's prefix cache, or restart the
 engine, so it does not reuse what a previous benchmark cached. Do not vary
