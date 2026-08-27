@@ -214,7 +214,7 @@ func newTestRunner(t *testing.T, client docker.APIClient) *DockerRunner {
 	t.Helper()
 	return &DockerRunner{
 		client:       client,
-		dockerParams: &dockerParametersMock{runnersDir: t.TempDir()},
+		dockerParams: &dockerParametersMock{tasksDir: t.TempDir()},
 		gpuLock:      newTestGpuLock(t),
 		tasks:        NewTaskStorage(),
 	}

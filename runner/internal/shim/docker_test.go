@@ -38,7 +38,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	params := &dockerParametersMock{
 		commands:         []string{"/usr/sbin/sshd -V 2>&1 | grep OpenSSH"},
 		sshShellCommands: true,
-		runnersDir:       t.TempDir(),
+		tasksDir:         t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -62,8 +62,8 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:   []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
-		runnersDir: t.TempDir(),
+		commands: []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+		tasksDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -87,8 +87,8 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:   []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
-		runnersDir: t.TempDir(),
+		commands: []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+		tasksDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -113,8 +113,8 @@ func TestDocker_ContainerExitedWithError(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:   []string{"echo failed for a reason", "exit 3"},
-		runnersDir: t.TempDir(),
+		commands: []string{"echo failed for a reason", "exit 3"},
+		tasksDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -144,8 +144,8 @@ func TestDocker_RestoredTaskIsTerminated(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:   []string{"sleep 3", "exit 7"},
-		runnersDir: t.TempDir(),
+		commands: []string{"sleep 3", "exit 7"},
+		tasksDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -177,8 +177,8 @@ func TestDocker_RestoredTaskKeepsTerminationReason(t *testing.T) {
 	}
 
 	params := &dockerParametersMock{
-		commands:   []string{"sleep 60"},
-		runnersDir: t.TempDir(),
+		commands: []string{"sleep 60"},
+		tasksDir: t.TempDir(),
 	}
 
 	timeout := 180 // seconds
@@ -208,7 +208,7 @@ func TestDocker_RestoredTaskKeepsTerminationReason(t *testing.T) {
 
 func TestVolumesFromMounts(t *testing.T) {
 	mounts := []dockertypes.MountPoint{
-		{Source: "/root/.dstack/runners/task-0-0-1234abcd", Destination: consts.RunnerTempDir},
+		{Source: "/root/.dstack/runners/task-0-0-1234abcd/runner", Destination: consts.RunnerTempDir},
 		{Source: "/mnt/disks/dstack-volumes/volume-1", Destination: "/volume"},
 		{Source: "/home/dstack/data", Destination: "/instance-data"},
 	}
@@ -257,13 +257,37 @@ func TestShouldRetryWithoutNvidiaDisplayCapability(t *testing.T) {
 	assert.False(t, shouldRetryWithoutNvidiaDisplayCapability(gpu.GpuVendorNvidia, nil))
 }
 
+func TestMakeTaskDir(t *testing.T) {
+	args := CLIArgs{}
+	args.Shim.HomeDir = t.TempDir()
+
+	taskDir, err := args.MakeTaskDir("task-0-0-1234abcd")
+	require.NoError(t, err)
+
+	assert.Equal(t, filepath.Join(args.Shim.HomeDir, "runners", "task-0-0-1234abcd"), taskDir)
+	info, err := os.Stat(taskDir)
+	require.NoError(t, err)
+	// Shim's files in the task dir, e.g. the task state file, are not world-readable
+	assert.Zero(t, info.Mode().Perm()&0o077, "task dir mode: %s", info.Mode())
+	// Only the runner dir inside the task dir is shared with the container
+	runnerDir := filepath.Join(taskDir, "runner")
+	assert.DirExists(t, runnerDir)
+	mounts, err := args.DockerMounts(taskDir)
+	require.NoError(t, err)
+	assert.Contains(t, mounts, mount.Mount{
+		Type:   mount.TypeBind,
+		Source: runnerDir,
+		Target: consts.RunnerTempDir,
+	})
+}
+
 /* Mocks */
 
 type dockerParametersMock struct {
 	commands         []string
 	sshShellCommands bool
-	// runnersDir is the parent dir of all task runner dirs
-	runnersDir string
+	// tasksDir is the parent dir of all task dirs
+	tasksDir string
 }
 
 func (c *dockerParametersMock) DockerPrivileged() bool {
@@ -291,24 +315,22 @@ func (c *dockerParametersMock) DockerPorts() []int {
 	return []int{}
 }
 
-func (c *dockerParametersMock) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
-	// The runner dir mount is how a restarted shim finds the dir of a restored task,
-	// and with it the task state file
+func (c *dockerParametersMock) DockerMounts(hostTaskDir string) ([]mount.Mount, error) {
 	return []mount.Mount{
-		{Type: mount.TypeBind, Source: hostRunnerDir, Target: consts.RunnerTempDir},
+		{Type: mount.TypeBind, Source: taskRunnerDir(hostTaskDir), Target: consts.RunnerTempDir},
 	}, nil
 }
 
-func (c *dockerParametersMock) RunnersDir() string {
-	return c.runnersDir
+func (c *dockerParametersMock) TasksDir() string {
+	return c.tasksDir
 }
 
-func (c *dockerParametersMock) MakeRunnerDir(name string) (string, error) {
-	runnerDir := filepath.Join(c.runnersDir, name)
-	if err := os.MkdirAll(runnerDir, 0o755); err != nil {
+func (c *dockerParametersMock) MakeTaskDir(name string) (string, error) {
+	taskDir := filepath.Join(c.tasksDir, name)
+	if err := os.MkdirAll(taskRunnerDir(taskDir), 0o755); err != nil {
 		return "", err
 	}
-	return runnerDir, nil
+	return taskDir, nil
 }
 
 /* Utilities */
@@ -544,7 +566,7 @@ func nvidiaContainer(containerID, taskID string, gpuIDs []string) (dockertypes.C
 		State:  containerStateRunning,
 		Labels: map[string]string{LabelKeyIsTask: LabelValueTrue, LabelKeyTaskID: taskID},
 		Mounts: []dockertypes.MountPoint{
-			{Destination: consts.RunnerTempDir, Source: "/root/.dstack/runners/" + containerID},
+			{Destination: consts.RunnerTempDir, Source: "/root/.dstack/runners/" + containerID + "/runner"},
 		},
 	}
 	inspection := dockertypes.ContainerJSON{
@@ -570,11 +592,79 @@ func newRestoreRunner(t *testing.T, gpuIDs []string, containers ...dockertypes.C
 	gpuLock, err := NewGpuLock(gpus)
 	require.NoError(t, err)
 	return &DockerRunner{
-		client:    &restoreClientMock{containers: containers, inspect: map[string]dockertypes.ContainerJSON{}},
-		gpuVendor: gpu.GpuVendorNvidia,
-		gpuLock:   gpuLock,
-		tasks:     NewTaskStorage(),
+		client:       &restoreClientMock{containers: containers, inspect: map[string]dockertypes.ContainerJSON{}},
+		dockerParams: &dockerParametersMock{tasksDir: t.TempDir()},
+		gpuVendor:    gpu.GpuVendorNvidia,
+		gpuLock:      gpuLock,
+		tasks:        NewTaskStorage(),
 	}
+}
+
+// TestRestoreState_FromStateFile checks that the task dir and the part of the task
+// state that cannot be recovered from the container are restored from the state file
+func TestRestoreState_FromStateFile(t *testing.T) {
+	containerShort, containerFull := nvidiaContainer("container-1", "task-1", nil)
+	runner := newRestoreRunner(t, nil, containerShort)
+	runner.client.(*restoreClientMock).inspect["container-1"] = containerFull
+	tasksDir := runner.dockerParams.TasksDir()
+	taskDir := filepath.Join(tasksDir, "container-1")
+	require.NoError(t, os.MkdirAll(taskRunnerDir(taskDir), 0o755))
+	task := NewTaskFromConfig(TaskConfig{
+		ID:          "task-1",
+		Name:        "task",
+		HostSshUser: "root",
+		HostSshKeys: []string{"ssh-ed25519 AAAA"},
+	})
+	task.SetStatusTerminated(string(types.TerminationReasonTerminatedByUser), "bye")
+	require.NoError(t, writeTaskState(taskDir, newTaskState(&task)))
+
+	stored := scanTaskDirs(t.Context(), tasksDir)
+	require.NoError(t, runner.restoreStateFromContainers(t.Context(), stored))
+
+	restored, ok := runner.tasks.Get("task-1")
+	require.True(t, ok)
+	assert.Equal(t, taskDir, restored.taskDir)
+	assert.Equal(t, TaskStatusTerminated, restored.Status)
+	assert.Equal(t, string(types.TerminationReasonTerminatedByUser), restored.TerminationReason)
+	assert.Equal(t, "bye", restored.TerminationMessage)
+	// The host SSH keys are only known to the state file
+	assert.Equal(t, []string{"ssh-ed25519 AAAA"}, restored.config.HostSshKeys)
+}
+
+// TestRestoreState_LegacyTaskDir checks that a task started by a shim version that did
+// not write state files is restored with its dir, named after the container, so that the
+// dir is still removed along with the task
+func TestRestoreState_LegacyTaskDir(t *testing.T) {
+	containerShort, containerFull := nvidiaContainer("container-1", "task-1", nil)
+	containerShort.Mounts = append(containerShort.Mounts, dockertypes.MountPoint{
+		Source: volumeMountPointDir + "/volume-1", Destination: "/volume",
+	})
+	runner := newRestoreRunner(t, nil, containerShort)
+	runner.client.(*restoreClientMock).inspect["container-1"] = containerFull
+	legacyDir := filepath.Join(runner.dockerParams.TasksDir(), "container-1")
+	require.NoError(t, os.MkdirAll(legacyDir, 0o755))
+
+	require.NoError(t, runner.restoreStateFromContainers(t.Context(), nil))
+
+	restored, ok := runner.tasks.Get("task-1")
+	require.True(t, ok)
+	assert.Equal(t, legacyDir, restored.taskDir)
+	assert.Equal(t, TaskStatusRunning, restored.Status)
+	// Without a state file, the volumes are recovered from the container mounts
+	assert.Equal(t, []VolumeInfo{{Name: "volume-1"}}, restored.config.Volumes)
+}
+
+// TestRestoreState_NoTaskDir checks that a task whose dir is gone is still restored
+func TestRestoreState_NoTaskDir(t *testing.T) {
+	containerShort, containerFull := nvidiaContainer("container-1", "task-1", nil)
+	runner := newRestoreRunner(t, nil, containerShort)
+	runner.client.(*restoreClientMock).inspect["container-1"] = containerFull
+
+	require.NoError(t, runner.restoreStateFromContainers(t.Context(), nil))
+
+	restored, ok := runner.tasks.Get("task-1")
+	require.True(t, ok)
+	assert.Empty(t, restored.taskDir)
 }
 
 // TestRestoreState_GpuLockedByAnotherTaskIsNotOwned checks that a task restored with
@@ -589,7 +679,7 @@ func TestRestoreState_GpuLockedByAnotherTaskIsNotOwned(t *testing.T) {
 	mock.inspect["container-1"] = firstFull
 	mock.inspect["container-2"] = secondFull
 
-	require.NoError(t, runner.restoreStateFromContainers(t.Context()))
+	require.NoError(t, runner.restoreStateFromContainers(t.Context(), nil))
 
 	firstTask, ok := runner.tasks.Get("task-1")
 	require.True(t, ok)
@@ -615,7 +705,7 @@ func TestRestoreState_DuplicateTaskReleasesGpus(t *testing.T) {
 	mock.inspect["container-1"] = firstFull
 	mock.inspect["container-2"] = secondFull
 
-	require.NoError(t, runner.restoreStateFromContainers(t.Context()))
+	require.NoError(t, runner.restoreStateFromContainers(t.Context(), nil))
 
 	assert.Len(t, runner.tasks.List(), 1)
 	assert.True(t, runner.gpuLock.lock["GPU-beef"], "GPU-beef")

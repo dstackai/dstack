@@ -12,7 +12,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
-// taskStateFileName is the name of the task state file in the task runner dir
+// taskStateFileName is the name of the task state file in the task dir
 const taskStateFileName = "task.json"
 
 // taskStateVersion is the version of the task state file format. It is only bumped on
@@ -52,18 +52,18 @@ func newTaskState(task *Task) taskState {
 	}
 }
 
-// saveTaskState writes the state of the task to its runner dir. Tasks that have not
-// acquired any resources yet, that is, tasks without a runner dir, are skipped.
+// saveTaskState writes the state of the task to its task dir. Tasks that have not
+// acquired any resources yet, that is, tasks without a task dir, are skipped.
 // The stored task is snapshotted while holding a lock, so that a concurrent call
 // cannot replace a newer state with an older one.
 func (d *DockerRunner) saveTaskState(ctx context.Context, taskID string) {
 	d.stateMu.Lock()
 	defer d.stateMu.Unlock()
 	task, ok := d.tasks.Get(taskID)
-	if !ok || task.runnerDir == "" {
+	if !ok || task.taskDir == "" {
 		return
 	}
-	if err := writeTaskState(task.runnerDir, newTaskState(&task)); err != nil {
+	if err := writeTaskState(task.taskDir, newTaskState(&task)); err != nil {
 		log.Error(ctx, "failed to save task state", "task", taskID, "err", err)
 	}
 }
@@ -86,9 +86,9 @@ func writeTaskState(dir string, state taskState) error {
 	return nil
 }
 
-// readTaskState reads the state file from the task runner dir. The error wraps
-// os.ErrNotExist if the dir has no state file, e.g., if the task was started by a shim
-// version that did not write one.
+// readTaskState reads the state file from the task dir. The error wraps os.ErrNotExist
+// if the dir has no state file, e.g., if the task was started by a shim version that
+// did not write one.
 func readTaskState(dir string) (taskState, error) {
 	var state taskState
 	path := filepath.Join(dir, taskStateFileName)
@@ -105,48 +105,35 @@ func readTaskState(dir string) (taskState, error) {
 	return state, nil
 }
 
-// readRestoredTaskState reads the state file of a task being restored from its
-// container. It reports whether there was a state file to restore from; if there was
-// not, the returned state is empty and the caller has to fall back to the container
-func readRestoredTaskState(ctx context.Context, taskID string, runnerDir string) (taskState, bool) {
-	if runnerDir == "" {
-		return taskState{}, false
-	}
-	state, err := readTaskState(runnerDir)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			// A task started by a shim version that did not write the state file has none
-			log.Error(ctx, "failed to read task state", "task", taskID, "err", err)
-		}
-		return taskState{}, false
-	}
-	if state.ID != taskID {
-		log.Error(ctx, "task state belongs to another task", "task", taskID, "id", state.ID)
-		return taskState{}, false
-	}
-	return state, true
+// storedTask is a task state file found in the tasks dir, along with the task dir it
+// was read from
+type storedTask struct {
+	dir   string
+	state taskState
 }
 
-// sweepOrphanedTaskDirs releases the resources of tasks that have a state file but no
-// container, which normally means that the shim stopped running before the container
-// was created, and removes their dirs.
-// Dirs without a state file are left intact, as there is no way to tell whether they
-// belong to a task, and so are the dirs of the tasks restored from containers.
-func (d *DockerRunner) sweepOrphanedTaskDirs(ctx context.Context) {
-	runnersDir := d.dockerParams.RunnersDir()
-	entries, err := os.ReadDir(runnersDir)
+// scanTaskDirs reads the state files of all the task dirs, returning them by task ID.
+// This is how the dirs of the tasks started by a previous shim process are found, both
+// the dirs of the tasks restored from their containers and the dirs of the orphaned
+// tasks swept by sweepOrphanedTaskDirs().
+// Dirs without a state file are skipped, as there is no way to tell whether they belong
+// to a task; the dirs of the tasks started by a shim version that did not write state
+// files are found by findLegacyTaskDir() instead.
+func scanTaskDirs(ctx context.Context, tasksDir string) map[string]storedTask {
+	stored := make(map[string]storedTask)
+	entries, err := os.ReadDir(tasksDir)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			log.Error(ctx, "failed to list task dirs", "dir", runnersDir, "err", err)
+			log.Error(ctx, "failed to list task dirs", "dir", tasksDir, "err", err)
 		}
-		return
+		return stored
 	}
 	for _, entry := range entries {
 		// Dot dirs are not task dirs, e.g., the .trash-* dirs left by Remove()
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		dir := filepath.Join(runnersDir, entry.Name())
+		dir := filepath.Join(tasksDir, entry.Name())
 		state, err := readTaskState(dir)
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
@@ -154,18 +141,51 @@ func (d *DockerRunner) sweepOrphanedTaskDirs(ctx context.Context) {
 			}
 			continue
 		}
-		if _, ok := d.tasks.Get(state.ID); ok {
+		if other, ok := stored[state.ID]; ok {
+			log.Error(
+				ctx, "duplicate task state, ignoring",
+				"task", state.ID, "dir", dir, "used", other.dir,
+			)
+			continue
+		}
+		stored[state.ID] = storedTask{dir: dir, state: state}
+	}
+	return stored
+}
+
+// findLegacyTaskDir returns the dir of a task started by a shim version that did not
+// write state files, so that the dir is still removed along with the task. Such a dir
+// cannot be found by scanTaskDirs() and is identified by its name, which is the name of
+// the task container. Returns an empty string if there is no such dir.
+func (d *DockerRunner) findLegacyTaskDir(containerName string) string {
+	if containerName == "" {
+		return ""
+	}
+	dir := filepath.Join(d.dockerParams.TasksDir(), containerName)
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return ""
+	}
+	return dir
+}
+
+// sweepOrphanedTaskDirs releases the resources of the scanned tasks that have no
+// container, which normally means that the shim stopped running before the container
+// was created, and removes their dirs. The dirs of the tasks restored from their
+// containers are left intact.
+func (d *DockerRunner) sweepOrphanedTaskDirs(ctx context.Context, storedTasks map[string]storedTask) {
+	for taskID, stored := range storedTasks {
+		if _, ok := d.tasks.Get(taskID); ok {
 			// the task has been restored from its container
 			continue
 		}
-		log.Warning(ctx, "cleaning up orphaned task dir", "task", state.ID, "dir", dir)
-		if !state.CleanedUp {
+		log.Warning(ctx, "cleaning up orphaned task dir", "task", taskID, "dir", stored.dir)
+		if !stored.state.CleanedUp {
 			// GPU locks are in-memory, so there is nothing to release: a task without
 			// a container holds no GPUs after a restart
-			releaseTaskResources(ctx, state.Config)
+			releaseTaskResources(ctx, stored.state.Config)
 		}
-		if err := os.RemoveAll(dir); err != nil {
-			log.Error(ctx, "failed to remove orphaned task dir", "dir", dir, "err", err)
+		if err := os.RemoveAll(stored.dir); err != nil {
+			log.Error(ctx, "failed to remove orphaned task dir", "dir", stored.dir, "err", err)
 		}
 	}
 }

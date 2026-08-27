@@ -203,12 +203,15 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 		tasks:        NewTaskStorage(),
 	}
 
-	if err := runner.restoreStateFromContainers(ctx); err != nil {
+	// The task dirs are scanned once: the tasks whose dirs are claimed by a container
+	// are restored, the dirs of the rest are orphaned and swept
+	storedTasks := scanTaskDirs(ctx, dockerParams.TasksDir())
+	if err := runner.restoreStateFromContainers(ctx, storedTasks); err != nil {
 		return nil, fmt.Errorf("failed to restore state from containers: %w", err)
 	}
 	// Must be called after the tasks are restored, as it uses them to tell the dirs of
 	// the live tasks from the orphaned ones
-	runner.sweepOrphanedTaskDirs(ctx)
+	runner.sweepOrphanedTaskDirs(ctx, storedTasks)
 
 	return runner, nil
 }
@@ -219,8 +222,11 @@ func taskContainerFilters() filters.Args {
 }
 
 // restoreStateFromContainers regenerates TaskStorage and GpuLock inspecting containers
+// and the task state files scanned by scanTaskDirs()
 // Used to restore shim state on restarts
-func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
+func (d *DockerRunner) restoreStateFromContainers(
+	ctx context.Context, storedTasks map[string]storedTask,
+) error {
 	listOptions := container.ListOptions{All: true, Filters: taskContainerFilters()}
 	containers, err := d.client.ContainerList(ctx, listOptions)
 	if err != nil {
@@ -282,20 +288,17 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 			}
 			ports = extractPorts(ctx, containerFull.NetworkSettings.Ports)
 		}
-		var runnerDir string
-		for _, mount := range containerShort.Mounts {
-			if mount.Destination == consts.RunnerTempDir {
-				runnerDir = mount.Source
-				break
-			}
-		}
-		state, restored := readRestoredTaskState(ctx, taskID, runnerDir)
+		storedTask, restored := storedTasks[taskID]
+		state := storedTask.state
 		config := state.Config
+		taskDir := storedTask.dir
 		if !restored {
 			// Containers created by shim versions that did not write the state file have
 			// no config to restore. The volumes can still be recovered from the container
 			// mounts, unlike the host SSH keys, which are only known to the state file
 			config.Volumes = volumesFromMounts(containerShort.Mounts)
+			// Such a task still has a dir that must be removed along with the task
+			taskDir = d.findLegacyTaskDir(containerName)
 		}
 		if state.CleanedUp {
 			// The resources of this task, its GPUs included, have already been released,
@@ -325,7 +328,7 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 		task.containerID = containerID
 		task.gpuIDs = gpuIDs
 		task.ports = ports
-		task.runnerDir = runnerDir
+		task.taskDir = taskDir
 		task.cleanedUp = state.CleanedUp
 		if !d.tasks.Add(task) {
 			log.Error(ctx, "duplicate restored task", "task", taskID)
@@ -512,14 +515,14 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 
 	cfg := task.config
 
-	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
+	taskDir, err := d.dockerParams.MakeTaskDir(task.containerName)
 	if err != nil {
-		return fmt.Errorf("make runner dir: %w", err)
+		return fmt.Errorf("make task dir: %w", err)
 	}
-	log.Trace(ctx, "runner dir", "task", task.ID, "path", runnerDir)
+	log.Trace(ctx, "task dir", "task", task.ID, "path", taskDir)
 	// Resources are committed as soon as they are acquired, so that they are not
 	// lost if the task is updated by another goroutine, e.g., terminated by the server
-	if err := d.commit(ctx, &task, func(t *Task) { t.runnerDir = runnerDir }); err != nil {
+	if err := d.commit(ctx, &task, func(t *Task) { t.taskDir = taskDir }); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 
@@ -571,9 +574,7 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 	if err := d.commit(ctx, &task, func(t *Task) { t.SetStatusPulling(cancelPull) }); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	// Although it's called "runner dir", we also use it for shim task-related data.
-	// Maybe we should rename it to "task dir" (including the `/root/.dstack/runners` dir on the host).
-	pullLogPath := filepath.Join(runnerDir, "pull.log")
+	pullLogPath := filepath.Join(taskDir, "pull.log")
 	if err = pullImage(pullCtx, d.client, cfg, pullLogPath, task.pullTracker); err != nil {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Error(ctx, errMessage)
@@ -782,16 +783,16 @@ func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
 	// but the task may be removed before that happens
 	d.cleanupLocked(ctx, task)
 	// Normally, it should not be empty
-	if task.runnerDir != "" {
-		// Failed attempts to remove or rename runner dir are considered non-fatal
-		if err := os.RemoveAll(task.runnerDir); err != nil {
-			log.Error(ctx, "failed to remove runner directory", "dir", task.runnerDir, "err", err)
+	if task.taskDir != "" {
+		// Failed attempts to remove or rename task dir are considered non-fatal
+		if err := os.RemoveAll(task.taskDir); err != nil {
+			log.Error(ctx, "failed to remove task directory", "dir", task.taskDir, "err", err)
 			trashName := filepath.Join(
-				filepath.Dir(task.runnerDir),
-				fmt.Sprintf(".trash-%s-%d", filepath.Base(task.runnerDir), time.Now().UnixMicro()),
+				filepath.Dir(task.taskDir),
+				fmt.Sprintf(".trash-%s-%d", filepath.Base(task.taskDir), time.Now().UnixMicro()),
 			)
-			if err := os.Rename(task.runnerDir, trashName); err != nil {
-				log.Error(ctx, "failed to rename runner directory", "dir", task.runnerDir, "err", err)
+			if err := os.Rename(task.taskDir, trashName); err != nil {
+				log.Error(ctx, "failed to rename task directory", "dir", task.taskDir, "err", err)
 			}
 		}
 	}
@@ -913,7 +914,7 @@ func (d *DockerRunner) createContainer(
 	task *Task,
 	options createContainerOptions,
 ) error {
-	mounts, err := d.dockerParams.DockerMounts(task.runnerDir)
+	mounts, err := d.dockerParams.DockerMounts(task.taskDir)
 	if err != nil {
 		return fmt.Errorf("get docker mounts: %w", err)
 	}
@@ -1356,11 +1357,11 @@ func (c *CLIArgs) DockerShellCommands(authorizedKeys []string, runnerHttpAddress
 	return append(commands, strings.Join(runnerCommand, " "))
 }
 
-func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
+func (c *CLIArgs) DockerMounts(hostTaskDir string) ([]mount.Mount, error) {
 	return []mount.Mount{
 		{
 			Type:   mount.TypeBind,
-			Source: hostRunnerDir,
+			Source: taskRunnerDir(hostTaskDir),
 			Target: consts.RunnerTempDir,
 		},
 		{
@@ -1375,14 +1376,39 @@ func (c *CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Runner.SSHPort}
 }
 
-func (c *CLIArgs) RunnersDir() string {
-	return filepath.Join(c.Shim.HomeDir, "runners")
+// tasksDirName is the name of the dir inside shim's home dir that holds the dirs of
+// the tasks. A task dir holds shim's own files, such as the task state file and the
+// image pull log, and the runner dir, the only part of it mounted into the container.
+// Historically, the whole task dir was mounted into the container and held runner's
+// files only, hence the name, which is kept for backward compatibility: an upgraded
+// shim must find the dirs of the tasks created by the previous version.
+const tasksDirName = "runners"
+
+// taskRunnerDirName is the name of the dir inside a task dir that is mounted into the
+// container as consts.RunnerTempDir. Only the files in this dir are shared with the
+// container, the rest of the task dir is private to shim.
+const taskRunnerDirName = "runner"
+
+func (c *CLIArgs) TasksDir() string {
+	return filepath.Join(c.Shim.HomeDir, tasksDirName)
 }
 
-func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
-	runnerTemp := filepath.Join(c.RunnersDir(), name)
-	if err := os.MkdirAll(runnerTemp, 0o755); err != nil {
+// MakeTaskDir creates the dir of the task, including the runner dir inside it,
+// and returns the path to the task dir
+func (c *CLIArgs) MakeTaskDir(name string) (string, error) {
+	taskDir := filepath.Join(c.TasksDir(), name)
+	// Only shim needs access to the task dir itself, unlike the runner dir, which is
+	// written by the container
+	if err := os.MkdirAll(taskDir, 0o700); err != nil {
+		return "", fmt.Errorf("create task directory: %w", err)
+	}
+	if err := os.MkdirAll(taskRunnerDir(taskDir), 0o755); err != nil {
 		return "", fmt.Errorf("create runner directory: %w", err)
 	}
-	return runnerTemp, nil
+	return taskDir, nil
+}
+
+// taskRunnerDir returns the path to the runner dir inside the given task dir
+func taskRunnerDir(taskDir string) string {
+	return filepath.Join(taskDir, taskRunnerDirName)
 }
