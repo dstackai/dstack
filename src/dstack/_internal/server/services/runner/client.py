@@ -318,6 +318,10 @@ class ShimClient:
     # `/api/shutdown`
     _SHUTDOWN_MIN_SHIM_VERSION = (0, 20, 1)
 
+    # Whether it is safe to restart the shim while at least one task is still running
+    # (not terminated). Other task statuses are not restart-safe regardless of the shim version
+    _RESTART_SAFE_RUNNING_STATUS_MIN_SHIM_VERSION = (0, 21, 3)
+
     _shim_version_string: str
     _shim_version_tuple: Optional["_Version"]
     _api_version: int
@@ -358,36 +362,28 @@ class ShimClient:
         return self._api_version == 2
 
     def is_instance_health_supported(self) -> bool:
-        if not self._negotiated:
-            self._negotiate()
+        shim_version_tuple = self.get_version_tuple()
         return (
-            self._shim_version_tuple is None
-            or self._shim_version_tuple >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
+            shim_version_tuple is None
+            or shim_version_tuple >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
         )
 
     def is_instance_info_supported(self) -> bool:
-        if not self._negotiated:
-            self._negotiate()
+        shim_version_tuple = self.get_version_tuple()
         return (
-            self._shim_version_tuple is None
-            or self._shim_version_tuple >= self._INSTANCE_INFO_MIN_SHIM_VERSION
+            shim_version_tuple is None
+            or shim_version_tuple >= self._INSTANCE_INFO_MIN_SHIM_VERSION
         )
 
     def are_components_supported(self) -> bool:
-        if not self._negotiated:
-            self._negotiate()
+        shim_version_tuple = self.get_version_tuple()
         return (
-            self._shim_version_tuple is None
-            or self._shim_version_tuple >= self._COMPONENTS_MIN_SHIM_VERSION
+            shim_version_tuple is None or shim_version_tuple >= self._COMPONENTS_MIN_SHIM_VERSION
         )
 
     def is_shutdown_supported(self) -> bool:
-        if not self._negotiated:
-            self._negotiate()
-        return (
-            self._shim_version_tuple is None
-            or self._shim_version_tuple >= self._SHUTDOWN_MIN_SHIM_VERSION
-        )
+        shim_version_tuple = self.get_version_tuple()
+        return shim_version_tuple is None or shim_version_tuple >= self._SHUTDOWN_MIN_SHIM_VERSION
 
     @overload
     def healthcheck(self) -> Optional[HealthcheckResponse]: ...
@@ -671,11 +667,14 @@ class ShimClient:
         self._negotiated = True
 
     def _get_restart_safe_task_statuses(self) -> list[TaskStatus]:
-        # TODO: Rework shim's DockerRunner.Run() so that it does not wait for container termination
-        # (this at least requires replacing .waitContainer() with periodic polling of container
-        # statuses and moving some cleanup defer calls to .Terminate() and/or .Remove()) and add
-        # TaskStatus.RUNNING to the list of restart-safe task statuses for supported shim versions.
-        return [TaskStatus.TERMINATED]
+        statuses = [TaskStatus.TERMINATED]
+        shim_version_tuple = self.get_version_tuple()
+        if (
+            shim_version_tuple is None
+            or shim_version_tuple >= self._RESTART_SAFE_RUNNING_STATUS_MIN_SHIM_VERSION
+        ):
+            statuses.append(TaskStatus.RUNNING)
+        return statuses
 
 
 def _make_session_and_base_url(
