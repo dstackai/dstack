@@ -362,28 +362,16 @@ class ShimClient:
         return self._api_version == 2
 
     def is_instance_health_supported(self) -> bool:
-        shim_version_tuple = self.get_version_tuple()
-        return (
-            shim_version_tuple is None
-            or shim_version_tuple >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
-        )
+        return self._check_min_version(self._INSTANCE_HEALTH_MIN_SHIM_VERSION)
 
     def is_instance_info_supported(self) -> bool:
-        shim_version_tuple = self.get_version_tuple()
-        return (
-            shim_version_tuple is None
-            or shim_version_tuple >= self._INSTANCE_INFO_MIN_SHIM_VERSION
-        )
+        return self._check_min_version(self._INSTANCE_INFO_MIN_SHIM_VERSION)
 
     def are_components_supported(self) -> bool:
-        shim_version_tuple = self.get_version_tuple()
-        return (
-            shim_version_tuple is None or shim_version_tuple >= self._COMPONENTS_MIN_SHIM_VERSION
-        )
+        return self._check_min_version(self._COMPONENTS_MIN_SHIM_VERSION)
 
     def is_shutdown_supported(self) -> bool:
-        shim_version_tuple = self.get_version_tuple()
-        return shim_version_tuple is None or shim_version_tuple >= self._SHUTDOWN_MIN_SHIM_VERSION
+        return self._check_min_version(self._SHUTDOWN_MIN_SHIM_VERSION)
 
     @overload
     def healthcheck(self) -> Optional[HealthcheckResponse]: ...
@@ -666,13 +654,13 @@ class ShimClient:
         self._api_version = api_version
         self._negotiated = True
 
+    def _check_min_version(self, min_version: "_Version") -> bool:
+        current_version = self.get_version_tuple()
+        return current_version is None or current_version >= min_version
+
     def _get_restart_safe_task_statuses(self) -> list[TaskStatus]:
         statuses = [TaskStatus.TERMINATED]
-        shim_version_tuple = self.get_version_tuple()
-        if (
-            shim_version_tuple is None
-            or shim_version_tuple >= self._RESTART_SAFE_RUNNING_STATUS_MIN_SHIM_VERSION
-        ):
+        if self._check_min_version(self._RESTART_SAFE_RUNNING_STATUS_MIN_SHIM_VERSION):
             statuses.append(TaskStatus.RUNNING)
         return statuses
 
