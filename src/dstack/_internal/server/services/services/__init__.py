@@ -33,7 +33,12 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def register_service(session: AsyncSession, run_model: RunModel, run_spec: RunSpec):
+async def assign_service(
+    session: AsyncSession,
+    run_model: RunModel,
+    run_spec: RunSpec,
+    is_new_service_submission: bool,
+) -> None:
     assert isinstance(run_spec.configuration, ServiceConfiguration)
 
     if isinstance(run_spec.configuration.gateway, EntityReference) or isinstance(
@@ -70,14 +75,21 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
                 "The service requires a gateway, but there is no default gateway in the project"
             )
 
+    if (
+        not is_new_service_submission
+        and (gateway.id if gateway is not None else None) == run_model.gateway_id
+    ):
+        return
+
     if gateway is not None:
-        service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)
+        service_spec = await _assign_service_to_gateway(session, run_model, run_spec, gateway)
         run_model.gateway = gateway
         # For faster registration
         for replica_model in get_gateway_replica_models(gateway):
             replica_model.skip_min_processing_interval = True
     elif not settings.FORBID_SERVICES_WITHOUT_GATEWAY:
-        service_spec = _register_service_in_server(session, run_model, run_spec)
+        service_spec = _assign_service_to_in_server_proxy(session, run_model, run_spec)
+        run_model.gateway = None
     else:
         raise ResourceNotExistsError(
             "This dstack-server installation forbids services without a gateway."
@@ -86,7 +98,7 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
     run_model.service_spec = service_spec.model_dump_json()
 
 
-async def _register_service_in_gateway(
+async def _assign_service_to_gateway(
     session: AsyncSession, run_model: RunModel, run_spec: RunSpec, gateway: GatewayModel
 ) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
@@ -150,7 +162,7 @@ async def _register_service_in_gateway(
     return service_spec
 
 
-def _register_service_in_server(
+def _assign_service_to_in_server_proxy(
     session: AsyncSession, run_model: RunModel, run_spec: RunSpec
 ) -> ServiceSpec:
     assert run_spec.configuration.type == "service"

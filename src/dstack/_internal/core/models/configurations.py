@@ -1167,7 +1167,8 @@ class ServiceConfigurationParams(CoreModel):
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
                 " Specify boolean `true` to run with the default gateway."
-                " Omit to run with the default gateway if there is one, or without a gateway otherwise"
+                " Omit to run with the default gateway if there is one, or without a gateway otherwise."
+                " Can be updated in-place to migrate existing services between gateways"
             ),
         ),
     ] = None

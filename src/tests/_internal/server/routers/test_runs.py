@@ -3073,18 +3073,38 @@ class TestGetRunPlan:
                     commands=["one", "two"],
                     port=80,
                     gateway=None,
+                    auth=True,
                     replicas=Range(min=1, max=1),
                     scaling=None,
                 ),
                 ServiceConfiguration(
                     commands=["one", "two"],
                     port=8080,
-                    gateway="test-gateway",  # not updatable
+                    gateway="test-gateway",
+                    auth=False,  # not updatable
                     replicas=Range(min=2, max=4),
                     scaling=ScalingSpec(metric="rps", target=5),
                 ),
                 "create",
                 id="no-update-service",
+            ),
+            pytest.param(
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=80,
+                    gateway=None,
+                    replicas=Range(min=1, max=1),
+                    scaling=None,
+                ),
+                ServiceConfiguration(
+                    commands=["one", "two"],
+                    port=8080,
+                    gateway="test-gateway",
+                    replicas=Range(min=2, max=4),
+                    scaling=ScalingSpec(metric="rps", target=5),
+                ),
+                "update",
+                id="update-service-gateway",
             ),
             pytest.param(
                 DevEnvironmentConfiguration(ide="vscode", inactivity_duration=False),
@@ -3652,6 +3672,364 @@ class TestApplyPlan:
 
         assert response.status_code == 200
         assert response.json()["run_spec"]["configuration"]["probes"] == expected_probes
+
+
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestApplyPlanServiceGatewayUpdate:
+    async def _create_service_run(
+        self,
+        session: AsyncSession,
+        project,
+        repo,
+        user,
+        gateway=None,
+        gateway_field=None,
+    ) -> Tuple[RunModel, RunSpec]:
+        run_spec = get_run_spec(
+            run_name="test-service",
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                type="service",
+                commands=["one", "two"],
+                port=80,
+                gateway=gateway_field,
+                replicas=Range(min=1, max=1),
+            ),
+        )
+        validate_run_spec_and_set_defaults(user, run_spec)
+        run_model = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+            gateway=gateway,
+        )
+        return run_model, run_spec
+
+    async def _apply(
+        self,
+        client: AsyncClient,
+        project,
+        user,
+        run_model: RunModel,
+        run_spec: RunSpec,
+    ):
+        run = run_model_to_run(run_model)
+        return await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+            json=json.loads(
+                ApplyRunPlanRequest(
+                    plan=ApplyRunPlanInput(run_spec=run_spec, current_resource=run),
+                    force=False,
+                ).model_dump_json()
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_assigns_to_specified_gateway_on_field_change(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+
+        run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        run_spec.configuration.gateway = "my-gateway"
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        assert response.json()["service"]["url"] == "https://test-service.my-gateway.example"
+        await session.refresh(run_model)
+        assert run_model.gateway_id == gateway.id
+        event_messages = {e.message for e in await list_events(session)}
+        assert "Service assigned to gateway" in event_messages
+
+    @pytest.mark.asyncio
+    async def test_reassigns_between_specific_gateways_on_field_change(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        old_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="old-gateway",
+            wildcard_domain="old-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=old_gateway.id)
+        new_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="new-gateway",
+            wildcard_domain="new-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=new_gateway.id)
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=old_gateway, gateway_field="old-gateway"
+        )
+        run_spec.configuration.gateway = "new-gateway"
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        assert response.json()["service"]["url"] == "https://test-service.new-gateway.example"
+        await session.refresh(run_model)
+        assert run_model.gateway_id == new_gateway.id
+
+    @pytest.mark.asyncio
+    async def test_unassigns_gateway_when_field_changes_to_false(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
+        )
+        run_spec.configuration.gateway = False
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        assert response.json()["service"]["url"] == "/proxy/services/test-project/test-service/"
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+        event_messages = {e.message for e in await list_events(session)}
+        assert "Service assigned to run without a gateway" in event_messages
+
+    @pytest.mark.asyncio
+    async def test_reassigns_to_default_gateway_when_field_changes_to_true(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        default_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="default-gateway",
+            wildcard_domain="default-gateway.example",
+        )
+        await create_gateway_replica(
+            session=session, backend=backend, gateway_id=default_gateway.id
+        )
+        project.default_gateway_id = default_gateway.id
+        await session.commit()
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway_field=False
+        )
+        run_spec.configuration.gateway = True
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id == default_gateway.id
+
+    @pytest.mark.asyncio
+    async def test_reassigns_to_default_gateway_when_field_changes_to_true_even_if_assigned(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        default_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="default-gateway",
+            wildcard_domain="default-gateway.example",
+        )
+        await create_gateway_replica(
+            session=session, backend=backend, gateway_id=default_gateway.id
+        )
+        project.default_gateway_id = default_gateway.id
+        await session.commit()
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
+        )
+        run_spec.configuration.gateway = True
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id == default_gateway.id
+
+    @pytest.mark.asyncio
+    async def test_no_reassignment_when_gateway_field_unchanged(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Changing which gateway is the project's default must not, by itself, move a service
+        configured with `gateway: true` — only an explicit change to the `gateway` field
+        should trigger reassignment."""
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_a = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="gateway-a",
+            wildcard_domain="gateway-a.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway_a.id)
+        project.default_gateway_id = gateway_a.id
+        await session.commit()
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway=gateway_a, gateway_field=True
+        )
+
+        # The project's default gateway changes, but the run spec's `gateway` field is untouched.
+        gateway_b = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="gateway-b",
+            wildcard_domain="gateway-b.example",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway_b.id)
+        project.default_gateway_id = gateway_b.id
+        await session.commit()
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id == gateway_a.id
+
+    @pytest.mark.asyncio
+    async def test_rejects_update_to_nonexistent_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+
+        run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        run_spec.configuration.gateway = "nonexistent-gateway"
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 400, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+
+    @pytest.mark.asyncio
+    async def test_rejects_field_change_to_true_when_no_default_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway_field=False
+        )
+        run_spec.configuration.gateway = True
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 400, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+
+    @pytest.mark.asyncio
+    async def test_no_reassignment_when_resolved_gateway_is_unchanged(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Even though the literal `gateway` field changes, if it still resolves to the
+        gateway the service is already assigned to (here: no gateway, since no default exists
+        either way), no reassignment should happen — no event, and `service_spec` untouched."""
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+
+        run_model, run_spec = await self._create_service_run(
+            session, project, repo, user, gateway_field=None
+        )
+        assert run_model.service_spec is None
+        run_spec.configuration.gateway = False
+
+        response = await self._apply(client, project, user, run_model, run_spec)
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        assert run_model.gateway_id is None
+        assert run_model.service_spec is None
+        event_messages = {e.message for e in await list_events(session)}
+        assert "Service assigned to gateway" not in event_messages
+        assert "Service assigned to run without a gateway" not in event_messages
 
 
 class TestStopRuns:
