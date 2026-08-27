@@ -139,17 +139,14 @@ func (t *Task) SetStatusTerminated(reason string, message string) {
 	t.cancelPull = nil
 }
 
-func NewTask(id string, status TaskStatus, containerName string, containerID string, gpuIDs []string, ports []PortMapping, runnerDir string) Task {
+// NewTask returns a task with the given identity and status. The state fields are
+// assigned by the caller, e.g., by restoreStateFromContainers()
+func NewTask(id string, status TaskStatus) Task {
 	return Task{
-		ID:            id,
-		Status:        status,
-		containerName: containerName,
-		containerID:   containerID,
-		runnerDir:     runnerDir,
-		gpuIDs:        gpuIDs,
-		ports:         ports,
-		pullTracker:   newPullTracker(),
-		mu:            &sync.Mutex{},
+		ID:          id,
+		Status:      status,
+		pullTracker: newPullTracker(),
+		mu:          &sync.Mutex{},
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -90,10 +91,13 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	return nil
 }
 
+// volumeMountPointDir is a dstack-specific dir for volumes, used to avoid clashes with
+// host dirs. /mnt/disks is used since on some VM images other places may not be
+// writable (e.g. GCP COS).
+const volumeMountPointDir = "/mnt/disks/dstack-volumes"
+
 func getVolumeMountPoint(volumeName string) string {
-	// Put volumes in dstack-specific dir to avoid clashes with host dirs.
-	// /mnt/disks is used since on some VM images other places may not be writable (e.g. GCP COS).
-	return fmt.Sprintf("/mnt/disks/dstack-volumes/%s", volumeName)
+	return filepath.Join(volumeMountPointDir, volumeName)
 }
 
 func prepareInstanceMountPoints(taskConfig TaskConfig) error {

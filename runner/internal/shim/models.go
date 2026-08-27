@@ -10,6 +10,7 @@ type DockerParameters interface {
 	DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string
 	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
+	RunnersDir() string
 	MakeRunnerDir(name string) (string, error)
 	DockerPJRTDevice() string
 }
