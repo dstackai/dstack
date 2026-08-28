@@ -40,7 +40,10 @@ type Task struct {
 	cancelPull    context.CancelFunc
 	gpuIDs        []string
 	ports         []PortMapping
-	runnerDir     string // path on host mapped to consts.RunnerDir in container
+	// taskDir is the path on the host to the dir holding shim's files related to the
+	// task, e.g., the task state file. Its runner subdir, and only it, is mounted into
+	// the container as consts.RunnerTempDir
+	taskDir string
 	// startInFlight is true while Start() is working on the task. Start() owns the
 	// task resources until it returns, therefore ProcessTasks() skips such tasks.
 	// Tasks restored from containers are never in flight.

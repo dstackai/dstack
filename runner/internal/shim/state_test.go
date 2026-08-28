@@ -78,7 +78,7 @@ func TestSaveTaskState(t *testing.T) {
 	runner := newTestRunner(t, nil)
 	dir := t.TempDir()
 	task := NewTaskFromConfig(TaskConfig{ID: "task-1", Name: "task"})
-	task.runnerDir = dir
+	task.taskDir = dir
 	addTask(runner, task)
 
 	runner.saveTaskState(t.Context(), "task-1")
@@ -89,7 +89,7 @@ func TestSaveTaskState(t *testing.T) {
 }
 
 // A task that has not acquired any resources yet has no dir to save the state to
-func TestSaveTaskState_NoRunnerDir(t *testing.T) {
+func TestSaveTaskState_NoTaskDir(t *testing.T) {
 	runner := newTestRunner(t, nil)
 	addTask(runner, NewTaskFromConfig(TaskConfig{ID: "task-1", Name: "task"}))
 
@@ -99,41 +99,61 @@ func TestSaveTaskState_NoRunnerDir(t *testing.T) {
 	assert.NoFileExists(t, taskStateFileName)
 }
 
-func TestSweepOrphanedTaskDirs(t *testing.T) {
-	runner := newTestRunner(t, nil)
-	runnersDir := runner.dockerParams.RunnersDir()
-
-	// A task that has no container: its resources are released and its dir is removed
-	orphanedDir := makeTaskDir(t, runnersDir, "orphaned-0-0-1234abcd", "orphaned-task")
-	// A task restored from its container: still in use
-	restoredDir := makeTaskDir(t, runnersDir, "restored-0-0-5678cdef", "restored-task")
-	addTask(runner, newRunningTask("restored-task", "container-1"))
+func TestScanTaskDirs(t *testing.T) {
+	tasksDir := t.TempDir()
+	dir := makeTaskDir(t, tasksDir, "task-0-0-1234abcd", "task-1")
 	// A dir without a state file may belong to anything, e.g., to a task started by a
 	// shim version that did not write the state file
-	legacyDir := filepath.Join(runnersDir, "legacy-0-0-90abef01")
-	require.NoError(t, os.MkdirAll(legacyDir, 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tasksDir, "legacy-0-0-90abef01"), 0o755))
 	// Dot dirs are not task dirs
-	trashDir := makeTaskDir(t, runnersDir, ".trash-orphaned-0-0-1234abcd-1", "trashed-task")
+	makeTaskDir(t, tasksDir, ".trash-task-0-0-1234abcd-1", "trashed-task")
 
-	runner.sweepOrphanedTaskDirs(t.Context())
+	stored := scanTaskDirs(t.Context(), tasksDir)
+
+	require.Len(t, stored, 1)
+	require.Contains(t, stored, "task-1")
+	assert.Equal(t, dir, stored["task-1"].dir)
+	assert.Equal(t, "task-1", stored["task-1"].state.ID)
+}
+
+func TestScanTaskDirs_NoTasksDir(t *testing.T) {
+	stored := scanTaskDirs(t.Context(), filepath.Join(t.TempDir(), "missing"))
+
+	assert.Empty(t, stored)
+}
+
+func TestFindLegacyTaskDir(t *testing.T) {
+	runner := newTestRunner(t, nil)
+	tasksDir := runner.dockerParams.TasksDir()
+	dir := filepath.Join(tasksDir, "legacy-0-0-90abef01")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+
+	assert.Equal(t, dir, runner.findLegacyTaskDir("legacy-0-0-90abef01"))
+	assert.Empty(t, runner.findLegacyTaskDir("unknown-0-0-1234abcd"))
+	// An empty container name must not resolve to the tasks dir itself
+	assert.Empty(t, runner.findLegacyTaskDir(""))
+}
+
+func TestSweepOrphanedTaskDirs(t *testing.T) {
+	runner := newTestRunner(t, nil)
+	tasksDir := runner.dockerParams.TasksDir()
+
+	// A task that has no container: its resources are released and its dir is removed
+	orphanedDir := makeTaskDir(t, tasksDir, "orphaned-0-0-1234abcd", "orphaned-task")
+	// A task restored from its container: still in use
+	restoredDir := makeTaskDir(t, tasksDir, "restored-0-0-5678cdef", "restored-task")
+	addTask(runner, newRunningTask("restored-task", "container-1"))
+
+	runner.sweepOrphanedTaskDirs(t.Context(), scanTaskDirs(t.Context(), tasksDir))
 
 	assert.NoDirExists(t, orphanedDir)
 	assert.DirExists(t, restoredDir)
-	assert.DirExists(t, legacyDir)
-	assert.DirExists(t, trashDir)
 }
 
-func TestSweepOrphanedTaskDirs_NoRunnersDir(t *testing.T) {
-	runner := newTestRunner(t, nil)
-	runner.dockerParams = &dockerParametersMock{runnersDir: filepath.Join(t.TempDir(), "missing")}
-
-	runner.sweepOrphanedTaskDirs(t.Context())
-}
-
-func makeTaskDir(t *testing.T, runnersDir string, name string, taskID string) string {
+func makeTaskDir(t *testing.T, tasksDir string, name string, taskID string) string {
 	t.Helper()
-	dir := filepath.Join(runnersDir, name)
-	require.NoError(t, os.MkdirAll(dir, 0o755))
+	dir := filepath.Join(tasksDir, name)
+	require.NoError(t, os.MkdirAll(taskRunnerDir(dir), 0o755))
 	task := NewTaskFromConfig(TaskConfig{ID: taskID, Name: name})
 	require.NoError(t, writeTaskState(dir, newTaskState(&task)))
 	return dir

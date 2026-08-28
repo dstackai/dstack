@@ -8,10 +8,10 @@ type DockerParameters interface {
 	DockerPassEnv() []string
 	DockerPrivileged() bool
 	DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string
-	DockerMounts(string) ([]mount.Mount, error)
+	DockerMounts(taskDir string) ([]mount.Mount, error)
 	DockerPorts() []int
-	RunnersDir() string
-	MakeRunnerDir(name string) (string, error)
+	TasksDir() string
+	MakeTaskDir(name string) (string, error)
 	DockerPJRTDevice() string
 }
 
