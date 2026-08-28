@@ -98,3 +98,17 @@ If service verification fails because the image, install, model download,
 command, resources, cache, or model behavior needs to change, go back to a task.
 If the tested serving setup is still right and only the dstack service
 configuration is wrong, fix the configuration and submit the service again.
+
+## Aggregated Vs Disaggregated
+
+There are two types of inference service, aggregated and disaggregated.
+
+For aggregated inference, prototype and convert as described in
+`## Use A Task Before Service` and `## Verify As A Service`.
+
+Disaggregated inference differs only in shape: the task uses node groups — one
+group each for the router, the prefill workers and the decode workers — and the
+service uses replica groups, one per role.
+
+See `https://dstack.ai/docs/concepts/tasks.md#node-groups` and
+`https://dstack.ai/docs/concepts/services.md#pd-disaggregation`.

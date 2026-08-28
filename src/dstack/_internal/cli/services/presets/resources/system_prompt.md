@@ -251,10 +251,19 @@ also failed when its benchmark does not meet the constraints (see
 `# Constraints`). When a trial that changed several things fails, be
 mindful of which specific change was the root cause.
 
-`trials/<n>/trial.json` is one JSON object with these fields and no others:
+`trials/<n>/trial.json` is a JSON object. This object differs for a trial with
+node groups and a trial without node groups.
+
+1. For a trial with node groups the fields are these and no others:
 
 ```
-{"resources": {...} or "groups": [...], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
+{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
+```
+
+2. For a trial without node groups the fields are these and no others:
+
+```
+{"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -265,10 +274,20 @@ mindful of which specific change was the root cause.
   `dstack run get <run name> --json`, converting MiB values to GB and the
   `gpus` list into one `gpu` object with the GPU `name`, per-GPU `memory`,
   and `count`.
-- `groups`: replaces `resources` when the task used node groups. One entry per
-  group, in the order the groups appear in the task configuration; each entry
-  is the list of that group's nodes, one object per node, in the same syntax as
-  `resources` and read the same way.
+- `groups`: a list of node groups, in the order they appear in the task
+  configuration. Each node group is a list of its nodes. Each node is the exact
+  resources of the instance that node ran on, e.g. a PD disaggregation task
+  with a one-node router group, a two-node prefill group and a one-node decode
+  group records:
+
+  ```
+  [
+    [{"cpu": "16", "memory": "64GB", "disk": "100GB"}],
+    [{"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}},
+     {"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}}],
+    [{"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}}]
+  ]
+  ```
 - `context_length`: the largest context the trial's configuration handles,
   found as described in `## Benchmark`; `null` only when the benchmark couldn't
   be done at all.
@@ -297,9 +316,10 @@ serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`co
 `shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
 
-When the configuration serves through a router, as PD disaggregation does, the
-router is the serving endpoint: run the benchmark there, against the router's
-own API port, never against a prefill or decode worker.
+To benchmark a PD disaggregation setup, SSH into the job running the router and
+run the benchmark directly against the router. Never benchmark a prefill or
+decode worker — each handles only part of a request, so the result would not
+describe the configuration.
 <!--?if dataset-->
 Before any benchmark, reset the serving engine's prefix cache, or restart the
 engine, so it does not reuse what a previous benchmark cached. Do not vary
