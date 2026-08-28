@@ -6,7 +6,9 @@ import (
 	"errors"
 	"math/rand"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -597,6 +599,7 @@ func newRestoreRunner(t *testing.T, gpuIDs []string, containers ...dockertypes.C
 		gpuVendor:    gpu.GpuVendorNvidia,
 		gpuLock:      gpuLock,
 		tasks:        NewTaskStorage(),
+		userLookup:   failingUserLookup,
 	}
 }
 
@@ -710,4 +713,118 @@ func TestRestoreState_DuplicateTaskReleasesGpus(t *testing.T) {
 	assert.Len(t, runner.tasks.List(), 1)
 	assert.True(t, runner.gpuLock.lock["GPU-beef"], "GPU-beef")
 	assert.False(t, runner.gpuLock.lock["GPU-f00d"], "GPU-f00d is not owned by any task")
+}
+
+const testHostSshUser = "test_user"
+
+// newHostSshKeysRunner returns a runner whose host user's home is a temp dir, along with
+// the path of that user's authorized_keys file. The mocked lookup reports the ids of the
+// current process, so that setting the ownership of the file succeeds without root
+func newHostSshKeysRunner(t *testing.T) (*DockerRunner, string) {
+	t.Helper()
+	usr := &user.User{
+		Username: testHostSshUser,
+		HomeDir:  t.TempDir(),
+		Uid:      strconv.Itoa(os.Getuid()),
+		Gid:      strconv.Itoa(os.Getgid()),
+	}
+	runner := newTestRunner(t, nil)
+	runner.userLookup = func(username string) (*user.User, error) {
+		if username != usr.Username {
+			return nil, errors.New("user not found")
+		}
+		return usr, nil
+	}
+	return runner, authorizedKeysPath(usr.HomeDir)
+}
+
+func addHostSshKeysTask(t *testing.T, runner *DockerRunner, taskID string, keys ...string) Task {
+	t.Helper()
+	task := NewTaskFromConfig(TaskConfig{
+		ID:          taskID,
+		Name:        taskID,
+		HostSshUser: testHostSshUser,
+		HostSshKeys: keys,
+	})
+	require.True(t, runner.tasks.Add(task))
+	return task
+}
+
+func cleanupHostSshKeysTask(t *testing.T, runner *DockerRunner, task *Task) {
+	t.Helper()
+	task.Lock(t.Context())
+	defer task.Release(t.Context())
+	runner.cleanupLocked(t.Context(), task)
+}
+
+func readAuthorizedKeysFile(t *testing.T, path string) string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return string(content)
+}
+
+// TestHostSshKeys_CoLocatedTasksShareKey covers dstackai/dstack#4174: on an instance with
+// blocks, the tasks co-located on it hold the same host SSH key, and the first one to
+// finish must not revoke the access of the others
+func TestHostSshKeys_CoLocatedTasksShareKey(t *testing.T) {
+	const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj user@host"
+	entry := key + " # added by dstack-shim\n"
+	runner, keysPath := newHostSshKeysRunner(t)
+	first := addHostSshKeysTask(t, runner, "task-1", key)
+	second := addHostSshKeysTask(t, runner, "task-2", key)
+
+	require.NoError(t, runner.reconcileHostSshKeys(t.Context()))
+	// One entry, however many tasks are using the key
+	assert.Equal(t, entry, readAuthorizedKeysFile(t, keysPath))
+
+	cleanupHostSshKeysTask(t, runner, &first)
+	assert.Equal(t, entry, readAuthorizedKeysFile(t, keysPath), "the key is still used by task-2")
+
+	cleanupHostSshKeysTask(t, runner, &second)
+	assert.Empty(t, readAuthorizedKeysFile(t, keysPath), "the last task using the key is gone")
+}
+
+// TestHostSshKeys_KeepsKeyAddedByHand checks that a key the user added to the file
+// themselves survives a task that happened to use the same key
+func TestHostSshKeys_KeepsKeyAddedByHand(t *testing.T) {
+	const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj user@host"
+	runner, keysPath := newHostSshKeysRunner(t)
+	writeTestAuthorizedKeys(t, keysPath, key+"\n")
+	task := addHostSshKeysTask(t, runner, "task-1", key)
+
+	require.NoError(t, runner.reconcileHostSshKeys(t.Context()))
+	assert.Equal(t, key+"\n"+key+" # added by dstack-shim\n", readAuthorizedKeysFile(t, keysPath))
+
+	cleanupHostSshKeysTask(t, runner, &task)
+	assert.Equal(t, key+"\n", readAuthorizedKeysFile(t, keysPath))
+}
+
+// TestHostSshKeys_SweepOrphanedTaskDir checks that the keys of a task that has no
+// container are removed, while the keys of a task that has one are kept
+func TestHostSshKeys_SweepOrphanedTaskDir(t *testing.T) {
+	const (
+		liveKey    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj live"
+		orphanKey  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuLmyPGV/gcatBaZFxRPKGQVJ4vBjuqEsHIkKGrGZKS orphan"
+		markerLine = " # added by dstack-shim\n"
+	)
+	runner, keysPath := newHostSshKeysRunner(t)
+	addHostSshKeysTask(t, runner, "task-1", liveKey)
+	orphan := NewTaskFromConfig(TaskConfig{
+		ID:          "task-2",
+		Name:        "task-2",
+		HostSshUser: testHostSshUser,
+		HostSshKeys: []string{orphanKey},
+	})
+	orphanDir := filepath.Join(runner.dockerParams.TasksDir(), "task-2")
+	require.NoError(t, os.MkdirAll(orphanDir, 0o755))
+	require.NoError(t, writeTaskState(orphanDir, newTaskState(&orphan)))
+	stored := scanTaskDirs(t.Context(), runner.dockerParams.TasksDir())
+	// Both tasks left their keys behind before the shim restarted
+	writeTestAuthorizedKeys(t, keysPath, liveKey+markerLine+orphanKey+markerLine)
+
+	runner.sweepOrphanedTaskDirs(t.Context(), stored)
+
+	assert.Equal(t, liveKey+markerLine, readAuthorizedKeysFile(t, keysPath))
+	assert.NoDirExists(t, orphanDir)
 }
