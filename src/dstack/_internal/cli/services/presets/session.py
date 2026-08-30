@@ -30,6 +30,7 @@ from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.utils.common import get_dstack_dir
 
 if TYPE_CHECKING:
@@ -300,9 +301,13 @@ def create_preset_session(
             )
         )
         record = configuration.model_dump(mode="json", exclude_none=True)
-        # Env values may be secrets: the session records only the variable names,
-        # which read back as passthrough references resolved from the environment.
-        record["env"] = list(configuration.env)
+        # Keep literal values so a resumed session does not depend on the
+        # caller's current environment. Passthrough entries remain names and are
+        # resolved again on resume. The session manifest is written mode 0600.
+        record["env"] = [
+            key if isinstance(value, EnvSentinel) else f"{key}={value}"
+            for key, value in configuration.env.items()
+        ]
         if not configuration.env:
             record.pop("env")
         _write_private_text(

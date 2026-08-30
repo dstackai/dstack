@@ -23,6 +23,7 @@ from dstack._internal.cli.services.presets.agent import (
     get_claude_auth,
     run_preset_agent,
 )
+from dstack._internal.cli.services.presets.create import load_session_configuration
 from dstack._internal.cli.services.presets.redaction import (
     contains_redacted_value,
     redact,
@@ -49,6 +50,7 @@ from dstack._internal.cli.services.presets.workspace import (
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.services.configs import ConfigManager
 from tests._internal.cli.common import get_session_run, get_session_state
 
@@ -223,15 +225,19 @@ class TestAgentSession:
             assert session.path.stat().st_mode & 0o777 == 0o700
             assert session.log_path.stat().st_mode & 0o777 == 0o600
 
-    def test_session_saves_scrubbed_configuration(self, tmp_path, monkeypatch):
+    def test_session_saves_resumable_configuration(self, tmp_path, monkeypatch):
         self._home(tmp_path, monkeypatch)
 
         session = create_preset_session(self._configuration(), previous=())
 
         data = yaml.safe_load((session.path / "preset.dstack.yml").read_text())
         assert data["max_price"] == 0.5
-        assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM"]
-        assert "false" not in (session.path / "preset.dstack.yml").read_text()
+        assert data["env"] == ["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"]
+        loaded = load_session_configuration(session)
+        assert isinstance(loaded.env["HF_TOKEN"], EnvSentinel)
+        assert loaded.env["TOKENIZERS_PARALLELISM"] == "false"
+        if not IS_WINDOWS:
+            assert (session.path / "preset.dstack.yml").stat().st_mode & 0o777 == 0o600
 
     @pytest.mark.parametrize("status", ["success", "failed"])
     def test_finish_records_terminal_status(self, tmp_path, monkeypatch, status):
