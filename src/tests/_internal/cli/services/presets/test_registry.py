@@ -97,6 +97,16 @@ class FakePresetsAPIClient:
             raise self.error
 
 
+class FakeProjectsAPIClient:
+    def __init__(self):
+        self.error: Optional[Exception] = None
+
+    def get(self, project_name):
+        if self.error is not None:
+            raise self.error
+        return SimpleNamespace(name=project_name)
+
+
 def _registry_preset_info(*, name: Optional[str] = "qwen38") -> PushPresetResponse:
     return PushPresetResponse(
         id=uuid4(),
@@ -183,7 +193,13 @@ def _archive_member_texts(blob: bytes) -> dict[str, str]:
 @pytest.fixture
 def stub_client(monkeypatch: pytest.MonkeyPatch):
     fake = FakePresetsAPIClient()
-    client = SimpleNamespace(presets=fake, files=fake.files, base_url="http://test-server")
+    fake.projects = FakeProjectsAPIClient()
+    client = SimpleNamespace(
+        presets=fake,
+        files=fake.files,
+        projects=fake.projects,
+        base_url="http://test-server",
+    )
     monkeypatch.setattr(registry_module, "resolve_registry_client", lambda project: client)
     return fake
 
@@ -655,6 +671,13 @@ class TestPullPresetFromRegistry:
 
         with pytest.raises(CLIError, match="'main/qwen38' does not exist"):
             pull_preset_from_registry(PresetStore(tmp_path / "presets"), "main/qwen38")
+
+    def test_maps_a_missing_project_to_a_does_not_exist_error(self, tmp_path, stub_client):
+        stub_client.error = URLNotFoundError("Status code 404")
+        stub_client.projects.error = URLNotFoundError("Status code 404")
+
+        with pytest.raises(CLIError, match="Project 'unknown-project' does not exist"):
+            pull_preset_from_registry(PresetStore(tmp_path / "presets"), "unknown-project/qwen38")
 
     @pytest.mark.parametrize(
         "error",

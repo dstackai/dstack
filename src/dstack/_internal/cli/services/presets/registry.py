@@ -116,7 +116,9 @@ def push_preset_to_registry(store: PresetStore, local_ref: str, registry_ref: st
         raise CLIError(f"Preset {local_ref!r} cannot be pushed: {e}") from e
     try:
         client.presets.push(project, name=name, spec=spec)
-    except (URLNotFoundError, MethodNotAllowedError):
+    except URLNotFoundError as e:
+        raise _registry_url_not_found_error(project, client) from e
+    except MethodNotAllowedError:
         raise _registry_not_supported_error(project, client)
     console.print("OK")
 
@@ -126,7 +128,9 @@ def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
     client = resolve_registry_client(project)
     try:
         remote = client.presets.get(project, name_or_id)
-    except (URLNotFoundError, MethodNotAllowedError):
+    except URLNotFoundError as e:
+        raise _registry_url_not_found_error(project, client) from e
+    except MethodNotAllowedError:
         raise _registry_not_supported_error(project, client)
     except ResourceNotExistsError as e:
         # The server's detail names the bare ref; the qualified one reads better.
@@ -276,6 +280,17 @@ def _registry_not_supported_error(project: str, client: APIClient) -> CLIError:
         f"The server at {client.base_url} (project {project!r})"
         " does not support the preset registry"
     )
+
+
+def _registry_url_not_found_error(project: str, client: APIClient) -> CLIError:
+    """Distinguishes a missing project from a server without registry routes."""
+    try:
+        client.projects.get(project)
+    except (URLNotFoundError, ResourceNotExistsError):
+        return CLIError(f"Project {project!r} does not exist")
+    except MethodNotAllowedError:
+        pass
+    return _registry_not_supported_error(project, client)
 
 
 def _relative_pushed_path(local_path: str, preset_dir: Path) -> str:
