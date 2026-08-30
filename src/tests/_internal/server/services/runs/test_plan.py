@@ -1,6 +1,7 @@
 import copy
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
+import gpuhunt
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +25,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
+from dstack._internal.server.services.offers import get_matching_shared_offer
 from dstack._internal.server.services.projects import get_project_model_by_name
 from dstack._internal.server.services.runs import get_plan
 from dstack._internal.server.services.runs.plan import (
@@ -32,9 +34,11 @@ from dstack._internal.server.services.runs.plan import (
     _get_backend_offers_in_fleet,
     get_backend_offers_in_run_candidate_fleets,
     get_job_plans,
+    get_run_profile_and_requirements_in_fleet,
     get_targeted_instance_offers,
 )
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_export,
     create_fleet,
     create_instance,
@@ -46,6 +50,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_remote_connection_info,
     get_run_spec,
+    get_ssh_fleet_configuration,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -808,6 +813,35 @@ class TestGetBackendOffersInRunCandidateFleets:
 
 class TestGetBackendOffersInFleet:
     @pytest.mark.asyncio
+    async def test_ssh_blocks_fleet_keeps_old_requirement_combination_semantics(self) -> None:
+        fleet_spec = get_fleet_spec(get_ssh_fleet_configuration(blocks="auto"))
+        fleet_spec.configuration.resources = ResourcesSpec(
+            cpu=CPUSpec.parse("4..8"),
+            memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+            gpu=None,
+        )
+        run_spec = get_run_spec(
+            repo_id="repo",
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("1"),
+                    memory=Range[Memory](min=Memory.parse("2GB"), max=None),
+                    gpu=None,
+                ),
+            ),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+
+        with pytest.raises(ValueError, match="Cannot combine fleet requirements"):
+            get_run_profile_and_requirements_in_fleet(
+                job=jobs[0],
+                run_spec=run_spec,
+                fleet_spec=fleet_spec,
+            )
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_keeps_unconstrained_offers_for_non_empty_cluster_fleet_without_elected_master(
         self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
@@ -853,3 +887,229 @@ class TestGetBackendOffersInFleet:
             get_offers_by_requirements_mock.await_args.kwargs["master_job_provisioning_data"]
             is None
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_single_block_offer_when_new_capacity_can_share_growing_blocks_fleet(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet_spec.configuration.blocks = "auto"
+        fleet_spec.configuration.resources = ResourcesSpec(
+            cpu=CPUSpec.parse("4..8"),
+            memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+            gpu=None,
+            disk="100GB..",
+        )
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("arm:1"),
+                    memory=Range[Memory](min=Memory.parse("2GB"), max=None),
+                    gpu=None,
+                    disk="200GB..",
+                ),
+            ),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        offer = get_instance_offer_with_availability(cpu_count=4, memory_gib=8, disk_gib=300)
+        offer.instance.resources.cpu_arch = gpuhunt.CPUArchitecture.ARM
+        with (
+            patch("dstack._internal.server.services.backends.get_project_backends") as m,
+            patch(
+                "dstack._internal.server.services.offers.get_matching_shared_offer",
+                wraps=get_matching_shared_offer,
+            ) as matching_shared_offer_mock,
+        ):
+            backend = Mock()
+            backend.TYPE = BackendType.AWS
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend.compute.return_value = compute_mock
+            compute_mock.get_offers.return_value = [offer]
+            m.return_value = [backend]
+
+            offers = await _get_backend_offers_in_fleet(
+                project=project,
+                fleet_model=fleet,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=None,
+            )
+
+        assert [
+            (selected_backend, selected_offer.blocks)
+            for selected_backend, selected_offer in offers
+        ] == [(backend, 1)]
+        assert offers[0][1].total_blocks == 4
+        assert offers[0][1].instance.resources.cpus == 4
+        assert offers[0][1].instance.resources.memory_mib == 8 * 1024
+        queried_requirements = compute_mock.get_offers.call_args.args[0]
+        shared_offer_requirements = matching_shared_offer_mock.call_args.kwargs["requirements"]
+        assert queried_requirements.resources.cpu.count == Range[int](min=4, max=8)
+        assert queried_requirements.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM
+        assert queried_requirements.resources.memory == Range[Memory](
+            min=Memory.parse("8GB"),
+            max=Memory.parse("32GB"),
+        )
+        assert queried_requirements.resources.disk.size == Range[Memory](
+            min=Memory.parse("200GB"),
+            max=None,
+        )
+        assert shared_offer_requirements.resources.cpu.count == Range[int](min=1, max=1)
+        assert shared_offer_requirements.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM
+        assert shared_offer_requirements.resources.memory == Range[Memory](
+            min=Memory.parse("2GB"),
+            max=None,
+        )
+        assert shared_offer_requirements.resources.disk.size == Range[Memory](
+            min=Memory.parse("200GB"),
+            max=None,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_multi_block_offer_when_new_capacity_needs_more_than_one_block(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet_spec.configuration.blocks = "auto"
+        fleet_spec.configuration.resources = ResourcesSpec(
+            cpu=CPUSpec.parse("4..8"),
+            memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+            gpu=None,
+        )
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("2"),
+                    memory=Range[Memory](min=Memory.parse("3GB"), max=None),
+                    gpu=None,
+                ),
+            ),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        offer = get_instance_offer_with_availability(cpu_count=4, memory_gib=8)
+        with (
+            patch("dstack._internal.server.services.backends.get_project_backends") as m,
+            patch(
+                "dstack._internal.server.services.offers.get_matching_shared_offer",
+                wraps=get_matching_shared_offer,
+            ) as matching_shared_offer_mock,
+        ):
+            backend = Mock()
+            backend.TYPE = BackendType.AWS
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend.compute.return_value = compute_mock
+            compute_mock.get_offers.return_value = [offer]
+            m.return_value = [backend]
+
+            offers = await _get_backend_offers_in_fleet(
+                project=project,
+                fleet_model=fleet,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=None,
+            )
+
+        assert [
+            (selected_backend, selected_offer.blocks)
+            for selected_backend, selected_offer in offers
+        ] == [(backend, 2)]
+        assert offers[0][1].total_blocks == 4
+        assert offers[0][1].instance.resources.cpus == 4
+        assert offers[0][1].instance.resources.memory_mib == 8 * 1024
+        queried_requirements = compute_mock.get_offers.call_args.args[0]
+        shared_offer_requirements = matching_shared_offer_mock.call_args.kwargs["requirements"]
+        assert queried_requirements.resources.cpu.count == Range[int](min=4, max=8)
+        assert queried_requirements.resources.memory == Range[Memory](
+            min=Memory.parse("8GB"),
+            max=Memory.parse("32GB"),
+        )
+        assert shared_offer_requirements.resources.cpu.count == Range[int](min=2, max=2)
+        assert shared_offer_requirements.resources.memory == Range[Memory](
+            min=Memory.parse("3GB"),
+            max=None,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_excludes_non_create_backends_for_cloud_blocks_fleet(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet_spec.configuration.blocks = "auto"
+        fleet_spec.configuration.resources = ResourcesSpec(
+            cpu=CPUSpec.parse("4..8"),
+            memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+            gpu=None,
+        )
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("1"),
+                    memory=Range[Memory](min=Memory.parse("2GB"), max=None),
+                    gpu=None,
+                ),
+            ),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            aws_backend = Mock()
+            aws_backend.TYPE = BackendType.AWS
+            aws_compute_mock = Mock(spec=ComputeMockSpec)
+            aws_backend.compute.return_value = aws_compute_mock
+            aws_offer = get_instance_offer_with_availability(
+                backend=BackendType.AWS, cpu_count=4, memory_gib=8
+            )
+            aws_compute_mock.get_offers.return_value = [aws_offer]
+
+            kubernetes_backend = Mock()
+            kubernetes_backend.TYPE = BackendType.KUBERNETES
+            kubernetes_compute_mock = Mock()
+            kubernetes_backend.compute.return_value = kubernetes_compute_mock
+            kubernetes_offer = get_instance_offer_with_availability(
+                backend=BackendType.KUBERNETES,
+                region="",
+                cpu_count=4,
+                memory_gib=8,
+            )
+            kubernetes_compute_mock.get_offers.return_value = [kubernetes_offer]
+
+            m.return_value = [aws_backend, kubernetes_backend]
+
+            offers = await _get_backend_offers_in_fleet(
+                project=project,
+                fleet_model=fleet,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=None,
+            )
+
+        assert [backend.TYPE for backend, _ in offers] == [BackendType.AWS]
+        aws_compute_mock.get_offers.assert_called_once()
+        kubernetes_compute_mock.get_offers.assert_not_called()

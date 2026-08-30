@@ -4,10 +4,11 @@ import pytest
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     get_instance_offer_with_availability,
     get_kubernetes_volume_configuration,
     get_volume,
@@ -211,3 +212,108 @@ class TestGetOffersByRequirements:
             )
             m.assert_awaited_once()
             assert res == []
+
+    @pytest.mark.asyncio
+    async def test_filters_shared_offers_before_max_offers(self):
+        profile = Profile(name="test")
+        requirements = Requirements(
+            resources=ResourcesSpec(
+                cpu=CPUSpec.parse("4..8"),
+                memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+                gpu=None,
+            )
+        )
+        shared_offer_requirements = Requirements(
+            resources=ResourcesSpec(
+                cpu=CPUSpec.parse("2"),
+                memory=Range[Memory](min=Memory.parse("3GB"), max=None),
+                gpu=None,
+            )
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.SEEWEB
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            nonmatching_offer = get_instance_offer_with_availability(
+                backend=BackendType.SEEWEB,
+                instance_type="nonmatching",
+                cpu_count=6,
+                memory_gib=8,
+            )
+            matching_offer = get_instance_offer_with_availability(
+                backend=BackendType.SEEWEB,
+                instance_type="matching",
+                cpu_count=4,
+                memory_gib=8,
+            )
+            backend_mock.compute.return_value.get_offers.return_value = [
+                nonmatching_offer,
+                matching_offer,
+            ]
+            m.return_value = [backend_mock]
+            res = await get_offers_by_requirements(
+                project=Mock(),
+                profile=profile,
+                requirements=requirements,
+                shared_offer_requirements=shared_offer_requirements,
+                blocks="auto",
+                max_offers=1,
+            )
+
+            assert [
+                (backend, offer.instance.name, offer.blocks, offer.total_blocks)
+                for backend, offer in res
+            ] == [(backend_mock, "matching", 2, 4)]
+
+    @pytest.mark.asyncio
+    async def test_filters_non_create_dstack_wrapper_offers_before_max_offers(self):
+        profile = Profile(name="test")
+        requirements = Requirements(
+            resources=ResourcesSpec(
+                cpu=CPUSpec.parse("4..8"),
+                memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+                gpu=None,
+            )
+        )
+        shared_offer_requirements = Requirements(
+            resources=ResourcesSpec(
+                cpu=CPUSpec.parse("2"),
+                memory=Range[Memory](min=Memory.parse("3GB"), max=None),
+                gpu=None,
+            )
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.DSTACK
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            container_offer = get_instance_offer_with_availability(
+                backend=BackendType.KUBERNETES,
+                region="",
+                instance_type="container-offer",
+                cpu_count=4,
+                memory_gib=8,
+            )
+            vm_offer = get_instance_offer_with_availability(
+                backend=BackendType.SEEWEB,
+                instance_type="vm-offer",
+                cpu_count=4,
+                memory_gib=8,
+            )
+            backend_mock.compute.return_value.get_offers.return_value = [
+                container_offer,
+                vm_offer,
+            ]
+            m.return_value = [backend_mock]
+            res = await get_offers_by_requirements(
+                project=Mock(),
+                profile=profile,
+                requirements=requirements,
+                shared_offer_requirements=shared_offer_requirements,
+                blocks="auto",
+                max_offers=1,
+            )
+
+            assert [
+                (backend, offer.backend, offer.instance.name, offer.blocks, offer.total_blocks)
+                for backend, offer in res
+            ] == [(backend_mock, BackendType.SEEWEB, "vm-offer", 2, 4)]

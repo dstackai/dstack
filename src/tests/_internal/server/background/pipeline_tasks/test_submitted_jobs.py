@@ -25,7 +25,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -465,6 +465,136 @@ class TestJobSubmittedWorker:
             )
         )
         assert len(res.scalars().all()) == 1
+
+    async def test_provisions_shared_block_offer_for_new_capacity_in_blocks_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=2)
+        fleet_spec.configuration.blocks = "auto"
+        fleet_spec.configuration.resources = ResourcesSpec(
+            cpu=CPUSpec.parse("4..8"),
+            memory=Range[Memory](min=Memory.parse("8GB"), max=Memory.parse("32GB")),
+            gpu=None,
+            disk="100GB..",
+        )
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("arm:1"),
+                    memory=Range[Memory](min=Memory.parse("2GB"), max=None),
+                    gpu=None,
+                    disk="200GB..",
+                ),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        job = await create_job(session=session, run=run)
+
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.AWS,
+            cpu_count=4,
+            memory_gib=8,
+            disk_gib=300,
+        )
+        offer.instance.resources.cpu_arch = gpuhunt.CPUArchitecture.ARM
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.return_value = get_job_provisioning_data(
+                dockerized=True,
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+            job = await _get_job(session, job.id)
+            assert job.status == JobStatus.SUBMITTED
+            assert job.instance is not None
+            placeholder_id = job.instance.id
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None and job.instance.id == placeholder_id
+        assert job.instance.status == InstanceStatus.PROVISIONING
+        instance_offer = validate_json_extra_ignore(
+            InstanceOfferWithAvailability, get_or_error(job.instance.offer)
+        )
+        assert instance_offer.blocks == 1
+        assert instance_offer.total_blocks == 4
+        assert instance_offer.instance.resources.cpu_arch == gpuhunt.CPUArchitecture.ARM
+        assert instance_offer.instance.resources.cpus == 4
+        assert instance_offer.instance.resources.memory_mib == 8 * 1024
+        assert instance_offer.instance.resources.disk.size_mib == 300 * 1024
+        assert job.instance.total_blocks == 4
+        assert job.instance.busy_blocks == 1
+        runtime = validate_json_extra_ignore(JobRuntimeData, get_or_error(job.job_runtime_data))
+        assert runtime.network_mode == NetworkMode.BRIDGE
+        assert runtime.offer is not None
+        assert runtime.offer.blocks == 1
+        assert runtime.offer.total_blocks == 4
+        assert runtime.offer.instance.resources.cpu_arch == gpuhunt.CPUArchitecture.ARM
+        assert runtime.offer.instance.resources.cpus == 1
+        assert runtime.offer.instance.resources.memory_mib == 2 * 1024
+        assert runtime.offer.instance.resources.disk.size_mib == 300 * 1024
+        run_job_offer = compute_mock.run_job.call_args.args[2]
+        assert run_job_offer.blocks == 1
+        assert run_job_offer.total_blocks == 4
+        assert run_job_offer.instance.resources.cpu_arch == gpuhunt.CPUArchitecture.ARM
+        assert run_job_offer.instance.resources.cpus == 4
+        assert run_job_offer.instance.resources.memory_mib == 8 * 1024
+        assert run_job_offer.instance.resources.disk.size_mib == 300 * 1024
+        run_job_requirements = compute_mock.run_job.call_args.args[7]
+        assert run_job_requirements.resources.cpu.arch == gpuhunt.CPUArchitecture.ARM
+        assert run_job_requirements.resources.cpu.count == Range[int](min=1, max=1)
+        assert run_job_requirements.resources.memory == Range[Memory](
+            min=Memory.parse("2GB"),
+            max=None,
+        )
+        assert run_job_requirements.resources.disk.size == Range[Memory](
+            min=Memory.parse("200GB"),
+            max=None,
+        )
+
+        job.instance.status = InstanceStatus.IDLE
+        await session.commit()
+
+        second_run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        second_job = await create_job(session=session, run=second_run)
+        await _process_job(session=session, worker=worker, job_model=second_job)
+
+        second_job = await _get_job(session, second_job.id)
+        assert second_job.status == JobStatus.SUBMITTED
+        assert second_job.instance is not None and second_job.instance.id == placeholder_id
+        await session.refresh(second_job.instance)
+        assert second_job.instance.busy_blocks == 2
 
     async def test_multinode_master_reuses_placeholder_when_provisioning_falls_back_to_run_job(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

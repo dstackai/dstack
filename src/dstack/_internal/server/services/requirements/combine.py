@@ -64,8 +64,24 @@ def combine_fleet_and_run_requirements(
     fleet_requirements: Requirements, run_requirements: Requirements
 ) -> Optional[Requirements]:
     try:
+        resources = _combine_resources(fleet_requirements.resources, run_requirements.resources)
+    except CombineError:
+        return None
+    return combine_fleet_and_run_requirements_with_resources(
+        fleet_requirements=fleet_requirements,
+        run_requirements=run_requirements,
+        resources=resources,
+    )
+
+
+def combine_fleet_and_run_requirements_with_resources(
+    fleet_requirements: Requirements,
+    run_requirements: Requirements,
+    resources: ResourcesSpec,
+) -> Optional[Requirements]:
+    try:
         return Requirements(
-            resources=_combine_resources(fleet_requirements.resources, run_requirements.resources),
+            resources=resources.model_copy(deep=True),
             max_price=_get_min_optional(fleet_requirements.max_price, run_requirements.max_price),
             spot=_combine_spot_optional(fleet_requirements.spot, run_requirements.spot),
             reservation=get_single_value_optional(

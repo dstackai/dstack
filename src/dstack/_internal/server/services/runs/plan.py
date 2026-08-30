@@ -18,7 +18,9 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceStatus,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
@@ -64,6 +66,7 @@ from dstack._internal.server.services.offers import (
 from dstack._internal.server.services.requirements.combine import (
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
+    combine_fleet_and_run_requirements_with_resources,
 )
 from dstack._internal.server.services.runs.spec import (
     check_run_spec_requires_instance_mounts,
@@ -81,6 +84,42 @@ _DEFAULT_MAX_OFFERS = 50
 # Without the limit, time and peak memory usage spike since
 # they grow linearly with the number of fleets.
 _PER_FLEET_MAX_OFFERS = 100
+
+
+def _is_cloud_blocks_fleet(fleet_spec: FleetSpec) -> bool:
+    return fleet_spec.configuration.ssh_config is None and fleet_spec.configuration.blocks != 1
+
+
+def _get_cloud_blocks_backend_resources(
+    fleet_resources: ResourcesSpec,
+    run_resources: ResourcesSpec,
+) -> Optional[ResourcesSpec]:
+    resources = fleet_resources.model_copy(deep=True)
+
+    run_cpu_arch = run_resources.cpu.arch
+    if run_cpu_arch is not None:
+        if resources.cpu.arch is not None and resources.cpu.arch != run_cpu_arch:
+            return None
+        resources.cpu.arch = run_cpu_arch
+
+    run_shm_size = run_resources.shm_size
+    if run_shm_size is not None and (
+        resources.shm_size is None or run_shm_size < resources.shm_size
+    ):
+        resources.shm_size = run_shm_size
+
+    run_disk = run_resources.disk
+    if run_disk is None:
+        return resources
+    if resources.disk is None:
+        resources.disk = run_disk.model_copy(deep=True)
+        return resources
+
+    disk_size = resources.disk.size.intersect(run_disk.size)
+    if disk_size is None:
+        return None
+    resources.disk.size = disk_size
+    return resources
 
 
 async def get_job_plans(
@@ -526,12 +565,49 @@ def get_run_profile_and_requirements_in_fleet(
     if profile is None:
         raise ValueError("Cannot combine fleet profile")
     fleet_requirements = get_fleet_requirements(fleet_spec)
-    requirements = combine_fleet_and_run_requirements(
-        fleet_requirements, job.job_spec.requirements
-    )
+    if not _is_cloud_blocks_fleet(fleet_spec):
+        requirements = combine_fleet_and_run_requirements(
+            fleet_requirements, job.job_spec.requirements
+        )
+    else:
+        requirements = combine_fleet_and_run_requirements_with_resources(
+            fleet_requirements=fleet_requirements,
+            run_requirements=job.job_spec.requirements,
+            resources=job.job_spec.requirements.resources,
+        )
     if requirements is None:
         raise ValueError("Cannot combine fleet requirements")
     return profile, requirements
+
+
+def _get_backend_offer_requirements_in_fleet(
+    job: Job,
+    run_spec: RunSpec,
+    fleet_spec: FleetSpec,
+) -> tuple[Profile, Requirements, Optional[Requirements]]:
+    profile, offer_requirements = get_run_profile_and_requirements_in_fleet(
+        job=job,
+        run_spec=run_spec,
+        fleet_spec=fleet_spec,
+    )
+    if not _is_cloud_blocks_fleet(fleet_spec):
+        return profile, offer_requirements, None
+
+    fleet_requirements = get_fleet_requirements(fleet_spec)
+    backend_resources = _get_cloud_blocks_backend_resources(
+        fleet_resources=fleet_requirements.resources,
+        run_resources=job.job_spec.requirements.resources,
+    )
+    if backend_resources is None:
+        raise ValueError("Cannot combine fleet requirements")
+    backend_requirements = combine_fleet_and_run_requirements_with_resources(
+        fleet_requirements=fleet_requirements,
+        run_requirements=job.job_spec.requirements,
+        resources=backend_resources,
+    )
+    if backend_requirements is None:
+        raise ValueError("Cannot combine fleet requirements")
+    return profile, backend_requirements, offer_requirements
 
 
 async def _select_candidate_fleet_models(
@@ -766,6 +842,9 @@ async def _get_backend_offers_in_fleet(
     job: Job,
     volumes: Optional[list[list[Volume]]],
     fleet_spec: Optional[FleetSpec] = None,
+    placement_group: Optional[PlacementGroup] = None,
+    exclude_not_available: bool = False,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
     max_offers: Optional[int] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
@@ -774,19 +853,22 @@ async def _get_backend_offers_in_fleet(
         fleet_spec = get_fleet_spec(fleet_model)
     try:
         check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
-        profile, requirements = get_run_profile_and_requirements_in_fleet(
-            job=job,
-            run_spec=run_spec,
-            fleet_spec=fleet_spec,
+        profile, requirements, shared_offer_requirements = (
+            _get_backend_offer_requirements_in_fleet(
+                job=job,
+                run_spec=run_spec,
+                fleet_spec=fleet_spec,
+            )
         )
     except ValueError:
         backend_offers = []
     else:
         # Master job offers must be in the same cluster as existing instances.
-        master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
-            fleet_model=fleet_model,
-            fleet_spec=fleet_spec,
-        )
+        if master_job_provisioning_data is None:
+            master_job_provisioning_data = get_fleet_master_instance_provisioning_data(
+                fleet_model=fleet_model,
+                fleet_spec=fleet_spec,
+            )
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
@@ -794,11 +876,15 @@ async def _get_backend_offers_in_fleet(
             project=project,
             profile=profile,
             requirements=requirements,
+            shared_offer_requirements=shared_offer_requirements,
+            exclude_not_available=exclude_not_available,
             multinode=multinode,
-            master_job_provisioning_data=master_instance_provisioning_data,
+            master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
             privileged=job.job_spec.privileged,
             instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+            placement_group=placement_group,
+            blocks=fleet_spec.configuration.blocks,
             max_offers=max_offers,
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,

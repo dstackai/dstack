@@ -59,7 +59,7 @@ from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
 from dstack._internal.server.schemas.runner import InstanceHealthResponse, TaskStatus
 from dstack._internal.server.services import events
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import generate_shared_offer
+from dstack._internal.server.services.offers import get_matching_shared_offer
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.utils import common as common_utils
@@ -693,7 +693,6 @@ def get_shared_instances_with_offers(
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
-    query_filter = requirements_to_query_filter(requirements)
     filtered_instances = filter_instances(
         instances=instances,
         profile=profile,
@@ -711,18 +710,20 @@ def get_shared_instances_with_offers(
             continue
         total_blocks = common_utils.get_or_error(instance.total_blocks)
         idle_blocks = total_blocks - instance.busy_blocks
-        min_blocks = total_blocks if multinode else 1
-        for blocks in range(min_blocks, total_blocks + 1):
-            shared_offer = generate_shared_offer(offer, blocks, total_blocks)
-            catalog_item = offer_to_catalog_item(shared_offer)
-            if gpuhunt.matches(catalog_item, query_filter):
-                if blocks <= idle_blocks:
-                    shared_offer.availability = InstanceAvailability.IDLE
-                else:
-                    shared_offer.availability = InstanceAvailability.BUSY
-                if shared_offer.availability == InstanceAvailability.IDLE or not idle_only:
-                    instances_with_offers.append((instance, shared_offer))
-                break
+        shared_offer = get_matching_shared_offer(
+            offer,
+            requirements=requirements,
+            blocks=total_blocks,
+            multinode=multinode,
+        )
+        if shared_offer is None:
+            continue
+        if shared_offer.blocks <= idle_blocks:
+            shared_offer.availability = InstanceAvailability.IDLE
+        else:
+            shared_offer.availability = InstanceAvailability.BUSY
+        if shared_offer.availability == InstanceAvailability.IDLE or not idle_only:
+            instances_with_offers.append((instance, shared_offer))
     return instances_with_offers
 
 

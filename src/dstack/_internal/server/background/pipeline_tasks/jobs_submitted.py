@@ -116,8 +116,8 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import (
+    generate_shared_offer,
     get_instance_offer_with_restricted_az,
-    get_offers_by_requirements,
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
@@ -128,15 +128,13 @@ from dstack._internal.server.services.placement import (
 )
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.plan import (
+    _get_backend_offers_in_fleet,
     find_optimal_fleet_with_offers,
     get_instance_offers_in_fleet,
     get_run_candidate_fleet_models_filters,
     get_run_profile_and_requirements_in_fleet,
     get_targeted_instance_offers,
     select_run_candidate_fleet_models_with_filters,
-)
-from dstack._internal.server.services.runs.spec import (
-    check_run_spec_requires_instance_mounts,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.volumes import volume_model_to_volume
@@ -1738,8 +1736,11 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
             provisioned_job_model.used_instance_id = instance_model.id
 
         instance_models.append(instance_model)
+        runtime_offer = offer
+        if offer.blocks < offer.total_blocks:
+            runtime_offer = generate_shared_offer(offer, offer.blocks, offer.total_blocks)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
-            offer, context.multinode
+            runtime_offer, context.multinode
         ).model_dump_json()
         events.emit(
             session,
@@ -1817,8 +1818,8 @@ def _create_instance_model_for_job(
         price=offer.price,
         region=offer.region,
         volume_attachments=[],
-        total_blocks=1,
-        busy_blocks=1,
+        total_blocks=offer.total_blocks,
+        busy_blocks=offer.blocks,
     )
 
 
@@ -1848,8 +1849,8 @@ def _promote_placeholder_instance(
     instance_model.region = offer.region
     instance_model.termination_policy = termination_policy
     instance_model.termination_idle_time = termination_idle_time
-    instance_model.total_blocks = 1
-    instance_model.busy_blocks = 1
+    instance_model.total_blocks = offer.total_blocks
+    instance_model.busy_blocks = offer.blocks
 
 
 async def _process_volume_attachments(
@@ -2405,18 +2406,15 @@ async def _provision_new_capacity(
         placement_group_models=placement_group_models,
         fleet_model=fleet_model,
     )
-    multinode = requirements.multinode or is_multinode_job(job)
-    offers = await get_offers_by_requirements(
+    offers = await _get_backend_offers_in_fleet(
         project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=True,
-        multinode=multinode,
-        master_job_provisioning_data=master_job_provisioning_data,
+        fleet_model=fleet_model,
+        run_spec=run.run_spec,
+        job=job,
         volumes=volumes,
-        privileged=job.job_spec.privileged,
-        instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
+        exclude_not_available=True,
+        master_job_provisioning_data=master_job_provisioning_data,
     )
     offers_iter = iter(offers)
     offers_tried = 0
