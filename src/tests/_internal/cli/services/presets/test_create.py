@@ -49,7 +49,7 @@ from dstack._internal.cli.services.presets.workspace import (
     create_agent_workspace,
     remove_agent_workspace,
 )
-from dstack._internal.core.errors import CLIError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
@@ -174,6 +174,29 @@ class TestCreatePreset:
         assert state["status"] == "success"
         assert state["id"] == paths[0].name
         assert "testing preset" in (paths[0] / "agent.log").read_text()
+
+    def test_resume_preflight_error_leaves_session_interrupted(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("MISSING_PRESET_VALUE", raising=False)
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+        session.write_state(get_session_state(status="interrupted", run=get_session_run()))
+
+        with pytest.raises(ConfigurationError, match="MISSING_PRESET_VALUE"):
+            create_preset(
+                api=SimpleNamespace(),
+                configuration=PresetConfiguration(
+                    name="qwen",
+                    base="Qwen/Qwen3.5-27B",
+                    env=["MISSING_PRESET_VALUE"],
+                ),
+                store=PresetStore(tmp_path / "presets"),
+                resume_session=session,
+            )
+
+        state = session.read_state()
+        assert state is not None
+        assert state.status == "interrupted"
 
     def test_finalization_error_does_not_mask_success(self, tmp_path, monkeypatch, capsys):
         monkeypatch.setenv("HOME", str(tmp_path))
