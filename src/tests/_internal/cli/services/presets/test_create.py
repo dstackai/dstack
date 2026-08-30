@@ -52,6 +52,7 @@ from dstack._internal.cli.services.presets.workspace import (
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
+from dstack._internal.core.models.presets import PresetBenchmarkLatency
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.common import (
     get_preset,
@@ -730,11 +731,22 @@ class TestPerformanceConstraints:
         benchmark = preset.benchmark
         benchmark.metrics.output_tok_per_s = 999999.0
         benchmark.metrics.per_user_tok_per_s = 999999.0
+        benchmark.metrics.tpot_ms = PresetBenchmarkLatency(
+            mean=999999.0, p50=999999.0, p99=999999.0
+        )
 
         expected = benchmark.metrics.total_output_tokens / benchmark.metrics.duration_seconds
         assert benchmark.effective_output_tok_per_s == expected
-        # Per-user speed is the steady decode rate, not the aggregate over concurrency.
-        assert benchmark.effective_per_user_tok_per_s == 1000 / benchmark.metrics.tpot_ms.mean
+        # Per-user speed is the steady decode rate derived from the E2E and TTFT
+        # means, not a self-reported rate or chunk-level ITL mislabeled as TPOT.
+        assert benchmark.metrics.e2e_ms is not None
+        mean_output_tokens = (
+            benchmark.metrics.total_output_tokens / benchmark.metrics.successful_requests
+        )
+        mean_tpot_ms = (benchmark.metrics.e2e_ms.mean - benchmark.metrics.ttft_ms.mean) / (
+            mean_output_tokens - 1
+        )
+        assert benchmark.effective_per_user_tok_per_s == 1000 / mean_tpot_ms
 
 
 class TestBuildConstraints:

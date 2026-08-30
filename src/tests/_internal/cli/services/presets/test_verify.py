@@ -349,6 +349,28 @@ class TestLoadPresetAgentReport:
         assert report.benchmark.command.endswith("Bearer [redacted]'")
         assert "sk-live" not in report.benchmark.command
 
+    def test_requires_e2e_latency_in_a_fresh_report(self, tmp_path):
+        run = get_running_service_run()
+        data = get_successful_preset_report(run).model_dump()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"]["metrics"].pop("e2e_ms")
+
+        with pytest.raises(CLIError, match="e2e_ms"):
+            self._load(tmp_path, data, redacted_values=())
+
+    def test_rejects_a_reported_tpot_that_exceeds_available_slot_time(self, tmp_path):
+        run = get_running_service_run()
+        data = get_successful_preset_report(run).model_dump()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"]["metrics"]["tpot_ms"] = {
+            "mean": 137.18,
+            "p50": 55.34,
+            "p99": 1160.43,
+        }
+
+        with pytest.raises(CLIError, match="exceeds the decode time available"):
+            self._load(tmp_path, data, redacted_values=())
+
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()

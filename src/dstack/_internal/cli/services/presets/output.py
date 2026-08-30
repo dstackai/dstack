@@ -211,9 +211,9 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
         tps = _format_number(best["tok_s"])
         if objective:
             # Lead with per-user tps: comparable across rows regardless of concurrency.
-            tpot_ms = best.get("tpot_ms")
-            if isinstance(tpot_ms, (int, float)) and tpot_ms > 0:
-                parts.append(f"tps/user={_format_number(1000 / tpot_ms)}")
+            per_user_tok_s = best.get("per_user_tok_s")
+            if isinstance(per_user_tok_s, (int, float)) and per_user_tok_s > 0:
+                parts.append(f"tps/user={_format_number(per_user_tok_s)}")
             if verbose:
                 parts.append(f"tps={tps}")
             ttft_ms = best.get("ttft_ms")

@@ -628,17 +628,41 @@ def _trial_entry(
     gpu: Optional[str],
 ) -> dict[str, Any]:
     ttft = (metrics.get("ttft_ms") or {}).get("p50")
-    # Mean, not p50: MTP skews TPOT right, and mean is the delivered decode rate.
-    tpot = (metrics.get("tpot_ms") or {}).get("mean")
     context_length = record.get("context_length")
     return {
         "tok_s": tok_s,
-        "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
+        "per_user_tok_s": _effective_per_user_tok_s(metrics),
         "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
         "context_length": context_length if isinstance(context_length, int) else None,
         "concurrency": workload.get("concurrency"),
         "gpu": gpu,
     }
+
+
+def _effective_per_user_tok_s(metrics: dict[str, Any]) -> Optional[float]:
+    e2e_ms = (metrics.get("e2e_ms") or {}).get("mean")
+    ttft_ms = (metrics.get("ttft_ms") or {}).get("mean")
+    total_output_tokens = metrics.get("total_output_tokens")
+    successful_requests = metrics.get("successful_requests")
+    if (
+        isinstance(e2e_ms, (int, float))
+        and isinstance(ttft_ms, (int, float))
+        and isinstance(total_output_tokens, (int, float))
+        and isinstance(successful_requests, (int, float))
+        and e2e_ms > ttft_ms
+        and successful_requests > 0
+        and total_output_tokens > successful_requests
+    ):
+        mean_output_tokens = total_output_tokens / successful_requests
+        mean_tpot_ms = (e2e_ms - ttft_ms) / (mean_output_tokens - 1)
+        return 1000 / mean_tpot_ms
+
+    # Sessions created by older clients have no E2E latency. Preserve their
+    # display using the reported TPOT, but new reports never depend on it.
+    legacy_tpot_ms = (metrics.get("tpot_ms") or {}).get("mean")
+    if isinstance(legacy_tpot_ms, (int, float)) and legacy_tpot_ms > 0:
+        return 1000 / legacy_tpot_ms
+    return None
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:

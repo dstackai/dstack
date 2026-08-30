@@ -106,6 +106,22 @@ class TestValidatePresetFilePaths:
                 validate_preset_file_path(paths[0])
 
 
+class TestPresetBenchmarkMetrics:
+    def test_legacy_benchmark_uses_stored_tpot(self):
+        benchmark = PresetBenchmark.model_validate(get_benchmark_data(get_workload_data()))
+
+        assert benchmark.metrics.e2e_ms is None
+        assert benchmark.effective_per_user_tok_per_s == 1000 / 7.5
+
+    def test_rejects_nonpositive_decode_interval(self):
+        data = get_benchmark_data(get_workload_data())
+        data["metrics"]["e2e_ms"] = {"mean": 100.0, "p50": 100.0, "p99": 100.0}
+        data["metrics"]["ttft_ms"] = {"mean": 100.0, "p50": 90.0, "p99": 110.0}
+
+        with pytest.raises(ValidationError, match="e2e_ms must be greater"):
+            PresetBenchmark.model_validate(data)
+
+
 class TestPresetBenchmarkWorkload:
     """`api` is a Literal, not a plain string: the agent-facing JSON schema is
     generated from these models. `dataset` states the requested dataset, and its

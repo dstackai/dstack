@@ -9,11 +9,16 @@ from pydantic import (
     ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    model_validator,
 )
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.presets import PresetBenchmark
+from dstack._internal.core.models.presets import (
+    PresetBenchmark,
+    PresetBenchmarkLatency,
+    PresetBenchmarkMetrics,
+)
 
 
 class PresetAgentInvalidService(CoreModel):
@@ -42,6 +47,33 @@ ReportedService = Annotated[
 ]
 
 
+class PresetAgentBenchmarkMetrics(PresetBenchmarkMetrics):
+    """Fresh reports require the E2E latency missing from legacy stored presets."""
+
+    e2e_ms: PresetBenchmarkLatency
+
+
+class PresetAgentBenchmark(PresetBenchmark):
+    metrics: PresetAgentBenchmarkMetrics
+
+    @model_validator(mode="after")
+    def validate_reported_tpot_is_possible(self) -> "PresetAgentBenchmark":
+        tpot_ms = self.metrics.tpot_ms
+        if tpot_ms is None:
+            return self
+        decode_token_count = self.metrics.total_output_tokens - self.metrics.successful_requests
+        reported_decode_seconds = decode_token_count * tpot_ms.mean / 1000
+        available_slot_seconds = self.metrics.duration_seconds * self.workload.concurrency
+        # Benchmark tools round their displayed latency values. A one-percent
+        # allowance prevents that formatting from rejecting a boundary value.
+        if reported_decode_seconds > available_slot_seconds * 1.01:
+            raise ValueError(
+                "reported tpot_ms exceeds the decode time available from duration_seconds"
+                " and workload.concurrency"
+            )
+        return self
+
+
 class PresetAgentSuccess(CoreModel):
     """A preset the agent created, cross-checked against the run in `verify`."""
 
@@ -53,7 +85,7 @@ class PresetAgentSuccess(CoreModel):
     base: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
     context_length: PositiveInt
-    benchmark: PresetBenchmark
+    benchmark: PresetAgentBenchmark
 
 
 class PresetAgentFailure(CoreModel):

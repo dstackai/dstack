@@ -367,6 +367,7 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
     "total_input_tokens": 16384, "total_output_tokens": 2048,
     "output_tok_per_s": 512.0, "per_user_tok_per_s": 64.0,
     "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+    "e2e_ms": {"mean": 1063.4, "p50": 1048.0, "p99": 1150.3},
     "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1}
   }
 }
@@ -379,7 +380,13 @@ input and output token counts of the benchmark, rounded to whole tokens.
 <!--?end-->
 Compute `output_tok_per_s` as `total_output_tokens / duration_seconds` and
 `per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`. These are
-the numbers used to compare trials (see `## Performance`).
+the numbers used to compare trials (see `## Performance`). Record the benchmark
+tool's per-request end-to-end latency as `e2e_ms`. Record `tpot_ms` only when the
+tool reports time per output token; set it to `null` when the tool only reports
+inter-token latency per streamed chunk. In particular, do not use SGLang's ITL
+row as TPOT: speculative decoding can put several accepted tokens in one chunk.
+The CLI derives its per-user decode rate from `e2e_ms`, `ttft_ms`, and the output
+token totals rather than trusting either self-reported throughput field.
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free

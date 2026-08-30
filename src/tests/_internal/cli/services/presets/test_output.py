@@ -32,10 +32,17 @@ class TestFormatPresetBenchmark:
         ttft.mean = 8148.3
         ttft.p50 = 8151.4
         ttft.p99 = 8334.2
+        e2e = preset.benchmark.metrics.e2e_ms
+        tpot = preset.benchmark.metrics.tpot_ms
+        assert e2e is not None and tpot is not None
+        output_token_intervals = preset.benchmark.workload.output_tokens - 1
+        e2e.mean = ttft.mean + output_token_intervals * tpot.mean
+        e2e.p50 = ttft.p50 + output_token_intervals * tpot.p50
+        e2e.p99 = ttft.p99 + output_token_intervals * tpot.p99
 
         output = output_module.format_preset_benchmark(preset, verbose=True)
 
-        # Per-user speed is 1/TPOT (p50 7.4ms), not the aggregate over concurrency.
+        # Per-user speed is the derived mean decode rate, not aggregate throughput.
         assert output.startswith("tps/user=133 ")
         assert output_module.format_preset_objective(preset).startswith("[secondary]io=1K/128 ")
         assert "ctx=32K" in output
@@ -171,7 +178,7 @@ class TestSessionRow:
                     "count": 2,
                     "best": {
                         "tok_s": 2339.0,
-                        "tpot_ms": 3.42,
+                        "per_user_tok_s": 292.0,
                         "concurrency": 8,
                         "gpu": "A40:48GB:1",
                     },
@@ -181,8 +188,8 @@ class TestSessionRow:
 
         # 2 completed, so the 3rd is the one being trialed.
         assert row["STATUS"] == "[bold sea_green3]trialing[/] [secondary](3/3)[/]"
-        # Per-user speed is 1/TPOT, the same definition the preset row uses — not
-        # the aggregate over concurrency, which would read 292 here.
+        # Per-user speed comes from the trial's E2E/TTFT-derived decode rate, not
+        # aggregate throughput.
         assert row["BENCHMARK"].startswith("tps/user=292")
         assert row["RESOURCES"] == "A40:48GB:1"
 
@@ -441,8 +448,8 @@ class TestFailedTrials:
 
         assert summary["best"] is None
         assert summary["best_failed"]["tok_s"] == 300.0
-        # Mean, not p50: MTP skews TPOT right, and mean is the delivered rate.
-        assert summary["best_failed"]["tpot_ms"] == 41.7
+        # Older sessions without E2E preserve their reported mean TPOT display.
+        assert summary["best_failed"]["per_user_tok_s"] == pytest.approx(1000 / 41.7)
 
     def test_a_run_that_met_nothing_still_shows_what_it_measured(self):
         row = _session_row(
@@ -457,7 +464,7 @@ class TestFailedTrials:
                     "best": None,
                     "best_failed": {
                         "tok_s": 100.0,
-                        "tpot_ms": 34.4,
+                        "per_user_tok_s": 1000 / 34.4,
                         "ttft_ms": 4300.0,
                         "context_length": 1048576,
                         "concurrency": 4,

@@ -83,13 +83,22 @@ class PresetBenchmarkMetrics(CoreModel):
     output_tok_per_s: PositiveFloat
     per_user_tok_per_s: PositiveFloat
     ttft_ms: PresetBenchmarkLatency
-    tpot_ms: PresetBenchmarkLatency
+    # Old stored presets predate `e2e_ms`. New agent reports require it via
+    # `PresetAgentBenchmarkMetrics` and use it for the derived decode rate.
+    e2e_ms: Optional[PresetBenchmarkLatency] = None
+    # Some benchmark tools report inter-token latency per streamed chunk rather
+    # than TPOT per output token. Keep genuine TPOT when available, but do not
+    # force the agent to substitute a different metric.
+    tpot_ms: Optional[PresetBenchmarkLatency] = None
 
 
 class PresetBenchmark(CoreModel):
-    """The agent reports its benchmark in exactly this shape, and is forced to by
-    the schema generated from it. Changing a field here means also changing the
-    `## Benchmark` section of the system prompt, which tells it what to put there."""
+    """The benchmark shape stored in presets.
+
+    Fresh agent reports use a stricter subclass in `cli/models/preset_agent.py`.
+    Changing these fields also means changing the `## Benchmark` section of the
+    system prompt, which tells the agent what to report.
+    """
 
     tool: Annotated[str, Field(min_length=1)]
     tool_version: Annotated[str, Field(min_length=1)]
@@ -103,7 +112,15 @@ class PresetBenchmark(CoreModel):
 
     @property
     def effective_per_user_tok_per_s(self) -> float:
-        return 1000 / self.metrics.tpot_ms.mean
+        e2e_ms = self.metrics.e2e_ms
+        if e2e_ms is None:
+            # Compatibility with presets stored before end-to-end latency was
+            # recorded. New agent reports always provide `e2e_ms`.
+            assert self.metrics.tpot_ms is not None
+            return 1000 / self.metrics.tpot_ms.mean
+        mean_output_tokens = self.metrics.total_output_tokens / self.metrics.successful_requests
+        mean_tpot_ms = (e2e_ms.mean - self.metrics.ttft_ms.mean) / (mean_output_tokens - 1)
+        return 1000 / mean_tpot_ms
 
     @field_validator("command")
     @classmethod
@@ -125,6 +142,14 @@ class PresetBenchmark(CoreModel):
             raise ValueError("benchmark must not include failed requests")
         if self.metrics.successful_requests != self.workload.num_requests:
             raise ValueError("benchmark request count must match workload.num_requests")
+        if self.metrics.e2e_ms is None:
+            if self.metrics.tpot_ms is None:
+                raise ValueError("legacy benchmark without e2e_ms must include tpot_ms")
+            return self
+        if self.metrics.total_output_tokens <= self.metrics.successful_requests:
+            raise ValueError("benchmark must average more than one output token per request")
+        if self.metrics.e2e_ms.mean <= self.metrics.ttft_ms.mean:
+            raise ValueError("benchmark mean e2e_ms must be greater than mean ttft_ms")
         return self
 
 

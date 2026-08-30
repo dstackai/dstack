@@ -1096,12 +1096,32 @@ class TestSummarizeSessionTrials:
         assert summary["count"] == 4
         assert summary["best"] == {
             "tok_s": 2300.0,
-            "tpot_ms": None,
+            "per_user_tok_s": None,
             "ttft_ms": None,
             "context_length": None,
             "concurrency": 8,
             "gpu": "A40:48GB:1",
         }
+
+    def test_derives_per_user_rate_from_e2e_instead_of_reported_tpot(self, tmp_path):
+        record = {
+            "benchmark": {
+                "metrics": {
+                    "successful_requests": 4,
+                    "duration_seconds": 10.0,
+                    "total_output_tokens": 512,
+                    "ttft_ms": {"mean": 100.0},
+                    "e2e_ms": {"mean": 1370.0},
+                    # Chunk-level ITL from speculative decoding, mislabeled as TPOT.
+                    "tpot_ms": {"mean": 137.18},
+                },
+                "workload": {"concurrency": 4},
+            }
+        }
+
+        summary = _summarize_session_trials(_write_trials(tmp_path, [record]))
+
+        assert summary["best"]["per_user_tok_s"] == pytest.approx(100.0)
 
     def test_trials_are_ordered_numerically_beyond_nine(self, tmp_path):
         # Twelve trials: a string sort would chart 1, 10, 11, 12, 2, ...

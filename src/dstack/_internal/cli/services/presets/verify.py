@@ -192,7 +192,9 @@ def _normalized_benchmark(
             {"dataset": None} if configuration.dataset is None else {"shared_prefix_tokens": 0}
         )
     )
-    return benchmark.model_copy(update={"workload": workload})
+    return PresetBenchmark.model_validate(
+        {**benchmark.model_dump(), "workload": workload.model_dump()}
+    )
 
 
 def _portable_service(

@@ -114,6 +114,7 @@ def get_preset_benchmark() -> PresetBenchmark:
             "output_tok_per_s": 42.1,
             "per_user_tok_per_s": 42.1,
             "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+            "e2e_ms": {"mean": 1063.4, "p50": 1048.0, "p99": 1150.3},
             "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1},
         },
     )
@@ -254,5 +255,5 @@ def get_successful_preset_report(run: Run) -> PresetAgentSuccess:
         base="Qwen/Qwen3.5-27B",
         model="community/Qwen3.5-27B-GPTQ-Int4",
         context_length=32768,
-        benchmark=get_preset_benchmark(),
+        benchmark=get_preset_benchmark().model_dump(),
     )
