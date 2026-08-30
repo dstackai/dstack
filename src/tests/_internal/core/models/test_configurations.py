@@ -1196,6 +1196,20 @@ class TestServiceGroupsPhase1:
         dumped = parsed.model_dump()
         validate_extra_ignore(_Legacy021Service, dumped)
 
+    def test_dump_keep_groups_context_keeps_groups(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "groups": [{"replicas": 1, "commands": ["x"]}],
+            }
+        )
+        dumped = parsed.model_dump(mode="json", context={"keep_groups": True})
+        assert "groups" in dumped
+        assert dumped.get("replicas") is None
+        assert "replicas" in dumped["groups"][0]
+        assert "count" not in dumped["groups"][0]
+
     def test_homogeneous_dump_has_no_groups_key(self):
         parsed = parse_run_configuration(
             {
@@ -1208,6 +1222,9 @@ class TestServiceGroupsPhase1:
         dumped = parsed.model_dump()
         assert "groups" not in dumped
         assert dumped["replicas"] == {"min": 2, "max": 2}
+        kept = parsed.model_dump(mode="json", context={"keep_groups": True})
+        assert "groups" not in kept
+        assert kept["replicas"] == {"min": 2, "max": 2}
 
     def test_replicas_and_groups_rejected(self):
         with pytest.raises(ConfigurationError, match="mutually exclusive"):

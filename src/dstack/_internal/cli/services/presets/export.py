@@ -54,7 +54,12 @@ def export_preset(
             if target.exists():
                 raise CLIError(f"{target} already exists. Use --force to overwrite")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(yaml.safe_dump(service.model_dump(mode="json"), sort_keys=False))
+    destination.write_text(
+        yaml.safe_dump(
+            service.model_dump(mode="json", context={"keep_groups": True}),
+            sort_keys=False,
+        )
+    )
     for source, target in copies:
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():

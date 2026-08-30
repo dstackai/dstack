@@ -12,6 +12,7 @@ from pydantic import (
     GetCoreSchemaHandler,
     PositiveInt,
     RootModel,
+    SerializationInfo,
     SerializerFunctionWrapHandler,
     ValidationError,
     ValidationInfo,
@@ -1258,11 +1259,16 @@ class ServiceConfigurationParams(CoreModel):
 
     @model_serializer(mode="wrap")
     def _serialize_legacy_replica_groups(
-        self, handler: SerializerFunctionWrapHandler
+        self, handler: SerializerFunctionWrapHandler, info: SerializationInfo
     ) -> Dict[str, Any]:
         res = handler(self)
         groups = res.pop("groups", None)
         if groups is None:
+            return res
+        # keep_groups=True: dump `groups:` for `dstack preset export` (`*.dstack.yml`)
+        # and PresetStore.save (`preset.yml`).
+        if info.context and info.context.get("keep_groups"):
+            res["groups"] = groups
             return res
         for group in groups:
             if "replicas" in group:
