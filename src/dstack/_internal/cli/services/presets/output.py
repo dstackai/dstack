@@ -116,6 +116,7 @@ def get_presets_table(
     table.add_column("STATUS")
     table.add_column("SUBMITTED", style="secondary")
     presets_by_base: dict[str, list[AnyStoredPreset]] = defaultdict(list)
+    preset_ids = {preset.id for preset in presets}
     repo_to_base: dict[str, str] = {}
     for preset in presets:
         presets_by_base[preset.base].append(preset)
@@ -123,9 +124,11 @@ def get_presets_table(
     sessions_by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
     creations_by_id: dict[str, dict[str, Any]] = {}
     for session in sessions or []:
-        if str(session.get("status")) == "success":
-            # A completed creation session decorates its preset row.
-            creations_by_id[str(session.get("id"))] = session
+        session_id = str(session.get("id"))
+        if session_id in preset_ids:
+            # The stored artifact is the completion record. Cleanup can be
+            # interrupted before session.json advances to `success`.
+            creations_by_id[session_id] = session
             continue
         model = str(session.get("model") or "unknown")
         sessions_by_model[repo_to_base.get(model, model)].append(session)

@@ -108,6 +108,29 @@ class TestPresetLocalCommands:
         assert kwargs["configuration"].model.base == "Qwen/Qwen3.5-27B"
         assert kwargs["user_prompt"] == "go deep"
 
+    def test_resume_refuses_a_session_with_a_saved_preset(self, tmp_path, capsys):
+        preset = get_preset()
+        session_dir = tmp_path / ".dstack" / "presets" / preset.id
+        session_dir.mkdir(parents=True)
+        session_dir.joinpath("session.json").write_text(
+            get_session_state(
+                id=preset.id,
+                status="interrupted",
+                run=get_session_run(claude_session_id="sid-1"),
+            ).model_dump_json(),
+            encoding="utf-8",
+        )
+        PresetStore(session_dir.parent).save(preset)
+
+        with patch("dstack._internal.cli.commands.preset.create_preset") as create:
+            exit_code = run_dstack_cli(
+                ["preset", "resume", preset.id], home_dir=tmp_path, repo_dir=tmp_path
+            )
+
+        assert exit_code == 1
+        create.assert_not_called()
+        assert "already created; nothing to resume" in capsys.readouterr().out
+
     def test_get_returns_the_requested_configuration_for_an_unfinished_preset(
         self, tmp_path, capsys
     ):
