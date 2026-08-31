@@ -14,6 +14,9 @@ from gpuhunt import AcceleratorVendor
 from kubernetes import client
 from typing_extensions import Self
 
+from dstack._internal.core.backends.base.authorized_keys import (
+    get_add_authorized_keys_script,
+)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
@@ -1035,11 +1038,9 @@ def _check_and_configure_jump_pod_service(
         ssh_private_key=project_ssh_private_key,
         # command= in authorized_keys is equivalent to ForceCommand in sshd_config
         # By forcing the /bin/false command we only allow proxy jumping, no shell access
-        command=f"""
-            if grep -qvF '{user_ssh_public_key}' ~/.ssh/authorized_keys; then
-                echo 'command="/bin/false" {user_ssh_public_key}' >> ~/.ssh/authorized_keys
-            fi
-        """,
+        command=get_add_authorized_keys_script(
+            [user_ssh_public_key], options='command="/bin/false"'
+        ),
     )
     if ssh_exit_status != 0:
         logger.debug(

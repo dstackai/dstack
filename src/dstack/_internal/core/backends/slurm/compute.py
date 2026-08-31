@@ -5,6 +5,9 @@ import time
 from functools import partial
 from typing import Optional
 
+from dstack._internal.core.backends.base.authorized_keys import (
+    get_add_authorized_keys_script,
+)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
@@ -319,20 +322,12 @@ class SlurmCompute(
                 for job_node in job_nodes
             ]
 
-            res = client.exec(f"""
-                set -eu
-                if [ ! -e ~/.ssh/authorized_keys ]; then
-                    mkdir -p ~/.ssh
-                    chmod 700 ~/.ssh
-                    touch ~/.ssh/authorized_keys
-                    chmod 600 ~/.ssh/authorized_keys
-                fi
-                for key in {shlex.join(authorized_keys)}; do
-                    if ! grep -qF "$key" ~/.ssh/authorized_keys; then
-                        echo 'command="/bin/false"' "$key" >> ~/.ssh/authorized_keys
-                    fi
-                done
-            """)
+            # command= in authorized_keys is equivalent to ForceCommand in sshd_config.
+            # By forcing the /bin/false command we only allow proxy jumping through the login
+            # node, no shell access
+            res = client.exec(
+                get_add_authorized_keys_script(authorized_keys, options='command="/bin/false"')
+            )
             if not res.ok:
                 raise ComputeError(f"Failed to add authorized keys: {res}")
 
