@@ -253,16 +253,16 @@ mindful of which specific change was the root cause.
 
 `trials/<n>/trial.json` is a JSON object.
 
-1. In case the task is not using PD disaggregation (and thus no node groups),
-   the fields are these and no others:
+1. In case the task is not using node groups, the fields are these and no
+   others:
 
 ```
 {"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
-2. In case the task is using PD disaggregation (and thus node groups), instead
-   of a single `resources` it includes `groups`, and the fields are these and
-   no others:
+2. In case the task is using node groups (e.g. for PD disaggregation),
+   instead of a single `resources` it includes `groups`, and the fields are
+   these and no others:
 
 ```
 {"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}

@@ -150,7 +150,7 @@ If background attach fails in the sandbox (permissions writing `~/.dstack` or `~
 
 ### Distributed tasks and multi-replica services
 
-Unless you use **Distributed tasks** (see `### 2. Tasks`) or **Multi-replica services** (see `### 3. Services`), both tasks and services run on a single node. That's why `dstack logs <run name>`, `dstack attach <run name>`, and `ssh <run name>` default to replica 0/job 0.
+Unless you use **Distributed tasks** (see `### 2. Tasks`) or **Multi-replica services** (see `### 3. Services`), both tasks and services run on a single node. That's why `dstack logs <run name>`, `dstack attach <run name>`, and `ssh <run name>` default to the first replica/job.
 
 - In a distributed task, each node runs its own job, numbered from 0 in order across node groups. Target a node via `dstack logs <run name> --job 1` or `dstack attach <run name> --job 1`.
 - In a multi-replica service, replicas are numbered from 0 in order across replica groups. Target a replica via `dstack logs <run name> --replica 1` or `dstack attach <run name> --replica 1`.
