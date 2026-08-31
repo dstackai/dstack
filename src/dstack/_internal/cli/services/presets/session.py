@@ -562,6 +562,7 @@ def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
 
 
 def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+    # TODO: Refactor this crap - must be explicit what is this and where is it used; also dicts are prohibited in dstack repo
     """A trial directory without `trial.json` is still in flight and is not
     counted."""
     records = []

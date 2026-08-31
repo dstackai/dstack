@@ -251,19 +251,21 @@ also failed when its benchmark does not meet the constraints (see
 `# Constraints`). When a trial that changed several things fails, be
 mindful of which specific change was the root cause.
 
-`trials/<n>/trial.json` is a JSON object. This object differs for a trial with
-node groups and a trial without node groups.
+`trials/<n>/trial.json` is a JSON object.
 
-1. For a trial with node groups the fields are these and no others:
-
-```
-{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
-```
-
-2. For a trial without node groups the fields are these and no others:
+1. In case the task is not using PD disaggregation (and thus no node groups),
+   the fields are these and no others:
 
 ```
 {"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
+```
+
+2. In case the task is using PD disaggregation (and thus node groups), instead
+   of a single `resources` it includes `groups`, and the fields are these and
+   no others:
+
+```
+{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -274,11 +276,14 @@ node groups and a trial without node groups.
   `dstack run get <run name> --json`, converting MiB values to GB and the
   `gpus` list into one `gpu` object with the GPU `name`, per-GPU `memory`,
   and `count`.
-- `groups`: a list of node groups, in the order they appear in the task
-  configuration. Each node group is a list of its nodes. Each node is the exact
-  resources of the instance that node ran on, e.g. a PD disaggregation task
-  with a one-node router group, a two-node prefill group and a one-node decode
-  group records:
+- `groups`: the exact resources of each instance the task ran on, per node
+  group; groups are in the order they appear in the task configuration, and
+  each group lists the resources of its instances, in the same format as
+  `resources`. Read the actual values from each job's latest submission's
+  `job_runtime_data.offer.instance.resources` in
+  `dstack run get <run name> --json`, converting them as for `resources`.
+  E.g. a one-node router group, a two-node prefill group, and a one-node
+  decode group record:
 
   ```
   [
@@ -316,10 +321,10 @@ serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`co
 `shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
 
-To benchmark a PD disaggregation setup, SSH into the job running the router and
-run the benchmark directly against the router. Never benchmark a prefill or
-decode worker — each handles only part of a request, so the result would not
-describe the configuration.
+In case the task is using PD disaggregation, run benchmarks via SSH inside
+the router node, directly against the router engine. Never benchmark prefill
+or decode workers — each handles only part of a request.
+
 <!--?if dataset-->
 Before any benchmark, reset the serving engine's prefix cache, or restart the
 engine, so it does not reuse what a previous benchmark cached. Do not vary
@@ -463,7 +468,8 @@ patches are correct (and will exactly replicate the result).
 # Task Usage
 
 Trials are done entirely using `dstack` tasks. For maximum efficiency, it is a
-requirement that you always set the task `commands` to `sleep infinity` and
+requirement that you always set the task `commands` to `sleep infinity` (for
+a task with `groups`, in each group's `commands`) and
 run commands inside the task interactively, via SSH. It is important that
 you follow the `/dstack-prototyping` skill when working with tasks.
 
@@ -558,6 +564,10 @@ the service replica, directly against the serving engine, the same way as the
 trial benchmarks so that the results are comparable with each other. Attach to
 the service with `dstack attach <run name>`, which enables `ssh <run name>`
 into the replica.
+
+In case the service is using PD disaggregation, run the final benchmark
+inside the router replica, directly against the router engine. Attach to it
+via `dstack attach <run name> --replica <replica num> --job <job num>`.
 
 If the service or its benchmark cannot be completed, stop that service,
 pick the next-best trial, and repeat, until a service is verified or there
