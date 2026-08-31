@@ -39,7 +39,6 @@ async def register_service(
         ssh_private_key=body.ssh_private_key,
         repo=repo,
         has_router_replica=body.has_router_replica,
-        router=body.router,
         nginx=nginx,
         service_conn_pool=service_conn_pool,
     )

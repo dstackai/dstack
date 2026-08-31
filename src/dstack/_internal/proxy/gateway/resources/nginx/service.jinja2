@@ -4,13 +4,9 @@ limit_req_zone {{ zone.key }} zone={{ zone.name }}:10m rate={{ zone.rpm }}r/m;
 
 {% if replicas %}
 upstream {{ domain }}.upstream {
-    {% if router_port is not none %}
-    server 127.0.0.1:{{ router_port }};  # SGLang router on the gateway
-    {% else %}
     {% for replica in replicas %}
     server unix:{{ replica.socket }};  # replica {{ replica.id }}
     {% endfor %}
-    {% endif %}
 }
 {% else %}
 
@@ -48,7 +44,7 @@ server {
     {% endfor %}
 
     {# For router services: block all requests except whitelisted locations added dynamically above #}
-    {% if has_router_replica or (router is not none and router.type == "sglang") %}
+    {% if has_router_replica %}
     location / {
         return 403;
     }

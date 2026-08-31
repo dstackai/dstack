@@ -6,7 +6,6 @@ from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
@@ -49,7 +48,6 @@ async def register_service(
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
     has_router_replica: bool = False,
-    router: Optional[AnyServiceRouterConfig] = None,
 ) -> None:
     cors_enabled = model is not None and model.type == "chat" and model.format == "openai"
     service = models.Service(
@@ -63,7 +61,6 @@ async def register_service(
         client_max_body_size=client_max_body_size,
         replicas=(),
         has_router_replica=has_router_replica,
-        router=router,
         cors_enabled=cors_enabled,
     )
 
@@ -268,11 +265,6 @@ async def register_model_entrypoint(
     logger.info("Entrypoint %s is now registered in project %s", domain, project_name)
 
 
-def _uses_pd_disaggregation(service: models.Service) -> bool:
-    """PD disaggregation: router talks to replicas via internal_ip, no SSH tunnels needed."""
-    return service.router is not None and service.router.pd_disaggregation
-
-
 async def apply_service(
     service: models.Service,
     old_service: Optional[models.Service],
@@ -292,31 +284,18 @@ async def apply_service(
             ),
             service_conn_pool=service_conn_pool,
         )
-    if _uses_pd_disaggregation(service):
-        replica_conns = {}
-        replica_failures = {}
-        replica_configs = [
-            ReplicaConfig(
-                id=replica.id,
-                socket=Path("/dev/null"),
-                port=replica.app_port,
-                internal_ip=replica.internal_ip,
-            )
-            for replica in service.replicas
-        ]
-    else:
-        replica_conns, replica_failures = await get_or_add_replica_connections(
-            service, repo, service_conn_pool
+    replica_conns, replica_failures = await get_or_add_replica_connections(
+        service, repo, service_conn_pool
+    )
+    replica_configs = [
+        ReplicaConfig(
+            id=replica.id,
+            socket=conn.app_socket_path,
+            port=replica.app_port,
+            internal_ip=replica.internal_ip,
         )
-        replica_configs = [
-            ReplicaConfig(
-                id=replica.id,
-                socket=conn.app_socket_path,
-                port=replica.app_port,
-                internal_ip=replica.internal_ip,
-            )
-            for replica, conn in replica_conns.items()
-        ]
+        for replica, conn in replica_conns.items()
+    ]
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures
@@ -365,9 +344,6 @@ async def get_nginx_service_config(
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
-    is_router = (
-        service.router is not None and service.router.type == RouterType.SGLANG
-    ) or service.has_router_replica
     sglang_limits: dict[str, LimitReqConfig] = {}
     sglang_prefix_lengths: dict[str, int] = {}  # Track prefix lengths for most-specific selection
 
@@ -382,7 +358,7 @@ async def get_nginx_service_config(
         limit_req_zones.append(
             LimitReqZoneConfig(name=zone_name, key=key, rpm=round(rate_limit.rps * 60))
         )
-        if is_router:
+        if service.has_router_replica:
             for path in ROUTER_WHITELISTED_PATHS:
                 if rate_limit.prefix == path or path.startswith(rate_limit.prefix):
                     # Use the longest prefix if multiple prefixes match the same path
@@ -403,7 +379,7 @@ async def get_nginx_service_config(
             )
 
     # Add router whitelisted paths as locations
-    if is_router:
+    if service.has_router_replica:
         for path in ROUTER_WHITELISTED_PATHS:
             # Use prefix match for paths that end with a slash and exact match for paths that don't
             if path.endswith("/"):
@@ -414,7 +390,10 @@ async def get_nginx_service_config(
                 )
 
     # Don't auto-add / location for router-based services (catch-all 403 handles it)
-    if not any(location.prefix == "/" for location in locations) and not is_router:
+    if (
+        not any(location.prefix == "/" for location in locations)
+        and not service.has_router_replica
+    ):
         locations.append(LocationConfig(prefix="/", limit_req=None))
     return ServiceConfig(
         domain=service.domain_safe,
@@ -427,7 +406,6 @@ async def get_nginx_service_config(
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         has_router_replica=service.has_router_replica,
-        router=service.router,
         cors_enabled=service.cors_enabled,
     )
 
