@@ -91,6 +91,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.jobs import (
     emit_job_status_change_event,
     find_job,
+    get_extra_authorized_keys,
     get_job_attached_volumes,
     get_job_runtime_data,
     get_job_spec,
@@ -816,14 +817,15 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        public_keys = [context.project.ssh_public_key.strip()]
+        extra_authorized_keys = get_extra_authorized_keys(context.run.run_spec)
+        public_keys = [context.project.ssh_public_key.strip(), *extra_authorized_keys]
+        # Host access, unlike container access, is all or nothing -- the user key is added to
+        # the host only if they are allowed to bypass the SSH proxy
         ssh_user: Optional[str] = None
         user_ssh_key: Optional[str] = None
         if not server_settings.SSHPROXY_ENFORCED:
             ssh_user = job_provisioning_data.username
-            assert context.run.run_spec.ssh_key_pub is not None
-            user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
-            public_keys.append(user_ssh_key)
+            user_ssh_key = get_or_error(context.run.run_spec.ssh_key_pub).strip()
         success = await run_async(
             _process_provisioning_with_shim,
             server_ssh_private_keys,

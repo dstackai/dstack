@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import Callable, List, Optional
 
+from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
@@ -34,7 +35,6 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
@@ -135,20 +135,17 @@ class RunpodCompute(
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
-        assert run.run_spec.ssh_key_pub is not None
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, job),
-            ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
+            ssh_keys=[],
             user=run.user,
         )
 
         pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
-        authorized_keys = instance_config.get_public_keys()
+        authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
@@ -251,6 +248,7 @@ class RunpodCompute(
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> ComputeGroupProvisioningData:
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job
@@ -259,15 +257,12 @@ class RunpodCompute(
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_job_instance_name(run, master_job),
-            ssh_keys=[
-                SSHKey(public=get_or_error(run.run_spec.ssh_key_pub).strip()),
-                SSHKey(public=project_ssh_public_key.strip()),
-            ],
+            ssh_keys=[],
             user=run.user,
         )
 
         pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
-        authorized_keys = instance_config.get_public_keys()
+        authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
         network_volume_id = None

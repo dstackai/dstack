@@ -15,7 +15,9 @@ from kubernetes import client
 from typing_extensions import Self
 
 from dstack._internal.core.backends.base.authorized_keys import (
+    build_authorized_keys,
     get_add_authorized_keys_script,
+    normalize_authorized_keys,
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
@@ -126,7 +128,15 @@ class Operator(str, Enum):
 class KubernetesBackendData(CoreModel):
     jump_pod_name: str
     jump_pod_service_name: str
-    user_ssh_public_key: str
+    # TODO: remove `user_ssh_public_key` once servers before 0.21.4 are no longer supported.
+    user_ssh_public_key: str = ""
+    """Superseded by `extra_authorized_keys`, but still written -- as the first extra key, or an
+    empty string if there are none -- because servers before 0.21.4 require this field and may
+    read this record during a rolling deployment. Read only if `extra_authorized_keys` is empty,
+    that is, if such a server wrote the record.
+    """
+    extra_authorized_keys: list[str] = []
+    """Empty in records written before the field was introduced, see `user_ssh_public_key`."""
 
     @classmethod
     def load(cls, raw: str) -> Self:
@@ -193,6 +203,7 @@ class KubernetesCompute(
         volumes: list[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         cluster = self.region_cluster_map.get(instance_offer.region)
         if cluster is None:
@@ -201,6 +212,13 @@ class KubernetesCompute(
             raise SkipOffer(f"cluster {cluster} has recently failed to schedule a similar job")
         api = client.CoreV1Api(cluster.api_client)
         namespace = cluster.namespace
+
+        # The jump pod, created below only if it does not exist yet, gets the project key alone.
+        # This job's extra keys are added to it later by update_provisioning_data(), which runs
+        # for every job, whether or not the job created the pod. The job pod gets both at once.
+        project_authorized_keys = build_authorized_keys(project_ssh_public_key, [])
+        extra_authorized_keys = normalize_authorized_keys(extra_authorized_keys)
+        authorized_keys = project_authorized_keys + extra_authorized_keys
 
         # There is one jump pod per project that is used as an ssh proxy jump to connect
         # to all job pods of the same project.
@@ -214,7 +232,7 @@ class KubernetesCompute(
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=cluster.proxy_jump.port,
-            project_ssh_public_key=project_ssh_public_key.strip(),
+            authorized_keys=project_authorized_keys,
         )
 
         pod_name = generate_unique_instance_name_for_job(
@@ -256,8 +274,6 @@ class KubernetesCompute(
                     should_delete_manually_if_failed=True,
                 )
 
-            assert run.run_spec.ssh_key_pub is not None
-            authorized_keys = [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
             _create_job_pod(
                 api=api,
                 namespace=namespace,
@@ -329,7 +345,9 @@ class KubernetesCompute(
         backend_data = KubernetesBackendData(
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
-            user_ssh_public_key=run.run_spec.ssh_key_pub.strip(),
+            extra_authorized_keys=extra_authorized_keys,
+            # For compatibility with server replicas < 0.21.4
+            user_ssh_public_key=next(iter(extra_authorized_keys), ""),
         )
 
         return JobProvisioningData(
@@ -369,6 +387,11 @@ class KubernetesCompute(
         if provisioning_data.backend_data is not None:
             # Before running a job, ensure the jump pod is running and has user's public SSH key.
             backend_data = KubernetesBackendData.load(provisioning_data.backend_data)
+            extra_authorized_keys = backend_data.extra_authorized_keys
+            # TODO: remove the fallback once servers before 0.21.4 are no longer supported.
+            if not extra_authorized_keys and backend_data.user_ssh_public_key:
+                # Written by a server that predates the `extra_authorized_keys` field.
+                extra_authorized_keys = [backend_data.user_ssh_public_key]
             ssh_proxy = _check_and_configure_jump_pod_service(
                 api=api,
                 namespace=namespace,
@@ -376,7 +399,7 @@ class KubernetesCompute(
                 jump_pod_service_name=backend_data.jump_pod_service_name,
                 jump_pod_hostname=cluster.proxy_jump.hostname,
                 project_ssh_private_key=project_ssh_private_key,
-                user_ssh_public_key=backend_data.user_ssh_public_key,
+                authorized_keys=extra_authorized_keys,
             )
             if ssh_proxy is None:
                 # Jump pod is not ready yet
@@ -837,7 +860,7 @@ def _create_jump_pod_service_if_not_exists(
     jump_pod_name: str,
     jump_pod_service_name: str,
     jump_pod_port: Optional[int],
-    project_ssh_public_key: str,
+    authorized_keys: list[str],
 ) -> None:
     base_labels = build_base_labels(
         component="ssh-proxy",
@@ -914,7 +937,7 @@ def _create_jump_pod_service_if_not_exists(
             )
         if not tolerations:
             logger.warning("No appropriate node found, the jump pod may never be scheduled")
-    commands = _get_jump_pod_commands(authorized_keys=[project_ssh_public_key])
+    commands = _get_jump_pod_commands(authorized_keys)
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(
             name=jump_pod_name,
@@ -977,7 +1000,7 @@ def _check_and_configure_jump_pod_service(
     jump_pod_service_name: str,
     jump_pod_hostname: Optional[str],
     project_ssh_private_key: str,
-    user_ssh_public_key: str,
+    authorized_keys: list[str],
 ) -> Optional[SSHConnectionParams]:
     jump_pod = api.read_namespaced_pod(
         namespace=namespace,
@@ -1031,13 +1054,9 @@ def _check_and_configure_jump_pod_service(
     if (jump_pod_port := jump_pod_service_ports[0].node_port) is None:
         raise ProvisioningError("Jump pod service %s port is not set", jump_pod_service_name)
 
-    ssh_exit_status, ssh_output = _run_ssh_command(
-        hostname=jump_pod_hostname,
-        port=jump_pod_port,
-        username=JUMP_POD_USER,
-        ssh_private_key=project_ssh_private_key,
-        command=get_add_authorized_keys_script(
-            [user_ssh_public_key],
+    if authorized_keys:
+        command = get_add_authorized_keys_script(
+            authorized_keys,
             # The project key, written by _get_jump_pod_commands(), carries no marker, and
             # marking only some of our entries defeats the purpose of the marker. It is
             # redundant on the jump pod anyway -- every entry there is ours
@@ -1045,7 +1064,16 @@ def _check_and_configure_jump_pod_service(
             # command= in authorized_keys is equivalent to ForceCommand in sshd_config
             # By forcing the /bin/false command we only allow proxy jumping, no shell access
             options='command="/bin/false"',
-        ),
+        )
+    else:
+        # No keys to add, but the connection itself is still the check that sshd is up
+        command = "true"
+    ssh_exit_status, ssh_output = _run_ssh_command(
+        hostname=jump_pod_hostname,
+        port=jump_pod_port,
+        username=JUMP_POD_USER,
+        ssh_private_key=project_ssh_private_key,
+        command=command,
     )
     if ssh_exit_status != 0:
         logger.debug(
@@ -1072,11 +1100,11 @@ def _check_and_configure_jump_pod_service(
 
 
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
-    authorized_keys_content = "\n".join(authorized_keys).strip()
+    authorized_keys_content = "\n".join(authorized_keys)
     commands = [
         "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
-        f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
+        f"echo {shlex.quote(authorized_keys_content)} > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",

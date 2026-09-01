@@ -6,6 +6,7 @@ from functools import partial
 from typing import Optional
 
 from dstack._internal.core.backends.base.authorized_keys import (
+    build_authorized_keys,
     get_add_authorized_keys_script,
 )
 from dstack._internal.core.backends.base.compute import (
@@ -140,6 +141,7 @@ class SlurmCompute(
         volumes: list[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         # run_job provisions a single dstack job → one Slurm node. Do not fall
         # back to jobs_per_replica (total across hetero groups).
@@ -148,6 +150,7 @@ class SlurmCompute(
             job=job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
+            extra_authorized_keys=extra_authorized_keys,
             requirements=requirements,
             node_count=1,
         )
@@ -162,6 +165,7 @@ class SlurmCompute(
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> ComputeGroupProvisioningData:
         master_job = job_configurations[0].job
         return self._run_slurm_job(
@@ -169,6 +173,7 @@ class SlurmCompute(
             job=master_job,
             instance_offer=instance_offer,
             project_ssh_public_key=project_ssh_public_key,
+            extra_authorized_keys=extra_authorized_keys,
             requirements=requirements,
             node_count=len(job_configurations),
         )
@@ -192,6 +197,7 @@ class SlurmCompute(
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        extra_authorized_keys: list[str],
         requirements: Requirements,
         node_count: int,
     ) -> ComputeGroupProvisioningData:
@@ -214,8 +220,8 @@ class SlurmCompute(
                 max_length=SLURM_JOB_NAME_MAX_LENGTH,
             )
 
-            assert run.run_spec.ssh_key_pub is not None
-            authorized_keys = [project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()]
+            # The same keys go to the login node, for proxy jumping, and to the container
+            authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
 
             # Slurm --nodes for this call (1 from run_job, len(batch) from run_jobs).
             resources_spec = requirements.resources

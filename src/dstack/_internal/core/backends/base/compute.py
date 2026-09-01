@@ -148,11 +148,21 @@ class Compute(ABC):
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
         If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
         and implement `update_provisioning_data()`.
+
+        `extra_authorized_keys` are the public keys to authorize on the job container in addition
+        to `project_ssh_public_key`, as decided by the caller -- typically the user key, or
+        nothing if the server does not let the user connect to the container directly. The project
+        key is never among them, and the keys are not validated; pass them to
+        `base.authorized_keys.build_authorized_keys()` to get the complete, validated list to
+        authorize. Only Computes that add the keys themselves need this argument; VM-based
+        (shim-based) Computes ignore it, as the server submits the keys to the shim once the
+        instance is up.
         """
         pass
 
@@ -390,10 +400,14 @@ class ComputeWithCreateInstanceSupport(ABC):
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         """
         The default `run_job()` implementation for all backends that support `create_instance()`.
         Override only if custom `run_job()` behavior is required.
+
+        `extra_authorized_keys` is ignored -- all such backends are VM-based, and the server
+        submits the keys to the shim later, see `Compute.run_job()`.
         """
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -442,7 +456,13 @@ class ComputeWithGroupProvisioningSupport(ABC):
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> ComputeGroupProvisioningData:
+        """
+        Launches a compute group -- instances created all at once via the provider API -- running
+        one job per instance. See `Compute.run_job()` for the arguments shared with it, including
+        `extra_authorized_keys`.
+        """
         pass
 
     @abstractmethod

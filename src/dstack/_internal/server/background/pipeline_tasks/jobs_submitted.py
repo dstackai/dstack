@@ -104,6 +104,7 @@ from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     find_job,
     find_jobs,
+    get_extra_authorized_keys,
     get_job_configured_volume_models,
     get_job_configured_volumes,
     get_job_runtime_data,
@@ -2418,6 +2419,7 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
+    extra_authorized_keys = get_extra_authorized_keys(run.run_spec)
     offers_iter = iter(offers)
     offers_tried = 0
     offers_taken = 0
@@ -2492,6 +2494,7 @@ async def _provision_new_capacity(
                     project_ssh_private_key,
                     placement_group_model_to_placement_group_optional(placement_group_model),
                     requirements,
+                    extra_authorized_keys,
                 )
                 return _ProvisionNewCapacityResult(
                     provisioning_data=compute_group_provisioning_data,
@@ -2516,6 +2519,7 @@ async def _provision_new_capacity(
                 offer_volumes,
                 placement_group_model_to_placement_group_optional(placement_group_model),
                 requirements,
+                extra_authorized_keys,
             )
             return _ProvisionNewCapacityResult(
                 provisioning_data=job_provisioning_data,
