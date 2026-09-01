@@ -1,11 +1,14 @@
+import base64
 import io
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -31,6 +34,77 @@ def get_public_key_fingerprint(text: str) -> str:
     pb = PublicBlob.from_string(text)
     pk = PKey.from_type_string(pb.key_type, pb.key_blob)
     return pk.fingerprint
+
+
+@dataclass
+class PublicKey:
+    """
+    A public key in OpenSSH disk format, parsed into fields.
+
+    Converting to str renders the key back into the one-line `type blob [comment]` form.
+
+    Attributes:
+        type: The key type, e.g. `ssh-ed25519`.
+        blob_base64: The base64-encoded key blob, as it appears in the key file.
+        comment: The comment or None if the key has no comment.
+    """
+
+    type: str
+    blob_base64: str
+    comment: Optional[str] = None
+
+    def __str__(self) -> str:
+        if not self.comment:
+            return f"{self.type} {self.blob_base64}"
+        return f"{self.type} {self.blob_base64} {self.comment}"
+
+
+def parse_public_key(key: str) -> PublicKey:
+    """
+    Parses a public key in OpenSSH disk format into its fields.
+
+    Performs basic validation -- ensures that the key consists of exactly one line, that the blob
+    is valid base64, and that the type field matches the type encoded in the blob. The key type
+    itself is not restricted, that is, keys of any type, including types unsupported by dstack,
+    are accepted.
+
+    Options (an optional field preceding the key type in the authorized_keys format) are not
+    supported -- the first field is always interpreted as a key type, so a line with options is
+    rejected as invalid.
+
+    The comment, if present, is normalized -- surrounding whitespaces are removed, adjacent
+    whitespaces are collapsed into a single space.
+
+    Args:
+        key: The public key in OpenSSH disk format, a `type blob [comment]` string.
+
+    Returns:
+        The parsed key. The blob is stored as is, without decoding.
+
+    Raises:
+        ValueError: Invalid public key.
+    """
+    lines = key.strip().splitlines()
+    if len(lines) != 1:
+        raise ValueError("Expected a single line")
+    try:
+        type_declared, blob_base64, *comment_parts = lines[0].split()
+    except ValueError:
+        raise ValueError("Not enough fields")
+    # paramiko.pkey.PublicBlob.from_string() performs the same key type check
+    try:
+        blob = base64.b64decode(blob_base64, validate=True)
+        [type_length] = struct.unpack(">I", blob[:4])
+        type_parsed = blob[4 : 4 + type_length].decode()
+    except (ValueError, struct.error) as e:
+        raise ValueError(f"Failed to parse key: {e}") from e
+    if type_declared != type_parsed:
+        raise ValueError(f"Key type mismatch: {type_declared} != {type_parsed}")
+    if comment_parts:
+        comment = " ".join(comment_parts)
+    else:
+        comment = None
+    return PublicKey(type=type_declared, blob_base64=blob_base64, comment=comment)
 
 
 def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_config_path) -> dict:
