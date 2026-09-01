@@ -304,6 +304,74 @@ class TestBuildVerifiedPreset:
                 created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
+    @pytest.mark.parametrize(
+        "served",
+        [
+            "Qwen/Qwen3.8-27B-GPTQ-Int4",  # the reported substitution: another generation
+            "Qwen/Qwen3.8-27B",
+            "meta-llama/Llama-3-8B",  # another family entirely
+            "Qwen/Qwen3.5-27Bx",  # a longer name that merely starts the same
+        ],
+    )
+    def test_rejects_a_served_repo_that_is_not_a_variant_of_the_base(self, tmp_path, served):
+        """`base` has to constrain which repos are acceptable.
+
+        Verification checked that the service advertised the requested name and
+        that the report echoed the requested base — both of which a substitution
+        preserves. `vllm serve Qwen/Qwen3.5-27B-GPTQ-Int4 --served-model-name
+        Qwen/Qwen3.8-27B` answered a request for Qwen3.8 with a different model
+        generation and verified clean.
+        """
+        run = get_running_service_run()
+        report = get_successful_preset_report(run).model_copy(update={"model": served})
+
+        # Both values named, as elsewhere here: "not a variant" alone is not actionable.
+        with pytest.raises(CLIError, match="is not a variant of the requested base"):
+            build_verified_preset(
+                run=run,
+                preset_configuration=PresetConfiguration(
+                    name="qwen-build", base="Qwen/Qwen3.5-27B"
+                ),
+                report=report,
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    @pytest.mark.parametrize(
+        "served",
+        [
+            "community/Qwen3.5-27B-GPTQ-Int4",  # a quantisation by another publisher
+            "Qwen/Qwen3.5-27B-AWQ",
+            "Qwen/Qwen3.5-27B",  # the base itself
+            "qwen/qwen3.5-27b-gptq-int4",  # repo references are not case-sensitive
+        ],
+    )
+    def test_accepts_a_genuine_variant_of_the_base(self, tmp_path, served):
+        """The check must not cost the freedom `base` exists to grant.
+
+        A quantisation is routinely published by someone other than the model's
+        author, so the owner is deliberately not compared — only the model name.
+        """
+        run = get_running_service_run()
+        report = get_successful_preset_report(run).model_copy(update={"model": served})
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=PresetConfiguration(name="qwen-build", base="Qwen/Qwen3.5-27B"),
+            report=report,
+            workspace_path=tmp_path,
+            session_path=tmp_path,
+            preset_id="ab12cd34",
+            name=None,
+            created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        assert preset.repo == served
+        assert preset.base == "Qwen/Qwen3.5-27B"
+
     def test_rejects_variant_for_exact_model_request(self, tmp_path):
         run = get_running_service_run()
         report = get_successful_preset_report(run).model_copy(update={"model": "other/model"})
