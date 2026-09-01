@@ -35,7 +35,7 @@ def install_action(args):
     )
     service_path.write_text(service_file.format(working_dir=working_dir.as_posix()))
 
-    for script_name in ["start.sh", "update.sh"]:
+    for script_name in ["start.sh"]:
         print(f"Writing {script_name} script...")
         script = importlib.resources.read_text("dstack.gateway.resources.systemd", script_name)
         script_path = working_dir / script_name

@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import itertools
+import shlex
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -827,17 +828,51 @@ async def _update_gateway_replica(gateway_replica_model: GatewayReplicaModel, bu
 
     # Build package spec with extras and wheel URL
     gateway_package = get_dstack_gateway_wheel(build)
-    commands = [
-        # prevent update.sh from overwriting itself during execution
-        "cp dstack/update.sh dstack/_update.sh",
-        f'sh dstack/_update.sh "{gateway_package}" {build}',
-        "rm dstack/_update.sh",
-    ]
-    stdout = await connection.tunnel.aexec("/bin/sh -c '" + " && ".join(commands) + "'")
+    command = (
+        "/bin/sh -c "
+        + shlex.quote(_GATEWAY_UPDATE_SCRIPT)
+        + " sh "  # $0 placeholder
+        + shlex.quote(gateway_package)
+        + " "
+        + shlex.quote(build)
+    )
+    stdout = await connection.tunnel.aexec(command)
     if "Update successfully completed" in stdout:
         logger.info("Gateway replica %s updated", connection.ip_address)
         return True
     return False
+
+
+# Blue/green: install the new build into the currently inactive venv and flip to it
+_GATEWAY_UPDATE_SCRIPT = """\
+set -e
+gateway_package="$1"
+build="$2"
+root=/home/ubuntu/dstack
+if [ -f "$root/version" ]; then
+  version=$(cat "$root/version")
+else
+  version=blue
+fi
+current_build=$("$root/$version/bin/pip" show dstack-gateway | grep Version | awk '{print $2}')
+if [ "$current_build" = "$build" ]; then
+  echo "The build $build is already installed. Skipping..."
+  exit 0
+fi
+if [ "$version" = blue ]; then
+  version=green
+else
+  version=blue
+fi
+"$root/$version/bin/pip" uninstall -y dstack-gateway dstack
+"$root/$version/bin/pip" cache remove dstack
+"$root/$version/bin/pip" install "$gateway_package"
+sudo "$root/$version/bin/python" -m dstack.gateway.systemd install
+echo "$version" > "$root/version"
+sudo systemctl daemon-reload
+sudo systemctl restart dstack.gateway
+echo "Update successfully completed"
+"""
 
 
 def _recently_updated(gateway_replica_model: GatewayReplicaModel) -> bool:
