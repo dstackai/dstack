@@ -1036,10 +1036,15 @@ def _check_and_configure_jump_pod_service(
         port=jump_pod_port,
         username=JUMP_POD_USER,
         ssh_private_key=project_ssh_private_key,
-        # command= in authorized_keys is equivalent to ForceCommand in sshd_config
-        # By forcing the /bin/false command we only allow proxy jumping, no shell access
         command=get_add_authorized_keys_script(
-            [user_ssh_public_key], options='command="/bin/false"'
+            [user_ssh_public_key],
+            # The project key, written by _get_jump_pod_commands(), carries no marker, and
+            # marking only some of our entries defeats the purpose of the marker. It is
+            # redundant on the jump pod anyway -- every entry there is ours
+            add_dstack_marker=False,
+            # command= in authorized_keys is equivalent to ForceCommand in sshd_config
+            # By forcing the /bin/false command we only allow proxy jumping, no shell access
+            options='command="/bin/false"',
         ),
     )
     if ssh_exit_status != 0:

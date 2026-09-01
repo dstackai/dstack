@@ -40,6 +40,13 @@ class TestGetAddAuthorizedKeysScript:
 
         assert entries(script) == [f"{ED25519_KEY} {DSTACK_PUBLIC_KEY_MARKER}"]
 
+    def test_omits_marker(self):
+        script = get_add_authorized_keys_script(
+            [f"{ED25519_KEY} dev@host"], add_dstack_marker=False
+        )
+
+        assert entries(script) == [f"{ED25519_KEY} dev@host"]
+
     def test_prepends_options(self):
         script = get_add_authorized_keys_script([ED25519_KEY], options='command="/bin/false"')
 

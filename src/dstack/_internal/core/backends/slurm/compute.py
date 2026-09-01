@@ -322,11 +322,14 @@ class SlurmCompute(
                 for job_node in job_nodes
             ]
 
-            # command= in authorized_keys is equivalent to ForceCommand in sshd_config.
-            # By forcing the /bin/false command we only allow proxy jumping through the login
-            # node, no shell access
             res = client.exec(
-                get_add_authorized_keys_script(authorized_keys, options='command="/bin/false"')
+                get_add_authorized_keys_script(
+                    authorized_keys,
+                    # command= in authorized_keys is equivalent to ForceCommand in sshd_config.
+                    # By forcing the /bin/false command we only allow proxy jumping through
+                    # the login node, no shell access
+                    options='command="/bin/false"',
+                )
             )
             if not res.ok:
                 raise ComputeError(f"Failed to add authorized keys: {res}")
