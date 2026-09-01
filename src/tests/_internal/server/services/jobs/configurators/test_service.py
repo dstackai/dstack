@@ -13,6 +13,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs.configurators.base import get_default_image
@@ -105,6 +106,47 @@ class TestProbes:
 
         assert len(job_specs) == 1
         assert len(job_specs[0].probes) == 0
+
+
+@pytest.mark.windows_only
+def test_default_probe_only_for_router_replica_group():
+    """A model probe should not make gRPC worker groups fail readiness."""
+    configuration = ServiceConfiguration(
+        port=80,
+        image="debian",
+        model=OpenAIChatModel(
+            name="meta-llama/Meta-Llama-3.1-8B-Instruct",
+            format="openai",
+        ),
+        replicas=[
+            ReplicaGroup(
+                name="router",
+                replicas=1,
+                router=ReplicaGroupRouterConfig(),
+            ),
+            ReplicaGroup(name="worker", replicas=1),
+        ],
+    )
+    run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+
+    router_probes = ServiceJobConfigurator(run_spec, replica_group_name="router")._probes()
+    worker_probes = ServiceJobConfigurator(run_spec, replica_group_name="worker")._probes()
+
+    assert len(router_probes) == 1
+    assert worker_probes == []
+
+    explicit_configuration = configuration.model_copy(
+        update={"probes": [ProbeConfig(type="http", url="/health")]}
+    )
+    explicit_run_spec = get_run_spec(
+        run_name="run", repo_id="id", configuration=explicit_configuration
+    )
+    explicit_worker_probes = ServiceJobConfigurator(
+        explicit_run_spec, replica_group_name="worker"
+    )._probes()
+
+    assert len(explicit_worker_probes) == 1
+    assert explicit_worker_probes[0].url == "/health"
 
 
 def _make_run_spec(replicas, **service_kwargs):

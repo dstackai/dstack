@@ -495,6 +495,17 @@ class JobConfigurator(ABC):
             if probes is not None:
                 return list(map(_probe_config_to_spec, probes))
             # Generate default probe if model is set
+            if self.replica_group_name is not None:
+                replica_group = next(
+                    (
+                        group
+                        for group in self.run_spec.configuration.replica_groups
+                        if group.name == self.replica_group_name
+                    ),
+                    None,
+                )
+                if replica_group is not None and replica_group.router is None:
+                    return []
             model = self.run_spec.configuration.model
             if isinstance(model, OpenAIChatModel):
                 return [_openai_model_probe_spec(model.name, model.prefix)]
