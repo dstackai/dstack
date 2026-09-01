@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Literal, Optional, Sequence, get_args
+from typing import Any, AsyncIterator, Callable, Iterable, Literal, Optional, Sequence, get_args
 
 import psutil
 from pydantic import ValidationError
@@ -314,10 +314,16 @@ async def _run_claude_process(
                 offset_store=offset_store,
             )
         )
+        descendants = _process_descendants(proc.pid)
+        descendant_watcher = asyncio.create_task(_watch_process_descendants(proc.pid, descendants))
         try:
             returncode = await proc.wait()
             output = await collect_task
         finally:
+            descendant_watcher.cancel()
+            with suppress(asyncio.CancelledError):
+                await descendant_watcher
+            _terminate_processes(descendants.values())
             # Never leave the collector orphaned when an await above raises
             # (cancellation, interrupt, or a wait failure).
             if not collect_task.done():
@@ -585,6 +591,7 @@ async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
         await asyncio.to_thread(_terminate_windows_process_tree, proc.pid)
         await proc.wait()
         return
+    _terminate_processes(_process_descendants(proc.pid).values())
     # The Windows branch returns above; Pyright still checks these POSIX-only APIs on Windows.
     if hasattr(os, "killpg"):
         with suppress(ProcessLookupError):
@@ -613,6 +620,7 @@ def terminate_agent_process(agent: Optional[PresetSessionProcess]) -> None:
     if IS_WINDOWS:
         _terminate_windows_process_tree(agent_pid)
         return
+    _terminate_processes(_process_descendants(agent_pid).values())
     with suppress(OSError):
         os.killpg(agent_pid, signal.SIGTERM)  # pyright: ignore[reportAttributeAccessIssue]
     for _ in range(_TERMINATE_GRACE_SECONDS * 10):
@@ -621,6 +629,34 @@ def terminate_agent_process(agent: Optional[PresetSessionProcess]) -> None:
         time.sleep(0.1)
     with suppress(OSError):
         os.killpg(agent_pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def _process_descendants(pid: int) -> dict[int, psutil.Process]:
+    try:
+        processes = psutil.Process(pid).children(recursive=True)
+    except psutil.NoSuchProcess:
+        return {}
+    return {process.pid: process for process in processes}
+
+
+async def _watch_process_descendants(pid: int, descendants: dict[int, psutil.Process]) -> None:
+    while True:
+        descendants.update(_process_descendants(pid))
+        if not pid_running(pid):
+            return
+        await asyncio.sleep(0.05)
+
+
+def _terminate_processes(processes: Iterable[psutil.Process]) -> None:
+    processes = list(processes)
+    for process in processes:
+        with suppress(psutil.NoSuchProcess):
+            process.terminate()
+    _, alive = psutil.wait_procs(processes, timeout=_TERMINATE_GRACE_SECONDS)
+    for process in alive:
+        with suppress(psutil.NoSuchProcess):
+            process.kill()
+    psutil.wait_procs(alive, timeout=_TERMINATE_GRACE_SECONDS)
 
 
 def _terminate_windows_process_tree(pid: int) -> None:

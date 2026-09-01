@@ -18,6 +18,7 @@ from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     _build_claude_command,
     _prepare_subprocess_command,
+    _run_claude_process,
     _terminate_process,
     build_preset_agent_env,
     get_claude_auth,
@@ -480,6 +481,57 @@ class TestProcessCleanup:
 
         assert proc.returncode is not None
         assert not psutil.pid_exists(child_pid)
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX process groups")
+    @pytest.mark.asyncio
+    async def test_terminates_detached_process_tree(self):
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys,time; "
+                "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'], "
+                "start_new_session=True); print(p.pid,flush=True); time.sleep(60)"
+            ),
+            start_new_session=True,
+            stdout=asyncio.subprocess.PIPE,
+        )
+        assert proc.stdout is not None
+        child_pid = int((await proc.stdout.readline()).decode())
+
+        await _terminate_process(proc)
+
+        assert proc.returncode is not None
+        assert not psutil.pid_exists(child_pid)
+
+    @pytest.mark.skipif(IS_WINDOWS, reason="exercises POSIX process groups")
+    @pytest.mark.asyncio
+    async def test_cleans_detached_process_after_agent_exits(self, tmp_path):
+        child_pid_path = tmp_path / "child.pid"
+        script = tmp_path / "agent.py"
+        script.write_text(
+            "import pathlib, subprocess, sys, time; "
+            "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], "
+            "start_new_session=True); "
+            "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); "
+            'print(\'{"type": "result", "structured_output": {"ok": true}}\', flush=True); '
+            "time.sleep(0.2)"
+        )
+        workspace, session = _agent_setup(tmp_path)
+
+        output, returncode = await _run_claude_process(
+            command=[sys.executable, str(script), str(child_pid_path)],
+            prompt="prompt",
+            env=_subprocess_env(),
+            workspace=workspace,
+            redacted_values=(),
+            session=session,
+            offset_store=open_session_offsets(session),
+        )
+
+        assert returncode == 0
+        assert output.report_data == {"ok": True}
+        assert not psutil.pid_exists(int(child_pid_path.read_text()))
 
 
 class TestRecordMirror:
