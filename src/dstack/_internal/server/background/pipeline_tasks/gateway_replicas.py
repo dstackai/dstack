@@ -1281,6 +1281,11 @@ async def _register_service(
         gateway_https=get_gateway_https(gateway_configuration),
         auth=run_spec.configuration.auth,
         client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+        proxy_read_timeout=(
+            run_spec.configuration.proxy_read_timeout
+            if run_spec.configuration.proxy_read_timeout is not None
+            else settings.DEFAULT_SERVICE_PROXY_READ_TIMEOUT
+        ),
         options=service_spec.options,
         rate_limits=run_spec.configuration.rate_limits,
         ssh_private_key=run_model.project.ssh_private_key,

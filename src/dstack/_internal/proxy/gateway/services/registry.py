@@ -19,7 +19,7 @@ from dstack._internal.proxy.gateway.services.nginx import (
     ServiceConfig,
 )
 from dstack._internal.proxy.lib import models
-from dstack._internal.proxy.lib.const import ROUTER_WHITELISTED_PATHS
+from dstack._internal.proxy.lib.const import DEFAULT_PROXY_READ_TIMEOUT, ROUTER_WHITELISTED_PATHS
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.services.service_connection import (
@@ -42,6 +42,7 @@ async def register_service(
     rate_limits: tuple[models.RateLimit, ...],
     auth: bool,
     client_max_body_size: int,
+    proxy_read_timeout: Optional[int],
     model: Optional[schemas.AnyModel],
     ssh_private_key: str,
     repo: GatewayProxyRepo,
@@ -59,6 +60,9 @@ async def register_service(
         rate_limits=rate_limits,
         auth=auth,
         client_max_body_size=client_max_body_size,
+        proxy_read_timeout=(
+            proxy_read_timeout if proxy_read_timeout is not None else DEFAULT_PROXY_READ_TIMEOUT
+        ),
         replicas=(),
         has_router_replica=has_router_replica,
         cors_enabled=cors_enabled,
@@ -401,6 +405,7 @@ async def get_nginx_service_config(
         project_name=service.project_name,
         auth=service.auth,
         client_max_body_size=service.client_max_body_size,
+        proxy_read_timeout=service.proxy_read_timeout,
         access_log_path=ACCESS_LOG_PATH,
         limit_req_zones=limit_req_zones,
         locations=locations,

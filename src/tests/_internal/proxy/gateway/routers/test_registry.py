@@ -11,7 +11,8 @@ from freezegun import freeze_time
 from dstack._internal.core.errors import SSHError
 from dstack._internal.proxy.gateway.app import make_app
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
-from dstack._internal.proxy.gateway.services.nginx import Nginx
+from dstack._internal.proxy.gateway.services.nginx import Nginx, ReplicaConfig
+from dstack._internal.proxy.gateway.services.registry import get_nginx_service_config
 from dstack._internal.proxy.gateway.testing.common import Mocks
 from dstack._internal.proxy.lib.models import ChatModel, OpenAIChatModelFormat
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
@@ -117,6 +118,21 @@ class TestRegisterService:
         # no replicas
         assert "upstream" not in conf
         assert "return 503;" in conf
+
+    @pytest.mark.windows
+    async def test_nginx_service_config_uses_proxy_read_timeout(self) -> None:
+        service = make_service(
+            "test-proj", "test-run", domain="test-run.gtw.test", https=False
+        ).model_copy(update={"proxy_read_timeout": 900})
+        replicas = [ReplicaConfig(id="replica", socket=Path("/tmp/replica.sock"), port=80)]
+        config = await get_nginx_service_config(service, replicas)
+        assert "proxy_read_timeout 900s;" in config.render()
+
+        default_config = await get_nginx_service_config(
+            make_service("test-proj", "default-run", domain="default.gtw.test", https=False),
+            replicas,
+        )
+        assert "proxy_read_timeout 300s;" in default_config.render()
 
     async def test_legacy_register_without_id(self, tmp_path: Path, system_mocks: Mocks) -> None:
         repo = GatewayProxyRepo()

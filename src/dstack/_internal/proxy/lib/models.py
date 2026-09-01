@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.lib.const import DEFAULT_PROXY_READ_TIMEOUT
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 
@@ -59,6 +60,7 @@ class Service(ImmutableModel):
     rate_limits: tuple[RateLimit, ...] = ()  # only used on gateways
     auth: bool
     client_max_body_size: int  # only enforced on gateways
+    proxy_read_timeout: int = DEFAULT_PROXY_READ_TIMEOUT  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
     has_router_replica: bool = False

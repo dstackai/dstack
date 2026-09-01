@@ -35,6 +35,7 @@ async def register_service(
         rate_limits=body.rate_limits,
         auth=body.auth,
         client_max_body_size=body.client_max_body_size,
+        proxy_read_timeout=body.proxy_read_timeout,
         model=body.options.openai.model if body.options.openai is not None else None,
         ssh_private_key=body.ssh_private_key,
         repo=repo,

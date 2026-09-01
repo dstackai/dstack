@@ -43,6 +43,7 @@ class RegisterServiceRequest(BaseModel):
     https: bool
     auth: bool
     client_max_body_size: int
+    proxy_read_timeout: Optional[int] = Field(default=None, ge=1)
     options: Options
     ssh_private_key: str
     rate_limits: tuple[RateLimit, ...] = ()

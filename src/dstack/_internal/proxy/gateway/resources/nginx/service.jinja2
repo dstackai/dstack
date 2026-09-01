@@ -68,7 +68,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
-        proxy_read_timeout 300s;
+        proxy_read_timeout {{ proxy_read_timeout }}s;
         {% else %}
         return 503;
         {% endif %}
@@ -88,7 +88,7 @@ server {
         proxy_pass http://{{ domain }}.upstream;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
-        proxy_read_timeout 300s;
+        proxy_read_timeout {{ proxy_read_timeout }}s;
         {% else %}
         return 503;
         {% endif %}

@@ -32,7 +32,10 @@ from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel
 from dstack._internal.server.services.instances import get_instance_remote_connection_info
 from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.services.runs import get_run_spec
-from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
+from dstack._internal.server.settings import (
+    DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+    DEFAULT_SERVICE_PROXY_READ_TIMEOUT,
+)
 from dstack._internal.utils.common import get_or_error
 
 _ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
@@ -133,6 +136,11 @@ class ServerProxyRepo(BaseProxyRepo):
             https=None,
             auth=run_spec.configuration.auth,
             client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+            proxy_read_timeout=(
+                run_spec.configuration.proxy_read_timeout
+                if run_spec.configuration.proxy_read_timeout is not None
+                else DEFAULT_SERVICE_PROXY_READ_TIMEOUT
+            ),
             strip_prefix=run_spec.configuration.strip_prefix,
             replicas=tuple(replicas),
             has_router_replica=has_router_replica,

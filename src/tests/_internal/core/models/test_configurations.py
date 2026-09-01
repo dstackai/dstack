@@ -74,6 +74,33 @@ class TestParseConfiguration:
         assert isinstance(parsed, ServiceConfiguration)
         assert parsed.probes is None
 
+    @pytest.mark.windows
+    def test_service_proxy_read_timeout_accepts_duration(self):
+        parsed = parse_run_configuration(
+            {
+                "type": "service",
+                "commands": ["python3 -m http.server"],
+                "port": 8000,
+                "proxy_read_timeout": "15m",
+            }
+        )
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.proxy_read_timeout == 15 * 60
+
+    @pytest.mark.windows
+    def test_service_proxy_read_timeout_rejects_zero(self):
+        with pytest.raises(
+            ConfigurationError, match="Proxy read timeout must be at least 1 second"
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "commands": ["python3 -m http.server"],
+                    "port": 8000,
+                    "proxy_read_timeout": 0,
+                }
+            )
+
     def test_service_model_does_not_override_explicit_probes(self):
         conf = {
             "type": "service",

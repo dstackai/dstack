@@ -62,6 +62,7 @@ class ServiceConfig(SiteConfig):
     project_name: str
     auth: bool
     client_max_body_size: int
+    proxy_read_timeout: int
     access_log_path: Path
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]

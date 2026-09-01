@@ -1208,6 +1208,16 @@ class ServiceConfigurationParams(CoreModel):
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
 
+    proxy_read_timeout: Annotated[
+        Optional[Duration],
+        Field(
+            description=(
+                "Maximum interval between reads from the service upstream when using a gateway. "
+                "Defaults to 300 seconds."
+            )
+        ),
+    ] = None
+
     scaling: Annotated[
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
@@ -1221,6 +1231,13 @@ class ServiceConfigurationParams(CoreModel):
             "Set explicitly to override"
         ),
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
+
+    @field_validator("proxy_read_timeout")
+    @classmethod
+    def validate_proxy_read_timeout(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v < 1:
+            raise ValueError("Proxy read timeout must be at least 1 second")
+        return v
 
     replicas: Annotated[
         Optional[Range[int]],
