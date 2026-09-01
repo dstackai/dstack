@@ -18,7 +18,7 @@ from dstack._internal.utils.logging import get_logger
 
 CERTBOT_TIMEOUT = 40
 CERTBOT_2ND_TIMEOUT = 5
-CONFIGS_DIR = Path("/etc/nginx/sites-enabled")
+NGINX_DIR = Path("/etc/nginx")
 logger = get_logger(__name__)
 
 
@@ -78,8 +78,10 @@ class ModelEntrypointConfig(SiteConfig):
 class Nginx:
     """Updates nginx config and issues SSL certificates."""
 
-    def __init__(self, conf_dir: Path = Path("/etc/nginx/sites-enabled")) -> None:
-        self._conf_dir = conf_dir
+    def __init__(self, nginx_dir: Path = NGINX_DIR) -> None:
+        self._nginx_dir = nginx_dir
+        self._sites_enabled_dir = nginx_dir / "sites-enabled"
+        self._nginx_conf_path = nginx_dir / "nginx.conf"
         self._lock: Lock = Lock()
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
@@ -89,14 +91,14 @@ class Nginx:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
 
-            await run_async(self.write_conf, conf.render(), conf_name)
+            await run_async(self.write_conf, conf.render(), self._sites_enabled_dir / conf_name)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
     async def unregister(self, service: models.Service) -> None:
         domain = service.domain_safe
         logger.debug("Unregistering domain %s", domain)
-        conf_path = self._conf_dir / self.get_config_name(domain)
+        conf_path = self._sites_enabled_dir / self.get_config_name(domain)
         if not conf_path.exists():
             return
         async with self._lock:
@@ -111,9 +113,8 @@ class Nginx:
         if r.returncode != 0:
             raise UnexpectedProxyError("Failed to reload nginx")
 
-    def write_conf(self, conf: str, conf_name: str) -> None:
+    def write_conf(self, conf: str, conf_path: Path) -> None:
         """Update config and reload nginx. Rollback changes on error."""
-        conf_path = self._conf_dir / conf_name
         old_conf = conf_path.read_text() if conf_path.exists() else None
         if conf == old_conf:
             return
@@ -176,8 +177,11 @@ class Nginx:
         return f"443-{domain}.conf"
 
     def write_global_conf(self) -> None:
-        conf = read_package_resource("00-log-format.conf")
-        self.write_conf(conf, "00-log-format.conf")
+        log_format_conf = read_package_resource("00-log-format.conf")
+        self.write_conf(log_format_conf, self._sites_enabled_dir / "00-log-format.conf")
+
+        nginx_conf = read_package_resource("nginx.conf")
+        self.write_conf(nginx_conf, self._nginx_conf_path)
 
 
 def read_package_resource(file: str) -> str:
