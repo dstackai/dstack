@@ -293,6 +293,9 @@ declare interface IJobProvisioningData {
 declare interface IJobRuntimeData {
     working_dir?: string | null;
     username?: string | null;
+    offer?: {
+        instance: InstanceType;
+    } | null;
 }
 
 declare interface IJobSubmission {

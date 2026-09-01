@@ -6,8 +6,14 @@ import { capitalize } from 'libs';
 import { formatBackend } from 'libs/fleet';
 import { formatResources } from 'libs/resources';
 
+export const getJobSubmissionResources = (submission?: IJobSubmission | null) => {
+    return (
+        submission?.job_runtime_data?.offer?.instance?.resources ?? submission?.job_provisioning_data?.instance_type?.resources
+    );
+};
+
 export const getJobListItemResources = (job: IJob) => {
-    const resources = job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.instance_type?.resources;
+    const resources = getJobSubmissionResources(job.job_submissions?.[job.job_submissions.length - 1]);
     return resources ? formatResources(resources) : '-';
 };
 

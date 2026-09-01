@@ -6,7 +6,7 @@ import { formatResources } from 'libs/resources';
 import { getBaseUrl } from 'App/helpers';
 
 import { finishedJobs, finishedRunStatuses } from '../constants';
-import { getJobStatus } from '../Details/Jobs/List/helpers';
+import { getJobStatus, getJobSubmissionResources } from '../Details/Jobs/List/helpers';
 
 export const getGroupedRunsByProjectAndRepoID = (runs: IRun[]) => {
     return _groupBy(runs, ({ project_name }) => project_name);
@@ -17,7 +17,7 @@ export const getRunListItemResources = (run: IRun) => {
         return '-';
     }
 
-    const resources = run.latest_job_submission?.job_provisioning_data?.instance_type?.resources;
+    const resources = getJobSubmissionResources(run.latest_job_submission);
     return resources ? formatResources(resources) : '-';
 };
 
