@@ -362,7 +362,6 @@ At the same time, it's recommended to create presets using your own agent — ei
 ## Limitations
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-* Doesn't support PD disaggregation (coming soon)
 * The registry doesn't support public presets (coming soon)
 * Doesn't support ranges for `concurrency`
 

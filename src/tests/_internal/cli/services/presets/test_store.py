@@ -11,7 +11,7 @@ from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetConfiguration, ServiceConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.presets import PortablePreset
@@ -48,6 +48,29 @@ class TestPresetStore:
         assert store.list() == [preset]
         assert store.get(preset.id) == preset
         assert not list(path.parent.glob("*.tmp"))
+
+    def test_saves_replica_groups_in_the_groups_syntax(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        preset.service = ServiceConfiguration.model_validate(
+            {
+                "port": 8000,
+                "model": "meta-llama/Llama-3.2-3B-Instruct",
+                "groups": [
+                    {"replicas": 1, "commands": ["smg launch"]},
+                    {"replicas": 1, "commands": ["python -m sglang.launch_server"]},
+                ],
+            }
+        )
+
+        path = store.save(preset)
+
+        data = yaml.safe_load(path.read_text())
+        service = data["service"]
+        assert "groups" in service
+        assert service.get("replicas") is None
+        assert "replicas" in service["groups"][0]
+        assert "count" not in service["groups"][0]
 
     def test_a_verified_document_loads_as_a_verified_preset(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")

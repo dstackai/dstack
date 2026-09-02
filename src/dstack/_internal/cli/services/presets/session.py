@@ -562,6 +562,7 @@ def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
 
 
 def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+    # TODO: Refactor this crap - must be explicit what is this and where is it used; also dicts are prohibited in dstack repo
     """A trial directory without `trial.json` is still in flight and is not
     counted."""
     records = []
@@ -642,8 +643,44 @@ def _trial_entry(
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+    """A trial records its hardware in one of two formats, as described in
+    `system_prompt.md`: `{"resources": {...}}` without node groups, and
+    `{"groups": [[...], ...]}` with them.
+
+    Without node groups it returns that one instance's GPU, e.g. `H200:141GB:1`.
+    With node groups it returns the GPUs of every node, e.g. `H200:141GB:1 x5`
+    for a router plus 2 prefill and 3 decode nodes, or
+    `H200:141GB:1 x2 + H100:80GB:1 x3` when the GPU models differ.
+
+    The value fills the `RESOURCES` column of a session row in
+    `dstack preset list -v`.
+    """
+    counts: dict[str, int] = {}
+    for node in _trial_nodes(record):
+        spec = _format_gpu(node.get("gpu"))
+        if spec:
+            # Insertion order is group order, so the roles read in the order they ran.
+            counts[spec] = counts.get(spec, 0) + 1
+    if not counts:
+        return None
+    return " + ".join(spec if n == 1 else f"{spec} x{n}" for spec, n in counts.items())
+
+
+def _trial_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
+    groups = record.get("groups")
+    if isinstance(groups, list):
+        return [
+            node
+            for group in groups
+            if isinstance(group, list)
+            for node in group
+            if isinstance(node, dict)
+        ]
     resources = record.get("resources")
-    gpu = resources.get("gpu") if isinstance(resources, dict) else None
+    return [resources] if isinstance(resources, dict) else []
+
+
+def _format_gpu(gpu: Any) -> Optional[str]:
     if not isinstance(gpu, dict) or not gpu.get("name"):
         return None
     text = str(gpu["name"])
