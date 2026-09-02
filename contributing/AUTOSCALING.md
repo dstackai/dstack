@@ -2,8 +2,8 @@
 
 `dstack` features auto-scaling for services published via the gateway. The general flow is:
 
-- STEP 1: `dstack-gateway` parses nginx `access.log` to collect per-second statistics about requests to the service and request times.
-- STEP 2: `dstack-gateway` aggregates statistics over several predefined windows.
+- STEP 1: The gateway parses nginx `access.log` to collect per-second statistics about requests to the service and request times.
+- STEP 2: The gateway aggregates statistics over several predefined windows.
 - STEP 3: The server keeps gateway connections alive in the scheduled `process_gateways_connections` task and continuously collects stats from active gateways. This is separate from `GatewayPipeline`, which handles gateway provisioning and deletion.
 - STEP 4: When `RunPipeline` processes a service run, it loads the latest collected gateway stats for that service.
 - STEP 5: The autoscaler (configured via `dstack.yml`) computes the desired replica count for each replica group.

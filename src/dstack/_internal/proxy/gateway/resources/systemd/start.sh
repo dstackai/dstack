@@ -8,4 +8,4 @@ else
   version="blue"
   echo "$version" > "$root/version"
 fi
-"$root/$version/bin/uvicorn" dstack.gateway.main:app
+"$root/$version/bin/uvicorn" dstack._internal.proxy.gateway.main:app

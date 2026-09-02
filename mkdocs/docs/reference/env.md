@@ -173,6 +173,7 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
       `https://dstack.example.com/{arch}/{version}/dstack-runner`.
      * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
       see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
+     * `DSTACK_GATEWAY_PACKAGE_URL` – Overrides the URL the `dstack` package is installed from on gateway instances (used as `dstack[gateway] @ <URL>`).
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
 
 ## CLI

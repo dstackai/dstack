@@ -25,21 +25,6 @@ jobs:
           ignore-empty-workdir: true
       - name: Install AWS
         run: uv tool install awscli
-      - name: Download dstack-gateway
-        uses: actions/download-artifact@v4
-        with:
-          name: dstack-gateway
-          path: gateway
-      - name: Upload dstack-gateway to S3
-        working-directory: gateway
-        run: |
-          CHANNEL=release
-          if [ "${{ inputs.staging }}" = "true" ]; then
-            CHANNEL=stgn
-          fi
-          WHEEL=dstack_gateway-${{ inputs.version }}-py3-none-any.whl
-          aws s3 cp $WHEEL "s3://dstack-gateway-downloads/$CHANNEL/$WHEEL"
-          echo "${{ inputs.version }}" | aws s3 cp - "s3://dstack-gateway-downloads/$CHANNEL/latest-version"
       - name: Download dstack-runner
         uses: actions/download-artifact@v4
         with:

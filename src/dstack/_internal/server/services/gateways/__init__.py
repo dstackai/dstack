@@ -16,8 +16,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
-    get_dstack_gateway_wheel,
-    get_dstack_runner_version,
+    get_dstack_gateway_package_and_target_version,
 )
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GATEWAY_SUPPORT,
@@ -782,11 +781,11 @@ async def init_gateways(session: AsyncSession):
                 "Skipping gateway replicas update due to DSTACK_SKIP_GATEWAY_UPDATE env variable"
             )
         else:
-            build = get_dstack_runner_version() or "latest"
+            gateway_package, target_version = get_dstack_gateway_package_and_target_version()
 
             for gateway_replica, res in await gather_map_async(
                 gateway_replicas,
-                lambda r: _update_gateway_replica(r, build),
+                lambda r: _update_gateway_replica(r, gateway_package, target_version),
                 return_exceptions=True,
             ):
                 if isinstance(res, Exception):
@@ -808,7 +807,11 @@ async def init_gateways(session: AsyncSession):
                 )
 
 
-async def _update_gateway_replica(gateway_replica_model: GatewayReplicaModel, build: str) -> bool:
+async def _update_gateway_replica(
+    gateway_replica_model: GatewayReplicaModel,
+    gateway_package: str,
+    target_version: str | None,
+) -> bool:
     if gateway_replica_model.ip_address is None:
         logger.warning(
             "Gateway replica %s has no ip_address, cannot update", gateway_replica_model.id
@@ -826,15 +829,13 @@ async def _update_gateway_replica(gateway_replica_model: GatewayReplicaModel, bu
     )
     logger.debug("Updating gateway replica %s", connection.ip_address)
 
-    # Build package spec with extras and wheel URL
-    gateway_package = get_dstack_gateway_wheel(build)
     command = (
         "/bin/sh -c "
         + shlex.quote(_GATEWAY_UPDATE_SCRIPT)
         + " sh "  # $0 placeholder
         + shlex.quote(gateway_package)
         + " "
-        + shlex.quote(build)
+        + shlex.quote(target_version or "")
     )
     stdout = await connection.tunnel.aexec(command)
     if "Update successfully completed" in stdout:
@@ -854,20 +855,23 @@ if [ -f "$root/version" ]; then
 else
   version=blue
 fi
-current_build=$("$root/$version/bin/pip" show dstack-gateway | grep Version | awk '{print $2}')
-if [ "$current_build" = "$build" ]; then
-  echo "The build $build is already installed. Skipping..."
-  exit 0
+if [ -n "$build" ]; then
+  current_build=$("$root/$version/bin/pip" show dstack | grep Version | awk '{print $2}')
+  if [ "$current_build" = "$build" ]; then
+    echo "The build $build is already installed. Skipping..."
+    exit 0
+  fi
 fi
 if [ "$version" = blue ]; then
   version=green
 else
   version=blue
 fi
+# dstack-gateway is a pre-0.21.4 package that may still be installed and require a conflicting dstack version
 "$root/$version/bin/pip" uninstall -y dstack-gateway dstack
 "$root/$version/bin/pip" cache remove dstack
 "$root/$version/bin/pip" install "$gateway_package"
-sudo "$root/$version/bin/python" -m dstack.gateway.systemd install
+sudo "$root/$version/bin/python" -m dstack._internal.proxy.gateway.systemd install
 echo "$version" > "$root/version"
 sudo systemctl daemon-reload
 sudo systemctl restart dstack.gateway

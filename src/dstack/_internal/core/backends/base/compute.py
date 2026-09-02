@@ -1218,25 +1218,23 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str) -> str:
-    channel = "release" if settings.DSTACK_RELEASE else "stgn"
-    base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
-    if build == "latest":
-        build = _fetch_version(f"{base_url}/latest-version") or "latest"
-        logger.debug("Found the latest gateway build: %s", build)
-    wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
-    return f"dstack-gateway @ {wheel}"
+def get_dstack_gateway_package_and_target_version() -> tuple[str, str | None]:
+    if settings.DSTACK_GATEWAY_PACKAGE_URL:
+        return f"dstack[gateway] @ {settings.DSTACK_GATEWAY_PACKAGE_URL}", None
+    if settings.DSTACK_VERSION is not None:
+        return f"dstack[gateway]=={settings.DSTACK_VERSION}", settings.DSTACK_VERSION
+    package = "dstack[gateway] @ https://github.com/dstackai/dstack/archive/refs/heads/master.zip"
+    return package, None
 
 
 def get_dstack_gateway_commands() -> List[str]:
-    build = get_dstack_runner_version() or "latest"
-    gateway_package = get_dstack_gateway_wheel(build)
+    gateway_package, _ = get_dstack_gateway_package_and_target_version()
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
         f"/home/ubuntu/dstack/blue/bin/pip install '{gateway_package}'",
-        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
+        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack._internal.proxy.gateway.systemd install --run",
     ]
 
 

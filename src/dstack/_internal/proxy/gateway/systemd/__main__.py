@@ -30,14 +30,12 @@ def install_action(args):
     uid, gid = user.pw_uid, user.pw_gid
 
     print("Writing service file...")
-    service_file = importlib.resources.read_text(
-        "dstack.gateway.resources.systemd", service_path.name
-    )
+    service_file = read_resource(service_path.name)
     service_path.write_text(service_file.format(working_dir=working_dir.as_posix()))
 
     for script_name in ["start.sh"]:
         print(f"Writing {script_name} script...")
-        script = importlib.resources.read_text("dstack.gateway.resources.systemd", script_name)
+        script = read_resource(script_name)
         script_path = working_dir / script_name
         script_path.write_text(script)
         os.chown(script_path, uid, gid)
@@ -48,6 +46,14 @@ def install_action(args):
     print("Enabling service...")
     args = ["--now"] if args.run else []
     assert subprocess.run(["systemctl", "enable", service_name] + args).returncode == 0
+
+
+def read_resource(file: str) -> str:
+    return (
+        importlib.resources.files("dstack._internal.proxy.gateway")
+        .joinpath(f"resources/systemd/{file}")
+        .read_text()
+    )
 
 
 if __name__ == "__main__":
