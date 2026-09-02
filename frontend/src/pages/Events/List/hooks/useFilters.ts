@@ -14,7 +14,7 @@ import {
 import { useLazyGetProjectsQuery } from 'services/project';
 import { useLazyGetUserListQuery } from 'services/user';
 
-import { filterLastElementByPrefix, getEventTargetTypeFilteringOption } from '../helpers';
+import { filterLastElementByPrefix } from '../helpers';
 
 type RequestParamsKeys = keyof TEventListFilters;
 
@@ -215,7 +215,11 @@ export const useFilters = ({
         const options: PropertyFilterProps.FilteringOption[] = [...dynamicFilteringOptions];
 
         targetTypes?.forEach((targetType) => {
-            options.push(getEventTargetTypeFilteringOption(targetType, filterKeys.INCLUDE_TARGET_TYPES));
+            options.push({
+                propertyKey: filterKeys.INCLUDE_TARGET_TYPES,
+                label: targetType.label,
+                value: targetType.value,
+            });
         });
 
         return options;
