@@ -643,8 +643,18 @@ def _trial_entry(
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
-    """A trial on one instance records a flat `resources` object; a trial that
-    used node groups records `groups` instead."""
+    """A trial records its hardware in one of two formats, as described in
+    `system_prompt.md`: `{"resources": {...}}` without node groups, and
+    `{"groups": [[...], ...]}` with them.
+
+    Without node groups it returns that one instance's GPU, e.g. `H200:141GB:1`.
+    With node groups it returns the GPUs of every node, e.g. `H200:141GB:1 x5`
+    for a router plus 2 prefill and 3 decode nodes, or
+    `H200:141GB:1 x2 + H100:80GB:1 x3` when the GPU models differ.
+
+    The value fills the `RESOURCES` column of a session row in
+    `dstack preset list -v`.
+    """
     counts: dict[str, int] = {}
     for node in _trial_nodes(record):
         spec = _format_gpu(node.get("gpu"))

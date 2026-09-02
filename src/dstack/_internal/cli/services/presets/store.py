@@ -89,10 +89,7 @@ class PresetStore:
         preset = preset.model_copy(deep=True)
         for mapping in preset.service.files:
             mapping.local_path = _relative_to_preset_dir(mapping.local_path, directory)
-        content = yaml.safe_dump(
-            preset.model_dump(mode="json", context={"keep_groups": True}),
-            sort_keys=False,
-        )
+        content = yaml.safe_dump(preset.model_dump(mode="json"), sort_keys=False)
         fd, temporary_path = tempfile.mkstemp(
             dir=directory,
             prefix=f".{preset.id}.",
