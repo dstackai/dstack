@@ -242,7 +242,7 @@ Pushing the same name again moves the name to the new preset. The previous one s
 
 Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). To share a preset, create a project there, add the people you want to share it with, and push the preset to that project. To push or pull a preset from a project, you have to be its member.
 
-A self-hosted registry is part of [dstack Enterprise](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
+A self-hosted registry is part of [dstack Factory](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
 
 ## Export a preset
 

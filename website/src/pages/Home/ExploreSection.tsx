@@ -1,57 +1,21 @@
-import CodeView from '@cloudscape-design/code-view/code-view';
-import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
-import Button from '@cloudscape-design/components/button';
+import { useState } from 'react';
 import Icon from '@cloudscape-design/components/icon';
-import Tabs from '@cloudscape-design/components/tabs';
-import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
 import { DashedBorder } from '../../components/DashedBorder';
 import { highlightTerms } from '../../components/highlightTerms';
-import { gpuOffers } from '../../data/gpus';
 import { docsUrl } from '../../routes';
-import {
-  backendConfigs,
-  clusterConfigs,
-  maxBackendYamlLines,
-  maxClusterYamlLines,
-  padYamlToLines,
-} from '../../data/snippets';
+import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedSection';
 
-// Core orchestration primitives shown in the "AI-native orchestration" block.
+// Core orchestration primitives shown in the "AI-native orchestration" block. "Runs" folds the
+// three run types (dev environments, tasks, services) into one card; there's no single runs
+// concept page, so it links to the quickstart ("creating fleets and submitting runs").
 const keyConcepts = [
   { name: 'Fleets', label: 'Cloud & on-prem', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
-  { name: 'Dev environments', label: 'Development', href: docsUrl('concepts/dev-environments'), description: 'Launch dev environments to be accessed by agents or from your IDE.' },
-  { name: 'Tasks', label: 'Training and batch', href: docsUrl('concepts/tasks'), description: 'Run training and batch jobs across a single node or clusters.' },
-  { name: 'Services', label: 'Model inference', href: docsUrl('concepts/services'), description: 'Deploy model inference as secure and scalable endpoints.' },
+  { name: 'Runs', label: 'Dev, training, and inference', href: docsUrl('quickstart'), description: 'Run dev environments, training tasks, and inference services on your fleets.' },
+  { name: 'Gateways', label: 'Ingress', href: docsUrl('concepts/gateways'), description: 'Manage auto-scaling, rate limits, ingress, custom domains, etc.' },
+  { name: 'Presets', label: 'Inference optimization', href: docsUrl('concepts/presets'), description: 'Agent-based inference optimization toolkit, and a preset registry.' },
 ];
-
-// Read-only YAML snippet. Line wrapping is left off so one line maps to one row,
-// which keeps padded snippets equal height across tabs (see padYamlToLines).
-function YamlCode({ content }: { content: string }) {
-  return (
-    <div className="code-snippet">
-      <CodeView ariaLabel="YAML configuration" content={content} highlight={yamlHighlight} />
-    </div>
-  );
-}
-
-// GPU price list — a plain monospace name/price list in a bordered card, matching the dstack Sky
-// "GPU marketplace" pane in the Get started section (same .gs-mkt__row treatment, single source).
-function GpuMarketplaceTable() {
-  return (
-    <div className="gpu-mkt">
-      <ul className="gpu-mkt__list">
-        {gpuOffers.map(offer => (
-          <li className="gs-mkt__row" key={`${offer.name} ${offer.memory}`}>
-            <span className="gs-mkt__g"><span className="gs-mkt__name">{offer.name}</span>{' '}{offer.memory}</span>
-            <span className="gs-mkt__p">{offer.price}/hr</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 // The main marketing content: a sequence of alternating documentation blocks.
 export function ExploreSection() {
@@ -66,52 +30,96 @@ export function ExploreSection() {
 
       <KeyConceptsBlock />
 
-      <AlternatingDocBlock
-        visual={
-          <Tabs
-            variant="container"
-            ariaLabel="Cloud backend"
-            tabs={backendConfigs.map(backend => ({
-              id: backend.id,
-              label: backend.label,
-              content: <YamlCode content={padYamlToLines(backend.yaml, maxBackendYamlLines)} />,
-            }))}
-          />
-        }
-        title="Bring your own clouds"
-        imageFirst
-      >
-        dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
-        <br />
-        <br />
-        Authorize dstack by providing credentials, and dstack will provision compute and schedule workloads
-        in your own cloud account.
-      </AlternatingDocBlock>
+      <BringComputeBlock />
 
-      <AlternatingDocBlock
-        visual={
-          <Tabs
-            variant="container"
-            ariaLabel="Cluster type"
-            tabs={clusterConfigs.map(cluster => ({
-              id: cluster.id,
-              label: cluster.label,
-              content: <YamlCode content={padYamlToLines(cluster.yaml, maxClusterYamlLines)} />,
-            }))}
-          />
-        }
-        title="Bring on-prem clusters"
-      >
-        Have an existing Kubernetes cluster? Point dstack to the kubeconfig, and dstack
-        will schedule workloads on it as it was a cloud cluster.
-        <br />
-        <br />
-        Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH credentials, and dstack will
-        schedule workloads on them alongside Kubernetes and cloud clusters.
-      </AlternatingDocBlock>
-
-      <GpuMarketplaceBlock />
     </section>
+  );
+}
+
+// Clouds grid for the merged compute block, grouped per column: traditional hyperscalers,
+// top GPU neoclouds, then smaller GPU clouds.
+const CLOUD_GROUPS = [
+  ['AWS', 'GCP', 'Azure', 'OCI', 'DigitalOcean', 'Vultr'],
+  ['Nebius', 'Crusoe', 'Lambda', 'Verda', 'Runpod'],
+  ['AMD Dev Cloud', 'Hot Aisle', 'Vast.ai', 'JarvisLabs'],
+];
+
+// On-prem capability rows for the merged compute block (same shape as the Factory CapList tabs).
+const onPremItems = [
+  { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Attach bare-metal servers or VMs with SSH access' },
+  { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Attach your existing Kubernetes clusters' },
+];
+
+// One block for both compute targets: the Get-started panes' tabbed box as the visual (on-prem
+// rows / the clouds grid), with a footer note that swaps with the selected tab (like the dstack
+// Sky pane's notes). The prose beside it is static and condenses the former per-target blocks.
+// These are core dstack capabilities, so they live here rather than under dstack Factory.
+function BringComputeBlock() {
+  const [pane, setPane] = useState<'onprem' | 'clouds'>('onprem');
+  return (
+    <AlternatingDocBlock
+      visual={
+        <div className="gs-box">
+          <div className="gs-tabs" role="tablist" aria-label="Bring your own compute">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pane === 'onprem'}
+              className={`gs-tab${pane === 'onprem' ? ' gs-tab--on' : ''}`}
+              onClick={() => setPane('onprem')}
+            >
+              On-prem clusters
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pane === 'clouds'}
+              className={`gs-tab${pane === 'clouds' ? ' gs-tab--on' : ''}`}
+              onClick={() => setPane('clouds')}
+            >
+              Clouds
+            </button>
+          </div>
+          <div className="gs-skybody">
+            {pane === 'onprem' && <CapList items={onPremItems} />}
+            {pane === 'clouds' && (
+              <div className="gs-cloudcols">
+                {CLOUD_GROUPS.map(group => (
+                  <ul key={group[0]}>
+                    {group.map(cloud => (
+                      <li key={cloud} className="gs-cloud">
+                        <span className="gs-li__ic"><CloudGlyph /></span>
+                        <span>{cloud}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="gs-boxfoot">
+            {pane === 'onprem' && (
+              <span className="gs-foot__note">Bring bare-metal servers, a Kubernetes cluster, or just VMs</span>
+            )}
+            {pane === 'clouds' && (
+              <span className="gs-foot__note">Configure credentials for your clouds to automate provisioning</span>
+            )}
+          </div>
+        </div>
+      }
+      title="Bring your own compute"
+      imageFirst
+    >
+      dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
+      Authorize dstack by configuring backends with your credentials, and dstack will provision fleets
+      and schedule workloads in your own cloud account.
+      <br />
+      <br />
+      Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH
+      credentials to create an SSH fleet. Have an existing Kubernetes cluster? Point dstack's
+      Kubernetes backend to the kubeconfig. dstack will schedule workloads on them alongside cloud
+      clusters.
+    </AlternatingDocBlock>
   );
 }
 
@@ -142,23 +150,6 @@ function KeyConceptsBlock() {
       <br />
       <br />
       dstack offers a streamlined interface for development, training, and inference built for heterogeneous AI compute.
-    </AlternatingDocBlock>
-  );
-}
-
-function GpuMarketplaceBlock() {
-  return (
-    <AlternatingDocBlock
-      visual={<GpuMarketplaceTable />}
-      title="Access marketplace GPUs"
-      imageFirst
-      action={<Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Try dstack Sky</Button>}
-    >
-      Don't have your own cloud accounts or on-prem clusters? No problem. You can access compute
-      through dstack Sky, our hosted GPU marketplace.
-      <br />
-      <br />
-      It's possible to use dstack Sky alongside with your own cloud accounts or on-prem clusters.
     </AlternatingDocBlock>
   );
 }

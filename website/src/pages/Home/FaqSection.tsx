@@ -31,6 +31,8 @@ export function FaqSection() {
 
   return (
     <section className="docs-section" id="faq">
+      {/* No imageFirst: the merged compute block above is visual-left, so the FAQ alternates back
+          to visual-right. */}
       <AlternatingDocBlock
         visual={
           <div className="faq-list">

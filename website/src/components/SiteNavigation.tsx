@@ -1,7 +1,6 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
-import Icon from '@cloudscape-design/components/icon';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { getStartedButtonStyle, menuButtonStyle } from '../cloudscape-theme';
@@ -27,21 +26,14 @@ const GithubGlyph = () => (
     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
   </svg>
 );
-const CloudUploadGlyph = () => (
+const CloudGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M4 14.899A6 6 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973" />
-    <path d="M12 12v8" />
-    <path d="m8 16 4-4 4 4" />
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
   </svg>
 );
-const FingerprintGlyph = () => (
+const BoxGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 10a2 2 0 0 0-2 2c0 1.5.4 3 1 4.3" />
-    <path d="M12 6.5A5.5 5.5 0 0 0 6.5 12c0 2 .4 3.5 1.1 5" />
-    <path d="M12 14v3.5" />
-    <path d="M15.6 8.4A5.5 5.5 0 0 1 17.5 12c0 2.2-.5 4.3-1.3 6" />
-    <path d="M12 3a9 9 0 0 0-9 9" />
-    <path d="M21 12a9 9 0 0 0-3-6.7" />
+    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
   </svg>
 );
 
@@ -61,15 +53,18 @@ type ProductLink = {
   href: string;
   external?: boolean;
   icon: ReactNode;
+  badge: string;
 };
 
 // The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
 // follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
 // section.
+// NOTE: the descriptions are duplicated in GetStartedSection.tsx (the switcher rail) and
+// mkdocs/overrides/header-2.html — keep all three in sync.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: DOCS_URL, icon: <GithubGlyph /> },
-  { id: 'enterprise', text: 'Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <FingerprintGlyph /> },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudUploadGlyph /> },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: DOCS_URL, icon: <GithubGlyph />, badge: 'Self-hosted' },
+  { id: 'factory', text: 'dstack Factory', secondaryText: 'Extends dstack with a governance and metering layer, and a private preset registry.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <BoxGlyph />, badge: 'Self-hosted' },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Everything in dstack Factory, plus the GPU marketplace and the public preset registry.', href: 'https://sky.dstack.ai', external: true, icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
@@ -126,6 +121,23 @@ function ProductsHoverMenu() {
       .catch(() => {});
   }, [open]);
 
+  // The popup renders the Get-started section's switcher rail verbatim. The white indicator card
+  // rests on the first row and slides to whichever row the pointer is over.
+  const [active, setActive] = useState(0);
+  const railRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const rail = railRef.current;
+    const selected = rail?.querySelector<HTMLElement>('.gs-opt--on');
+    if (!rail || !selected) return;
+    const railBox = rail.getBoundingClientRect();
+    const rowBox = selected.getBoundingClientRect();
+    // Fractional rect math (offsetTop/offsetHeight round to integers and leave 1px slivers).
+    const borderTop = parseFloat(getComputedStyle(rail).borderTopWidth) || 0;
+    setIndicator({ top: rowBox.top - railBox.top - borderTop, height: rowBox.height });
+  }, [open, active, stars]);
+
   return (
     <div
       className="site-hover-menu"
@@ -145,38 +157,45 @@ function ProductsHoverMenu() {
         </svg>
       </button>
       {open && (
-        <div className="site-products-menu" role="menu">
-          {/* Open-source featured on the brand gradient; the whole panel links to install. */}
-          <a className="site-products-menu__feat" role="menuitem" href={products[0].href}>
-            <span className="site-products-menu__feat-iccol">
-              <span className="site-products-menu__feat-ic"><GithubGlyph /></span>
-              {stars !== null && (
-                <span className="site-products-menu__gh" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
-              )}
-            </span>
-            <span className="site-products-menu__feat-body">
-              <span className="site-products-menu__feat-name">{products[0].text}</span>
-              <span className="site-products-menu__feat-desc">{products[0].secondaryText}</span>
-            </span>
-          </a>
-          <div className="site-products-menu__list">
-            {products.slice(1).map(product => (
-              <a
-                key={product.id}
-                role="menuitem"
-                className="site-products-menu__row"
-                href={product.href}
-                {...(product.external ? { target: '_blank', rel: 'noreferrer' } : {})}
-              >
-                <span className="site-products-menu__ic">{product.icon}</span>
-                <div className="site-products-menu__rbody">
-                  <span className="site-products-menu__name">
-                    {product.text}
-                    {product.external && <Icon name="external" />}
+        <div className="site-products-menu">
+          {/* The Get-started section's switcher rail, verbatim (rows are links here). */}
+          <div className="gs-rail" role="menu" ref={railRef}>
+            {indicator && <div className="gs-rail__indicator" style={{ top: indicator.top, height: indicator.height }} aria-hidden="true" />}
+            <div className="gs-rail__group">Self-hosted</div>
+            <a
+              className={`gs-opt gs-opt--feat${active === 0 ? ' gs-opt--on' : ''}`}
+              role="menuitem"
+              href={products[0].href}
+              onMouseEnter={() => setActive(0)}
+            >
+              <span className="gs-opt__icwrap">
+                <span className="gs-opt__ic"><GithubGlyph /></span>
+                {stars !== null && (
+                  <span className="gs-opt__stars" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
+                )}
+              </span>
+              <span className="gs-opt__body">
+                <span className="gs-opt__name">{products[0].text}</span>
+                <span className="gs-opt__desc">{products[0].secondaryText}</span>
+              </span>
+            </a>
+            {products.slice(1).map((product, index) => (
+              <Fragment key={product.id}>
+                {product.badge !== products[index].badge && <div className="gs-rail__group">{product.badge}</div>}
+                <a
+                  role="menuitem"
+                  className={`gs-opt gs-opt--row${active === index + 1 ? ' gs-opt--on' : ''}`}
+                  href={product.href}
+                  onMouseEnter={() => setActive(index + 1)}
+                  {...(product.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                >
+                  <span className="gs-opt__ic">{product.icon}</span>
+                  <span className="gs-opt__body">
+                    <span className="gs-opt__name">{product.text}</span>
+                    <span className="gs-opt__desc">{product.secondaryText}</span>
                   </span>
-                  <span className="site-products-menu__desc">{product.secondaryText}</span>
-                </div>
-              </a>
+                </a>
+              </Fragment>
             ))}
           </div>
         </div>
@@ -271,14 +290,21 @@ export function SiteNavigation({
             >
               GitHub
             </Button>
-            <Button
-              variant="primary"
-              href="#resources"
-              onClick={goToGetStarted}
-              style={getStartedButtonStyle}
-            >
-              Get started
-            </Button>
+            <span className="cta-with-arrow">
+              <Button
+                variant="primary"
+                href="#resources"
+                onClick={goToGetStarted}
+                style={getStartedButtonStyle}
+              >
+                Get started
+                {/* Same thin arrow as the banner link (shaft + head), sliding right on hover. */}
+                <svg className="cta-arrow" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 12h15" />
+                  <path d="m12.5 5.5 6.5 6.5-6.5 6.5" />
+                </svg>
+              </Button>
+            </span>
           </SpaceBetween>
         </nav>
         <div className="site-mobile-spacer" aria-hidden="true" />
