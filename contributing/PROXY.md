@@ -137,7 +137,7 @@ Provisioning happens as follows:
 1. Launch a non-GPU instance (usually the smallest) with all ports exposed.
 2. Install Nginx, Certbot, and patch configs.
 3. Create blue-green virtual environments.
-4. Install the latest `dstack-gateway` package from the S3 bucket. `dstack-gateway` is a thin package that depends on the `dstack` package, which contains the actual gateway implementation.
+4. Install the `dstack[gateway]` Python package.
 5. Run the systemd service `dstack.gateway.service`.
 
 ### Update
@@ -152,56 +152,18 @@ The update process looks like this:
 
 ## Gateway development
 
-The gateway app needs to interact with Nginx and certbot, so running it locally can be challenging. One way to test your code is to upload your development branch to an existing gateway and run the gateway app from source.
+The gateway app needs to interact with Nginx and certbot, so running it locally can be challenging. You can test your development version by deploying it to a live gateway.
 
-1. Run `dstack server` with `DSTACK_SKIP_GATEWAY_UPDATE=1` environment variable. This will prevent `dstack` from updating and starting the standard gateway version on each server restart.
+For example, push your version to GitHub and run `dstack server` with the `DSTACK_GATEWAY_PACKAGE_URL` environment variable, which will instruct `dstack` to deploy that version to all gateways.
 
-1. Provision a gateway through `dstack`:
+```shell
+DSTACK_GATEWAY_PACKAGE_URL=https://github.com/dstackai/dstack/archive/refs/heads/my_development_branch.zip dstack server
+```
 
-   ```shell
-   dstack apply -f my-gateway.dstack.yml
-   ```
+To access logs or troubleshoot, extract the gateway's private key from the database and connect to it via SSH. Logs are available in `journalctl`.
 
-1. Save the gateway key to a file:
-
-   ```shell
-   sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ssh_private_key FROM gateway_computes WHERE deleted = 0 AND ip_address = '<gateway-ip-addr>'" > /tmp/gateway.key
-   chmod 600 /tmp/gateway.key
-   ```
-
-1. Deliver your code to the gateway. For example, clone it from a remote repo:
-
-   ```shell
-   ssh -i /tmp/gateway.key ubuntu@gateway.example "git clone https://github.com/dstackai/dstack.git ~/dstack-repo"
-   ```
-
-   Or push it from your machine:
-
-   ```shell
-   ssh -i /tmp/gateway.key ubuntu@gateway.example "git init ~/dstack-repo"
-   git remote add gateway ubuntu@gateway.example:~/dstack-repo
-   GIT_SSH_COMMAND='ssh -i /tmp/gateway.key' git push gateway branch_name
-   ```
-
-1. Connect to the gateway:
-
-   ```shell
-   ssh -i /tmp/gateway.key ubuntu@gateway.example
-   ```
-
-1. Prepare an environment with your development branch on the gateway:
-
-   ```shell
-   cd ~/dstack-repo
-   git checkout branch_name
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   source ~/.local/bin/env
-   uv sync --extra gateway
-   ```
-
-1. Stop the gateway service and start your development version from source:
-
-   ```shell
-   sudo systemctl stop dstack.gateway.service
-   uv run uvicorn dstack._internal.proxy.gateway.main:app
-   ```
+```shell
+sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ssh_private_key FROM gateway_computes WHERE deleted = 0 AND ip_address = '$GATEWAY_IP_ADDR'" > /tmp/gateway.key
+chmod 600 /tmp/gateway.key
+ssh -i /tmp/gateway.key ubuntu@$GATEWAY_IP_ADDR sudo journalctl -u dstack.gateway.service
+```

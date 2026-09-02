@@ -163,33 +163,6 @@ jobs:
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
           retention-days: 1
 
-  gateway-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: 3.11
-      - name: Build package
-        working-directory: gateway
-        run: |
-          echo "__version__ = \"${{ inputs.version }}\"" > src/dstack/gateway/version.py
-          # TODO: depend on a specific dstackai/dstack commit for staging builds?
-          if [[ "${{ inputs.staging }}" == "false" ]]; then
-            sed \
-              -i.old \
-              "s|@ https://github.com/dstackai/dstack/archive/refs/heads/master.tar.gz|== ${{ inputs.version }}|" \
-              pyproject.toml
-            diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
-          fi
-          uv build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dstack-gateway
-          path: gateway/dist/dstack_gateway-${{ inputs.version }}-py3-none-any.whl
-          retention-days: 1
-
   python-build:
     needs: [code-lint, frontend-build]
     runs-on: ubuntu-latest
