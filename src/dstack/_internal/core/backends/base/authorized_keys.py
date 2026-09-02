@@ -2,6 +2,7 @@ from textwrap import dedent
 from typing import Optional
 from uuid import uuid4
 
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import parse_public_key
 
@@ -18,6 +19,57 @@ logger = get_logger(__name__)
 # by this script are never touched by the shim. Do not change this value to anything that ends
 # with the shim's marker.
 DSTACK_PUBLIC_KEY_MARKER = "# added by dstack"
+
+
+def build_authorized_keys(
+    project_ssh_public_key: str,
+    extra_authorized_keys: list[str],
+) -> list[str]:
+    """
+    Builds the list of public keys to authorize on a job container.
+
+    Args:
+        project_ssh_public_key: The project public key, always authorized. Must be valid --
+            the server cannot reach the container without it.
+        extra_authorized_keys: The public keys to authorize in addition to the project key,
+            as passed to `Compute.run_job()`. Untrusted -- keys that cannot be parsed are
+            skipped with a warning, one bad key does not keep the rest out.
+
+    Returns:
+        The normalized keys in OpenSSH disk format, the project key first.
+
+    Raises:
+        ComputeError: The project key is invalid.
+    """
+    project_authorized_keys = normalize_authorized_keys([project_ssh_public_key])
+    if not project_authorized_keys:
+        raise ComputeError("Invalid project SSH key")
+    return project_authorized_keys + normalize_authorized_keys(extra_authorized_keys)
+
+
+def normalize_authorized_keys(authorized_keys: list[str]) -> list[str]:
+    """
+    Rebuilds the given public keys from their parsed fields.
+
+    Every returned entry is a single `type blob [comment]` line with the comment whitespace
+    normalized, so that nothing unvalidated reaches a command or a file.
+
+    Args:
+        authorized_keys: The public keys in OpenSSH disk format.
+
+    Returns:
+        The normalized keys, in the original order. Keys that cannot be parsed are skipped with
+        a warning, therefore the result may be shorter than the input, or empty.
+    """
+    normalized: list[str] = []
+    for authorized_key in authorized_keys:
+        try:
+            key = parse_public_key(authorized_key)
+        except ValueError as e:
+            logger.warning("Failed to parse authorized key: %r: %s", authorized_key, e)
+            continue
+        normalized.append(str(key))
+    return normalized
 
 
 def get_add_authorized_keys_script(

@@ -288,6 +288,22 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
     return validate_json_extra_ignore(JobRuntimeData, job_model.job_runtime_data)
 
 
+def get_extra_authorized_keys(run_spec: RunSpec) -> list[str]:
+    """
+    Returns the public keys, besides the project key, to authorize on a job's container.
+
+    The user key is included unless `DSTACK_SERVER_SSHPROXY_ENFORCED` is set, in which case the
+    user is only let in through the SSH proxy, which authenticates them itself and connects with
+    the project key.
+
+    The keys are unvalidated -- whoever writes them to a container must normalize them first,
+    see `backends.base.authorized_keys`.
+    """
+    if settings.SSHPROXY_ENFORCED:
+        return []
+    return [common.get_or_error(run_spec.ssh_key_pub).strip()]
+
+
 def _get_image_pull_progress(job_model: JobModel) -> Optional[ImagePullProgress]:
     if job_model.image_pull_progress is None:
         return None
