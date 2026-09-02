@@ -217,7 +217,8 @@ export const useFilters = ({
         targetTypes?.forEach((targetType) => {
             options.push({
                 propertyKey: filterKeys.INCLUDE_TARGET_TYPES,
-                value: targetType.label,
+                label: targetType.label,
+                value: targetType.value,
             });
         });
 
