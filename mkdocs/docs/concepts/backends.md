@@ -952,6 +952,9 @@ projects:
 
 </div>
 
+??? info "Cluster placement"
+    Fleets with `placement: cluster` are supported in the `india-chennai-01` and `india-noida-01` regions, where instances join the account's default [VPC](https://docs.jarvislabs.ai/vpc/) and communicate over private IPs. No additional configuration is required.
+
 ### CloudRift
 
 Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
