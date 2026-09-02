@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
+import requests
 import requests_mock
 from gpuhunt import AcceleratorVendor
 
@@ -32,6 +33,7 @@ from dstack._internal.server.schemas.runner import (
 )
 from dstack._internal.server.services.runner.client import (
     RunnerClient,
+    RunnerHTTPError,
     ShimClient,
     ShimHTTPError,
     _parse_version,
@@ -138,6 +140,38 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
 
         assert adapter.last_request is not None
         assert adapter.last_request.json()["job_spec"]["env"]["DSTACK_PROJECT"] == "other"
+
+
+class TestRunnerClientRaiseForStatus(BaseShimClientTest):
+    def test_wraps_http_error(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/stop", status_code=502, reason="Bad Gateway")
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerHTTPError) as excinfo:
+            client.stop()
+
+        exc = excinfo.value
+        assert exc.status_code == 502
+        assert exc.message.startswith("502 Server Error: Bad Gateway")
+        assert str(exc).startswith("502 Server Error: Bad Gateway")
+        assert repr(exc) == "RunnerHTTPError(502)"
+        # API-level errors must not be confused with connection errors
+        assert not isinstance(exc, requests.RequestException)
+
+    def test_healthcheck_returns_none_on_connection_error(self, adapter: requests_mock.Adapter):
+        adapter.register_uri(
+            "GET", "/api/healthcheck", exc=requests.exceptions.ConnectionError("refused")
+        )
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        assert client.healthcheck() is None
+
+    def test_healthcheck_raises_on_http_error(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("GET", "/api/healthcheck", status_code=500)
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerHTTPError):
+            client.healthcheck()
 
 
 class TestShimClientNegotiate(BaseShimClientTest):
