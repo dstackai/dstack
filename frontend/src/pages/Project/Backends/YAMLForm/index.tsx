@@ -7,11 +7,11 @@ import { Button, FormCodeEditor, FormUI, InfoLink, SpaceBetween } from 'componen
 import { useHelpPanel, useNotifications } from 'hooks';
 import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 
-import { CONFIG_YAML_HELP_ENTERPRISE, CONFIG_YAML_HELP_SKY } from './constants';
+import { CONFIG_YAML_HELP_SELF_HOSTED, CONFIG_YAML_HELP_SKY } from './constants';
 
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
-const INFO = process.env.UI_VERSION === 'enterprise' ? CONFIG_YAML_HELP_ENTERPRISE : CONFIG_YAML_HELP_SKY;
+const INFO = process.env.UI_VERSION === 'sky' ? CONFIG_YAML_HELP_SKY : CONFIG_YAML_HELP_SELF_HOSTED;
 
 export interface IProps {
     initialValues?: IBackendConfigYaml;

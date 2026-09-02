@@ -7,8 +7,8 @@ import AppLayout from 'layouts/AppLayout';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { useGetUserDataQuery } from 'services/user';
 
-import { EnterpriseLogin } from './Login/EnterpriseLogin';
 import { LoginByGithub } from './Login/LoginByGithub';
+import { SelfHostedLogin } from './Login/SelfHostedLogin';
 import { ROUTES } from '../routes';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { selectAuthToken, setUserData } from './slice';
@@ -23,7 +23,7 @@ const IGNORED_AUTH_PATHS = [
     ROUTES.AUTH.TOKEN,
 ];
 
-const LoginFormComponent = process.env.UI_VERSION === 'enterprise' ? EnterpriseLogin : LoginByGithub;
+const LoginFormComponent = process.env.UI_VERSION === 'sky' ? LoginByGithub : SelfHostedLogin;
 
 const App: React.FC = () => {
     const { t } = useTranslation();

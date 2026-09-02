@@ -72,7 +72,7 @@ export const UserDetails: React.FC = () => {
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
         },
-        {
+        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
             label: t('users.events'),
             id: UserDetailsTabTypeEnum.EVENTS,
             href: ROUTES.USER.EVENTS.FORMAT(paramUserName),

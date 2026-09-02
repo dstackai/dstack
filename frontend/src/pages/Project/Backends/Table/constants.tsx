@@ -28,7 +28,7 @@ export const BACKENDS_HELP_SKY = {
     ),
 };
 
-export const BACKENDS_HELP_ENTERPRISE = {
+export const BACKENDS_HELP_SELF_HOSTED = {
     header: <h2>Backends</h2>,
     body: (
         <>
