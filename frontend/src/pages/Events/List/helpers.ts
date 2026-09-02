@@ -21,3 +21,14 @@ export function filterLastElementByPrefix(
         return !item.propertyKey?.startsWith(prefix) || index === lastTestIndex;
     });
 }
+
+export function getEventTargetTypeFilteringOption(
+    targetType: { label: string; value: string },
+    propertyKey: string,
+): PropertyFilterProps.FilteringOption {
+    return {
+        propertyKey,
+        label: targetType.label,
+        value: targetType.value,
+    };
+}
