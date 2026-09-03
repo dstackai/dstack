@@ -16,22 +16,22 @@ export const ProjectDetails: React.FC = () => {
     const matchSettings = useMatch(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName));
     const matchEvents = useMatch(ROUTES.PROJECT.DETAILS.EVENTS.FORMAT(paramProjectName));
 
-    const tabs: {
-        label: string;
-        id: string;
-        href: string;
-    }[] = [
+    const tabs = [
         {
             label: t('projects.settings'),
             id: 'settings',
             href: ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
         },
-        {
+        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
             label: t('projects.events'),
             id: 'events',
             href: ROUTES.PROJECT.DETAILS.EVENTS.FORMAT(paramProjectName),
         },
-    ].filter(Boolean);
+    ].filter(Boolean) as {
+        label: string;
+        id: string;
+        href: string;
+    }[];
 
     const showTabs = useMemo<boolean>(() => {
         return Boolean(matchSettings) || Boolean(matchEvents);

@@ -22,25 +22,13 @@ Events are accessible through the UI, CLI, and API.
 
 ## UI
 
-The UI allows you to query events either globally on the dedicated `Events` page or within a specific group on the page of a run, job, fleet, and other resources.
-
-### Global page
-
-The global page shows events from all projects that the user has access to and allows filtering by many fields.
-
-![](https://dstack.ai/static-assets/static-assets/images/dstack-ui-events-global.png){ width=800 }
-
-This page allows you to query events targeting a specific resource or within a particular group.
-
-### Resource page
-
-The resource page shows events within that specific group. For example, if you open a run and switch to the `Events` tab, you will see all events about that run and its jobs.
+In the UI, the `Events` tab is included on the run, job, fleet, and instance pages. It shows events within that specific group. For example, if you open a run and switch to the `Events` tab, you will see all events about that run and its jobs.
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-ui-events-run.png){ width=800 }
 
 ## CLI
 
-To query events via the CLI, use the `dstack event` command. This command provides several arguments that allow filtering by target and within scopes.
+To query events via the CLI, use the `dstack event` command.
 
 Here is an example of querying all events within a particular run:
 
@@ -66,9 +54,17 @@ $ dstack event --within-run cursor
 
 </div>
 
-To see all supported arguments, check the [reference](../reference/cli/dstack/event.md).
+If you invoke the command without arguments, it shows the last events targeting resources in the current project.
 
-If you invoke the command without arguments, it will include all events targeting resources in the project.
+The command supports arguments for narrowing down the output:
+
+* `--target-fleet`, `--target-run`, `--target-volume`, `--target-gateway`, and `--target-secret` only show events that target the specified resource itself.
+* `--within-fleet`, `--within-run`, and `--within-gateway` also include events about the resources it contains: instances within a fleet, jobs within a run, and replicas within a gateway.
+* `--include-target-type` only shows events that target entities of the specified types, e.g. `job` or `instance`.
+* `--since` only shows events newer than the specified duration (e.g. `10s`, `5m`, `1d`) or RFC 3339 timestamp. If not specified, the last 100 events are shown.
+* `-w` (`--watch`) streams new events in realtime as they are recorded.
+
+To see all supported arguments, check the [reference](../reference/cli/dstack/event.md).
 
 ## TTL
 

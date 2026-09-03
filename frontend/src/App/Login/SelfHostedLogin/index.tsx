@@ -15,7 +15,7 @@ import { LoginByTokenForm } from '../LoginByTokenForm';
 
 import styles from './styles.module.scss';
 
-export const EnterpriseLogin: React.FC = () => {
+export const SelfHostedLogin: React.FC = () => {
     const { t } = useTranslation();
     const { data: oktaData, isLoading: isLoadingOkta } = useGetOktaInfoQuery();
     const { data: entraData, isLoading: isLoadingEntra } = useGetEntraInfoQuery();
@@ -33,7 +33,7 @@ export const EnterpriseLogin: React.FC = () => {
             <div className={cn(styles.form)}>
                 <SpaceBetween size="xl" alignItems="center">
                     <Box variant="h1" textAlign="center">
-                        {t('auth.sign_in_to_dstack_enterprise')}
+                        {t('auth.sign_in_to_dstack')}
                     </Box>
 
                     {!isLoading && isShowTokenForm && <LoginByTokenForm />}

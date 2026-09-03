@@ -24,7 +24,7 @@
   --cs-border: #16191f;
   --cs-panel: #f4f4f7;
   --font-small: 15px; /* small body text: action-card descriptions, quotes, FAQ answers */
-  --font-card-heading: 16px; /* card titles: action cards, dstack Sky/Enterprise, quote names */
+  --font-card-heading: 16px; /* card titles: action cards, dstack Sky/Factory, quote names */
   --cs-hover: rgba(22, 25, 31, 0.03); /* shared faint hover tint: normal buttons, cards, dropdown items (softened from 0.05) */
   --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
   --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
@@ -134,6 +134,16 @@ p {
   white-space: nowrap;
 }
 
+/* On phones the announcement is wider than the viewport; wrap it (the sticky .site-header is
+   built for the banner's variable height) instead of clipping the text at both edges. */
+@media (max-width: 640px) {
+  .site-banner__link {
+    white-space: normal;
+    text-wrap: balance;
+    font-size: 15px;
+  }
+}
+
 /* Light-on-dark text looks thinner than dark-on-light at the same weight; use a heavier weight in
    dark mode so the banner reads with the same emphasis as in light. */
 :root[data-theme='dark'] .site-banner__link {
@@ -153,6 +163,22 @@ p {
 }
 
 .site-banner__link:hover .site-banner__arrow {
+  transform: translateX(3px);
+}
+
+/* "Get started" CTA arrow — the banner's thin arrow + hover slide, reused on the primary CTAs
+   (top-nav and hero). Cloudscape's Button takes no className, so a wrapper span carries the
+   hover: hovering the button hovers the wrapper, which slides the arrow. */
+.cta-with-arrow {
+  display: inline-flex;
+}
+.cta-arrow {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  transition: transform 0.2s ease;
+}
+.cta-with-arrow:hover .cta-arrow {
   transform: translateX(3px);
 }
 
@@ -316,149 +342,22 @@ p {
   transform: rotate(180deg);
 }
 
-/* "Products" popup: the open-source product featured on the brand gradient (with its live
-   GitHub star count), then dstack Sky & Enterprise as rows. Anchored to the trigger; flat with a
-   single 0.5px cs-text border and 12px radius, matching the landing's popup geometry. */
+/* "Products" popup: renders the exact same grouped switcher rail as the Get-started section
+   (.gs-rail — see that block below for the visuals). This wrapper only anchors and sizes it. */
 .site-products-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   z-index: 1000;
   width: 360px;
-  padding: 0;
-  background: var(--cs-bg);
-  border: 1px solid var(--cs-text);
-  border-radius: 12px;
-}
-
-/* Featured open-source panel — brand gradient; the whole panel links to the docs. Carries an icon
-   tile (like the Sky/Enterprise rows) with the star count beneath, so all three read consistently. */
-.site-products-menu__feat {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 11px 10px;
-  border-radius: 10px;
-  background: var(--cs-text);
-  color: var(--cs-bg);
-  text-decoration: none;
-}
-/* Left column: the icon tile (same as the Sky/Enterprise rows) with the star count beneath it. */
-.site-products-menu__feat-iccol {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.site-products-menu__feat-body {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.site-products-menu__feat-ic {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  border: 0.5px solid color-mix(in srgb, var(--cs-bg) 50%, transparent);
-  color: var(--cs-bg);
-}
-.site-products-menu__feat-ic svg {
-  width: 20px;
-  height: 20px;
-}
-.site-products-menu__feat-name {
-  display: block;
-  color: var(--cs-bg);
-  font-size: 16px;
-  font-weight: 600;
-}
-.site-products-menu__feat-desc {
-  display: block;
-  margin: 8px 0 0;
-  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
-  font-size: 13px;
-  line-height: 1.5;
-}
-/* The "Documentation" button. Hovering anywhere on the featured panel changes the button's
-   background (only the button reacts, not the whole section). */
-.site-products-menu__feat-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  background: var(--cs-bg);
-  color: var(--cs-text);
-  font-size: 12.5px;
-  font-weight: 600;
-  transition: background-color 0.15s ease;
-}
-.site-products-menu__feat:hover .site-products-menu__feat-cta {
+  /* A floating popup can't show a see-through hole between the groups (arbitrary page content
+     sits behind it) — back the rail with the unselected-row color so the gap reads as ground. */
   background: var(--cs-panel);
+  border-radius: 8px;
 }
-
-/* Live GitHub star count, centered beneath the icon tile (only shown once the API responds). */
-.site-products-menu__gh {
-  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
-  font-size: 12px;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-}
-
-/* dstack Sky & Enterprise rows. */
-.site-products-menu__list {
-  display: flex;
-  flex-direction: column;
-}
-.site-products-menu__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 11px 10px;
-  border-radius: 9px;
-  color: var(--cs-text);
-  text-decoration: none;
-}
-.site-products-menu__row:hover {
-  background: var(--cs-hover);
-}
-.site-products-menu__ic {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  border: 0.5px solid var(--cs-text);
-  color: var(--cs-text);
-}
-.site-products-menu__ic svg {
-  width: 20px;
-  height: 20px;
-}
-.site-products-menu__rbody {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.site-products-menu__name {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--cs-text);
-  font-size: 15px;
-  font-weight: 600;
-}
-.site-products-menu__desc {
-  display: block;
-  margin-top: 3px;
-  color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
-  font-size: 13px;
-  line-height: 1.5;
+/* And no hole at all in the popup: the groups sit flush, like one continuous menu. */
+.site-products-menu .gs-opt + .gs-rail__group {
+  margin-top: 0;
 }
 
 .home-hero {
@@ -898,24 +797,6 @@ p {
   background-color: transparent !important;
 }
 
-/* "Access marketplace GPUs" price list — the same monospace row treatment as the dstack Sky
-   marketplace pane (.gs-mkt__row), inside a bordered card matching the landing's other boxes. */
-.gpu-mkt {
-  border: 1px solid var(--cs-border);
-  border-radius: 12px;
-  background: var(--cs-bg);
-  padding: 16px 20px;
-  overflow: hidden;
-}
-.gpu-mkt__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 /* Cloudscape buttons render as <a> when given href; exclude them from the docs underline rule.
    Higher specificity than `.docs-article a` so the reset wins regardless of source order. */
 .docs-article .doc-action a,
@@ -1339,7 +1220,7 @@ p {
   gap: var(--card-gap);
 }
 
-/* Two-up variant: dstack Sky and Enterprise side by side. */
+/* Two-up variant: dstack Sky and Factory side by side. */
 .product-grid--pair {
   grid-template-columns: repeat(2, 1fr);
 }
@@ -1384,7 +1265,7 @@ p {
 /* "Get started" deployment switcher. The Products-popup component reused as a vertical switcher:
    a bordered selector panel on the left whose options carry a caption + description, with the
    selected option filled by the brand gradient. Open-source is featured (bigger, with a live star
-   count and a Documentation button) and selected by default; dstack Sky / Enterprise are compact
+   count and a Documentation button) and selected by default; dstack Sky / Factory are compact
    rows. The right column shows the selection's detail — install code for open-source, an included-
    features list + CTA for the hosted / self-hosted tiers. align-items: stretch keeps the selector
    and the detail equal height and top-aligned. */
@@ -1401,34 +1282,125 @@ p {
   display: flex;
   flex-direction: column;
   padding: 0;
+  position: relative; /* anchors the sliding selection indicator */
+  border-radius: 8px; /* same radius as the rows and the indicator card */
+  overflow: hidden; /* clip the full-width group bars to the rounded corners */
+  background: transparent; /* the rows carry the panel ground, so the gap between groups is a true hole */
+}
+/* The selection indicator: a white card (0.5px solid ring) that slides up/down to the selected
+   row. Rows are transparent; bars sit above it so it passes underneath between groups. */
+.gs-rail__indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2; /* above the rows' ground, beneath their content (3) and the bars (4) */
+  background: var(--cs-bg);
   border: 1px solid var(--cs-text);
-  border-radius: 12px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+/* No z-index on the rows: a row with its own stacking context would trap its content beneath
+   the indicator card, so the content is lifted above the card explicitly instead. */
+.gs-opt__icwrap,
+.gs-opt__ic,
+.gs-opt__body {
+  position: relative;
+  z-index: 3;
+}
+/* In the Products popup the rows are links; render them exactly like the section's buttons. */
+.gs-rail a.gs-opt {
+  color: var(--cs-text);
+  text-decoration: none;
+}
+.gs-rail__group {
+  position: relative;
+  z-index: 4;
 }
 .gs-opt {
   position: relative;
   display: block;
   width: 100%;
-  border: 0.5px solid transparent; /* non-active: no visible border (space reserved so selecting never shifts) */
-  border-radius: 10px;
-  background: transparent;
+  border-radius: 8px; /* same radius as the tab chips */
+  background: var(--cs-panel); /* each row paints its own ground (the rail is transparent) */
   color: var(--cs-text);
   font: inherit;
+  line-height: 1.15; /* pinned (not inherited) so the rail renders identically on the docs site */
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-.gs-opt:not(.gs-opt--on):hover {
-  background: var(--cs-hover);
+
+/* Adjacent rows inside a group square off their shared edge, so the group's ground reads as one
+   block (rounded corners there would open see-through notches between the rows). */
+.gs-opt + .gs-opt {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
-.gs-opt--on,
-.gs-opt--on:hover {
-  background: var(--cs-text);
-  color: var(--cs-bg);
+.gs-opt:has(+ .gs-opt) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
+
+/* Row names mirror the tab typography: 16px / 700. */
 .gs-opt__name {
   display: block;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+}
+/* Rail group segments ("self-hosted" over dstack + Factory, "hosted by us" over Sky): thin
+   full-width solid bars; the rows beneath carry a thick left spine showing what each group
+   includes. */
+.gs-rail__group {
+  background: var(--cs-text);
+  color: var(--cs-bg);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 5px 16px 5px 60.5px; /* left-aligns the label with the row titles */
+  border-radius: 8px 8px 0 0; /* same radius as the rows */
+  white-space: nowrap;
+}
+/* The first bar sits inside the rail's border corner: a 12px outer radius with a 1px border has
+   an 11px inner curve, so the bar needs the nested radius to fill it without a sliver. */
+/* A group bar that follows a row stands off from it, so the groups read as separate
+   blocks inside the rail (keyed on adjacency, not :first-child — the indicator div
+   is the rail's first DOM child). */
+.gs-opt + .gs-rail__group {
+  margin-top: 10px;
+}
+.gs-rail__group:first-child {
+  border-radius: 8px 8px 0 0; /* flush with the borderless rail's 8px clip */
+}
+/* A white inset ring around the state fill, like the active tab chip floating in its strip.
+   Drawn as an inset shadow so the rows' borders, radii, and the bar hug stay untouched. */
+
+/* Rows keep their full rounding. The bar hugs the first row's top corners with two
+   inverted-radius notch shapes painted over the corners (nothing black sits behind the row's
+   antialiased edge, so no hairline outline), and tucks 1px under the row to kill the seam. */
+.gs-rail__group {
+  margin-bottom: -2px; /* tuck under the next row past any fractional-pixel rounding */
+}
+/* A black top border bridges the bar/row boundary in the middle span, so pixel-snapping can
+   never open a white seam there (the bar's -1px margin tucks it under this border). */
+.gs-rail__group + .gs-opt {
+  border-top: 1px solid var(--cs-text);
+}
+.gs-rail__group + .gs-opt::before,
+.gs-rail__group + .gs-opt::after {
+  content: '';
+  position: absolute;
+  top: -1.5px; /* half-pixel deeper into the bar so fractional rounding can't expose a sliver */
+  width: 9px; /* 1px overlap + the 8px corner radius */
+  height: 9.5px; /* 1.5px overlap + the 8px corner radius */
+  pointer-events: none;
+}
+.gs-rail__group + .gs-opt::before {
+  left: -1px;
+  background: radial-gradient(circle at 100% 100%, transparent 8px, var(--cs-text) 8.7px);
+}
+.gs-rail__group + .gs-opt::after {
+  right: -1px;
+  background: radial-gradient(circle at 0 100%, transparent 8px, var(--cs-text) 8.7px);
 }
 .gs-opt__desc {
   display: block;
@@ -1437,11 +1409,8 @@ p {
   line-height: 1.5;
   color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
 }
-.gs-opt--on .gs-opt__desc {
-  color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
-}
 
-/* Open-source: the featured card — bigger, but now with an icon tile (like the Sky/Enterprise rows)
+/* Open-source: the featured card — bigger, but now with an icon tile (like the Sky/Factory rows)
    and the star count moved beneath the name, so all three controls read consistently. */
 .gs-opt--feat {
   padding: 13px 14px;
@@ -1450,7 +1419,7 @@ p {
   gap: 14px;
 }
 /* Left column: the icon tile with the star count centered beneath it (the icon itself lays out
-   exactly like the Sky / Enterprise icon tiles). */
+   exactly like the Sky / Factory icon tiles). */
 .gs-opt__icwrap {
   display: flex;
   flex-direction: column;
@@ -1465,7 +1434,7 @@ p {
   color: inherit;
 }
 
-/* dstack Sky / Enterprise: compact rows with an icon. */
+/* dstack Sky / Factory: compact rows with an icon. */
 .gs-opt--row {
   display: flex;
   align-items: flex-start;
@@ -1480,16 +1449,14 @@ p {
   width: 34px;
   height: 34px;
   border-radius: 9px;
-  border: 0.5px solid var(--cs-border);
+  border: 1px solid var(--cs-border);
   color: inherit;
 }
 .gs-opt__ic svg {
   width: 20px;
   height: 20px;
 }
-.gs-opt--on .gs-opt__ic {
-  border-color: color-mix(in srgb, var(--cs-bg) 50%, transparent);
-}
+
 .gs-opt__body {
   flex: 1 1 auto;
   min-width: 0;
@@ -1499,12 +1466,11 @@ p {
 .gs-detail {
   min-width: 0;
 }
-/* The detail box — shared shell for all three tabs: a bordered container with a fixed height (so its
-   own scrollable lists never inflate it), holding a tab strip, content, and a footer CTA bar. The
+/* The detail box — shared shell for all three tabs: a bordered container with a fixed height, holding a tab strip, content, and a footer CTA bar. The
    height is tuned a touch taller than the rail, giving the content room to breathe and matching the
    tabbed code cards higher up the page; all three tabs reuse this shell, so they stay equal height. */
 .gs-box {
-  height: 320px;
+  height: 360px; /* a touch taller than the rail (~332px); fits the 5-item Governance grid with slack */
   display: flex;
   flex-direction: column;
   background: var(--cs-bg);
@@ -1515,7 +1481,8 @@ p {
 .gs-boxfoot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* Buttons only (the footer notes are gone) — keep them together at the right edge. */
+  justify-content: flex-end;
   gap: 14px;
   padding: 13px 16px 13px 20px;
   border-top: 1px solid color-mix(in srgb, var(--cs-border) 14%, transparent);
@@ -1524,6 +1491,7 @@ p {
   font-size: 13px;
   color: var(--cs-muted);
   min-width: 0; /* allow the note to shrink/wrap so it shares the row with the CTA on narrow screens */
+  margin-inline-end: auto; /* note left, button(s) right — the footer itself is flex-end */
 }
 /* Footer note has a full (desktop) and a shorter (mobile) wording; the mobile breakpoint swaps them. */
 .gs-foot__short {
@@ -1622,6 +1590,61 @@ p {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
+
+/* Sky pane lists — multi-column grids sized so everything fits without scrolling, all
+   top-aligned under the tabs like the GPU marketplace. */
+.gs-col__list--grid {
+  display: grid;
+  column-gap: 28px;
+  align-content: start;
+  overflow-y: visible;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.gs-col__list--offers {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+/* The explore block's categorized clouds grid: one column per group (hyperscalers, top GPU
+   neoclouds, smaller GPU clouds), each column an ordered list. Rows match .gs-cloud styling. */
+.gs-cloudcols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 28px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.gs-cloudcols ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-content: start;
+}
+@media (max-width: 640px) {
+  /* Too narrow for three columns; the group lists stack as blocks instead. */
+  .gs-cloudcols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 9px;
+  }
+}
+
+/* Sky tab pane body. The 44px top padding reproduces the offset the GPU marketplace had when
+   its near-full grid was vertically centered — now fixed, so every tab starts at the same line. */
+.gs-skybody {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 36px 28px 18px; /* was 44px; trimmed so the 5-item Governance caps grid fits the box */
+}
+/* The on-prem tab reuses the Factory capability rows, top-aligned like the other Sky tabs. */
+.gs-skybody .gs-caps {
+  flex: 1 1 auto;
+  align-content: start;
+}
+
 .gs-mkt__row {
   display: flex;
   align-items: baseline;
@@ -1647,10 +1670,11 @@ p {
   align-items: center;
   gap: 10px;
   font-size: var(--font-small);
+  font-weight: 600; /* match the emphasized GPU names in the marketplace tab */
   line-height: 1.3;
 }
 
-/* Enterprise: the "Extra" capabilities — a 2×2 grid of capability rows (icon + title + one-line
+/* Factory: the "Extra" capabilities — a 2×2 grid of capability rows (icon + title + one-line
    detail), centered in the body. No card borders. */
 .gs-entbody {
   flex: 1 1 auto;
@@ -1666,7 +1690,13 @@ p {
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px 26px;
+  gap: 12px 26px; /* row gap was 18px; tightened for the same reason */
+}
+/* Column-flow variant (Governance): items fill the left column top-to-bottom, then the right —
+   so the array order is the reading order, on desktop and in the single mobile column alike. */
+.gs-caps--cols {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
 }
 .gs-cap {
   display: flex;
@@ -1691,7 +1721,7 @@ p {
   min-width: 0;
 }
 .gs-cap__t {
-  font-size: 14px;
+  font-size: var(--font-small); /* same size as the Sky cloud rows */
   font-weight: 600;
   line-height: 1.3;
 }
@@ -1702,17 +1732,27 @@ p {
   line-height: 1.4;
 }
 
-/* Brand-purple check (Sky clouds). */
-.gs-check__mark {
-  width: 17px;
-  height: 17px;
+/* Brand-purple list glyphs (Sky clouds + marketplace GPU chips), matching the capability icons. */
+.gs-li__ic {
+  display: inline-flex;
   flex: 0 0 auto;
-  margin-top: 1px;
   color: #8b2fd0;
 }
-:root[data-theme='dark'] .gs-check__mark {
+:root[data-theme='dark'] .gs-li__ic {
   color: #c08bff;
 }
+.gs-li__ic svg {
+  width: 15px;
+  height: 15px;
+}
+/* Marketplace row: chip + name group on the left, price on the right. */
+.gs-mkt__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
 
 @media (max-width: 860px) {
   .gs-deploy { grid-template-columns: 1fr; gap: 24px; }
@@ -1725,6 +1765,7 @@ p {
   .gs-sky .gs-col + .gs-skyhalf { margin-top: 12px; }
   .gs-col__list { overflow-y: visible; -webkit-mask-image: none; mask-image: none; }
   .gs-caps { grid-template-columns: 1fr; }
+  .gs-caps--cols { grid-auto-flow: row; grid-template-rows: none; }
   /* Read-only install code is wider than the phone; let it scroll instead of clipping. */
   .gs-codebody { overflow-x: auto; }
   /* Footer stays a single row (note + CTA, like desktop), never split onto separate rows. The note
@@ -2229,7 +2270,8 @@ p {
 
   .home-hero__content {
     order: 1;
-    padding: 64px 0 24px;
+    /* Tighter than tablet's 64px — the sticky banner + nav already eat a phone's first screen. */
+    padding: 40px 0 24px;
   }
 
   /* Hero CTAs share one full-width row on phones — two equal columns spanning the width. */

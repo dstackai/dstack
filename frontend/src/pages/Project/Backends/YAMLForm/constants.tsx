@@ -48,7 +48,7 @@ export const CONFIG_YAML_HELP_SKY = {
     ),
 };
 
-export const CONFIG_YAML_HELP_ENTERPRISE = {
+export const CONFIG_YAML_HELP_SELF_HOSTED = {
     header: <h2>Backend config</h2>,
     body: (
         <>
