@@ -1027,6 +1027,21 @@ class TestLoadResumableSession:
 
         assert load_resumable_session("ab12cd34").preset_id == "ab12cd34"
 
+    def test_refuses_session_that_already_saved_a_preset(self, tmp_path, monkeypatch):
+        path = self._write_session(
+            tmp_path,
+            monkeypatch,
+            {
+                "id": "ab12cd34",
+                "status": "interrupted",
+                "run": get_session_run(claude_session_id="sid-1"),
+            },
+        )
+        (path / "preset.yml").write_text("status: verified\n", encoding="utf-8")
+
+        with pytest.raises(CLIError, match="already created; nothing to resume"):
+            load_resumable_session("ab12cd34")
+
     @pytest.mark.parametrize(
         ("state", "match"),
         [

@@ -322,7 +322,9 @@ def load_resumable_session(preset_id: str) -> PresetSession:
     state = session.read_state()
     if not path.is_dir() or state is None:
         raise CLIError(f"Unknown preset: {preset_id}")
-    if state.status == "success":
+    # `PresetStore.save()` commits this file before best-effort run cleanup.
+    # An interrupted cleanup must not turn that durable result back into work.
+    if (path / "preset.yml").is_file() or state.status == "success":
         raise CLIError(f"Preset {preset_id} is already created; nothing to resume")
     if state.status == "failed":
         raise CLIError(f"Preset {preset_id} creation failed and cannot be resumed")
