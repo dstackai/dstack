@@ -2,16 +2,44 @@ from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pydantic
 import pytest
 import requests
 
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import SSHError
-from dstack._internal.server.services.runner.client import LocalAddress, ShimHTTPError
+from dstack._internal.server.schemas.runner import HealthcheckResponse
+from dstack._internal.server.services.runner.client import (
+    LocalAddress,
+    ShimResponseBodyError,
+    ShimResponseError,
+    ShimResponseStatusError,
+)
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.testing.common import get_job_provisioning_data
 
 FORWARDED_PATHS = {DSTACK_SHIM_HTTP_PORT: Path("/tmp/shim.sock")}
+
+
+def _shim_response(status_code: int, content: bytes) -> requests.Response:
+    response = requests.Response()
+    response.status_code = status_code
+    response._content = content
+    response.request = requests.Request(
+        method="GET", url="http://localhost/api/tasks/id"
+    ).prepare()
+    return response
+
+
+def _make_error(error_cls: type[ShimResponseError]) -> ShimResponseError:
+    """Builds either leaf of the `ShimResponseError` family without going through a client."""
+    if error_cls is ShimResponseStatusError:
+        return ShimResponseStatusError(_shim_response(404, b"Task not found"))
+    try:
+        HealthcheckResponse.model_validate({})
+    except pydantic.ValidationError as error:
+        return ShimResponseBodyError(_shim_response(200, b"{}"), error)
+    raise AssertionError("expected a validation error")
 
 
 class BaseRunnerSSHTunnelTest:
@@ -62,14 +90,12 @@ class TestEphemeralConnection(BaseRunnerSSHTunnelTest):
         assert self.call(func) is False
         assert conn.close.call_count == 1
 
-    def test_api_errors_propagate(self, conn):
+    @pytest.mark.parametrize("error_cls", [ShimResponseStatusError, ShimResponseBodyError])
+    def test_api_errors_propagate(self, conn, error_cls):
         def func(addresses: Mapping[int, LocalAddress]):
-            try:
-                raise requests.exceptions.HTTPError("404 Client Error: Not Found")
-            except requests.exceptions.HTTPError as e:
-                raise ShimHTTPError() from e
+            raise _make_error(error_cls)
 
-        with pytest.raises(ShimHTTPError):
+        with pytest.raises(ShimResponseError):
             self.call(func)
         # the connection is still released
         assert conn.close.call_count == 1
@@ -106,14 +132,12 @@ class TestPooledConnection(BaseRunnerSSHTunnelTest):
         assert pool.get_or_open.call_count == 1
         assert pool.drop.call_count == 0
 
-    def test_api_errors_propagate(self, pool):
+    @pytest.mark.parametrize("error_cls", [ShimResponseStatusError, ShimResponseBodyError])
+    def test_api_errors_propagate(self, pool, error_cls):
         def func(addresses: Mapping[int, LocalAddress]):
-            try:
-                raise requests.exceptions.HTTPError("404 Client Error: Not Found")
-            except requests.exceptions.HTTPError as e:
-                raise ShimHTTPError() from e
+            raise _make_error(error_cls)
 
-        with pytest.raises(ShimHTTPError):
+        with pytest.raises(ShimResponseError):
             self.call(func, dockerized=True)
         assert pool.get_or_open.call_count == 1
         assert pool.drop.call_count == 0

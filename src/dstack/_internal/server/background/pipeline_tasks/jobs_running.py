@@ -842,8 +842,10 @@ async def _process_provisioning_status(
                 ssh_user=ssh_user,
                 ssh_key=user_ssh_key,
             )
-        except client.ShimHTTPError as e:
-            logger.warning("%s: shim refused the task submission: %s", fmt(context.job_model), e)
+        except client.ShimResponseError as e:
+            logger.warning(
+                "%s: shim did not accept the task submission: %s", fmt(context.job_model), e
+            )
             success = False
         if success:
             _set_job_status(context.job_model, result, JobStatus.PULLING)
@@ -937,7 +939,7 @@ async def _process_pulling_status(
             job_model=context.job_model,
             jrd=_get_result_job_runtime_data(context.job_model, result),
         )
-    except client.ShimHTTPError as e:
+    except client.ShimResponseError as e:
         # Same outcome as a connection error, `_handle_instance_unreachable()` below,
         # but the cause is now logged instead of being silently indistinguishable.
         logger.warning("%s: shim failed to report the task state: %s", fmt(context.job_model), e)
@@ -1529,10 +1531,11 @@ def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _R
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     try:
         healthcheck_response = runner_client.healthcheck()
-    except client.RunnerHTTPError as e:
-        # Unlike a runner that has not started yet, a peer answering with an error status
-        # is not expected to become a working runner, so this counts as unreachable.
-        logger.warning("Runner healthcheck returned an error status: %s", e)
+    except client.RunnerResponseError as e:
+        # Unlike a runner that has not started yet, a peer that answers with an error status
+        # or an unreadable body is not expected to become a working runner, so this counts
+        # as unreachable.
+        logger.warning("Runner healthcheck failed: %s", e)
         return _RunnerAvailability.UNREACHABLE
     if healthcheck_response is None:
         return _RunnerAvailability.UNAVAILABLE
@@ -1675,10 +1678,10 @@ def _submit_job_to_runner(
             runner_client.upload_code(code)
         logger.debug("%s: starting job", fmt(job_model))
         job_info = runner_client.run_job()
-    except client.RunnerHTTPError as e:
-        # The runner answered with an error status, so retrying the same submission
-        # is not expected to help.
-        logger.warning("%s: runner refused the job submission: %s", fmt(job_model), e)
+    except client.RunnerResponseError as e:
+        # The runner answered, but unusably, so retrying the same submission is not
+        # expected to help.
+        logger.warning("%s: runner did not accept the job submission: %s", fmt(job_model), e)
         return _SubmitJobToRunnerResult(success=False)
     if job_info is not None:
         if jrd is not None:
@@ -1707,7 +1710,7 @@ def _process_running(
     timestamp = job_model.runner_timestamp or 0
     try:
         resp = runner_client.pull(timestamp)
-    except client.RunnerHTTPError as e:
+    except client.RunnerResponseError as e:
         logger.warning("%s: runner failed to serve the pull request: %s", fmt(job_model), e)
         return False
     try:
