@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
 
 import packaging.version
+import pydantic
 import requests
 import requests.exceptions
 import requests_unixsocket
@@ -13,7 +14,11 @@ from typing_extensions import Self
 
 from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.common import CoreModel, NetworkMode, validate_extra_ignore
+from dstack._internal.core.models.common import (
+    CoreModel,
+    NetworkMode,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import GpuDriverInfo
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
@@ -59,53 +64,101 @@ LocalAddress = Union[int, Path]
 """A local TCP port or a Unix domain socket path the client connects to."""
 
 
-class _HTTPErrorWrapper(DstackError):
-    """
-    A base class for wrappers of `requests.exceptions.HTTPError`.
+_M = TypeVar("_M", bound=CoreModel)
+"""A response model parsed from a peer's response body."""
 
-    Wrapping keeps API-level errors (the peer answered with a non-2xx status) distinct from
-    connection-level errors, which stay `requests.RequestException`. Subclasses are raised
-    as follows, so that `status_code` and `message` can read the original error:
+_MAX_ERROR_BODY_BYTES = 512
+"""How much of an unusable response body is kept in the error message."""
 
-        try:
-            <do something>
-        except requests.exceptions.HTTPError as e:
-            raise RunnerHTTPError() from e
+
+class _ResponseError(DstackError):
     """
+    A base implementation for the `*ResponseError` families: the peer was reached and answered,
+    but the answer cannot be used. Unlike `requests.RequestException`, which means the request
+    did not get through, repeating the same request is not expected to help.
+    """
+
+    def __init__(self, response: requests.Response) -> None:
+        super().__init__()
+        self.response = response
 
     def __str__(self) -> str:
         return self.message
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.status_code})"
-
-    @property
-    def status_code(self) -> int:
-        cause = self._cause
-        if cause is not None and cause.response is not None:
-            return cause.response.status_code
-        return 0
+        return f"{self.__class__.__name__}({self.response.status_code})"
 
     @property
     def message(self) -> str:
-        cause = self._cause
-        if cause is None:
-            return "unknown_error"
-        return str(cause)
+        raise NotImplementedError
 
     @property
-    def _cause(self) -> Optional[requests.exceptions.HTTPError]:
-        cause = self.__cause__
-        if isinstance(cause, requests.exceptions.HTTPError):
-            return cause
-        return None
+    def _request_line(self) -> str:
+        request = self.response.request
+        # The full URL is noise: the authority is always localhost or a percent-encoded
+        # socket path, since the client always talks to a locally forwarded port.
+        return f"{request.method} {request.path_url}"
+
+    @property
+    def _body(self) -> str:
+        content = self.response.content
+        text = content[:_MAX_ERROR_BODY_BYTES].decode("utf-8", "replace").strip()
+        if not text:
+            return "<empty>"
+        if len(content) > _MAX_ERROR_BODY_BYTES:
+            text += "..."
+        return text
+
+
+class _ResponseStatusError(_ResponseError):
+    """
+    The peer answered with an error status. Both shim and runner use HTTP status codes as API
+    error codes and put the message in the body, so the body is worth more than the status line
+    reason, which Go generates from the status code alone.
+    """
+
+    @property
+    def status_code(self) -> int:
+        return self.response.status_code
+
+    @property
+    def message(self) -> str:
+        return f"{self._request_line}: {self.status_code}: {self._body}"
+
+
+class _ResponseBodyError(_ResponseError):
+    """
+    The peer answered with a body we cannot read: malformed JSON, or a payload that does not
+    match the expected schema, e.g. because shim or runner is too old or too new.
+    """
+
+    def __init__(self, response: requests.Response, error: pydantic.ValidationError) -> None:
+        super().__init__(response)
+        self.error = error
+
+    @property
+    def message(self) -> str:
+        errors = self.error.errors()
+        detail = f"{len(errors)} validation error(s)"
+        if errors:
+            location = ".".join(str(item) for item in errors[0]["loc"]) or "<root>"
+            detail = f"{detail}, first at {location}: {errors[0]['msg']}"
+        return f"{self._request_line}: {detail}; body: {self._body}"
 
 
 class RunnerError(DstackError):
     pass
 
 
-class RunnerHTTPError(_HTTPErrorWrapper, RunnerError):
+class RunnerResponseError(RunnerError):
+    pass
+
+
+class RunnerResponseStatusError(_ResponseStatusError, RunnerResponseError):
+    pass
+
+
+class RunnerResponseBodyError(_ResponseBodyError, RunnerResponseError):
     pass
 
 
@@ -113,11 +166,19 @@ class ShimError(DstackError):
     pass
 
 
-class ShimHTTPError(_HTTPErrorWrapper, ShimError):
+class ShimAPIVersionError(ShimError):
+    """Raised when a caller uses an API the peer does not support. Signals a server-side bug."""
+
+
+class ShimResponseError(ShimError):
     pass
 
 
-class ShimAPIVersionError(ShimError):
+class ShimResponseStatusError(_ResponseStatusError, ShimResponseError):
+    pass
+
+
+class ShimResponseBodyError(_ResponseBodyError, ShimResponseError):
     pass
 
 
@@ -164,9 +225,10 @@ class RunnerClient:
         """
         Returns the healthcheck response, or `None` if the runner cannot be reached.
 
-        Only connection errors mean "not up yet". A non-2xx status means something is
-        listening that is not a working runner, which is not expected to resolve on its own,
-        so `RunnerHTTPError` propagates instead of being reported as unavailable.
+        Only connection errors mean "not up yet". An error status or a body we cannot read
+        means something is listening that is not a working runner, which is not expected to
+        resolve on its own, so `RunnerResponseError` propagates instead of being reported as
+        unavailable.
         """
         try:
             healthcheck_response = self._healthcheck()
@@ -181,7 +243,7 @@ class RunnerClient:
         if resp.status_code == 404:
             return None
         self._raise_for_status(resp)
-        return validate_extra_ignore(MetricsResponse, resp.json())
+        return self._response(MetricsResponse, resp)
 
     def submit_job(
         self,
@@ -252,14 +314,14 @@ class RunnerClient:
         if not _is_json_response(resp):
             # Old runner or runner failed to get job info
             return None
-        return validate_extra_ignore(JobInfoResponse, resp.json())
+        return self._response(JobInfoResponse, resp)
 
     def pull(self, timestamp: int) -> PullResponse:
         resp = self._session.get(
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
         self._raise_for_status(resp)
-        return validate_extra_ignore(PullResponse, resp.json())
+        return self._response(PullResponse, resp)
 
     def stop(self):
         resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
@@ -268,16 +330,20 @@ class RunnerClient:
     def _url(self, path: str) -> str:
         return f"{self._base_url}/{path.lstrip('/')}"
 
-    def _raise_for_status(self, response: requests.Response) -> None:
+    def _response(self, model_cls: type[_M], response: requests.Response) -> _M:
         try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            raise RunnerHTTPError() from e
+            return validate_json_extra_ignore(model_cls, response.content)
+        except pydantic.ValidationError as e:
+            raise RunnerResponseBodyError(response, e) from e
+
+    def _raise_for_status(self, response: requests.Response) -> None:
+        if response.status_code >= HTTPStatus.BAD_REQUEST:
+            raise RunnerResponseStatusError(response)
 
     def _healthcheck(self) -> HealthcheckResponse:
         resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
         self._raise_for_status(resp)
-        return validate_extra_ignore(HealthcheckResponse, resp.json())
+        return self._response(HealthcheckResponse, resp)
 
     def _negotiate(self, healthcheck_response: Optional[HealthcheckResponse] = None) -> None:
         if healthcheck_response is None:
@@ -658,16 +724,15 @@ class ShimClient:
             self._raise_for_status(resp)
         return resp
 
-    _M = TypeVar("_M", bound=CoreModel)
-
     def _response(self, model_cls: type[_M], response: requests.Response) -> _M:
-        return validate_extra_ignore(model_cls, response.json())
+        try:
+            return validate_json_extra_ignore(model_cls, response.content)
+        except pydantic.ValidationError as e:
+            raise ShimResponseBodyError(response, e) from e
 
     def _raise_for_status(self, response: requests.Response) -> None:
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            raise ShimHTTPError() from e
+        if response.status_code >= HTTPStatus.BAD_REQUEST:
+            raise ShimResponseStatusError(response)
 
     def _negotiate(self, healthcheck_response: Optional[requests.Response] = None) -> None:
         if healthcheck_response is None:

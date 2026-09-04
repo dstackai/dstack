@@ -852,10 +852,10 @@ def _shim_submit_stop(addresses: Mapping[int, client.LocalAddress], job_model: J
                 shim_client.remove_task(task_id=job_model.id)
         else:
             shim_client.stop(force=True)
-    except client.ShimHTTPError as e:
+    except client.ShimResponseError as e:
         # The job is being terminated either way; dangling tasks are cleared later
         # by `remove_dangling_tasks_from_instance()` on instance checks.
-        logger.warning("%s: shim refused to stop the container: %s", fmt(job_model), e)
+        logger.warning("%s: shim failed to stop the container: %s", fmt(job_model), e)
         return False
     return True
 

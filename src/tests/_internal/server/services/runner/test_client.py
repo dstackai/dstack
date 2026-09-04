@@ -33,9 +33,11 @@ from dstack._internal.server.schemas.runner import (
 )
 from dstack._internal.server.services.runner.client import (
     RunnerClient,
-    RunnerHTTPError,
+    RunnerResponseBodyError,
+    RunnerResponseStatusError,
     ShimClient,
-    ShimHTTPError,
+    ShimResponseBodyError,
+    ShimResponseStatusError,
     _parse_version,
     healthcheck_response_to_instance_check,
     instance_info_response_to_gpu_driver,
@@ -142,21 +144,70 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
         assert adapter.last_request.json()["job_spec"]["env"]["DSTACK_PROJECT"] == "other"
 
 
-class TestRunnerClientRaiseForStatus(BaseShimClientTest):
-    def test_wraps_http_error(self, adapter: requests_mock.Adapter):
-        adapter.register_uri("POST", "/api/stop", status_code=502, reason="Bad Gateway")
+class TestRunnerClientResponseErrors(BaseShimClientTest):
+    def test_status_error_reports_endpoint_status_and_body(self, adapter: requests_mock.Adapter):
+        adapter.register_uri(
+            "POST", "/api/stop", status_code=502, reason="Bad Gateway", text="upstream is down"
+        )
         client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
 
-        with pytest.raises(RunnerHTTPError) as excinfo:
+        with pytest.raises(RunnerResponseStatusError) as excinfo:
             client.stop()
 
         exc = excinfo.value
         assert exc.status_code == 502
-        assert exc.message.startswith("502 Server Error: Bad Gateway")
-        assert str(exc).startswith("502 Server Error: Bad Gateway")
-        assert repr(exc) == "RunnerHTTPError(502)"
-        # API-level errors must not be confused with connection errors
+        assert exc.response.status_code == 502
+        # The status line reason is dropped: Go derives it from the status code alone,
+        # while the body carries the message the handler actually wrote.
+        assert str(exc) == "POST /api/stop: 502: upstream is down"
+        assert repr(exc) == "RunnerResponseStatusError(502)"
+        # API errors must not be confused with connection errors
         assert not isinstance(exc, requests.RequestException)
+
+    def test_status_error_without_body(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/stop", status_code=500, text="")
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerResponseStatusError) as excinfo:
+            client.stop()
+
+        assert str(excinfo.value) == "POST /api/stop: 500: <empty>"
+
+    def test_status_error_truncates_long_body(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("POST", "/api/stop", status_code=500, text="x" * 4096)
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerResponseStatusError) as excinfo:
+            client.stop()
+
+        message = str(excinfo.value)
+        assert message.endswith("x" * 512 + "...")
+        assert len(message) < 600
+
+    def test_body_error_on_malformed_json(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("GET", "/api/healthcheck", text="<html>not json")
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerResponseBodyError) as excinfo:
+            client.healthcheck()
+
+        exc = excinfo.value
+        assert str(exc).startswith("GET /api/healthcheck: 1 validation error(s)")
+        assert str(exc).endswith("body: <html>not json")
+        # Parsing the body with pydantic rather than `Response.json()` keeps this out of the
+        # `requests.RequestException` hierarchy, where the tunnel would read it as transport.
+        assert not isinstance(exc, requests.RequestException)
+
+    def test_body_error_on_schema_mismatch(self, adapter: requests_mock.Adapter):
+        adapter.register_uri("GET", "/api/healthcheck", json={"service": "dstack-runner"})
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+
+        with pytest.raises(RunnerResponseBodyError) as excinfo:
+            client.healthcheck()
+
+        exc = excinfo.value
+        assert "first at version: Field required" in str(exc)
+        assert exc.error.error_count() == 1
 
     def test_healthcheck_returns_none_on_connection_error(self, adapter: requests_mock.Adapter):
         adapter.register_uri(
@@ -166,11 +217,11 @@ class TestRunnerClientRaiseForStatus(BaseShimClientTest):
 
         assert client.healthcheck() is None
 
-    def test_healthcheck_raises_on_http_error(self, adapter: requests_mock.Adapter):
+    def test_healthcheck_raises_on_error_status(self, adapter: requests_mock.Adapter):
         adapter.register_uri("GET", "/api/healthcheck", status_code=500)
         client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
 
-        with pytest.raises(RunnerHTTPError):
+        with pytest.raises(RunnerResponseStatusError):
             client.healthcheck()
 
 
@@ -214,19 +265,29 @@ class TestShimClientNegotiate(BaseShimClientTest):
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
 
 
-class TestShimClientRaiseForStatus(BaseShimClientTest):
-    def test(self, client: ShimClient, adapter: requests_mock.Adapter):
-        adapter.register_uri("GET", "/test/path", status_code=502, reason="Bad Gateway")
+class TestShimClientResponseErrors(BaseShimClientTest):
+    def test_status_error(self, client: ShimClient, adapter: requests_mock.Adapter):
+        adapter.register_uri(
+            "GET", "/test/path", status_code=502, reason="Bad Gateway", text="Task not found"
+        )
         response = client._request("GET", "/test/path")
 
-        with pytest.raises(ShimHTTPError) as excinfo:
+        with pytest.raises(ShimResponseStatusError) as excinfo:
             client._raise_for_status(response)
 
         exc = excinfo.value
         assert exc.status_code == 502
-        assert exc.message.startswith("502 Server Error: Bad Gateway")
-        assert str(exc).startswith("502 Server Error: Bad Gateway")
-        assert repr(exc) == "ShimHTTPError(502)"
+        assert str(exc) == "GET /test/path: 502: Task not found"
+        assert repr(exc) == "ShimResponseStatusError(502)"
+
+    def test_body_error(self, client: ShimClient, adapter: requests_mock.Adapter):
+        adapter.register_uri("GET", "/test/path", json={"service": "dstack-shim"})
+        response = client._request("GET", "/test/path")
+
+        with pytest.raises(ShimResponseBodyError) as excinfo:
+            client._response(HealthcheckResponse, response)
+
+        assert "first at version: Field required" in str(excinfo.value)
 
 
 @pytest.mark.shim_version("0.18.30")
