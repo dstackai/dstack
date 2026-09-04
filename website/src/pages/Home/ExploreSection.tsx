@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import Icon from '@cloudscape-design/components/icon';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
-import { DashedBorder } from '../../components/DashedBorder';
 import { highlightTerms } from '../../components/highlightTerms';
 import { docsUrl } from '../../routes';
 import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedSection';
@@ -11,10 +9,11 @@ import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedS
 // three run types (dev environments, tasks, services) into one card; there's no single runs
 // concept page, so it links to the quickstart ("creating fleets and submitting runs").
 const keyConcepts = [
-  { name: 'Fleets', label: 'Cloud & on-prem', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
-  { name: 'Runs', label: 'Dev, training, and inference', href: docsUrl('quickstart'), description: 'Run dev environments, training tasks, and inference services on your fleets.' },
-  { name: 'Gateways', label: 'Ingress', href: docsUrl('concepts/gateways'), description: 'Manage auto-scaling, rate limits, ingress, custom domains, etc.' },
-  { name: 'Presets', label: 'Inference optimization', href: docsUrl('concepts/presets'), description: 'Agent-based inference optimization toolkit, and a preset registry.' },
+  { name: 'Projects', href: docsUrl('concepts/projects'), description: 'Multi-tenancy and resource isolation' },
+  { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Cluster provisioning and monitoring' },
+  { name: 'Runs', href: docsUrl('quickstart'), description: 'Training and inference primitives' },
+  { name: 'Presets', href: docsUrl('concepts/presets'), description: 'Agent-based inference optimization' },
+  { name: 'Gateways', href: docsUrl('concepts/gateways'), description: 'Ingress, auto-scaling, rate limits, etc' },
 ];
 
 // The main marketing content: a sequence of alternating documentation blocks.
@@ -22,10 +21,10 @@ export function ExploreSection() {
   return (
     <section className="docs-section explore-section" id="explore">
       <AlternatingDocBlock visual={<ArchitectureDiagram />} title="Vendor-agnostic, open-source" imageFirst>
-        dstack unifies fleets, dev environments, tasks, services, volumes, and gateways in one control plane for AI workloads.
+        dstack gives cloud tenants and data-center operators a unified control plane for managing compute and orchestrating AI workloads.
         <br />
         <br />
-        It’s built for containerized AI workloads with a simple CLI, UI, and API. No Kubernetes or Slurm hassle required.
+        It improves operational efficiency and removes vendor lock-in. No more hassle of building your own compute stack on top of Kubernetes or Slurm.
       </AlternatingDocBlock>
 
       <KeyConceptsBlock />
@@ -68,7 +67,7 @@ function BringComputeBlock() {
               className={`gs-tab${pane === 'onprem' ? ' gs-tab--on' : ''}`}
               onClick={() => setPane('onprem')}
             >
-              On-prem clusters
+              On-prem
             </button>
             <button
               type="button"
@@ -110,15 +109,15 @@ function BringComputeBlock() {
       title="Bring your own compute"
       imageFirst
     >
-      dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
-      Authorize dstack by configuring backends with your credentials, and dstack will provision fleets
-      and schedule workloads in your own cloud account.
-      <br />
-      <br />
       Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH
       credentials to create an SSH fleet. Have an existing Kubernetes cluster? Point dstack's
       Kubernetes backend to the kubeconfig. dstack will schedule workloads on them alongside cloud
       clusters.
+      <br />
+      <br />
+      dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
+      Authorize dstack by configuring backends with your credentials, and dstack will provision fleets
+      and schedule workloads in your own cloud account.
     </AlternatingDocBlock>
   );
 }
@@ -127,29 +126,25 @@ function KeyConceptsBlock() {
   return (
     <AlternatingDocBlock
       visual={
-        <div className="concept-grid">
-          {keyConcepts.map(concept => (
-            // Whole card is the link so it reads as clickable, with an ActionCard-style
-            // arrow. Kept as a real <a> (open-in-new-tab / SEO) rather than Cloudscape's
-            // onClick-only ActionCard component.
-            <a className="media-card concept-card" href={concept.href} key={concept.name}>
-              <DashedBorder />
-              <span className="concept-card__label">{concept.label}</span>
-              <h3>
-                {concept.name}
-                <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
-              </h3>
-              <p>{highlightTerms(concept.description)}</p>
-            </a>
-          ))}
+        <div className="concept-grid-wrap">
+          <div className="concept-grid">
+            {keyConcepts.map(concept => (
+              // Whole card is the link so it reads as clickable. Kept as a real <a>
+              // (open-in-new-tab / SEO) rather than Cloudscape's onClick-only ActionCard.
+              <a className="media-card concept-card" href={concept.href} key={concept.name}>
+                <h3>{concept.name}</h3>
+                <p>{highlightTerms(concept.description)}</p>
+              </a>
+            ))}
+          </div>
         </div>
       }
       title="AI-native orchestration"
     >
-      Managing AI infrastructure requires first-class primitives for accelerator provisioning, workload scheduling, and observability.
+      Managing AI infrastructure requires first-class primitives for compute management, training, inference, and observability that support heterogeneous AI compute.
       <br />
       <br />
-      dstack offers a streamlined interface for development, training, and inference built for heterogeneous AI compute.
+      dstack provides a streamlined interface to efficiently utilize cloud compute, run data-center operations, or run your own AI token factory at planet scale.
     </AlternatingDocBlock>
   );
 }
