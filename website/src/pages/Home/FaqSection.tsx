@@ -9,19 +9,19 @@ import { highlightTerms } from '../../components/highlightTerms';
 const faqItems = [
   {
     q: 'How does dstack differ from Slurm?',
-    a: 'Slurm is a battle-tested system with decades of production use in HPC environments. dstack, by contrast, is built for modern ML/AI workloads with cloud-native provisioning and a container-first architecture. While both support distributed training and batch jobs, dstack also natively supports development and production-grade inference.',
+    a: 'Slurm is a battle-tested workload manager with decades of production use in HPC environments. dstack is a unified orchestration layer built for containerized AI workloads and heterogeneous AI compute. While both support batch jobs and distributed training, dstack also provides first-class primitives for compute management, inference, and observability, including native cloud provisioning.',
   },
   {
     q: 'How does dstack compare to Kubernetes?',
-    a: "Kubernetes is a general-purpose container orchestrator. dstack also orchestrates containers, but it provides a lightweight, streamlined interface that's purpose-built for ML. You declare dev environments, tasks, services, and fleets with simple configuration, and dstack provisions GPUs, manages clusters via fleets with fine-grained controls, and optimizes cost and utilization, all while keeping a simple CLI and UI.",
+    a: 'Kubernetes is a general-purpose container orchestrator. dstack also orchestrates containers, but provides a lightweight, streamlined interface purpose-built for AI workloads, with first-class primitives for compute management, training, inference, and observability. It can use Kubernetes as a compute backend or work directly with cloud GPUs, pre-provisioned VMs, or bare-metal, helping cloud tenants and data-center operators improve utilization without building and maintaining their own AI orchestration stack.',
   },
   {
     q: 'Can I use dstack with Kubernetes?',
-    a: 'Yes. You can connect existing Kubernetes clusters using the Kubernetes backend and run dev environments, tasks, and services on them. Choose the Kubernetes backend if your GPUs already run on Kubernetes and your team depends on its ecosystem and tooling. Otherwise, VM-based backends (for cloud GPUs) or SSH fleets (for on-prem) are often a better fit.',
+    a: 'Yes. Connect existing Kubernetes clusters through the Kubernetes backend, and dstack will schedule AI workloads on them alongside cloud GPUs, VMs, and bare-metal. Use the Kubernetes backend when your GPUs already run on Kubernetes or your team relies on its ecosystem and tooling. Otherwise, cloud backends are often simpler for cloud GPUs, and SSH fleets for pre-provisioned VMs or bare-metal.',
   },
   {
     q: 'When should I use dstack?',
-    a: "dstack accelerates ML development with a simple, ML-native interface: spin up dev environments, run single-node or distributed tasks, and deploy services without infrastructure overhead. It radically reduces GPU costs through smart orchestration and fine-grained fleet controls, including efficient reuse, right-sizing, and support for spot, on-demand, and reserved capacity. It's 100% interoperable with your stack, working with any open-source frameworks and tools and your own Docker images and code, across GPU clouds, Kubernetes, and on-prem GPUs.",
+    a: 'Use dstack as a unified orchestration layer for cluster management, training, and inference, built for heterogeneous AI compute. It is designed for cloud tenants, data-center operators, and teams running their own AI token factory at planet scale.',
   },
 ];
 
