@@ -59,6 +59,68 @@ LocalAddress = Union[int, Path]
 """A local TCP port or a Unix domain socket path the client connects to."""
 
 
+class _HTTPErrorWrapper(DstackError):
+    """
+    A base class for wrappers of `requests.exceptions.HTTPError`.
+
+    Wrapping keeps API-level errors (the peer answered with a non-2xx status) distinct from
+    connection-level errors, which stay `requests.RequestException`. Subclasses are raised
+    as follows, so that `status_code` and `message` can read the original error:
+
+        try:
+            <do something>
+        except requests.exceptions.HTTPError as e:
+            raise RunnerHTTPError() from e
+    """
+
+    def __str__(self) -> str:
+        return self.message
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.status_code})"
+
+    @property
+    def status_code(self) -> int:
+        cause = self._cause
+        if cause is not None and cause.response is not None:
+            return cause.response.status_code
+        return 0
+
+    @property
+    def message(self) -> str:
+        cause = self._cause
+        if cause is None:
+            return "unknown_error"
+        return str(cause)
+
+    @property
+    def _cause(self) -> Optional[requests.exceptions.HTTPError]:
+        cause = self.__cause__
+        if isinstance(cause, requests.exceptions.HTTPError):
+            return cause
+        return None
+
+
+class RunnerError(DstackError):
+    pass
+
+
+class RunnerHTTPError(_HTTPErrorWrapper, RunnerError):
+    pass
+
+
+class ShimError(DstackError):
+    pass
+
+
+class ShimHTTPError(_HTTPErrorWrapper, ShimError):
+    pass
+
+
+class ShimAPIVersionError(ShimError):
+    pass
+
+
 class RunnerClient:
     # `/api/upload_code` call is not required if there is no code
     _OPTIONAL_CODE_UPLOAD_MIN_VERSION = (0, 20, 17)
@@ -99,6 +161,13 @@ class RunnerClient:
         return version_tuple is None or version_tuple >= self._OPTIONAL_CODE_UPLOAD_MIN_VERSION
 
     def healthcheck(self) -> Optional[HealthcheckResponse]:
+        """
+        Returns the healthcheck response, or `None` if the runner cannot be reached.
+
+        Only connection errors mean "not up yet". A non-2xx status means something is
+        listening that is not a working runner, which is not expected to resolve on its own,
+        so `RunnerHTTPError` propagates instead of being reported as unavailable.
+        """
         try:
             healthcheck_response = self._healthcheck()
         except requests.exceptions.RequestException:
@@ -111,7 +180,7 @@ class RunnerClient:
         resp = self._session.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
         if resp.status_code == 404:
             return None
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return validate_extra_ignore(MetricsResponse, resp.json())
 
     def submit_job(
@@ -161,7 +230,7 @@ class RunnerClient:
             headers={"Content-Type": "application/json"},
             timeout=REQUEST_TIMEOUT,
         )
-        resp.raise_for_status()
+        self._raise_for_status(resp)
 
     def upload_archive(self, id: uuid.UUID, file: Union[BinaryIO, bytes]):
         resp = self._session.post(
@@ -169,17 +238,17 @@ class RunnerClient:
             files={"archive": (str(id), file)},
             timeout=UPLOAD_CODE_REQUEST_TIMEOUT,
         )
-        resp.raise_for_status()
+        self._raise_for_status(resp)
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
         resp = self._session.post(
             self._url("/api/upload_code"), data=file, timeout=UPLOAD_CODE_REQUEST_TIMEOUT
         )
-        resp.raise_for_status()
+        self._raise_for_status(resp)
 
     def run_job(self) -> Optional[JobInfoResponse]:
         resp = self._session.post(self._url("/api/run"), timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         if not _is_json_response(resp):
             # Old runner or runner failed to get job info
             return None
@@ -189,19 +258,25 @@ class RunnerClient:
         resp = self._session.get(
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return validate_extra_ignore(PullResponse, resp.json())
 
     def stop(self):
         resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
 
     def _url(self, path: str) -> str:
         return f"{self._base_url}/{path.lstrip('/')}"
 
+    def _raise_for_status(self, response: requests.Response) -> None:
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise RunnerHTTPError() from e
+
     def _healthcheck(self) -> HealthcheckResponse:
         resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
+        self._raise_for_status(resp)
         return validate_extra_ignore(HealthcheckResponse, resp.json())
 
     def _negotiate(self, healthcheck_response: Optional[HealthcheckResponse] = None) -> None:
@@ -212,52 +287,6 @@ class RunnerClient:
         self._version_string = version_string
         self._version_tuple = version_tuple
         self._negotiated = True
-
-
-class ShimError(DstackError):
-    pass
-
-
-class ShimHTTPError(ShimError):
-    """
-    An HTTP error wrapper for `requests.exceptions.HTTPError`. Should be used as follows:
-
-        try:
-            <do something>
-        except requests.exceptions.HTTPError as e:
-            raise ShimHTTPError() from e
-    """
-
-    def __str__(self) -> str:
-        return self.message
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.status_code})"
-
-    @property
-    def status_code(self) -> int:
-        cause = self._cause
-        if cause is not None and cause.response is not None:
-            return cause.response.status_code
-        return 0
-
-    @property
-    def message(self) -> str:
-        cause = self._cause
-        if cause is None:
-            return "unknown_error"
-        return str(cause)
-
-    @property
-    def _cause(self) -> Optional[requests.exceptions.HTTPError]:
-        cause = self.__cause__
-        if isinstance(cause, requests.exceptions.HTTPError):
-            return cause
-        return None
-
-
-class ShimAPIVersionError(ShimError):
-    pass
 
 
 class ComponentList:

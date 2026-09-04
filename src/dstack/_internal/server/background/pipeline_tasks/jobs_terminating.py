@@ -830,25 +830,33 @@ async def _stop_container(
 def _shim_submit_stop(addresses: Mapping[int, client.LocalAddress], job_model: JobModel) -> bool:
     shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
-    resp = shim_client.healthcheck()
-    if resp is None:
-        logger.debug("%s: can't stop container, shim is not available yet", fmt(job_model))
-        return False
+    try:
+        resp = shim_client.healthcheck()
+        if resp is None:
+            logger.debug("%s: can't stop container, shim is not available yet", fmt(job_model))
+            return False
 
-    if shim_client.is_api_v2_supported():
-        reason = (
-            None if job_model.termination_reason is None else job_model.termination_reason.value
-        )
-        shim_client.terminate_task(
-            task_id=job_model.id,
-            reason=reason,
-            message=job_model.termination_reason_message,
-            timeout=0,
-        )
-        if not settings.SERVER_KEEP_SHIM_TASKS:
-            shim_client.remove_task(task_id=job_model.id)
-    else:
-        shim_client.stop(force=True)
+        if shim_client.is_api_v2_supported():
+            reason = (
+                None
+                if job_model.termination_reason is None
+                else job_model.termination_reason.value
+            )
+            shim_client.terminate_task(
+                task_id=job_model.id,
+                reason=reason,
+                message=job_model.termination_reason_message,
+                timeout=0,
+            )
+            if not settings.SERVER_KEEP_SHIM_TASKS:
+                shim_client.remove_task(task_id=job_model.id)
+        else:
+            shim_client.stop(force=True)
+    except client.ShimHTTPError as e:
+        # The job is being terminated either way; dangling tasks are cleared later
+        # by `remove_dangling_tasks_from_instance()` on instance checks.
+        logger.warning("%s: shim refused to stop the container: %s", fmt(job_model), e)
+        return False
     return True
 
 

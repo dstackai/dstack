@@ -387,7 +387,8 @@ def _stop_runner(
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     try:
         runner_client.stop()
-    except requests.RequestException:
+    except (requests.RequestException, client.RunnerError):
+        # Stopping the runner is best-effort: the job is being terminated either way.
         logger.exception("%s: failed to stop runner gracefully", fmt(job_model))
 
 
