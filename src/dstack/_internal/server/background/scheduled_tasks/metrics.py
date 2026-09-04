@@ -131,13 +131,12 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
             jpd,
             jrd,
         )
+    except client.PeerConnectionError as e:
+        # The job may already be terminated when collecting metrics - that's ok.
+        logger.warning("Failed to connect to job %s to collect metrics: %s", job_model.job_name, e)
+        return None
     except Exception:
         logger.exception("Failed to collect job %s metrics", job_model.job_name)
-        return None
-
-    if isinstance(res, bool):
-        # The job may already be terminated when collecting metrics - that's ok.
-        logger.warning("Failed to connect to job %s to collect metrics", job_model.job_name)
         return None
 
     if res is None:

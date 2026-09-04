@@ -11,6 +11,7 @@ from dstack._internal.core.errors import SSHError
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services.runner.client import (
     LocalAddress,
+    PeerConnectionError,
     ShimResponseBodyError,
     ShimResponseError,
     ShimResponseStatusError,
@@ -49,11 +50,17 @@ class BaseRunnerSSHTunnelTest:
         conn.forwarded_paths.return_value = FORWARDED_PATHS
         return conn
 
-    def call(self, func, dockerized: bool = False):
+    def call(self, func, dockerized: bool = False, jpd=None):
         decorated = runner_ssh_tunnel(func)
-        return decorated(
-            ("private_key", None), get_job_provisioning_data(dockerized=dockerized), None
-        )
+        if jpd is None:
+            jpd = get_job_provisioning_data(dockerized=dockerized)
+        return decorated(("private_key", None), jpd, None)
+
+    def test_missing_connection_details_raise(self):
+        jpd = get_job_provisioning_data().model_copy(update={"hostname": None})
+
+        with pytest.raises(PeerConnectionError, match="hostname or SSH port is not known"):
+            self.call(lambda addresses: "result", jpd=jpd)
 
 
 class TestEphemeralConnection(BaseRunnerSSHTunnelTest):
@@ -70,10 +77,12 @@ class TestEphemeralConnection(BaseRunnerSSHTunnelTest):
         assert self.call(lambda addresses: "result") == "result"
         assert conn.close.call_count == 1
 
-    def test_ssh_error_on_open_returns_false(self, conn):
+    def test_ssh_error_on_open_raises(self, conn):
         conn.open.side_effect = SSHError("no route")
 
-        assert self.call(lambda addresses: "result") is False
+        with pytest.raises(PeerConnectionError, match="failed to open an SSH connection") as exc:
+            self.call(lambda addresses: "result")
+        assert isinstance(exc.value.__cause__, SSHError)
 
     @pytest.mark.parametrize(
         "exc",
@@ -83,11 +92,14 @@ class TestEphemeralConnection(BaseRunnerSSHTunnelTest):
             requests.exceptions.ChunkedEncodingError("truncated"),
         ],
     )
-    def test_connection_errors_return_false(self, conn, exc):
+    def test_connection_errors_raise(self, conn, exc):
         def func(addresses: Mapping[int, LocalAddress]):
             raise exc
 
-        assert self.call(func) is False
+        with pytest.raises(PeerConnectionError, match="did not get through") as raised:
+            self.call(func)
+        assert raised.value.__cause__ is exc
+        # the connection is still released
         assert conn.close.call_count == 1
 
     @pytest.mark.parametrize("error_cls", [ShimResponseStatusError, ShimResponseBodyError])
@@ -117,10 +129,14 @@ class TestPooledConnection(BaseRunnerSSHTunnelTest):
         assert pool.drop.call_count == 0
 
     def test_connection_error_drops_and_retries_once(self, pool):
-        def func(addresses: Mapping[int, LocalAddress]):
-            raise requests.ConnectionError("refused")
+        error = requests.ConnectionError("refused")
 
-        assert self.call(func, dockerized=True) is False
+        def func(addresses: Mapping[int, LocalAddress]):
+            raise error
+
+        with pytest.raises(PeerConnectionError, match="did not get through") as raised:
+            self.call(func, dockerized=True)
+        assert raised.value.__cause__ is error
         assert pool.get_or_open.call_count == 2
         assert pool.drop.call_count == 2
 
@@ -128,9 +144,16 @@ class TestPooledConnection(BaseRunnerSSHTunnelTest):
         def func(addresses: Mapping[int, LocalAddress]):
             raise requests.ReadTimeout("too slow")
 
-        assert self.call(func, dockerized=True) is False
+        with pytest.raises(PeerConnectionError, match="did not get through"):
+            self.call(func, dockerized=True)
         assert pool.get_or_open.call_count == 1
         assert pool.drop.call_count == 0
+
+    def test_unopenable_connection_raises(self, pool):
+        pool.get_or_open.return_value = None
+
+        with pytest.raises(PeerConnectionError, match="failed to open an SSH connection"):
+            self.call(lambda addresses: "result", dockerized=True)
 
     @pytest.mark.parametrize("error_cls", [ShimResponseStatusError, ShimResponseBodyError])
     def test_api_errors_propagate(self, pool, error_cls):
