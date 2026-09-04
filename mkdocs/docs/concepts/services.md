@@ -24,7 +24,6 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
     name: qwen36
 
     image: lmsysorg/sglang:v0.5.10.post1
-
     commands:
       - |
         sglang serve \
@@ -44,6 +43,9 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
       - instance_path: /root/.cache
         path: /root/.cache
         optional: true
+
+    # Number of replicas, or a range to enable scaling
+    replicas: 1
 
     resources:
       shm_size: 16GB
@@ -82,6 +84,9 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
         path: /root/.cache
         optional: true
 
+    # Number of replicas, or a range to enable scaling
+    replicas: 1
+
     resources:
       cpu: 52..
       memory: 896GB..
@@ -92,8 +97,13 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
     </div>
 
-The first startup on MI300X can take longer while SGLang compiles ROCm
-kernels.
+    The first startup on MI300X can take longer while SGLang compiles ROCm
+    kernels.
+
+<span id="replicas"></span>
+<span id="replicas-and-scaling"></span>
+!!! info "Replicas"
+    [`replicas`](../reference/dstack.yml/service.md#replicas) can be a number or, if you use a [gateway](#gateway), a range to enable [scaling](#scaling). If omitted, it defaults to `1`.
 
 To run a service, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
@@ -143,158 +153,22 @@ The request and response format depends on the serving framework used by the
 service. Even for OpenAI-compatible endpoints, the format may vary slightly
 across frameworks.
 
-If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <user token>`.
+??? info "Authorization"
+    If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <user token>`.
 
-## Configuration options
-
-<!-- !!! info "No commands"
-    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set). -->
-
-### Gateway
-
-Here are cases where a service may need a [gateway](gateways.md):
-
-* To use [auto-scaling](#replicas-and-scaling) or [rate limits](#rate-limits)
-* To enable HTTPS for the endpoint and map it to your domain
-* If your service requires WebSockets
-* If your service cannot work with a [path prefix](#path-prefix)
-
-<!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
-a gateway is already pre-configured for you. -->
-
-If you want `dstack` to explicitly validate that a gateway is used, you can set the [`gateway`](../reference/dstack.yml/service.md#gateway) property in the service configuration to `true`. In this case, `dstack` will raise an error during `dstack apply` if a default gateway is not created.
-
-You can also set the `gateway` property to the name of a specific gateway, if required.
-
-If you have a [gateway](gateways.md) created, the service endpoint will be accessible at `https://<run name>.<gateway domain>/`:
-
-<div class="termy">
-
-```shell
-$ curl https://llama31.example.com/v1/chat/completions \
-    -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;user token&gt;' \
-    -d '{
-        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-        "messages": [
-            {
-                "role": "user",
-                "content": "Compose a poem that explains the concept of recursion in programming."
-            }
-        ]
-    }'
-```
-
-</div>
-
-### Replicas and scaling
-
-By default, `dstack` runs a single replica of the service.
-You can configure the number of replicas as well as the auto-scaling rules.
-
-=== "NVIDIA"
-
-    <div editor-title="service.dstack.yml">
-
-    ```yaml
-    type: service
-    name: qwen36-service
-
-    image: lmsysorg/sglang:v0.5.10.post1
-
-    commands:
-      - |
-        sglang serve \
-          --model-path Qwen/Qwen3.6-27B \
-          --host 0.0.0.0 \
-          --port 30000 \
-          --tp $DSTACK_GPUS_NUM \
-          --reasoning-parser qwen3 \
-          --mem-fraction-static 0.8 \
-          --context-length 262144
-
-    port: 30000
-    model: Qwen/Qwen3.6-27B
-
-    volumes:
-      # Optional instance volume for model and runtime caches
-      - instance_path: /root/.cache
-        path: /root/.cache
-        optional: true
-
-    resources:
-      shm_size: 16GB
-      gpu: H100:4
-
-    replicas: 1..2
-    scaling:
-      metric: rps
-      target: 1
-    ```
-
-    </div>
-
-=== "AMD"
-
-    <div editor-title="service.dstack.yml">
-
-    ```yaml
-    type: service
-    name: qwen36-service
-
-    image: lmsysorg/sglang:v0.5.10-rocm720-mi30x
-
-    commands:
-      - |
-        sglang serve \
-          --model-path Qwen/Qwen3.6-27B \
-          --host 0.0.0.0 \
-          --port 30000 \
-          --tp $DSTACK_GPUS_NUM \
-          --reasoning-parser qwen3 \
-          --mem-fraction-static 0.8 \
-          --context-length 262144
-
-    port: 30000
-    model: Qwen/Qwen3.6-27B
-
-    volumes:
-      # Optional instance volume for model and runtime caches
-      - instance_path: /root/.cache
-        path: /root/.cache
-        optional: true
-
-    resources:
-      cpu: 52..
-      memory: 896GB..
-      shm_size: 16GB
-      disk: 450GB..
-      gpu: MI300X:4
-
-    replicas: 1..2
-    scaling:
-      metric: rps
-      target: 1
-    ```
-
-    </div>
-
-The [`replicas`](../reference/dstack.yml/service.md#replicas) property can be a number or a range.
-
-The [`metric`](../reference/dstack.yml/service.md#metric) property of [`scaling`](../reference/dstack.yml/service.md#scaling) only supports the `rps` metric (requests per second). In this
-case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load.
-
-Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
-
-> The `scaling` property requires creating a [gateway](gateways.md).
-
-<span id="replica-groups"></span>
-
-### Replica groups
+## Replica groups
 
 A service can define multiple replica groups. Each group has its own `replicas` count (or range),
 `resources`, `commands`, and `scaling` rules. For a common use case, see
 [PD disaggregation](#pd-disaggregation).
+
+<!-- TODO: update the text above to de-focus from PD to the router. -->
+
+### Router
+
+<!-- TODO: Introduce a router concept and what it does/why it's needed. -->
+
+<!-- TODO: update the example below to use router for aggregated inference. -->
 
 <div editor-title="service.dstack.yml">
 
@@ -307,10 +181,7 @@ env:
   - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
 groups:
-  - replicas: 1..2
-    scaling:
-      metric: rps
-      target: 10
+  - replicas: 1
     commands:
       - |
         python -m sglang.launch_server \
@@ -320,10 +191,7 @@ groups:
     resources:
       gpu: 48GB
 
-  - replicas: 1..4
-    scaling:
-      metric: rps
-      target: 5
+  - replicas: 4
     commands:
       - |
         python -m sglang.launch_server \
@@ -343,7 +211,7 @@ model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
 > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
-??? info "Accessing replica IPs"
+??? info "Internal replica IPs"
     Commands in any group can reference the internal IP address of any replica in the run via
     `${{ groups[i].replicas[j].IP_ADDRESS }}`, where `i` is the index of the group in `groups` and `j` is
     the index of the replica within that group.
@@ -395,10 +263,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: sglang
 
-      - replicas: 1..4
-        scaling:
-          metric: rps
-          target: 3
+      - replicas: 4
         commands:
           - |
             python -m sglang.launch_server \
@@ -410,10 +275,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - replicas: 1..8
-        scaling:
-          metric: rps
-          target: 2
+      - replicas: 8
         commands:
           - |
             python -m sglang.launch_server \
@@ -476,10 +338,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         router:
           type: dynamo
 
-      - replicas: 1..4
-        scaling:
-          metric: rps
-          target: 3
+      - replicas: 4
         python: "3.12"
         nvcc: true
         commands:
@@ -505,10 +364,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           gpu: H200
 
-      - replicas: 1..8
-        scaling:
-          metric: rps
-          target: 2
+      - replicas: 8
         python: "3.12"
         nvcc: true
         commands:
@@ -581,10 +437,7 @@ groups:
     router:
       type: sglang
 
-  - replicas: 1..2
-    scaling:
-      metric: rps
-      target: 300
+  - replicas: 2
     commands:
       - |
         python3 -m sglang.launch_server \
@@ -607,10 +460,7 @@ groups:
       cpu: 96..
       memory: 512GB..
 
-  - replicas: 1..4
-    scaling:
-      metric: rps
-      target: 300
+  - replicas: 4
     commands:
       - |
         python3 -m sglang.launch_server \
@@ -658,28 +508,84 @@ volumes:
 
     While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
 
-### Authorization
+## Gateway
 
-By default, the service enables authorization, meaning the service endpoint requires a `dstack` user token.
-This can be disabled by setting `auth` to `false`.
+Here are cases where a service may need a [gateway](gateways.md):
 
-<div editor-title="examples/misc/http.server/service.dstack.yml">
+* To use [auto-scaling](#scaling) or [rate limits](#rate-limits)
+* To enable HTTPS for the endpoint and map it to your domain
+* If your service requires WebSockets
+* If your service cannot work with a [path prefix](#path-prefix)
 
-```yaml
-type: service
-name: http-server-service
+<!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
+a gateway is already pre-configured for you. -->
 
-# Disable authorization
-auth: false
+If you want `dstack` to explicitly validate that a gateway is used, you can set the [`gateway`](../reference/dstack.yml/service.md#_gateway) property in the service configuration to `true`. In this case, `dstack` will raise an error during `dstack apply` if a default gateway is not created.
 
-python: 3.12
+You can also set the `gateway` property to the name of a specific gateway, if required.
 
-commands:
-  - python3 -m http.server
-port: 8000
+If you have a [gateway](gateways.md) created, the service endpoint will be accessible at `https://<run name>.<gateway domain>/`:
+
+<div class="termy">
+
+```shell
+$ curl https://llama31.example.com/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
+    -d '{
+        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Compose a poem that explains the concept of recursion in programming."
+            }
+        ]
+    }'
 ```
 
 </div>
+
+## Configuration options
+
+### Environment variables
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+name: llama-2-7b-service
+
+python: 3.12
+
+env:
+  - HF_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - uv pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+> If you don't assign a value to an environment variable (see `HF_TOKEN` above),
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
+
+    | Name                    | Description                                      |
+    |-------------------------|--------------------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                              |
+    | `DSTACK_REPO_ID`        | The ID of the repo                               |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run              |
+    | `DSTACK_WORKING_DIR`    | The working directory of the run                 |
+    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any) |
+
+<!-- TODO: Ellaborate on using environment variables in `registry_auth` -->
 
 ### Probes
 
@@ -760,46 +666,24 @@ Probes are executed for each service replica while the replica is `running`. A p
 
 See the [reference](../reference/dstack.yml/service.md#probes) for more probe configuration options.
 
-### Path prefix { #path-prefix }
+### Model
 
-If your `dstack` project doesn't have a [gateway](gateways.md), services are hosted with the
-`/proxy/services/<project name>/<run name>/` path prefix in the URL.
-When running web apps, you may need to set some app-specific settings
-so that browser-side scripts and CSS work correctly with the path prefix.
+If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page.
+In this case, `dstack` will use the service's `/v1/chat/completions` service.
 
-<div editor-title="dash.dstack.yml">
+When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
+To customize or disable this, set `probes` explicitly.
 
-```yaml
-type: service
-name: dash
-gateway: false
+### Scaling
 
-auth: false
-# Do not strip the path prefix
-strip_prefix: false
+<!-- TODO: add intro and example -->
 
-env:
-  # Configure Dash to work with a path prefix
-  # Replace `main` with your dstack project name
-  - DASH_ROUTES_PATHNAME_PREFIX=/proxy/services/main/dash/
+The [`metric`](../reference/dstack.yml/service.md#metric) property of [`scaling`](../reference/dstack.yml/service.md#scaling) only supports the `rps` metric (requests per second). In this
+case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load.
 
-commands:
-  - uv pip install dash
-  # Assuming the Dash app is in your repo at app.py
-  - python app.py
+Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
-port: 8050
-```
-
-</div>
-
-By default, `dstack` strips the prefix before forwarding requests to your service,
-so to the service it appears as if the prefix isn't there. This allows some apps
-to work out of the box. If your app doesn't expect the prefix to be stripped,
-set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`.
-
-If your app cannot be configured to work with a path prefix, you can host it
-on a dedicated domain name by setting up a [gateway](gateways.md).
+> The `scaling` property requires creating a [gateway](gateways.md).
 
 ### Rate limits
 
@@ -850,90 +734,28 @@ Limits apply to the whole service (all replicas) and per client (by IP). Clients
 
     </div>
 
-### Model
+### Authorization
 
-If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page.
-In this case, `dstack` will use the service's `/v1/chat/completions` service.
+By default, the service enables authorization, meaning the service endpoint requires a `dstack` user token.
+This can be disabled by setting `auth` to `false`.
 
-When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
-To customize or disable this, set `probes` explicitly.
-
-### Resources
-
-If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a
-range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
-
-<div editor-title=".dstack.yml">
+<div editor-title="examples/misc/http.server/service.dstack.yml">
 
 ```yaml
 type: service
-name: llama31-service
+name: http-server-service
+
+# Disable authorization
+auth: false
 
 python: 3.12
-env:
-  - HF_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-  - MAX_MODEL_LEN=4096
+
 commands:
-  - uv pip install vllm
-  - |
-    vllm serve $MODEL_ID
-      --max-model-len $MAX_MODEL_LEN
-      --tensor-parallel-size $DSTACK_GPUS_NUM
+  - python3 -m http.server
 port: 8000
-
-resources:
-  # 16 or more x86_64 cores
-  cpu: 16..
-  # 2 GPUs of 80GB
-  gpu: 80GB:2
-
-  # Minimum disk size
-  disk: 200GB
 ```
 
 </div>
-
-The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores).
-If the architecture is not set, `dstack` allows any architecture supported by the `image`, or `x86` if no `image` is set.
-Since the default `dstack` image only supports `x86`, requesting `arm` requires setting `image` and is not compatible with `docker: true`.
-
-The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s).
-
-If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
-
-<!-- ??? info "Google Cloud TPU"
-    To use TPUs, specify its architecture via the `gpu` property.
-
-    ```yaml
-    type: service
-    name: llama31-service-optimum-tpu
-
-    image: dstackai/optimum-tpu:llama31
-    env:
-      - HF_TOKEN
-      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-      - MAX_TOTAL_TOKENS=4096
-      - MAX_BATCH_PREFILL_TOKENS=4095
-    commands:
-      - text-generation-launcher --port 8000
-    port: 8000
-    # Register the model
-    model: meta-llama/Meta-Llama-3.1-8B-Instruct
-
-    resources:
-      gpu: v5litepod-4
-    ```
-
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
-
-??? info "Shared memory"
-    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure
-    `shm_size`, e.g. set it to `16GB`.
-
-> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
-> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
-
 
 ### Docker
 
@@ -961,28 +783,27 @@ port: 8000
 
 </div>
 
-#### NVCC
+??? info "NVCC"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels.
+    If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
 
-By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels.
-If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
+    <!-- TODO: Add a relevant example -->
 
-<!-- TODO: Add a relevant example -->
+    <div editor-title="service.dstack.yml">
 
-<div editor-title="service.dstack.yml">
+    ```yaml
+    type: service
+    name: http-server-service
 
-```yaml
-type: service
-name: http-server-service
+    python: 3.12
+    nvcc: true
 
-python: 3.12
-nvcc: true
+    commands:
+      - python3 -m http.server
+    port: 8000
+    ```
 
-commands:
-  - python3 -m http.server
-port: 8000
-```
-
-</div>
+    </div>
 
 #### Custom image
 
@@ -1002,6 +823,9 @@ If you want, you can specify your own Docker image via `image`.
     ```
 
 </div>
+
+!!! info "No commands"
+    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
 
 #### Docker in Docker
 
@@ -1064,69 +888,6 @@ model: deepseek-ai/deepseek-r1-distill-llama-8b
 resources:
   gpu: H100:1
 ```
-
-### `dstack` inside `dstack`
-
-Set `dstack` to `true` when a service needs to use the dstack CLI. dstack configures the server and
-current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: service
-image: dstackai/dstack
-dstack: true
-port: 8000
-env:
-  - DSTACK_TOKEN
-commands:
-  - dstack ps
-  - python -m http.server 8000
-```
-
-</div>
-
-> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
-
-### Environment variables
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: service
-name: llama-2-7b-service
-
-python: 3.12
-
-env:
-  - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
-commands:
-  - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
-port: 8000
-
-resources:
-  gpu: 24GB
-```
-
-</div>
-
-> If you don't assign a value to an environment variable (see `HF_TOKEN` above),
-`dstack` will require the value to be passed via the CLI or set in the current process.
-
-??? info "System environment variables"
-    The following environment variables are available in any run by default:
-
-    | Name                    | Description                                      |
-    |-------------------------|--------------------------------------------------|
-    | `DSTACK_RUN_NAME`       | The name of the run                              |
-    | `DSTACK_REPO_ID`        | The ID of the repo                               |
-    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run              |
-    | `DSTACK_WORKING_DIR`    | The working directory of the run                 |
-    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any) |
-
-<!-- TODO: Ellaborate on using environment variables in `registry_auth` -->
 
 ### Working directory
 
@@ -1351,6 +1112,152 @@ The local path can be either relative to the configuration file or absolute.
 
 Currently, you can configure up to one repo per run configuration.
 
+### Resources
+
+If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+name: llama31-service
+
+python: 3.12
+env:
+  - HF_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_MODEL_LEN=4096
+commands:
+  - uv pip install vllm
+  - |
+    vllm serve $MODEL_ID
+      --max-model-len $MAX_MODEL_LEN
+      --tensor-parallel-size $DSTACK_GPUS_NUM
+port: 8000
+
+resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
+  # 2 GPUs of 80GB
+  gpu: 80GB:2
+
+  # Minimum disk size
+  disk: 200GB
+```
+
+</div>
+
+The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores).
+If the architecture is not set, `dstack` allows any architecture supported by the `image`, or `x86` if no `image` is set.
+Since the default `dstack` image only supports `x86`, requesting `arm` requires setting `image` and is not compatible with `docker: true`.
+
+The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s).
+
+If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
+
+<!-- ??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: service
+    name: llama31-service-optimum-tpu
+
+    image: dstackai/optimum-tpu:llama31
+    env:
+      - HF_TOKEN
+      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+      - MAX_TOTAL_TOKENS=4096
+      - MAX_BATCH_PREFILL_TOKENS=4095
+    commands:
+      - text-generation-launcher --port 8000
+    port: 8000
+    # Register the model
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+    resources:
+      gpu: v5litepod-4
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure
+    `shm_size`, e.g. set it to `16GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
+
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
+### `dstack` inside `dstack`
+
+Set `dstack` to `true` when a service needs to use the dstack CLI. dstack configures the server and
+current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+image: dstackai/dstack
+dstack: true
+port: 8000
+env:
+  - DSTACK_TOKEN
+commands:
+  - dstack ps
+  - python -m http.server 8000
+```
+
+</div>
+
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
+
+### Path prefix { #path-prefix }
+
+If your `dstack` project doesn't have a [gateway](gateways.md), services are hosted with the
+`/proxy/services/<project name>/<run name>/` path prefix in the URL.
+When running web apps, you may need to set some app-specific settings
+so that browser-side scripts and CSS work correctly with the path prefix.
+
+<div editor-title="dash.dstack.yml">
+
+```yaml
+type: service
+name: dash
+gateway: false
+
+auth: false
+# Do not strip the path prefix
+strip_prefix: false
+
+env:
+  # Configure Dash to work with a path prefix
+  # Replace `main` with your dstack project name
+  - DASH_ROUTES_PATHNAME_PREFIX=/proxy/services/main/dash/
+
+commands:
+  - uv pip install dash
+  # Assuming the Dash app is in your repo at app.py
+  - python app.py
+
+port: 8050
+```
+
+</div>
+
+By default, `dstack` strips the prefix before forwarding requests to your service,
+so to the service it appears as if the prefix isn't there. This allows some apps
+to work out of the box. If your app doesn't expect the prefix to be stripped,
+set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`.
+
+If your app cannot be configured to work with a path prefix, you can host it
+on a dedicated domain name by setting up a [gateway](gateways.md).
+
 ### Retry policy
 
 By default, if `dstack` can't find capacity, or the service exits with an error, or the instance is interrupted, the run will fail.
@@ -1379,11 +1286,6 @@ If one replica of a multi-replica service fails with retry enabled,
 
 !!! info "Retry duration"
     The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
-
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/service.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
 
 ### Utilization policy
 

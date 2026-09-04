@@ -131,7 +131,7 @@ In this case, `dstack` attaches the specified volume to each new replica. This e
 once, reducing cold start time in proportion to the model size.
 
 A notable feature of Runpod is that volumes can be attached to multiple containers simultaneously. This capability is
-particularly useful for auto-scalable services or distributed tasks.
+particularly useful for auto-scalable services or multi-node tasks.
 
 Using [volumes](../../docs/concepts/volumes.md) not only optimizes inference cold start times but also enhances the
 efficiency of data and model checkpoint loading during training and fine-tuning.

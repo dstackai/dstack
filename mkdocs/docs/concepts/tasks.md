@@ -15,7 +15,7 @@ A task allows you to run arbitrary commands on one or more nodes. They are best 
 First, define a task configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
-[//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
+[//]: # (TODO: Make tabs - single machine & multi-node tasks & web app)
 
 <div editor-title=".dstack.yml"> 
 
@@ -74,37 +74,9 @@ Launching `axolotl-train`...
 
 `dstack apply` automatically provisions instances and runs the task.
 
-## Configuration options
+<span id="distributed-tasks"></span>
 
-!!! info "No commands"
-    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
-
-### Ports
-
-A task can configure ports. In this case, if the task is running an application on a port, `dstack apply` 
-will securely allow you to access this port from your local machine through port forwarding.
-
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: task
-name: streamlit-hello
-
-python: 3.12
-
-commands:
-  - uv pip install streamlit
-  - streamlit hello
-ports: 
-  - 8501
-```
-
-</div>
-
-When running it, `dstack apply` forwards `8501` port to `localhost:8501`, enabling secure access to the running
-application.
-
-### Distributed tasks
+## Nodes
 
 By default, a task runs on a single node.
 However, you can run it on a cluster of nodes by specifying `nodes`.
@@ -141,7 +113,7 @@ resources:
 </div>
 
 !!! info "Cluster placement"
-    To submit a distributed task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
+    To submit a multi-node task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
     <!-- TODO: Update the link once fleets.md is refactored. -->
 
 Jobs on each node communicate using their private IP addresses. Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other [system environment variables](#system-environment-variables) for inter-node communication.
@@ -221,12 +193,21 @@ the index of the node within that group.
 
 > `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves to.
 
-Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
+Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#_groups) and top-level `nodes` are mutually exclusive. Support for other properties is coming soon.
 
-??? info "PD disaggregation"
+> See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
+and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
+
+??? info "Prototyping services"
+    <!-- TODO: update text to explain that node groups can be used as replica groups equivalent when prototyping a service. -->
+
     While PD disaggregaton is mostly used with [services](services.md#pd-disaggregation), it also possible to run it as tasks. The example below runs  a CPU
     router (`groups[0]`, the master) and GPU workers. `startup_order: workers-first`
     instructs `dstack` to start prefill and decode workers before the router.
+
+    <!-- TODO: also ensure the text above is linked with services' replica groups section -->
+
+    <!-- TODO: update the example below to use non-PD but with a router. -->
 
     <div editor-title=".dstack.yml">
 
@@ -284,24 +265,114 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
 
     </div>
 
-> See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
-and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
+    > The [`dstack-prototyping`](https://skills.sh/dstackai/dstack/dstack-prototyping) skill is designed specifically to help agents use tasks when prototyping a service.
+    > Install it along with the [`dstack`](https://skills.sh/dstackai/dstack/dstack) skill via `npx skills add dstackai/dstack`.
 
-### Resources
+## Retry policy
 
-When you specify a resource value like `cpu` or `memory`,
-you can either use an exact value (e.g. `24GB`) or a 
-range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
+the run will fail.
+
+If you'd like `dstack` to automatically retry, configure the 
+[retry](../reference/dstack.yml/task.md#retry) property accordingly:
+
+<!-- TODO: Add a relevant example -->
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train    
+
+python: 3.12
+
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+retry:
+  on_events: [no-capacity, error, interruption]
+  # Retry for up to 1 hour
+  duration: 1h
+```
+
+</div>
+
+If one job of a multi-node task fails with retry enabled,
+`dstack` will stop all the jobs and resubmit the run.
+
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
+
+#### Priority
+
+Be default, submitted runs are scheduled in the order they were submitted.
+When compute resources are limited, you may want to prioritize some runs over others.
+This can be done by specifying the [`priority`](../reference/dstack.yml/task.md) property in the run configuration:
+
+<!-- TODO: Add a relevant example -->
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+name: train
+
+python: 3.12
+
+commands:
+  - uv pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+priority: 50
+```
+
+</div>
+
+`dstack` tries to provision runs with higher priority first.
+Note that if a high priority run cannot be scheduled,
+it does not block other runs with lower priority from scheduling.
+
+## Ports
+
+A task can configure ports. In this case, if the task is running an application on a port, `dstack apply` 
+will securely allow you to access this port from your local machine through port forwarding.
 
 <div editor-title=".dstack.yml"> 
 
 ```yaml
 type: task
-name: trl-sft    
+name: streamlit-hello
+
+python: 3.12
+
+commands:
+  - uv pip install streamlit
+  - streamlit hello
+ports: 
+  - 8501
+```
+
+</div>
+
+When running it, `dstack apply` forwards `8501` port to `localhost:8501`, enabling secure access to the running
+application.
+
+## Configuration options
+
+### Environment variables
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: task
+name: trl-sft
 
 python: 3.12
 
 env:
+  - HF_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
   - MODEL=Qwen/Qwen2.5-0.5B
   - DATASET=stanfordnlp/imdb
 
@@ -311,56 +382,33 @@ commands:
     trl sft \
       --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
-  
+
 resources:
-  # 16 or more x86_64 cores
-  cpu: 16..
-  # 200GB or more RAM
-  memory: 200GB..
-  # 4 GPUs from 40GB to 80GB
-  gpu: 40GB..80GB:4
-  # Shared memory (required by multi-gpu)
-  shm_size: 24GB
-  # Disk size
-  disk: 500GB
+  gpu: H100:1
 ```
 
 </div>
 
-The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
-If the architecture is not set, `dstack` allows any architecture supported by the `image`, or `x86` if no `image` is set.
-Since the default `dstack` image only supports `x86`, requesting `arm` requires setting `image` and is not compatible with `docker: true`.
+If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
 
-The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
-
-If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
-
-<!-- ??? info "Google Cloud TPU"
-    To use TPUs, specify its architecture via the `gpu` property.
-
-    ```yaml
-    type: task
-    name: train    
+<span id="system-environment-variables"></span>
+??? info "System environment variables"
+    The following environment variables are available in any run by default:
     
-    python: 3.12
-    
-    commands:
-      - pip install -r fine-tuning/qlora/requirements.txt
-      - python fine-tuning/qlora/train.py
-    
-    resources:
-      gpu: v2-8
-    ```
-
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
-
-??? info "Shared memory"
-    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
-    `shm_size`, e.g. set it to `24GB`.
-
-> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
-> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
-
+    | Name                    | Description                                                      |
+    |-------------------------|------------------------------------------------------------------|
+    | `DSTACK_RUN_NAME`       | The name of the run                                              |
+    | `DSTACK_REPO_ID`        | The ID of the repo                                               |
+    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run                              |
+    | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
+    | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
+    | `DSTACK_NODE_RANK`      | The rank of the node                                             |
+    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                       |
+    | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
+    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile. The file lists GPU nodes as `<ip> slots=<gpus>` and CPU nodes as `<ip>` |
+    | `DSTACK_WORKING_DIR`    | The working directory of the run                                 |
+    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any)                 |
 
 ### Docker
 
@@ -397,34 +445,33 @@ resources:
 
 </div>
 
-#### NVCC
+??? info "NVCC"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
 
-By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
-If you need `nvcc`, set the [`nvcc`](../reference/dstack.yml/dev-environment.md#nvcc) property to true.
+    ```yaml
+    type: task
+    name: train    
 
-```yaml
-type: task
-name: train    
+    python: 3.12
+    nvcc: true
 
-python: 3.12
-nvcc: true
+    env:
+      - MODEL=Qwen/Qwen2.5-0.5B
+      - DATASET=stanfordnlp/imdb
 
-env:
-  - MODEL=Qwen/Qwen2.5-0.5B
-  - DATASET=stanfordnlp/imdb
+    commands:
+      - uv pip install trl
+      - uv pip install flash_attn --no-build-isolation
+      - |
+        trl sft \
+          --model_name_or_path $MODEL --dataset_name $DATASET \
+          --attn_implementation=flash_attention_2 \
+          --num_processes $DSTACK_GPUS_PER_NODE
 
-commands:
-  - uv pip install trl
-  - uv pip install flash_attn --no-build-isolation
-  - |
-    trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET \
-      --attn_implementation=flash_attention_2 \
-      --num_processes $DSTACK_GPUS_PER_NODE
-
-resources:
-  gpu: H100:1
-```
+    resources:
+      gpu: H100:1
+    ```
 
 #### Custom image
 
@@ -461,6 +508,9 @@ resources:
 ```
 
 </div>
+
+!!! info "No commands"
+    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
 
 #### Docker in Docker
 
@@ -521,56 +571,6 @@ resources:
   gpu: H100:1..2
   shm_size: 24GB
 ```
-
-### Environment variables
-
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: task
-name: trl-sft
-
-python: 3.12
-
-env:
-  - HF_TOKEN
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-  - MODEL=Qwen/Qwen2.5-0.5B
-  - DATASET=stanfordnlp/imdb
-
-commands:
-  - uv pip install trl
-  - | 
-    trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET \
-      --num_processes $DSTACK_GPUS_PER_NODE
-
-resources:
-  gpu: H100:1
-```
-
-</div>
-
-If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
-`dstack` will require the value to be passed via the CLI or set in the current process.
-
-<span id="system-environment-variables"></span>
-??? info "System environment variables"
-    The following environment variables are available in any run by default:
-    
-    | Name                    | Description                                                      |
-    |-------------------------|------------------------------------------------------------------|
-    | `DSTACK_RUN_NAME`       | The name of the run                                              |
-    | `DSTACK_REPO_ID`        | The ID of the repo                                               |
-    | `DSTACK_GPUS_NUM`       | The total number of GPUs in the run                              |
-    | `DSTACK_NODES_NUM`      | The number of nodes in the run                                   |
-    | `DSTACK_GPUS_PER_NODE`  | The number of GPUs per node                                      |
-    | `DSTACK_NODE_RANK`      | The rank of the node                                             |
-    | `DSTACK_MASTER_NODE_IP` | The internal IP address of the master node                       |
-    | `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
-    | `DSTACK_MPI_HOSTFILE`   | The path to a pre-populated MPI hostfile. The file lists GPU nodes as `<ip> slots=<gpus>` and CPU nodes as `<ip>` |
-    | `DSTACK_WORKING_DIR`    | The working directory of the run                                 |
-    | `DSTACK_REPO_DIR`       | The directory where the repo is mounted (if any)                 |
 
 ### Working directory
 
@@ -821,70 +821,106 @@ The local path can be either relative to the configuration file or absolute.
 
 Currently, you can configure up to one repo per run configuration.
 
-### Retry policy
+### Resources
 
-By default, if `dstack` can't find capacity, or the task exits with an error, or the instance is interrupted, 
-the run will fail.
+When you specify a resource value like `cpu` or `memory`,
+you can either use an exact value (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
-If you'd like `dstack` to automatically retry, configure the 
-[retry](../reference/dstack.yml/task.md#retry) property accordingly:
+<div editor-title=".dstack.yml"> 
 
-<!-- TODO: Add a relevant example -->
+```yaml
+type: task
+name: trl-sft    
+
+python: 3.12
+
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
+commands:
+  - uv pip install trl
+  - | 
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
+  
+resources:
+  # 16 or more x86_64 cores
+  cpu: 16..
+  # 200GB or more RAM
+  memory: 200GB..
+  # 4 GPUs from 40GB to 80GB
+  gpu: 40GB..80GB:4
+  # Shared memory (required by multi-gpu)
+  shm_size: 24GB
+  # Disk size
+  disk: 500GB
+```
+
+</div>
+
+The `cpu` property lets you set the architecture (`x86` or `arm`) and core count — e.g., `x86:16` (16 x86 cores), `arm:8..` (at least 8 ARM cores). 
+If the architecture is not set, `dstack` allows any architecture supported by the `image`, or `x86` if no `image` is set.
+Since the default `dstack` image only supports `x86`, requesting `arm` requires setting `image` and is not compatible with `docker: true`.
+
+The `gpu` property lets you specify vendor, model, memory, and count — e.g., `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either), `A100:80GB` (one 80GB A100), `A100:2` (two A100), `24GB..40GB:2` (two GPUs with 24–40GB), `A100:40GB:2` (two 40GB A100s). 
+
+If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
+
+<!-- ??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture via the `gpu` property.
+
+    ```yaml
+    type: task
+    name: train    
+    
+    python: 3.12
+    
+    commands:
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    
+    resources:
+      gpu: v2-8
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon. -->
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `24GB`.
+
+> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
+> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
+
+
+### Spot policy
+
+By default, `dstack` uses on-demand instances. However, you can change that
+via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
+
+### `dstack` inside `dstack`
+
+Set `dstack` to `true` when a task needs to use the dstack CLI. dstack configures the server and
+current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
 
 <div editor-title=".dstack.yml">
 
 ```yaml
 type: task
-name: train    
-
-python: 3.12
-
+image: dstackai/dstack
+dstack: true
+env:
+  - DSTACK_TOKEN
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
-
-retry:
-  on_events: [no-capacity, error, interruption]
-  # Retry for up to 1 hour
-  duration: 1h
+  - dstack ps
 ```
 
 </div>
 
-If one job of a multi-node task fails with retry enabled,
-`dstack` will stop all the jobs and resubmit the run.
-
-!!! info "Retry duration"
-    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
-
-### Priority
-
-Be default, submitted runs are scheduled in the order they were submitted.
-When compute resources are limited, you may want to prioritize some runs over others.
-This can be done by specifying the [`priority`](../reference/dstack.yml/task.md) property in the run configuration:
-
-<!-- TODO: Add a relevant example -->
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: task
-name: train
-
-python: 3.12
-
-commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
-
-priority: 50
-```
-
-</div>
-
-`dstack` tries to provision runs with higher priority first.
-Note that if a high priority run cannot be scheduled,
-it does not block other runs with lower priority from scheduling.
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
 
 ### Utilization policy
 
@@ -967,32 +1003,6 @@ schedule:
     | `,`      | Value list separator  | `15,45 10 * * *` runs at 10:15 and 10:45 every day.                     |
     | `-`      | Range of values       | `0 1-3 * * *` runs at 1:00, 2:00, and 3:00 every day.                   |
     | `/`      | Step values           | `*/10 8-10 * * *` runs every 10 minutes during the hours 8:00 to 10:59. |
-
-### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-### `dstack` inside `dstack`
-
-Set `dstack` to `true` when a task needs to use the dstack CLI. dstack configures the server and
-current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: task
-image: dstackai/dstack
-dstack: true
-env:
-  - DSTACK_TOKEN
-commands:
-  - dstack ps
-```
-
-</div>
-
-> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
 
 --8<-- "docs/concepts/snippets/manage-fleets.ext"
 

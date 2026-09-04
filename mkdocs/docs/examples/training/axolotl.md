@@ -84,13 +84,13 @@ Provisioning...
 ## Distributed training
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
+    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
 
 This section walks through running distributed fine-tuning of `Llama-3.1-70B` with QLoRA and FSDP across multiple nodes.
 
 ### Define a configuration
 
-Once the fleet is created, define a distributed task configuration. Here's an example of a distributed `QLoRA` task using `FSDP`.
+Once the fleet is created, define a multi-node task configuration. Here's an example of a multi-node `QLoRA` task using `FSDP`.
 
 <div editor-title="train-distrib.dstack.yml">
 
