@@ -128,12 +128,12 @@ Dev environments support many [different options](../../docs/concepts/dev-enviro
 
 ## Running distributed training
 
-Distributed training can be performed in `dstack` using [distributed tasks](../../docs/concepts/tasks.md#nodes). 
+Distributed training can be performed in `dstack` using [multi-node tasks](../../docs/concepts/tasks.md#nodes). 
 The configuration is similar to a dev environment, except it runs across multiple nodes.
 
 ### Creating a cluster fleet
 
-Before running a distributed task, create a fleet with `placement` set to `cluster`:
+Before running a multi-node task, create a fleet with `placement` set to `cluster`:
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
     
@@ -172,11 +172,11 @@ Provisioning...
 
 </div>
 
-Once the fleet is created, you can run distributed tasks on it.
+Once the fleet is created, you can run multi-node tasks on it.
 
 ### NCCL tests example
 
-Below is an example of using distributed tasks to run NCCL tests.
+Below is an example of using multi-node tasks to run NCCL tests.
 It also demonstrates how to use mpirun with `dstack`:
 
 <div editor-title="examples/clusters/nccl-tests/.dstack.yml">

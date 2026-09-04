@@ -139,7 +139,7 @@ $ dstack apply -f examples/models/gpt-oss/120b.dstack.yml
 </div>
 
 > If you prefer to use bare-metal clusters with `dstack`, you can create an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets).
-> This way, you’ll be able to run [distributed tasks](../../docs/concepts/tasks.md#nodes) efficiently across the cluster.
+> This way, you’ll be able to run [multi-node tasks](../../docs/concepts/tasks.md#nodes) efficiently across the cluster.
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)

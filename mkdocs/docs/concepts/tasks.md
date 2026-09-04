@@ -74,6 +74,8 @@ Launching `axolotl-train`...
 
 `dstack apply` automatically provisions instances and runs the task.
 
+<span id="distributed-tasks"></span>
+
 ## Nodes
 
 By default, a task runs on a single node.

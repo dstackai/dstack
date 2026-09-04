@@ -103,7 +103,7 @@ $ dstack apply -f .dstack.yml
 Currently, `dstack` supports 1xGPU Hot Aisle VMs. Support for 8xGPU VMs will be added once Hot Aisle supports it.
 
 > If you prefer to use Hot Aisle’s bare-metal 8-GPU clusters with dstack, you can create an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets).
-> This way, you’ll be able to run [distributed tasks](../../docs/concepts/tasks.md#nodes) efficiently across the cluster.
+> This way, you’ll be able to run [multi-node tasks](../../docs/concepts/tasks.md#nodes) efficiently across the cluster.
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)

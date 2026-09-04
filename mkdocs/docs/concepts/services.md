@@ -101,6 +101,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
     kernels.
 
 <span id="replicas"></span>
+<span id="replicas-and-scaling"></span>
 !!! info "Replicas"
     [`replicas`](../reference/dstack.yml/service.md#replicas) can be a number or, if you use a [gateway](#gateway), a range to enable [scaling](#scaling). If omitted, it defaults to `1`.
 
