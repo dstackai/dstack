@@ -128,14 +128,15 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[str]:
             jrd,
             job_model.id,
         )
+    except client.PeerConnectionError as e:
+        logger.warning(
+            "Failed to connect to job %s to collect Prometheus metrics: %s",
+            job_model.job_name,
+            e,
+        )
+        return None
     except Exception:
         logger.exception("Failed to collect job %s Prometheus metrics", job_model.job_name)
-        return None
-
-    if isinstance(res, bool):
-        logger.warning(
-            "Failed to connect to job %s to collect Prometheus metrics", job_model.job_name
-        )
         return None
 
     if res is None:

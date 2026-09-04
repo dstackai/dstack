@@ -14,7 +14,6 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
-    SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_json_extra_ignore
@@ -374,8 +373,8 @@ async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
         jrd = get_job_runtime_data(job_model)
         try:
             await run_async(_stop_runner, ssh_private_keys, jpd, jrd, job_model)
-        except SSHError:
-            logger.debug("%s: failed to stop runner", fmt(job_model))
+        except client.PeerConnectionError as e:
+            logger.debug("%s: failed to stop runner: %s", fmt(job_model), e)
 
 
 @runner_ssh_tunnel

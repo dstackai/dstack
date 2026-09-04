@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, Iterable, Literal, Optional, Sequence, Union
+from typing import Dict, Iterable, Optional, Sequence
 
 from sqlalchemy import and_, exists, false, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -842,6 +842,10 @@ async def _process_provisioning_status(
                 ssh_user=ssh_user,
                 ssh_key=user_ssh_key,
             )
+        except client.PeerConnectionError as e:
+            # Expected while the instance is still booting
+            logger.debug("%s: shim is unreachable: %s", fmt(context.job_model), e)
+            success = False
         except client.ShimResponseError as e:
             logger.warning(
                 "%s: shim did not accept the task submission: %s", fmt(context.job_model), e
@@ -857,49 +861,53 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        runner_availability = await run_async(
-            _get_runner_availability,
-            server_ssh_private_keys,
-            job_provisioning_data,
-            None,
-        )
-        if runner_availability == _RunnerAvailability.AVAILABLE:
-            if not await _ensure_job_server_connection(context, result):
-                return
-            file_archives = await _get_job_file_archives(
-                archive_mappings=context.job.job_spec.file_archives,
-                user=context.run_model.user,
-            )
-            code = await _get_job_code(
-                project=context.project,
-                repo=context.repo_model,
-                code_hash=_get_repo_code_hash(context.run, context.job),
-            )
-            submit_result = await run_async(
-                _submit_job_to_runner,
+        try:
+            if await run_async(
+                _is_runner_available,
                 server_ssh_private_keys,
                 job_provisioning_data,
                 None,
-                run=context.run,
-                job_model=context.job_model,
-                job=context.job,
-                jrd=get_job_runtime_data(context.job_model),
-                cluster_info=startup_context.cluster_info,
-                code=code,
-                file_archives=file_archives,
-                secrets=startup_context.secrets,
-                repo_credentials=startup_context.repo_creds,
-                router_env=startup_context.router_env,
-                success_if_not_available=False,
-            )
-            if submit_result is not False:
+            ):
+                if not await _ensure_job_server_connection(context, result):
+                    return
+                file_archives = await _get_job_file_archives(
+                    archive_mappings=context.job.job_spec.file_archives,
+                    user=context.run_model.user,
+                )
+                code = await _get_job_code(
+                    project=context.project,
+                    repo=context.repo_model,
+                    code_hash=_get_repo_code_hash(context.run, context.job),
+                )
+                submit_result = await run_async(
+                    _submit_job_to_runner,
+                    server_ssh_private_keys,
+                    job_provisioning_data,
+                    None,
+                    run=context.run,
+                    job_model=context.job_model,
+                    job=context.job,
+                    jrd=get_job_runtime_data(context.job_model),
+                    cluster_info=startup_context.cluster_info,
+                    code=code,
+                    file_archives=file_archives,
+                    secrets=startup_context.secrets,
+                    repo_credentials=startup_context.repo_creds,
+                    router_env=startup_context.router_env,
+                    success_if_not_available=False,
+                )
                 _apply_submit_job_to_runner_result(
                     job_model=context.job_model,
                     result=result,
                     submit_result=submit_result,
                 )
-            if submit_result is not False and submit_result.success:
-                return
+                if submit_result.success:
+                    return
+        except client.PeerConnectionError as e:
+            # Expected while the instance is still booting
+            logger.debug("%s: runner is unreachable: %s", fmt(context.job_model), e)
+        except client.RunnerResponseError as e:
+            logger.warning("%s: runner healthcheck failed: %s", fmt(context.job_model), e)
 
     provisioning_timeout = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
@@ -939,12 +947,7 @@ async def _process_pulling_status(
             job_model=context.job_model,
             jrd=_get_result_job_runtime_data(context.job_model, result),
         )
-    except client.ShimResponseError as e:
-        # Same outcome as a connection error, `_handle_instance_unreachable()` below,
-        # but the cause is now logged instead of being silently indistinguishable.
-        logger.warning("%s: shim failed to report the task state: %s", fmt(context.job_model), e)
-        shim_state = False
-    if shim_state is not False:
+
         if shim_state.job_runtime_data is not None:
             _set_job_runtime_data(result, shim_state.job_runtime_data)
 
@@ -974,56 +977,59 @@ async def _process_pulling_status(
 
         # _ShimPullingState.READY
         job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
-        runner_availability = await run_async(
-            _get_runner_availability,
+        if not await run_async(
+            _is_runner_available,
             server_ssh_private_keys,
             job_provisioning_data,
             job_runtime_data,
-        )
-        if runner_availability == _RunnerAvailability.UNAVAILABLE:
+        ):
             _reset_disconnected_at(context.job_model, result)
             return
 
-        if runner_availability == _RunnerAvailability.AVAILABLE:
-            if not await _ensure_job_server_connection(context, result):
-                return
-            file_archives = await _get_job_file_archives(
-                archive_mappings=context.job.job_spec.file_archives,
-                user=context.run_model.user,
-            )
-            code = await _get_job_code(
-                project=context.project,
-                repo=context.repo_model,
-                code_hash=_get_repo_code_hash(context.run, context.job),
-            )
-            submit_result = await run_async(
-                _submit_job_to_runner,
-                server_ssh_private_keys,
-                job_provisioning_data,
-                job_runtime_data,
-                run=context.run,
-                job_model=context.job_model,
-                job=context.job,
-                jrd=job_runtime_data,
-                cluster_info=startup_context.cluster_info,
-                code=code,
-                file_archives=file_archives,
-                secrets=startup_context.secrets,
-                repo_credentials=startup_context.repo_creds,
-                router_env=startup_context.router_env,
-                success_if_not_available=True,
-            )
-            if submit_result is not False:
-                _apply_submit_job_to_runner_result(
-                    job_model=context.job_model,
-                    result=result,
-                    submit_result=submit_result,
-                )
-            if submit_result is not False and submit_result.success:
-                _reset_disconnected_at(context.job_model, result)
-                return
+        if not await _ensure_job_server_connection(context, result):
+            return
+        file_archives = await _get_job_file_archives(
+            archive_mappings=context.job.job_spec.file_archives,
+            user=context.run_model.user,
+        )
+        code = await _get_job_code(
+            project=context.project,
+            repo=context.repo_model,
+            code_hash=_get_repo_code_hash(context.run, context.job),
+        )
+        submit_result = await run_async(
+            _submit_job_to_runner,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            job_runtime_data,
+            run=context.run,
+            job_model=context.job_model,
+            job=context.job,
+            jrd=job_runtime_data,
+            cluster_info=startup_context.cluster_info,
+            code=code,
+            file_archives=file_archives,
+            secrets=startup_context.secrets,
+            repo_credentials=startup_context.repo_creds,
+            router_env=startup_context.router_env,
+            success_if_not_available=True,
+        )
+        _apply_submit_job_to_runner_result(
+            job_model=context.job_model,
+            result=result,
+            submit_result=submit_result,
+        )
+        if submit_result.success:
+            _reset_disconnected_at(context.job_model, result)
+            return
+    except client.PeerConnectionError as e:
+        logger.debug("%s: instance is unreachable: %s", fmt(context.job_model), e)
+    except (client.ShimResponseError, client.RunnerResponseError) as e:
+        # Same outcome as a connection error, but the cause is logged instead of being
+        # silently indistinguishable.
+        logger.warning("%s: shim or runner answered unusably: %s", fmt(context.job_model), e)
 
-    # SSH tunnel failed or READY but runner submit failed — treat as disconnect
+    # The peer could not be reached, or it is READY but the runner submit failed
     _handle_instance_unreachable(context, result, job_provisioning_data)
 
 
@@ -1039,20 +1045,30 @@ async def _process_running_status(
         fmt(context.job_model),
         context.job_submission.age,
     )
-    process_running_result = await run_async(
-        _process_running,
-        server_ssh_private_keys,
-        job_provisioning_data,
-        context.job_submission.job_runtime_data,
-        run_model=context.run_model,
-        job_model=context.job_model,
-    )
-    if process_running_result is not False:
-        result.job_update_map.update(process_running_result.job_update_map)
-        _reset_disconnected_at(context.job_model, result)
+    try:
+        process_running_result = await run_async(
+            _process_running,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            context.job_submission.job_runtime_data,
+            run_model=context.run_model,
+            job_model=context.job_model,
+        )
+    except client.PeerConnectionError as e:
+        logger.debug("%s: instance is unreachable: %s", fmt(context.job_model), e)
+        _handle_instance_unreachable(context, result, job_provisioning_data)
+        return
+    except client.RunnerResponseError as e:
+        # Same outcome as a connection error, but the cause is logged instead of being
+        # silently indistinguishable.
+        logger.warning(
+            "%s: runner failed to serve the pull request: %s", fmt(context.job_model), e
+        )
+        _handle_instance_unreachable(context, result, job_provisioning_data)
         return
 
-    _handle_instance_unreachable(context, result, job_provisioning_data)
+    result.job_update_map.update(process_running_result.job_update_map)
+    _reset_disconnected_at(context.job_model, result)
 
 
 async def _ensure_job_server_connection(
@@ -1504,13 +1520,6 @@ def _process_provisioning_with_shim(
     return True
 
 
-class _RunnerAvailability(enum.Enum):
-    AVAILABLE = "available"
-    UNAVAILABLE = "unavailable"
-    UNREACHABLE = "unreachable"
-    """Reached the runner port, but the peer is not a working runner."""
-
-
 class _ShimPullingState(enum.Enum):
     WAITING = "waiting"
     READY = "ready"
@@ -1527,19 +1536,16 @@ class _SyncShimPullingStateResult:
 
 
 @runner_ssh_tunnel
-def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
+def _is_runner_available(addresses: Mapping[int, client.LocalAddress]) -> bool:
+    """
+    Whether the runner has started and is ready to accept a job.
+
+    A peer that answers the healthcheck with an error status or an unreadable body is not
+    expected to become a working runner, so `RunnerResponseError` propagates and the callers
+    treat it as an unreachable instance, unlike a runner that has not started yet.
+    """
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    try:
-        healthcheck_response = runner_client.healthcheck()
-    except client.RunnerResponseError as e:
-        # Unlike a runner that has not started yet, a peer that answers with an error status
-        # or an unreadable body is not expected to become a working runner, so this counts
-        # as unreachable.
-        logger.warning("Runner healthcheck failed: %s", e)
-        return _RunnerAvailability.UNREACHABLE
-    if healthcheck_response is None:
-        return _RunnerAvailability.UNAVAILABLE
-    return _RunnerAvailability.AVAILABLE
+    return runner_client.healthcheck() is not None
 
 
 @runner_ssh_tunnel
@@ -1547,7 +1553,7 @@ def _sync_shim_pulling_state(
     addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
     jrd: Optional[JobRuntimeData] = None,
-) -> Union[_SyncShimPullingStateResult, Literal[False]]:
+) -> _SyncShimPullingStateResult:
     shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     image_pull_progress: Optional[ImagePullProgress] = None
     if shim_client.is_api_v2_supported():
@@ -1638,7 +1644,7 @@ def _submit_job_to_runner(
     repo_credentials: Optional[RemoteRepoCreds],
     router_env: Optional[Dict[str, str]],
     success_if_not_available: bool,
-) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
+) -> _SubmitJobToRunnerResult:
     logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
         "%s: repo clone URL is %s",
@@ -1705,14 +1711,10 @@ def _process_running(
     addresses: Mapping[int, client.LocalAddress],
     run_model: RunModel,
     job_model: JobModel,
-) -> Union[_ProcessRunningResult, Literal[False]]:
+) -> _ProcessRunningResult:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
-    try:
-        resp = runner_client.pull(timestamp)
-    except client.RunnerResponseError as e:
-        logger.warning("%s: runner failed to serve the pull request: %s", fmt(job_model), e)
-        return False
+    resp = runner_client.pull(timestamp)
     try:
         logs_services.write_logs(
             project=run_model.project,

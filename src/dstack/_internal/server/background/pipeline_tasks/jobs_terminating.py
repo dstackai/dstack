@@ -816,13 +816,17 @@ async def _stop_container(
     ssh_private_keys: tuple[str, Optional[str]],
 ) -> bool:
     if job_provisioning_data.dockerized:
-        return await common.run_async(
-            _shim_submit_stop,
-            ssh_private_keys,
-            job_provisioning_data,
-            None,
-            job_model,
-        )
+        try:
+            return await common.run_async(
+                _shim_submit_stop,
+                ssh_private_keys,
+                job_provisioning_data,
+                None,
+                job_model,
+            )
+        except client.PeerConnectionError as e:
+            logger.debug("%s: can't stop container, shim is unreachable: %s", fmt(job_model), e)
+            return False
     return True
 
 
