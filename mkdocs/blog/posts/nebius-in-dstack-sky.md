@@ -101,7 +101,7 @@ $ dstack apply -f my-cluster.dstack.yml
 
 </div>
 
-Once the fleet is ready, you can run [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks). 
+Once the fleet is ready, you can run [distributed tasks](../../docs/concepts/tasks.md#nodes). 
 `dstack` automatically configures drivers, networking, and fast GPU-to-GPU interconnect.
 
 To learn more, see the [clusters](../../docs/examples/clusters/nebius.md) guide.

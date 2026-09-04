@@ -136,7 +136,7 @@ Backend fleets support [many options](../reference/dstack.yml/fleet.md); see som
 
 Both [backend fleets](#backend-fleet) and [SSH fleets](#ssh-fleet) allow the `placement` property to be set to `cluster`. 
 
-This property ensures that instances are interconnected. This is required for running [distributed tasks](tasks.md#distributed-tasks).
+This property ensures that instances are interconnected. This is required for running [multi-node tasks](tasks.md#nodes).
 
 === "Backend fleets"
     Backend fleets allow to provision interconnected clusters across supported backends.
@@ -405,8 +405,8 @@ For example, with 8 GPUs, 128 CPUs, and 2TB RAM, setting `blocks` to `8` gives e
 
 Set `blocks` to `auto` to match the number of blocks to the number of GPUs.
 
-!!! info "Distributed tasks"
-    Distributed tasks require exclusive access to all host resources and therefore must use all blocks on each node.
+!!! info "Multi-node tasks"
+    Multi-node tasks require exclusive access to all host resources and therefore must use all blocks on each node.
 
 ### SSH config
 

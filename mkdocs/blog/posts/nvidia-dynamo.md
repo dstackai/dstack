@@ -29,7 +29,7 @@ Dynamo brings together disaggregated serving, intelligent routing, KV cache mana
 
 ## PD disaggregation with dstack
 
-To deploy NVIDIA Dynamo with PD disaggregation, define a [service](../../docs/concepts/services.md) with three [replica groups](../../docs/concepts/services.md#replicas-and-scaling):
+To deploy NVIDIA Dynamo with PD disaggregation, define a [service](../../docs/concepts/services.md) with three [replica groups](../../docs/concepts/services.md#replica-groups):
 
 - a Dynamo router
 - prefill workers

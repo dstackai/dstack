@@ -110,11 +110,11 @@ Provisioning...
 ## Distributed training
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
+    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
 
 ### Define a configuration
 
-Once the fleet is created, define a distributed task configuration. Here's an example using either FSDP or DeepSpeed ZeRO-3.
+Once the fleet is created, define a multi-node task configuration. Here's an example using either FSDP or DeepSpeed ZeRO-3.
 
 === "FSDP"
 

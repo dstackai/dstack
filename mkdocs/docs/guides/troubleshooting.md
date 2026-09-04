@@ -133,7 +133,7 @@ one of these features, `dstack` will only select offers from the backends that s
   and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
   are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
 - [Clusters](../concepts/fleets.md#cluster-placement)
-  and [distributed tasks](../concepts/tasks.md#distributed-tasks)
+  and [multi-node tasks](../concepts/tasks.md#nodes)
   are only supported by the `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr` backends,
   as well as SSH fleets.
 - [Reservations](../reference/dstack.yml/fleet.md#reservation)

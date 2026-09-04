@@ -121,7 +121,7 @@ $ dstack apply -f gateway.dstack.yml
 
 Once the gateway has a hostname, update your domain’s DNS settings by adding a record for `*.<gateway domain>`.
 
-After that, if you configure [replicas and scaling](../../docs/concepts/services.md#replicas-and-scaling), the gateway will automatically scale the number of replicas and route traffic across them.
+After that, if you configure [replicas and scaling](../../docs/concepts/services.md#scaling), the gateway will automatically scale the number of replicas and route traffic across them.
 
 ### Router
 

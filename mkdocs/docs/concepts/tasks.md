@@ -15,7 +15,7 @@ A task allows you to run arbitrary commands on one or more nodes. They are best 
 First, define a task configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
-[//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
+[//]: # (TODO: Make tabs - single machine & multi-node tasks & web app)
 
 <div editor-title=".dstack.yml"> 
 
@@ -111,7 +111,7 @@ resources:
 </div>
 
 !!! info "Cluster placement"
-    To submit a distributed task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
+    To submit a multi-node task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
     <!-- TODO: Update the link once fleets.md is refactored. -->
 
 Jobs on each node communicate using their private IP addresses. Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other [system environment variables](#system-environment-variables) for inter-node communication.
@@ -191,7 +191,7 @@ the index of the node within that group.
 
 > `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves to.
 
-Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#groups) and top-level `nodes` are mutually exclusive.Support for other properties is coming soon.
+Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#_groups) and top-level `nodes` are mutually exclusive. Support for other properties is coming soon.
 
 > See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
 and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.

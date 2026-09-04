@@ -128,7 +128,7 @@ Dev environments support many [different options](../../docs/concepts/dev-enviro
 
 ## Running distributed training
 
-Distributed training can be performed in `dstack` using [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks). 
+Distributed training can be performed in `dstack` using [distributed tasks](../../docs/concepts/tasks.md#nodes). 
 The configuration is similar to a dev environment, except it runs across multiple nodes.
 
 ### Creating a cluster fleet

@@ -172,9 +172,9 @@ and its contents will persist across runs.
 
     `dstack` will attach one of the volumes based on the region and backend of the run.  
 
-<span id="distributed-tasks"></span>
-??? info "Distributed tasks"
-    When using single-attach volumes such as AWS EBS with distributed tasks,
+<span id="multi-node-tasks"></span>
+??? info "Multi-node tasks"
+    When using single-attach volumes such as AWS EBS with multi-node tasks,
     you can attach different volumes to different nodes using `dstack` variable interpolation:
 
     <div editor-title=".dstack.yml">

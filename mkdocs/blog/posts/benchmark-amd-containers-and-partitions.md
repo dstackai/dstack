@@ -215,7 +215,7 @@ taskset -c 0-31 ./ib_write_bw -d rocep28s0 -F -a --report_gbits -q $SERVER_IP_AD
 
 #### Containers
 
-For the container experiments we used a `dstack`’s [distributed task](../../docs/concepts/tasks.md#distributed-tasks).
+For the container experiments we used a `dstack`’s [distributed task](../../docs/concepts/tasks.md#nodes).
 
 **RCCL tests**
 

@@ -100,6 +100,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
     The first startup on MI300X can take longer while SGLang compiles ROCm
     kernels.
 
+<span id="replicas"></span>
 !!! info "Replicas"
     [`replicas`](../reference/dstack.yml/service.md#replicas) can be a number or, if you use a [gateway](#gateway), a range to enable [scaling](#scaling). If omitted, it defaults to `1`.
 
@@ -518,7 +519,7 @@ Here are cases where a service may need a [gateway](gateways.md):
 <!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
 a gateway is already pre-configured for you. -->
 
-If you want `dstack` to explicitly validate that a gateway is used, you can set the [`gateway`](../reference/dstack.yml/service.md#gateway) property in the service configuration to `true`. In this case, `dstack` will raise an error during `dstack apply` if a default gateway is not created.
+If you want `dstack` to explicitly validate that a gateway is used, you can set the [`gateway`](../reference/dstack.yml/service.md#_gateway) property in the service configuration to `true`. In this case, `dstack` will raise an error during `dstack apply` if a default gateway is not created.
 
 You can also set the `gateway` property to the name of a specific gateway, if required.
 

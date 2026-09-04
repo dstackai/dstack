@@ -313,7 +313,7 @@ Using Ray via `dstack` gives you access to the Ray ecosystem while benefiting
 from `dstack`'s provisioning capabilities.
 
 !!! info "What's next"
-    1. Read about [distributed tasks](../../concepts/tasks.md#distributed-tasks)
+    1. Read about [multi-node tasks](../../concepts/tasks.md#nodes)
        and [fleets](../../concepts/fleets.md)
     2. See the [SGLang inference](../inference/sglang.md) example
     3. Browse Miles' [examples](https://github.com/radixark/miles/tree/main/examples)
