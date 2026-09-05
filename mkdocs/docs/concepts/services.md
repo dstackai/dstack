@@ -489,10 +489,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
           - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
           # Set to enable /health endpoint required by dstack probes.
           - export DYN_SYSTEM_PORT="8000"
-          # Wait until the router's etcd and NATS ports are actually accepting connections.
+          # Wait until the router's etcd and NATS are healthy.
           - |
-            until (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/2379) 2>/dev/null \
-               && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
+            until curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:2379/health" \
+               && curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:8222/healthz"; do
               echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
             done
           - pip install "ai-dynamo[sglang]==1.1.1"
@@ -516,8 +516,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
           - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
           - export DYN_SYSTEM_PORT="8000"
           - |
-            until (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/2379) 2>/dev/null \
-               && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
+            until curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:2379/health" \
+               && curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:8222/healthz"; do
               echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
             done
           - pip install "ai-dynamo[sglang]==1.1.1"
