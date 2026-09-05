@@ -10,7 +10,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
 import psutil
 import yaml
@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from rich.text import Text
 
 from dstack._internal.cli.models.preset_agent import (
+    PresetAgentInfo,
     PresetSessionFinalize,
     PresetSessionProcess,
     PresetSessionRun,
@@ -28,13 +29,9 @@ from dstack._internal.cli.models.preset_agent import (
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.utils.common import get_dstack_dir
-
-if TYPE_CHECKING:
-    from dstack._internal.cli.services.presets.agent import ClaudeAuth
-
 
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
@@ -45,6 +42,7 @@ VERIFICATION_RESULT_FILENAME = "verification.json"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
+_AGENT_INFO_FILENAME = "agent.json"
 _USER_PROMPT_FILENAME = "user_prompt.md"
 
 
@@ -114,21 +112,25 @@ class PresetSession:
     def write_final_report(self, report_text: str) -> None:
         _write_private_text(self.path / _FINAL_REPORT_FILENAME, report_text)
 
-    def write_agent_info(self, auth: "ClaudeAuth") -> None:
-        from dstack._internal.cli.services.presets.agent import (
-            _get_claude_auth_status,
-            _get_claude_version,
+    def write_agent_info(self, info: PresetAgentInfo) -> None:
+        _write_private_text(
+            self.path / _AGENT_INFO_FILENAME,
+            info.model_dump_json(indent=2) + "\n",
         )
 
-        # `agent.json`: a debug document written once and read by nothing, so it
-        # is a plain dump, not a model.
-        info = {
-            "executable": auth.executable,
-            "version": _get_claude_version(auth),
-            "model": {"name": auth.model, "effort": auth.effort or "default"},
-            "auth_status": _get_claude_auth_status(auth),
-        }
-        _write_private_text(self.path / "agent.json", json.dumps(info, indent=2) + "\n")
+    def read_agent_info(self) -> Optional[PresetAgentInfo]:
+        try:
+            text = (self.path / _AGENT_INFO_FILENAME).read_text(encoding="utf-8")
+            return validate_json_extra_ignore(PresetAgentInfo, text)
+        except (OSError, ValidationError):
+            return None
+
+    def record_agent_model(self, model: str) -> None:
+        info = self.read_agent_info()
+        if info is None:
+            return
+        info.model = model
+        self.write_agent_info(info)
 
     def append_log(self, line: str) -> None:
         if not self._log_enabled:
