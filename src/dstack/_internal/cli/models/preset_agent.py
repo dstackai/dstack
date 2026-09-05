@@ -125,6 +125,18 @@ class PresetSessionState(CoreModel):
     run: Optional[PresetSessionRun]
 
 
+class PresetAgentInfo(CoreModel):
+    """`agent.json`: how the claude agent was launched. A debug record."""
+
+    executable: str
+    version: Optional[str]
+    auth_status: str
+    # None is the claude CLI's default.
+    effort: Optional[str]
+    # Reported by claude on its init line; None until then.
+    model: Optional[str]
+
+
 class ClaudeStreamEvent(CoreModel):
     """One line of the claude CLI's `--output-format stream-json`. Not our format:
     unknown fields are dropped and omitted fields default."""
@@ -135,6 +147,8 @@ class ClaudeStreamEvent(CoreModel):
     # Identifies the claude conversation, so an interrupted creation can be
     # resumed with `claude --resume`. Not every line carries it.
     session_id: Optional[str] = None
+    # The model claude runs with, e.g. "claude-opus-5[1m]". Set on the init line only.
+    model: Optional[str] = None
 
 
 class ClaudeResultEvent(ClaudeStreamEvent):
