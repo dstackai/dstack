@@ -28,6 +28,7 @@ from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
     attach_preset_agent,
     build_preset_agent_env,
+    get_agent_info,
     get_claude_auth,
     run_preset_agent,
     terminate_agent_process,
@@ -636,8 +637,8 @@ async def _create_preset(
         # while the listing and `--previous` read constraints from the session dir.
         session.write_constraints(constraints_text)
         session.write_prompt(prompt)
-        if setup.auth is not None:
-            session.write_agent_info(setup.auth)
+    if setup.auth is not None:
+        session.write_agent_info(get_agent_info(setup.auth))
     try:
         if mode == "attach":
             process_output = await attach_preset_agent(

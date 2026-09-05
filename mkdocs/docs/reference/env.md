@@ -219,5 +219,5 @@ $ find ~/.dstack/logs/cli/
 - `DSTACK_PROJECT`{ #DSTACK_PROJECT } – Has the same effect as `--project`. Defaults to `None`.
 - `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the preset agent. If unset, the existing `claude` login is used.
 - `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the preset agent. Defaults to `claude` from `PATH`.
-- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. Defaults to `claude-opus-4-8`.
+- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. If unset, the `claude` CLI's built-in default is used.
 - `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.
