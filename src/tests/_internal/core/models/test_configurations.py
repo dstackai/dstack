@@ -8,6 +8,7 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfigurationParams,
+    PresetAgentConfig,
     PresetConfiguration,
     PresetModelBase,
     PresetModelRepo,
@@ -1208,6 +1209,7 @@ class TestPresetConfiguration:
         assert all(field.description for field in PresetConfiguration.model_fields.values())
         assert all(field.description for field in PresetModelBase.model_fields.values())
         assert all(field.description for field in PresetModelRepo.model_fields.values())
+        assert all(field.description for field in PresetAgentConfig.model_fields.values())
         assert {"type": "string"} in PresetConfiguration.model_json_schema()["properties"][
             "model"
         ]["anyOf"]
@@ -1227,6 +1229,34 @@ class TestPresetConfiguration:
         assert configuration.model.exact_repo is None
         assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
         assert configuration.model.allows_variant_selection
+
+    def test_agent_is_optional_and_carries_provider_model_and_effort(self):
+        assert PresetConfiguration(model="Qwen/Qwen3.5-27B").agent is None
+
+        configuration = PresetConfiguration(
+            model="Qwen/Qwen3.5-27B",
+            agent={"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+        )
+
+        assert configuration.agent == PresetAgentConfig(
+            provider="codex", model="gpt-6-astra", effort="xhigh"
+        )
+        assert PresetConfiguration(
+            model="Qwen/Qwen3.5-27B", agent={"provider": "claude"}
+        ).agent == (PresetAgentConfig(provider="claude", model=None, effort=None))
+
+    @pytest.mark.parametrize("agent", [{}, {"model": "gpt-6-astra"}, {"provider": "gemini"}])
+    def test_agent_requires_a_known_provider(self, agent):
+        with pytest.raises(ValidationError):
+            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+
+    @pytest.mark.parametrize(
+        "agent",
+        [{"provider": "claude", "effort": "ultra"}, {"provider": "codex", "effort": "max"}],
+    )
+    def test_agent_effort_must_exist_for_the_provider(self, agent):
+        with pytest.raises(ValidationError):
+            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
 
     def test_parses_exact_repo_with_client_facing_name(self):
         configuration = PresetConfiguration(

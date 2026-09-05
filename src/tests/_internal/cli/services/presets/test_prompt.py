@@ -1,3 +1,5 @@
+import difflib
+
 import pytest
 
 from dstack._internal.cli.services.presets import prompt as prompt_module
@@ -8,6 +10,27 @@ pytestmark = pytest.mark.windows
 
 
 class TestSystemPrompt:
+    def test_codex_prompt_swaps_only_the_agent_specific_parts(self):
+        claude = get_preset_agent_system_prompt(
+            user_prompt=None, baseline=True, previous=(), custom_dataset=False, provider="claude"
+        )
+        codex = get_preset_agent_system_prompt(
+            user_prompt=None, baseline=True, previous=(), custom_dataset=False, provider="codex"
+        )
+
+        assert "`$dstack`" in codex and "`/dstack`" not in codex
+        assert "$dstack-prototyping" in codex and "/dstack-prototyping" not in codex
+        assert ".codex/skills/<skill name>/SKILL.md" in codex and ".claude/skills" not in codex
+        assert "StructuredOutput" not in codex and "exactly that JSON object" in codex
+        assert "$dstack" not in claude and "StructuredOutput" in claude
+        changed = [
+            line
+            for line in difflib.unified_diff(claude.splitlines(), codex.splitlines(), n=0)
+            if line[:1] in "+-" and line[:3] not in ("+++", "---")
+        ]
+        # The skills paragraph, three skill mentions, and the report sentence.
+        assert 0 < len(changed) < 24, changed
+
     def test_stays_byte_identical_without_user_prompt(self):
         text = get_preset_agent_system_prompt(
             user_prompt=None, baseline=False, previous=(), custom_dataset=False

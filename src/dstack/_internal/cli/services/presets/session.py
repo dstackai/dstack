@@ -30,7 +30,7 @@ from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
-from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetAgentProvider, PresetConfiguration
 from dstack._internal.utils.common import get_dstack_dir
 
 _PROGRESS_FILENAME = "progress.jsonl"
@@ -152,6 +152,8 @@ class PresetSession:
             return None
         if isinstance(data, dict) and "run" not in data and ("pid" in data or "workspace" in data):
             data = _upgrade_pre_0_21_2_state(data)
+        if isinstance(data, dict) and isinstance(data.get("run"), dict):
+            data["run"] = _upgrade_pre_0_22_run(data["run"])
         try:
             return validate_extra_ignore(PresetSessionState, data)
         except ValidationError:
@@ -168,10 +170,11 @@ class PresetSession:
         *,
         workspace: PresetSessionWorkspace,
         finalize: PresetSessionFinalize,
-        claude_model: Optional[str],
+        agent_provider: PresetAgentProvider,
+        agent_model: Optional[str],
     ) -> None:
         """This CLI takes ownership and starts (or joins) the agent run. Everything
-        an earlier run established survives: the claude session id and model pin so
+        an earlier run established survives: the agent session id and model pin so
         a resume finds them, and the agent process reference so following a live
         detached agent keeps it alive instead of reading it as dead."""
         state = self.read_state()
@@ -183,26 +186,27 @@ class PresetSession:
         state.run = PresetSessionRun(
             workspace=workspace,
             finalize=finalize,
-            claude_model=claude_model or (earlier.claude_model if earlier else None),
-            agent=earlier.agent if earlier else None,
-            claude_session_id=earlier.claude_session_id if earlier else None,
+            agent_provider=agent_provider,
+            agent_model=agent_model or (earlier.agent_model if earlier else None),
+            session_process=earlier.session_process if earlier else None,
+            session_id=earlier.session_id if earlier else None,
         )
         self.write_state(state)
 
-    def record_agent(self, agent: PresetSessionProcess) -> None:
+    def record_session_process(self, process: PresetSessionProcess) -> None:
         state = self.read_state()
         if state is None or state.run is None:
             return
-        state.run.agent = agent
+        state.run.session_process = process
         self.write_state(state)
 
-    def record_claude_session_id(self, session_id: str) -> None:
+    def record_session_id(self, session_id: str) -> None:
         # An unreadable state stays as it is: rewriting it would fabricate a
         # session record out of one field.
         state = self.read_state()
         if state is None or state.run is None:
             return
-        state.run.claude_session_id = session_id
+        state.run.session_id = session_id
         self.write_state(state)
 
     def detach(self) -> None:
@@ -247,6 +251,7 @@ def _upgrade_pre_0_21_2_state(data: dict[str, Any]) -> dict[str, Any]:
         # Without the finalize context there is no run to reconcile or resume.
         data["run"] = None
     else:
+        # The 0.21.2 shape; `_upgrade_pre_0_22_run` renames its fields next.
         data["run"] = {
             "workspace": {"path": workspace, "alias": alias or workspace},
             "finalize": {"project": project, "keep_service": bool(keep_service)},
@@ -260,6 +265,20 @@ def _upgrade_pre_0_21_2_state(data: dict[str, Any]) -> dict[str, Any]:
         }
     data.setdefault("previous", [])
     return data
+
+
+# TODO: Remove in 0.23
+def _upgrade_pre_0_22_run(run: dict[str, Any]) -> dict[str, Any]:
+    """A run written before 0.22 named its fields after Claude, the only agent
+    then. Pure renaming for backward compatibility."""
+    if "claude_model" not in run and "claude_session_id" not in run:
+        return run
+    run = dict(run)
+    run["agent_model"] = run.pop("claude_model", None)
+    run["session_id"] = run.pop("claude_session_id", None)
+    run["session_process"] = run.pop("agent", None)
+    run.setdefault("agent_provider", "claude")
+    return run
 
 
 def get_presets_dir() -> Path:
@@ -333,7 +352,7 @@ def load_resumable_session(preset_id: str) -> PresetSession:
             f"Preset {preset_id} is still being created;"
             f" follow it with dstack preset logs -f {preset_id}"
         )
-    if state.run is None or state.run.claude_session_id is None:
+    if state.run is None or state.run.session_id is None:
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
     return session
 
@@ -356,7 +375,7 @@ def process_alive(process: Optional[PresetSessionProcess]) -> bool:
 def session_process_alive(state: PresetSessionState) -> bool:
     """True if either a live agent (possibly detached) or a live CLI (possibly
     between agent retries) still owns the session."""
-    if state.run is not None and process_alive(state.run.agent):
+    if state.run is not None and process_alive(state.run.session_process):
         return True
     if state.owner is None or state.owner.pid == os.getpid():
         return False

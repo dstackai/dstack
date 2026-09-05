@@ -217,7 +217,12 @@ $ find ~/.dstack/logs/cli/
 </div>
 
 - `DSTACK_PROJECT`{ #DSTACK_PROJECT } – Has the same effect as `--project`. Defaults to `None`.
-- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the preset agent. If unset, the existing `claude` login is used.
+- `DSTACK_AGENT_PROVIDER`{ #DSTACK_AGENT_PROVIDER } – The agent CLI that creates presets: `claude` (default) or `codex`. The preset configuration's `agent` block overrides the `DSTACK_AGENT_*` variables.
+- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the `claude` preset agent. If unset, the existing `claude` login is used.
 - `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the preset agent. Defaults to `claude` from `PATH`.
 - `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. If unset, the `claude` CLI's built-in default is used.
 - `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.
+- `DSTACK_AGENT_OPENAI_API_KEY`{ #DSTACK_AGENT_OPENAI_API_KEY } – The OpenAI API key used by the `codex` preset agent. If unset, the existing `codex` login is used.
+- `DSTACK_AGENT_CODEX_PATH`{ #DSTACK_AGENT_CODEX_PATH } – The `codex` executable name or path used by the preset agent. Defaults to `codex` from `PATH`.
+- `DSTACK_AGENT_OPENAI_MODEL`{ #DSTACK_AGENT_OPENAI_MODEL } – The model used by the `codex` preset agent. If unset, the `codex` CLI's built-in default is used.
+- `DSTACK_AGENT_CODEX_EFFORT`{ #DSTACK_AGENT_CODEX_EFFORT } – The reasoning effort used by the `codex` preset agent. Can be `low`, `medium`, `high`, or `xhigh`. If unset, the `codex` CLI default is used.
