@@ -199,68 +199,66 @@ Currently, only `resources`, `commands`, and `ports` can be configured per node 
 and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
 
 ??? info "Prototyping services"
-    <!-- TODO: update text to explain that node groups can be used as replica groups equivalent when prototyping a service. -->
+    Node groups are the task-level equivalent of a service's [replica groups](services.md#replica-groups):
+    as with replica groups, each node group defines its own resources, commands, and ports.
 
-    While PD disaggregaton is mostly used with [services](services.md#pd-disaggregation), it also possible to run it as tasks. The example below runs  a CPU
-    router (`groups[0]`, the master) and GPU workers. `startup_order: workers-first`
-    instructs `dstack` to start prefill and decode workers before the router.
+    The example below uses node groups to prototype a service. One group runs a router node and the
+    other group runs two worker nodes. The workers are registered with the router by referencing
+    their IP addresses. Since the router needs its workers to be listening before it can register
+    them, `startup_order: workers-first` instructs `dstack` to start the worker groups before the
+    master node.
 
-    <!-- TODO: also ensure the text above is linked with services' replica groups section -->
-
-    <!-- TODO: update the example below to use non-PD but with a router. -->
+    > In a service, worker registration happens automatically when the router group sets
+    > [`router`](services.md#router) to `type: sglang`.
 
     <div editor-title=".dstack.yml">
 
     ```yaml
     type: task
-    name: prefill-decode
-    image: lmsysorg/sglang:v0.5.10.post1
+    name: qwen38-flash-next
+    image: lmsysorg/sglang:qwen38flashnext
+
     env:
       - HF_TOKEN
-      - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+      - MODEL_ID=Qwen/Qwen3.8-Flash-Next
 
     startup_order: workers-first
     groups:
-      # Router (CPU) — master node; wires prefill + decode by IP
+      # Router
       - nodes: 1
         commands:
           - pip install smg
           - |
-            echo "prefill=${{ groups[1].nodes[0].IP_ADDRESS }}"
-            echo "decode=${{ groups[2].nodes[0].IP_ADDRESS }}"
             smg launch \
-              --pd-disaggregation \
-              --prefill http://${{ groups[1].nodes[0].IP_ADDRESS }}:8000 8998 \
-              --decode  http://${{ groups[2].nodes[0].IP_ADDRESS }}:8000 \
-              --prefill-policy cache_aware \
-              --host 0.0.0.0 --port 8000
+              --worker-urls \
+                http://${{ groups[1].nodes[0].IP_ADDRESS }}:8000 \
+                http://${{ groups[1].nodes[1].IP_ADDRESS }}:8000 \
+              --policy cache_aware \
+              --host 0.0.0.0 \
+              --port 8000
         ports:
           - 8000
         resources:
           cpu: 4
-
-      - nodes: 1
+      
+      # Workers
+      - nodes: 2
         commands:
           - |
             python -m sglang.launch_server \
               --model-path $MODEL_ID \
-              --disaggregation-mode prefill \
-              --disaggregation-transfer-backend nixl \
-              --host 0.0.0.0 --port 8000 \
-              --disaggregation-bootstrap-port 8998
+              --tp $DSTACK_GPUS_PER_NODE \
+              --ep $DSTACK_GPUS_PER_NODE \
+              --mem-fraction-static 0.85 \
+              --chunked-prefill-size 8192 \
+              --linear-attn-prefill-backend flashinfer \
+              --linear-attn-decode-backend flashinfer \
+              --mamba-ssm-dtype bfloat16 \
+              --reasoning-parser auto \
+              --host 0.0.0.0 \
+              --port 8000
         resources:
-          gpu: H200
-
-      - nodes: 1
-        commands:
-          - |
-            python -m sglang.launch_server \
-              --model-path $MODEL_ID \
-              --disaggregation-mode decode \
-              --disaggregation-transfer-backend nixl \
-              --host 0.0.0.0 --port 8000
-        resources:
-          gpu: H200
+          gpu: H200:4
     ```
 
     </div>

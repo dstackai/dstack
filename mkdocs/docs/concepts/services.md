@@ -159,50 +159,72 @@ across frameworks.
 ## Replica groups
 
 A service can define multiple replica groups. Each group has its own `replicas` count (or range),
-`resources`, `commands`, and `scaling` rules. For a common use case, see
-[PD disaggregation](#pd-disaggregation).
+`resources`, `commands`, and `scaling` rules.
 
-<!-- TODO: update the text above to de-focus from PD to the router. -->
+With replica groups, you can define an inference service with separate router and worker
+groups: the router can have CPU-only `resources` and different `commands` than the workers, since
+both are set per group.
 
 ### Router
 
-<!-- TODO: Introduce a router concept and what it does/why it's needed. -->
+Router sits in front of inference backend workers (SGLang, vLLM, TensorRT-LLM) and decides
+which worker serves each request based on routing policy.
 
-<!-- TODO: update the example below to use router for aggregated inference. -->
+`dstack` supports two router implementations:
+
+* `sglang` — runs [Shepherd Model Gateway (SMG)](https://lightseek.org/smg/)
+* `dynamo` — runs the [NVIDIA Dynamo frontend](https://docs.nvidia.com/dynamo/dev/kubernetes/kv-aware-routing/using-the-dynamo-frontend/)
 
 <div editor-title="service.dstack.yml">
 
 ```yaml
 type: service
-name: llama-8b-service
+name: qwen38-flash-next
+image: lmsysorg/sglang:qwen38flashnext
 
-image: lmsysorg/sglang:v0.5.10.post1
 env:
-  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  - HF_TOKEN
+  - MODEL_ID=Qwen/Qwen3.8-Flash-Next
 
 groups:
   - replicas: 1
     commands:
+      - pip install smg
       - |
-        python -m sglang.launch_server \
-          --model-path $MODEL_ID \
+        smg launch \
+          --host 0.0.0.0 \
           --port 8000 \
-          --trust-remote-code
+          --prefill-policy cache_aware
     resources:
-      gpu: 48GB
+      cpu: 4
+    router:
+      type: sglang
 
-  - replicas: 4
+  - replicas: 2
     commands:
       - |
         python -m sglang.launch_server \
           --model-path $MODEL_ID \
-          --port 8000 \
-          --trust-remote-code
+          --tp $DSTACK_GPUS_NUM \
+          --ep $DSTACK_GPUS_NUM \
+          --mem-fraction-static 0.85 \
+          --chunked-prefill-size 8192 \
+          --linear-attn-prefill-backend flashinfer \
+          --linear-attn-decode-backend flashinfer \
+          --mamba-ssm-dtype bfloat16 \
+          --reasoning-parser auto \
+          --host 0.0.0.0 \
+          --port 8000
     resources:
-      gpu: 24GB
+      gpu: H200:4
 
 port: 8000
-model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+model: Qwen/Qwen3.8-Flash-Next
+
+probes:
+  - type: http
+    url: /health
+    interval: 15s
 ```
 
 </div>
@@ -676,12 +698,34 @@ To customize or disable this, set `probes` explicitly.
 
 ### Scaling
 
-<!-- TODO: add intro and example -->
+To scale a service automatically, set [`replicas`](#replicas) to a range and configure
+[`scaling`](../reference/dstack.yml/service.md#scaling). `dstack` then adjusts the number of
+replicas within that range based on the load.
 
-The [`metric`](../reference/dstack.yml/service.md#metric) property of [`scaling`](../reference/dstack.yml/service.md#scaling) only supports the `rps` metric (requests per second). In this
-case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load.
+<div editor-title="service.dstack.yml">
+
+```yaml
+type: service
+image: my-app:latest
+port: 80
+
+replicas: 1..4
+scaling:
+  metric: rps
+  target: 3
+```
+
+</div>
+
+[`metric`](../reference/dstack.yml/service.md#metric) currently supports only `rps` (requests per
+second). `target` is the RPS a single replica should handle, so with `target: 3`, a load of 12 RPS
+scales the service to 4 replicas.
 
 Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
+
+Each [replica group](#replica-groups) can set its own `replicas` range and `scaling` rules, so
+worker groups scale independently. For now, a group with [`router`](#router) must have
+`replicas: 1` and cannot be scaled.
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 
