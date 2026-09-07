@@ -100,7 +100,7 @@ export function ArchitectureDiagram() {
             <LogoMark logo={DOCKER} />
           </div>
           <div className="arch-orchestration__cells">
-            {['Projects', 'Fleets', 'Runs', 'Presets', 'Gateways'].map(name => (
+            {['Fleets', 'Tasks', 'Services', 'Presets', 'Gateways'].map(name => (
               <div className="arch-subcell" key={name}>
                 {name}
               </div>
