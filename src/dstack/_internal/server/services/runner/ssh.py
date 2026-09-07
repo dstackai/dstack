@@ -5,7 +5,7 @@ from typing import Callable, Literal, Optional, TypeVar, Union
 import requests
 from typing_extensions import Concatenate, ParamSpec
 
-from dstack._internal.core.errors import DstackError, SSHError
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.runs import JobProvisioningData, JobRuntimeData
 from dstack._internal.server import settings
 from dstack._internal.server.services.runner.client import LocalAddress
@@ -38,6 +38,10 @@ def runner_ssh_tunnel(
 
     There are no retries: a transient transport failure fails the call,
     and the callers must retry. In high-latency setups, tune `DSTACK_SERVER_SSH_CONNECT_TIMEOUT`.
+
+    Only connection errors are converted to `False`. Errors reported by the peer's API
+    (`ShimError`, `RunnerError`) mean the shim or the runner was reached and answered, so they
+    propagate and the wrapped function or its caller must decide what they mean for the job.
     """
 
     @functools.wraps(func)
@@ -74,7 +78,7 @@ def runner_ssh_tunnel(
                 return False
             try:
                 return func(conn.forwarded_paths(), *args, **kwargs)
-            except (DstackError, requests.RequestException):
+            except requests.RequestException:
                 return False
             finally:
                 conn.close()
@@ -95,10 +99,11 @@ def runner_ssh_tunnel(
                 return False  # couldn't establish at all
             try:
                 return func(conn.forwarded_paths(), *args, **kwargs)
-            except (SSHError, requests.ConnectionError):
+            except requests.ConnectionError:
                 instance_connection_pool.drop(conn.key)  # dead ssh connection, re-open
-            except (DstackError, requests.RequestException):
-                return False  # reached runner, app-level fail; don't re-open ssh connection
+            except requests.RequestException:
+                # Reached the peer, e.g. a read timeout — do not re-open the ssh connection
+                return False
         return False
 
     return wrapper

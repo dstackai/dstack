@@ -6,11 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/user"
 	"path/filepath"
-	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -23,15 +22,23 @@ import (
 // provisioning SSH fleets. sshd ignores everything after the key blob, so the marker
 // has no effect on authentication; it only records that the entry is ours.
 //
-// Nothing honors the marker yet -- keys are still removed by fingerprint regardless of
-// the comment. It is written now so that, once removal does honor it, entries added by
-// earlier shim versions are already marked. Until then, a task can only be started and
-// finalized by the same shim process, so there is no cross-version handoff to protect.
+// The marker is what makes Reconcile() safe: only the entries carrying it are rewritten,
+// so a key added by the user, or by the server at fleet provisioning time, is never
+// touched. Entries added by a shim version that did not write the marker are kept
+// forever; leaking a key we cannot prove we added beats revoking it.
 //
 // The marker must be matched as an exact suffix: a substring match on `# added by
-// dstack` would also claim the keys the server adds at fleet provisioning time, which
-// the shim must never remove.
+// dstack` would also claim the keys the server adds at fleet provisioning time.
 const publicKeyMarker = "# added by dstack-shim"
+
+const (
+	sshDirName             = ".ssh"
+	authorizedKeysFileName = "authorized_keys"
+	// Modes of the dir and the file when the shim creates them; an existing
+	// authorized_keys file keeps its own mode
+	sshDirMode             = 0o700
+	authorizedKeysFileMode = 0o600
+)
 
 func PublicKeyFingerprint(key string) (string, error) {
 	pk, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key))
@@ -40,37 +47,6 @@ func PublicKeyFingerprint(key string) (string, error) {
 	}
 	keyFingerprint := ssh.FingerprintSHA256(pk)
 	return keyFingerprint, nil
-}
-
-func IsPublicKeysEqual(left string, right string) bool {
-	leftFingerprint, err := PublicKeyFingerprint(left)
-	if err != nil {
-		return false
-	}
-
-	rightFingerprint, err := PublicKeyFingerprint(right)
-	if err != nil {
-		return false
-	}
-
-	return leftFingerprint == rightFingerprint
-}
-
-func RemovePublicKeys(fileKeys []string, keysToRemove []string) []string {
-	newKeys := slices.DeleteFunc(fileKeys, func(fileKey string) bool {
-		delete := slices.ContainsFunc(keysToRemove, func(removeKey string) bool {
-			return IsPublicKeysEqual(fileKey, removeKey)
-		})
-		return delete
-	})
-	return newKeys
-}
-
-func AppendPublicKeys(fileKeys []string, keysToAppend []string) []string {
-	newKeys := []string{}
-	newKeys = append(newKeys, fileKeys...)
-	newKeys = append(newKeys, keysToAppend...)
-	return newKeys
 }
 
 // canonicalizePublicKey validates a public key received from the server and returns the
@@ -100,17 +76,59 @@ func canonicalizePublicKey(publicKey string) (string, error) {
 	return keyLine + " " + strings.Join(commentFields, " "), nil
 }
 
+// isShimEntry reports whether the authorized_keys line has been added by the shim, that
+// is, whether it carries publicKeyMarker. canonicalizePublicKey() always puts the marker
+// last, therefore matching it as a suffix cannot claim an entry that merely mentions it.
+func isShimEntry(line string) bool {
+	return strings.HasSuffix(strings.TrimRight(line, " \t\r"), " "+publicKeyMarker)
+}
+
 type AuthorizedKeys struct {
 	user   string
 	lookup func(username string) (*user.User, error)
 }
 
-// AppendPublicKeys appends the keys to the user's authorized_keys file, marking them
-// with publicKeyMarker. Invalid entries are skipped, so that one bad key does not keep
-// the rest out of the file.
-// Duplicates are not detected: a key already present in the file is appended once more.
-func (ak AuthorizedKeys) AppendPublicKeys(ctx context.Context, publicKeys []string) error {
+// Reconcile makes the shim-owned part of the user's authorized_keys file exactly the
+// given set of keys: the entries carrying publicKeyMarker are replaced with the entries
+// for publicKeys. Everything else -- keys added by the user, keys added by the server
+// when provisioning an SSH fleet, comments, blank lines -- is kept verbatim and in order.
+//
+// The keys of all the tasks that still need them are passed on every call, so that a task
+// releasing a key shared with another task does not revoke it, see dstackai/dstack#4174.
+// Duplicates collapse into a single entry, which is what makes the file depend on the set
+// of keys in use and not on the number of tasks using them.
+// A key that is also present as an entry the shim does not own is still written as an
+// entry of its own: the two have different owners, and sharing one would let a manual
+// edit revoke the access of a running task.
+//
+// Invalid keys are skipped, so that one bad key does not keep the rest out of the file.
+func (ak AuthorizedKeys) Reconcile(ctx context.Context, publicKeys []string) error {
+	usr, err := ak.lookup(ak.user)
+	if err != nil {
+		return fmt.Errorf("lookup user %s: %w", ak.user, err)
+	}
+	path := authorizedKeysPath(usr.HomeDir)
+
+	lines, mode, err := readAuthorizedKeys(path)
+	if err != nil {
+		return err
+	}
+	kept := make([]string, 0, len(lines)+len(publicKeys))
+	for _, line := range lines {
+		if !isShimEntry(line) {
+			kept = append(kept, line)
+		}
+	}
+	kept = append(kept, shimEntries(ctx, publicKeys)...)
+
+	return writeAuthorizedKeys(path, kept, mode, usr)
+}
+
+// shimEntries returns the marked authorized_keys lines to write for the keys, skipping
+// the invalid ones and collapsing the duplicates
+func shimEntries(ctx context.Context, publicKeys []string) []string {
 	lines := make([]string, 0, len(publicKeys))
+	seen := make(map[string]struct{}, len(publicKeys))
 	for _, publicKey := range publicKeys {
 		line, err := canonicalizePublicKey(publicKey)
 		if err != nil {
@@ -121,44 +139,117 @@ func (ak AuthorizedKeys) AppendPublicKeys(ctx context.Context, publicKeys []stri
 			)
 			continue
 		}
+		// Matched by fingerprint and not by line, so that the same key submitted with
+		// different comments does not yield two entries
+		fingerprint, err := PublicKeyFingerprint(line)
+		if err != nil {
+			// canonicalizePublicKey() has already parsed the key, so this cannot happen
+			log.Error(ctx, "failed to fingerprint canonicalized key", "err", err)
+			continue
+		}
+		if _, ok := seen[fingerprint]; ok {
+			continue
+		}
+		seen[fingerprint] = struct{}{}
 		lines = append(lines, line)
 	}
-	if len(lines) == 0 {
-		return nil
+	return lines
+}
+
+// readAuthorizedKeys returns the lines of the file and its mode. A missing file is
+// reported as an empty one with the mode to create it with: sshd treats it the same way,
+// and the shim creates it as the server does when provisioning an SSH fleet.
+func readAuthorizedKeys(path string) ([]string, os.FileMode, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, authorizedKeysFileMode, nil
+		}
+		return nil, 0, fmt.Errorf("open authorized keys: %w", err)
 	}
-	return ak.transformAuthorizedKeys(AppendPublicKeys, lines)
-}
+	defer file.Close()
 
-// RemovePublicKeys removes the keys from the user's authorized_keys file, matching by
-// fingerprint and ignoring the comment. That is, publicKeyMarker is not honored yet, so
-// entries the shim did not add are removed as well, and every matching entry is removed
-// even if another task still relies on the key. See dstackai/dstack#4174.
-func (ak AuthorizedKeys) RemovePublicKeys(publicKeys []string) error {
-	return ak.transformAuthorizedKeys(RemovePublicKeys, publicKeys)
-}
-
-func (ak AuthorizedKeys) read(r io.Reader) ([]string, error) {
-	lines := []string{}
-	scanner := bufio.NewScanner(r)
+	info, err := file.Stat()
+	if err != nil {
+		return nil, 0, fmt.Errorf("stat authorized keys: %w", err)
+	}
+	var lines []string
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		text := scanner.Text()
-		lines = append(lines, text)
+		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return []string{}, fmt.Errorf("scan authorized keys: %w", err)
+		return nil, 0, fmt.Errorf("scan authorized keys: %w", err)
 	}
-	return lines, nil
+	return lines, info.Mode().Perm(), nil
 }
 
-func (ak AuthorizedKeys) write(w io.Writer, lines []string) error {
-	wr := bufio.NewWriter(w)
-	for _, line := range lines {
-		_, err := fmt.Fprintln(wr, line)
-		if err != nil {
-			return fmt.Errorf("write line: %w", err)
+// writeAuthorizedKeys replaces the file with the given lines, creating it and its dir if
+// they do not exist. The content is written to a temporary file in the same dir and
+// renamed over the old one, so that a failed or interrupted write cannot leave the user
+// with a partial file, that is, without some of their keys.
+func writeAuthorizedKeys(path string, lines []string, mode os.FileMode, usr *user.User) (err error) {
+	uid, gid, err := userIDs(usr)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if _, statErr := os.Stat(dir); errors.Is(statErr, os.ErrNotExist) {
+		if err := os.MkdirAll(dir, sshDirMode); err != nil {
+			return fmt.Errorf("create %s: %w", dir, err)
+		}
+		// The shim normally runs as root, therefore a dir it creates must be given
+		// to the user. An existing dir is left alone, as it is not ours to fix
+		if err := os.Chown(dir, uid, gid); err != nil {
+			return fmt.Errorf("chown %s: %w", dir, err)
 		}
 	}
-	return wr.Flush()
+
+	var content []byte
+	if len(lines) > 0 {
+		// The last line is terminated as well, so that appending to the file by hand
+		// cannot join a new entry to the last one
+		content = []byte(strings.Join(lines, "\n") + "\n")
+	}
+	tempPath := path + ".tmp"
+	defer func() {
+		if err != nil {
+			// sshd does not read the temporary file, so leaving it behind would only
+			// clutter the dir with a half-written copy of the user's keys
+			if removeErr := os.Remove(tempPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				err = errors.Join(err, fmt.Errorf("remove %s: %w", tempPath, removeErr))
+			}
+		}
+	}()
+	if err := writeFileSync(tempPath, content, mode); err != nil {
+		return fmt.Errorf("write authorized keys: %w", err)
+	}
+	// The mode passed to writeFileSync() only applies to a file it creates, and is
+	// masked by the umask, therefore it is set explicitly
+	if err := os.Chmod(tempPath, mode); err != nil {
+		return fmt.Errorf("chmod %s: %w", tempPath, err)
+	}
+	if err := os.Chown(tempPath, uid, gid); err != nil {
+		return fmt.Errorf("chown %s: %w", tempPath, err)
+	}
+	if err := os.Rename(tempPath, path); err != nil {
+		return fmt.Errorf("rename %s: %w", tempPath, err)
+	}
+	return nil
+}
+
+// userIDs returns the numeric ids of the user. os/user reports them as strings, since
+// not all platforms have numeric ids, but Linux, the only platform the shim runs on, does
+func userIDs(usr *user.User) (int, int, error) {
+	uid, err := strconv.Atoi(usr.Uid)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse uid %q of user %s: %w", usr.Uid, usr.Username, err)
+	}
+	gid, err := strconv.Atoi(usr.Gid)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse gid %q of user %s: %w", usr.Gid, usr.Username, err)
+	}
+	return uid, gid, nil
 }
 
 func (ak AuthorizedKeys) GetHomeDirectory() (string, error) {
@@ -174,61 +265,9 @@ func (ak AuthorizedKeys) GetAuthorizedKeysPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, ".ssh", "authorized_keys"), nil
+	return authorizedKeysPath(homeDir), nil
 }
 
-func (ak AuthorizedKeys) transformAuthorizedKeys(transform func([]string, []string) []string, publicKeys []string) error {
-	authorizedKeysPath, err := ak.GetAuthorizedKeysPath()
-	if err != nil {
-		return fmt.Errorf("get authorized keys path: %w", err)
-	}
-
-	info, err := os.Stat(authorizedKeysPath)
-	if err != nil {
-		return fmt.Errorf("stat authorized keys: %w", err)
-	}
-	fileMode := info.Mode().Perm()
-
-	authorizedKeysFile, err := os.OpenFile(authorizedKeysPath, os.O_RDWR, fileMode)
-	if err != nil {
-		return fmt.Errorf("open authorized keys: %w", err)
-	}
-	defer authorizedKeysFile.Close()
-
-	lines, err := ak.read(authorizedKeysFile)
-	if err != nil {
-		return fmt.Errorf("read authorized keys: %w", err)
-	}
-
-	// write backup
-	authorizedKeysPath, err = ak.GetAuthorizedKeysPath()
-	if err != nil {
-		return fmt.Errorf("get authorized keys path: %w", err)
-	}
-
-	authorizedKeysPathBackup := authorizedKeysPath + ".bak"
-	authorizedKeysBackup, err := os.OpenFile(authorizedKeysPathBackup, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode)
-	if err != nil {
-		return fmt.Errorf("open authorized keys backup: %w", err)
-	}
-	defer authorizedKeysBackup.Close()
-	if err := ak.write(authorizedKeysBackup, lines); err != nil {
-		return fmt.Errorf("write authorized keys backup: %w", err)
-	}
-
-	// transform lines
-	newLines := transform(lines, publicKeys)
-
-	// write authorized_keys
-	if err := authorizedKeysFile.Truncate(0); err != nil {
-		return fmt.Errorf("truncate authorized keys: %w", err)
-	}
-	if _, err := authorizedKeysFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("seek authorized keys: %w", err)
-	}
-	if err := ak.write(authorizedKeysFile, newLines); err != nil {
-		return fmt.Errorf("write authorized keys: %w", err)
-	}
-
-	return nil
+func authorizedKeysPath(homeDir string) string {
+	return filepath.Join(homeDir, sshDirName, authorizedKeysFileName)
 }

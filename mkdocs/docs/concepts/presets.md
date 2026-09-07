@@ -91,12 +91,14 @@ To stop a creation and its runs, use `dstack preset stop`.
     export DSTACK_AGENT_ANTHROPIC_API_KEY=...
     ```
 
-    By default, the agent uses `claude-opus-4-8`. It doesn't set an effort level, so the `claude` CLI default applies. To override them, set:
+    By default, the agent sets neither a model nor an effort level, so the `claude` CLI's built-in defaults apply. To override them, set:
 
     ```shell
-    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-opus-5
+    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-fable-5-1
     export DSTACK_AGENT_CLAUDE_EFFORT=max
     ```
+
+    See the [Models overview](https://platform.claude.com/docs/en/models/overview) for the available models and their IDs.
 
     Supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`.
 
@@ -242,7 +244,7 @@ Pushing the same name again moves the name to the new preset. The previous one s
 
 Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). To share a preset, create a project there, add the people you want to share it with, and push the preset to that project. To push or pull a preset from a project, you have to be its member.
 
-A self-hosted registry is part of [dstack Enterprise](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
+A self-hosted registry is part of [dstack Factory](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
 
 ## Export a preset
 
@@ -362,7 +364,6 @@ At the same time, it's recommended to create presets using your own agent — ei
 ## Limitations
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-* Doesn't support PD disaggregation (coming soon)
 * The registry doesn't support public presets (coming soon)
 * Doesn't support ranges for `concurrency`
 

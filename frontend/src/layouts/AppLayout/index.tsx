@@ -124,7 +124,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const isVisibleInfoTab = helpPanelContent.header || helpPanelContent.footer || helpPanelContent.body;
 
-    const avatarProps = process.env.UI_VERSION === 'enterprise' ? { name: userName } : { githubHandle: userName };
+    const avatarProps = process.env.UI_VERSION === 'sky' ? { githubHandle: userName } : { name: userName };
 
     const onChangeSystemModeToggle: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();

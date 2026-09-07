@@ -18,6 +18,7 @@ from dstack._internal.cli.models.preset_agent import (
     AnyClaudeStreamEvent,
     ClaudeResultEvent,
     PresetAgentFailure,
+    PresetAgentInfo,
     PresetAgentSuccess,
     PresetSessionProcess,
 )
@@ -90,9 +91,9 @@ _WINDOWS_INHERITED_ENV_NAMES = (
 class ClaudeAuth:
     api_key: Optional[str]
     executable: str
-    # None uses the claude CLI's own default.
+    # None means the flag is not passed and claude uses its own default.
     effort: Optional[ClaudeEffort]
-    model: str
+    model: Optional[str]
 
 
 @dataclass
@@ -131,6 +132,16 @@ def _get_claude_auth_status(auth: "ClaudeAuth") -> str:
         return "unknown"
 
 
+def get_agent_info(auth: ClaudeAuth) -> PresetAgentInfo:
+    return PresetAgentInfo(
+        executable=auth.executable,
+        version=_get_claude_version(auth),
+        auth_status=_get_claude_auth_status(auth),
+        effort=auth.effort,
+        model=None,
+    )
+
+
 def get_claude_auth() -> ClaudeAuth:
     api_key = os.getenv("DSTACK_AGENT_ANTHROPIC_API_KEY") or None
     configured_path = os.getenv("DSTACK_AGENT_CLAUDE_PATH") or "claude"
@@ -146,7 +157,7 @@ def get_claude_auth() -> ClaudeAuth:
         api_key=api_key,
         executable=executable,
         effort=effort,
-        model=os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-opus-4-8"),
+        model=os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL") or None,
     )
 
 
@@ -351,8 +362,6 @@ def _build_claude_command(*, auth: ClaudeAuth, resume_session_id: Optional[str])
         "Task,NotebookEdit",
         "--permission-mode",
         "bypassPermissions",
-        "--model",
-        auth.model,
         "--json-schema",
         json.dumps(_get_report_json_schema()),
     ]
@@ -362,6 +371,8 @@ def _build_claude_command(*, auth: ClaudeAuth, resume_session_id: Optional[str])
         command[2:2] = ["--bare"]
     if auth.effort is not None:
         command[2:2] = ["--effort", auth.effort]
+    if auth.model is not None:
+        command[2:2] = ["--model", auth.model]
     if resume_session_id is not None:
         command += ["--resume", resume_session_id]
     return command
@@ -559,6 +570,8 @@ async def _read_process_stream(
         if output.session_id is None and event.session_id:
             output.session_id = event.session_id
             session.record_claude_session_id(event.session_id)
+        if event.model:
+            session.record_agent_model(event.model)
         if event.type == "assistant":
             output.made_progress = True
         if not isinstance(event, ClaudeResultEvent):

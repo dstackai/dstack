@@ -3,7 +3,6 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.proxy.lib.models import RateLimit
 
 
@@ -48,7 +47,6 @@ class RegisterServiceRequest(BaseModel):
     ssh_private_key: str
     rate_limits: tuple[RateLimit, ...] = ()
     has_router_replica: bool = False
-    router: Optional[AnyServiceRouterConfig] = None
 
 
 class SetServiceIdRequest(BaseModel):

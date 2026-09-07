@@ -159,6 +159,11 @@ type DockerRunner struct {
 	tasks        TaskStorage
 	// stateMu serializes task state file updates, see saveTaskState()
 	stateMu sync.Mutex
+	// authorizedKeysMu serializes authorized_keys updates, covering the whole
+	// read-modify-write cycle, see reconcileHostSshKeys()
+	authorizedKeysMu sync.Mutex
+	// userLookup resolves a host user to its home dir and ids. Overridden in tests
+	userLookup func(username string) (*user.User, error)
 }
 
 func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*DockerRunner, error) {
@@ -201,6 +206,7 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 		gpuVendor:    gpuVendor,
 		gpuLock:      gpuLock,
 		tasks:        NewTaskStorage(),
+		userLookup:   user.Lookup,
 	}
 
 	// The task dirs are scanned once: the tasks whose dirs are claimed by a container
@@ -212,6 +218,12 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 	// Must be called after the tasks are restored, as it uses them to tell the dirs of
 	// the live tasks from the orphaned ones
 	runner.sweepOrphanedTaskDirs(ctx, storedTasks)
+	// Brings authorized_keys in line with the restored tasks, dropping the entries left
+	// by the tasks that are gone. Only the users of the restored tasks are reconciled;
+	// the users of the swept tasks are already done by sweepOrphanedTaskDirs()
+	if err := runner.reconcileHostSshKeys(ctx); err != nil {
+		log.Error(ctx, "failed to reconcile host SSH keys on startup", "err", err)
+	}
 
 	return runner, nil
 }
@@ -543,12 +555,13 @@ func (d *DockerRunner) Start(ctx context.Context, taskID string) (err error) {
 	}
 
 	if len(cfg.HostSshKeys) > 0 {
-		ak := AuthorizedKeys{user: cfg.HostSshUser, lookup: user.Lookup}
-		if err := ak.AppendPublicKeys(ctx, cfg.HostSshKeys); err != nil {
-			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
+		// No user is passed: the task is already stored and not cleaned up by now,
+		// therefore its own keys are a part of the reconciled set
+		if err := d.reconcileHostSshKeys(ctx); err != nil {
+			errMessage := fmt.Sprintf("reconcileHostSshKeys error: %s", err.Error())
 			log.Error(ctx, errMessage)
 			task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
-			return fmt.Errorf("append public keys: %w", err)
+			return fmt.Errorf("reconcile host SSH keys: %w", err)
 		}
 	}
 
@@ -657,12 +670,12 @@ func (d *DockerRunner) cleanupLocked(ctx context.Context, task *Task) {
 		return
 	}
 	log.Debug(ctx, "releasing task resources", "task", task.ID)
-	releaseTaskResources(ctx, task.config)
-	if len(task.gpuIDs) > 0 {
-		releasedGpuIDs := d.gpuLock.Release(ctx, task.gpuIDs)
-		log.Debug(ctx, "released GPU(s)", "task", task.ID, "gpus", releasedGpuIDs)
-	}
 	task.cleanedUp = true
+	// The flag is committed _before_ the resources are released, so that the host SSH
+	// keys of this task are already out of the reconciled set by the time
+	// releaseTaskResources() computes it. This is safe if the shim stops running in
+	// between: the state file is only written at the end, therefore the task is cleaned
+	// up again, idempotently, after a restart.
 	// Commit the flag without touching the rest of the local copy of the task,
 	// which may contain uncommitted changes made by the caller
 	if _, err := d.tasks.Modify(task.ID, func(t *Task) error {
@@ -671,22 +684,70 @@ func (d *DockerRunner) cleanupLocked(ctx context.Context, task *Task) {
 	}); err != nil && !errors.Is(err, ErrNotFound) {
 		log.Error(ctx, "failed to commit cleaned up state", "task", task.ID, "err", err)
 	}
+	d.releaseTaskResources(ctx, task.config)
+	if len(task.gpuIDs) > 0 {
+		releasedGpuIDs := d.gpuLock.Release(ctx, task.gpuIDs)
+		log.Debug(ctx, "released GPU(s)", "task", task.ID, "gpus", releasedGpuIDs)
+	}
 	d.saveTaskState(ctx, task.ID)
 }
 
 // releaseTaskResources releases the host resources acquired for a task: volumes and
 // host SSH keys. Unlike GPU locks, which are only kept in memory, these outlive the
-// shim process, therefore they are released by task config and not by task
-func releaseTaskResources(ctx context.Context, cfg TaskConfig) {
+// shim process, therefore they are released by task config and not by task.
+// The task must already be marked as cleaned up, or gone from TaskStorage altogether,
+// otherwise its host SSH keys are still considered to be in use
+func (d *DockerRunner) releaseTaskResources(ctx context.Context, cfg TaskConfig) {
 	if err := unmountVolumes(ctx, cfg); err != nil {
 		log.Error(ctx, "failed to unmount volumes", "err", err)
 	}
 	if len(cfg.HostSshKeys) > 0 {
-		ak := AuthorizedKeys{user: cfg.HostSshUser, lookup: user.Lookup}
-		if err := ak.RemovePublicKeys(cfg.HostSshKeys); err != nil {
-			log.Error(ctx, "failed to remove public keys", "err", err)
+		if err := d.reconcileHostSshKeys(ctx, cfg.HostSshUser); err != nil {
+			log.Error(ctx, "failed to reconcile host SSH keys", "err", err)
 		}
 	}
+}
+
+// reconcileHostSshKeys brings the shim-owned entries of the host users' authorized_keys
+// files in line with the tasks that still need them, that is, with the keys of all the
+// stored tasks that have not been cleaned up yet.
+//
+// extraUsers are reconciled on top of the users of those tasks. Only a user whose tasks
+// contribute no keys needs it: once the last task of a user is cleaned up, or gone from
+// TaskStorage altogether, nothing names that user anymore, yet its entries are still in
+// the file and have to be dropped.
+//
+// A failure for one user does not keep the other users from being reconciled; all the
+// failures are returned joined, for the caller to report.
+func (d *DockerRunner) reconcileHostSshKeys(ctx context.Context, extraUsers ...string) error {
+	// The lock is held for the whole read-modify-write cycle, so that a stale set of
+	// keys cannot overwrite a newer one. Nothing takes a task lock while holding it,
+	// therefore it cannot deadlock with the task lock its callers may hold
+	d.authorizedKeysMu.Lock()
+	defer d.authorizedKeysMu.Unlock()
+
+	// Seeding the map is what makes the loop at the end visit the extra users: a user
+	// that no task names has no entry in the map, and so is never reconciled
+	keysByUser := make(map[string][]string, len(extraUsers))
+	for _, username := range extraUsers {
+		keysByUser[username] = nil
+	}
+	for _, task := range d.tasks.List() {
+		cfg := task.config
+		if task.cleanedUp || len(cfg.HostSshKeys) == 0 {
+			continue
+		}
+		keysByUser[cfg.HostSshUser] = append(keysByUser[cfg.HostSshUser], cfg.HostSshKeys...)
+	}
+
+	var errs []error
+	for username, keys := range keysByUser {
+		ak := AuthorizedKeys{user: username, lookup: d.userLookup}
+		if err := ak.Reconcile(ctx, keys); err != nil {
+			errs = append(errs, fmt.Errorf("user %s: %w", username, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Terminate aborts running operations (pulling an image, running a container) and sets task status to terminated

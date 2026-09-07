@@ -1,5 +1,4 @@
 import { asset } from '../asset';
-import { DashedBorder } from './DashedBorder';
 
 // Layered "vendor-agnostic" architecture diagram, rebuilt as HTML/CSS (replaces the previous
 // static SVG). Logos are recolored to the current text color via CSS masking (see .arch-logo in
@@ -21,8 +20,7 @@ const FRAMEWORKS: Logo[] = [
   { key: 'pytorch', label: 'PyTorch', src: logoSrc('pytorch.svg') },
   { key: 'vllm', label: 'vLLM', src: logoSrc('vllm.svg') },
   { key: 'sglang', label: 'SGLang', src: logoSrc('sglang.svg') },
-  { key: 'meta', label: 'Meta', src: logoSrc('meta.svg') },
-  { key: 'huggingface', label: 'Hugging Face', src: logoSrc('huggingface.svg') },
+  { key: 'smg', label: 'SMG', src: logoSrc('smg.svg') },
 ];
 
 const MODELS: Logo[] = [
@@ -82,17 +80,14 @@ function LogoRow({ logos }: { logos: Logo[] }) {
 export function ArchitectureDiagram() {
   return (
     <div className="arch-diagram-wrap">
-      <div className="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
-        {/* Top: what plugs in on top of the orchestration layer. "Any model" spans the last two
-            columns so it lines up with Kubernetes + on-prem below. */}
-        <div className="arch-row">
+      <div className="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, VMs, bare-metal, and hardware below.">
+        {/* Top: what plugs in on top of the orchestration layer. */}
+        <div className="arch-row arch-row--inputs">
           <div className="arch-cell">
-            <DashedBorder />
             <span className="arch-cell__label">Any framework</span>
             <LogoRow logos={FRAMEWORKS} />
           </div>
           <div className="arch-cell arch-cell--model">
-            <DashedBorder />
             <span className="arch-cell__label">Any model</span>
             <LogoRow logos={MODELS} />
           </div>
@@ -105,9 +100,8 @@ export function ArchitectureDiagram() {
             <LogoMark logo={DOCKER} />
           </div>
           <div className="arch-orchestration__cells">
-            {['Fleets', 'Dev environments', 'Tasks', 'Services', 'Volumes'].map(name => (
+            {['Projects', 'Fleets', 'Runs', 'Presets', 'Gateways'].map(name => (
               <div className="arch-subcell" key={name}>
-                <DashedBorder />
                 {name}
               </div>
             ))}
@@ -115,25 +109,21 @@ export function ArchitectureDiagram() {
         </div>
 
         {/* Bottom: where workloads run */}
-        <div className="arch-row">
+        <div className="arch-row arch-row--compute">
           <div className="arch-cell arch-cell--gpu">
-            <DashedBorder />
             <LogoRow logos={GPU_CLOUDS} />
-            <span className="arch-cell__label">Any cloud</span>
+            <span className="arch-cell__label">Clouds</span>
           </div>
-          <div className="arch-cell">
-            <DashedBorder />
-            <LogoRow logos={[KUBERNETES]} />
+          <div className="arch-cell arch-cell--platform">
+            <LogoMark logo={KUBERNETES} />
             <span className="arch-cell__label">Kubernetes</span>
           </div>
-          <div className="arch-cell arch-cell--center">
-            <DashedBorder />
-            <span className="arch-cell__label">On-prem clusters</span>
+          <div className="arch-cell arch-cell--platform">
+            <span className="arch-cell__label">VMs or bare-metal</span>
           </div>
         </div>
 
         <div className="arch-cell arch-cell--full arch-cell--hw">
-          <DashedBorder />
           <span className="arch-cell__label">Any hardware</span>
           <LogoRow logos={HARDWARE} />
         </div>

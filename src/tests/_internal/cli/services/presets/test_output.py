@@ -415,6 +415,53 @@ class TestFailedTrials:
         assert summary["best_failed"] is None
         assert summary["gpu"] == "MI300X:192GB:1"
 
+    def test_reports_the_gpu_of_a_single_node_group(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        trials_dir = _write_trials(
+            tmp_path,
+            [{"groups": [[{"gpu": {"name": "MI300X", "memory": "192GB", "count": 1}}]]}],
+        )
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["gpu"] == "MI300X:192GB:1"
+
+    def test_counts_the_worker_nodes_of_a_disaggregated_trial(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        # The CPU router has no GPU: it must neither blank the column nor split it.
+        h200 = {"gpu": {"name": "H200", "memory": "141GB", "count": 8}}
+        trials_dir = _write_trials(
+            tmp_path,
+            [{"groups": [[{"cpu": "16"}], [h200], [h200, h200]]}],
+        )
+
+        summary = _summarize_session_trials(trials_dir)
+
+        assert summary["gpu"] == "H200:141GB:8 x3"
+
+    def test_shows_the_split_when_roles_ran_different_gpus(self, tmp_path):
+        from dstack._internal.cli.services.presets.session import _summarize_session_trials
+
+        h100 = {"gpu": {"name": "H100", "memory": "80GB", "count": 8}}
+        trials_dir = _write_trials(
+            tmp_path,
+            [
+                {
+                    "groups": [
+                        [{"gpu": {"name": "H200", "memory": "141GB", "count": 8}}],
+                        [h100, h100],
+                    ]
+                }
+            ],
+        )
+
+        summary = _summarize_session_trials(trials_dir)
+
+        # Group order, not sorted: the roles read in the order they ran.
+        assert summary["gpu"] == "H200:141GB:8 + H100:80GB:8 x2"
+
     def test_the_fastest_failed_trial_is_kept_when_nothing_passed(self, tmp_path):
         from dstack._internal.cli.services.presets.session import _summarize_session_trials
 

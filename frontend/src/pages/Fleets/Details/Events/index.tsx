@@ -46,7 +46,13 @@ export const EventsList = () => {
             loading={isLoading}
             loadingText={t('common.loading')}
             header={
-                <Header actions={<Button onClick={goToFullView}>{t('common.full_view')}</Button>}>
+                <Header
+                    actions={
+                        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && (
+                            <Button onClick={goToFullView}>{t('common.full_view')}</Button>
+                        )
+                    }
+                >
                     {t('navigation.events')}
                 </Header>
             }

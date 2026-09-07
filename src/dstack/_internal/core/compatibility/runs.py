@@ -5,7 +5,10 @@ from dstack._internal.core.models.common import (
     IncludeExcludeDictType,
     IncludeExcludeSetType,
 )
-from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.runs import (
     DEFAULT_REPLICA_GROUP_NAME,
     ApplyRunPlanInput,
@@ -89,6 +92,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         if run_spec.configuration.nodes is None:
             # Omit nodes when unset so old servers never see null (pre-hetero nodes was int=1).
             configuration_excludes["nodes"] = True
+    elif isinstance(run_spec.configuration, ServiceConfiguration):
+        if run_spec.configuration.groups is None:
+            # Servers before 0.21.3 have no service `groups` and reject it as an extra field.
+            configuration_excludes["groups"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

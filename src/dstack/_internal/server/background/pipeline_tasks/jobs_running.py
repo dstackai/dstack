@@ -91,6 +91,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.jobs import (
     emit_job_status_change_event,
     find_job,
+    get_extra_authorized_keys,
     get_job_attached_volumes,
     get_job_runtime_data,
     get_job_spec,
@@ -816,29 +817,36 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        public_keys = [context.project.ssh_public_key.strip()]
+        extra_authorized_keys = get_extra_authorized_keys(context.run.run_spec)
+        public_keys = [context.project.ssh_public_key.strip(), *extra_authorized_keys]
+        # Host access, unlike container access, is all or nothing -- the user key is added to
+        # the host only if they are allowed to bypass the SSH proxy
         ssh_user: Optional[str] = None
         user_ssh_key: Optional[str] = None
         if not server_settings.SSHPROXY_ENFORCED:
             ssh_user = job_provisioning_data.username
-            assert context.run.run_spec.ssh_key_pub is not None
-            user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
-            public_keys.append(user_ssh_key)
-        success = await run_async(
-            _process_provisioning_with_shim,
-            server_ssh_private_keys,
-            job_provisioning_data,
-            None,
-            run=context.run,
-            job_model=context.job_model,
-            jrd=get_job_runtime_data(context.job_model),
-            jpd=job_provisioning_data,
-            volumes=startup_context.volumes,
-            registry_auth=context.job.job_spec.registry_auth,
-            public_keys=public_keys,
-            ssh_user=ssh_user,
-            ssh_key=user_ssh_key,
-        )
+            user_ssh_key = get_or_error(context.run.run_spec.ssh_key_pub).strip()
+        try:
+            success = await run_async(
+                _process_provisioning_with_shim,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run=context.run,
+                job_model=context.job_model,
+                jrd=get_job_runtime_data(context.job_model),
+                jpd=job_provisioning_data,
+                volumes=startup_context.volumes,
+                registry_auth=context.job.job_spec.registry_auth,
+                public_keys=public_keys,
+                ssh_user=ssh_user,
+                ssh_key=user_ssh_key,
+            )
+        except client.ShimResponseError as e:
+            logger.warning(
+                "%s: shim did not accept the task submission: %s", fmt(context.job_model), e
+            )
+            success = False
         if success:
             _set_job_status(context.job_model, result, JobStatus.PULLING)
             result.job_update_map["skip_min_processing_interval"] = True
@@ -922,14 +930,20 @@ async def _process_pulling_status(
         fmt(context.job_model),
         context.job_submission.age,
     )
-    shim_state = await run_async(
-        _sync_shim_pulling_state,
-        server_ssh_private_keys,
-        job_provisioning_data,
-        None,
-        job_model=context.job_model,
-        jrd=_get_result_job_runtime_data(context.job_model, result),
-    )
+    try:
+        shim_state = await run_async(
+            _sync_shim_pulling_state,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            None,
+            job_model=context.job_model,
+            jrd=_get_result_job_runtime_data(context.job_model, result),
+        )
+    except client.ShimResponseError as e:
+        # Same outcome as a connection error, `_handle_instance_unreachable()` below,
+        # but the cause is now logged instead of being silently indistinguishable.
+        logger.warning("%s: shim failed to report the task state: %s", fmt(context.job_model), e)
+        shim_state = False
     if shim_state is not False:
         if shim_state.job_runtime_data is not None:
             _set_job_runtime_data(result, shim_state.job_runtime_data)
@@ -1493,6 +1507,8 @@ def _process_provisioning_with_shim(
 class _RunnerAvailability(enum.Enum):
     AVAILABLE = "available"
     UNAVAILABLE = "unavailable"
+    UNREACHABLE = "unreachable"
+    """Reached the runner port, but the peer is not a working runner."""
 
 
 class _ShimPullingState(enum.Enum):
@@ -1513,7 +1529,15 @@ class _SyncShimPullingStateResult:
 @runner_ssh_tunnel
 def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    if runner_client.healthcheck() is None:
+    try:
+        healthcheck_response = runner_client.healthcheck()
+    except client.RunnerResponseError as e:
+        # Unlike a runner that has not started yet, a peer that answers with an error status
+        # or an unreadable body is not expected to become a working runner, so this counts
+        # as unreachable.
+        logger.warning("Runner healthcheck failed: %s", e)
+        return _RunnerAvailability.UNREACHABLE
+    if healthcheck_response is None:
         return _RunnerAvailability.UNAVAILABLE
     return _RunnerAvailability.AVAILABLE
 
@@ -1628,31 +1652,37 @@ def _submit_job_to_runner(
         instance_env = None
 
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    if runner_client.healthcheck() is None:
-        return _SubmitJobToRunnerResult(success=success_if_not_available)
+    try:
+        if runner_client.healthcheck() is None:
+            return _SubmitJobToRunnerResult(success=success_if_not_available)
 
-    runner_client.submit_job(
-        run=run,
-        job=job,
-        cluster_info=cluster_info,
-        # Do not send all the secrets since interpolation is already done by the server.
-        # TODO: Passing secrets may be necessary for filtering out secret values from logs.
-        secrets={},
-        repo_credentials=repo_credentials,
-        instance_env=instance_env,
-        router_env=router_env,
-    )
-    for archive_id, archive in file_archives:
-        logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
-        runner_client.upload_archive(archive_id, archive)
-    if code is None and not runner_client.is_code_upload_optional():
-        # Old runner, we must call `/api/upload_code` to proceed
-        code = b""
-    if code is not None:
-        logger.debug("%s: uploading code", fmt(job_model))
-        runner_client.upload_code(code)
-    logger.debug("%s: starting job", fmt(job_model))
-    job_info = runner_client.run_job()
+        runner_client.submit_job(
+            run=run,
+            job=job,
+            cluster_info=cluster_info,
+            # Do not send all the secrets since interpolation is already done by the server.
+            # TODO: Passing secrets may be necessary for filtering out secret values from logs.
+            secrets={},
+            repo_credentials=repo_credentials,
+            instance_env=instance_env,
+            router_env=router_env,
+        )
+        for archive_id, archive in file_archives:
+            logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
+            runner_client.upload_archive(archive_id, archive)
+        if code is None and not runner_client.is_code_upload_optional():
+            # Old runner, we must call `/api/upload_code` to proceed
+            code = b""
+        if code is not None:
+            logger.debug("%s: uploading code", fmt(job_model))
+            runner_client.upload_code(code)
+        logger.debug("%s: starting job", fmt(job_model))
+        job_info = runner_client.run_job()
+    except client.RunnerResponseError as e:
+        # The runner answered, but unusably, so retrying the same submission is not
+        # expected to help.
+        logger.warning("%s: runner did not accept the job submission: %s", fmt(job_model), e)
+        return _SubmitJobToRunnerResult(success=False)
     if job_info is not None:
         if jrd is not None:
             jrd = jrd.model_copy(
@@ -1678,14 +1708,25 @@ def _process_running(
 ) -> Union[_ProcessRunningResult, Literal[False]]:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
-    resp = runner_client.pull(timestamp)
-    logs_services.write_logs(
-        project=run_model.project,
-        run_name=run_model.run_name,
-        job_submission_id=job_model.id,
-        runner_logs=resp.runner_logs,
-        job_logs=resp.job_logs,
-    )
+    try:
+        resp = runner_client.pull(timestamp)
+    except client.RunnerResponseError as e:
+        logger.warning("%s: runner failed to serve the pull request: %s", fmt(job_model), e)
+        return False
+    try:
+        logs_services.write_logs(
+            project=run_model.project,
+            run_name=run_model.run_name,
+            job_submission_id=job_model.id,
+            runner_logs=resp.runner_logs,
+            job_logs=resp.job_logs,
+        )
+    except logs_services.LogStorageError as e:
+        # The instance is reachable, the log storage is not, so this must not be reported as a
+        # disconnect. Nothing is updated: `runner_timestamp` is not advanced, so the same logs
+        # and job state events are pulled again next time instead of being lost.
+        logger.error("%s: failed to write logs: %s", fmt(job_model), e)
+        return _ProcessRunningResult()
     result = _ProcessRunningResult(
         job_update_map=_JobUpdateMap(runner_timestamp=resp.last_updated)
     )

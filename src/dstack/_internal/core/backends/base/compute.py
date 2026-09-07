@@ -148,11 +148,21 @@ class Compute(ABC):
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
         If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
         and implement `update_provisioning_data()`.
+
+        `extra_authorized_keys` are the public keys to authorize on the job container in addition
+        to `project_ssh_public_key`, as decided by the caller -- typically the user key, or
+        nothing if the server does not let the user connect to the container directly. The project
+        key is never among them, and the keys are not validated; pass them to
+        `base.authorized_keys.build_authorized_keys()` to get the complete, validated list to
+        authorize. Only Computes that add the keys themselves need this argument; VM-based
+        (shim-based) Computes ignore it, as the server submits the keys to the shim once the
+        instance is up.
         """
         pass
 
@@ -390,10 +400,14 @@ class ComputeWithCreateInstanceSupport(ABC):
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         """
         The default `run_job()` implementation for all backends that support `create_instance()`.
         Override only if custom `run_job()` behavior is required.
+
+        `extra_authorized_keys` is ignored -- all such backends are VM-based, and the server
+        submits the keys to the shim later, see `Compute.run_job()`.
         """
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -442,7 +456,13 @@ class ComputeWithGroupProvisioningSupport(ABC):
         project_ssh_private_key: str,
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> ComputeGroupProvisioningData:
+        """
+        Launches a compute group -- instances created all at once via the provider API -- running
+        one job per instance. See `Compute.run_job()` for the arguments shared with it, including
+        `extra_authorized_keys`.
+        """
         pass
 
     @abstractmethod
@@ -1098,12 +1118,6 @@ def get_gateway_user_data(authorized_key: str) -> str:
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[
             ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
-            [
-                "sed",
-                "-i",
-                "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
-                "/etc/nginx/nginx.conf",
-            ],
             ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],
@@ -1204,25 +1218,23 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str) -> str:
-    channel = "release" if settings.DSTACK_RELEASE else "stgn"
-    base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
-    if build == "latest":
-        build = _fetch_version(f"{base_url}/latest-version") or "latest"
-        logger.debug("Found the latest gateway build: %s", build)
-    wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
-    return f"dstack-gateway @ {wheel}"
+def get_dstack_gateway_package_and_target_version() -> tuple[str, str | None]:
+    if settings.DSTACK_GATEWAY_PACKAGE_URL:
+        return f"dstack[gateway] @ {settings.DSTACK_GATEWAY_PACKAGE_URL}", None
+    if settings.DSTACK_VERSION is not None:
+        return f"dstack[gateway]=={settings.DSTACK_VERSION}", settings.DSTACK_VERSION
+    package = "dstack[gateway] @ https://github.com/dstackai/dstack/archive/refs/heads/master.zip"
+    return package, None
 
 
 def get_dstack_gateway_commands() -> List[str]:
-    build = get_dstack_runner_version() or "latest"
-    gateway_package = get_dstack_gateway_wheel(build)
+    gateway_package, _ = get_dstack_gateway_package_and_target_version()
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
         f"/home/ubuntu/dstack/blue/bin/pip install '{gateway_package}'",
-        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
+        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack._internal.proxy.gateway.systemd install --run",
     ]
 
 

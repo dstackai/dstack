@@ -13,13 +13,14 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.models.preset_agent import PresetSessionProcess
+from dstack._internal.cli.models.preset_agent import PresetAgentInfo, PresetSessionProcess
 from dstack._internal.cli.services.presets.agent import (
     ClaudeAuth,
     _build_claude_command,
     _prepare_subprocess_command,
     _terminate_process,
     build_preset_agent_env,
+    get_agent_info,
     get_claude_auth,
     run_preset_agent,
 )
@@ -63,12 +64,14 @@ def _record_run(session, workspace_record):
 pytestmark = pytest.mark.windows
 
 
-def _claude_auth(*, api_key: str | None = "anthropic-secret", effort=None) -> ClaudeAuth:
+def _claude_auth(
+    *, api_key: str | None = "anthropic-secret", effort=None, model: str | None = "claude-test"
+) -> ClaudeAuth:
     return ClaudeAuth(
         api_key=api_key,
         executable="claude",
         effort=effort,
-        model="claude-test",
+        model=model,
     )
 
 
@@ -85,6 +88,18 @@ class TestClaudeAuth:
 
         assert auth.api_key == api_key_env
 
+    @pytest.mark.parametrize("model_env", ["claude-pinned", "", None])
+    def test_leaves_model_to_claude_unless_env_is_set(self, monkeypatch, model_env):
+        if model_env is None:
+            monkeypatch.delenv("DSTACK_AGENT_ANTHROPIC_MODEL", raising=False)
+        else:
+            monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_MODEL", model_env)
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
+
+        auth = get_claude_auth()
+
+        assert auth.model == (model_env or None)
+
     @pytest.mark.parametrize("api_key", ["key", None])
     def test_builds_command_for_selected_auth_mode(self, api_key):
         command = _build_claude_command(
@@ -94,6 +109,15 @@ class TestClaudeAuth:
         assert ("--bare" in command) is (api_key is not None)
         assert ("--setting-sources" in command) is (api_key is None)
         assert command[command.index("--effort") + 1] == "high"
+
+    @pytest.mark.parametrize("model", ["claude-pinned", None])
+    def test_passes_model_only_when_pinned(self, model):
+        command = _build_claude_command(auth=_claude_auth(model=model), resume_session_id=None)
+
+        if model is None:
+            assert "--model" not in command
+        else:
+            assert command[command.index("--model") + 1] == model
 
     @pytest.mark.windows_only
     def test_runs_windows_batch_launcher(self, tmp_path):
@@ -615,8 +639,8 @@ class TestDirectoryMirror:
         assert not (tmp_path / "session" / "trials" / "1" / "trial.json").exists()
 
 
-class TestWriteAgentInfo:
-    def test_writes_model_params_and_auth(self, tmp_path, monkeypatch):
+class TestGetAgentInfo:
+    def test_describes_the_launch_without_a_model(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
             "dstack._internal.cli.services.presets.agent._get_claude_version",
             lambda auth: "2.1.0 (Claude Code)",
@@ -629,16 +653,48 @@ class TestWriteAgentInfo:
         session_dir.mkdir()
         session = PresetSession(path=session_dir, preset_id="ab12cd34")
 
+        # Even a pinned model is not recorded here: claude reports the model it
+        # runs on its init line, and that is what gets recorded.
         session.write_agent_info(
-            ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
+            get_agent_info(
+                ClaudeAuth(api_key=None, executable="claude", effort="high", model="claude-pinned")
+            )
         )
 
         assert json.loads((session_dir / "agent.json").read_text()) == {
             "executable": "claude",
             "version": "2.1.0 (Claude Code)",
-            "model": {"name": "claude-opus-4-8", "effort": "default"},
             "auth_status": '{"authMethod": "claude.ai", "loggedIn": true}',
+            "effort": "high",
+            "model": None,
         }
+
+
+class TestRecordAgentModel:
+    def test_records_the_model_claude_reports(self, tmp_path):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+        session.write_agent_info(
+            PresetAgentInfo(
+                executable="claude", version=None, auth_status="{}", effort=None, model=None
+            )
+        )
+
+        session.record_agent_model("claude-opus-5[1m]")
+
+        info = session.read_agent_info()
+        assert info is not None
+        assert info.model == "claude-opus-5[1m]"
+
+    def test_does_not_record_a_model_without_launch_info(self, tmp_path):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+
+        session.record_agent_model("claude-opus-5[1m]")
+
+        assert not (session_dir / "agent.json").exists()
 
 
 def _offsets(tmp_path):
@@ -702,7 +758,7 @@ if "--resume" in args:
         "structured_output": {"resumed": True},
     }))
 else:
-    print(json.dumps({"type": "system", "subtype": "init", "session_id": "sid-123"}))
+    print(json.dumps({"type": "system", "session_id": "sid-123", "model": "claude-effective"}))
     print(json.dumps({
         "type": "result",
         "is_error": True,
@@ -716,17 +772,26 @@ else:
         )
         _patch_claude_command(monkeypatch, script)
         workspace, session = _agent_setup(tmp_path)
+        session.write_agent_info(
+            PresetAgentInfo(
+                executable="claude", version=None, auth_status="{}", effort=None, model=None
+            )
+        )
 
         output = await run_preset_agent(
             prompt="system prompt",
             env=_subprocess_env(),
             workspace=workspace,
-            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model=None),
             redacted_values=(),
             session=session,
         )
 
         assert output.report_data == {"resumed": True}
+        # The model comes from claude's init line, not from our configuration.
+        agent_info = session.read_agent_info()
+        assert agent_info is not None
+        assert agent_info.model == "claude-effective"
         calls = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
         assert len(calls) == 2
         assert calls[0]["args"] == []

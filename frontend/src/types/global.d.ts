@@ -23,7 +23,7 @@ declare interface HashMap<T = any> {
 declare namespace NodeJS {
     interface ProcessEnv {
         readonly NODE_ENV: 'development' | 'production' | 'test';
-        readonly UI_VERSION: 'sky' | 'enterprise';
+        readonly UI_VERSION: 'sky' | 'factory' | 'oss';
         readonly PUBLIC_URL: string;
         readonly API_URL: string;
     }

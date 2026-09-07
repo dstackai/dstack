@@ -435,7 +435,10 @@ def _check_instance_inner(
         logger.warning("%s: error removing dangling tasks: %s", fmt(instance), exc)
 
     # There should be no shim API calls after this function call since it can request shim restart.
-    _maybe_install_components(instance, shim_client)
+    try:
+        _maybe_install_components(instance, shim_client)
+    except Exception as exc:
+        logger.warning("%s: error installing components: %s", fmt(instance), exc)
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response,
         instance_health_response,
@@ -453,29 +456,25 @@ def _get_gpu_driver(
     """
     try:
         instance_info = shim_client.get_instance_info()
-    except requests.RequestException as exc:
+        return runner_client.instance_info_response_to_gpu_driver(instance_info)
+    except (requests.RequestException, runner_client.ShimError) as exc:
         logger.warning(
             "Instance %s: shim.get_instance_info(): request error: %s", instance_model.name, exc
         )
-        return None
-    try:
-        return runner_client.instance_info_response_to_gpu_driver(instance_info)
     except ValueError as exc:
         logger.warning("Instance %s: unexpected instance info: %s", instance_model.name, exc)
-        return None
+    except Exception:
+        logger.exception(
+            "Instance %s: unexpected error retrieving the GPU driver", instance_model.name
+        )
+    return None
 
 
 def _maybe_install_components(
     instance_model: InstanceModel,
     shim_client: runner_client.ShimClient,
 ) -> None:
-    try:
-        components = shim_client.get_components()
-    except requests.RequestException as exc:
-        logger.warning(
-            "Instance %s: shim.get_components(): request error: %s", instance_model.name, exc
-        )
-        return
+    components = shim_client.get_components()
     if components is None:
         logger.debug("Instance %s: no components info", instance_model.name)
         return

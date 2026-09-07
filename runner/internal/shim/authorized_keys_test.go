@@ -1,14 +1,21 @@
 package shim
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/user"
-	"path"
+	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+// Two valid keys, used to build authorized_keys entries. Short on purpose: the blob is
+// noise in a test that is about the lines around it
+const (
+	testKeyOne = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj"
+	testKeyTwo = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuLmyPGV/gcatBaZFxRPKGQVJ4vBjuqEsHIkKGrGZKS"
 )
 
 func TestPublicKeyFingerprint(t *testing.T) {
@@ -24,75 +31,6 @@ func TestPublicKeyFingerprintError(t *testing.T) {
 	fingerprint, err := PublicKeyFingerprint(key)
 	require.Error(t, err)
 	require.Empty(t, fingerprint)
-}
-
-func TestIsPublicKeysEqual(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-
-	result := IsPublicKeysEqual(keyLeft, keyRight)
-	require.True(t, result)
-}
-
-func TestIsPublicKeysEqualBrokenKey(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAP66um5MadfhB5dSnEM= thebits@barracuda"
-
-	resultFwd := IsPublicKeysEqual(keyLeft, keyRight)
-	require.False(t, resultFwd)
-
-	resultBck := IsPublicKeysEqual(keyRight, keyLeft)
-	require.False(t, resultBck)
-}
-
-func TestIsPublicKeysNotEqual(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-
-	result := IsPublicKeysEqual(keyLeft, keyRight)
-	require.False(t, result)
-}
-
-func TestRemovePublicKeys(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-
-	keys := []string{keyLeft, keyRight}
-	newKeys := RemovePublicKeys(keys, []string{keyRight})
-
-	require.Len(t, newKeys, 1)
-	require.Equal(t, newKeys, []string{keyLeft})
-}
-
-func TestRemovePublicKeysRemoveAll(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-
-	keys := []string{keyLeft, keyRight}
-	newKeys := RemovePublicKeys(keys, []string{keyRight, keyLeft})
-
-	require.Empty(t, newKeys)
-}
-
-func TestRemovePublicKeysRemoveNotContained(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-
-	keys := []string{keyLeft, keyRight}
-	newKeys := RemovePublicKeys(keys, []string{"# line with comment"})
-
-	require.Equal(t, keys, newKeys)
-}
-
-func TestAppendPublicKeys(t *testing.T) {
-	keyLeft := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	keyRight := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-	comment := "# line with coment"
-
-	keys := []string{keyLeft, keyRight}
-	newKeys := AppendPublicKeys(keys, []string{comment})
-
-	require.Equal(t, []string{keyLeft, keyRight, comment}, newKeys)
 }
 
 func mockUserLookup(username string) (*user.User, error) {
@@ -143,6 +81,7 @@ func TestGetAuthorizedKeysPath(t *testing.T) {
 		filePath, err := ak.GetAuthorizedKeysPath()
 		if tc.isError {
 			require.Error(t, err)
+			require.Equal(t, tc.expected, filePath)
 		} else {
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, filePath)
@@ -150,53 +89,8 @@ func TestGetAuthorizedKeysPath(t *testing.T) {
 	}
 }
 
-func TestAppendKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
-	filePath, err := ak.GetAuthorizedKeysPath()
-	require.NoError(t, err)
-
-	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
-	require.NoError(t, err)
-
-	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	err = os.WriteFile(filePath, []byte(key), os.ModePerm)
-	require.NoError(t, err)
-
-	newKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj user@host"
-	err = ak.AppendPublicKeys(context.Background(), []string{newKey})
-	require.NoError(t, err)
-
-	b, err := os.ReadFile(filePath)
-	require.NoError(t, err)
-	require.Contains(t, string(b), key)
-	require.Contains(t, string(b), newKey+" # added by dstack-shim")
-}
-
-func TestAppendKeySkipsInvalid(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
-	filePath, err := ak.GetAuthorizedKeysPath()
-	require.NoError(t, err)
-
-	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
-	require.NoError(t, err)
-	err = os.WriteFile(filePath, []byte{}, os.ModePerm)
-	require.NoError(t, err)
-
-	first := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj first"
-	second := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuLmyPGV/gcatBaZFxRPKGQVJ4vBjuqEsHIkKGrGZKS second"
-
-	// authorized_keys is line-based, therefore an entry must hold exactly one key
-	err = ak.AppendPublicKeys(context.Background(), []string{first + "\n" + second, first})
-	require.NoError(t, err)
-
-	b, err := os.ReadFile(filePath)
-	require.NoError(t, err)
-	require.NotContains(t, string(b), second)
-	require.Equal(t, first+" # added by dstack-shim\n", string(b))
-}
-
 func TestCanonicalizePublicKey(t *testing.T) {
-	const blob = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGYzO2yHhoIzYHnGH5CT/hpTNGRHvJHkKQlXqPZ0Uxwj"
+	const blob = testKeyOne
 
 	testCases := []struct {
 		name     string
@@ -261,76 +155,208 @@ func TestCanonicalizePublicKey(t *testing.T) {
 	}
 }
 
-func TestRemoveKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
-	filePath, err := ak.GetAuthorizedKeysPath()
-	require.NoError(t, err)
+func TestIsShimEntry(t *testing.T) {
+	testCases := []struct {
+		name     string
+		line     string
+		expected bool
+	}{
+		{
+			name:     "shim entry",
+			line:     testKeyOne + " user@host # added by dstack-shim",
+			expected: true,
+		},
+		{
+			name:     "shim entry without comment",
+			line:     testKeyOne + " # added by dstack-shim",
+			expected: true,
+		},
+		{
+			name:     "trailing whitespace",
+			line:     testKeyOne + " # added by dstack-shim  \r",
+			expected: true,
+		},
+		{
+			// the marker the server writes when provisioning an SSH fleet is a prefix of
+			// ours, and the keys it marks must never be touched by the shim
+			name:     "server entry",
+			line:     testKeyOne + " user@host # added by dstack",
+			expected: false,
+		},
+		{
+			name:     "user entry",
+			line:     testKeyOne + " user@host",
+			expected: false,
+		},
+		{
+			name:     "marker not at the end",
+			line:     testKeyOne + " # added by dstack-shim user@host",
+			expected: false,
+		},
+		{
+			name:     "blank line",
+			line:     "",
+			expected: false,
+		},
+	}
 
-	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
-	require.NoError(t, err)
-
-	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	err = os.WriteFile(filePath, []byte(key), os.ModePerm)
-	require.NoError(t, err)
-
-	err = ak.RemovePublicKeys([]string{key})
-	require.NoError(t, err)
-
-	b, err := os.ReadFile(filePath)
-	require.NoError(t, err)
-	require.Empty(t, string(b))
-
-	back, err := os.ReadFile(filePath + ".bak")
-	require.NoError(t, err)
-	require.Contains(t, string(back), key)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.expected, isShimEntry(tc.line))
+		})
+	}
 }
 
-func TestRemoveTwoKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
-	filePath, err := ak.GetAuthorizedKeysPath()
-	require.NoError(t, err)
-
-	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
-	require.NoError(t, err)
-
-	first := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	second := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-	third := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIAGg0prDVeane6xLvMPBKQHxNUpt4q/hmuAAxjOUW0GWMPS2qE3l8YkmWeK80nKvio4M/IYWe67HIVeibdvKPoFJTtgm93WeJT9KD6h7MCschAf78mAIBhzUMK+9UYl5pE2jpfqc0SXkUsXDxMVN+ST9lN7fXUVsCPXO6qJG+0hLA3vs5r0aY1Td72vI4h45DhwjdpYkY1KTNJwfSwyvZpoN9n85JjaqXsjLG/NhieDBKu0VJE1a44aWuFwmULmpDZcUcWtk074pPMMvuh/Go5gbTaIf1gsniBKNLrfTeGjIHE/Hu9o1G3GGpq6CDqOjb0ykukWZbD2qfV0gERwIR dstack"
-
-	err = os.WriteFile(filePath, []byte(first+"\n"+second+"\n"+third), os.ModePerm)
-	require.NoError(t, err)
-
-	err = ak.RemovePublicKeys([]string{first, third})
-	require.NoError(t, err)
-
-	b, err := os.ReadFile(filePath)
-	require.NoError(t, err)
-	require.NotContains(t, string(b), first)
-	require.NotContains(t, string(b), third)
-	require.Contains(t, string(b), second)
+// newTestAuthorizedKeys returns an AuthorizedKeys for a user whose home is a temp dir,
+// along with the path of their authorized_keys file. The mocked lookup reports the ids of
+// the current process, so that setting the ownership of the file succeeds without root
+func newTestAuthorizedKeys(t *testing.T) (AuthorizedKeys, string) {
+	t.Helper()
+	usr := &user.User{
+		Username: "test_user",
+		HomeDir:  t.TempDir(),
+		Uid:      strconv.Itoa(os.Getuid()),
+		Gid:      strconv.Itoa(os.Getgid()),
+	}
+	ak := AuthorizedKeys{
+		user: usr.Username,
+		lookup: func(username string) (*user.User, error) {
+			if username != usr.Username {
+				return nil, fmt.Errorf("user not found")
+			}
+			return usr, nil
+		},
+	}
+	return ak, authorizedKeysPath(usr.HomeDir)
 }
 
-func TestAppendTwoKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
-	filePath, err := ak.GetAuthorizedKeysPath()
-	require.NoError(t, err)
+func writeTestAuthorizedKeys(t *testing.T, path string, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), sshDirMode))
+	require.NoError(t, os.WriteFile(path, []byte(content), authorizedKeysFileMode))
+}
 
-	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
-	require.NoError(t, err)
+func TestReconcile(t *testing.T) {
+	const (
+		marker = " # added by dstack-shim"
+		// an entry added by the user by hand, which the shim must never remove
+		manual = testKeyOne + " added-by-hand"
+		// an entry added by the server when provisioning an SSH fleet
+		server = testKeyTwo + " dstack # added by dstack"
+	)
 
-	first := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
-	second := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCfAFHwfyMKPFbKq+D/vYNaXjqer4uV5+zvlrPY2bvkdRT4GiH4hm2s1Z7+fUEYQBNfw5O9SgxGotqyguUJbuVUc2BCNdD8HC3PxKtEev35ga4G3jjyuVeHcL2T9pn+F8IW1o3SpDGATAHJyFtArPYz31Hwg6PiuggPNdPLMSzZNrwNVuPwT1uDMKFqAh+1ryIVi7389fjZ7aBR9F06VIPpWIVVKqSVD+NbHtwWqCw8AsprJE3bPwVW09OJeQX8GXryKasaX4t4HMXmO/UI8tprnyf05dAl7NQOPY9Iut5PgfzEVY/T0M1RSnZi7i+1x7WBWX3aMM/Hv+NUeX2YtuAN"
-	third := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDIAGg0prDVeane6xLvMPBKQHxNUpt4q/hmuAAxjOUW0GWMPS2qE3l8YkmWeK80nKvio4M/IYWe67HIVeibdvKPoFJTtgm93WeJT9KD6h7MCschAf78mAIBhzUMK+9UYl5pE2jpfqc0SXkUsXDxMVN+ST9lN7fXUVsCPXO6qJG+0hLA3vs5r0aY1Td72vI4h45DhwjdpYkY1KTNJwfSwyvZpoN9n85JjaqXsjLG/NhieDBKu0VJE1a44aWuFwmULmpDZcUcWtk074pPMMvuh/Go5gbTaIf1gsniBKNLrfTeGjIHE/Hu9o1G3GGpq6CDqOjb0ykukWZbD2qfV0gERwIR dstack"
+	testCases := []struct {
+		name     string
+		content  string
+		keys     []string
+		expected string
+	}{
+		{
+			name:     "adds an entry",
+			content:  "",
+			keys:     []string{testKeyOne + " user@host"},
+			expected: testKeyOne + " user@host" + marker + "\n",
+		},
+		{
+			name:     "removes an entry that is no longer in use",
+			content:  testKeyOne + marker + "\n",
+			keys:     nil,
+			expected: "",
+		},
+		{
+			name:     "keeps an entry that is still in use",
+			content:  testKeyOne + " user@host" + marker + "\n",
+			keys:     []string{testKeyOne + " user@host"},
+			expected: testKeyOne + " user@host" + marker + "\n",
+		},
+		{
+			// the whole point of dstackai/dstack#4174: two co-located tasks share a key,
+			// and the one that finishes first must not revoke it for the other
+			name:     "collapses a key used more than once into one entry",
+			content:  "",
+			keys:     []string{testKeyOne + " first", testKeyOne + " second"},
+			expected: testKeyOne + " first" + marker + "\n",
+		},
+		{
+			name:     "keeps the entries the shim does not own",
+			content:  "# a comment\n\n" + manual + "\n" + server + "\n",
+			keys:     nil,
+			expected: "# a comment\n\n" + manual + "\n" + server + "\n",
+		},
+		{
+			name:     "keeps a key added by hand and used by a task as two entries",
+			content:  manual + "\n",
+			keys:     []string{testKeyOne + " user@host"},
+			expected: manual + "\n" + testKeyOne + " user@host" + marker + "\n",
+		},
+		{
+			name:     "removes only the entries the shim owns",
+			content:  manual + "\n" + testKeyTwo + marker + "\n" + server + "\n",
+			keys:     nil,
+			expected: manual + "\n" + server + "\n",
+		},
+		{
+			name:     "skips an invalid key without dropping the valid ones",
+			content:  "",
+			keys:     []string{"not a key", testKeyOne + "\n" + testKeyTwo, testKeyTwo},
+			expected: testKeyTwo + marker + "\n",
+		},
+		{
+			name:     "terminates the last line of a file without a trailing newline",
+			content:  manual,
+			keys:     nil,
+			expected: manual + "\n",
+		},
+	}
 
-	err = os.WriteFile(filePath, []byte(first), os.ModePerm)
-	require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ak, path := newTestAuthorizedKeys(t)
+			writeTestAuthorizedKeys(t, path, tc.content)
 
-	err = ak.AppendPublicKeys(context.Background(), []string{second, third})
-	require.NoError(t, err)
+			require.NoError(t, ak.Reconcile(t.Context(), tc.keys))
 
-	b, err := os.ReadFile(filePath)
+			content, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, string(content))
+		})
+	}
+}
+
+func TestReconcileCreatesMissingFile(t *testing.T) {
+	ak, path := newTestAuthorizedKeys(t)
+
+	require.NoError(t, ak.Reconcile(t.Context(), []string{testKeyOne}))
+
+	content, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.Contains(t, string(b), first)
-	require.Contains(t, string(b), second)
-	require.Contains(t, string(b), third)
+	require.Equal(t, testKeyOne+" # added by dstack-shim\n", string(content))
+	fileInfo, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(authorizedKeysFileMode), fileInfo.Mode().Perm())
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(sshDirMode), dirInfo.Mode().Perm())
+}
+
+func TestReconcileKeepsFileMode(t *testing.T) {
+	ak, path := newTestAuthorizedKeys(t)
+	writeTestAuthorizedKeys(t, path, "")
+	require.NoError(t, os.Chmod(path, 0o644))
+
+	require.NoError(t, ak.Reconcile(t.Context(), []string{testKeyOne}))
+
+	fileInfo, err := os.Stat(path)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o644), fileInfo.Mode().Perm())
+	// sshd does not read the temporary file, so leaving it behind would only make the
+	// next call write to a stale one
+	_, err = os.Stat(path + ".tmp")
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestReconcileUnknownUser(t *testing.T) {
+	ak := AuthorizedKeys{user: "no_such_user", lookup: mockUserLookup}
+
+	require.Error(t, ak.Reconcile(t.Context(), []string{testKeyOne}))
 }

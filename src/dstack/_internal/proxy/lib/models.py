@@ -1,13 +1,12 @@
 """Things stored in BaseProxyRepo implementations."""
 
 from datetime import datetime
-from typing import Iterable, Literal, Optional, Union
+from typing import Any, Iterable, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 
@@ -63,9 +62,15 @@ class Service(ImmutableModel):
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
     has_router_replica: bool = False
-    router: Optional[AnyServiceRouterConfig] = None
-    """TODO: drop `router`, unused by the server since 0.21.0"""
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ignore_router(cls, data: Any) -> Any:
+        """Ignore the dropped `router` field for compatibility with 0.19.38-0.21.3 state files."""
+        if isinstance(data, dict) and "router" in data:
+            data = {k: v for k, v in data.items() if k != "router"}
+        return data
 
     @property
     def domain_safe(self) -> str:
