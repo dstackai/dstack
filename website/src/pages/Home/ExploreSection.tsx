@@ -5,15 +5,14 @@ import { highlightTerms } from '../../components/highlightTerms';
 import { docsUrl } from '../../routes';
 import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedSection';
 
-// Core orchestration primitives shown in the "AI-native orchestration" block. "Runs" folds the
-// three run types (dev environments, tasks, services) into one card; there's no single runs
-// concept page, so it links to the quickstart ("creating fleets and submitting runs").
+// Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
-  { name: 'Projects', href: docsUrl('concepts/projects'), description: 'Multi-tenancy and resource isolation' },
   { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Cluster provisioning and monitoring' },
-  { name: 'Runs', href: docsUrl('quickstart'), description: 'Training and inference primitives' },
-  { name: 'Presets', href: docsUrl('concepts/presets'), description: 'Agent-based inference optimization' },
-  { name: 'Gateways', href: docsUrl('concepts/gateways'), description: 'Ingress, auto-scaling, rate limits, etc' },
+  { name: 'Tasks', href: docsUrl('concepts/tasks'), description: 'Training and other kind of jobs scheduling' },
+  { name: 'Services', href: docsUrl('concepts/services'), description: 'Cache-aware and PD-disaggregated inference' },
+  { name: 'Gateways', href: docsUrl('concepts/gateways'), description: 'HTTPS, auto-scaling, domains, and rate limits' },
+  { name: 'Presets', href: docsUrl('concepts/presets'), description: 'Agent-based optimization toolkit' },
+  { name: 'Projects', href: docsUrl('concepts/projects'), description: 'Tenant isolation and usage metering' },
 ];
 
 // The main marketing content: a sequence of alternating documentation blocks.
