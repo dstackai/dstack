@@ -264,19 +264,18 @@ async def _run_instance_check(
     check_instance_info: bool,
 ) -> InstanceCheck:
     ssh_private_keys = get_instance_ssh_private_keys(instance_model)
-    instance_check = await run_async(
-        _check_instance_inner,
-        ssh_private_keys,
-        job_provisioning_data,
-        None,
-        instance=instance_model,
-        check_instance_health=check_instance_health,
-        check_instance_info=check_instance_info,
-    )
-    # May return False if fails to establish ssh connection.
-    if instance_check is False:
-        return InstanceCheck(reachable=False, message="SSH or tunnel error")
-    return instance_check
+    try:
+        return await run_async(
+            _check_instance_inner,
+            ssh_private_keys,
+            job_provisioning_data,
+            None,
+            instance=instance_model,
+            check_instance_health=check_instance_health,
+            check_instance_info=check_instance_info,
+        )
+    except runner_client.PeerConnectionError as e:
+        return InstanceCheck(reachable=False, message=f"SSH or tunnel error: {e}")
 
 
 def _get_health_status_for_instance_check(

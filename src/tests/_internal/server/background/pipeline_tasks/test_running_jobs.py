@@ -57,7 +57,6 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     _ProcessContext,
     _ProcessResult,
     _referenced_ips_ready,
-    _RunnerAvailability,
     _SubmitJobToRunnerResult,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
@@ -1202,10 +1201,10 @@ class TestJobRunningWorker:
         ]
         expected_ports = {10022: 32771, 10999: 32772}
 
-        def assert_runner_availability(_, __, job_runtime_data):
+        def assert_runner_available(_, __, job_runtime_data):
             assert job_runtime_data is not None
             assert job_runtime_data.ports == expected_ports
-            return _RunnerAvailability.AVAILABLE
+            return True
 
         def assert_submit_job_to_runner(_, __, job_runtime_data, **kwargs):
             assert job_runtime_data is not None
@@ -1214,9 +1213,9 @@ class TestJobRunningWorker:
 
         with (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_runner_availability",
-                side_effect=assert_runner_availability,
-            ) as get_runner_availability_mock,
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._is_runner_available",
+                side_effect=assert_runner_available,
+            ) as is_runner_available_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running._submit_job_to_runner",
                 side_effect=assert_submit_job_to_runner,
@@ -1234,7 +1233,7 @@ class TestJobRunningWorker:
         ):
             await _process_job(session, worker, job)
             ssh_tunnel_mock.assert_called_once()
-            get_runner_availability_mock.assert_called_once()
+            is_runner_available_mock.assert_called_once()
             submit_job_to_runner_mock.assert_called_once()
 
         await session.refresh(job)
@@ -1485,8 +1484,8 @@ class TestJobRunningWorker:
 
         with (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_runner_availability",
-                return_value=_RunnerAvailability.AVAILABLE,
+                "dstack._internal.server.background.pipeline_tasks.jobs_running._is_runner_available",
+                return_value=True,
             ),
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running._get_job_file_archives",

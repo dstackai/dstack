@@ -71,10 +71,18 @@ _MAX_ERROR_BODY_BYTES = 512
 """How much of an unusable response body is kept in the error message."""
 
 
+class PeerConnectionError(DstackError):
+    """
+    The shim or the runner could not be reached: the SSH tunnel could not be established or
+    broke, or the request did not get through. The counterpart of the `*ResponseError`
+    families: nothing is known about the peer's state, and retrying may help.
+    """
+
+
 class _ResponseError(DstackError):
     """
     A base implementation for the `*ResponseError` families: the peer was reached and answered,
-    but the answer cannot be used. Unlike `requests.RequestException`, which means the request
+    but the answer cannot be used. Unlike `PeerConnectionError`, which means the request
     did not get through, repeating the same request is not expected to help.
     """
 
