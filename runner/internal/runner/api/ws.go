@@ -81,7 +81,7 @@ func (s *Server) streamJobLogs(ctx context.Context, conn *websocket.Conn, params
 		case <-s.shutdownCh:
 			if currentPos >= len(jobLogsWsHistory) {
 				s.executor.RUnlock()
-				close(s.wsDoneCh)
+				s.closeWsDone()
 				return
 			}
 		default:

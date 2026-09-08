@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	_ "net/http/pprof"
+	"sync"
 	"time"
 
 	"github.com/dstackai/dstack/runner/internal/common/api"
@@ -19,7 +20,9 @@ type Server struct {
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
 	pullDoneCh   chan interface{} // Closed then /api/pull gave everything
+	pullDoneOnce sync.Once
 	wsDoneCh     chan interface{} // Closed then /logs_ws gave everything
+	wsDoneOnce   sync.Once
 
 	startWaitDuration time.Duration
 	logsWaitDuration  time.Duration
@@ -121,6 +124,23 @@ loop:
 	}
 
 	return nil
+}
+
+// closePullDone reports that /api/pull has served the final logs.
+//
+// More than one request may observe the WaitLogsFinished state: the state is set as soon as
+// the job is asked to stop, while the server keeps serving until the executor returns, which
+// may take arbitrarily long if the job leaves processes behind. Closing must be idempotent.
+func (s *Server) closePullDone() {
+	s.pullDoneOnce.Do(func() { close(s.pullDoneCh) })
+}
+
+// closeWsDone reports that a /logs_ws stream has sent the final logs.
+//
+// Nothing limits the number of concurrent connections, and each one is served by its own
+// goroutine, so more than one may drain. Closing must be idempotent.
+func (s *Server) closeWsDone() {
+	s.wsDoneOnce.Do(func() { close(s.wsDoneCh) })
 }
 
 func (s *Server) stop() {
