@@ -37,13 +37,12 @@ func NewMetricsCollector(ctx context.Context) (*MetricsCollector, error) {
 }
 
 func (s *MetricsCollector) GetSystemMetrics(ctx context.Context) (*schemas.SystemMetrics, error) {
-	// It's possible to move a process from one control group to another (it's unlikely, but nonetheless),
-	// so we detect the current group each time.
-	cgroupPathname, err := getProcessCgroupPathname(ctx, "/proc/self/cgroup")
+	// Resolve the accounting group each time: start-dockerd can move the runner
+	// into a child cgroup, and host-namespace processes can change groups too.
+	cgroupPath, err := getMetricsCgroupPath(ctx, s.cgroupMountPoint, "/proc/self/cgroup")
 	if err != nil {
-		return nil, fmt.Errorf("get cgroup pathname: %w", err)
+		return nil, err
 	}
-	cgroupPath := path.Join(s.cgroupMountPoint, cgroupPathname)
 	timestamp := time.Now()
 	cpuUsage, err := s.GetCPUUsageMicroseconds(cgroupPath)
 	if err != nil {

@@ -1,11 +1,34 @@
 package metrics
 
 import (
+	"os"
+	"path"
 	"testing"
 
-	"github.com/dstackai/dstack/runner/internal/runner/schemas"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/runner/schemas"
 )
+
+func TestGetSystemMetrics_ContainerRoot(t *testing.T) {
+	mountPoint := t.TempDir()
+	for name, content := range map[string]string{
+		"cpu.stat":       "usage_usec 12345\nuser_usec 12000\nsystem_usec 345\n",
+		"memory.current": "8192\n",
+		"memory.stat":    "anon 6144\ninactive_file 2048\n",
+	} {
+		require.NoError(t, os.WriteFile(path.Join(mountPoint, name), []byte(content), 0o600))
+	}
+	collector := &MetricsCollector{cgroupMountPoint: mountPoint, gpuVendor: gpu.GpuVendorNone}
+	metrics, err := collector.GetSystemMetrics(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, uint64(12345), metrics.CpuUsage)
+	require.Equal(t, uint64(8192), metrics.MemoryUsage)
+	require.Equal(t, uint64(6144), metrics.MemoryWorkingSet)
+	require.Empty(t, metrics.GPUMetrics)
+}
 
 func TestGetAMDGPUMetrics_OK(t *testing.T) {
 	collector, err := NewMetricsCollector(t.Context())

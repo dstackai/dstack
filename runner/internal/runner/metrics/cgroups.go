@@ -6,10 +6,28 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/dstackai/dstack/runner/internal/common/log"
 )
+
+func getMetricsCgroupPath(ctx context.Context, mountPoint, procPidCgroupPath string) (string, error) {
+	// In a container cgroup namespace, the mount root accounts for the whole
+	// container, including nested containers in sibling groups of /dind.
+	// The host's root cgroup has no memory.current; keep using the process
+	// cgroup in that case.
+	if _, err := os.Stat(path.Join(mountPoint, "memory.current")); err == nil {
+		return mountPoint, nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("stat cgroup root memory.current: %w", err)
+	}
+	cgroupPathname, err := getProcessCgroupPathname(ctx, procPidCgroupPath)
+	if err != nil {
+		return "", fmt.Errorf("get cgroup pathname: %w", err)
+	}
+	return path.Join(mountPoint, cgroupPathname), nil
+}
 
 func getProcessCgroupMountPoint(ctx context.Context, ProcPidMountsPath string) (string, error) {
 	// See proc_pid_mounts(5) for the ProcPidMountsPath file description
