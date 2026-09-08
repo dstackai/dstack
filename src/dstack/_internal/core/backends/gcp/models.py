@@ -38,6 +38,17 @@ class GCPBackendConfig(CoreModel):
         Optional[str],
         Field(description="The name of a custom VPC. If not specified, the default VPC is used"),
     ] = None
+    subnetworks: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from regions to names of subnetworks in the VPC specified by `vpc_name`."
+                " `dstack` provisions instances in the specified subnetwork in mapped regions"
+                " and in any usable subnetwork of the VPC in other regions."
+                " Requires `vpc_name` to be set"
+            )
+        ),
+    ] = None
     extra_vpcs: Annotated[
         Optional[List[str]],
         Field(

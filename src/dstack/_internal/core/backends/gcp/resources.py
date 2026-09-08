@@ -71,6 +71,7 @@ def check_vpc(
     regions: List[str],
     allocate_public_ip: bool,
     vpc_name: Optional[str] = None,
+    subnetworks: Optional[Dict[str, str]] = None,
     shared_vpc_project_id: Optional[str] = None,
     nat_check: bool = True,
 ):
@@ -88,6 +89,7 @@ def check_vpc(
                 vpc_name=vpc_name,
                 region=region,
                 usable_subnets=usable_subnets,
+                subnetwork_name=subnetworks.get(region) if subnetworks else None,
             )
     except google.api_core.exceptions.NotFound:
         raise ComputeError(f"Failed to find VPC project {vpc_project_id}")
@@ -305,12 +307,23 @@ def get_vpc_subnet_or_error(
     vpc_name: str,
     region: str,
     usable_subnets: list[compute_v1.UsableSubnetwork],
+    subnetwork_name: Optional[str] = None,
 ) -> str:
     """
-    Returns resource name of any usable subnet in a given VPC
-    (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
+    Returns resource name of a usable subnet in a given VPC
+    (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet").
+    If `subnetwork_name` is not specified, any usable subnet is returned.
     """
     vpc_subnets = get_vpc_subnets(vpc_name, region, usable_subnets)
+    if subnetwork_name is not None:
+        for subnet in vpc_subnets:
+            if subnet.split("/")[-1] == subnetwork_name:
+                return subnet
+        raise ComputeError(
+            f"Subnetwork {subnetwork_name} not found among usable subnetworks"
+            f" of VPC {vpc_name} in region {region}."
+            f" Available subnetworks: {[s.split('/')[-1] for s in vpc_subnets]}"
+        )
     if vpc_subnets:
         return vpc_subnets[0]
     raise ComputeError(
