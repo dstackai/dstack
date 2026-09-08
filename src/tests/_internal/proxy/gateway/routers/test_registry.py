@@ -88,6 +88,34 @@ def sample_model_options(name: str = "test-model") -> dict:
 
 @pytest.mark.asyncio
 class TestRegisterService:
+    @pytest.mark.parametrize("model_format", [None, "openai", "tgi"])
+    async def test_proxy_buffering(
+        self, tmp_path: Path, system_mocks: Mocks, model_format: Optional[str]
+    ) -> None:
+        repo = GatewayProxyRepo()
+        client = make_client(tmp_path, repo=repo)
+        options = None
+        if model_format is not None:
+            model = {"type": "chat", "name": "test-model", "format": model_format}
+            if model_format == "openai":
+                model["prefix"] = "/v1"
+            else:
+                model.update(chat_template="{{ messages }}", eos_token="</s>")
+            options = {"openai": {"model": model}}
+        response = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(options=options),
+        )
+        assert response.status_code == 200
+        response = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(),
+        )
+        assert response.status_code == 200
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
+        service_location = conf.split("location @ {", 1)[1].split("}", 1)[0]
+        assert ("proxy_buffering off;" in service_location) == (model_format is not None)
+
     async def test_register(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
         resp = await client.post(

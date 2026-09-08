@@ -76,6 +76,9 @@ server {
     location @ {
         set $dstack_replica_hit 1;
         {% if replicas %}
+        {% if not proxy_buffering %}
+        proxy_buffering off;
+        {% endif %}
         {% if cors_enabled %}
         proxy_hide_header 'Access-Control-Allow-Origin';
         proxy_hide_header 'Access-Control-Allow-Methods';

@@ -68,6 +68,7 @@ class ServiceConfig(SiteConfig):
     replicas: list[ReplicaConfig]
     has_router_replica: bool = False
     cors_enabled: bool = False
+    proxy_buffering: bool = True
 
 
 class ModelEntrypointConfig(SiteConfig):

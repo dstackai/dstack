@@ -63,6 +63,7 @@ class Service(ImmutableModel):
     replicas: tuple[Replica, ...]
     has_router_replica: bool = False
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
+    proxy_buffering: bool = True  # only used on gateways; disabled for model services
 
     @model_validator(mode="before")
     @classmethod

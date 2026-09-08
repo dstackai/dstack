@@ -62,6 +62,7 @@ async def register_service(
         replicas=(),
         has_router_replica=has_router_replica,
         cors_enabled=cors_enabled,
+        proxy_buffering=model is None,
     )
 
     async with lock:
@@ -407,6 +408,7 @@ async def get_nginx_service_config(
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         has_router_replica=service.has_router_replica,
         cors_enabled=service.cors_enabled,
+        proxy_buffering=service.proxy_buffering,
     )
 
 
@@ -446,10 +448,24 @@ async def _migrate_cors_enabled(repo: GatewayProxyRepo) -> None:
             await repo.set_service(updated)
 
 
+async def _migrate_proxy_buffering(repo: GatewayProxyRepo) -> None:
+    """Disable buffering for model services saved by older gateways."""
+    services = await repo.list_services()
+    model_runs = {
+        (project_name, model.run_name)
+        for project_name in {service.project_name for service in services}
+        for model in await repo.list_models(project_name)
+    }
+    for service in services:
+        if service.proxy_buffering and (service.project_name, service.run_name) in model_runs:
+            await repo.set_service(service.model_copy(update={"proxy_buffering": False}))
+
+
 async def apply_all(
     repo: GatewayProxyRepo, nginx: Nginx, service_conn_pool: ServiceConnectionPool
 ) -> None:
     await _migrate_cors_enabled(repo)
+    await _migrate_proxy_buffering(repo)
     service_tasks = [
         apply_service(
             service=service,
