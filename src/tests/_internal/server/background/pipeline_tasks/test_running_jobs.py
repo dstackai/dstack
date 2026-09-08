@@ -26,7 +26,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
+from dstack._internal.core.models.profiles import Profile, StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     ImagePullProgress,
@@ -44,6 +44,7 @@ from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     JOB_DISCONNECTED_RETRY_TIMEOUT,
+    MAX_DURATION_ENFORCEMENT_GRACE,
     ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS,
     JobRunningFetcher,
     JobRunningPipeline,
@@ -1751,6 +1752,128 @@ class TestJobRunningWorker:
         assert job.status == expected_status
         assert job.termination_reason == expected_termination_reason
         assert job.inactivity_secs == expected_inactivity_secs
+
+    @pytest.mark.parametrize(
+        (
+            "max_duration",
+            "running_for",
+            "stamp_running_at",
+            "expected_status",
+            "expected_termination_reason",
+            "expect_pull",
+        ),
+        [
+            pytest.param(
+                600,
+                timedelta(seconds=600),
+                True,
+                JobStatus.RUNNING,
+                None,
+                True,
+                id="deadline-reached-but-runner-still-within-grace",
+            ),
+            pytest.param(
+                600,
+                timedelta(seconds=600) + MAX_DURATION_ENFORCEMENT_GRACE - timedelta(seconds=1),
+                True,
+                JobStatus.RUNNING,
+                None,
+                True,
+                id="grace-not-elapsed",
+            ),
+            pytest.param(
+                600,
+                timedelta(seconds=600) + MAX_DURATION_ENFORCEMENT_GRACE,
+                True,
+                JobStatus.TERMINATING,
+                JobTerminationReason.MAX_DURATION_EXCEEDED,
+                False,
+                id="grace-elapsed",
+            ),
+            pytest.param(
+                600,
+                timedelta(days=1),
+                False,
+                JobStatus.RUNNING,
+                None,
+                True,
+                id="job-started-before-upgrade",
+            ),
+            pytest.param(
+                "off",
+                timedelta(days=1),
+                True,
+                JobStatus.RUNNING,
+                None,
+                True,
+                id="max-duration-off",
+            ),
+        ],
+    )
+    async def test_max_duration_enforced_by_server(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        max_duration,
+        running_for: timedelta,
+        stamp_running_at: bool,
+        expected_status: JobStatus,
+        expected_termination_reason: Optional[JobTerminationReason],
+        expect_pull: bool,
+    ) -> None:
+        now = datetime(2023, 1, 2, 5, 0, tzinfo=timezone.utc)
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_name="test-run",
+            run_spec=get_run_spec(
+                run_name="test-run",
+                repo_id=repo.name,
+                profile=Profile(name="default", max_duration=max_duration),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            running_at=(now - running_for) if stamp_running_at else None,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+            freeze_time(now),
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=0,
+                no_connections_secs=0,
+            )
+            await _process_job(session, worker, job)
+            assert runner_client_mock.pull.called == expect_pull
+
+        await session.refresh(job)
+        assert job.status == expected_status
+        assert job.termination_reason == expected_termination_reason
 
     @pytest.mark.parametrize(
         ["samples", "expected_status"],
