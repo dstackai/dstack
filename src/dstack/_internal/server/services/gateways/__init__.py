@@ -1245,15 +1245,25 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
 
     if configuration.load_balancer is not None:
         if configuration.load_balancer.type == "alb":
-            if configuration.backend != BackendType.AWS:
+            if configuration.backend not in (BackendType.AWS, BackendType.GCP):
                 raise ServerClientError(
-                    "`load_balancer: { type: alb }` is supported for `aws` backend only"
+                    "`load_balancer: { type: alb }` is supported for `aws` and `gcp` backends only"
                 )
-            if configuration.certificate is not None and configuration.certificate.type != "acm":
-                raise ServerClientError(
-                    "`load_balancer: { type: alb }` can only be used with `certificate: null` or"
-                    " `certificate: { type: acm }`"
-                )
+            if configuration.backend == BackendType.AWS:
+                if (
+                    configuration.certificate is not None
+                    and configuration.certificate.type != "acm"
+                ):
+                    raise ServerClientError(
+                        "`load_balancer: { type: alb }` can only be used with `certificate: null`"
+                        " or `certificate: { type: acm }`"
+                    )
+            elif configuration.backend == BackendType.GCP:
+                if configuration.certificate is not None:
+                    raise ServerClientError(
+                        "`load_balancer: { type: alb }` for the `gcp` backend can only be used"
+                        " with `certificate: null`"
+                    )
 
     if configuration.certificate is not None:
         if configuration.certificate.type == "lets-encrypt" and not configuration.public_ip:
