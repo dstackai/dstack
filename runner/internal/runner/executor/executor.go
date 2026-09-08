@@ -17,7 +17,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/creack/pty"
 	"github.com/dstackai/ansistrip"
 	"github.com/prometheus/procfs"
 	"github.com/sirupsen/logrus"
@@ -85,7 +84,10 @@ type RunExecutor struct {
 	runnerLogs      *appendWriter
 	timestamp       *MonotonicTimestamp
 
-	killDelay         time.Duration
+	killDelay time.Duration
+	// How long output may go on being copied after the command has exited, before the pty
+	// master is closed. Only reached when the job leaves processes holding the terminal open.
+	logsDrainDelay    time.Duration
 	connectionTracker ConnectionTracker
 }
 
@@ -121,6 +123,7 @@ func NewRunExecutor(tempDir string, dstackDir string, currentUser linuxuser.User
 		timestamp:       timestamp,
 
 		killDelay:         10 * time.Second,
+		logsDrainDelay:    2 * time.Second,
 		connectionTracker: connectionTracker,
 	}, nil
 }
@@ -595,38 +598,21 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		return fmt.Errorf("start command: %w", err)
 	}
 	defer func() { _ = ptm.Close() }()
-	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 
-	if err := ex.copyOutputWithQuota(cmd, ptm, stripper, logger); err != nil {
-		return err
-	}
-	if err = cmd.Wait(); err != nil {
-		return fmt.Errorf("wait for command: %w", err)
-	}
-	return nil
-}
-
-// copyOutputWithQuota streams process output through the log pipeline and
-// monitors for log quota exceeded. The quota signal is out-of-band (via channel)
-// because the ansistrip writer is async and swallows downstream write errors.
-func (ex *RunExecutor) copyOutputWithQuota(cmd *exec.Cmd, ptm io.Reader, stripper io.Closer, logger io.Writer) error {
 	copyDone := make(chan error, 1)
 	go func() {
-		_, err := io.Copy(logger, ptm)
-		copyDone <- err
+		_, copyErr := io.Copy(logger, ptm)
+		copyDone <- copyErr
 	}()
 
-	// Wait for either io.Copy to finish or quota to be exceeded.
-	var copyErr error
-	select {
-	case copyErr = <-copyDone:
-	case <-ex.jobLogs.QuotaExceeded():
-		_ = cmd.Process.Kill()
-		<-copyDone
-	}
+	stopQuotaWatch := watchLogQuota(cmd, ex.jobLogs.QuotaExceeded())
+	defer stopQuotaWatch()
+
+	waitErr := cmd.Wait()
+	copyErr := ex.finishOutputCopy(ctx, ptm, copyDone)
 
 	// Flush the ansistrip buffer — may also trigger quota exceeded.
 	_ = stripper.Close()
@@ -636,11 +622,50 @@ func (ex *RunExecutor) copyOutputWithQuota(cmd *exec.Cmd, ptm io.Reader, strippe
 		return ErrLogQuotaExceeded
 	default:
 	}
-
 	if copyErr != nil && !isPtyError(copyErr) {
 		return fmt.Errorf("copy command output: %w", copyErr)
 	}
+	if waitErr != nil {
+		return fmt.Errorf("wait for command: %w", waitErr)
+	}
 	return nil
+}
+
+// finishOutputCopy waits for the output copy to finish, bounding how long it may run after
+// the command has exited.
+//
+// A read on the pty master returns EIO only once every process holding the slave has closed
+// it. A job that leaves a process behind -- a `cmd &` job, a daemon -- would otherwise keep
+// the copy running forever, and with it the executor: the job state would never be reported
+// and the run would hang until the container is destroyed. Give the output the command has
+// already written a moment to drain, then close the master, which unblocks the read.
+func (ex *RunExecutor) finishOutputCopy(ctx context.Context, ptm *os.File, copyDone <-chan error) error {
+	select {
+	case copyErr := <-copyDone:
+		return copyErr
+	case <-time.After(ex.logsDrainDelay):
+	}
+	log.Warning(ctx, "The job left processes holding the terminal open, stopped reading output")
+	_ = ptm.Close()
+	<-copyDone // fails with os.ErrClosed, which is what closing the master is for
+	return nil
+}
+
+// watchLogQuota kills the command if the job exceeds its log quota. Output keeps being copied
+// until the command exits, so a full pty buffer cannot keep it from exiting.
+//
+// The quota signal is out-of-band (via channel) because the ansistrip writer is async and
+// swallows downstream write errors.
+func watchLogQuota(cmd *exec.Cmd, quotaExceeded <-chan struct{}) (stop func()) {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-quotaExceeded:
+			_ = cmd.Process.Kill()
+		case <-done:
+		}
+	}()
+	return func() { close(done) }
 }
 
 // setupGitCredentials must be called from Run after setJobUser
@@ -704,6 +729,37 @@ func (ex *RunExecutor) setupGitCredentials(ctx context.Context) (func(), error) 
 	return nil, fmt.Errorf("unknown protocol %s", ex.repoCredentials.GetProtocol())
 }
 
+// openPty opens a new pty pair.
+//
+// The master is opened non-blocking so that Go registers it with the runtime poller. A
+// blocking os.File never reaches the poller, and closing one does not interrupt a Read already
+// in flight -- the close is deferred until that read returns, which may be never. execJob
+// relies on closing the master to stop reading output.
+func openPty() (*os.File, *os.File, error) {
+	ptmFd, err := unix.Open("/dev/ptmx", unix.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open pty master: %w", err)
+	}
+	ptm := os.NewFile(uintptr(ptmFd), "/dev/ptmx")
+
+	if err := unix.IoctlSetPointerInt(ptmFd, unix.TIOCSPTLCK, 0); err != nil {
+		_ = ptm.Close()
+		return nil, nil, fmt.Errorf("unlock pty slave: %w", err)
+	}
+	ptsNum, err := unix.IoctlGetInt(ptmFd, unix.TIOCGPTN)
+	if err != nil {
+		_ = ptm.Close()
+		return nil, nil, fmt.Errorf("get pty slave number: %w", err)
+	}
+	ptsName := fmt.Sprintf("/dev/pts/%d", ptsNum)
+	pts, err := os.OpenFile(ptsName, os.O_RDWR|unix.O_NOCTTY, 0)
+	if err != nil {
+		_ = ptm.Close()
+		return nil, nil, fmt.Errorf("open pty slave: %w", err)
+	}
+	return ptm, pts, nil
+}
+
 func isPtyError(err error) bool {
 	/* read /dev/ptmx: input/output error */
 	var e *os.PathError
@@ -715,9 +771,9 @@ func isPtyError(err error) bool {
 // * controlling terminal is properly set (cmd.Extrafiles, Cmd.SysProcAttr.Ctty)
 // * owner of slave pty is changed to the child process uid
 func startCommand(cmd *exec.Cmd) (*os.File, error) {
-	ptm, pts, err := pty.Open()
+	ptm, pts, err := openPty()
 	if err != nil {
-		return nil, fmt.Errorf("open pty: %w", err)
+		return nil, err
 	}
 	defer func() { _ = pts.Close() }()
 

@@ -7,7 +7,6 @@ require (
 	github.com/alexellis/go-execute/v2 v2.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.2
 	github.com/codeclysm/extract/v4 v4.0.0
-	github.com/creack/pty v1.1.24
 	github.com/docker/docker v26.0.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
