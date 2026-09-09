@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone
 import os
 import uuid
 from types import SimpleNamespace
@@ -49,7 +50,7 @@ from dstack._internal.cli.services.presets.workspace import (
     create_agent_workspace,
     remove_agent_workspace,
 )
-from dstack._internal.core.errors import CLIError
+from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
@@ -390,6 +391,52 @@ class TestCreatePreset:
         assert "license-secret" not in result.path.read_text()
         assert result.preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
         assert creation_context.run_apis.stopped_names == stopped_names
+
+
+    def test_env_resolution_failure_keeps_resume_session_interrupted(self, tmp_path, monkeypatch):
+        # Regression for #4164: resuming an interrupted preset from a shell
+        # missing a passthrough env var raised before the agent was spawned,
+        # yet the blanket `except BaseException` marked the session "failed" and
+        # deleted the workspace, making it unresumable forever. A failure before
+        # anything started must leave the session interrupted.
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        monkeypatch.delenv("MODEL_LABEL", raising=False)
+
+        session_path = tmp_path / ".dstack" / "presets" / "ab12cd34"
+        session_path.mkdir(parents=True)
+        (session_path / "agent.log").touch()
+        (session_path / "trace.jsonl").touch()
+        session = PresetSession(path=session_path, preset_id="ab12cd34")
+        session.write_state(
+            PresetSessionState(
+                id="ab12cd34",
+                name="qwen",
+                model="Qwen/Qwen3.5-27B",
+                trials_num=None,
+                previous=[],
+                created_at=datetime.now(timezone.utc),
+                status="interrupted",
+                owner=None,
+                run=None,
+            )
+        )
+
+        with pytest.raises(ConfigurationError, match="MODEL_LABEL"):
+            create_preset(
+                api=SimpleNamespace(),
+                configuration=PresetConfiguration(
+                    name="qwen",
+                    base="Qwen/Qwen3.5-27B",
+                    env=["MODEL_LABEL"],
+                ),
+                store=PresetStore(tmp_path / "presets"),
+                resume_session=session,
+            )
+
+        assert session.read_state().status == "interrupted"
+        assert session_path.is_dir()
+
 
 
 class TestResolvePreviousSessions:

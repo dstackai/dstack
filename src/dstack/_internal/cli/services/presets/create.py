@@ -411,12 +411,16 @@ def create_preset(
     allowed_fleets: Optional[tuple[str, ...]] = None,
     previous: Sequence[PresetSession] = (),
 ) -> PresetCreateResult:
+    # Resolve env before the session is claimed and before the try that marks
+    # it failed: a missing variable here means nothing was spawned and nothing
+    # changed, so a resumable session must stay interrupted - a failure this
+    # early is not a failed creation.
+    resolved_configuration = _resolve_preset_env(configuration)
     session = resume_session or create_preset_session(
         configuration,
         previous=tuple(session.preset_id for session in previous),
     )
     try:
-        resolved_configuration = _resolve_preset_env(configuration)
         # A creation session runs unattended for hours; an idling machine would
         # freeze the agent and the process supervising it alike.
         with prevent_idle_sleep():
