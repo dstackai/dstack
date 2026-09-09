@@ -8,6 +8,7 @@ from dstack._internal.core.models.imports import (
     ImportExport,
     ImportExportedFleet,
     ImportExportedGateway,
+    ListImportsResponse,
 )
 from dstack._internal.server.models import (
     ExportedFleetModel,
@@ -18,11 +19,16 @@ from dstack._internal.server.models import (
     ImportModel,
     ProjectModel,
 )
-from dstack._internal.server.services.exports import get_export_model_by_name_for_update
+from dstack._internal.server.services.exports import (
+    EXPORTS_NOT_SUPPORTED_MESSAGE,
+    EXPORTS_PHASE_OUT_MESSAGE,
+    are_exports_enabled,
+    get_export_model_by_name_for_update,
+)
 from dstack._internal.server.services.projects import get_project_model_by_name
 
 
-async def list_imports(session: AsyncSession, project: ProjectModel) -> list[Import]:
+async def list_imports(session: AsyncSession, project: ProjectModel) -> ListImportsResponse:
     res = await session.execute(
         select(ImportModel)
         .where(ImportModel.project_id == project.id)
@@ -45,8 +51,18 @@ async def list_imports(session: AsyncSession, project: ProjectModel) -> list[Imp
         )
         .order_by(ImportModel.created_at.desc())
     )
-    imports = res.scalars().all()
-    return [import_model_to_import(imp) for imp in imports]
+    import_models = res.scalars().all()
+    imports = [import_model_to_import(imp) for imp in import_models]
+    warnings = []
+    if not are_exports_enabled():
+        if not imports:
+            raise ServerClientError(EXPORTS_NOT_SUPPORTED_MESSAGE)
+        else:
+            warnings.append(EXPORTS_PHASE_OUT_MESSAGE)
+    return ListImportsResponse(
+        imports=imports,
+        warnings=warnings,
+    )
 
 
 async def delete_import(

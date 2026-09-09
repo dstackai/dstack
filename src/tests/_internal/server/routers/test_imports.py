@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel, ImportModel
+from dstack._internal.server.services import exports as exports_service
+from dstack._internal.server.services.exports import (
+    EXPORTS_NOT_SUPPORTED_MESSAGE,
+    EXPORTS_PHASE_OUT_MESSAGE,
+)
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
@@ -25,6 +30,11 @@ pytestmark = [
     pytest.mark.usefixtures("test_db"),
     pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True),
 ]
+
+
+@pytest.fixture(autouse=True)
+def enable_exports(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", True)
 
 
 class TestDeleteImport:
@@ -267,7 +277,7 @@ class TestListImports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        imports = response.json()
+        imports = response.json()["imports"]
         assert len(imports) == 2
         imports.sort(key=lambda i: i["export"]["name"])
 
@@ -311,7 +321,56 @@ class TestListImports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json() == {"imports": [], "warnings": []}
+
+    async def test_returns_400_when_disabled_and_no_imports(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{project.name}/imports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 400
+        assert EXPORTS_NOT_SUPPORTED_MESSAGE in response.json()["detail"][0]["msg"]
+
+    async def test_warns_when_disabled_but_imports_exist(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.USER
+        )
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            name="test-export",
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{importer_project.name}/imports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["imports"]) == 1
+        assert data["imports"][0]["export"]["name"] == "test-export"
+        assert data["warnings"] == [EXPORTS_PHASE_OUT_MESSAGE]
 
     async def test_not_includes_deleted_fleets(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -351,7 +410,7 @@ class TestListImports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        imports = response.json()
+        imports = response.json()["imports"]
         assert len(imports) == 1
         assert imports[0]["export"]["name"] == "test-export"
         assert len(imports[0]["export"]["exported_fleets"]) == 1
@@ -389,4 +448,4 @@ class TestListImports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["imports"] == []

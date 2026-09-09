@@ -4,7 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import ExportNameCompleter
-from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console
+from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console, warn
 from dstack._internal.core.models.exports import Export
 
 
@@ -142,8 +142,10 @@ class ExportCommand(APIBaseCommand):
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
-        exports = self.api.client.exports.list(self.api.project)
-        print_exports_table(exports)
+        response = self.api.client.exports.list_exports(self.api.project)
+        for warning in response.warnings:
+            warn(warning)
+        print_exports_table(response.exports)
 
     def _create(self, args: argparse.Namespace):
         with console.status("Creating export..."):
