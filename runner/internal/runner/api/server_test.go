@@ -163,3 +163,37 @@ func TestLogsWs_TwoClientsBothDrain(t *testing.T) {
 	// Give the second stream time to reach its own close.
 	time.Sleep(500 * time.Millisecond)
 }
+
+// /api/stop must not turn the next pull into the final one. The job is still stopping -- the
+// runner has up to killDelay before the command is killed -- and the state it will report does
+// not exist yet. Treating that pull as final lets the runner exit before handing the state
+// over, and the server ends the job as unreachable instead.
+func TestStop_DoesNotMarkLogsFinished(t *testing.T) {
+	s := newTestServer(t, executor.ServeLogs)
+	s.cancelRun = func() {} // set by runPostHandler in production
+
+	_, err := s.stopPostHandler(
+		httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/api/stop", nil),
+	)
+	require.NoError(t, err)
+	pull(t, s)
+
+	select {
+	case <-s.pullDoneCh:
+		t.Fatal("pullDoneCh must stay open while the job is still stopping")
+	default:
+	}
+
+	// The executor finishes and records the terminal job state.
+	s.executor.Lock()
+	s.executor.SetRunnerState(executor.WaitLogsFinished)
+	s.executor.Unlock()
+	pull(t, s)
+
+	select {
+	case <-s.pullDoneCh:
+	default:
+		t.Fatal("the first pull after the executor finished must be the final one")
+	}
+}
