@@ -10,7 +10,9 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -160,6 +162,49 @@ func TestExecutor_LogQuota(t *testing.T) {
 	history := ex.GetHistory(0)
 	lastState := history.JobStates[len(history.JobStates)-1]
 	assert.Equal(t, schemas.JobStateFailed, lastState.State)
+}
+
+// A job that leaves a process behind keeps the pty slave open, so reading the master never
+// returns EIO. The executor must stop reading anyway instead of hanging forever.
+func TestExecutor_SurvivingProcessDoesNotHangRun(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	ex := makeTestExecutor(t)
+	ex.logsDrainDelay = 500 * time.Millisecond
+	// `-i` as the server sends it: job control puts the backgrounded process in its own
+	// process group, so it does not get the SIGHUP the kernel sends to the foreground group
+	// when the shell exits, and goes on holding the pty slave open. It must outlive the
+	// assertion below, or the executor would be let off the hook by the process exiting.
+	pidPath := filepath.Join(t.TempDir(), "survivor.pid")
+	ex.jobSpec.Commands = []string{
+		"/bin/bash", "-i", "-c",
+		fmt.Sprintf("sleep 300 & echo $! > %s; echo done", pidPath),
+	}
+	t.Cleanup(func() { killRecordedPid(t, pidPath) })
+	makeCodeTar(t, ex)
+
+	runDone := make(chan error, 1)
+	go func() { runDone <- ex.Run(t.Context()) }()
+
+	select {
+	case err := <-runDone:
+		assert.NoError(t, err)
+	case <-time.After(20 * time.Second):
+		t.Fatal("Run did not return while a process left by the job held the terminal open")
+	}
+
+	history := ex.GetHistory(0)
+	lastState := history.JobStates[len(history.JobStates)-1]
+	assert.Equal(t, schemas.JobStateDone, lastState.State)
+
+	// Output written before the command exited must still be drained.
+	var logs strings.Builder
+	for _, event := range history.JobLogs {
+		logs.Write(event.Message)
+	}
+	assert.Contains(t, logs.String(), "done")
 }
 
 func TestExecutor_RemoteRepo(t *testing.T) {
@@ -481,4 +526,17 @@ func combineLogMessages(logHistory []schemas.LogEvent) string {
 		logOutput.Write(logEvent.Message)
 	}
 	return logOutput.String()
+}
+
+func killRecordedPid(t *testing.T, pidPath string) {
+	t.Helper()
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		return
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return
+	}
+	_ = syscall.Kill(pid, syscall.SIGKILL)
 }
