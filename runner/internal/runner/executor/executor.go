@@ -43,6 +43,11 @@ const (
 
 	// Maximum buffer size for ansistrip
 	MaxBufferSize = 32 * 1024 // 32KB
+
+	// intrChar is the terminal's INTR character (Ctrl-C) in the default configuration.
+	intrChar = 0x03
+	// intrWriteTimeout bounds how long writing INTR to the pty master may block.
+	intrWriteTimeout = 5 * time.Second
 )
 
 type ConnectionTracker interface {
@@ -505,13 +510,6 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
-	cmd.Cancel = func() error {
-		// returns error on Windows
-		if signalErr := cmd.Process.Signal(os.Interrupt); signalErr != nil {
-			return fmt.Errorf("send interrupt signal: %w", signalErr)
-		}
-		return nil
-	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
 	if err := utils.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUser.Uid, ex.jobUser.Gid, 0o755); err != nil {
@@ -802,11 +800,48 @@ func startCommand(cmd *exec.Cmd) (*os.File, error) {
 		}
 	}
 
+	// Cancel must be set before Start, which installs the goroutine that calls it.
+	cmd.Cancel = func() error { return interruptJob(ptm) }
+
 	if err := cmd.Start(); err != nil {
 		_ = ptm.Close()
 		return nil, fmt.Errorf("start command: %w", err)
 	}
 	return ptm, nil
+}
+
+// interruptJob asks the job to stop the way Ctrl-C does. Writing the terminal's INTR character
+// to the pty master makes the line discipline raise SIGINT in the terminal's foreground process
+// group -- the command the shell is currently running, together with everything sharing its
+// process group.
+//
+// Signalling cmd.Process reaches the wrong process instead. The server runs commands under
+// `sh -i -c`, and an interactive shell turns on job control, which puts the job in a process
+// group of its own, while the shell ignores SIGINT for as long as it is waiting for that job.
+// The signal reached neither, so nothing stopped the job until WaitDelay expired and SIGKILL
+// went to the shell alone.
+//
+// The job may still ignore this: a program that puts the terminal in raw mode clears ISIG, and
+// the INTR character then delivers no signal at all. WaitDelay stays the backstop.
+func interruptJob(ptm *os.File) error {
+	// The master is pollable (see openPty), so a deadline is honoured here. Without one, a job
+	// that never reads its stdin could fill the terminal's input buffer and block this write
+	// indefinitely -- and Cmd only starts the WaitDelay timer once Cancel has returned.
+	if err := ptm.SetWriteDeadline(time.Now().Add(intrWriteTimeout)); err != nil {
+		return fmt.Errorf("set INTR write deadline: %w", err)
+	}
+	defer func() { _ = ptm.SetWriteDeadline(time.Time{}) }()
+
+	if _, err := ptm.Write([]byte{intrChar}); err != nil {
+		if isPtyError(err) || errors.Is(err, os.ErrClosed) {
+			// The terminal is gone, so the job is gone with it. Reporting the process as
+			// already done keeps Wait returning the command's own exit status rather than
+			// replacing it with the context error.
+			return fmt.Errorf("write INTR: %w", errors.Join(err, os.ErrProcessDone))
+		}
+		return fmt.Errorf("write INTR: %w", err)
+	}
+	return nil
 }
 
 func prepareUserSshDir(user *linuxuser.User) (string, error) {
