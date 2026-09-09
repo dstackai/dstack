@@ -143,11 +143,14 @@ func (s *Server) closeWsDone() {
 	s.wsDoneOnce.Do(func() { close(s.wsDoneCh) })
 }
 
+// stop asks the job to stop. The runner state is deliberately left alone: the executor sets
+// WaitLogsFinished when it has actually finished, and that is what tells /api/pull the state
+// it serves is final. Setting it here would mark a pull served while the job is still stopping
+// as the final one, and the runner would exit without ever handing over the job's real state.
 func (s *Server) stop() {
 	s.executor.Lock()
 	defer s.executor.Unlock()
 	if s.executor.GetRunnerState() == executor.ServeLogs {
 		s.cancelRun()
 	}
-	s.executor.SetRunnerState(executor.WaitLogsFinished)
 }
