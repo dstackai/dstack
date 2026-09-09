@@ -43,11 +43,13 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
+    UpdateMapDateTime,
     Worker,
     log_lock_token_changed_after_processing,
     log_lock_token_mismatch,
@@ -145,6 +147,12 @@ ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS = 30 * 60
 
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 """`The minimum time before terminating active job in case of connectivity issues."""
+
+MAX_DURATION_ENFORCEMENT_GRACE = timedelta(minutes=2)
+"""How long the server waits past `max_duration` before terminating the job itself.
+The runner enforces `max_duration` too and does it gracefully, so it normally stops the job
+well within the grace period. The server only steps in when the runner failed to.
+"""
 
 
 @dataclass
@@ -380,6 +388,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     job_provisioning_data: Optional[str]
     job_runtime_data: Optional[str]
     runner_timestamp: Optional[int]
+    running_at: UpdateMapDateTime
     disconnected_at: Optional[datetime]
     inactivity_secs: Optional[int]
     exit_status: Optional[int]
@@ -1045,6 +1054,10 @@ async def _process_running_status(
         fmt(context.job_model),
         context.job_submission.age,
     )
+    # Checked before pulling the runner: the runner may be stuck or unreachable, and that is
+    # exactly when server-side enforcement is needed.
+    if _terminate_if_max_duration_exceeded(context, result):
+        return
     try:
         process_running_result = await run_async(
             _process_running,
@@ -1808,6 +1821,48 @@ def _terminate_if_inactivity_duration_exceeded(
         )
 
 
+def _terminate_if_max_duration_exceeded(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> bool:
+    """
+    Terminates the job if it has been running longer than `max_duration` plus a grace period.
+
+    A backstop for the runner, which enforces `max_duration` itself and does it gracefully.
+    The server steps in only when the runner failed to stop the job -- e.g. the workload
+    survived the termination signals and the runner never reported the timeout.
+
+    Returns `True` if the job was terminated.
+    """
+    job_model = context.job_model
+    max_duration = context.job.job_spec.max_duration
+    if max_duration is None:
+        return False
+    if job_model.running_at is None:
+        # Jobs that started running before the server was upgraded have no reference point.
+        # They are still enforced by the runner.
+        return False
+    deadline = (
+        job_model.running_at + timedelta(seconds=max_duration) + MAX_DURATION_ENFORCEMENT_GRACE
+    )
+    if get_current_datetime() < deadline:
+        return False
+    logger.warning(
+        "%s: max duration exceeded and the runner did not stop the job, terminating",
+        fmt(job_model),
+    )
+    _terminate_job(
+        job_model=job_model,
+        job_update_map=result.job_update_map,
+        termination_reason=JobTerminationReason.MAX_DURATION_EXCEEDED,
+        termination_reason_message=(
+            f"The job exceeded the max_duration of {max_duration} seconds"
+            " and did not stop on its own"
+        ),
+    )
+    return True
+
+
 def _should_terminate_job_due_to_disconnect(disconnected_at: Optional[datetime]) -> bool:
     if disconnected_at is None:
         return False
@@ -2088,6 +2143,10 @@ def _set_job_update_status(
 ) -> None:
     if job_update_map.get("status", job_model.status) != new_status:
         job_update_map["status"] = new_status
+        if new_status == JobStatus.RUNNING:
+            # Stamped here rather than at the call site so that `running_at` cannot drift from
+            # `status`: it is the reference point for server-side `max_duration` enforcement.
+            job_update_map["running_at"] = NOW_PLACEHOLDER
 
 
 def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: JobStatus) -> None:

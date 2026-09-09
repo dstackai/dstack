@@ -535,6 +535,12 @@ class JobModel(PipelineModelMixin, BaseModel):
     job_name: Mapped[str] = mapped_column(String(100))
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    running_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`running_at` stores when the job entered the `RUNNING` status, that is, when the workload
+    started, excluding provisioning and pulling. It is the reference point for server-side
+    `max_duration` enforcement. `None` for jobs that never started running and for jobs that were
+    already running before the server was upgraded.
+    """
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     skip_min_processing_interval: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false()
