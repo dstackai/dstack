@@ -101,7 +101,10 @@ class PresetAgentProcessOutput:
     report_data: Optional[dict[str, Any]] = None
     error: Optional[str] = None
     session_id: Optional[str] = None
-    made_progress: bool = False
+    # Assistant lines seen this attempt. A count, not a flag: a crash-looping
+    # agent reaches the same point every attempt, and only an attempt that got
+    # FURTHER than any before it earns a fresh retry budget.
+    assistant_events: int = 0
 
 
 def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
@@ -225,6 +228,7 @@ async def run_preset_agent(
         resume_session_id: Optional[str] = initial_resume_session_id
         attempt_prompt = prompt if resume_session_id is None else _RESUME_PROMPT
         retry_delays = list(_RESUME_DELAYS_SECONDS)
+        best_progress = 0
         while True:
             command = _prepare_subprocess_command(
                 _build_claude_command(auth=auth, resume_session_id=resume_session_id)
@@ -245,10 +249,14 @@ async def run_preset_agent(
             # failure report from the agent returns immediately.
             if output.report_data is not None or error is None:
                 return output
-            # Only reset the retry budget when the last attempt made progress; a
-            # run that keeps stalling exhausts its retries instead of retrying a
-            # stuck agent forever.
-            if output.made_progress:
+            # Only reset the retry budget when the last attempt made NEW
+            # progress; a run that keeps stalling exhausts its retries instead
+            # of retrying a stuck agent forever. An agent that dies at startup
+            # after printing one assistant line makes the same "progress" on
+            # every attempt, so a boolean flag would reset the budget forever;
+            # only an attempt that got further than every previous one resets it.
+            if output.assistant_events > best_progress:
+                best_progress = output.assistant_events
                 retry_delays = list(_RESUME_DELAYS_SECONDS)
             # Another process marked this session interrupted; don't restart it.
             state = session.read_state()
@@ -573,7 +581,7 @@ async def _read_process_stream(
         if event.model:
             session.record_agent_model(event.model)
         if event.type == "assistant":
-            output.made_progress = True
+            output.assistant_events += 1
         if not isinstance(event, ClaudeResultEvent):
             continue
         if event.is_error:

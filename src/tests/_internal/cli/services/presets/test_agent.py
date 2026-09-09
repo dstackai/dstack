@@ -1352,3 +1352,62 @@ class TestOffsetStoreSharing:
         reloaded = OffsetStore(state)
         for key in ("agent_stdout", "agent_stderr", "runs", "trials"):
             assert reloaded.get(key) == 50
+
+
+class TestAgentRetryBudget:
+    @pytest.mark.asyncio
+    async def test_crash_loop_after_one_assistant_line_is_bounded(self, tmp_path, monkeypatch):
+        # Regression: an agent that dies without a report but prints one
+        # `assistant` line each attempt (e.g. claude starts then dies on expired
+        # OAuth) used to reset the retry budget on every attempt and loop
+        # forever. Only NEW progress (more assistant lines than any earlier
+        # attempt) may reset the budget.
+        counter = tmp_path / "attempts"
+        script = tmp_path / "fake_claude.py"
+        script.write_text(
+            """import json
+import sys
+from pathlib import Path
+
+counter = Path(sys.argv[1])
+attempts = int(counter.read_text()) + 1 if counter.exists() else 1
+counter.write_text(str(attempts))
+print(json.dumps({"type": "assistant"}), flush=True)
+if attempts > 8:  # unstick the run so a broken loop cannot hang the test
+    print(json.dumps({"type": "result", "structured_output": {"attempts": attempts}}), flush=True)
+sys.exit(1)
+"""
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._build_claude_command",
+            lambda **_: [sys.executable, str(script), str(counter)],
+        )
+        real_sleep = asyncio.sleep
+
+        async def _no_sleep(*_):
+            await real_sleep(0)
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent.asyncio.sleep",
+            _no_sleep,
+        )
+
+        workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
+        session_path = tmp_path / "session-running"
+        session_path.mkdir()
+        (session_path / "agent.log").touch()
+        (session_path / "trace.jsonl").touch()
+        session = PresetSession(path=session_path, preset_id="ab12cd34")
+        output = await run_preset_agent(
+            prompt="full preset prompt",
+            env=os.environ.copy(),
+            workspace=workspace,
+            auth=_claude_auth(),
+            redacted_values=(),
+            session=session,
+        )
+
+        attempts = int(counter.read_text())
+        # Initial attempt plus the bounded resume delays (30s, 60s, 120s).
+        assert attempts == 4
+        assert output.error is not None
