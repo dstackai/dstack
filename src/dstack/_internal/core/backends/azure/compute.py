@@ -236,6 +236,7 @@ class AzureCompute(
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         if configuration.instance_type is not None:
             # TODO: support instance_type. Requires selecting a VM image to avoid errors like this:

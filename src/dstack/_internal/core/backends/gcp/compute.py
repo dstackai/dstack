@@ -598,6 +598,7 @@ class GCPCompute(
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_firewall_rules(
@@ -605,7 +606,10 @@ class GCPCompute(
                 project_id=self.config.project_id,
                 network=self.config.vpc_resource_name,
             )
-        zone = self._get_gateway_zone(configuration.region)
+        if gateway_backend_data is not None:
+            zone = validate_json_extra_ignore(GCPGatewayBackendData, gateway_backend_data).zone
+        else:
+            zone = self._get_gateway_zone(configuration.region)
 
         instance_name = generate_unique_gateway_instance_name(
             configuration, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
