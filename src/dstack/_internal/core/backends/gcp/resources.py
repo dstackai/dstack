@@ -1,4 +1,5 @@
 import concurrent.futures
+import hashlib
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -352,15 +353,24 @@ def get_vpc_subnets(
     return result
 
 
+def get_firewall_rule_name(prefix: str, network: str) -> str:
+    name = f"{prefix}-" + network.replace("/", "-")
+    if is_valid_resource_name(name):
+        return name
+    name = f"{prefix}-" + network.split("/")[-1]
+    if is_valid_resource_name(name):
+        return name
+    # Hash the full network path so that names stay unique and stable
+    suffix = "-" + hashlib.sha256(network.encode()).hexdigest()[:8]
+    return name[: MAX_RESOURCE_NAME_LEN - len(suffix)] + suffix
+
+
 def create_runner_firewall_rules(
     firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = "dstack-ssh-in-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = "dstack-ssh-in-" + network_name
+    firewall_rule_name = get_firewall_rule_name("dstack-ssh-in", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
@@ -388,10 +398,7 @@ def create_gateway_firewall_rules(
     project_id: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = "dstack-gateway-in-all-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = "dstack-gateway-in-all-" + network_name
+    firewall_rule_name = get_firewall_rule_name("dstack-gateway-in-all", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
@@ -424,10 +431,7 @@ def create_gateway_lb_healthcheck_firewall_rule(
     project_id: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = "dstack-gateway-lb-healthcheck-in-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = "dstack-gateway-lb-healthcheck-in-" + network_name
+    firewall_rule_name = get_firewall_rule_name("dstack-gateway-lb-healthcheck-in", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
@@ -459,10 +463,7 @@ def create_gateway_lb_proxy_firewall_rule(
     proxy_subnet_cidr: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = f"dstack-gateway-lb-proxy-in-{region}-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = f"dstack-gateway-lb-proxy-in-{region}-" + network_name
+    firewall_rule_name = get_firewall_rule_name(f"dstack-gateway-lb-proxy-in-{region}", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"

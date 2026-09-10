@@ -135,3 +135,50 @@ class TestIsValidLabelValue:
     @pytest.mark.parametrize("name", ["", "a", "---", "some-lable-with-dashes-123"])
     def test_valid_label_value(self, name):
         assert gcp_resources.is_valid_label_value(name)
+
+
+class TestGetFirewallRuleName:
+    def test_uses_full_network_path(self):
+        name = gcp_resources.get_firewall_rule_name("dstack-ssh-in", "global/networks/default")
+        assert name == "dstack-ssh-in-global-networks-default"
+
+    def test_falls_back_to_short_network_name(self):
+        network = "projects/my-project/global/networks/my-vpc"
+        name = gcp_resources.get_firewall_rule_name("dstack-gateway-in-all", network)
+        assert name == "dstack-gateway-in-all-my-vpc"
+
+    def test_falls_back_to_hash_suffix_when_too_long(self):
+        network = "projects/my-project/global/networks/my-company-shared-vpc"
+        name = gcp_resources.get_firewall_rule_name(
+            "dstack-gateway-lb-proxy-in-northamerica-northeast1", network
+        )
+        assert gcp_resources.is_valid_resource_name(name)
+        assert name.startswith("dstack-gateway-lb-proxy-in-northamerica-northeast1-")
+
+    @pytest.mark.parametrize(
+        "prefix",
+        [
+            "dstack-ssh-in",
+            "dstack-gateway-in-all",
+            "dstack-gateway-lb-healthcheck-in",
+            "dstack-gateway-lb-proxy-in-northamerica-northeast1",
+        ],
+    )
+    @pytest.mark.parametrize(
+        "vpc",
+        ["default", "my-vpc", "a" * 63],
+    )
+    def test_always_returns_valid_name(self, prefix, vpc):
+        network = f"projects/my-project/global/networks/{vpc}"
+        name = gcp_resources.get_firewall_rule_name(prefix, network)
+        assert gcp_resources.is_valid_resource_name(name)
+
+    def test_different_networks_get_different_names(self):
+        prefix = "dstack-gateway-lb-proxy-in-northamerica-northeast1"
+        name1 = gcp_resources.get_firewall_rule_name(
+            prefix, "projects/p/global/networks/" + "a" * 40 + "-one"
+        )
+        name2 = gcp_resources.get_firewall_rule_name(
+            prefix, "projects/p/global/networks/" + "a" * 40 + "-two"
+        )
+        assert name1 != name2
