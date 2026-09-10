@@ -745,6 +745,18 @@ class GCPCompute(
             f"/targetHttpProxies/{target_http_proxy_name}"
         )
 
+        labels = {
+            "owner": "dstack",
+            "dstack_project": configuration.project_name.lower(),
+            "dstack_name": configuration.gateway_name,
+        }
+        labels = merge_tags(
+            base_tags=labels,
+            backend_tags=self.config.tags,
+            resource_tags=configuration.tags,
+        )
+        labels = gcp_resources.filter_invalid_labels(labels)
+
         logger.debug("Creating instance group for gateway %s...", configuration.gateway_name)
         instance_group = compute_v1.InstanceGroup()
         instance_group.name = instance_group_name
@@ -827,6 +839,7 @@ class GCPCompute(
         forwarding_rule.port_range = "80"
         forwarding_rule.target = target_http_proxy_resource_name
         forwarding_rule.network = self.config.vpc_resource_name
+        forwarding_rule.labels = labels
         if not configuration.public_ip:
             forwarding_rule.subnetwork = self._get_gateway_lb_subnet_or_error(configuration.region)
         operation = self.forwarding_rules_client.insert(
