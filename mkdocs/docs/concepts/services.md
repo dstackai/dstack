@@ -170,64 +170,144 @@ both are set per group.
 Router sits in front of inference backend workers (SGLang, vLLM, TensorRT-LLM) and decides
 which worker serves each request based on routing policy.
 
-`dstack` supports two router implementations:
+Below is an example for running `Qwen/Qwen3.8-Flash-Next` on `H200`:
 
-* `sglang` — runs [Shepherd Model Gateway (SMG)](https://lightseek.org/smg/)
-* `dynamo` — runs the [NVIDIA Dynamo frontend](https://docs.nvidia.com/dynamo/dev/kubernetes/kv-aware-routing/using-the-dynamo-frontend/)
+=== "SMG"
 
-<div editor-title="service.dstack.yml">
+    <div editor-title="service.dstack.yml">
 
-```yaml
-type: service
-name: qwen38-flash-next
-image: lmsysorg/sglang:qwen38flashnext
+    ```yaml
+    type: service
+    name: qwen38-flash-next
+    image: lmsysorg/sglang:qwen38flashnext
 
-env:
-  - HF_TOKEN
-  - MODEL_ID=Qwen/Qwen3.8-Flash-Next
+    env:
+      - HF_TOKEN
+      - MODEL_ID=Qwen/Qwen3.8-Flash-Next
 
-groups:
-  - replicas: 1
-    commands:
-      - pip install smg
-      - |
-        smg launch \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --prefill-policy cache_aware
-    resources:
-      cpu: 4
-    router:
-      type: sglang
+    groups:
+      - replicas: 1
+        commands:
+          - pip install smg
+          - |
+            smg launch \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --prefill-policy cache_aware
+        resources:
+          cpu: 4
+        router:
+          type: sglang
 
-  - replicas: 2
-    commands:
-      - |
-        python -m sglang.launch_server \
-          --model-path $MODEL_ID \
-          --tp $DSTACK_GPUS_NUM \
-          --ep $DSTACK_GPUS_NUM \
-          --mem-fraction-static 0.85 \
-          --chunked-prefill-size 8192 \
-          --linear-attn-prefill-backend flashinfer \
-          --linear-attn-decode-backend flashinfer \
-          --mamba-ssm-dtype bfloat16 \
-          --reasoning-parser auto \
-          --host 0.0.0.0 \
-          --port 8000
-    resources:
-      gpu: H200:4
+      - replicas: 2
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --tp $DSTACK_GPUS_NUM \
+              --ep $DSTACK_GPUS_NUM \
+              --mem-fraction-static 0.85 \
+              --chunked-prefill-size 8192 \
+              --linear-attn-prefill-backend flashinfer \
+              --linear-attn-decode-backend flashinfer \
+              --mamba-ssm-dtype bfloat16 \
+              --reasoning-parser auto \
+              --host 0.0.0.0 \
+              --port 8000
+        resources:
+          gpu: H200:4
 
-port: 8000
-model: Qwen/Qwen3.8-Flash-Next
+    port: 8000
+    model: Qwen/Qwen3.8-Flash-Next
 
-probes:
-  - type: http
-    url: /health
-    interval: 15s
-```
+    probes:
+      - type: http
+        url: /health
+        interval: 15s
+    ```
 
-</div>
+    </div>
+
+=== "Dynamo"
+
+    <div editor-title="service.dstack.yml">
+
+    ```yaml
+    type: service
+    name: qwen38-flash-next-dynamo
+
+    env:
+      - HF_TOKEN
+      - MODEL_ID=Qwen/Qwen3.8-Flash-Next
+
+    groups:
+      - replicas: 1
+        docker: true
+        commands:
+          - apt-get update
+          - apt-get install -y python3-dev python3-venv
+          - python3 -m venv ~/dyn-venv
+          - source ~/dyn-venv/bin/activate
+          - pip install -U pip
+          - pip install "ai-dynamo[sglang]==1.1.1"
+          - git clone https://github.com/ai-dynamo/dynamo.git
+          # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
+          - docker compose -f dynamo/dev/docker-compose.yml up -d
+          - |
+            python3 -m dynamo.frontend \
+              --http-host 0.0.0.0 --http-port 8000 \
+              --discovery-backend etcd --router-mode kv \
+              --kv-cache-block-size 64
+        resources:
+          cpu: 4
+        router:
+          type: dynamo
+
+      - replicas: 2
+        python: "3.12"
+        nvcc: true
+        commands:
+          # dstack injects DSTACK_ROUTER_INTERNAL_IP after the router replica
+          # is provisioned. Compose the etcd/NATS endpoints from it.
+          - export ETCD_ENDPOINTS="http://$DSTACK_ROUTER_INTERNAL_IP:2379"
+          - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
+          # Set to enable /health endpoint required by dstack probes.
+          - export DYN_SYSTEM_PORT="8000"
+          # Wait until the router's etcd and NATS ports are actually accepting connections.
+          - |
+            until curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:2379/health" \
+               && curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:8222/healthz"; do
+              echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
+            done
+          - pip install "ai-dynamo[sglang]==1.1.1"
+          - |
+            python3 -m dynamo.sglang \
+              --model-path $MODEL_ID \
+              --served-model-name $MODEL_ID \
+              --discovery-backend etcd \
+              --host 0.0.0.0 \
+              --page-size 64 \
+              --tp $DSTACK_GPUS_NUM \
+              --ep $DSTACK_GPUS_NUM \
+              --mem-fraction-static 0.85 \
+              --chunked-prefill-size 8192 \
+              --linear-attn-prefill-backend flashinfer \
+              --linear-attn-decode-backend flashinfer \
+              --mamba-ssm-dtype bfloat16 \
+              --reasoning-parser auto
+        resources:
+          gpu: H200:4
+
+    port: 8000
+    model: Qwen/Qwen3.8-Flash-Next
+
+    probes:
+      - type: http
+        url: /health
+        interval: 15s
+    ```
+
+    </div>
 
 [`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
 
