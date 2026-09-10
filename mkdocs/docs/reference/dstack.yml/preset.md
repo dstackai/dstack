@@ -11,6 +11,12 @@ used to create or apply a [preset](../../concepts/presets.md).
       type:
         required: true
 
+### `agent`
+
+#SCHEMA# dstack._internal.core.models.configurations.PresetAgentConfig
+    overrides:
+      show_root_heading: false
+
 ### `model`
 
 === "Base model"

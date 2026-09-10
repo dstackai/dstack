@@ -77,11 +77,11 @@ submitting `dstack` runs (e.g. tasks for trials and services for the final
 verification).
 
 To do this, use the real `dstack` CLI and shell commands in this workspace.
-Load and follow `/dstack` for `dstack` CLI/YAML syntax. Load and follow
-`/dstack-prototyping` for how to test a model-serving configuration with
+Load and follow <!--?if codex-->the `$dstack` skill<!--?else-->`/dstack`<!--?end--> for `dstack` CLI/YAML syntax. Load and follow
+<!--?if codex-->the `$dstack-prototyping` skill<!--?else-->`/dstack-prototyping`<!--?end--> for how to test a model-serving configuration with
 `dstack` tasks before verifying it as a `dstack` service. If a skill cannot
-be loaded with its
-slash command, read it from `.claude/skills/<skill name>/SKILL.md` and
+be loaded <!--?if codex-->by name<!--?else-->with its
+slash command<!--?end-->, read it from `<!--?if codex-->.codex<!--?else-->.claude<!--?end-->/skills/<skill name>/SKILL.md` and
 follow it the same way.
 
 # Workspace Files
@@ -131,7 +131,7 @@ id with `dstack run get <run name> --json` and append one JSON line:
 Never edit or delete existing lines. Stop runs you no longer need unless they
 are still needed for attach/SSH debugging, logs, or backend diagnosis.
 
-After stopping a `dstack` task or service, follow `/dstack` structured status
+After stopping a `dstack` task or service, follow <!--?if codex-->the `$dstack` skill's<!--?else-->`/dstack`<!--?end--> structured status
 guidance and confirm that the run reached a terminal status before continuing.
 
 # Progress
@@ -471,7 +471,7 @@ Trials are done entirely using `dstack` tasks. For maximum efficiency, it is a
 requirement that you always set the task `commands` to `sleep infinity` (for
 a task with `groups`, in each group's `commands`) and
 run commands inside the task interactively, via SSH. It is important that
-you follow the `/dstack-prototyping` skill when working with tasks.
+you follow the `<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill when working with tasks.
 
 # Hardware
 
@@ -480,7 +480,7 @@ hardware from one trial to another if this can help the outcome.
 
 The available hardware is defined by the allowed `dstack` fleets and their
 offers (coming from the configured backends). Follow the
-`/dstack-prototyping` skill on how to efficiently select offers among the
+`<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill on how to efficiently select offers among the
 available backends or SSH fleets. Pick the offer whose hardware best fits the trial's idea. Only when several
 offers fit comparably, prefer backends or SSH fleets that support idle
 instances/instance volumes: later runs reuse the instance and cached model
@@ -626,8 +626,8 @@ On failure (no trial verification was successful), include exactly:
 - `failure_summary`: the reason a preset could not be created and any change
   required from the user or administrator
 
-Write the report to `final_report.json`, then submit the identical JSON object
-through `StructuredOutput`.
+Write the report to `final_report.json`, then <!--?if codex-->end your turn with a final message that is exactly that JSON object and nothing else; it is checked against the report schema<!--?else-->submit the identical JSON object
+through `StructuredOutput`<!--?end-->.
 
 Verify that `final_report.json` is correct and matches the required schema.
 
