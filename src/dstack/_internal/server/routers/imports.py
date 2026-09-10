@@ -1,15 +1,20 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.imports import Import
+from dstack._internal.core.models.imports import Import, ListImportsResponse
+from dstack._internal.server.compatibility.imports import patch_list_imports_response
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.imports import DeleteImportRequest
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services import imports as imports_services
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    get_base_api_additional_responses,
+    get_client_version,
+)
 
 project_router = APIRouter(
     prefix="/api/project/{project_name}/imports",
@@ -33,13 +38,17 @@ async def delete_import(
     )
 
 
-@project_router.post("/list", summary="List imports", response_model=list[Import])
+@project_router.post("/list", summary="List imports")
 async def list_imports(
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
-):
+    client_version: Annotated[Version | None, Depends(get_client_version)],
+) -> ListImportsResponse | list[Import]:
+    """Returns a bare list for clients older than 0.22.0, otherwise a `ListImportsResponse`."""
     _, project = user_project
-    return await imports_services.list_imports(
+    response = await imports_services.list_imports(
         session=session,
         project=project,
     )
+    response = patch_list_imports_response(response, client_version)
+    return response

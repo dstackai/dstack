@@ -139,7 +139,7 @@ Launching `train-model`...
 | **Output** | `--output=train-%j.out` (writes files) | `dstack logs` or UI (streams via API) |
 | **Working directory** | `--chdir=/path/to/dir` or defaults to submission directory | `working_dir: /path/to/dir` (defaults to image's working directory, typically `/dstack/run`) |
 | **Environment variables** | `export VAR` or `--export=ALL,VAR=value` | `env: - VAR` or `--env VAR=value` |
-| **Node exclusivity** | `--exclusive` (entire node) | Automatic if `blocks` is not used or job uses all blocks; required for distributed tasks (`nodes` > 1) |
+| **Node exclusivity** | `--exclusive` (entire node) | Automatic if `blocks` is not used or job uses all blocks; required for multi-node tasks (`nodes` > 1) |
 
 > For multi-node examples, see [Distributed training](#distributed-training) below.
 
@@ -412,7 +412,7 @@ Slurm explicitly controls both `nodes` and processes/tasks.
 | N/A | `DSTACK_MPI_HOSTFILE` | Pre-populated MPI hostfile |
 
 !!! info "Fleets"
-    Distributed tasks may run only on a fleet with `placement: cluster` configured. Refer to [Partitions and fleets](#partitions-and-fleets) for configuration details.
+    Multi-node tasks may run only on a fleet with `placement: cluster` configured. Refer to [Partitions and fleets](#partitions-and-fleets) for configuration details.
 
 ## Queueing and scheduling
 
@@ -676,7 +676,7 @@ $ sbatch --partition=gpu train.sh
     resources:
       gpu: A100:80GB:8
 
-    # Optional: Enables inter-node connectivity; required for distributed tasks
+    # Optional: Enables inter-node connectivity; required for multi-node tasks
     placement: cluster
 
     # Optional: Split GPUs into blocks for multi-tenant sharing
@@ -699,7 +699,7 @@ $ sbatch --partition=gpu train.sh
     type: fleet
     name: on-prem-gpu-fleet
 
-    # Optional: Enables inter-node connectivity; required for distributed tasks
+    # Optional: Enables inter-node connectivity; required for multi-node tasks
     placement: cluster
 
     # Optional: Allows to share the instance across up to 8 workloads
@@ -868,7 +868,7 @@ srun python train.py --input=/tmp/input.txt
 
 #### Instance volumes
 
-Instance volumes mount host directories into containers. With distributed tasks, the host can use a shared filesystem (NFS, Lustre, GPFS) to share data across jobs within the same task:
+Instance volumes mount host directories into containers. With multi-node tasks, the host can use a shared filesystem (NFS, Lustre, GPFS) to share data across jobs within the same task:
 
 <div editor-title=".dstack.yml">
 
@@ -936,9 +936,9 @@ resources:
 
 </div>
 
-Network volumes cannot be used with distributed tasks (no multi-attach support), except where multi-attach is supported (Runpod) or via volume interpolation. 
+Network volumes cannot be used with multi-node tasks (no multi-attach support), except where multi-attach is supported (Runpod) or via volume interpolation. 
 
-For distributed tasks, use interpolation to attach different volumes to each node.
+For multi-node tasks, use interpolation to attach different volumes to each node.
 
 <div editor-title=".dstack.yml">
 
@@ -1643,7 +1643,7 @@ retry:
 
 </div>
 
-For distributed tasks, if any job fails and retry is enabled, all jobs are stopped and the run is resubmitted (all-or-nothing).
+For multi-node tasks, if any job fails and retry is enabled, all jobs are stopped and the run is resubmitted (all-or-nothing).
 
 Unlike Slurm, `dstack` does not support graceful shutdown signals. Applications must implement proactive checkpointing (periodic saves) and check for existing checkpoints on startup to resume after retries.
 

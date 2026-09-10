@@ -874,36 +874,24 @@ p {
   --arch-gradient: var(--cs-text);
 }
 
-/* Thin hairline outline: an inline <svg> with one rounded rect, stroked with a solid 0.5px line
-   (dasharray 1 0). Geometry is set in CSS (modern browsers allow x/y/width/height/rx as CSS so we
-   can inset by the half stroke with calc — no edge clipping) and the stroke takes the text color
-   so it matches the labels and flips with the theme. */
-.arch-dash {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-.arch-dash rect {
-  x: 0.25px;
-  y: 0.25px;
-  width: calc(100% - 0.5px);
-  height: calc(100% - 0.5px);
-  rx: 12px;
-  fill: none;
-  stroke: var(--arch-dash-stroke, var(--cs-text));
-  stroke-width: 0.5px;
-  stroke-dasharray: 1 0;
-  stroke-linecap: butt;
-}
-
-/* Top + bottom three-up rows share one grid so cells line up. Ratio 487.3 : 191.8 : 191.8. */
 .arch-row {
   display: grid;
-  grid-template-columns: 2.54fr 1fr 1fr;
   gap: 1.72cqw; /* 15.5u */
+}
+
+/* Framework/model inputs use equal-width blocks. */
+.arch-row--inputs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Keep the logo-heavy cloud block wide, followed by Kubernetes and VMs/bare-metal. */
+.arch-row--compute {
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+}
+
+/* Pin both input labels left and their logo groups right. */
+.arch-row--inputs .arch-cell {
+  justify-content: space-between;
 }
 
 .arch-cell {
@@ -913,6 +901,7 @@ p {
   gap: 1.55cqw;
   min-height: 9.83cqw; /* 88.7u */
   padding: 0 2cqw;
+  border: 1px solid currentColor;
   border-radius: 12px;
 }
 
@@ -933,13 +922,27 @@ p {
 /* "Any GPU cloud": logos left, label pushed to the right edge. */
 .arch-cell--gpu {
   justify-content: space-between;
+  gap: 0.9cqw;
+  padding-inline: 2.1cqw;
 }
 
-/* "Any model": spans the last two columns so it lines up with Kubernetes + on-prem below;
-   label pinned left, model logos pushed to the right edge. */
-.arch-cell--model {
-  grid-column: span 2;
-  justify-content: space-between;
+.arch-cell--gpu .arch-logos {
+  gap: 0.8cqw;
+}
+
+.arch-cell--platform {
+  justify-content: center;
+  gap: 0.55cqw;
+  padding-inline: 2.1cqw;
+}
+
+.arch-cell--platform .arch-cell__label {
+  font-size: 2.55cqw;
+}
+
+.arch-cell--platform .arch-logo--kubernetes {
+  width: 4.8cqw;
+  height: 4.8cqw;
 }
 
 /* "Any hardware": label pinned left, logos centered across the full row. */
@@ -982,10 +985,10 @@ p {
   font-weight: 500;
 }
 
-/* Five primitives — NOT equal width: "Dev environments" (2nd) is wider so its label fits. */
+/* Five top-level orchestration primitives. */
 .arch-orchestration__cells {
   display: grid;
-  grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(5, 1fr);
   gap: 1.26cqw; /* 11.4u */
   width: 100%;
 }
@@ -1002,7 +1005,7 @@ p {
   font-size: 2.25cqw;
   font-weight: 500;
   line-height: 1.2;
-  --arch-dash-stroke: var(--cs-bg); /* dotted outline on the fill */
+  border: 1px solid currentColor;
 }
 
 .arch-logos {
@@ -1027,29 +1030,35 @@ p {
 }
 
 /* Per-logo height (cqw, so it scales) + aspect from each source's viewBox. Wide marks (AWS,
-   Meta, NVIDIA) are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
+   NVIDIA) are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
 .arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; }
 .arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; }
 .arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; }
 .arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; }
 .arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; }
 .arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; }
-.arch-logo--pytorch { height: 5.2cqw; aspect-ratio: 90.3 / 109.1; }
+.arch-logo--pytorch { height: 4.9cqw; aspect-ratio: 90.3 / 109.1; }
 .arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; }
 .arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; }
-.arch-logo--meta { height: 3.7cqw; aspect-ratio: 287.56 / 191; }
-.arch-logo--huggingface { height: 5.1cqw; aspect-ratio: 1; }
-.arch-logo--nvidia { height: 3.7cqw; aspect-ratio: 271.7 / 179.7; }
-.arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; }
+.arch-logo--smg { height: 3.75cqw; aspect-ratio: 28 / 29; }
+.arch-logo--nvidia { height: 4cqw; aspect-ratio: 271.7 / 179.7; }
+.arch-logo--amd { height: 4.8cqw; margin-left: 2px; aspect-ratio: 1600 / 1408; }
 .arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; }
 .arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
 /* "Any model" marks (top row) — square icons; plus the Docker marker on the orchestration band. */
-/* Heights tuned per-logo so the visible marks read equal, compensating for differing padding
-   inside each source viewBox (GLM's glyph is tight; DeepSeek/Qwen/Kimi sit inset in their boxes). */
-.arch-logo--glm { height: 3.4cqw; aspect-ratio: 19 / 16; }
-.arch-logo--deepseek { height: 4.8cqw; aspect-ratio: 1; transform: translateY(-1px); }
-.arch-logo--qwen { height: 4.9cqw; aspect-ratio: 1; transform: translateY(1px); }
-.arch-logo--kimi { height: 4.3cqw; aspect-ratio: 1; }
+/* Heights tuned per-logo for similar optical weight, compensating for differing padding and
+   visual density inside each source viewBox. */
+.arch-logo--glm { height: 3.8cqw; aspect-ratio: 19 / 16; }
+.arch-logo--deepseek { height: 5.75cqw; aspect-ratio: 1; transform: translateY(-1px); }
+.arch-logo--qwen {
+  width: 5.4cqw;
+  height: 6.3cqw;
+  aspect-ratio: 1;
+  -webkit-mask-size: auto 100%;
+  mask-size: auto 100%;
+  transform: translateY(1px);
+}
+.arch-logo--kimi { height: 5.2cqw; aspect-ratio: 1; transform: translateY(-1px); }
 .arch-logo--docker { height: 2.8cqw; aspect-ratio: 122.88 / 88.17; }
 
 /* Placeholder badge (fallback if a logo ever lacks a source). Overrides the mask fill. */
@@ -1077,14 +1086,21 @@ p {
      own row, and the two narrower cells pair up on the row below. */
   .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .arch-row > :first-child { grid-column: 1 / -1; }
+  .arch-row--inputs > .arch-cell { grid-column: 1 / -1; }
+  .arch-row--compute { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arch-row--compute > :first-child { grid-column: 1 / -1; }
   .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
   .arch-cell__label { font-size: 16px; white-space: normal; }
+  .arch-cell--platform { min-height: 52px; gap: 6px; padding: 8px 4px; }
+  .arch-cell--platform .arch-cell__label { font-size: 16px; }
+  .arch-cell--platform .arch-logo--kubernetes { width: 22px; height: 22px; }
   /* "Any hardware": label left, logos pushed to the right (the desktop layout centers them). */
   .arch-cell--hw { justify-content: space-between; }
   .arch-cell--hw > .arch-cell__label { position: static; }
   .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
   .arch-orchestration__title { font-size: 15px; }
   .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .arch-orchestration__cells > :last-child { grid-column: 1 / -1; }
   .arch-subcell { min-height: 44px; font-size: 13px; border-width: 1px; border-radius: 7px; }
   .arch-logos { gap: 12px; }
   /* !important to beat the per-logo cqw heights. */
@@ -1145,56 +1161,34 @@ p {
   font-size: var(--font-small);
 }
 
-/* Core-concept cards: 2x2 grid inside the AlternatingDocBlock visual slot. */
-.concept-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: 1fr; /* equal-height cards across both rows */
-  gap: var(--card-gap);
-  /* No outer border/padding — each card carries its own dotted outline (DashedBorder / .arch-dash),
-     matching the architecture diagram's pills. */
+/* Core-concept cards: three columns inside the AlternatingDocBlock visual slot. */
+.concept-grid-wrap {
+  container-type: inline-size;
+  width: 100%;
 }
 
-/* Each concept card is a whole-card link to the docs: an uppercase label (with a small gradient
-   dot), a tight title, and muted copy inside the landing's dotted outline — the shared
-   <DashedBorder> / .arch-dash, matching the architecture-diagram pills above. Faint fill on
-   hover, and the arrow slides. */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr; /* equal-height cards across both rows */
+  column-gap: 1.72cqw; /* match .arch-row */
+  row-gap: 2.66cqw; /* match .arch-diagram */
+}
+
+/* Each concept card is a whole-card link to the docs with a simple 1px outline. */
 .concept-grid .media-card {
   display: block;
-  position: relative; /* for the arrow, label dot, and dotted overlay */
   color: var(--cs-text);
   text-decoration: none !important;
   background: transparent;
-  border: none;
+  border: 1px solid currentColor;
   border-radius: 12px;
   padding: 16px 18px 18px;
   transition: background-color 0.15s ease;
 }
 
-/* ActionCard-style navigation arrow on the title row (aligned with Fleets / Dev environments /
-   …) — hidden until hover, then fades in and slides right. No background change on hover; the
-   arrow alone signals interactivity. */
-.concept-card__arrow {
-  margin-left: auto;
-  display: inline-flex;
-  color: var(--cs-text);
-  opacity: 0;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.concept-grid .media-card:hover .concept-card__arrow {
-  opacity: 1;
-  transform: translateX(4px);
-}
-
-/* Uppercase category label above the title — black and light weight for a delicate look. */
-.concept-card__label {
-  display: block;
-  margin-bottom: 11px;
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--cs-text);
+.concept-grid .media-card:hover {
+  background: var(--cs-hover);
 }
 
 .concept-grid .media-card h3 {

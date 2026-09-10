@@ -152,7 +152,7 @@ description: Quick guide to creating fleets and submitting runs
     Open the link to access the dev environment using your desktop IDE. Alternatively, you can access it via `ssh <run name>`.
 
 === "Task"
-    A [task](concepts/tasks.md) allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
+    A [task](concepts/tasks.md) allows you to schedule a job or run a web app. Tasks can run on multiple nodes and forward ports.
 
     Create the following run configuration:
 
@@ -181,8 +181,8 @@ description: Quick guide to creating fleets and submitting runs
 
     </div>
 
-    By default, tasks run on a single instance. To run a distributed task, specify 
-    [`nodes`](concepts/tasks.md#distributed-tasks), and `dstack` will run it on a cluster.
+    By default, tasks run on a single instance. To run a multi-node task, specify
+    [`nodes`](concepts/tasks.md#nodes) or define multiple [node groups](concepts/tasks.md#node-groups), and `dstack` will run it on a cluster.
 
     Run the configuration via `dstack apply`:
 
@@ -242,6 +242,9 @@ description: Quick guide to creating fleets and submitting runs
     ```
 
     </div>
+
+    By default, a service runs a single replica. To run multiple replicas, specify
+    [`replicas`](concepts/services.md#replicas) or define multiple [replica groups](concepts/services.md#replica-groups), and `dstack` will run them behind a single endpoint.
 
     Run the configuration via `dstack apply`:
 

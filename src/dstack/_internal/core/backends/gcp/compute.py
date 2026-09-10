@@ -307,8 +307,8 @@ class GCPCompute(
                 network=self.config.vpc_resource_name,
             )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        # Choose any usable subnet in a VPC.
-        # Configuring a specific subnet per region is not supported yet.
+        # Use the subnet configured in `subnetworks` for the region if any,
+        # otherwise choose any usable subnet in the VPC.
         subnetwork = self._get_vpc_subnet(instance_offer.region)
         extra_subnets = self._get_extra_subnets(
             region=instance_offer.region,
@@ -610,8 +610,8 @@ class GCPCompute(
         instance_name = generate_unique_gateway_instance_name(
             configuration, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
         )
-        # Choose any usable subnet in a VPC.
-        # Configuring a specific subnet per region is not supported yet.
+        # Use the subnet configured in `subnetworks` for the region if any,
+        # otherwise choose any usable subnet in the VPC.
         subnetwork = self._get_vpc_subnet(configuration.region)
 
         labels = {
@@ -1357,10 +1357,12 @@ class GCPCompute(
     def _get_vpc_subnet(self, region: str) -> Optional[str]:
         if self.config.vpc_name is None:
             return None
+        subnetworks = self.config.subnetworks
         return gcp_resources.get_vpc_subnet_or_error(
             vpc_name=self.config.vpc_name,
             region=region,
             usable_subnets=self._list_usable_subnets(),
+            subnetwork_name=subnetworks.get(region) if subnetworks else None,
         )
 
     @cachedmethod(

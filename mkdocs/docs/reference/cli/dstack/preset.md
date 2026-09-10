@@ -50,7 +50,7 @@ Preset creation uses the existing `claude` login unless
 | --- | --- |
 | `DSTACK_AGENT_ANTHROPIC_API_KEY` | Anthropic API key used by the agent. |
 | `DSTACK_AGENT_CLAUDE_PATH` | `claude` executable name or path. Defaults to `claude` from `PATH`. |
-| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. Defaults to `claude-opus-4-8`. |
+| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. If unset, the `claude` CLI's built-in default is used. |
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used. |
 
 Agent progress is written to `agent.log` under `~/.dstack/presets/<preset-id>/`,

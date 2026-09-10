@@ -158,7 +158,7 @@ Once the fleet is created, you can run [dev environments](../../concepts/dev-env
 
 ## NCCL tests
 
-Use a [distributed task](../../concepts/tasks.md#distributed-tasks) to run NCCL tests and validate the cluster’s network bandwidth.
+Use a [multi-node task](../../concepts/tasks.md#nodes) to run NCCL tests and validate the cluster’s network bandwidth.
 
 <div editor-title="nccl-tests.dstack.yml">
 
