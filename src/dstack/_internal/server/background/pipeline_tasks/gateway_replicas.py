@@ -432,6 +432,7 @@ async def _process_submitted_item(item: GatewayReplicaPipelineItem):
             GatewayModel.configuration,
             GatewayModel.region,
             GatewayModel.wildcard_domain,
+            GatewayModel.backend_data,
         ],
         load_backends=True,
         load_gateway_backend_type=True,
@@ -471,7 +472,9 @@ async def _provision_gateway_replica(
 
     logger.debug("%s: creating gateway replica", fmt(replica_model))
     try:
-        gpd = await run_async(compute.create_gateway_replica, replica_configuration)
+        gpd = await run_async(
+            compute.create_gateway_replica, replica_configuration, gateway_model.backend_data
+        )
     except BackendError as e:
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:

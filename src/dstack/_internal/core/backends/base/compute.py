@@ -579,6 +579,7 @@ class ComputeWithGatewaySupport(ABC):
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         """
         Creates a gateway replica instance.

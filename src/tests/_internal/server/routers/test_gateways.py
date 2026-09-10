@@ -762,13 +762,13 @@ class TestCreateGateway:
                 {
                     "type": "gateway",
                     "name": "test",
-                    "backend": "gcp",
+                    "backend": "azure",
                     "region": "us",
                     "certificate": None,
                     "load_balancer": {"type": "alb"},
                 },
-                "`load_balancer: { type: alb }` is supported for `aws` backend only",
-                id="load-balancer-non-aws-backend",
+                "`load_balancer: { type: alb }` is supported for `aws` and `gcp` backends only",
+                id="load-balancer-unsupported-backend",
             ),
             pytest.param(
                 {
@@ -781,6 +781,19 @@ class TestCreateGateway:
                 "`load_balancer: { type: alb }` can only be used with `certificate: null` or"
                 " `certificate: { type: acm }`",
                 id="load-balancer-with-lets-encrypt-cert",
+            ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "gcp",
+                    "region": "us",
+                    "certificate": {"type": "lets-encrypt"},
+                    "load_balancer": {"type": "alb"},
+                },
+                "`load_balancer: { type: alb }` for the `gcp` backend can only be used with"
+                " `certificate: null`",
+                id="gcp-load-balancer-with-lets-encrypt-cert",
             ),
         ],
     )

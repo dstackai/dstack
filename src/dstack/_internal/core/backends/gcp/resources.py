@@ -1,4 +1,5 @@
 import concurrent.futures
+import hashlib
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -352,15 +353,24 @@ def get_vpc_subnets(
     return result
 
 
+def get_firewall_rule_name(prefix: str, network: str) -> str:
+    name = f"{prefix}-" + network.replace("/", "-")
+    if is_valid_resource_name(name):
+        return name
+    name = f"{prefix}-" + network.split("/")[-1]
+    if is_valid_resource_name(name):
+        return name
+    # Hash the full network path so that names stay unique and stable
+    suffix = "-" + hashlib.sha256(network.encode()).hexdigest()[:8]
+    return name[: MAX_RESOURCE_NAME_LEN - len(suffix)] + suffix
+
+
 def create_runner_firewall_rules(
     firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = "dstack-ssh-in-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = "dstack-ssh-in-" + network_name
+    firewall_rule_name = get_firewall_rule_name("dstack-ssh-in", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
@@ -388,10 +398,7 @@ def create_gateway_firewall_rules(
     project_id: str,
     network: str = "global/networks/default",
 ):
-    network_name = network.split("/")[-1]
-    firewall_rule_name = "dstack-gateway-in-all-" + network.replace("/", "-")
-    if not is_valid_resource_name(firewall_rule_name):
-        firewall_rule_name = "dstack-gateway-in-all-" + network_name
+    firewall_rule_name = get_firewall_rule_name("dstack-gateway-in-all", network)
     firewall_rule = compute_v1.Firewall()
     firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
@@ -412,6 +419,94 @@ def create_gateway_firewall_rules(
         wait_for_extended_operation(operation, "firewall rule creation")
     except google.api_core.exceptions.Conflict:
         pass
+
+
+# Fixed source range GCP's Envoy-based regional load balancer health check probes use.
+# See https://cloud.google.com/load-balancing/docs/health-check-concepts#ip-ranges.
+GCP_LB_HEALTH_CHECK_SOURCE_RANGES = ["35.191.0.0/16"]
+
+
+def create_gateway_lb_healthcheck_firewall_rule(
+    firewalls_client: compute_v1.FirewallsClient,
+    project_id: str,
+    network: str = "global/networks/default",
+):
+    firewall_rule_name = get_firewall_rule_name("dstack-gateway-lb-healthcheck-in", network)
+    firewall_rule = compute_v1.Firewall()
+    firewall_rule.name = firewall_rule_name
+    firewall_rule.direction = "INGRESS"
+
+    allowed_ports = compute_v1.Allowed()
+    allowed_ports.I_p_protocol = "tcp"
+    allowed_ports.ports = ["80"]
+
+    firewall_rule.allowed = [allowed_ports]
+    firewall_rule.source_ranges = GCP_LB_HEALTH_CHECK_SOURCE_RANGES
+    firewall_rule.network = network
+    firewall_rule.description = (
+        "Allowing GCP health check probes to reach gateway load balancer backends."
+    )
+
+    firewall_rule.target_tags = [DSTACK_GATEWAY_TAG]
+
+    try:
+        operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
+        wait_for_extended_operation(operation, "firewall rule creation")
+    except google.api_core.exceptions.Conflict:
+        pass
+
+
+def create_gateway_lb_proxy_firewall_rule(
+    firewalls_client: compute_v1.FirewallsClient,
+    project_id: str,
+    region: str,
+    proxy_subnet_cidr: str,
+    network: str = "global/networks/default",
+):
+    firewall_rule_name = get_firewall_rule_name(f"dstack-gateway-lb-proxy-in-{region}", network)
+    firewall_rule = compute_v1.Firewall()
+    firewall_rule.name = firewall_rule_name
+    firewall_rule.direction = "INGRESS"
+
+    allowed_ports = compute_v1.Allowed()
+    allowed_ports.I_p_protocol = "tcp"
+    allowed_ports.ports = ["80"]
+
+    firewall_rule.allowed = [allowed_ports]
+    firewall_rule.source_ranges = [proxy_subnet_cidr]
+    firewall_rule.network = network
+    firewall_rule.description = (
+        "Allowing traffic from the regional proxy-only subnet to gateway load balancer backends."
+    )
+
+    firewall_rule.target_tags = [DSTACK_GATEWAY_TAG]
+
+    try:
+        operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
+        wait_for_extended_operation(operation, "firewall rule creation")
+    except google.api_core.exceptions.Conflict:
+        pass
+
+
+def get_proxy_only_subnet_cidr_or_error(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    project_id: str,
+    region: str,
+    network: str,
+) -> str:
+    network_name = network.split("/")[-1]
+    for subnet in subnetworks_client.list(project=project_id, region=region):
+        if (
+            subnet.purpose == compute_v1.Subnetwork.Purpose.REGIONAL_MANAGED_PROXY.name
+            and subnet.role == compute_v1.Subnetwork.Role.ACTIVE.name
+            and subnet.network.split("/")[-1] == network_name
+        ):
+            return subnet.ip_cidr_range
+    raise ComputeError(
+        f"No active proxy-only subnet (purpose: REGIONAL_MANAGED_PROXY) found in region"
+        f" {region} for network {network_name}. Regional Application Load Balancers require"
+        " such a subnet to be created in the target VPC and region."
+    )
 
 
 def get_accelerators(

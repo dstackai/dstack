@@ -531,6 +531,7 @@ class AWSCompute(
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)

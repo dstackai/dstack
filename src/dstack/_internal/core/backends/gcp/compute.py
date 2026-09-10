@@ -13,6 +13,7 @@ from cachetools import TTLCache, cachedmethod
 from google.cloud import tpu_v2
 from google.cloud.compute_v1.types.compute import Instance
 from gpuhunt import KNOWN_TPUS
+from pydantic import ValidationError
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
@@ -22,6 +23,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeTTLCache,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
@@ -32,6 +34,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
+    generate_unique_short_backend_name,
     generate_unique_volume_name,
     get_gateway_user_data,
     get_shim_commands,
@@ -55,8 +58,14 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
+from dstack._internal.core.models.common import (
+    CoreModel,
+    validate_extra_ignore,
+    validate_json_extra_ignore,
+)
 from dstack._internal.core.models.gateways import (
+    GatewayLoadBalancerConfiguration,
+    GatewayLoadBalancerData,
     GatewayReplicaConfiguration,
     GatewayReplicaProvisioningData,
 )
@@ -102,6 +111,16 @@ class GCPVolumeDiskBackendData(CoreModel):
     disk_type: str
 
 
+class GCPGatewayBackendData(CoreModel):
+    zone: str
+    instance_group_name: str
+    health_check_name: str
+    backend_service_name: str
+    url_map_name: str
+    target_http_proxy_name: str
+    forwarding_rule_name: str
+
+
 class GCPCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
@@ -112,6 +131,7 @@ class GCPCompute(
     ComputeWithPlacementGroupSupport,
     ComputeWithGatewaySupport,
     ComputeWithPrivateGatewaySupport,
+    ComputeWithGatewayLoadBalancerSupport,
     ComputeWithVolumeSupport,
     Compute,
 ):
@@ -130,6 +150,20 @@ class GCPCompute(
             credentials=self.credentials
         )
         self.reservations_client = compute_v1.ReservationsClient(credentials=self.credentials)
+        self.instance_groups_client = compute_v1.InstanceGroupsClient(credentials=self.credentials)
+        self.region_health_checks_client = compute_v1.RegionHealthChecksClient(
+            credentials=self.credentials
+        )
+        self.region_backend_services_client = compute_v1.RegionBackendServicesClient(
+            credentials=self.credentials
+        )
+        self.region_url_maps_client = compute_v1.RegionUrlMapsClient(credentials=self.credentials)
+        self.region_target_http_proxies_client = compute_v1.RegionTargetHttpProxiesClient(
+            credentials=self.credentials
+        )
+        self.forwarding_rules_client = compute_v1.ForwardingRulesClient(
+            credentials=self.credentials
+        )
         self._usable_subnets_cache = ComputeTTLCache(cache=TTLCache(maxsize=1, ttl=120))
         # Smaller TTL since we check the reservation's in_use_count, which can change often
         self._reservation_cache = ComputeTTLCache(cache=TTLCache(maxsize=8, ttl=20))
@@ -564,6 +598,7 @@ class GCPCompute(
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_firewall_rules(
@@ -571,12 +606,10 @@ class GCPCompute(
                 project_id=self.config.project_id,
                 network=self.config.vpc_resource_name,
             )
-        for i in self.regions_client.list(project=self.config.project_id):
-            if i.name == configuration.region:
-                zone = i.zones[0].split("/")[-1]
-                break
+        if gateway_backend_data is not None:
+            zone = validate_json_extra_ignore(GCPGatewayBackendData, gateway_backend_data).zone
         else:
-            raise ComputeResourceNotFoundError()
+            zone = self._get_gateway_zone(configuration.region)
 
         instance_name = generate_unique_gateway_instance_name(
             configuration, max_length=gcp_resources.MAX_RESOURCE_NAME_LEN
@@ -646,6 +679,369 @@ class GCPCompute(
             instance_id=instance_id,
             region=configuration.region,
             backend_data=backend_data,
+        )
+
+    def _get_gateway_zone(self, region: str) -> str:
+        for i in self.regions_client.list(project=self.config.project_id):
+            if i.name == region:
+                return i.zones[0].split("/")[-1]
+        raise ComputeResourceNotFoundError()
+
+    def create_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+    ) -> GatewayLoadBalancerData:
+        assert configuration.certificate is None
+
+        zone = self._get_gateway_zone(configuration.region)
+
+        proxy_subnet_cidr = gcp_resources.get_proxy_only_subnet_cidr_or_error(
+            subnetworks_client=self.subnetworks_client,
+            project_id=self.config.vpc_project_id or self.config.project_id,
+            region=configuration.region,
+            network=self.config.vpc_resource_name,
+        )
+        subnetwork = None
+        if not configuration.public_ip:
+            subnetwork = gcp_resources.get_vpc_subnet_or_error(
+                vpc_name=self.config.vpc_name or "default",
+                region=configuration.region,
+                usable_subnets=self._list_usable_subnets(),
+                subnetwork_name=(
+                    self.config.subnetworks.get(configuration.region)
+                    if self.config.subnetworks
+                    else None
+                ),
+            )
+        if self.config.vpc_project_id is None:
+            gcp_resources.create_gateway_lb_healthcheck_firewall_rule(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                network=self.config.vpc_resource_name,
+            )
+            gcp_resources.create_gateway_lb_proxy_firewall_rule(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                region=configuration.region,
+                proxy_subnet_cidr=proxy_subnet_cidr,
+                network=self.config.vpc_resource_name,
+            )
+
+        name = generate_unique_short_backend_name()
+        instance_group_name = f"{name}-ig"
+        health_check_name = f"{name}-hc"
+        backend_service_name = f"{name}-bs"
+        url_map_name = f"{name}-um"
+        target_http_proxy_name = f"{name}-proxy"
+        forwarding_rule_name = f"{name}-fr"
+
+        instance_group_resource_name = (
+            f"projects/{self.config.project_id}/zones/{zone}/instanceGroups/{instance_group_name}"
+        )
+        health_check_resource_name = (
+            f"projects/{self.config.project_id}/regions/{configuration.region}"
+            f"/healthChecks/{health_check_name}"
+        )
+        backend_service_resource_name = (
+            f"projects/{self.config.project_id}/regions/{configuration.region}"
+            f"/backendServices/{backend_service_name}"
+        )
+        url_map_resource_name = (
+            f"projects/{self.config.project_id}/regions/{configuration.region}"
+            f"/urlMaps/{url_map_name}"
+        )
+        target_http_proxy_resource_name = (
+            f"projects/{self.config.project_id}/regions/{configuration.region}"
+            f"/targetHttpProxies/{target_http_proxy_name}"
+        )
+
+        logger.debug("Creating instance group for gateway %s...", configuration.gateway_name)
+        instance_group = compute_v1.InstanceGroup()
+        instance_group.name = instance_group_name
+        instance_group.named_ports = [compute_v1.NamedPort(name="http", port=80)]
+        operation = self.instance_groups_client.insert(
+            project=self.config.project_id, zone=zone, instance_group_resource=instance_group
+        )
+        gcp_resources.wait_for_extended_operation(operation, "instance group creation")
+        logger.debug("Created instance group for gateway %s.", configuration.gateway_name)
+
+        logger.debug("Creating health check for gateway %s...", configuration.gateway_name)
+        health_check = compute_v1.HealthCheck()
+        health_check.name = health_check_name
+        health_check.type_ = compute_v1.HealthCheck.Type.HTTP.name
+        health_check.http_health_check = compute_v1.HTTPHealthCheck(port=80)
+        operation = self.region_health_checks_client.insert(
+            project=self.config.project_id,
+            region=configuration.region,
+            health_check_resource=health_check,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "health check creation")
+        logger.debug("Created health check for gateway %s.", configuration.gateway_name)
+
+        logger.debug("Creating backend service for gateway %s...", configuration.gateway_name)
+        load_balancing_scheme = (
+            compute_v1.BackendService.LoadBalancingScheme.EXTERNAL_MANAGED.name
+            if configuration.public_ip
+            else compute_v1.BackendService.LoadBalancingScheme.INTERNAL_MANAGED.name
+        )
+        backend_service = compute_v1.BackendService()
+        backend_service.name = backend_service_name
+        backend_service.load_balancing_scheme = load_balancing_scheme
+        backend_service.protocol = compute_v1.BackendService.Protocol.HTTP.name
+        backend_service.port_name = "http"
+        backend_service.health_checks = [health_check_resource_name]
+        backend_service.backends = [
+            compute_v1.Backend(
+                group=instance_group_resource_name,
+                balancing_mode=compute_v1.Backend.BalancingMode.UTILIZATION.name,
+                capacity_scaler=1.0,
+            )
+        ]
+        operation = self.region_backend_services_client.insert(
+            project=self.config.project_id,
+            region=configuration.region,
+            backend_service_resource=backend_service,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "backend service creation")
+        logger.debug("Created backend service for gateway %s.", configuration.gateway_name)
+
+        logger.debug("Creating URL map for gateway %s...", configuration.gateway_name)
+        url_map = compute_v1.UrlMap()
+        url_map.name = url_map_name
+        url_map.default_service = backend_service_resource_name
+        operation = self.region_url_maps_client.insert(
+            project=self.config.project_id,
+            region=configuration.region,
+            url_map_resource=url_map,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "URL map creation")
+        logger.debug("Created URL map for gateway %s.", configuration.gateway_name)
+
+        logger.debug("Creating target HTTP proxy for gateway %s...", configuration.gateway_name)
+        target_http_proxy = compute_v1.TargetHttpProxy()
+        target_http_proxy.name = target_http_proxy_name
+        target_http_proxy.url_map = url_map_resource_name
+        operation = self.region_target_http_proxies_client.insert(
+            project=self.config.project_id,
+            region=configuration.region,
+            target_http_proxy_resource=target_http_proxy,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "target HTTP proxy creation")
+        logger.debug("Created target HTTP proxy for gateway %s.", configuration.gateway_name)
+
+        logger.debug("Creating forwarding rule for gateway %s...", configuration.gateway_name)
+        forwarding_rule = compute_v1.ForwardingRule()
+        forwarding_rule.name = forwarding_rule_name
+        forwarding_rule.load_balancing_scheme = load_balancing_scheme
+        forwarding_rule.I_p_protocol = compute_v1.ForwardingRule.IPProtocolEnum.TCP.name
+        forwarding_rule.port_range = "80"
+        forwarding_rule.target = target_http_proxy_resource_name
+        forwarding_rule.network = self.config.vpc_resource_name
+        if subnetwork is not None:
+            forwarding_rule.subnetwork = subnetwork
+        operation = self.forwarding_rules_client.insert(
+            project=self.config.project_id,
+            region=configuration.region,
+            forwarding_rule_resource=forwarding_rule,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "forwarding rule creation")
+        forwarding_rule = self.forwarding_rules_client.get(
+            project=self.config.project_id,
+            region=configuration.region,
+            forwarding_rule=forwarding_rule_name,
+        )
+        logger.debug("Created forwarding rule for gateway %s.", configuration.gateway_name)
+
+        return GatewayLoadBalancerData(
+            hostname=forwarding_rule.I_p_address,
+            backend_data=GCPGatewayBackendData(
+                zone=zone,
+                instance_group_name=instance_group_name,
+                health_check_name=health_check_name,
+                backend_service_name=backend_service_name,
+                url_map_name=url_map_name,
+                target_http_proxy_name=target_http_proxy_name,
+                forwarding_rule_name=forwarding_rule_name,
+            ).model_dump_json(),
+        )
+
+    def terminate_gateway_load_balancer(
+        self,
+        configuration: GatewayLoadBalancerConfiguration,
+        backend_data: Optional[str],
+    ) -> None:
+        if backend_data is None:
+            logger.error(
+                "Failed to terminate load balancer for gateway %s: backend_data is None.",
+                configuration.gateway_name,
+            )
+            return
+        try:
+            backend_data_parsed = validate_json_extra_ignore(GCPGatewayBackendData, backend_data)
+        except ValidationError:
+            logger.exception(
+                "Failed to terminate load balancer for gateway %s: backend_data parsing error.",
+                configuration.gateway_name,
+            )
+            return
+
+        logger.debug(
+            "Deleting load balancer resources for gateway %s...", configuration.gateway_name
+        )
+        for delete_call, verbose_name in [
+            (
+                lambda: self.forwarding_rules_client.delete(
+                    project=self.config.project_id,
+                    region=configuration.region,
+                    forwarding_rule=backend_data_parsed.forwarding_rule_name,
+                ),
+                "forwarding rule deletion",
+            ),
+            (
+                lambda: self.region_target_http_proxies_client.delete(
+                    project=self.config.project_id,
+                    region=configuration.region,
+                    target_http_proxy=backend_data_parsed.target_http_proxy_name,
+                ),
+                "target HTTP proxy deletion",
+            ),
+            (
+                lambda: self.region_url_maps_client.delete(
+                    project=self.config.project_id,
+                    region=configuration.region,
+                    url_map=backend_data_parsed.url_map_name,
+                ),
+                "URL map deletion",
+            ),
+            (
+                lambda: self.region_backend_services_client.delete(
+                    project=self.config.project_id,
+                    region=configuration.region,
+                    backend_service=backend_data_parsed.backend_service_name,
+                ),
+                "backend service deletion",
+            ),
+            (
+                lambda: self.region_health_checks_client.delete(
+                    project=self.config.project_id,
+                    region=configuration.region,
+                    health_check=backend_data_parsed.health_check_name,
+                ),
+                "health check deletion",
+            ),
+            (
+                lambda: self.instance_groups_client.delete(
+                    project=self.config.project_id,
+                    zone=backend_data_parsed.zone,
+                    instance_group=backend_data_parsed.instance_group_name,
+                ),
+                "instance group deletion",
+            ),
+        ]:
+            try:
+                operation = delete_call()
+                gcp_resources.wait_for_extended_operation(operation, verbose_name)
+            except google.api_core.exceptions.NotFound:
+                pass
+        logger.debug("Deleted load balancer resources for gateway %s.", configuration.gateway_name)
+
+    def register_gateway_replica_with_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        if gateway_backend_data is None:
+            raise ComputeError(
+                f"Cannot register gateway {configuration.gateway_name} replica with load balancer:"
+                " gateway_backend_data is None"
+            )
+        try:
+            gateway_backend_data_parsed = validate_json_extra_ignore(
+                GCPGatewayBackendData, gateway_backend_data
+            )
+        except ValidationError as e:
+            raise ComputeError(
+                f"Cannot register gateway {configuration.gateway_name} replica with load balancer:"
+                " gateway_backend_data parsing error"
+            ) from e
+
+        instance_self_link = (
+            "https://www.googleapis.com/compute/v1/projects/"
+            f"{self.config.project_id}/zones/{gateway_backend_data_parsed.zone}/instances/{instance_id}"
+        )
+        logger.debug(
+            "Registering gateway %s replica %s with instance group %s...",
+            configuration.gateway_name,
+            instance_id,
+            gateway_backend_data_parsed.instance_group_name,
+        )
+        operation = self.instance_groups_client.add_instances(
+            project=self.config.project_id,
+            zone=gateway_backend_data_parsed.zone,
+            instance_group=gateway_backend_data_parsed.instance_group_name,
+            instance_groups_add_instances_request_resource=compute_v1.InstanceGroupsAddInstancesRequest(
+                instances=[compute_v1.InstanceReference(instance=instance_self_link)]
+            ),
+        )
+        gcp_resources.wait_for_extended_operation(operation, "instance group registration")
+        logger.debug(
+            "Registered gateway %s replica %s with instance group.",
+            configuration.gateway_name,
+            instance_id,
+        )
+
+    def deregister_gateway_replica_from_load_balancer(
+        self,
+        instance_id: str,
+        configuration: GatewayLoadBalancerConfiguration,
+        gateway_backend_data: Optional[str],
+    ) -> None:
+        if gateway_backend_data is None:
+            raise ComputeError(
+                f"Cannot deregister gateway {configuration.gateway_name} replica from load"
+                " balancer: gateway_backend_data is None"
+            )
+        try:
+            gateway_backend_data_parsed = validate_json_extra_ignore(
+                GCPGatewayBackendData, gateway_backend_data
+            )
+        except ValidationError as e:
+            raise ComputeError(
+                f"Cannot deregister gateway {configuration.gateway_name} replica from load"
+                " balancer: gateway_backend_data parsing error",
+            ) from e
+
+        instance_self_link = (
+            "https://www.googleapis.com/compute/v1/projects/"
+            f"{self.config.project_id}/zones/{gateway_backend_data_parsed.zone}/instances/{instance_id}"
+        )
+        logger.debug(
+            "Deregistering gateway %s replica %s from instance group %s...",
+            configuration.gateway_name,
+            instance_id,
+            gateway_backend_data_parsed.instance_group_name,
+        )
+        try:
+            operation = self.instance_groups_client.remove_instances(
+                project=self.config.project_id,
+                zone=gateway_backend_data_parsed.zone,
+                instance_group=gateway_backend_data_parsed.instance_group_name,
+                instance_groups_remove_instances_request_resource=compute_v1.InstanceGroupsRemoveInstancesRequest(
+                    instances=[compute_v1.InstanceReference(instance=instance_self_link)]
+                ),
+            )
+            gcp_resources.wait_for_extended_operation(operation, "instance group deregistration")
+        except google.api_core.exceptions.NotFound:
+            pass
+        except google.api_core.exceptions.BadRequest as e:
+            # The instance was never added to the group or was already removed
+            if "is not a member of" not in e.message:
+                raise
+        logger.debug(
+            "Deregistered gateway %s replica %s from instance group.",
+            configuration.gateway_name,
+            instance_id,
         )
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:

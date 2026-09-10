@@ -564,6 +564,33 @@ gcloud projects list --format="json(projectId)"
     compute.zoneOperations.get
     ```
 
+    If you plan to use gateways with `load_balancer: { type: alb }`, additional permissions are required:
+
+    ```
+    compute.forwardingRules.create
+    compute.forwardingRules.delete
+    compute.forwardingRules.get
+    compute.forwardingRules.use
+    compute.instanceGroups.create
+    compute.instanceGroups.delete
+    compute.instanceGroups.update
+    compute.instanceGroups.use
+    compute.instances.use
+    compute.regionBackendServices.create
+    compute.regionBackendServices.delete
+    compute.regionBackendServices.use
+    compute.regionHealthChecks.create
+    compute.regionHealthChecks.delete
+    compute.regionHealthChecks.useReadOnly
+    compute.regionOperations.get
+    compute.regionTargetHttpProxies.create
+    compute.regionTargetHttpProxies.delete
+    compute.regionTargetHttpProxies.use
+    compute.regionUrlMaps.create
+    compute.regionUrlMaps.delete
+    compute.regionUrlMaps.use
+    ```
+
     If you plan to use TPUs, additional permissions are required:
 
     ```

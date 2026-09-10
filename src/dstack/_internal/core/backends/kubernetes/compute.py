@@ -491,6 +491,7 @@ class KubernetesCompute(
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,
+        gateway_backend_data: Optional[str] = None,
     ) -> GatewayReplicaProvisioningData:
         cluster = self.region_cluster_map.get(configuration.region)
         if cluster is None:
