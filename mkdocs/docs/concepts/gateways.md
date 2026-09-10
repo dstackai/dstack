@@ -82,57 +82,57 @@ The optional `load_balancer` property allows you to provision a load balancer in
 
 Setting `load_balancer: { type: alb }` provisions an Application Load Balancer (ALB). It's supported for the `aws` and `gcp` backends.
 
-#### AWS
+=== "AWS"
 
-<div editor-title="gateway.dstack.yml">
+    <div editor-title="gateway.dstack.yml">
 
-```yaml
-type: gateway
-name: example-gateway
-backend: aws
-region: eu-west-1
-domain: example.com
-replicas: 2
-load_balancer:
-  type: alb
-certificate:
-  type: acm
-  arn: arn:aws:acm:eu-west-1:164099421079:certificate/3670388f-f43b-4872-aaf8-907b107a170d
-```
+    ```yaml
+    type: gateway
+    name: example-gateway
+    backend: aws
+    region: eu-west-1
+    domain: example.com
+    replicas: 2
+    load_balancer:
+      type: alb
+    certificate:
+      type: acm
+      arn: arn:aws:acm:eu-west-1:164099421079:certificate/3670388f-f43b-4872-aaf8-907b107a170d
+    ```
 
-</div>
+    </div>
 
-??? info "Requirements"
-    An ALB gateway on `aws` requires:
+    ??? info "Requirements"
+        An ALB gateway on `aws` requires:
 
-    - The `aws` backend.
-    - Either `certificate: { type: acm, ... }` or `certificate: null`.
-    - A VPC with at least two subnets in different availability zones. If `public_ip: False`, subnets must be private and have a route to a NAT gateway.
+        - The `aws` backend.
+        - Either `certificate: { type: acm, ... }` or `certificate: null`.
+        - A VPC with at least two subnets in different availability zones. If `public_ip: False`, subnets must be private and have a route to a NAT gateway.
 
-#### GCP
+=== "GCP"
 
-<div editor-title="gateway.dstack.yml">
+    <div editor-title="gateway.dstack.yml">
 
-```yaml
-type: gateway
-name: example-gateway
-backend: gcp
-region: europe-west4
-domain: example.com
-replicas: 2
-load_balancer:
-  type: alb
-certificate: null
-```
+    ```yaml
+    type: gateway
+    name: example-gateway
+    backend: gcp
+    region: europe-west4
+    domain: example.com
+    replicas: 2
+    load_balancer:
+      type: alb
+    certificate: null
+    ```
 
-</div>
+    </div>
 
-??? info "Requirements"
-    An ALB gateway on `gcp` requires:
+    ??? info "Requirements"
+        An ALB gateway on `gcp` requires:
 
-    - The `gcp` backend.
-    - `certificate: null`.
-    - A VPC with a proxy-only subnet (`purpose: REGIONAL_MANAGED_PROXY`) in the target region — required by GCP for all Envoy-based regional load balancers. See [Proxy-only subnets](https://cloud.google.com/load-balancing/docs/proxy-only-subnets) for how to create one.
+        - The `gcp` backend.
+        - `certificate: null`.
+        - A VPC with a proxy-only subnet (`purpose: REGIONAL_MANAGED_PROXY`) in the target region — required by GCP for all Envoy-based regional load balancers. See [Proxy-only subnets](https://cloud.google.com/load-balancing/docs/proxy-only-subnets) for how to create one.
 
 The provisioned load balancer provides a hostname (or IP address) you can add to your DNS records. Replica hostnames do not need to be added to DNS.
 
