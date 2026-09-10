@@ -50,7 +50,7 @@ You can disallow instance volumes or restrict access to certain paths by writing
 
 ## Host network access
 
-By default, most `dstack` jobs run in host networking mode. This allows them to listen on any host network interface and communicate with other jobs over the internal network, which facilitates workloads such as [distributed tasks](../concepts/tasks.md#distributed-tasks) or [services with routers](../concepts/services.md#pd-disaggregation).
+By default, most `dstack` jobs run in host networking mode. This allows them to listen on any host network interface and communicate with other jobs over the internal network, which facilitates workloads such as [multi-node tasks](../concepts/tasks.md#nodes) or [services with routers](../concepts/services.md#router).
 
 However, exposing the host network to the job also exposes internal `dstack` APIs used to manage containers and SSH authorized keys on the host. If this is not acceptable, bridge networking should be used, which isolates the job from the host network. Bridge networking, however, breaks workloads that do need inter-job communication.
 
@@ -58,13 +58,13 @@ The `DSTACK_SERVER_JOB_NETWORK_MODE` environment variable controls which jobs ge
 
 | Value | Name | Behavior |
 |---|---|---|
-| `1` | `HOST_FOR_MULTINODE_ONLY` | Host for distributed tasks, bridge otherwise |
+| `1` | `HOST_FOR_MULTINODE_ONLY` | Host for multi-node tasks, bridge otherwise |
 | `2` | `HOST_WHEN_POSSIBLE` | Host whenever the job occupies a full instance (default) |
-| `3` | `FORCED_BRIDGE` | Always bridge, including distributed tasks |
+| `3` | `FORCED_BRIDGE` | Always bridge, including multi-node tasks |
 
-### No distributed tasks
+### No multi-node tasks
 
-If you don't need distributed tasks or other runs with inter-job communication, you can set `DSTACK_SERVER_JOB_NETWORK_MODE=3` when starting the server:
+If you don't need multi-node tasks or other runs with inter-job communication, you can set `DSTACK_SERVER_JOB_NETWORK_MODE=3` when starting the server:
 
 ```shell
 DSTACK_SERVER_JOB_NETWORK_MODE=3
@@ -72,6 +72,6 @@ DSTACK_SERVER_JOB_NETWORK_MODE=3
 
 This forces bridge networking for all jobs on the server without exception, preventing access to internal `dstack` APIs, as well as communication between jobs.
 
-### Allow distributed tasks in selected projects
+### Allow multi-node tasks in selected projects
 
-If you want distributed tasks or other runs with inter-job communication to be available in some projects but not others, use `DSTACK_SERVER_JOB_NETWORK_MODE=1` instead. With this mode, single-node jobs get bridge networking, while distributed tasks still run with host networking. Distributed tasks can then be selectively blocked per project or user by writing a [REST plugin](../reference/plugins/rest/index.md) or a [Python plugin](../reference/plugins/python/index.md).
+If you want multi-node tasks or other runs with inter-job communication to be available in some projects but not others, use `DSTACK_SERVER_JOB_NETWORK_MODE=1` instead. With this mode, single-node jobs get bridge networking, while multi-node tasks still run with host networking. Multi-node tasks can then be selectively blocked per project or user by writing a [REST plugin](../reference/plugins/rest/index.md) or a [Python plugin](../reference/plugins/python/index.md).

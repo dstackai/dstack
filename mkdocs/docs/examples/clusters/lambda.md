@@ -120,7 +120,7 @@ Once the fleet is created, you can run [dev environments](../../concepts/dev-env
 
 ## Run tasks
 
-To run tasks on a cluster, you must use [distributed tasks](../../concepts/tasks.md#distributed-task).
+To run tasks on a cluster, you must use [multi-node tasks](../../concepts/tasks.md#nodes).
 
 ### Run NCCL tests
 

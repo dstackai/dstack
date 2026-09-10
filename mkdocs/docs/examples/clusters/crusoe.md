@@ -137,7 +137,7 @@ Once the fleet is created, you can run [dev environments](../../concepts/dev-env
 
 ## NCCL tests
 
-Use a [distributed task](../../concepts/tasks.md#distributed-tasks) that runs NCCL tests to validate cluster network bandwidth.
+Use a [multi-node task](../../concepts/tasks.md#nodes) that runs NCCL tests to validate cluster network bandwidth.
 
 === "VMs"
 

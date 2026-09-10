@@ -44,7 +44,7 @@ Kubernetes clusters or vanilla bare-metal hosts.
     For Kubernetes and SSH fleets, the network must be properly configured.
 
     To test whether the cluster is properly configured, run the
-    [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
+    [RCCL tests via a multi-node task](../clusters/nccl-rccl-tests.md).
 
 Once a fleet is created, you can run dev environments, tasks, and services.
 
@@ -191,9 +191,9 @@ resources:
 
 </div>
 
-!!! info "Distributed tasks"
+!!! info "Multi-node tasks"
     To run training across multiple nodes, use
-    [distributed tasks](../../concepts/tasks.md#distributed-tasks). Distributed
+    [multi-node tasks](../../concepts/tasks.md#nodes). Multi-node
     tasks may run on a cluster; in that case, the fleet must use
     [cluster placement](../../concepts/fleets.md#cluster-placement).
 

@@ -148,11 +148,11 @@ If background attach fails in the sandbox (permissions writing `~/.dstack` or `~
 
 **"Connect to" or "open" a dev environment:** If a dev environment is already running, use `dstack attach <run name> --logs` (agent runs it in the background by default) to surface the IDE URL (`cursor://`, `vscode://`, etc.) and SSH alias. If sandboxed attach fails, request escalation or ask the user to run attach locally and share the link.
 
-### Distributed tasks and multi-replica services
+### Multi-node tasks and multi-replica services
 
-Unless you use **Distributed tasks** (see `### 2. Tasks`) or **Multi-replica services** (see `### 3. Services`), both tasks and services run on a single node. That's why `dstack logs <run name>`, `dstack attach <run name>`, and `ssh <run name>` default to the first replica/job.
+Unless you use **Multi-node tasks** (see `### 2. Tasks`) or **Multi-replica services** (see `### 3. Services`), both tasks and services run on a single node. That's why `dstack logs <run name>`, `dstack attach <run name>`, and `ssh <run name>` default to the first replica/job.
 
-- In a distributed task, each node runs its own job, numbered from 0 in order across node groups. Target a node via `dstack logs <run name> --job 1` or `dstack attach <run name> --job 1`.
+- In a multi-node task, each node runs its own job, numbered from 0 in order across node groups. Target a node via `dstack logs <run name> --job 1` or `dstack attach <run name> --job 1`.
 - In a multi-replica service, replicas are numbered from 0 in order across replica groups. Target a replica via `dstack logs <run name> --replica 1` or `dstack attach <run name> --replica 1`.
 - Attaching with a non-zero `--job` or `--replica` creates the SSH alias `ssh <run name>-<job num>-<replica num>`.
 
@@ -230,7 +230,7 @@ resources:
 
 **Port forwarding:** When you specify `ports`, `dstack apply` forwards them to `localhost` while attached. Use `dstack attach <run name>` to reconnect and restore port forwarding. The run name becomes an SSH alias (e.g., `ssh <run name>`) for direct access.
 
-**Distributed tasks:** Set `nodes` to run a task across multiple nodes, or use `groups` to define node groups, each with its own `nodes` count, `resources`, `commands`, and `ports` (`groups` and top-level `nodes` are mutually exclusive). Requires a fleet that supports inter-node communication (see `placement: cluster` in fleets).
+**Multi-node tasks:** Set `nodes` to run a task across multiple nodes, or use `groups` to define node groups, each with its own `nodes` count, `resources`, `commands`, and `ports` (`groups` and top-level `nodes` are mutually exclusive). Requires a fleet that supports inter-node communication (see `placement: cluster` in fleets).
 
 [Concept documentation](https://dstack.ai/docs/concepts/tasks.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/task.md)
 
