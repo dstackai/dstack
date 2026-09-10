@@ -5,19 +5,33 @@ from dstack._internal.core.compatibility.exports import (
     get_update_export_excludes,
 )
 from dstack._internal.core.models.common import validate_extra_ignore
-from dstack._internal.core.models.exports import Export
+from dstack._internal.core.models.exports import Export, ListExportsResponse
 from dstack._internal.server.schemas.exports import (
     CreateExportRequest,
     DeleteExportRequest,
     UpdateExportRequest,
 )
+from dstack._internal.utils.logging import get_logger
 from dstack.api.server._group import APIClientGroup
+
+logger = get_logger(__name__)
 
 
 class ExportsAPIClient(APIClientGroup):
-    def list(self, project_name: str) -> List[Export]:
+    def list_exports(self, project_name: str) -> ListExportsResponse:
         resp = self._request(f"/api/project/{project_name}/exports/list")
-        return validate_extra_ignore(List[Export], resp.json())
+        if isinstance(resp.json(), list):
+            return ListExportsResponse(
+                exports=validate_extra_ignore(list[Export], resp.json()),
+            )
+        return validate_extra_ignore(ListExportsResponse, resp.json())
+
+    def list(self, project_name: str) -> List[Export]:
+        logger.warning("The list() method is deprecated in favor of list_exports().")
+        resp = self._request(f"/api/project/{project_name}/exports/list")
+        if isinstance(resp.json(), list):
+            return validate_extra_ignore(List[Export], resp.json())
+        return validate_extra_ignore(ListExportsResponse, resp.json()).exports
 
     def create(
         self,

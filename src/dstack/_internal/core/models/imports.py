@@ -24,3 +24,8 @@ class ImportExport(CoreModel):
 class Import(CoreModel):
     id: uuid.UUID
     export: ImportExport
+
+
+class ListImportsResponse(CoreModel):
+    imports: list[Import]
+    warnings: list[str] = []

@@ -1,9 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.exports import Export
+from dstack._internal.core.models.exports import Export, ListExportsResponse
+from dstack._internal.server.compatibility.exports import patch_list_exports_response
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.exports import (
@@ -13,7 +15,10 @@ from dstack._internal.server.schemas.exports import (
 )
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services import exports as exports_services
-from dstack._internal.server.utils.routers import get_base_api_additional_responses
+from dstack._internal.server.utils.routers import (
+    get_base_api_additional_responses,
+    get_client_version,
+)
 
 project_router = APIRouter(
     prefix="/api/project/{project_name}/exports",
@@ -78,13 +83,17 @@ async def delete_export(
     )
 
 
-@project_router.post("/list", summary="List exports", response_model=list[Export])
+@project_router.post("/list", summary="List exports")
 async def list_exports(
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
-):
+    client_version: Annotated[Version | None, Depends(get_client_version)],
+) -> ListExportsResponse | list[Export]:
+    """Returns a bare list for clients older than 0.22.0, otherwise a `ListExportsResponse`."""
     _, project = user_project
-    return await exports_services.list_exports(
+    response = await exports_services.list_exports(
         session=session,
         project=project,
     )
+    response = patch_list_exports_response(response, client_version)
+    return response

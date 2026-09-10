@@ -17,6 +17,7 @@ from dstack._internal.core.models.exports import (
     ExportedFleet,
     ExportedGateway,
     ExportImport,
+    ListExportsResponse,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -40,6 +41,31 @@ from dstack._internal.server.services.projects import (
     get_user_project_role,
     list_project_models,
     list_user_project_models,
+)
+
+_EXPORTS_ENABLED = False
+
+
+def are_exports_enabled() -> bool:
+    return _EXPORTS_ENABLED
+
+
+def enable_exports() -> None:
+    """Extension point for alternative dstack versions."""
+    global _EXPORTS_ENABLED
+    _EXPORTS_ENABLED = True
+
+
+EXPORTS_NOT_SUPPORTED_MESSAGE = (
+    "This dstack server does not support exports."
+    " Export support is available in dstack Sky and dstack Factory."
+)
+EXPORTS_PHASE_OUT_MESSAGE = (
+    "Exports are being phased out in the dstack server version you are running."
+    " No new exports can be created, and existing exports can no longer be extended."
+    " A future dstack release will automatically remove any remaining exports."
+    " Please adjust your project organization to avoid relying on exports,"
+    " or switch to dstack Sky or dstack Factory for full export support."
 )
 
 
@@ -112,6 +138,8 @@ async def create_export(
     exported_fleet_names: list[str],
     exported_gateway_names: list[str],
 ) -> Export:
+    if not are_exports_enabled():
+        raise ServerClientError(EXPORTS_NOT_SUPPORTED_MESSAGE)
     validate_dstack_resource_name(name)
     if is_global and importer_project_names:
         raise ServerClientError(
@@ -207,6 +235,15 @@ async def update_export(
         if export is None:
             raise ResourceNotExistsError(f"Export {name!r} not found in project {project.name!r}")
 
+        if not are_exports_enabled() and any(
+            (
+                add_importer_project_names,
+                add_exported_fleet_names,
+                add_exported_gateway_names,
+                set_global,
+            )
+        ):
+            raise ServerClientError(EXPORTS_PHASE_OUT_MESSAGE)
         if (
             not set_global
             and not unset_global
@@ -427,7 +464,7 @@ async def delete_export(session: AsyncSession, project: ProjectModel, name: str)
         await session.commit()
 
 
-async def list_exports(session: AsyncSession, project: ProjectModel) -> list[Export]:
+async def list_exports(session: AsyncSession, project: ProjectModel) -> ListExportsResponse:
     res = await session.execute(
         select(ExportModel)
         .where(ExportModel.project == project)
@@ -450,8 +487,18 @@ async def list_exports(session: AsyncSession, project: ProjectModel) -> list[Exp
         )
         .order_by(ExportModel.created_at.desc())
     )
-    exports = res.scalars().all()
-    return [export_model_to_export(export) for export in exports]
+    export_models = res.scalars().all()
+    exports = [export_model_to_export(export) for export in export_models]
+    warnings = []
+    if not are_exports_enabled():
+        if not exports:
+            raise ServerClientError(EXPORTS_NOT_SUPPORTED_MESSAGE)
+        else:
+            warnings.append(EXPORTS_PHASE_OUT_MESSAGE)
+    return ListExportsResponse(
+        exports=exports,
+        warnings=warnings,
+    )
 
 
 def export_model_to_export(export_model: ExportModel) -> Export:

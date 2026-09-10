@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel, ImportModel
+from dstack._internal.server.services import exports as exports_service
+from dstack._internal.server.services.exports import (
+    EXPORTS_NOT_SUPPORTED_MESSAGE,
+    EXPORTS_PHASE_OUT_MESSAGE,
+)
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
@@ -25,6 +30,11 @@ pytestmark = [
     pytest.mark.usefixtures("test_db"),
     pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True),
 ]
+
+
+@pytest.fixture(autouse=True)
+def enable_exports(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", True)
 
 
 class TestCreateExport:
@@ -384,6 +394,26 @@ class TestCreateExport:
         res = await session.execute(select(func.count()).select_from(ExportModel))
         assert res.scalar_one() == 1
 
+    async def test_returns_400_when_disabled(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/create",
+            headers=get_auth_headers(user.token),
+            json={"name": "test-export"},
+        )
+        assert response.status_code == 400
+        assert EXPORTS_NOT_SUPPORTED_MESSAGE in response.json()["detail"][0]["msg"]
+        res = await session.execute(select(func.count()).select_from(ExportModel))
+        assert res.scalar_one() == 0
+
 
 class TestUpdateExport:
     async def test_returns_403_if_not_authenticated(self, client: AsyncClient):
@@ -526,7 +556,7 @@ class TestUpdateExport:
             f"/api/project/{project.name}/exports/list", headers=get_auth_headers(user.token)
         )
         assert response.status_code == 200
-        export_list = response.json()
+        export_list = response.json()["exports"]
         assert len(export_list) == 1
         export_response["imports"].sort(key=lambda i: i["project_name"])
         export_list[0]["imports"].sort(key=lambda i: i["project_name"])
@@ -603,8 +633,8 @@ class TestUpdateExport:
             f"/api/project/{project.name}/exports/list", headers=get_auth_headers(user.token)
         )
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0] == export_response
+        assert len(response.json()["exports"]) == 1
+        assert response.json()["exports"][0] == export_response
 
     @pytest.mark.parametrize(
         "body,error",
@@ -1144,6 +1174,109 @@ class TestUpdateExport:
         assert response.status_code == 400
         assert "The export is already global" in response.json()["detail"][0]["msg"]
 
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param({"add_importer_projects": ["ImporterProject"]}, id="add-importer"),
+            pytest.param({"add_exported_fleets": ["fleet"]}, id="add-fleet"),
+            pytest.param({"add_exported_gateways": ["gateway"]}, id="add-gateway"),
+        ],
+    )
+    async def test_rejects_additions_when_disabled(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+        body: dict,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, name="ExporterProject", owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            name="fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        backend = await create_backend(session=session, project_id=project.id)
+        await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway"
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="test-export",
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={"name": "test-export", **body},
+        )
+        assert response.status_code == 400
+        assert EXPORTS_PHASE_OUT_MESSAGE in response.json()["detail"][0]["msg"]
+
+    async def test_allows_removals_when_disabled(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, name="ExporterProject", owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.ADMIN
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            name="fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway"
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+            exported_gateways=[gateway],
+            name="test-export",
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={
+                "name": "test-export",
+                "remove_importer_projects": ["ImporterProject"],
+                "remove_exported_fleets": ["fleet"],
+                "remove_exported_gateways": ["gateway"],
+            },
+        )
+        assert response.status_code == 200
+        export_response = response.json()
+        assert export_response["imports"] == []
+        assert export_response["exported_fleets"] == []
+        assert export_response["exported_gateways"] == []
+
 
 class TestDeleteExport:
     async def test_returns_403_if_not_authenticated(self, client: AsyncClient):
@@ -1317,7 +1450,7 @@ class TestListExports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        exports = response.json()
+        exports = response.json()["exports"]
         assert len(exports) == 2
         exports.sort(key=lambda e: e["name"])
 
@@ -1363,7 +1496,7 @@ class TestListExports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        assert response.json() == []
+        assert response.json()["exports"] == []
 
     async def test_not_includes_deleted_entities(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -1404,10 +1537,54 @@ class TestListExports:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        exports = response.json()
+        exports = response.json()["exports"]
         assert len(exports) == 1
         assert exports[0]["name"] == "test-export"
         assert len(exports[0]["imports"]) == 1
         assert exports[0]["imports"][0]["project_name"] == "ImporterProject"
         assert len(exports[0]["exported_fleets"]) == 1
         assert exports[0]["exported_fleets"][0]["name"] == "fleet"
+
+    async def test_returns_400_when_disabled_and_no_exports(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{project.name}/exports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 400
+        assert EXPORTS_NOT_SUPPORTED_MESSAGE in response.json()["detail"][0]["msg"]
+
+    async def test_warns_when_disabled_but_exports_exist(
+        self, session: AsyncSession, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="test-export",
+        )
+
+        monkeypatch.setattr(exports_service, "_EXPORTS_ENABLED", False)
+        response = await client.post(
+            f"/api/project/{project.name}/exports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["exports"]) == 1
+        assert data["exports"][0]["name"] == "test-export"
+        assert data["warnings"] == [EXPORTS_PHASE_OUT_MESSAGE]
