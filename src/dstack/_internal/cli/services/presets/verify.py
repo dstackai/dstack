@@ -135,6 +135,46 @@ def _verified_run_service(run: Run, report: PresetAgentSuccess) -> ServiceConfig
     return service
 
 
+#: Characters that may follow the base name in a variant repo. A variant adds a
+#: suffix — a quantisation, a format, a precision — and these are what separate
+#: it, so requiring one stops ``Qwen3.5-27B`` from accepting ``Qwen3.5-27Bx``.
+_VARIANT_SUFFIX_SEPARATORS = ("-", "_", ".")
+
+
+def _model_name(repo: str) -> str:
+    """The model half of a repo reference, without its owner.
+
+    Deliberately owner-blind. A quantisation of a model is routinely published
+    by someone other than the original author — this repository's own fixtures
+    pair a ``Qwen/Qwen3.5-27B`` base with a ``community/Qwen3.5-27B-GPTQ-Int4``
+    repo — so requiring the owner to match would reject the ordinary case.
+    """
+    return repo.rsplit("/", 1)[-1].strip()
+
+
+def _is_variant_of(repo: str, base: str) -> bool:
+    """Is ``repo`` a variant of ``base``, rather than a different model?
+
+    A variant is the base plus a suffix: ``Qwen3.5-27B`` also answers to
+    ``Qwen3.5-27B-GPTQ-Int4`` and ``Qwen3.5-27B-AWQ``. A different generation
+    is not a variant, however similar the name — ``Qwen3.8-27B`` does not
+    answer a request for ``Qwen3.5-27B``, which is exactly the substitution
+    that verified clean before.
+
+    Compared case-insensitively, and on the model name alone, so the check
+    stays about which model was served rather than about who published it.
+    """
+    served = _model_name(repo).lower()
+    wanted = _model_name(base).lower()
+    if not served or not wanted:
+        return False
+    if served == wanted:
+        return True
+    if not served.startswith(wanted):
+        return False
+    return served[len(wanted)] in _VARIANT_SUFFIX_SEPARATORS
+
+
 def _check_report_answers_request(
     report: PresetAgentSuccess, configuration: PresetConfiguration
 ) -> None:
@@ -145,6 +185,17 @@ def _check_report_answers_request(
     if configuration.model.allows_variant_selection:
         if report.base != configuration.model.api_model_name:
             raise CLIError("Claude final report base does not match the requested model")
+        # The base must constrain which repos are acceptable, and echoing it
+        # back does not: the served repo is what the agent chose, and it was
+        # only ever checked against the *advertised* name — which a
+        # substitution preserves. `vllm serve Qwen/Qwen3.5-27B-GPTQ-Int4
+        # --served-model-name Qwen/Qwen3.8-27B` answered a request for
+        # Qwen3.8 with a different model generation and verified clean.
+        if not _is_variant_of(report.model, configuration.model.api_model_name):
+            raise CLIError(
+                f"Claude served {report.model!r}, which is not a variant of the requested"
+                f" base {configuration.model.api_model_name!r}"
+            )
     elif report.model != configuration.model.exact_repo:
         raise CLIError("Claude changed an exact model request")
 
