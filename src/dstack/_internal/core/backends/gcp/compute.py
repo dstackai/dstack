@@ -691,8 +691,6 @@ class GCPCompute(
         self,
         configuration: GatewayLoadBalancerConfiguration,
     ) -> GatewayLoadBalancerData:
-        """Creates a regional Application Load Balancer, an unmanaged instance group backing it,
-        and the supporting health check/backend service/URL map/target proxy resources."""
         assert configuration.certificate is None
 
         zone = self._get_gateway_zone(configuration.region)
@@ -703,6 +701,18 @@ class GCPCompute(
             region=configuration.region,
             network=self.config.vpc_resource_name,
         )
+        subnetwork = None
+        if not configuration.public_ip:
+            subnetwork = gcp_resources.get_vpc_subnet_or_error(
+                vpc_name=self.config.vpc_name or "default",
+                region=configuration.region,
+                usable_subnets=self._list_usable_subnets(),
+                subnetwork_name=(
+                    self.config.subnetworks.get(configuration.region)
+                    if self.config.subnetworks
+                    else None
+                ),
+            )
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_lb_healthcheck_firewall_rule(
                 firewalls_client=self.firewalls_client,
@@ -840,8 +850,8 @@ class GCPCompute(
         forwarding_rule.target = target_http_proxy_resource_name
         forwarding_rule.network = self.config.vpc_resource_name
         forwarding_rule.labels = labels
-        if not configuration.public_ip:
-            forwarding_rule.subnetwork = self._get_gateway_lb_subnet_or_error(configuration.region)
+        if subnetwork is not None:
+            forwarding_rule.subnetwork = subnetwork
         operation = self.forwarding_rules_client.insert(
             project=self.config.project_id,
             region=configuration.region,
@@ -866,13 +876,6 @@ class GCPCompute(
                 target_http_proxy_name=target_http_proxy_name,
                 forwarding_rule_name=forwarding_rule_name,
             ).model_dump_json(),
-        )
-
-    def _get_gateway_lb_subnet_or_error(self, region: str) -> str:
-        return gcp_resources.get_vpc_subnet_or_error(
-            vpc_name=self.config.vpc_name or "default",
-            region=region,
-            usable_subnets=self._list_usable_subnets(),
         )
 
     def terminate_gateway_load_balancer(
