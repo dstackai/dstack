@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { isNil } from 'lodash';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 
-import { Container, FormInput, FormToggle, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
+import {
+    Container,
+    FormField,
+    FormInput,
+    FormToggle,
+    InfoLink,
+    KeyValuePairs,
+    SelectCSD,
+    SpaceBetween,
+    Wizard,
+} from 'components';
 
 import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
 import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
@@ -82,6 +92,11 @@ export const ProjectAdd: React.FC = () => {
 
     const { handleSubmit, control, setError, clearErrors, trigger, watch, getValues } = formMethods;
     const formValues = watch();
+
+    const visibilityOptions = [
+        { label: t('projects.edit.visibility.private'), value: 'private' },
+        { label: t('projects.edit.visibility.public'), value: 'public' },
+    ];
 
     const getFormValuesForServer = (): IProjectCreateRequestParams => {
         const { project_name, is_public } = getValues();
@@ -270,7 +285,7 @@ export const ProjectAdd: React.FC = () => {
                 submitButtonText={t('projects.wizard.submit')}
                 steps={[
                     {
-                        title: 'Name and public',
+                        title: 'Name and visibility',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
@@ -282,12 +297,33 @@ export const ProjectAdd: React.FC = () => {
                                         disabled={loading}
                                     />
 
-                                    <FormToggle
-                                        label={t('projects.edit.is_public')}
-                                        toggleDescription={t('projects.edit.is_public_description')}
+                                    <Controller
                                         control={control}
                                         name="is_public"
-                                        disabled={loading}
+                                        render={({ field, fieldState: { error } }) => (
+                                            <FormField
+                                                label={t('projects.edit.project_visibility')}
+                                                description={
+                                                    field.value
+                                                        ? 'Any authorized user can see this project and join it as a member'
+                                                        : 'Only project members and global admins can access this project'
+                                                }
+                                                errorText={error?.message}
+                                            >
+                                                <SelectCSD
+                                                    ref={field.ref}
+                                                    options={visibilityOptions}
+                                                    selectedOption={visibilityOptions[field.value ? 1 : 0]}
+                                                    onChange={({ detail }) =>
+                                                        field.onChange(detail.selectedOption.value === 'public')
+                                                    }
+                                                    onBlur={field.onBlur}
+                                                    disabled={loading}
+                                                    expandToViewport
+                                                    filteringType="auto"
+                                                />
+                                            </FormField>
+                                        )}
                                     />
                                 </SpaceBetween>
                             </Container>
@@ -326,6 +362,10 @@ export const ProjectAdd: React.FC = () => {
                                         {
                                             label: t('projects.edit.project_name'),
                                             value: formValues['project_name'],
+                                        },
+                                        {
+                                            label: t('projects.edit.project_visibility'),
+                                            value: visibilityOptions[formValues.is_public ? 1 : 0].label,
                                         },
                                         ...(formValues['fleet']['enable_default']
                                             ? [

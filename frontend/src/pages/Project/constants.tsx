@@ -30,3 +30,14 @@ export const DEFAULT_FLEET_INFO = {
         </>
     ),
 };
+
+export const VISIBILITY_INFO = {
+    header: <h2>Visibility</h2>,
+    body: (
+        <>
+            <p>Only project members and global admins can access private projects.</p>
+            <p>Any authorized user can see public projects and join them as a member.</p>
+            <p>Changing a project to private keeps its existing members. Both visibility options require users to sign in.</p>
+        </>
+    ),
+};

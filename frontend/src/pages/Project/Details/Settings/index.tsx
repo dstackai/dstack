@@ -45,6 +45,7 @@ import { getProjectRoleByUserName } from 'pages/Project/utils';
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
 import { NoFleetProjectAlert } from '../../components/NoFleetProjectAlert';
+import { VISIBILITY_INFO } from '../../constants';
 import { GatewaysTable } from '../../Gateways';
 import { useGatewaysTable } from '../../Gateways/hooks';
 import { ProjectSecrets } from '../../Secrets';
@@ -498,11 +499,14 @@ export const ProjectSettings: React.FC = () => {
                                         </>
                                     )}
 
-                                    {isAvailableProjectManaging && (
+                                    {process.env.UI_VERSION !== 'sky' && isAvailableProjectManaging && (
                                         <>
-                                            <Box variant="h5" color="text-body-secondary">
-                                                {t('projects.edit.project_visibility_settings')}
-                                            </Box>
+                                            <div className={styles.dangerSectionTitle}>
+                                                <Box variant="h5" color="text-body-secondary">
+                                                    {t('projects.edit.project_visibility_settings')}
+                                                </Box>
+                                                <InfoLink onFollow={() => openHelpPanel(VISIBILITY_INFO)} />
+                                            </div>
 
                                             <div>
                                                 <ButtonWithConfirmation
@@ -562,7 +566,7 @@ export const ProjectSettings: React.FC = () => {
 
                                     {isAvailableProjectManaging && (
                                         <>
-                                            <div className={styles.templatesRepoTitle}>
+                                            <div className={styles.dangerSectionTitle}>
                                                 <Box variant="h5" color="text-body-secondary">
                                                     {t('projects.edit.override_project_templates')}
                                                 </Box>
