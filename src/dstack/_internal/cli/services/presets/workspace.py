@@ -80,7 +80,10 @@ class PresetAgentWorkspace:
 
 def create_agent_workspace(
     session: PresetSession,
+    skills_dir: Path,
 ) -> tuple[PresetAgentWorkspace, PresetSessionWorkspace]:
+    """`skills_dir` is where the agent CLI discovers project skills, relative to
+    the working directory."""
     real = session.path / "workspace"
     try:
         real.mkdir(mode=0o700)
@@ -92,7 +95,7 @@ def create_agent_workspace(
             alias = _create_workspace_alias(real)
             _validate_control_socket_path(alias)
         workspace = PresetAgentWorkspace(path=alias / "w", dstack_home=alias / "h")
-        _prepare_workspace(workspace)
+        _prepare_workspace(workspace, skills_dir)
     except OSError as e:
         raise CLIError(f"Could not create the agent workspace under {real}: {e}") from e
     return workspace, PresetSessionWorkspace(path=str(real), alias=str(alias))
@@ -183,7 +186,7 @@ def _validate_control_socket_path(build_root: Path) -> None:
         raise CLIError(f"Temporary path is too long for an SSH control socket: {build_root}")
 
 
-def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
+def _prepare_workspace(workspace: PresetAgentWorkspace, skills_dir: Path) -> None:
     workspace.path.mkdir(mode=0o700, parents=True, exist_ok=False)
     workspace.dstack_home.mkdir(mode=0o700)
     workspace.temp_path.mkdir(mode=0o700)
@@ -196,7 +199,7 @@ def _prepare_workspace(workspace: PresetAgentWorkspace) -> None:
     (workspace.dstack_home / ".ssh").mkdir(mode=0o700)
     _install_dstack_wrapper(workspace.bin_path, workspace.dstack_home)
     _install_home_wrapper(workspace.bin_path, "ssh", workspace.dstack_home)
-    _install_skills(workspace.path)
+    _install_skills(workspace.path / skills_dir)
 
 
 def _install_dstack_wrapper(bin_dir: Path, home: Path) -> None:
@@ -322,10 +325,8 @@ def _copy_session_records(source_root: Path, target_root: Path) -> bool:
     return copied
 
 
-def _install_skills(workspace: Path) -> None:
+def _install_skills(target_dir: Path) -> None:
     source_dir = _get_skills_dir()
-    target_dir = workspace / ".claude" / "skills"
-    target_dir.mkdir(parents=True)
     for skill_name in _SKILL_NAMES:
         source = source_dir / skill_name
         if not (source / "SKILL.md").is_file():

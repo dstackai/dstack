@@ -18,6 +18,7 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionWorkspace,
 )
 from dstack._internal.cli.models.presets import VerifiedPreset
+from dstack._internal.cli.services.presets.agents.base import PresetAgentSpec
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
@@ -232,13 +233,25 @@ def get_session_state(**overrides: Any) -> PresetSessionState:
     return PresetSessionState(**fields)
 
 
+def get_agent_spec(**overrides: Any) -> PresetAgentSpec:
+    fields: dict[str, Any] = {
+        "executable": "claude",
+        "api_key": "anthropic-secret",
+        "model": "claude-test",
+        "effort": None,
+    }
+    fields.update(overrides)
+    return PresetAgentSpec(**fields)
+
+
 def get_session_run(**overrides: Any) -> PresetSessionRun:
     fields: dict[str, Any] = {
         "workspace": PresetSessionWorkspace(path="/tmp/preset-ws", alias="/tmp/preset-ws"),
         "finalize": PresetSessionFinalize(project="main", keep_service=False),
-        "claude_model": None,
-        "agent": None,
-        "claude_session_id": None,
+        "agent_provider": "claude",
+        "agent_model": None,
+        "session_process": None,
+        "session_id": None,
     }
     fields.update(overrides)
     return PresetSessionRun(**fields)

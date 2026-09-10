@@ -67,7 +67,7 @@ def load_preset_agent_report(
     if report_data is None:
         raise CLIError(
             redact(
-                output.error or "Claude exited without a final report",
+                output.error or "The agent exited without a final report",
                 redacted_values,
             )
         )
@@ -76,7 +76,7 @@ def load_preset_agent_report(
             report_data, context={"redacted_values": tuple(redacted_values)}
         )
     except ValidationError as e:
-        raise CLIError(f"Claude returned an invalid final report: {e}") from e
+        raise CLIError(f"The agent returned an invalid final report: {e}") from e
 
 
 def build_verified_preset(
@@ -98,7 +98,7 @@ def build_verified_preset(
     service = _verified_run_service(run, report)
     _check_report_answers_request(report, preset_configuration)
     if service.model is None or service.model.name != preset_configuration.model.api_model_name:
-        raise CLIError("Claude final service model name does not match the requested model")
+        raise CLIError("The agent's final service model name does not match the requested model")
     return build_preset(
         name=name,
         service=_portable_service(
@@ -126,12 +126,12 @@ def _verified_run_service(run: Run, report: PresetAgentSuccess) -> ServiceConfig
     """The service the server actually runs, after proving the report talks about
     this run and the run is a live model service."""
     if run.id != report.run_id or run.run_spec.run_name != report.run_name:
-        raise CLIError("Claude final report identifies a different service run")
+        raise CLIError("The agent's final report identifies a different service run")
     if run.status != RunStatus.RUNNING or run.service is None:
-        raise CLIError("Claude final service is not running")
+        raise CLIError("The agent's final service is not running")
     service = run.run_spec.configuration
     if not isinstance(service, ServiceConfiguration):
-        raise CLIError("Claude final run is not a model service")
+        raise CLIError("The agent's final run is not a model service")
     return service
 
 
@@ -144,9 +144,9 @@ def _check_report_answers_request(
     _check_workload_answers_request(report.benchmark.workload, configuration)
     if configuration.model.allows_variant_selection:
         if report.base != configuration.model.api_model_name:
-            raise CLIError("Claude final report base does not match the requested model")
+            raise CLIError("The agent's final report base does not match the requested model")
     elif report.model != configuration.model.exact_repo:
-        raise CLIError("Claude changed an exact model request")
+        raise CLIError("The agent changed an exact model request")
 
 
 def _check_workload_answers_request(
@@ -162,19 +162,19 @@ def _check_workload_answers_request(
     if configuration.dataset is not None:
         if workload.dataset != configuration.dataset:
             raise CLIError(
-                f"Claude final benchmark dataset {workload.dataset!r} does not match the"
+                f"The agent's final benchmark dataset {workload.dataset!r} does not match the"
                 f" requested dataset {configuration.dataset!r}"
             )
     else:
         shared_prefix_tokens = configuration.shared_prefix_tokens or 0
         if workload.shared_prefix_tokens != shared_prefix_tokens:
             raise CLIError(
-                f"Claude final benchmark shared prefix of {workload.shared_prefix_tokens}"
+                f"The agent's final benchmark shared prefix of {workload.shared_prefix_tokens}"
                 f" tokens does not match the requested {shared_prefix_tokens}"
             )
     if configuration.concurrency is not None and workload.concurrency != configuration.concurrency:
         raise CLIError(
-            f"Claude final benchmark concurrency of {workload.concurrency} does not match the"
+            f"The agent's final benchmark concurrency of {workload.concurrency} does not match the"
             f" requested concurrency of {configuration.concurrency}"
         )
 
@@ -222,13 +222,15 @@ def _mirrored_file_path(local_path: str, *, workspace_path: Path, session_path: 
     try:
         relative = Path(local_path).resolve().relative_to(workspace_path.resolve())
     except ValueError:
-        raise CLIError(f"Claude final service file '{local_path}' is outside the agent workspace")
+        raise CLIError(
+            f"The agent's final service file '{local_path}' is outside the agent workspace"
+        )
     if (
         relative.parts[:1] not in (("trials",), ("service",))
         or not (session_path / relative).exists()
     ):
         raise CLIError(
-            f"Claude final service file '{local_path}' has no mirrored copy"
+            f"The agent's final service file '{local_path}' has no mirrored copy"
             f" at '{session_path / relative}'"
         )
     return relative.as_posix()

@@ -12,7 +12,7 @@ Presets offer a toolkit that streamlines agent-based model inference optimizatio
 ??? info "Prerequisites"
     Before using presets, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
 
-    Creating a preset requires the `claude` CLI to be installed on the machine where you create a preset.
+    Creating a preset requires the `claude` or `codex` CLI to be installed on the machine where you create a preset.
 
 ## Apply a configuration
 
@@ -68,7 +68,7 @@ Create the preset dsv4-flash? [y/n]: y
 > optimization is done against that hardware. Point `dstack apply` to a fleet configured
 > correspondingly, via `fleets` inside the preset configuration or via `--fleet` in the CLI.
 
-The command executes entirely locally and uses the locally installed `claude` CLI along with `dstack`'s bundled skills. The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark.
+The command executes entirely locally and uses the locally installed `claude` or `codex` CLI along with `dstack`'s bundled skills (see [Agent](#agent)). The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark.
 
 You can stop watching with `Ctrl`+`C` at any time. The agent keeps running, and `dstack preset logs -f` follows it again. Resume an interrupted creation with `dstack preset resume`:
 
@@ -84,24 +84,6 @@ When resuming, the configuration and constraints are read from the original sess
 
 To stop a creation and its runs, use `dstack preset stop`.
 
-??? info "Claude configuration"
-    By default, preset creation uses the existing `claude` login. To use an Anthropic API key instead, set:
-
-    ```shell
-    export DSTACK_AGENT_ANTHROPIC_API_KEY=...
-    ```
-
-    By default, the agent sets neither a model nor an effort level, so the `claude` CLI's built-in defaults apply. To override them, set:
-
-    ```shell
-    export DSTACK_AGENT_ANTHROPIC_MODEL=claude-fable-5-1
-    export DSTACK_AGENT_CLAUDE_EFFORT=max
-    ```
-
-    See the [Models overview](https://platform.claude.com/docs/en/models/overview) for the available models and their IDs.
-
-    Supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`.
-
 ??? info "Presets directory"
     The verified presets are saved locally under `~/.dstack/presets`, and `dstack preset` reads them from there. Presets aren't stored on the server.
 
@@ -115,6 +97,50 @@ Alternatively, pass `--fleet` to `dstack apply`.
 
 > Profile settings such as `spot_policy`, `max_price`, and `backends` are ignored during preset
 > creation. Configure them on the fleet instead.
+
+### Agent
+
+Set `agent` to choose which agent CLI creates the preset. Optionally, pin the model and the reasoning effort; otherwise the CLI's defaults apply.
+
+=== "Claude"
+
+    ```yaml
+    agent:
+      provider: claude
+      model: claude-fable-5-1
+      effort: max
+    ```
+
+    Model IDs are listed in the [Models overview](https://platform.claude.com/docs/en/models/overview). Supported effort levels are `low`, `medium`, `high`, `xhigh`, and `max`.
+
+    To set the defaults for all presets, use `DSTACK_AGENT_PROVIDER=claude`, `DSTACK_AGENT_ANTHROPIC_MODEL`, and `DSTACK_AGENT_CLAUDE_EFFORT`.
+
+    ??? info "Authentication"
+        By default, the agent uses your existing `claude` login. To use an Anthropic API key instead, set:
+
+        ```shell
+        export DSTACK_AGENT_ANTHROPIC_API_KEY=...
+        ```
+
+=== "Codex"
+
+    ```yaml
+    agent:
+      provider: codex
+      model: gpt-6-astra
+      effort: xhigh
+    ```
+
+    Run `codex debug models` to list model IDs. Supported effort levels are `low`, `medium`, `high`, and `xhigh`.
+
+    To set the defaults for all presets, use `DSTACK_AGENT_PROVIDER=codex`, `DSTACK_AGENT_OPENAI_MODEL`, and `DSTACK_AGENT_CODEX_EFFORT`.
+
+    ??? info "Authentication"
+        By default, the agent uses your existing `codex` login and configuration, without its MCP servers. To use an OpenAI API key instead, set:
+
+        ```shell
+        export DSTACK_AGENT_OPENAI_API_KEY=...
+        ```
 
 ### Model
 
@@ -354,7 +380,7 @@ $ dstack preset delete c83375b4
 
 ## Protips
 
-Under the hood, presets run an agent as a subprocess, using the local `claude` CLI. This process writes a real-time trace to `~/.dstack/presets/<id>/trace.jsonl`. The subprocess is launched with a built-in harness: how to run trials, submit runs, benchmark, verify presets, and use `dstack`.
+Under the hood, presets run an agent as a subprocess, using the local `claude` or `codex` CLI. This process writes a real-time trace to `~/.dstack/presets/<id>/trace.jsonl`. The subprocess is launched with a built-in harness: how to run trials, submit runs, benchmark, verify presets, and use `dstack`.
 
 At the same time, it's recommended to create presets using your own agent — either via a CLI such as Claude Code, or inside your IDE. Your agent helps you design the preset configuration, formulate hypotheses, and — most importantly — analyze the session's traces as well as the trial results (stored under `~/.dstack/presets/<id>/trials/<n>/trial.json`), to decide what the next session can be and what instructions to give it via `prompt`.
 

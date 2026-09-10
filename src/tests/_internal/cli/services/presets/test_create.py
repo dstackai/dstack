@@ -8,21 +8,24 @@ import pytest
 from pydantic import ValidationError
 
 from dstack._internal.cli.models.preset_agent import (
+    PresetAgentInfo,
     PresetSessionFinalize,
     PresetSessionProcess,
     PresetSessionState,
     PresetSessionWorkspace,
 )
 from dstack._internal.cli.services.presets.agent import (
-    ClaudeAuth,
     PresetAgentProcessOutput,
 )
+from dstack._internal.cli.services.presets.agents.base import PresetAgentSpec
+from dstack._internal.cli.services.presets.agents.claude import ClaudePresetAgent
 from dstack._internal.cli.services.presets.create import (
     PresetCreateResult,
     SessionBusyError,
     _build_constraints,
     _cleanup_runs,
     _create_preset,
+    _fresh_setup,
     _get_build_name,
     _print_fleet_offers,
     _save_final_report_copy,
@@ -50,10 +53,11 @@ from dstack._internal.cli.services.presets.workspace import (
     remove_agent_workspace,
 )
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetAgentConfig, PresetConfiguration
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.runs import Run, RunStatus
 from tests._internal.cli.common import (
+    get_agent_spec,
     get_preset,
     get_running_service_run,
     get_session_run,
@@ -64,13 +68,85 @@ from tests._internal.cli.common import (
 pytestmark = pytest.mark.windows
 
 
-def _claude_auth() -> ClaudeAuth:
-    return ClaudeAuth(
-        api_key="anthropic-secret",
-        executable="claude",
-        effort=None,
-        model="claude-test",
-    )
+class _TestClaudePresetAgent(ClaudePresetAgent):
+    """Claude without the environment lookup and the `claude` subprocess probes."""
+
+    def get_spec(self, config) -> PresetAgentSpec:
+        return get_agent_spec()
+
+    def get_info(self, spec: PresetAgentSpec) -> PresetAgentInfo:
+        return PresetAgentInfo(
+            provider="claude",
+            executable=spec.executable,
+            version=None,
+            auth_status="api-key",
+            effort=spec.effort,
+            model=None,
+        )
+
+
+class TestFreshSetup:
+    def test_the_agent_block_picks_the_agent_and_reaches_the_spec(self, tmp_path, monkeypatch):
+        seen: dict = {}
+
+        class _PresetAgent(_TestClaudePresetAgent):
+            provider = "codex"
+
+            def get_spec(self, config):
+                seen["config"] = config
+                return get_agent_spec()
+
+        def get_preset_agent(provider=None):
+            seen["provider"] = provider
+            return _PresetAgent()
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.get_preset_agent", get_preset_agent
+        )
+        configuration = PresetConfiguration(
+            name="qwen-build",
+            base="Qwen/Qwen3.5-27B",
+            agent={"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+        )
+
+        setup = _fresh_setup(
+            api=SimpleNamespace(project="main"),
+            configuration=configuration,
+            session=_agent_session(tmp_path),
+            build_name="qwen-build",
+            allowed_fleets=("gpu-fleet",),
+            user_prompt=None,
+            previous=(),
+        )
+
+        assert seen["provider"] == "codex"
+        assert seen["config"] == PresetAgentConfig(
+            provider="codex", model="gpt-6-astra", effort="xhigh"
+        )
+        assert setup.agent.provider == "codex"
+
+    def test_without_an_agent_block_the_environment_decides(self, tmp_path, monkeypatch):
+        seen: dict = {}
+
+        def get_preset_agent(provider=None):
+            seen["provider"] = provider
+            return _TestClaudePresetAgent()
+
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.get_preset_agent", get_preset_agent
+        )
+
+        _fresh_setup(
+            api=SimpleNamespace(project="main"),
+            configuration=PresetConfiguration(name="qwen-build", base="Qwen/Qwen3.5-27B"),
+            session=_agent_session(tmp_path),
+            build_name="qwen-build",
+            allowed_fleets=("gpu-fleet",),
+            user_prompt=None,
+            previous=(),
+        )
+
+        assert seen["provider"] is None
 
 
 def _session_dirs(tmp_path):
@@ -116,8 +192,8 @@ def creation_context(tmp_path, monkeypatch):
         env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
     )
     monkeypatch.setattr(
-        "dstack._internal.cli.services.presets.create.get_claude_auth",
-        _claude_auth,
+        "dstack._internal.cli.services.presets.create.get_preset_agent",
+        lambda provider=None: _TestClaudePresetAgent(),
     )
     monkeypatch.setattr(
         "dstack._internal.cli.services.presets.create._get_build_name",
@@ -256,14 +332,16 @@ class TestCreatePreset:
             )
 
     @pytest.mark.asyncio
-    async def test_checks_active_fleets_before_claude_auth(self, tmp_path, monkeypatch):
+    async def test_checks_active_fleets_before_claude_launch(self, tmp_path, monkeypatch):
         api = SimpleNamespace(
             project="main",
             client=SimpleNamespace(fleets=SimpleNamespace(list=lambda *args, **kwargs: [])),
         )
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.create.get_claude_auth",
-            lambda: pytest.fail("Claude auth must not be checked without an active fleet"),
+            "dstack._internal.cli.services.presets.create.get_preset_agent",
+            lambda provider=None: pytest.fail(
+                "The agent must not be set up without an active fleet"
+            ),
         )
 
         with pytest.raises(CLIError, match="no fleets"):
@@ -920,7 +998,7 @@ class TestInterruptAndResume:
         (session_dir / "agent.log").touch()
         session = PresetSession(path=session_dir, preset_id="fe98dc76")
         session.write_state(get_session_state(id="fe98dc76"))
-        workspace, workspace_record = create_agent_workspace(session)
+        workspace, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         workspace.constraints_path.write_text(
             '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
         )
@@ -928,8 +1006,8 @@ class TestInterruptAndResume:
         assert state is not None
         state.run = get_session_run(
             workspace=workspace_record,
-            claude_model="claude-pinned",
-            claude_session_id="sid-xyz",
+            agent_model="claude-pinned",
+            session_id="sid-xyz",
         )
         session.write_state(state)
         captured = {}
@@ -957,7 +1035,7 @@ class TestInterruptAndResume:
         )
 
         assert captured["initial_resume_session_id"] == "sid-xyz"
-        assert captured["auth"].model == "claude-pinned"
+        assert captured["spec"].model == "claude-pinned"
         assert result.preset.id == "fe98dc76"
         assert (session_dir / "workspace").is_dir()
         remove_agent_workspace(session)
@@ -1007,13 +1085,13 @@ class TestInterruptAndResume:
         (session_dir / "agent.log").touch()
         session = PresetSession(path=session_dir, preset_id="ab34ef12")
         session.write_state(get_session_state(id="ab34ef12"))
-        workspace, workspace_record = create_agent_workspace(session)
+        workspace, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         workspace.constraints_path.write_text(
             '{"run_name_prefix": "qwen-build"}', encoding="utf-8"
         )
         state = session.read_state()
         assert state is not None
-        state.run = get_session_run(workspace=workspace_record, claude_session_id="sid-abc")
+        state.run = get_session_run(workspace=workspace_record, session_id="sid-abc")
         session.write_state(state)
         session.write_user_prompt("Optimize for RAG traffic.")
         captured = {}
@@ -1124,13 +1202,13 @@ class TestFollowPreset:
         (session_dir / "agent.log").touch()
         (session_dir / "preset.dstack.yml").write_text(configuration_yaml)
         session = PresetSession(path=session_dir, preset_id="ab12cd34")
-        workspace, workspace_record = create_agent_workspace(session)
+        workspace, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         workspace.constraints_path.write_text('{"run_name_prefix": "qwen-build"}')
         session.write_state(
             get_session_state(
                 run=get_session_run(
                     workspace=workspace_record,
-                    agent=PresetSessionProcess(pid=987654321, started_at=None),
+                    session_process=PresetSessionProcess(pid=987654321, started_at=None),
                 )
             )
         )
@@ -1288,7 +1366,9 @@ class TestStopPresetSession:
             tmp_path,
             # A live owner: this very process.
             get_session_state(
-                run=get_session_run(agent=PresetSessionProcess(pid=os.getpid(), started_at=None))
+                run=get_session_run(
+                    session_process=PresetSessionProcess(pid=os.getpid(), started_at=None)
+                )
             ),
         )
         order = []
@@ -1404,7 +1484,7 @@ class TestReconcileDetachedSessions:
         )
         if owner_alive and state.run is not None:
             # A live pid with no recorded start time reads as an active owner.
-            state.run.agent = PresetSessionProcess(pid=os.getpid(), started_at=None)
+            state.run.session_process = PresetSessionProcess(pid=os.getpid(), started_at=None)
         (session_dir / "session.json").write_text(state.model_dump_json())
         if with_report:
             (session_dir / "workspace" / "w" / "final_report.json").write_text("{}")
@@ -1510,7 +1590,7 @@ class TestSessionProcessAlive:
             session_process_alive(
                 get_session_state(
                     run=get_session_run(
-                        agent=PresetSessionProcess(pid=os.getpid(), started_at=0.0)
+                        session_process=PresetSessionProcess(pid=os.getpid(), started_at=0.0)
                     )
                 )
             )
@@ -1538,9 +1618,9 @@ class TestBeginRun:
                 run=get_session_run(
                     workspace=workspace,
                     finalize=PresetSessionFinalize(project="old", keep_service=False),
-                    claude_model="claude-pinned",
-                    agent=PresetSessionProcess(pid=1, started_at=None),
-                    claude_session_id="sid-1",
+                    agent_model="claude-pinned",
+                    session_process=PresetSessionProcess(pid=1, started_at=None),
+                    session_id="sid-1",
                 ),
             )
         )
@@ -1548,7 +1628,8 @@ class TestBeginRun:
         session.begin_run(
             workspace=workspace,
             finalize=PresetSessionFinalize(project="main", keep_service=True),
-            claude_model=None,
+            agent_provider="claude",
+            agent_model=None,
         )
 
         state = session.read_state()
@@ -1561,6 +1642,7 @@ class TestBeginRun:
         # Everything the earlier run established survives: the claude state so a
         # resume finds it, and the agent reference so following a live detached
         # agent does not read it as dead (and kill it).
-        assert state.run.claude_model == "claude-pinned"
-        assert state.run.claude_session_id == "sid-1"
-        assert state.run.agent == PresetSessionProcess(pid=1, started_at=None)
+        assert state.run.agent_provider == "claude"
+        assert state.run.agent_model == "claude-pinned"
+        assert state.run.session_id == "sid-1"
+        assert state.run.session_process == PresetSessionProcess(pid=1, started_at=None)

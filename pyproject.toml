@@ -15,6 +15,7 @@ dependencies = [
     "requests",
     "requests-unixsocket>=0.4.1",
     "typing-extensions>=4.0.0",
+    "tomli>=2.0; python_version < '3.11'",
     "cryptography",
     "packaging",
     "python-dateutil",

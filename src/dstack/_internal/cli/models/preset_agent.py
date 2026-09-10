@@ -12,7 +12,7 @@ from pydantic import (
 )
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import PresetAgentProvider, ServiceConfiguration
 from dstack._internal.core.models.presets import PresetBenchmark
 
 
@@ -98,12 +98,15 @@ class PresetSessionRun(CoreModel):
 
     workspace: PresetSessionWorkspace
     finalize: PresetSessionFinalize
-    # Only known when this CLI launched the agent; a follower leaves it as is.
-    claude_model: Optional[str]
-    # None between claude process attempts and after a detach outlives them.
-    agent: Optional[PresetSessionProcess]
-    # None until the agent's stream reveals it.
-    claude_session_id: Optional[str]
+    # A resume launches the same agent CLI the session started with.
+    agent_provider: PresetAgentProvider
+    # The model pinned by the user; None leaves the choice to the agent CLI.
+    agent_model: Optional[str]
+    # The agent process; None between attempts and after a detach outlives them.
+    session_process: Optional[PresetSessionProcess]
+    # The agent CLI's own session, which its resume continues; None until the
+    # agent's stream reveals it.
+    session_id: Optional[str]
 
 
 class PresetSessionState(CoreModel):
@@ -126,14 +129,15 @@ class PresetSessionState(CoreModel):
 
 
 class PresetAgentInfo(CoreModel):
-    """`agent.json`: how the claude agent was launched. A debug record."""
+    """`agent.json`: how the agent CLI was launched. A debug record."""
 
+    provider: PresetAgentProvider
     executable: str
     version: Optional[str]
     auth_status: str
-    # None is the claude CLI's default.
+    # None is the agent CLI's default.
     effort: Optional[str]
-    # Reported by claude on its init line; None until then.
+    # Reported by the agent CLI once it starts; None until then.
     model: Optional[str]
 
 
@@ -169,3 +173,30 @@ class ClaudeResultEvent(ClaudeStreamEvent):
 AnyClaudeStreamEvent = Annotated[
     Union[ClaudeResultEvent, ClaudeStreamEvent], Field(union_mode="left_to_right")
 ]
+
+
+class CodexStreamItem(CoreModel):
+    # "agent_message", "command_execution", "web_search", "reasoning", and others.
+    type: str
+    # The message text of an "agent_message"; the final one is the JSON report.
+    text: Optional[str] = None
+
+
+class CodexStreamError(CoreModel):
+    message: str
+
+
+class CodexStreamEvent(CoreModel):
+    """One line of `codex exec --json`. Not our format: unknown fields are dropped
+    and omitted fields default."""
+
+    # "thread.started", "turn.started", "item.started", "item.completed",
+    # "turn.completed", "turn.failed", "error", and whatever a newer codex adds.
+    type: str
+    # On "thread.started": the id `codex exec resume` takes.
+    thread_id: Optional[str] = None
+    item: Optional[CodexStreamItem] = None
+    # On "turn.failed".
+    error: Optional[CodexStreamError] = None
+    # On "error": a stream or API failure outside a turn.
+    message: Optional[str] = None

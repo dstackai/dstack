@@ -18,20 +18,24 @@ from dstack._internal.cli.models.preset_agent import (
     PresetAgentFailure,
     PresetAgentSuccess,
     PresetSessionFinalize,
+    PresetSessionRun,
     PresetSessionState,
     PresetSessionStatus,
     PresetSessionWorkspace,
 )
 from dstack._internal.cli.models.presets import VerifiedPreset
 from dstack._internal.cli.services.presets.agent import (
-    ClaudeAuth,
     PresetAgentProcessOutput,
     attach_preset_agent,
     build_preset_agent_env,
-    get_agent_info,
-    get_claude_auth,
     run_preset_agent,
     terminate_agent_process,
+)
+from dstack._internal.cli.services.presets.agents import (
+    AGENT_PROVIDER_ENV,
+    PresetAgent,
+    PresetAgentSpec,
+    get_preset_agent,
 )
 from dstack._internal.cli.services.presets.prompt import get_preset_agent_system_prompt
 from dstack._internal.cli.services.presets.redaction import (
@@ -319,7 +323,7 @@ def stop_preset_session(api: Client, preset_id: str) -> None:
     # Stop wins, like `dstack stop`: record the intent first so a live owner's
     # retry loop exits instead of resurrecting the agent, then terminate.
     _finish_agent_session(session, "interrupted")
-    terminate_agent_process(state.run.agent if state.run else None)
+    terminate_agent_process(state.run.session_process if state.run else None)
     _stop_active_session_runs(api, session)
     _suspend_agent_session(session)
 
@@ -453,7 +457,9 @@ class _CreationSetup:
     """Per-mode inputs to the shared creation path, built by one of
     `_fresh_setup`, `_resume_setup`, or `_attach_setup`."""
 
-    auth: Optional[ClaudeAuth]
+    agent: PresetAgent
+    # None when this CLI only follows an agent it did not start.
+    spec: Optional[PresetAgentSpec]
     workspace: PresetAgentWorkspace
     workspace_record: PresetSessionWorkspace
     build_name: str
@@ -477,8 +483,9 @@ def _fresh_setup(
         allowed_fleets = _get_allowed_fleets(api, configuration)
     if not allowed_fleets:
         raise CLIError(_NO_FLEETS_ERROR)
-    auth = get_claude_auth()
-    workspace, workspace_record = create_agent_workspace(session)
+    agent = get_preset_agent(configuration.agent.provider if configuration.agent else None)
+    spec = agent.get_spec(configuration.agent)
+    workspace, workspace_record = create_agent_workspace(session, agent.skills_dir)
     previous_ids = tuple(session.preset_id for session in previous)
     if previous_ids:
         install_previous_records(workspace, previous)
@@ -486,7 +493,8 @@ def _fresh_setup(
         configuration.name, configuration.model.api_model_name, session.preset_id
     )
     return _CreationSetup(
-        auth=auth,
+        agent=agent,
+        spec=spec,
         workspace=workspace,
         workspace_record=workspace_record,
         build_name=build_name,
@@ -498,7 +506,15 @@ def _fresh_setup(
     )
 
 
+def _read_session_run(session: PresetSession) -> PresetSessionRun:
+    state = session.read_state()
+    if state is None or state.run is None:
+        raise CLIError(f"Preset {session.preset_id} session state is unreadable")
+    return state.run
+
+
 def _resume_setup(
+    configuration: PresetConfiguration,
     session: PresetSession,
     build_name: Optional[str],
     user_prompt: Optional[str],
@@ -510,19 +526,34 @@ def _resume_setup(
             "The configuration prompt is ignored when resuming: the preset keeps its original prompt"
         )
     user_prompt = pinned_prompt
-    auth = get_claude_auth()
     workspace, workspace_record = attach_agent_workspace(session)
-    state = session.read_state()
-    if state is None or state.run is None:
-        raise CLIError(f"Preset {session.preset_id} session state is unreadable")
-    if state.run.claude_model:
-        auth = dataclasses.replace(auth, model=state.run.claude_model)
-    initial_resume_session_id = state.run.claude_session_id
-    previous_ids = tuple(state.previous)
+    run = _read_session_run(session)
+    # The session keeps the agent it started with; neither the environment nor an
+    # edited `agent` block can switch it.
+    agent = get_preset_agent(run.agent_provider)
+    agent_config = configuration.agent
+    if agent_config is not None and agent_config.provider != agent.provider:
+        warn(
+            f"agent.provider={agent_config.provider} is ignored when resuming:"
+            f" the preset keeps its original agent ({agent.provider})"
+        )
+        agent_config = None
+    requested_provider = os.getenv(AGENT_PROVIDER_ENV)
+    if requested_provider and requested_provider != agent.provider:
+        warn(
+            f"{AGENT_PROVIDER_ENV}={requested_provider} is ignored when resuming:"
+            f" the preset keeps its original agent ({agent.provider})"
+        )
+    spec = agent.get_spec(agent_config)
+    if run.agent_model:
+        spec = dataclasses.replace(spec, model=run.agent_model)
+    initial_resume_session_id = run.session_id
+    previous_ids = _read_previous_ids(session)
     if previous_ids:
         install_previous_records(workspace, _load_pinned_previous_sessions(previous_ids))
     return _CreationSetup(
-        auth=auth,
+        agent=agent,
+        spec=spec,
         workspace=workspace,
         workspace_record=workspace_record,
         build_name=build_name or _load_build_name(workspace),
@@ -540,7 +571,8 @@ def _attach_setup(
 ) -> _CreationSetup:
     workspace, workspace_record = attach_agent_workspace(session)
     return _CreationSetup(
-        auth=None,
+        agent=get_preset_agent(_read_session_run(session).agent_provider),
+        spec=None,
         workspace=workspace,
         workspace_record=workspace_record,
         build_name=build_name or _load_build_name(workspace),
@@ -570,7 +602,7 @@ async def _create_preset(
     if mode == "attach":
         setup = _attach_setup(session, build_name)
     elif mode == "resume":
-        setup = _resume_setup(session, build_name, user_prompt)
+        setup = _resume_setup(configuration, session, build_name, user_prompt)
     else:
         setup = _fresh_setup(
             api, configuration, session, build_name, allowed_fleets, user_prompt, previous
@@ -580,7 +612,8 @@ async def _create_preset(
     session.begin_run(
         workspace=setup.workspace_record,
         finalize=PresetSessionFinalize(project=api.project, keep_service=keep_service),
-        claude_model=setup.auth.model if setup.auth is not None else None,
+        agent_provider=setup.agent.provider,
+        agent_model=setup.spec.model if setup.spec is not None else None,
     )
 
     preset_env = configuration.env.as_dict()
@@ -590,7 +623,7 @@ async def _create_preset(
     redacted_values = get_redacted_values(
         [
             token,
-            (setup.auth.api_key if setup.auth is not None else None) or "",
+            (setup.spec.api_key if setup.spec is not None else None) or "",
             # Passthrough values are resolved from the caller's environment and
             # are secrets; literal values are the user's own configuration text.
             # The passthrough keys come from the source configuration, since
@@ -610,11 +643,12 @@ async def _create_preset(
     creation_succeeded = False
     interrupted = False
     cleanup_error: Optional[str] = None
-    if setup.auth is not None:
+    if setup.spec is not None:
         env = build_preset_agent_env(
             api=api,
             preset_env=preset_env,
-            auth=setup.auth,
+            agent=setup.agent,
+            spec=setup.spec,
             workspace=setup.workspace,
             token=token,
         )
@@ -623,6 +657,7 @@ async def _create_preset(
         baseline=configuration.effective_baseline,
         previous=setup.previous,
         custom_dataset=configuration.dataset is not None,
+        provider=setup.agent.provider,
     )
     if setup.write_constraints:
         if setup.user_prompt:
@@ -637,12 +672,13 @@ async def _create_preset(
         # while the listing and `--previous` read constraints from the session dir.
         session.write_constraints(constraints_text)
         session.write_prompt(prompt)
-    if setup.auth is not None:
-        session.write_agent_info(get_agent_info(setup.auth))
+    if setup.spec is not None:
+        session.write_agent_info(setup.agent.get_info(setup.spec))
     try:
         if mode == "attach":
             process_output = await attach_preset_agent(
                 workspace=setup.workspace,
+                agent=setup.agent,
                 redacted_values=redacted_values,
                 session=session,
             )
@@ -653,12 +689,13 @@ async def _create_preset(
             ):
                 raise AgentExitedWithoutReport(process_output.error)
         else:
-            assert setup.auth is not None
+            assert setup.spec is not None
             process_output = await run_preset_agent(
                 prompt=prompt,
                 env=env,
                 workspace=setup.workspace,
-                auth=setup.auth,
+                agent=setup.agent,
+                spec=setup.spec,
                 redacted_values=redacted_values,
                 session=session,
                 initial_resume_session_id=setup.initial_resume_session_id,
@@ -670,7 +707,7 @@ async def _create_preset(
             redacted_values=redacted_values,
         )
         if isinstance(result, PresetAgentFailure):
-            raise CLIError(result.failure_summary or "Claude did not create a preset")
+            raise CLIError(result.failure_summary or "The agent did not create a preset")
         report = result
         run = api.client.runs.get(api.project, report.run_name)
         preset = build_verified_preset(
@@ -773,7 +810,9 @@ def _stop_or_detach_agent_session(session: PresetSession, api: Client) -> None:
     """`create` interrupt: stop the session, or detach and leave the agent
     working as a running session in `dstack preset`."""
     state = session.read_state()
-    agent_alive = state is not None and state.run is not None and process_alive(state.run.agent)
+    agent_alive = (
+        state is not None and state.run is not None and process_alive(state.run.session_process)
+    )
     stop = True
     if agent_alive:
         try:
@@ -788,7 +827,7 @@ def _stop_or_detach_agent_session(session: PresetSession, api: Client) -> None:
         )
         return
     if state is not None:
-        terminate_agent_process(state.run.agent if state.run else None)
+        terminate_agent_process(state.run.session_process if state.run else None)
     _stop_active_session_runs(api, session)
     _suspend_agent_session(session)
 
