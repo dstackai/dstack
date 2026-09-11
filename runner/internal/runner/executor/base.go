@@ -15,7 +15,14 @@ type Executor interface {
 	WriteFileArchive(id string, src io.Reader) error
 	// It must be safe to call WriteRepoBlob more than once
 	WriteRepoBlob(src io.Reader) error
+	// Setup must be called once, before Run. Run must not be called if it fails
+	Setup(ctx context.Context) error
+	// JobInfo must be called after a successful Setup
+	JobInfo() (username string, workingDir string)
+	// Run finalizes the executor before returning
 	Run(ctx context.Context) error
+	// It must be safe to call Finalize more than once
+	Finalize(ctx context.Context)
 
 	GetHistory(timestamp int64) *schemas.PullResponse
 	GetJobWsLogsHistory() []schemas.LogEvent
@@ -23,7 +30,6 @@ type Executor interface {
 	GetRunnerState() string
 	SetRunnerState(state string)
 
-	GetJobInfo(ctx context.Context) (username string, workingDir string, err error)
 	SetJobState(ctx context.Context, state schemas.JobState)
 	SetJobStateWithTerminationReason(
 		ctx context.Context,

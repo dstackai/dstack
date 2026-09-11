@@ -27,7 +27,10 @@ type fakeExecutor struct {
 func (e *fakeExecutor) SetJob(schemas.SubmitBody)                {}
 func (e *fakeExecutor) WriteFileArchive(string, io.Reader) error { return nil }
 func (e *fakeExecutor) WriteRepoBlob(io.Reader) error            { return nil }
+func (e *fakeExecutor) Setup(context.Context) error              { return nil }
+func (e *fakeExecutor) JobInfo() (string, string)                { return "", "" }
 func (e *fakeExecutor) Run(context.Context) error                { return nil }
+func (e *fakeExecutor) Finalize(context.Context)                 {}
 
 func (e *fakeExecutor) GetHistory(int64) *schemas.PullResponse  { return &schemas.PullResponse{} }
 func (e *fakeExecutor) GetJobWsLogsHistory() []schemas.LogEvent { return nil }
@@ -35,8 +38,7 @@ func (e *fakeExecutor) GetJobWsLogsHistory() []schemas.LogEvent { return nil }
 func (e *fakeExecutor) GetRunnerState() string      { return e.state }
 func (e *fakeExecutor) SetRunnerState(state string) { e.state = state }
 
-func (e *fakeExecutor) GetJobInfo(context.Context) (string, string, error) { return "", "", nil }
-func (e *fakeExecutor) SetJobState(context.Context, schemas.JobState)      {}
+func (e *fakeExecutor) SetJobState(context.Context, schemas.JobState) {}
 func (e *fakeExecutor) SetJobStateWithTerminationReason(
 	context.Context, schemas.JobState, types.TerminationReason, string,
 ) {

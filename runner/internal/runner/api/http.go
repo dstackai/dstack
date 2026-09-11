@@ -159,20 +159,31 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (interfa
 
 	var runCtx context.Context
 	runCtx, s.cancelRun = context.WithCancel(context.Background())
-	username, workingDir, err := s.executor.GetJobInfo(runCtx)
+	err := s.executor.Setup(runCtx)
 	go func() {
+		// The server waits on jobBarrierCh to start shutting down, so it must be notified even
+		// when there is no job to run. Finalize() runs first: the server goes on to wait for a
+		// final /api/pull, which is only served once the executor reports its state as final.
+		defer func() { s.jobBarrierCh <- nil }() // notify server that job finished
+		defer s.executor.Finalize(runCtx)        // a safeguard, Setup and Run finalize themselves
+		if err != nil {
+			return
+		}
 		_ = s.executor.Run(runCtx) // INFO: all errors are handled inside the Run()
-		s.jobBarrierCh <- nil      // notify server that job finished
 	}()
 
-	if err == nil {
-		return &schemas.JobInfoResponse{
-			Username:   username,
-			WorkingDir: workingDir,
-		}, nil
+	if err != nil {
+		// Setup has recorded the failure as a job state, and that state and the logs reach the
+		// server through /api/pull. Reporting the error here would instead be seen as the
+		// runner not accepting the job submission, losing the real termination reason.
+		//nolint:nilerr
+		return nil, nil
 	}
-
-	return nil, nil
+	username, workingDir := s.executor.JobInfo()
+	return &schemas.JobInfoResponse{
+		Username:   username,
+		WorkingDir: workingDir,
+	}, nil
 }
 
 func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
