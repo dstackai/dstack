@@ -41,6 +41,7 @@ declare interface IPreset {
     created_at: string;
     pushed_by: string;
     project_name: string;
+    can_delete?: boolean;
 }
 
 declare interface IPresetDetails extends IPreset {

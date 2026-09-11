@@ -1,9 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import cn from 'classnames';
+import { PublicApp } from 'PublicApp';
+import { colorBackgroundHomeHeader } from '@cloudscape-design/design-tokens';
 
-import { Box, NavigateLink, SpaceBetween } from 'components';
-import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
+import { Box, Container, ContentLayout, Header, NavigateLink, SpaceBetween, Spinner } from 'components';
 
 import { ROUTES } from 'routes';
 import { useGetEntraInfoQuery, useGetGoogleInfoQuery, useGetOktaInfoQuery } from 'services/auth';
@@ -13,9 +13,7 @@ import { LoginByGoogle } from '../LoginByGoogle';
 import { LoginByOkta } from '../LoginByOkta';
 import { LoginByTokenForm } from '../LoginByTokenForm';
 
-import styles from './styles.module.scss';
-
-export const SelfHostedLogin: React.FC = () => {
+export const SelfHostedLogin: React.FC<{ tokenOnly?: boolean }> = ({ tokenOnly = false }) => {
     const { t } = useTranslation();
     const { data: oktaData, isLoading: isLoadingOkta } = useGetOktaInfoQuery();
     const { data: entraData, isLoading: isLoadingEntra } = useGetEntraInfoQuery();
@@ -24,30 +22,44 @@ export const SelfHostedLogin: React.FC = () => {
     const oktaEnabled = oktaData?.enabled;
     const entraEnabled = entraData?.enabled;
     const googleEnabled = googleData?.enabled;
-
-    const isLoading = isLoadingOkta || isLoadingEntra;
-    const isShowTokenForm = !oktaEnabled && !entraEnabled;
+    const isLoading = isLoadingOkta || isLoadingEntra || isLoadingGoogle;
+    const hasSSO = oktaEnabled || entraEnabled || googleEnabled;
+    const showTokenForm = tokenOnly || (!isLoading && !hasSSO);
 
     return (
-        <UnauthorizedLayout>
-            <div className={cn(styles.form)}>
-                <SpaceBetween size="xl" alignItems="center">
-                    <Box variant="h1" textAlign="center">
+        <PublicApp>
+            <ContentLayout
+                defaultPadding
+                headerVariant="high-contrast"
+                maxContentWidth={500}
+                headerBackgroundStyle={colorBackgroundHomeHeader}
+                header={
+                    <Box variant="h1" padding={{ vertical: 'xxxl' }} textAlign="center">
                         {t('auth.sign_in_to_dstack')}
                     </Box>
-
-                    {!isLoading && isShowTokenForm && <LoginByTokenForm />}
-                    {!isLoadingOkta && oktaEnabled && <LoginByOkta className={styles.okta} />}
-                    {!isLoadingEntra && entraEnabled && <LoginByEntraID className={styles.entra} />}
-                    {!isLoadingGoogle && googleEnabled && <LoginByGoogle className={styles.google} />}
-
-                    {!isLoading && !isShowTokenForm && (
-                        <Box color="text-body-secondary">
-                            <NavigateLink href={ROUTES.AUTH.TOKEN}>{t('auth.login_by_token')}</NavigateLink>
+                }
+            >
+                <Container
+                    header={
+                        <Box padding={{ bottom: 'xs' }}>
+                            <Header variant="h2">{showTokenForm ? 'Sign in with a token' : t('common.login')}</Header>
                         </Box>
-                    )}
-                </SpaceBetween>
-            </div>
-        </UnauthorizedLayout>
+                    }
+                >
+                    <SpaceBetween size="l">
+                        {showTokenForm && <LoginByTokenForm />}
+                        {!tokenOnly && isLoading && <Spinner />}
+                        {!tokenOnly && !isLoading && oktaEnabled && <LoginByOkta />}
+                        {!tokenOnly && !isLoading && entraEnabled && <LoginByEntraID />}
+                        {!tokenOnly && !isLoading && googleEnabled && <LoginByGoogle />}
+                        {!isLoading && hasSSO && (
+                            <NavigateLink href={tokenOnly ? ROUTES.BASE : ROUTES.AUTH.TOKEN}>
+                                {tokenOnly ? t('auth.another_login_methods') : 'Sign in with a token'}
+                            </NavigateLink>
+                        )}
+                    </SpaceBetween>
+                </Container>
+            </ContentLayout>
+        </PublicApp>
     );
 };

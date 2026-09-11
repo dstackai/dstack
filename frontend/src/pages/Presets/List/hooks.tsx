@@ -10,7 +10,6 @@ import { DATE_TIME_FORMAT, PRESETS_DOCS_URL } from 'consts';
 import { useNotifications } from 'hooks';
 import { getServerError, goToUrl } from 'libs';
 import {
-    EMPTY_QUERY,
     getNamePatternFilterRequestParams,
     requestParamsToTokens,
     tokensToRequestParams,
@@ -34,13 +33,24 @@ const MAX_FILTER_OPTIONS = 100;
 export const usePresetsTableEmptyMessages = ({
     clearFilter,
     isDisabledClearFilter,
+    isAuthenticated,
 }: {
     clearFilter?: () => void;
     isDisabledClearFilter?: boolean;
+    isAuthenticated: boolean;
 }) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = (): React.ReactNode => {
+        if (isDisabledClearFilter && !isAuthenticated) {
+            return (
+                <ListEmptyMessage
+                    title={t('presets.public_empty_message_title')}
+                    message={t('presets.public_empty_message_text')}
+                />
+            );
+        }
+
         if (isDisabledClearFilter) {
             // Presets are created and pushed with the CLI, so there is nothing
             // to create here - the docs are the useful next step.
@@ -97,7 +107,15 @@ export const useColumnsDefinitions = () => {
             id: 'project',
             header: t('presets.project'),
             cell: (item: IPreset) => (
-                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)}>{item.project_name}</NavigateLink>
+                <NavigateLink
+                    href={
+                        item.can_delete
+                            ? ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)
+                            : `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: item.project_name })}`
+                    }
+                >
+                    {item.project_name}
+                </NavigateLink>
             ),
         },
         {
@@ -113,9 +131,12 @@ export const useColumnsDefinitions = () => {
         {
             id: 'user',
             header: t('presets.user'),
-            cell: (item: IPreset) => (
-                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.pushed_by)}>{item.pushed_by}</NavigateLink>
-            ),
+            cell: (item: IPreset) =>
+                item.can_delete ? (
+                    <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.pushed_by)}>{item.pushed_by}</NavigateLink>
+                ) : (
+                    item.pushed_by
+                ),
         },
         {
             id: 'created',
@@ -146,10 +167,11 @@ export const usePresetsDelete = () => {
     return { isDeleting, deletePresets } as const;
 };
 
-export const useFilters = () => {
+export const useFilters = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
-        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+    const propertyFilterQuery = useMemo(
+        () => requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+        [searchParams],
     );
     const [filteringOptions, setFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
     const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
@@ -181,30 +203,39 @@ export const useFilters = () => {
     // other list pages use; a base model is typed in, as no API enumerates one.
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setFilteringOptions([]);
+        if (!isAuthenticated) {
+            setFilteringStatusType(undefined);
+            return;
+        }
         setFilteringStatusType('loading');
 
-        if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects(getNamePatternFilterRequestParams(filteringText, MAX_FILTER_OPTIONS))
-                .unwrap()
-                .then(({ data }) =>
-                    data.map(({ project_name }) => ({
-                        propertyKey: filterKeys.PROJECT_NAME,
-                        value: project_name,
-                    })),
-                )
-                .then(setFilteringOptions);
-        }
+        try {
+            if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
+                await getProjects(getNamePatternFilterRequestParams(filteringText, MAX_FILTER_OPTIONS))
+                    .unwrap()
+                    .then(({ data }) =>
+                        data.map(({ project_name }) => ({
+                            propertyKey: filterKeys.PROJECT_NAME,
+                            value: project_name,
+                        })),
+                    )
+                    .then(setFilteringOptions);
+            }
 
-        if (filteringProperty?.key === filterKeys.USERNAME) {
-            await getUsers(getNamePatternFilterRequestParams(filteringText, MAX_FILTER_OPTIONS))
-                .unwrap()
-                .then(({ data }) =>
-                    data.map(({ username }) => ({
-                        propertyKey: filterKeys.USERNAME,
-                        value: username,
-                    })),
-                )
-                .then(setFilteringOptions);
+            if (filteringProperty?.key === filterKeys.USERNAME) {
+                await getUsers(getNamePatternFilterRequestParams(filteringText, MAX_FILTER_OPTIONS))
+                    .unwrap()
+                    .then(({ data }) =>
+                        data.map(({ username }) => ({
+                            propertyKey: filterKeys.USERNAME,
+                            value: username,
+                        })),
+                    )
+                    .then(setFilteringOptions);
+            }
+        } catch {
+            setFilteringStatusType('error');
+            return;
         }
 
         setFilteringStatusType(undefined);
@@ -217,12 +248,10 @@ export const useFilters = () => {
         });
 
         setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens));
-        setPropertyFilterQuery({ ...detail, tokens: filteredTokens });
     };
 
     const clearFilter = () => {
         setSearchParams({});
-        setPropertyFilterQuery(EMPTY_QUERY);
     };
 
     const filteringRequestParams = useMemo(() => {

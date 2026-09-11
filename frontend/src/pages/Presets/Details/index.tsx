@@ -42,12 +42,19 @@ export const PresetDetails: React.FC = () => {
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
 
-    const { data, isLoading } = useGetPresetQuery({
+    const {
+        currentData: data,
+        isLoading,
+        isFetching,
+        error,
+    } = useGetPresetQuery({
         project_name: paramProjectName,
         id: paramPresetId,
     });
 
     const [deletePreset, { isLoading: isDeleting }] = useDeletePresetMutation();
+    const isLoadingPreset = isLoading || (isFetching && !data);
+    const canDelete = !!data?.can_delete;
 
     useBreadcrumbs([
         {
@@ -61,7 +68,8 @@ export const PresetDetails: React.FC = () => {
     ]);
 
     const deleteClickHandle = () => {
-        deletePreset({ project_name: paramProjectName, id: paramPresetId })
+        if (!canDelete || !data) return;
+        deletePreset({ project_name: paramProjectName, id: data.id })
             .unwrap()
             .then(() => navigate(ROUTES.PRESETS.LIST))
             .catch((error) => {
@@ -78,22 +86,30 @@ export const PresetDetails: React.FC = () => {
                 <DetailsHeader
                     title={data?.name ?? paramPresetId}
                     actionButtons={
-                        <ButtonWithConfirmation
-                            disabled={isDeleting || !data}
-                            formAction="none"
-                            onClick={deleteClickHandle}
-                            confirmTitle={t('presets.delete_confirm_title')}
-                            confirmContent={t('presets.delete_confirm_message')}
-                        >
-                            {t('common.delete')}
-                        </ButtonWithConfirmation>
+                        canDelete && !error ? (
+                            <ButtonWithConfirmation
+                                disabled={isDeleting || !data}
+                                formAction="none"
+                                onClick={deleteClickHandle}
+                                confirmTitle={t('presets.delete_confirm_title')}
+                                confirmContent={t('presets.delete_confirm_message')}
+                            >
+                                {t('common.delete')}
+                            </ButtonWithConfirmation>
+                        ) : undefined
                     }
                 />
             }
         >
-            {isLoading && !data && <Loader />}
+            {isLoadingPreset && !data && <Loader />}
 
-            {data && (
+            {!isLoadingPreset && (error || !data) && (
+                <Alert type="error" header={t('presets.unavailable_title')}>
+                    {t('presets.unavailable_message')}
+                </Alert>
+            )}
+
+            {data && !error && (
                 <SpaceBetween size="l">
                     {/* Nothing else on the page explains an empty name. */}
                     {!data.name && <Alert type="info">{t('presets.superseded_alert')}</Alert>}
@@ -167,7 +183,13 @@ export const PresetDetailsOverview: React.FC = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('presets.project')}</Box>
                         <div>
-                            <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)}>
+                            <NavigateLink
+                                href={
+                                    data.can_delete
+                                        ? ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)
+                                        : `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: data.project_name })}`
+                                }
+                            >
                                 {data.project_name}
                             </NavigateLink>
                         </div>
@@ -175,7 +197,11 @@ export const PresetDetailsOverview: React.FC = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('presets.user')}</Box>
                         <div>
-                            <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
+                            {data.can_delete ? (
+                                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
+                            ) : (
+                                data.pushed_by
+                            )}
                         </div>
                     </div>
                     <div>

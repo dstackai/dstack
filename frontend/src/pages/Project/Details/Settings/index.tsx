@@ -31,7 +31,13 @@ import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProj
 import { riseRouterException } from 'libs';
 import { copyToClipboard } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectMutation } from 'services/project';
+import { presetApi } from 'services/preset';
+import {
+    useGetProjectQuery,
+    useUpdateProjectMembersMutation,
+    useUpdateProjectMutation,
+    useUpdateProjectPublicPresetsMutation,
+} from 'services/project';
 import { useGetRunsQuery } from 'services/run';
 import { templateApi } from 'services/templates';
 import { useGetUserDataQuery } from 'services/user';
@@ -45,7 +51,7 @@ import { getProjectRoleByUserName } from 'pages/Project/utils';
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
 import { NoFleetProjectAlert } from '../../components/NoFleetProjectAlert';
-import { VISIBILITY_INFO } from '../../constants';
+import { PRESETS_INFO, VISIBILITY_INFO } from '../../constants';
 import { GatewaysTable } from '../../Gateways';
 import { useGatewaysTable } from '../../Gateways/hooks';
 import { ProjectSecrets } from '../../Secrets';
@@ -74,7 +80,8 @@ export const ProjectSettings: React.FC = () => {
     const [openHelpPanel] = useHelpPanel();
     const dispatch = useDispatch();
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
-    const [updateProject] = useUpdateProjectMutation();
+    const [updateProject, { isLoading: isUpdatingProject }] = useUpdateProjectMutation();
+    const [updateProjectPublicPresets, { isLoading: isUpdatingPublicPresets }] = useUpdateProjectPublicPresetsMutation();
     const { deleteProject, isDeleting } = useDeleteProject();
     const { data: currentUser } = useGetUserDataQuery({});
 
@@ -108,22 +115,20 @@ export const ProjectSettings: React.FC = () => {
         value: data?.owner.username,
     };
 
+    const isSky = process.env.UI_VERSION === 'sky';
     const visibilityOptions = [
-        { label: t('projects.edit.visibility.private') || '', value: 'private' },
-        { label: t('projects.edit.visibility.public') || '', value: 'public' },
+        { label: t('projects.edit.visibility.private'), value: 'private' },
+        { label: t('projects.edit.visibility.public'), value: 'public' },
     ];
-
-    const [selectedVisibility, setSelectedVisibility] = useState(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
+    const isUpdatingVisibility = isUpdatingProject || isUpdatingPublicPresets;
+    const [visibilityEnabled, setVisibilityEnabled] = useState(false);
+    const [isChangeVisibilityVisible, setIsChangeVisibilityVisible] = useState(false);
     const [templatesRepoValue, setTemplatesRepoValue] = useState<string>('');
     const [templatesRepoError, setTemplatesRepoError] = useState<string | null>(null);
     const [isChangeTemplatesRepoVisible, setIsChangeTemplatesRepoVisible] = useState(false);
     const [isResetTemplatesRepoVisible, setIsResetTemplatesRepoVisible] = useState(false);
     const changeTemplatesRepoInputWrapperRef = React.useRef<HTMLDivElement | null>(null);
     const dangerZoneRef = React.useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        setSelectedVisibility(data?.isPublic ? visibilityOptions[1] : visibilityOptions[0]);
-    }, [data]);
 
     useEffect(() => {
         setTemplatesRepoValue(data?.templates_repo ?? '');
@@ -193,27 +198,6 @@ export const ProjectSettings: React.FC = () => {
 
     const debouncedMembersHandler = useCallback(debounce(changeMembersHandler, 1000), []);
 
-    const changeVisibilityHandler = (is_public: boolean) => {
-        updateProject({
-            project_name: paramProjectName,
-            is_public: is_public,
-        })
-            .unwrap()
-            .then(() => {
-                pushNotification({
-                    type: 'success',
-                    content: t('projects.edit.update_visibility_success'),
-                });
-            })
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .catch((error: any) => {
-                pushNotification({
-                    type: 'error',
-                    content: t('common.server_error', { error: error?.data?.detail?.msg }),
-                });
-            });
-    };
-
     const getApiErrorMessage = (error: unknown): string => {
         const detail = isFetchBaseQueryError(error) ? (error.data as ApiErrorResponse | undefined)?.detail : undefined;
         if (Array.isArray(detail)) {
@@ -226,6 +210,34 @@ export const ProjectSettings: React.FC = () => {
             return detail.msg;
         }
         return t('common.server_error', { error: 'Unknown error' });
+    };
+
+    const openChangeVisibilityDialog = () => {
+        setVisibilityEnabled(isSky ? (data?.public_presets ?? false) : !!data?.isPublic);
+        setIsChangeVisibilityVisible(true);
+    };
+
+    const confirmChangeVisibility = async () => {
+        if (!data || !isProjectAdmin(data) || isUpdatingVisibility) return;
+
+        try {
+            if (isSky) {
+                await updateProjectPublicPresets({
+                    project_name: paramProjectName,
+                    public_presets: visibilityEnabled,
+                }).unwrap();
+                dispatch(presetApi.util.invalidateTags(['Presets']));
+            } else {
+                await updateProject({ project_name: paramProjectName, is_public: visibilityEnabled }).unwrap();
+            }
+            setIsChangeVisibilityVisible(false);
+            pushNotification({
+                type: 'success',
+                content: t(isSky ? 'projects.edit.update_presets_success' : 'projects.edit.update_visibility_success'),
+            });
+        } catch (error: unknown) {
+            pushNotification({ type: 'error', content: getApiErrorMessage(error) });
+        }
     };
 
     const updateTemplatesRepoHandler = async (): Promise<boolean> => {
@@ -499,51 +511,30 @@ export const ProjectSettings: React.FC = () => {
                                         </>
                                     )}
 
-                                    {process.env.UI_VERSION !== 'sky' && isAvailableProjectManaging && (
+                                    {(isSky || isAvailableProjectManaging) && (
                                         <>
                                             <div className={styles.dangerSectionTitle}>
                                                 <Box variant="h5" color="text-body-secondary">
-                                                    {t('projects.edit.project_visibility_settings')}
+                                                    {t(
+                                                        isSky
+                                                            ? 'projects.edit.presets_settings'
+                                                            : 'projects.edit.project_visibility_settings',
+                                                    )}
                                                 </Box>
-                                                <InfoLink onFollow={() => openHelpPanel(VISIBILITY_INFO)} />
+                                                <InfoLink
+                                                    onFollow={() => openHelpPanel(isSky ? PRESETS_INFO : VISIBILITY_INFO)}
+                                                />
                                             </div>
 
                                             <div>
-                                                <ButtonWithConfirmation
+                                                <Button
                                                     variant="danger-normal"
-                                                    disabled={!isProjectAdmin(data)}
+                                                    disabled={!isProjectAdmin(data) || isUpdatingVisibility}
                                                     formAction="none"
-                                                    onClick={() =>
-                                                        changeVisibilityHandler(selectedVisibility.value === 'public')
-                                                    }
-                                                    confirmTitle={t('projects.edit.update_visibility_confirm_title')}
-                                                    confirmButtonLabel={t('projects.edit.change_visibility')}
-                                                    confirmContent={
-                                                        <SpaceBetween size="s">
-                                                            <Box variant="p" color="text-body-secondary">
-                                                                {t('projects.edit.update_visibility_confirm_message')}
-                                                            </Box>
-                                                            <div className={styles.dangerSectionField}>
-                                                                <SelectCSD
-                                                                    options={visibilityOptions}
-                                                                    selectedOption={selectedVisibility}
-                                                                    onChange={(event) =>
-                                                                        setSelectedVisibility(
-                                                                            event.detail.selectedOption as {
-                                                                                label: string;
-                                                                                value: string;
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                    expandToViewport={true}
-                                                                    filteringType="auto"
-                                                                />
-                                                            </div>
-                                                        </SpaceBetween>
-                                                    }
+                                                    onClick={openChangeVisibilityDialog}
                                                 >
                                                     {t('projects.edit.change_visibility')}
-                                                </ButtonWithConfirmation>
+                                                </Button>
                                             </div>
                                         </>
                                     )}
@@ -611,6 +602,34 @@ export const ProjectSettings: React.FC = () => {
                     </div>
                 </SpaceBetween>
             )}
+
+            <ConfirmationDialog
+                visible={isChangeVisibilityVisible}
+                onDiscard={() => setIsChangeVisibilityVisible(false)}
+                onConfirm={confirmChangeVisibility}
+                title={t(isSky ? 'projects.edit.presets_settings' : 'projects.edit.project_visibility_settings')}
+                confirmButtonLabel={t('projects.edit.change_visibility')}
+                content={
+                    <FormField
+                        description={
+                            isSky
+                                ? t(`projects.edit.presets_${visibilityEnabled ? 'public' : 'private'}_description`)
+                                : t(`projects.edit.visibility.${visibilityEnabled ? 'public' : 'private'}_description`)
+                        }
+                    >
+                        <div className={styles.dangerSectionField}>
+                            <SelectCSD
+                                options={visibilityOptions}
+                                selectedOption={visibilityOptions[visibilityEnabled ? 1 : 0]}
+                                onChange={({ detail }) => setVisibilityEnabled(detail.selectedOption.value === 'public')}
+                                disabled={isUpdatingVisibility}
+                                expandToViewport
+                                filteringType="auto"
+                            />
+                        </div>
+                    </FormField>
+                }
+            />
 
             <ConfirmationDialog
                 visible={isChangeTemplatesRepoVisible}

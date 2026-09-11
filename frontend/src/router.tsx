@@ -2,9 +2,13 @@ import React from 'react';
 import type { RouteObject } from 'react-router-dom';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
+import { PublicApp } from 'PublicApp';
+import { Home } from 'PublicApp/Home';
+import { PresetApp } from 'PublicApp/PresetApp';
 
 import App from 'App';
 import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
+import { LoginByGithub } from 'App/Login/LoginByGithub';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
@@ -39,6 +43,38 @@ import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
+    ...(process.env.UI_VERSION === 'sky'
+        ? [
+              {
+                  element: <PublicApp />,
+                  errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
+                  children: [
+                      { path: ROUTES.BASE, element: <Home /> },
+                      { path: ROUTES.AUTH.LOGIN, element: <LoginByGithub /> },
+                      { path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> },
+                  ],
+              },
+              {
+                  element: <PresetApp />,
+                  errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
+                  children: [
+                      {
+                          path: ROUTES.PRESETS.LIST,
+                          element: <PresetList />,
+                      },
+                      {
+                          path: ROUTES.PRESETS.DETAILS.TEMPLATE,
+                          element: <PresetDetails />,
+                          children: [
+                              { index: true, element: <PresetDetailsOverview /> },
+                              { path: ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE, element: <PresetVerifiedOn /> },
+                              { path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE, element: <PresetInspect /> },
+                          ],
+                      },
+                  ],
+              },
+          ]
+        : []),
     {
         path: '/',
         element: <App />,
@@ -61,15 +97,11 @@ export const router = createBrowserRouter([
                 path: ROUTES.AUTH.GOOGLE_CALLBACK,
                 element: <LoginByGoogleCallback />,
             },
-            {
-                path: ROUTES.AUTH.TOKEN,
-                element: <TokenLogin />,
-            },
+            ...(process.env.UI_VERSION !== 'sky' ? [{ path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> }] : []),
             // hubs
-            {
-                path: ROUTES.BASE,
-                element: <Navigate replace to={ROUTES.RUNS.LIST} />,
-            },
+            ...(process.env.UI_VERSION !== 'sky'
+                ? [{ path: ROUTES.BASE, element: <Navigate replace to={ROUTES.RUNS.LIST} /> }]
+                : []),
             {
                 path: ROUTES.PROJECT.LIST,
                 element: <ProjectList />,
@@ -256,32 +288,6 @@ export const router = createBrowserRouter([
                 path: ROUTES.VOLUMES.LIST,
                 element: <VolumeList />,
             },
-
-            // Presets, which only a server with a registry serves
-            ...([
-                process.env.UI_VERSION === 'sky' && {
-                    path: ROUTES.PRESETS.LIST,
-                    element: <PresetList />,
-                },
-                process.env.UI_VERSION === 'sky' && {
-                    path: ROUTES.PRESETS.DETAILS.TEMPLATE,
-                    element: <PresetDetails />,
-                    children: [
-                        {
-                            index: true,
-                            element: <PresetDetailsOverview />,
-                        },
-                        {
-                            path: ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE,
-                            element: <PresetVerifiedOn />,
-                        },
-                        {
-                            path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE,
-                            element: <PresetInspect />,
-                        },
-                    ],
-                },
-            ].filter(Boolean) as RouteObject[]),
 
             // Users
             {

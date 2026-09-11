@@ -3,6 +3,10 @@ declare var Tally: {
     closePopup: (string) => void;
 };
 
+interface Window {
+    Kapa?: { open: () => void };
+}
+
 declare type AddedEmptyString<Type> = {
     [Property in keyof Type]: Type[Property] | '';
 };

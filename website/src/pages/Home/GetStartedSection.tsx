@@ -365,7 +365,7 @@ export function GetStartedSection() {
                   <span className="gs-foot__note">Pull ready-to-deploy presets from the public registry</span>
                 )}
                 <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>
-                <Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign in</Button>
+                <Button href="https://sky.dstack.ai/auth" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign in</Button>
               </div>
             </div>
           </div>
