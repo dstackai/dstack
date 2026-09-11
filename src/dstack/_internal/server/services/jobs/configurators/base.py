@@ -27,11 +27,13 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
     OPENAI_MODEL_PROBE_TIMEOUT,
+    ROUTER_HEALTH_PROBE_URL,
     HTTPHeaderSpec,
     NodeGroup,
     PortMapping,
     ProbeConfig,
     PythonVersion,
+    ReplicaGroup,
     RepoExistsAction,
     RunConfigurationType,
     ServiceConfiguration,
@@ -489,15 +491,40 @@ class JobConfigurator(ABC):
             return self.run_spec.configuration.port.container_port
         return None
 
+    def _replica_group(self) -> Optional[ReplicaGroup]:
+        conf = self.run_spec.configuration
+        if not isinstance(conf, ServiceConfiguration):
+            return None
+        # `replica_group_name` is unset for services declaring `replicas` instead of
+        # `groups`; `replica_groups` synthesizes a group under the default name for them.
+        name = self.replica_group_name or DEFAULT_REPLICA_GROUP_NAME
+        for group in conf.replica_groups:
+            if group.name == name:
+                return group
+        return None
+
     def _probes(self) -> list[ProbeSpec]:
-        if isinstance(self.run_spec.configuration, ServiceConfiguration):
-            probes = self.run_spec.configuration.probes
-            if probes is not None:
-                return list(map(_probe_config_to_spec, probes))
-            # Generate default probe if model is set
-            model = self.run_spec.configuration.model
-            if isinstance(model, OpenAIChatModel):
-                return [_openai_model_probe_spec(model.name, model.prefix)]
+        conf = self.run_spec.configuration
+        if not isinstance(conf, ServiceConfiguration):
+            return []
+        if conf.probes is not None:
+            return list(map(_probe_config_to_spec, conf.probes))
+        # Generate default probe if model is set
+        model = conf.model
+        if not isinstance(model, OpenAIChatModel):
+            return []
+        if all(group.router is None for group in conf.replica_groups):
+            # No router: every replica serves the model itself, so a chat completions
+            # request is a genuine end-to-end readiness check.
+            return [_openai_model_probe_spec(model.name, model.prefix)]
+        group = self._replica_group()
+        if group is not None and group.router is not None:
+            # A router only answers chat completions once dstack has registered workers
+            # with it, and registration skips routers that are not ready yet. Probing
+            # chat completions here would deadlock: readiness would wait on registration
+            # while registration waits on readiness. Probe the router's own liveness
+            # endpoint instead, which does not depend on any worker.
+            return [_router_health_probe_spec()]
         return []
 
 
@@ -568,6 +595,19 @@ def _openai_model_probe_spec(model_name: str, prefix: str) -> ProbeSpec:
         ],
         body=body,
         timeout=OPENAI_MODEL_PROBE_TIMEOUT,
+        interval=DEFAULT_PROBE_INTERVAL,
+        ready_after=DEFAULT_PROBE_READY_AFTER,
+    )
+
+
+def _router_health_probe_spec() -> ProbeSpec:
+    # Both supported routers (SGLang/SMG and Dynamo) serve `/health` independently of
+    # whether any worker is registered.
+    return ProbeSpec(
+        type="http",
+        method=DEFAULT_PROBE_METHOD,
+        url=ROUTER_HEALTH_PROBE_URL,
+        timeout=DEFAULT_PROBE_TIMEOUT,
         interval=DEFAULT_PROBE_INTERVAL,
         ready_after=DEFAULT_PROBE_READY_AFTER,
     )
