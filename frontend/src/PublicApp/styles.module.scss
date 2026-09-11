@@ -1,0 +1,19 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.header {
+    display: flex;
+    background: awsui.$color-background-container-content;
+}
+
+.navigation {
+    flex: 1;
+    min-width: 0;
+}
+
+.signIn {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding-inline-end: awsui.$space-static-l;
+    border-block-end: 1px solid awsui.$color-border-divider-default;
+}

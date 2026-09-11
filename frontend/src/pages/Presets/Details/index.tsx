@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
+import { usePresetViewer } from 'PublicApp/PresetApp';
 
 import {
     Alert,
@@ -38,16 +39,29 @@ export const PresetDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const navigate = useNavigate();
+    const { isAuthenticated, scope, setScope } = usePresetViewer();
     const [pushNotification] = useNotifications();
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
 
-    const { data, isLoading } = useGetPresetQuery({
+    const {
+        currentData: data,
+        isLoading,
+        isFetching,
+        error,
+    } = useGetPresetQuery({
         project_name: paramProjectName,
         id: paramPresetId,
     });
 
     const [deletePreset, { isLoading: isDeleting }] = useDeletePresetMutation();
+    const isLoadingPreset = isLoading || (isFetching && !data);
+    const canDelete = isAuthenticated && !!data?.can_delete;
+    const isPublic = scope === 'public' || !canDelete;
+
+    useEffect(() => {
+        if (data && !data.can_delete) setScope('public');
+    }, [data, setScope]);
 
     useBreadcrumbs([
         {
@@ -61,7 +75,8 @@ export const PresetDetails: React.FC = () => {
     ]);
 
     const deleteClickHandle = () => {
-        deletePreset({ project_name: paramProjectName, id: paramPresetId })
+        if (!canDelete || !data) return;
+        deletePreset({ project_name: paramProjectName, id: data.id })
             .unwrap()
             .then(() => navigate(ROUTES.PRESETS.LIST))
             .catch((error) => {
@@ -78,22 +93,30 @@ export const PresetDetails: React.FC = () => {
                 <DetailsHeader
                     title={data?.name ?? paramPresetId}
                     actionButtons={
-                        <ButtonWithConfirmation
-                            disabled={isDeleting || !data}
-                            formAction="none"
-                            onClick={deleteClickHandle}
-                            confirmTitle={t('presets.delete_confirm_title')}
-                            confirmContent={t('presets.delete_confirm_message')}
-                        >
-                            {t('common.delete')}
-                        </ButtonWithConfirmation>
+                        canDelete && !error ? (
+                            <ButtonWithConfirmation
+                                disabled={isDeleting || !data}
+                                formAction="none"
+                                onClick={deleteClickHandle}
+                                confirmTitle={t('presets.delete_confirm_title')}
+                                confirmContent={t('presets.delete_confirm_message')}
+                            >
+                                {t('common.delete')}
+                            </ButtonWithConfirmation>
+                        ) : undefined
                     }
                 />
             }
         >
-            {isLoading && !data && <Loader />}
+            {isLoadingPreset && !data && <Loader />}
 
-            {data && (
+            {!isLoadingPreset && (error || !data) && (
+                <Alert type="error" header={t('presets.unavailable_title')}>
+                    {t('presets.unavailable_message')}
+                </Alert>
+            )}
+
+            {data && !error && (
                 <SpaceBetween size="l">
                     {/* Nothing else on the page explains an empty name. */}
                     {!data.name && <Alert type="info">{t('presets.superseded_alert')}</Alert>}
@@ -119,7 +142,7 @@ export const PresetDetails: React.FC = () => {
                         ]}
                     />
 
-                    <Outlet />
+                    <Outlet context={{ isPublic }} />
                 </SpaceBetween>
             )}
         </ContentLayout>
@@ -128,6 +151,7 @@ export const PresetDetails: React.FC = () => {
 
 export const PresetDetailsOverview: React.FC = () => {
     const { t } = useTranslation();
+    const { isPublic } = useOutletContext<{ isPublic: boolean }>();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
@@ -167,7 +191,13 @@ export const PresetDetailsOverview: React.FC = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('presets.project')}</Box>
                         <div>
-                            <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)}>
+                            <NavigateLink
+                                href={
+                                    isPublic
+                                        ? `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: data.project_name })}`
+                                        : ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)
+                                }
+                            >
                                 {data.project_name}
                             </NavigateLink>
                         </div>
@@ -175,7 +205,11 @@ export const PresetDetailsOverview: React.FC = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('presets.user')}</Box>
                         <div>
-                            <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
+                            {isPublic ? (
+                                data.pushed_by
+                            ) : (
+                                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
+                            )}
                         </div>
                     </div>
                     <div>

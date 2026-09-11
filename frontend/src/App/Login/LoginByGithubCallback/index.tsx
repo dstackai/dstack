@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -21,6 +21,7 @@ export const LoginByGithubCallback: React.FC = () => {
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const [isInvalidCode, setIsInvalidCode] = useState(false);
+    const callbackStarted = useRef(false);
     const dispatch = useAppDispatch();
 
     const [getNextRedirect] = useGetNextRedirectMutation();
@@ -42,7 +43,7 @@ export const LoginByGithubCallback: React.FC = () => {
                             dispatch(setAuthData({ token }));
                             if (process.env.UI_VERSION === 'sky') {
                                 const result = await getProjects({}).unwrap();
-                                if (result?.length === 0) {
+                                if (result.data.length === 0) {
                                     navigate(ROUTES.PROJECT.ADD);
                                     return;
                                 }
@@ -60,7 +61,11 @@ export const LoginByGithubCallback: React.FC = () => {
     };
 
     useEffect(() => {
-        if (code) {
+        // OAuth codes are single-use, including when StrictMode replays this effect.
+        if (callbackStarted.current) return;
+        callbackStarted.current = true;
+
+        if (code && state) {
             checkCode();
         } else {
             setIsInvalidCode(true);
@@ -71,14 +76,16 @@ export const LoginByGithubCallback: React.FC = () => {
         return (
             <UnauthorizedLayout>
                 <AuthErrorMessage title={t('auth.authorization_failed')}>
-                    <NavigateLink href={ROUTES.BASE}>{t('auth.try_again')}</NavigateLink>
+                    <NavigateLink href={process.env.UI_VERSION === 'sky' ? ROUTES.AUTH.LOGIN : ROUTES.BASE}>
+                        {t('auth.try_again')}
+                    </NavigateLink>
                 </AuthErrorMessage>
             </UnauthorizedLayout>
         );
 
     return (
         <UnauthorizedLayout>
-            <Loading />;
+            <Loading />
         </UnauthorizedLayout>
     );
 };

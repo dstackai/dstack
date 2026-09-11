@@ -268,7 +268,9 @@ Pushing the same name again moves the name to the new preset. The previous one s
 
 ### Registry
 
-Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). To share a preset, create a project there, add the people you want to share it with, and push the preset to that project. To push or pull a preset from a project, you have to be its member.
+Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). Create a project there and push presets to it. Project members can push, pull, and delete presets.
+
+Presets are private by default. Set **Presets** to **Public** when creating a project or in its settings to let anyone browse and pull its presets without signing in, including users of a self-hosted `dstack` server. Only project admins and global admins can change this setting; enabling it does not let anyone join the project.
 
 A self-hosted registry is part of [dstack Factory](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
 
@@ -390,7 +392,6 @@ At the same time, it's recommended to create presets using your own agent — ei
 ## Limitations
 
 * Currently, the agent doesn't upload compiled binaries anywhere; patches compile at runtime
-* The registry doesn't support public presets (coming soon)
 * Doesn't support ranges for `concurrency`
 
 > Report bugs and request features on [GitHub](https://github.com/dstackai/dstack/issues), and ask questions on [Discord](https://discord.gg/u8SmfwPpMd).

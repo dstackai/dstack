@@ -2,6 +2,7 @@ declare type TCreateWizardProjectParams = {
     project_name: string;
     dry?: boolean;
     is_public?: boolean;
+    public_presets?: boolean;
     config: {
         base_backends: string[];
     };
@@ -30,6 +31,7 @@ declare interface IProject {
     owner: IUser | { username: string };
     created_at: string;
     isPublic: boolean;
+    public_presets?: boolean;
     templates_repo?: string | null;
 }
 

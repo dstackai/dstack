@@ -33,10 +33,10 @@
         "clearFilter": "Clear filter",
         "server_error": "Server error: {{error}}",
         "login": "Sign in",
-        "login_github": "Sign in with GitHub",
-        "login_okta": "Sign in with Okta",
-        "login_entra": "Sign in with EntraID",
-        "login_google": "Sign in with Google",
+        "login_github": "Continue with GitHub",
+        "login_okta": "Continue with Okta",
+        "login_entra": "Continue with EntraID",
+        "login_google": "Continue with Google",
         "general": "General",
         "test": "Test",
         "local_storage_unavailable": "Local Storage is unavailable",
@@ -232,6 +232,10 @@
             "change_visibility": "Change",
             "project_visibility": "Visibility",
             "project_visibility_settings": "Visibility",
+            "presets_settings": "Presets",
+            "presets_private_description": "Only project members and global admins can view and pull this project’s presets",
+            "presets_public_description": "Anyone can view and pull this project’s presets without signing in",
+            "update_presets_success": "Preset visibility updated successfully",
             "templates_repo": "Templates",
             "override_project_templates": "Templates",
             "transfer_ownership": "Ownership",
@@ -361,7 +365,9 @@
             },
             "visibility": {
                 "private": "Private",
-                "public": "Public"
+                "public": "Public",
+                "private_description": "Only project members and global admins can access this project",
+                "public_description": "Any authorized user can see this project and join it as a member"
             }
         },
         "create": {
@@ -838,6 +844,14 @@
     },
     "presets": {
         "list_page_title": "Presets",
+        "my_projects": "My projects",
+        "public": "Public",
+        "public_empty_message_title": "No public presets",
+        "public_empty_message_text": "There are no public presets to display",
+        "load_error_title": "Unable to load presets",
+        "load_error_message": "Refresh to try again",
+        "unavailable_title": "Preset unavailable",
+        "unavailable_message": "This preset may have been removed, or you may not have access to it",
         "empty_message_title": "No presets",
         "empty_message_text": "Presets are created and pushed with the CLI.",
         "documentation": "Documentation",

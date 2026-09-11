@@ -1,4 +1,5 @@
 declare type TPresetsListRequestParams = {
+    scope?: 'public' | 'mine';
     project_name?: string;
     username?: string;
     base?: string;
@@ -41,6 +42,7 @@ declare interface IPreset {
     created_at: string;
     pushed_by: string;
     project_name: string;
+    can_delete?: boolean;
 }
 
 declare interface IPresetDetails extends IPreset {

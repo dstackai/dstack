@@ -1,17 +1,53 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePresetViewer } from 'PublicApp/PresetApp';
 
-import { Button, ButtonWithConfirmation, Header, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
+import { Alert, Button, ButtonWithConfirmation, Header, Loader, PropertyFilter, SpaceBetween, Table, Tabs } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
-import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useAppSelector, useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
-import { useLazyGetAllPresetsQuery } from 'services/preset';
+import { PresetListQueryArgs, useLazyGetAllPresetsQuery } from 'services/preset';
+
+import { selectAuthToken } from 'App/slice';
 
 import { useColumnsDefinitions, useFilters, usePresetsDelete, usePresetsTableEmptyMessages } from './hooks';
 
 export const PresetList: React.FC = () => {
     const { t } = useTranslation();
+    const { isAuthenticated, scope, setScope } = usePresetViewer();
+    const authToken = useAppSelector(selectAuthToken);
+
+    return (
+        <PresetListTable
+            key={`${authToken ?? ''}:${isAuthenticated}:${scope}`}
+            authToken={authToken}
+            scope={scope}
+            isAuthenticated={isAuthenticated}
+            tabs={
+                isAuthenticated && (
+                    <Tabs
+                        activeTabId={scope}
+                        tabs={[
+                            { id: 'mine', label: t('presets.my_projects') },
+                            { id: 'public', label: t('presets.public') },
+                        ]}
+                        onChange={({ detail }) => setScope(detail.activeTabId as 'mine' | 'public')}
+                    />
+                )
+            }
+        />
+    );
+};
+
+const PresetListTable: React.FC<{
+    authToken?: string;
+    scope: 'public' | 'mine';
+    isAuthenticated: boolean;
+    tabs?: React.ReactNode;
+}> = ({ authToken, scope, isAuthenticated, tabs }) => {
+    const { t } = useTranslation();
+    const isPublic = scope === 'public';
 
     const {
         clearFilter,
@@ -23,18 +59,19 @@ export const PresetList: React.FC = () => {
         isDisabledClearFilter,
         filteringStatusType,
         handleLoadItems,
-    } = useFilters();
+    } = useFilters({ scope });
 
     const { isDeleting, deletePresets } = usePresetsDelete();
 
     const { renderEmptyMessage, renderNoMatchMessage } = usePresetsTableEmptyMessages({
         clearFilter,
         isDisabledClearFilter,
+        isPublic,
     });
 
-    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IPreset, TPresetsListRequestParams>({
+    const { data, error, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IPreset, PresetListQueryArgs>({
         useLazyQuery: useLazyGetAllPresetsQuery,
-        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE } as TPresetsListRequestParams,
+        args: { ...filteringRequestParams, scope, authToken, limit: DEFAULT_TABLE_PAGE_SIZE } as PresetListQueryArgs,
 
         getPaginationParams: (lastPreset) => ({
             prev_created_at: lastPreset.created_at,
@@ -49,20 +86,27 @@ export const PresetList: React.FC = () => {
         },
     ]);
 
-    const { columns } = useColumnsDefinitions();
+    const { columns } = useColumnsDefinitions({ isPublic });
+    const loadError = error ? (
+        <Alert type="error" header={t('presets.load_error_title')}>
+            {t('presets.load_error_message')}
+        </Alert>
+    ) : undefined;
 
     const { items, actions, collectionProps } = useCollection<IPreset>(data ?? [], {
         filtering: {
-            empty: renderEmptyMessage(),
+            empty: loadError ?? renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
         },
         selection: {},
     });
 
     const { selectedItems } = collectionProps;
+    const canDelete = isAuthenticated && data.some((preset) => preset.can_delete);
+    const canDeleteSelected = canDelete && !!selectedItems?.length && selectedItems.every((preset) => preset.can_delete);
 
     const deleteSelected = () => {
-        if (!selectedItems?.length) return;
+        if (!canDeleteSelected || !selectedItems?.length) return;
 
         deletePresets([...selectedItems]).then(() => {
             actions.setSelectedItems([]);
@@ -70,7 +114,7 @@ export const PresetList: React.FC = () => {
         });
     };
 
-    const isDisabledDelete = isDeleting || !selectedItems?.length;
+    const isDisabledDelete = isDeleting || !canDeleteSelected;
 
     return (
         <Table
@@ -80,34 +124,40 @@ export const PresetList: React.FC = () => {
             items={items}
             loading={isLoading}
             loadingText={t('common.loading')}
-            selectionType="multi"
+            selectionType={canDelete ? 'multi' : undefined}
+            isItemDisabled={(preset) => !preset.can_delete}
             stickyHeader={true}
             header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <ButtonWithConfirmation
-                                disabled={isDisabledDelete}
-                                formAction="none"
-                                onClick={deleteSelected}
-                                confirmTitle={t('presets.delete_confirm_title')}
-                                confirmContent={t('presets.delete_confirm_message')}
-                            >
-                                {t('common.delete')}
-                            </ButtonWithConfirmation>
+                <SpaceBetween size="l">
+                    <Header
+                        variant="awsui-h1-sticky"
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                {canDelete && (
+                                    <ButtonWithConfirmation
+                                        disabled={isDisabledDelete}
+                                        formAction="none"
+                                        onClick={deleteSelected}
+                                        confirmTitle={t('presets.delete_confirm_title')}
+                                        confirmContent={t('presets.delete_confirm_message')}
+                                    >
+                                        {t('common.delete')}
+                                    </ButtonWithConfirmation>
+                                )}
 
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('presets.list_page_title')}
-                </Header>
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refreshList}
+                                />
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('presets.list_page_title')}
+                    </Header>
+                    {tabs}
+                </SpaceBetween>
             }
             filter={
                 <PropertyFilter
@@ -125,7 +175,12 @@ export const PresetList: React.FC = () => {
                     onLoadItems={handleLoadItems}
                 />
             }
-            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
+            footer={
+                <SpaceBetween size="m">
+                    {data.length > 0 && loadError}
+                    <Loader show={isLoadingMore} padding={{ vertical: 'm' }} />
+                </SpaceBetween>
+            }
         />
     );
 };

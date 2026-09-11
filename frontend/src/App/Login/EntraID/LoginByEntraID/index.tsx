@@ -28,7 +28,7 @@ export const LoginByEntraID: React.FC<{ className?: string }> = ({ className }) 
 
     return (
         <div className={cn(styles.entraSignIn, className)}>
-            <Button onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
+            <Button fullWidth onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
                 <span className={styles.loginButtonInner}>
                     <EntraIdIcon />
                     <span className={styles.loginButtonLabel}>{t('common.login_entra')}</span>
