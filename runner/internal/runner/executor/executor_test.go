@@ -76,6 +76,7 @@ func TestExecutor_NonZeroExit(t *testing.T) {
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
 	makeCodeTar(t, ex)
 
+	setUpTestExecutor(t, ex)
 	err := ex.Run(t.Context())
 	assert.Error(t, err)
 	assert.NotEmpty(t, ex.jobStateHistory)
@@ -124,8 +125,58 @@ func TestExecutor_Recover(t *testing.T) {
 	ex.jobSpec.Commands = nil // cause a panic
 	makeCodeTar(t, ex)
 
+	setUpTestExecutor(t, ex)
 	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "recovered: ")
+}
+
+// Setup can fail after it has already configured runner logging. It finalizes the executor
+// itself, so the buffered logs are flushed and the state it serves is reported as final --
+// otherwise /api/pull would keep waiting for logs that are never coming.
+func TestExecutor_SetupFailureFinalizes(t *testing.T) {
+	ex := makeTestExecutor(t)
+	workingDir := "not/an/absolute/path" // makes setJobWorkingDir, and so Setup, fail
+	ex.jobSpec.WorkingDir = &workingDir
+
+	err := ex.Setup(t.Context())
+	require.ErrorContains(t, err, "working dir must be absolute")
+
+	assert.Equal(t, WaitLogsFinished, ex.GetRunnerState())
+	history := ex.GetHistory(0)
+	assert.False(t, history.HasMore)
+	assert.NotEmpty(t, history.RunnerLogs, "runner logs must be flushed, not left in the stripper")
+
+	// The caller is expected to skip Run, but must not be punished for a redundant Finalize
+	assert.NotPanics(t, func() { ex.Finalize(t.Context()) })
+}
+
+// Run requires a successful Setup: without it there is no runner logging and no resolved job
+// user, so it must refuse rather than run the job with unset fields.
+func TestExecutor_RunWithoutSetup(t *testing.T) {
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo hello")
+	makeCodeTar(t, ex)
+
+	err := ex.Run(t.Context())
+	assert.ErrorContains(t, err, "not set up")
+}
+
+// Run finalizes the executor itself, so a job that finishes on its own leaves nothing buffered
+// and reports its state as final without the caller doing anything.
+func TestExecutor_RunFinalizes(t *testing.T) {
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo hello")
+	makeCodeTar(t, ex)
+	setUpTestExecutor(t, ex)
+
+	require.NoError(t, ex.Run(t.Context()))
+
+	assert.Equal(t, WaitLogsFinished, ex.GetRunnerState())
+	assert.False(t, ex.GetHistory(0).HasMore)
+	assert.NotPanics(t, func() { ex.Finalize(t.Context()) })
+
+	// Setup did happen, so the gate must report the finished job rather than a missing Setup
+	assert.ErrorContains(t, ex.Run(t.Context()), "already finished")
 }
 
 /* Long tests */
@@ -141,6 +192,7 @@ func TestExecutor_MaxDuration(t *testing.T) {
 	ex.jobSpec.MaxDuration = 1 // seconds
 	makeCodeTar(t, ex)
 
+	setUpTestExecutor(t, ex)
 	err := ex.Run(t.Context())
 	// The job is interrupted rather than killed: INTR reaches the workload through the
 	// terminal, so it exits on SIGINT long before the SIGKILL backstop would fire.
@@ -164,6 +216,7 @@ func TestExecutor_LogQuota(t *testing.T) {
 	ex.jobLogs.SetQuota(100)
 	makeCodeTar(t, ex)
 
+	setUpTestExecutor(t, ex)
 	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "log quota exceeded")
 
@@ -206,6 +259,7 @@ func TestExecutor_SurvivingProcessDoesNotHangRun(t *testing.T) {
 	makeCodeTar(t, ex)
 
 	runDone := make(chan error, 1)
+	setUpTestExecutor(t, ex)
 	go func() { runDone <- ex.Run(t.Context()) }()
 
 	select {
@@ -253,6 +307,7 @@ func TestExecutor_StopInterruptsWorkload(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	runDone := make(chan error, 1)
+	setUpTestExecutor(t, ex)
 	go func() { runDone <- ex.Run(ctx) }()
 
 	require.Eventually(t, func() bool {
@@ -321,6 +376,7 @@ func TestExecutor_StopKillsWholeSession(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	runDone := make(chan error, 1)
+	setUpTestExecutor(t, ex)
 	go func() { runDone <- ex.Run(ctx) }()
 
 	require.Eventually(t, func() bool {
@@ -388,6 +444,7 @@ func TestExecutor_FinishedJobHangsUpOnLeftoverProcesses(t *testing.T) {
 	makeCodeTar(t, ex)
 
 	runDone := make(chan error, 1)
+	setUpTestExecutor(t, ex)
 	go func() { runDone <- ex.Run(t.Context()) }()
 	select {
 	case err := <-runDone:
@@ -437,6 +494,12 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 }
 
 /* Helpers */
+
+// setUpTestExecutor performs the Setup that Run requires
+func setUpTestExecutor(t *testing.T, ex *RunExecutor) {
+	t.Helper()
+	require.NoError(t, ex.Setup(t.Context()))
+}
 
 func makeTestExecutor(t *testing.T) *RunExecutor {
 	t.Helper()
