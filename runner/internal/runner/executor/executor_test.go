@@ -16,11 +16,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dstackai/dstack/runner/internal/common/types"
 	linuxuser "github.com/dstackai/dstack/runner/internal/runner/linux/user"
 	"github.com/dstackai/dstack/runner/internal/runner/schemas"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExecutor_WorkingDir_Set(t *testing.T) {
@@ -166,10 +167,12 @@ func TestExecutor_LogQuota(t *testing.T) {
 	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "log quota exceeded")
 
-	// Verify the termination state was set
+	// Verify the termination state was set. The quota stops the job through the same
+	// cancellation an external stop uses, so the reason must survive that path.
 	history := ex.GetHistory(0)
 	lastState := history.JobStates[len(history.JobStates)-1]
 	assert.Equal(t, schemas.JobStateFailed, lastState.State)
+	assert.Equal(t, types.TerminationReasonLogQuotaExceeded, lastState.TerminationReason)
 }
 
 // A job that leaves a process behind keeps the pty slave open, so reading the master never
@@ -185,10 +188,19 @@ func TestExecutor_SurvivingProcessDoesNotHangRun(t *testing.T) {
 	// process group, so it does not get the SIGHUP the kernel sends to the foreground group
 	// when the shell exits, and goes on holding the pty slave open. It must outlive the
 	// assertion below, or the executor would be let off the hook by the process exiting.
-	pidPath := filepath.Join(t.TempDir(), "survivor.pid")
+	dir := t.TempDir()
+	pidPath := filepath.Join(dir, "survivor.pid")
+	// Ignores SIGHUP, the way a nohup'd process or a daemon does, so it goes on holding the
+	// terminal open even after the hangup the job's own end sends -- which is the case the
+	// drain bound exists for.
+	survivor := filepath.Join(dir, "survivor.sh")
+	require.NoError(t, os.WriteFile(survivor, []byte(
+		"trap '' HUP\n"+
+			"echo $$ > "+pidPath+"\n"+
+			"while :; do sleep 0.2; done\n"), 0o600))
 	ex.jobSpec.Commands = []string{
-		"/bin/bash", "-i", "-c",
-		fmt.Sprintf("sleep 300 & echo $! > %s; echo done", pidPath),
+		"/bin/sh", "-i", "-c",
+		"/bin/sh " + survivor + " & echo done",
 	}
 	t.Cleanup(func() { killRecordedPid(t, pidPath) })
 	makeCodeTar(t, ex)
@@ -271,6 +283,128 @@ func jobLogsSoFar(ex *RunExecutor) string {
 	ex.mu.RLock()
 	defer ex.mu.RUnlock()
 	return combineLogMessages(ex.jobLogs.history)
+}
+
+// A job that ignores the interrupt is escalated: SIGHUP to its session, then SIGKILL. The
+// escalation has to cover what the job left outside the terminal's foreground process group,
+// since that is all the interrupt itself, or the kernel's hangup, can reach.
+func TestExecutor_StopKillsWholeSession(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	dir := t.TempDir()
+	pidPath := filepath.Join(dir, "background.pid")
+	// Backgrounded, so job control gives it a process group of its own and neither the
+	// interrupt nor the kernel's hangup SIGHUP reaches it. It ignores both signals anyway, so
+	// only the SIGKILL stage can clear it.
+	background := filepath.Join(dir, "background.sh")
+	require.NoError(t, os.WriteFile(background, []byte(
+		"trap '' INT HUP\n"+
+			"echo $$ > "+pidPath+"\n"+
+			"while :; do sleep 0.2; done\n"), 0o600))
+	// Ignores the interrupt, so the job does not stop on its own and the shell stays alive.
+	foreground := filepath.Join(dir, "foreground.sh")
+	require.NoError(t, os.WriteFile(foreground, []byte(
+		"trap '' INT\n"+
+			"echo ready\n"+
+			"while :; do sleep 0.2; done\n"), 0o600))
+
+	ex := makeTestExecutor(t)
+	ex.hupDelay = 300 * time.Millisecond
+	ex.killDelay = 900 * time.Millisecond
+	ex.jobSpec.Commands = []string{
+		"/bin/sh", "-i", "-c",
+		"/bin/sh " + background + " & /bin/sh " + foreground,
+	}
+	makeCodeTar(t, ex)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	runDone := make(chan error, 1)
+	go func() { runDone <- ex.Run(ctx) }()
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(jobLogsSoFar(ex), "ready")
+	}, 30*time.Second, 100*time.Millisecond, "the job never started")
+	backgroundPid := readRecordedPid(t, pidPath)
+	t.Cleanup(func() { _ = syscall.Kill(backgroundPid, syscall.SIGKILL) })
+
+	cancel() // what /api/stop does
+	select {
+	case <-runDone:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Run did not return after the job was stopped")
+	}
+
+	assert.False(t, processAlive(backgroundPid),
+		"a process the job left outside the foreground group survived the stop")
+	history := ex.GetHistory(0)
+	lastState := history.JobStates[len(history.JobStates)-1]
+	assert.Equal(t, schemas.JobStateTerminated, lastState.State)
+}
+
+func readRecordedPid(t *testing.T, path string) int {
+	t.Helper()
+	var pid int
+	require.Eventually(t, func() bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		pid, err = strconv.Atoi(strings.TrimSpace(string(data)))
+		return err == nil && pid > 0
+	}, 30*time.Second, 100*time.Millisecond, "the process never recorded its pid")
+	return pid
+}
+
+// processAlive reports whether pid is a live process, treating a zombie as gone.
+func processAlive(pid int) bool {
+	state, ok := procState(pid)
+	return ok && state != 'Z'
+}
+
+// A job that finishes on its own can leave processes running -- a sidecar started with `&`,
+// say. They are about to lose the terminal, and shortly after the container, so they are told
+// rather than being killed outright without notice.
+func TestExecutor_FinishedJobHangsUpOnLeftoverProcesses(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	dir := t.TempDir()
+	pidPath := filepath.Join(dir, "sidecar.pid")
+	hupPath := filepath.Join(dir, "sidecar.hup")
+	sidecar := filepath.Join(dir, "sidecar.sh")
+	require.NoError(t, os.WriteFile(sidecar, []byte(
+		"trap 'echo yes > "+hupPath+"; exit 0' HUP\n"+
+			"echo $$ > "+pidPath+"\n"+
+			"while :; do sleep 0.2; done\n"), 0o600))
+
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = []string{
+		"/bin/sh", "-i", "-c",
+		"/bin/sh " + sidecar + " & echo done",
+	}
+	makeCodeTar(t, ex)
+
+	runDone := make(chan error, 1)
+	go func() { runDone <- ex.Run(t.Context()) }()
+	select {
+	case err := <-runDone:
+		assert.NoError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("Run did not return")
+	}
+	t.Cleanup(func() { killRecordedPid(t, pidPath) })
+
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(hupPath)
+		return err == nil
+	}, 10*time.Second, 100*time.Millisecond, "the leftover process was never sent SIGHUP")
+
+	history := ex.GetHistory(0)
+	lastState := history.JobStates[len(history.JobStates)-1]
+	assert.Equal(t, schemas.JobStateDone, lastState.State)
 }
 
 func TestExecutor_RemoteRepo(t *testing.T) {
