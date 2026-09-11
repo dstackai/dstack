@@ -305,8 +305,8 @@ export const ProjectAdd: React.FC = () => {
                                                 label={t('projects.edit.project_visibility')}
                                                 description={
                                                     field.value
-                                                        ? t('projects.edit.visibility.public_description')
-                                                        : t('projects.edit.visibility.private_description')
+                                                        ? 'Any authorized user can see this project and join it as a member'
+                                                        : 'Only project members and global admins can access this project'
                                                 }
                                                 errorText={error?.message}
                                             >

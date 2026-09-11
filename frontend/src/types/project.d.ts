@@ -2,7 +2,6 @@ declare type TCreateWizardProjectParams = {
     project_name: string;
     dry?: boolean;
     is_public?: boolean;
-    public_presets?: boolean;
     config: {
         base_backends: string[];
     };

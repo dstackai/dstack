@@ -844,8 +844,6 @@
     },
     "presets": {
         "list_page_title": "Presets",
-        "my_projects": "My projects",
-        "public": "Public",
         "public_empty_message_title": "No public presets",
         "public_empty_message_text": "There are no public presets to display",
         "load_error_title": "Unable to load presets",

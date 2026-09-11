@@ -65,18 +65,16 @@ describe('Preset viewer isolation', () => {
             return jsonResponse({ presets: [{ id: name, name, project_name: 'project', can_delete: name !== 'public' }] });
         });
 
-        const member = await store
-            .dispatch(presetApi.endpoints.getAllPresets.initiate({ scope: 'public', authToken: 'viewer-a' }))
-            .unwrap();
-        const guest = await store.dispatch(presetApi.endpoints.getAllPresets.initiate({ scope: 'public' })).unwrap();
+        const member = await store.dispatch(presetApi.endpoints.getAllPresets.initiate({ authToken: 'viewer-a' })).unwrap();
+        const guest = await store.dispatch(presetApi.endpoints.getAllPresets.initiate({})).unwrap();
 
         expect(member[0].can_delete).toBe(true);
         expect(guest[0].can_delete).toBe(false);
         expect(requests).toHaveLength(2);
         expect(requests[0].headers.get('Authorization')).toBe('Bearer viewer-a');
         expect(requests[1].headers.get('Authorization')).toBeNull();
-        expect(await requests[0].json()).toEqual({ scope: 'public' });
-        expect(await requests[1].json()).toEqual({ scope: 'public' });
+        expect(await requests[0].json()).toEqual({});
+        expect(await requests[1].json()).toEqual({});
     });
 
     it('never renders a cached private detail after switching accounts or signing out', async () => {

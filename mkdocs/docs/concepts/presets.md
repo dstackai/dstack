@@ -270,7 +270,7 @@ Pushing the same name again moves the name to the new preset. The previous one s
 
 Presets are pushed to and pulled from the registry hosted at [dstack Sky](https://sky.dstack.ai). Create a project there and push presets to it. Project members can push, pull, and delete presets.
 
-Presets are private by default. Set **Presets** to **Public** when creating a project or in its settings to let anyone browse and pull its presets without signing in, including users of a self-hosted `dstack` server. Only project admins and global admins can change this setting; enabling it does not let anyone join the project.
+Presets are private by default. Set **Presets** to **Public** in the project settings to let anyone browse and pull its presets without signing in, including users of a self-hosted `dstack` server. Only project admins and global admins can change this setting; enabling it does not let anyone join the project.
 
 A self-hosted registry is part of [dstack Factory](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
 

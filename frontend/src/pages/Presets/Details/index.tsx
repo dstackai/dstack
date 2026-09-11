@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { usePresetViewer } from 'PublicApp/PresetApp';
 
 import {
     Alert,
@@ -39,7 +38,6 @@ export const PresetDetails: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const navigate = useNavigate();
-    const { isAuthenticated, scope, setScope } = usePresetViewer();
     const [pushNotification] = useNotifications();
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
@@ -56,12 +54,7 @@ export const PresetDetails: React.FC = () => {
 
     const [deletePreset, { isLoading: isDeleting }] = useDeletePresetMutation();
     const isLoadingPreset = isLoading || (isFetching && !data);
-    const canDelete = isAuthenticated && !!data?.can_delete;
-    const isPublic = scope === 'public' || !canDelete;
-
-    useEffect(() => {
-        if (data && !data.can_delete) setScope('public');
-    }, [data, setScope]);
+    const canDelete = !!data?.can_delete;
 
     useBreadcrumbs([
         {
@@ -142,7 +135,7 @@ export const PresetDetails: React.FC = () => {
                         ]}
                     />
 
-                    <Outlet context={{ isPublic }} />
+                    <Outlet />
                 </SpaceBetween>
             )}
         </ContentLayout>
@@ -151,7 +144,6 @@ export const PresetDetails: React.FC = () => {
 
 export const PresetDetailsOverview: React.FC = () => {
     const { t } = useTranslation();
-    const { isPublic } = useOutletContext<{ isPublic: boolean }>();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
@@ -193,9 +185,9 @@ export const PresetDetailsOverview: React.FC = () => {
                         <div>
                             <NavigateLink
                                 href={
-                                    isPublic
-                                        ? `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: data.project_name })}`
-                                        : ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)
+                                    data.can_delete
+                                        ? ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)
+                                        : `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: data.project_name })}`
                                 }
                             >
                                 {data.project_name}
@@ -205,10 +197,10 @@ export const PresetDetailsOverview: React.FC = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('presets.user')}</Box>
                         <div>
-                            {isPublic ? (
-                                data.pushed_by
-                            ) : (
+                            {data.can_delete ? (
                                 <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
+                            ) : (
+                                data.pushed_by
                             )}
                         </div>
                     </div>

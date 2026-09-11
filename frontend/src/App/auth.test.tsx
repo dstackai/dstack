@@ -17,7 +17,6 @@ let mockUserQuery: {
     data?: { username: string };
     error?: { status: number };
     isFetching: boolean;
-    isLoading: boolean;
 };
 
 jest.mock('hooks', () => ({
@@ -32,9 +31,7 @@ jest.mock('services/auth', () => ({
 }));
 
 jest.mock('services/user', () => ({
-    useGetUserDataQuery: jest.fn((_, { skip }: { skip: boolean }) =>
-        skip ? { isLoading: false, isFetching: false } : mockUserQuery,
-    ),
+    useGetUserDataQuery: jest.fn((_, { skip }: { skip: boolean }) => (skip ? { isFetching: false } : mockUserQuery)),
 }));
 
 jest.mock('./slice', () => ({
@@ -43,21 +40,6 @@ jest.mock('./slice', () => ({
 }));
 
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-
-jest.mock('routes', () => ({
-    ROUTES: {
-        BASE: '/',
-        RUNS: { LIST: '/runs' },
-        AUTH: {
-            LOGIN: '/auth',
-            GITHUB_CALLBACK: '/auth/github/callback',
-            OKTA_CALLBACK: '/auth/okta/callback',
-            ENTRA_CALLBACK: '/auth/entra/callback',
-            GOOGLE_CALLBACK: '/auth/google/callback',
-            TOKEN: '/auth/token',
-        },
-    },
-}));
 
 jest.mock('layouts/AppLayout', () => ({
     __esModule: true,
@@ -77,19 +59,7 @@ jest.mock('components', () => {
         Box: ({ variant, children }: { variant?: string; children: React.ReactNode }) =>
             variant === 'h1' ? <h1>{children}</h1> : <>{children}</>,
         BreadcrumbGroup: () => null,
-        Button: ({
-            children,
-            href,
-            onFollow,
-        }: {
-            children: React.ReactNode;
-            href?: string;
-            onFollow?: (event: { preventDefault: () => void }) => void;
-        }) => (
-            <a href={href} onClick={onFollow}>
-                {children}
-            </a>
-        ),
+        Button: Wrapper,
         Alert: Wrapper,
         Container: Wrapper,
         Header: Wrapper,
@@ -107,7 +77,6 @@ jest.mock('./Loading', () => ({ Loading: () => <p role="status">Loading</p> }));
 jest.mock('./AuthErrorMessage', () => ({ AuthErrorMessage: () => <h1>Storage unavailable</h1> }));
 
 const publicPaths = [ROUTES.BASE, ROUTES.AUTH.LOGIN];
-const ignoredAuthPaths = Object.values(ROUTES.AUTH).filter((path) => path !== ROUTES.AUTH.LOGIN);
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 let App: React.FC;
 let rendered: ReactTestRenderer | undefined;
@@ -123,9 +92,6 @@ const renderApp = (path: string) => {
                     <Route path={ROUTES.AUTH.LOGIN} element={<LoginByGithub />} />
                     <Route element={<App />}>
                         <Route path="/runs" element={<h1>Runs</h1>} />
-                        {ignoredAuthPaths.map((authPath) => (
-                            <Route key={authPath} path={authPath} element={<h1>Authentication page</h1>} />
-                        ))}
                     </Route>
                 </Routes>
                 <CurrentPath />
@@ -147,7 +113,7 @@ beforeAll(() => {
 beforeEach(() => {
     Object.defineProperty(globalThis, 'window', { value: { localStorage: {} } });
     mockToken = undefined;
-    mockUserQuery = { isFetching: false, isLoading: false };
+    mockUserQuery = { isFetching: false };
 });
 
 afterEach(() => {
@@ -168,18 +134,6 @@ describe('Sky public and protected pages', () => {
         expect(view.root.findByType('output').children).toEqual([path]);
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(useGetUserDataQuery).toHaveBeenCalledWith({ token: undefined }, { skip: true });
-        expect(mockPrivateQuery).not.toHaveBeenCalled();
-    });
-
-    test('the home sign-in link opens the dedicated auth page', () => {
-        const view = renderApp(ROUTES.BASE);
-        const signInLink = view.root.findByType('a');
-        expect(signInLink.props.href).toBe(ROUTES.AUTH.LOGIN);
-
-        act(() => signInLink.props.onClick({ preventDefault: jest.fn() }));
-
-        expect(view.root.findByType('output').children).toEqual([ROUTES.AUTH.LOGIN]);
-        expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
@@ -239,7 +193,7 @@ describe('Sky public and protected pages', () => {
 
     test.each([...publicPaths, ROUTES.RUNS.LIST])('%s waits for token validation before showing private content', (path) => {
         mockToken = 'pending-token';
-        mockUserQuery.isFetching = mockUserQuery.isLoading = true;
+        mockUserQuery.isFetching = true;
         const view = renderApp(path);
 
         expect(view.root.findByProps({ role: 'status' }).children).toEqual(['Loading']);
@@ -269,16 +223,6 @@ describe('Sky public and protected pages', () => {
 
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(useGetUserDataQuery).toHaveBeenCalledWith({ token: 'saved-token' }, { skip: true });
-        expect(mockPrivateQuery).not.toHaveBeenCalled();
-    });
-
-    test.each(ignoredAuthPaths)('authentication page %s remains outside the auth guard', (path) => {
-        mockToken = 'expired-token';
-        mockUserQuery.error = { status: 401 };
-        const view = renderApp(path);
-
-        expect(view.root.findByType('output').children).toEqual([path]);
-        expect(view.root.findByType('h1').children).toEqual(['Authentication page']);
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 });

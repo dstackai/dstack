@@ -33,16 +33,16 @@ const MAX_FILTER_OPTIONS = 100;
 export const usePresetsTableEmptyMessages = ({
     clearFilter,
     isDisabledClearFilter,
-    isPublic,
+    isAuthenticated,
 }: {
     clearFilter?: () => void;
     isDisabledClearFilter?: boolean;
-    isPublic: boolean;
+    isAuthenticated: boolean;
 }) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = (): React.ReactNode => {
-        if (isDisabledClearFilter && isPublic) {
+        if (isDisabledClearFilter && !isAuthenticated) {
             return (
                 <ListEmptyMessage
                     title={t('presets.public_empty_message_title')}
@@ -85,7 +85,7 @@ export const usePresetsTableEmptyMessages = ({
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };
 
-export const useColumnsDefinitions = ({ isPublic }: { isPublic: boolean }) => {
+export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
 
     const columns = [
@@ -109,9 +109,9 @@ export const useColumnsDefinitions = ({ isPublic }: { isPublic: boolean }) => {
             cell: (item: IPreset) => (
                 <NavigateLink
                     href={
-                        isPublic
-                            ? `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: item.project_name })}`
-                            : ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)
+                        item.can_delete
+                            ? ROUTES.PROJECT.DETAILS.FORMAT(item.project_name)
+                            : `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: item.project_name })}`
                     }
                 >
                     {item.project_name}
@@ -132,10 +132,10 @@ export const useColumnsDefinitions = ({ isPublic }: { isPublic: boolean }) => {
             id: 'user',
             header: t('presets.user'),
             cell: (item: IPreset) =>
-                isPublic ? (
-                    item.pushed_by
-                ) : (
+                item.can_delete ? (
                     <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.pushed_by)}>{item.pushed_by}</NavigateLink>
+                ) : (
+                    item.pushed_by
                 ),
         },
         {
@@ -167,7 +167,7 @@ export const usePresetsDelete = () => {
     return { isDeleting, deletePresets } as const;
 };
 
-export const useFilters = ({ scope }: { scope: 'public' | 'mine' }) => {
+export const useFilters = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const propertyFilterQuery = useMemo(
         () => requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -203,7 +203,7 @@ export const useFilters = ({ scope }: { scope: 'public' | 'mine' }) => {
     // other list pages use; a base model is typed in, as no API enumerates one.
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setFilteringOptions([]);
-        if (scope === 'public') {
+        if (!isAuthenticated) {
             setFilteringStatusType(undefined);
             return;
         }
@@ -247,8 +247,7 @@ export const useFilters = ({ scope }: { scope: 'public' | 'mine' }) => {
             return !detail.tokens.some((item, index) => tokenIndex < index && item.propertyKey === token.propertyKey);
         });
 
-        const nextSearchParams = tokensToSearchParams<RequestParamsKeys>(filteredTokens);
-        setSearchParams(nextSearchParams);
+        setSearchParams(tokensToSearchParams<RequestParamsKeys>(filteredTokens));
     };
 
     const clearFilter = () => {

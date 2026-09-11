@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { isNil } from 'lodash';
@@ -18,7 +18,6 @@ import {
     FormToggle,
     InfoLink,
     KeyValuePairs,
-    SelectCSD,
     SpaceBetween,
     Wizard,
 } from 'components';
@@ -55,7 +54,6 @@ const projectValidationSchema = yup.object({
         .required(requiredFieldError)
         .matches(/^[a-zA-Z0-9-_]+$/, namesFieldError),
     project_type: yup.string().required(requiredFieldError),
-    public_presets: yup.boolean(),
     backends: yup.array().when('project_type', {
         is: 'gpu_marketplace',
         then: yup.array().min(1, minOneLengthError).required(requiredFieldError),
@@ -131,7 +129,6 @@ export const CreateProjectWizard: React.FC = () => {
         resolver,
         defaultValues: {
             project_type: 'own_cloud',
-            public_presets: false,
             fleet: {
                 ...fleetFormDefaultValues,
                 enable_default: true,
@@ -143,21 +140,15 @@ export const CreateProjectWizard: React.FC = () => {
     const formValues = watch();
     const selectedProjectTypeOption = projectTypeOptions.find(({ value }) => value === formValues['project_type']);
 
-    const presetsOptions = [
-        { label: t('projects.edit.visibility.private'), value: 'private' },
-        { label: t('projects.edit.visibility.public'), value: 'public' },
-    ];
-
     const onCancelHandler = () => {
         navigate(ROUTES.PROJECT.LIST);
     };
 
     const getFormValuesForServer = (): TCreateWizardProjectParams => {
-        const { project_name, backends, project_type, public_presets } = getValues();
+        const { project_name, backends, project_type } = getValues();
 
         return {
             project_name,
-            public_presets,
             config: {
                 base_backends: project_type === 'gpu_marketplace' ? (backends ?? []) : [],
             },
@@ -375,35 +366,6 @@ export const CreateProjectWizard: React.FC = () => {
                                         disabled={loading}
                                     />
 
-                                    <Controller
-                                        control={control}
-                                        name="public_presets"
-                                        render={({ field, fieldState: { error } }) => (
-                                            <FormField
-                                                label={t('projects.edit.presets_settings')}
-                                                description={
-                                                    field.value
-                                                        ? t('projects.edit.presets_public_description')
-                                                        : t('projects.edit.presets_private_description')
-                                                }
-                                                errorText={error?.message}
-                                            >
-                                                <SelectCSD
-                                                    ref={field.ref}
-                                                    options={presetsOptions}
-                                                    selectedOption={presetsOptions[field.value ? 1 : 0]}
-                                                    onChange={({ detail }) =>
-                                                        field.onChange(detail.selectedOption.value === 'public')
-                                                    }
-                                                    onBlur={field.onBlur}
-                                                    disabled={loading}
-                                                    expandToViewport
-                                                    filteringType="auto"
-                                                />
-                                            </FormField>
-                                        )}
-                                    />
-
                                     <div>
                                         <SpaceBetween direction="vertical" size="s">
                                             <FormField
@@ -508,10 +470,6 @@ export const CreateProjectWizard: React.FC = () => {
                                         {
                                             label: t('projects.edit.project_name'),
                                             value: formValues['project_name'],
-                                        },
-                                        {
-                                            label: t('projects.edit.presets_settings'),
-                                            value: presetsOptions[formValues.public_presets ? 1 : 0].label,
                                         },
                                         {
                                             label: t('projects.edit.project_type'),

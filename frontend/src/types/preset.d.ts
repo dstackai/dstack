@@ -1,5 +1,4 @@
 declare type TPresetsListRequestParams = {
-    scope?: 'public' | 'mine';
     project_name?: string;
     username?: string;
     base?: string;
