@@ -182,7 +182,7 @@ func (d *DockerRunner) sweepOrphanedTaskDirs(ctx context.Context, storedTasks ma
 		if !stored.state.CleanedUp {
 			// GPU locks are in-memory, so there is nothing to release: a task without
 			// a container holds no GPUs after a restart
-			releaseTaskResources(ctx, stored.state.Config)
+			d.releaseTaskResources(ctx, stored.state.Config)
 		}
 		if err := os.RemoveAll(stored.dir); err != nil {
 			log.Error(ctx, "failed to remove orphaned task dir", "dir", stored.dir, "err", err)

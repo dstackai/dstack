@@ -275,7 +275,7 @@
 }
 
 /* "Get started" header dropdown — mirrors the landing's Products popup (featured open-source +
-   dstack Sky + Enterprise). Pure-CSS hover/focus-within (the docs are static); right-aligned so the
+   dstack Sky + Factory). Pure-CSS hover/focus-within (the docs are static); right-aligned so the
    panel never overflows the header's right edge. Reuses the --cs-* tokens (defined in extra.css). */
 .cs-gs-menu {
     position: relative;
@@ -303,10 +303,10 @@
     z-index: 1000;
     width: 360px;
     padding: 0;
-    background: var(--cs-bg);
-    border: 1px solid var(--cs-text);
-    border-radius: 12px;
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+    /* A floating popup can't show a see-through hole between the groups (arbitrary page content
+       sits behind it) — back the rail with the unselected-row color so the gap reads as ground. */
+    background: var(--cs-panel);
+    border-radius: 8px;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
@@ -317,44 +317,109 @@
     visibility: visible;
     transform: translateY(0);
 }
-/* Text inside the popup must wrap — Material forces white-space:nowrap on header links/buttons. */
+/* No hole at all in the popup: the groups sit flush, like one continuous menu. */
+.cs-gs-menu__popup .gs-opt + .gs-rail__group {
+    margin-top: 0;
+}
+/* Text inside the popup must wrap — Material forces white-space:nowrap on header links/buttons
+   (the group bars keep their own nowrap). */
 .cs-gs-menu__popup,
-.cs-gs-menu__feat,
-.cs-gs-menu__row,
-.cs-gs-menu__feat *,
-.cs-gs-menu__row * {
+.cs-gs-menu__popup .gs-opt,
+.cs-gs-menu__popup .gs-opt * {
     white-space: normal !important;
 }
-.cs-gs-menu__feat {
+
+/* The switcher rail — copied pixel-for-pixel from the landing (website/src/styles.css, .gs-rail
+   block): grouped rows under solid bars, with a white indicator card that slides to the hovered
+   row. The docs and the landing are separate builds, so the styles can't be shared — any change
+   to the landing's rail must be mirrored here (and vice versa). */
+.gs-rail {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: relative; /* anchors the sliding selection indicator */
+    border-radius: 8px;
+    overflow: hidden; /* clip the full-width group bars to the rounded corners */
+    background: transparent; /* the rows carry the panel ground, so the gap between groups is a true hole */
+}
+.gs-rail__indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 2; /* above the rows' ground, beneath their content (3) and the bars (4) */
+    background: var(--cs-bg);
+    border: 1px solid var(--cs-text);
+    border-radius: 8px;
+    pointer-events: none;
+}
+/* No z-index on the rows: a row with its own stacking context would trap its content beneath
+   the indicator card, so the content is lifted above the card explicitly instead. */
+.gs-opt__icwrap,
+.gs-opt__ic,
+.gs-opt__body {
+    position: relative;
+    z-index: 3;
+}
+.gs-rail a.gs-opt {
+    color: var(--cs-text);
+    text-decoration: none;
+}
+.gs-opt {
     position: relative;
     display: flex;
     align-items: flex-start;
+    width: 100%;
+    border-radius: 8px;
+    background: var(--cs-panel); /* each row paints its own ground (the rail is transparent) */
+    font: inherit;
+    line-height: 1.15; /* pinned (not inherited) so the rail matches the landing exactly */
+    text-align: left;
+    cursor: pointer;
+}
+/* Adjacent rows inside a group square off their shared edge, so the group's ground reads as one
+   block (rounded corners there would open see-through notches between the rows). */
+.gs-opt + .gs-opt {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+.gs-opt:has(+ .gs-opt) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.gs-opt--feat {
+    padding: 13px 14px;
+    gap: 14px;
+}
+.gs-opt--row {
+    padding: 13px 14px;
     gap: 12px;
-    padding: 11px 10px;
-    border-radius: 10px;
-    background: var(--cs-text);
-    color: var(--cs-bg);
-    text-decoration: none;
 }
-.cs-gs-menu__feat-body {
-    flex: 1 1 auto;
-    min-width: 0;
+.gs-opt__name {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
 }
-/* Left column: icon tile with the live star count centered beneath it (mirrors the landing). */
-.cs-gs-menu__feat-iccol {
+.gs-opt__desc {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
+}
+.gs-opt__icwrap {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     flex: 0 0 auto;
 }
-.cs-gs-menu__gh {
-    color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
+.gs-opt__stars {
     font-size: 12px;
     font-weight: 300;
     font-variant-numeric: tabular-nums;
+    color: inherit;
 }
-.cs-gs-menu__feat-ic {
+.gs-opt__ic {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -362,84 +427,61 @@
     width: 34px;
     height: 34px;
     border-radius: 9px;
-    border: 0.5px solid color-mix(in srgb, var(--cs-bg) 50%, transparent);
-    color: var(--cs-bg);
+    border: 1px solid var(--cs-border);
+    color: inherit;
 }
-.cs-gs-menu__feat-ic svg {
-    width: 18px;
-    height: 18px;
-}
-.cs-gs-menu__feat-name {
-    display: block;
-    color: var(--cs-bg);
-    font-size: 16px;
-    font-weight: 600;
-}
-.cs-gs-menu__feat-desc {
-    display: block;
-    margin-top: 8px;
-    color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
-    font-size: 13px;
-    line-height: 1.5;
-}
-.cs-gs-menu__list {
-    display: flex;
-    flex-direction: column;
-}
-.cs-gs-menu__row {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 11px 10px;
-    border-radius: 9px;
-    color: var(--cs-text);
-    text-decoration: none;
-}
-.cs-gs-menu__row:hover {
-    background: var(--cs-hover);
-}
-.cs-gs-menu__ic {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    border: 0.5px solid var(--cs-text);
-    color: var(--cs-text);
-}
-.cs-gs-menu__ic svg {
+.gs-opt__ic svg {
     width: 20px;
     height: 20px;
 }
-.cs-gs-menu__rbody {
+.gs-opt__body {
     flex: 1 1 auto;
     min-width: 0;
 }
-.cs-gs-menu__name {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--cs-text);
-    font-size: 15px;
-    font-weight: 600;
+/* Group bars ("Self-hosted" / "Hosted by us"): thin solid segments that hug the row beneath. */
+.gs-rail__group {
+    position: relative;
+    z-index: 4;
+    background: var(--cs-text);
+    color: var(--cs-bg);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1;
+    padding: 5px 16px 5px 60.5px; /* left-aligns the label with the row titles */
+    border-radius: 8px 8px 0 0;
+    white-space: nowrap;
+    margin-bottom: -2px; /* tuck under the next row past any fractional-pixel rounding */
 }
-.cs-gs-menu__ext {
-    flex: 0 0 auto;
-    /* Shared Cloudscape external-link icon (same as footer / GitHub / dstack Sky buttons). */
-    width: 0.9em;
-    height: 0.9em;
-    background-color: currentColor;
-    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
-    mask: var(--cs-ext-icon) center / contain no-repeat;
+/* A group bar that follows a row stands off from it, so the groups read as separate
+   blocks inside the rail (keyed on adjacency, not :first-child — the indicator div
+   is the rail's first DOM child). */
+.gs-opt + .gs-rail__group {
+    margin-top: 10px;
 }
-.cs-gs-menu__desc {
-    display: block;
-    margin-top: 3px;
-    color: var(--cs-muted);
-    font-size: 13px;
-    line-height: 1.5;
+.gs-rail__group:first-child {
+    border-radius: 8px 8px 0 0; /* flush with the borderless rail's 8px clip */
+}
+/* A black top border bridges the bar/row boundary in the middle span; inverted-radius notches
+   fill the space outside the row's top corners so the bar hugs them without hairlines. */
+.gs-rail__group + .gs-opt {
+    border-top: 1px solid var(--cs-text);
+}
+.gs-rail__group + .gs-opt::before,
+.gs-rail__group + .gs-opt::after {
+    content: '';
+    position: absolute;
+    top: -1.5px;
+    width: 9px;
+    height: 9.5px;
+    pointer-events: none;
+}
+.gs-rail__group + .gs-opt::before {
+    left: -1px;
+    background: radial-gradient(circle at 100% 100%, transparent 8px, var(--cs-text) 8.7px);
+}
+.gs-rail__group + .gs-opt::after {
+    right: -1px;
+    background: radial-gradient(circle at 0 100%, transparent 8px, var(--cs-text) 8.7px);
 }
 /* On tablet/mobile the header buttons collapse; keep the dropdown from overflowing tiny screens. */
 @media (max-width: 76.1875em) {

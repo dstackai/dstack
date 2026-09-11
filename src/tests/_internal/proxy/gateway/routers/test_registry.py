@@ -17,10 +17,9 @@ from dstack._internal.proxy.lib.models import ChatModel, OpenAIChatModelFormat
 from dstack._internal.proxy.lib.testing.common import make_project, make_service
 
 
-def make_client(
-    nginx_conf_dir: Path, repo: Optional[GatewayProxyRepo] = None
-) -> httpx.AsyncClient:
-    app = make_app(repo=repo or GatewayProxyRepo(), nginx=Nginx(conf_dir=nginx_conf_dir))
+def make_client(nginx_dir: Path, repo: Optional[GatewayProxyRepo] = None) -> httpx.AsyncClient:
+    (nginx_dir / "sites-enabled").mkdir(exist_ok=True)
+    app = make_app(repo=repo or GatewayProxyRepo(), nginx=Nginx(nginx_dir=nginx_dir))
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test/")
 
 
@@ -103,7 +102,7 @@ class TestRegisterService:
         )
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         # general
         assert system_mocks.reload_nginx.call_count == 1
         assert "server_name test-run.gtw.test;" in conf
@@ -136,7 +135,7 @@ class TestRegisterService:
             json=register_service_payload(domain="test-run.gtw.test", https=True),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "listen 80;" in conf
         assert "listen 443 ssl;" in conf
         assert "ssl_certificate /etc/letsencrypt/live/test-run.gtw.test/fullchain.pem;" in conf
@@ -150,7 +149,7 @@ class TestRegisterService:
             json=register_service_payload(domain="test-run.gtw.test", auth=True),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "auth_request /_dstack_auth;" in conf
         assert "proxy_pass http://localhost:8000/api/auth/test-proj;" in conf
 
@@ -167,8 +166,8 @@ class TestRegisterService:
         )
         assert resp.status_code == 400
         assert resp.json() == {"detail": "Service test-proj/test-run is already registered"}
-        assert (tmp_path / "443-test-run-1.gtw.test.conf").exists()
-        assert not (tmp_path / "443-test-run-2.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run-1.gtw.test.conf").exists()
+        assert not (tmp_path / "sites-enabled" / "443-test-run-2.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 1
 
     async def test_register_same_name_in_different_projects(
@@ -185,8 +184,8 @@ class TestRegisterService:
             json=register_service_payload(run_name="test-run", domain="test-run.proj-2.gtw.test"),
         )
         assert resp.status_code == 200
-        assert (tmp_path / "443-test-run.proj-1.gtw.test.conf").exists()
-        assert (tmp_path / "443-test-run.proj-2.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run.proj-1.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run.proj-2.gtw.test.conf").exists()
 
     async def test_register_same_domain_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
@@ -203,7 +202,7 @@ class TestRegisterService:
         assert resp.json() == {
             "detail": "Domain name 'test-run.gtw.test' is already taken by another service"
         }
-        assert (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 1
 
     @freeze_time(datetime(2024, 12, 12, 0, 30))
@@ -251,7 +250,7 @@ class TestRegisterService:
             ),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert (
             "limit_req_zone $binary_remote_addr zone=0.test-run.gtw.test:10m rate=150r/m;" in conf
         )
@@ -276,7 +275,7 @@ class TestRegisterService:
             ),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert (
             "limit_req_zone $binary_remote_addr zone=0.test-run.gtw.test:10m rate=60r/m;" in conf
         )
@@ -290,7 +289,7 @@ class TestRegisterService:
             json=register_service_payload(domain="test-run.gtw.test", rate_limits=[]),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "limit_req_zone" not in conf
         assert "limit_req zone=" not in conf
         assert "location / {" in conf
@@ -306,7 +305,7 @@ class TestRegisterReplica:
             json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "upstream" not in conf
         # register 2 replicas
         resp = await client.post(
@@ -321,7 +320,7 @@ class TestRegisterReplica:
         )
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "upstream test-run.gtw.test.upstream" in conf
         assert (m1 := re.search(r"server unix:/(.+)/replica.sock;  # replica xxx-xxx", conf))
         assert (m2 := re.search(r"server unix:/(.+)/replica.sock;  # replica yyy-yyy", conf))
@@ -376,7 +375,7 @@ class TestRegisterReplica:
             json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
         )
         assert resp.status_code == 200
-        conf_before = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf_before = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         # register invalid replica
         system_mocks.open_conn.side_effect = SSHError("test error")
         resp = await client.post(
@@ -387,7 +386,7 @@ class TestRegisterReplica:
         assert resp.json() == {
             "detail": "Cannot register replica abc-def in service test-proj/test-run: test error"
         }
-        conf_after = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf_after = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert conf_after == conf_before
 
 
@@ -450,12 +449,12 @@ class TestUnregisterService:
             json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
         )
         assert resp.status_code == 200
-        assert (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         # unregister service
         resp = await client.post("/api/registry/test-proj/services/test-run/unregister")
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
-        assert not (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert not (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 2
 
     async def test_unregister_not_registered_error(
@@ -484,11 +483,11 @@ class TestUnregisterService:
                 json=register_replica_payload(job_id=job_id),
             )
             assert resp.status_code == 200
-        assert (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         # unregister service
         resp = await client.post("/api/registry/test-proj/services/test-run/unregister")
         assert resp.status_code == 200
-        assert not (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert not (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 4
         assert system_mocks.close_conn.call_count == 2
 
@@ -526,7 +525,7 @@ class TestUnregisterReplica:
                 json=register_replica_payload(job_id=job_id),
             )
             assert resp.status_code == 200
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "replica xxx-xxx" in conf
         assert "replica yyy-yyy" in conf
         # unregister 1 replica
@@ -535,7 +534,7 @@ class TestUnregisterReplica:
         )
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
-        conf = (tmp_path / "443-test-run.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "replica xxx-xxx" in conf
         assert "replica yyy-yyy" not in conf
         assert system_mocks.reload_nginx.call_count == 4
@@ -585,7 +584,7 @@ class TestRegisterEntrypoint:
         )
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
-        conf = (tmp_path / "443-gateway.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
         assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
         assert "listen 80;" in conf
         assert "listen 443" not in conf
@@ -599,7 +598,7 @@ class TestRegisterEntrypoint:
             json={"domain": "gateway.gtw.test", "https": True},
         )
         assert resp.status_code == 200
-        conf = (tmp_path / "443-gateway.gtw.test.conf").read_text()
+        conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
         assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
         assert "listen 80;" in conf
         assert "listen 443 ssl;" in conf

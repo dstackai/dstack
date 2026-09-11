@@ -12,13 +12,11 @@ from pydantic import (
     GetCoreSchemaHandler,
     PositiveInt,
     RootModel,
-    SerializerFunctionWrapHandler,
     ValidationError,
     ValidationInfo,
     conint,
     constr,
     field_validator,
-    model_serializer,
     model_validator,
 )
 from pydantic_core import CoreSchema, core_schema
@@ -1257,20 +1255,6 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("`replicas` and `groups` are mutually exclusive")
         return data
 
-    @model_serializer(mode="wrap")
-    def _serialize_legacy_replica_groups(
-        self, handler: SerializerFunctionWrapHandler
-    ) -> Dict[str, Any]:
-        res = handler(self)
-        groups = res.pop("groups", None)
-        if groups is None:
-            return res
-        for group in groups:
-            if "replicas" in group:
-                group["count"] = group.pop("replicas")
-        res["replicas"] = groups
-        return res
-
     @field_validator("port")
     @classmethod
     def convert_port(cls, v) -> PortMapping:
@@ -1653,6 +1637,41 @@ class PresetModelBase(CoreModel):
 
 PresetModelSpec = Union[PresetModelRepo, PresetModelBase]
 
+PresetAgentProvider = Literal["claude", "codex"]
+PresetAgentEffort = Literal["low", "medium", "high", "xhigh", "max"]
+
+
+class PresetAgentConfig(CoreModel):
+    provider: Annotated[
+        PresetAgentProvider,
+        Field(description="The agent CLI that creates the preset: `claude` or `codex`"),
+    ]
+    model: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The model the agent runs with, e.g. `claude-opus-5` or `gpt-6-astra`."
+                " Defaults to the agent CLI's own default"
+            )
+        ),
+    ] = None
+    effort: Annotated[
+        Optional[PresetAgentEffort],
+        Field(
+            description=(
+                "The reasoning effort. `max` is supported by `claude` only."
+                " Defaults to the agent CLI's own default"
+            )
+        ),
+    ] = None
+
+    @model_validator(mode="after")
+    def validate_effort(self) -> Self:
+        if self.provider == "codex" and self.effort == "max":
+            raise ValueError("effort `max` is not supported by `codex`")
+        return self
+
+
 MAX_PROMPT_LENGTH = 10_000
 
 
@@ -1819,6 +1838,15 @@ class PresetConfiguration(
                 " Specify boolean `true` to run with the default gateway."
                 " Omit to run with the default gateway if there is one, or without a gateway otherwise"
             ),
+        ),
+    ] = None
+    agent: Annotated[
+        Optional[PresetAgentConfig],
+        Field(
+            description=(
+                "The agent that creates the preset. Overrides the `DSTACK_AGENT_*` environment"
+                " variables. Defaults to `claude`"
+            )
         ),
     ] = None
     env: Annotated[Env, Field(description="The mapping or the list of environment variables")] = (

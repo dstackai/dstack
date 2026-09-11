@@ -2,7 +2,7 @@ import shlex
 import subprocess
 import tempfile
 from collections.abc import Iterable
-from typing import List, Optional, cast
+from typing import Callable, List, Optional, cast
 
 import gpuhunt
 from gpuhunt.providers.jarvislabs import JarvisLabsProvider
@@ -13,6 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithInstanceVolumesSupport,
+    ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
@@ -47,6 +48,11 @@ DEFAULT_USERNAME = "ubuntu"
 SSH_CONNECT_TIMEOUT_SECONDS = 10
 SSH_SETUP_TIMEOUT_SECONDS = 240
 SSH_LAUNCH_TIMEOUT_SECONDS = 60
+# VMs in these regions join the account's default VPC and get a private IP that is
+# routable between VMs of the same account. Other regions have no VPC, so their
+# private IPs cannot be used for inter-node communication.
+# See https://docs.jarvislabs.ai/vpc/
+VPC_REGIONS = frozenset({"india-chennai-01", "india-noida-01"})
 
 
 class JarvisLabsOfferBackendData(TypedDict):
@@ -70,6 +76,7 @@ class JarvisLabsCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
+    ComputeWithMultinodeSupport,
     Compute,
 ):
     def __init__(self, config: JarvisLabsConfig):
@@ -97,6 +104,13 @@ class JarvisLabsCompute(
         self, requirements: Requirements, full_offers: bool
     ) -> Iterable[OfferModifier]:
         return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+
+    def get_offers_post_filter(
+        self, requirements: Requirements
+    ) -> Optional[Callable[[InstanceOfferWithAvailability], bool]]:
+        if not requirements.multinode:
+            return None
+        return lambda offer: offer.region in VPC_REGIONS
 
     def create_instance(
         self,
@@ -207,6 +221,7 @@ class JarvisLabsCompute(
             return
         provisioning_data.hostname = hostname
         provisioning_data.username = username
+        provisioning_data.internal_ip = _get_internal_ip(instance)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -259,6 +274,16 @@ def _format_failed_status(status: dict) -> str:
 
 def _raise_failed_status(status: dict) -> None:
     raise ProvisioningError(_format_failed_status(status), status)
+
+
+def _get_internal_ip(instance: dict) -> Optional[str]:
+    # Private IPs of VMs outside a VPC are not routable between VMs.
+    if not instance.get("vpc_id"):
+        return None
+    private_ip = instance.get("private_ip")
+    if not isinstance(private_ip, str) or not private_ip:
+        return None
+    return private_ip
 
 
 def _get_ssh_username(instance: dict) -> str:

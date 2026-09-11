@@ -4,7 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import ImportNameCompleter
-from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console
+from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console, warn
 from dstack._internal.core.models.imports import Import
 
 
@@ -39,8 +39,10 @@ class ImportCommand(APIBaseCommand):
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
-        imports = self.api.client.imports.list(self.api.project)
-        print_imports_table(imports)
+        response = self.api.client.imports.list_imports(self.api.project)
+        for warning in response.warnings:
+            warn(warning)
+        print_imports_table(response.imports)
 
     def _delete(self, args: argparse.Namespace):
         parts = args.name.split("/")

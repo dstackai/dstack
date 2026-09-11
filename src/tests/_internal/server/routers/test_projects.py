@@ -1191,7 +1191,7 @@ class TestCreateProject:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
-        imports = response.json()
+        imports = response.json()["imports"]
         assert len(imports) == 1
         assert imports[0]["export"]["name"] == "global-export"
 

@@ -26,7 +26,7 @@ If you call the `dstack` HTTP API directly, note that UTC datetimes are now seri
 
 ### Gateway routers
 
-The top-level `router` property of gateway and run configurations, deprecated in `0.20.17` in favor of [replica-based routers](../concepts/services.md#pd-disaggregation), has been removed. Configurations that use it are no longer accepted, and the behavior of gateways and services created with it before the upgrade is undefined.
+The top-level `router` property of gateway and run configurations, deprecated in `0.20.17` in favor of [replica-based routers](../concepts/services.md#router), has been removed. Configurations that use it are no longer accepted, and the behavior of gateways and services created with it before the upgrade is undefined.
 
 > Terminate services and gateways that use the top-level `router` property before upgrading, then recreate them using replica-based routers.
 

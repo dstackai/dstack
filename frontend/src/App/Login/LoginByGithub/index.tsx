@@ -382,11 +382,11 @@ function OtherVersions() {
                         </SpaceBetween>
                     </Container>
                 </li>
-                <li className={styles.productCardsListItem} aria-label="dstack Enterprise">
+                <li className={styles.productCardsListItem} aria-label="dstack Factory">
                     <Container>
                         <SpaceBetween direction="vertical" size="s">
                             <SpaceBetween direction="vertical" size="xxs">
-                                <Box variant="h3">dstack Enterprise</Box>
+                                <Box variant="h3">dstack Factory</Box>
                                 <Box variant="small">Self-hosted</Box>
                             </SpaceBetween>
                             <Box variant="p">Single sign-on, advanced governance controls, and dedicated support.</Box>

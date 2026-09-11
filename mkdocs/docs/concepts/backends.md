@@ -564,6 +564,33 @@ gcloud projects list --format="json(projectId)"
     compute.zoneOperations.get
     ```
 
+    If you plan to use gateways with `load_balancer: { type: alb }`, additional permissions are required:
+
+    ```
+    compute.forwardingRules.create
+    compute.forwardingRules.delete
+    compute.forwardingRules.get
+    compute.forwardingRules.use
+    compute.instanceGroups.create
+    compute.instanceGroups.delete
+    compute.instanceGroups.update
+    compute.instanceGroups.use
+    compute.instances.use
+    compute.regionBackendServices.create
+    compute.regionBackendServices.delete
+    compute.regionBackendServices.use
+    compute.regionHealthChecks.create
+    compute.regionHealthChecks.delete
+    compute.regionHealthChecks.useReadOnly
+    compute.regionOperations.get
+    compute.regionTargetHttpProxies.create
+    compute.regionTargetHttpProxies.delete
+    compute.regionTargetHttpProxies.use
+    compute.regionUrlMaps.create
+    compute.regionUrlMaps.delete
+    compute.regionUrlMaps.use
+    ```
+
     If you plan to use TPUs, additional permissions are required:
 
     ```
@@ -615,6 +642,30 @@ gcloud projects list --format="json(projectId)"
         allowing all traffic within the VPC. This is needed for multi-node tasks to work.
         The default VPC already permits traffic within the VPC.
 
+        If the VPC has multiple subnets in a region, `dstack` uses any usable subnet.
+        Specify `subnetworks` to target a specific subnet in a region:
+
+        <div editor-title="~/.dstack/server/config.yml">
+
+        ```yaml
+        projects:
+        - name: main
+          backends:
+            - type: gcp
+              project_id: gcp-project-id
+              creds:
+                type: default
+
+              regions: [europe-west4]
+              vpc_name: my-custom-vpc
+              subnetworks:
+                europe-west4: my-custom-subnet
+        ```
+
+        </div>
+
+        Regions not mapped in `subnetworks` keep using any usable subnet of the VPC.
+
     === "Shared VPC"
     
         <div editor-title="~/.dstack/server/config.yml">
@@ -660,6 +711,8 @@ gcloud projects list --format="json(projectId)"
     ```
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
+    If the VPC has multiple subnets in a region and only some of them are reachable from the `dstack` server and users,
+    specify `subnetworks` to make `dstack` provision instances in a reachable subnet.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
 ### Lambda
@@ -951,6 +1004,9 @@ projects:
 ```
 
 </div>
+
+??? info "Cluster placement"
+    Fleets with `placement: cluster` are supported in the `india-chennai-01` and `india-noida-01` regions, where instances join the account's default [VPC](https://docs.jarvislabs.ai/vpc/) and communicate over private IPs. No additional configuration is required.
 
 ### CloudRift
 

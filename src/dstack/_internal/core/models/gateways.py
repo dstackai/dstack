@@ -59,7 +59,7 @@ class GatewayCertificate(RootModel[Annotated[AnyGatewayCertificate, Field(discri
 
 
 class ALBGatewayLoadBalancer(CoreModel):
-    type: Annotated[Literal["alb"], Field(description="AWS Application Load Balancer")] = "alb"
+    type: Annotated[Literal["alb"], Field(description="Application Load Balancer")] = "alb"
 
 
 AnyGatewayLoadBalancer = Union[ALBGatewayLoadBalancer]
@@ -111,7 +111,8 @@ class GatewayConfiguration(CoreModel):
             discriminator="type",
             description=(
                 "The load balancer configuration."
-                " Set to `type: alb` to front the gateway with an AWS Application Load Balancer"
+                " Set to `type: alb` to front the gateway with an Application Load Balancer"
+                " (supported for the `aws` and `gcp` backends)"
             ),
         ),
     ] = None

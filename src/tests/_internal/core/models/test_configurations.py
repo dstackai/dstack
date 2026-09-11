@@ -1,14 +1,14 @@
 from copy import deepcopy
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import pytest
-from pydantic import ValidationError, model_validator
-from typing_extensions import Self
+from pydantic import ValidationError
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfigurationParams,
+    PresetAgentConfig,
     PresetConfiguration,
     PresetModelBase,
     PresetModelRepo,
@@ -1096,29 +1096,6 @@ class TestNodeGroups:
         assert parsed.resources.gpu.name == ["H100"]
 
 
-class _Legacy021ReplicaGroup(CoreModel):
-    """0.21-shaped group: size is `count`, no `groups` parent field."""
-
-    count: Range[int]
-    commands: list[str] = []
-
-
-class _Legacy021Service(CoreModel):
-    """Stand-in for a 0.21 client that does not know `groups`."""
-
-    commands: list[str] = []
-    image: Optional[str] = None
-    replicas: Optional[Union[list[_Legacy021ReplicaGroup], Range[int]]] = None
-
-    @model_validator(mode="after")
-    def check_image_or_commands_present(self) -> Self:
-        if isinstance(self.replicas, list):
-            return self
-        if not self.commands and self.image is None:
-            raise ValueError("Either `commands` or `image` must be set")
-        return self
-
-
 class TestServiceGroupsPhase1:
     def test_legacy_replicas_list_parses_to_groups(self):
         parsed = parse_run_configuration(
@@ -1154,7 +1131,7 @@ class TestServiceGroupsPhase1:
         assert new.replicas is None
         assert legacy.groups == new.groups
 
-    def test_dump_is_legacy_canonical(self):
+    def test_dump_is_groups_canonical(self):
         parsed = parse_run_configuration(
             {
                 "type": "service",
@@ -1162,15 +1139,16 @@ class TestServiceGroupsPhase1:
                 "groups": [{"replicas": 1, "commands": ["x"]}],
             }
         )
+        # The legacy `replicas: [{count: ...}]` shape is produced only for old
+        # clients, by `server/compatibility/runs.py`, not by the model.
         dumped = parsed.model_dump()
-        assert "groups" not in dumped
-        assert isinstance(dumped["replicas"], list)
-        assert "count" in dumped["replicas"][0]
-        assert "replicas" not in dumped["replicas"][0]
+        assert dumped["replicas"] is None
+        assert isinstance(dumped["groups"], list)
+        assert "replicas" in dumped["groups"][0]
+        assert "count" not in dumped["groups"][0]
         dumped_json = parsed.model_dump(mode="json")
-        assert "groups" not in dumped_json
-        assert "count" in dumped_json["replicas"][0]
-        assert "replicas" not in dumped_json["replicas"][0]
+        assert dumped_json["replicas"] is None
+        assert "replicas" in dumped_json["groups"][0]
 
     def test_dump_validate_is_fixed_point(self):
         parsed = parse_run_configuration(
@@ -1185,18 +1163,7 @@ class TestServiceGroupsPhase1:
         twice = ServiceConfiguration.model_validate(once.model_dump())
         assert once.model_dump() == twice.model_dump() == parsed.model_dump()
 
-    def test_dumped_json_parses_as_0_21_client(self):
-        parsed = parse_run_configuration(
-            {
-                "type": "service",
-                "port": 8000,
-                "groups": [{"replicas": 1, "commands": ["x"]}],
-            }
-        )
-        dumped = parsed.model_dump()
-        validate_extra_ignore(_Legacy021Service, dumped)
-
-    def test_homogeneous_dump_has_no_groups_key(self):
+    def test_homogeneous_dump_has_null_groups(self):
         parsed = parse_run_configuration(
             {
                 "type": "service",
@@ -1205,8 +1172,9 @@ class TestServiceGroupsPhase1:
                 "replicas": 2,
             }
         )
+        # Nothing strips the key now that the model no longer rewrites groups.
         dumped = parsed.model_dump()
-        assert "groups" not in dumped
+        assert dumped["groups"] is None
         assert dumped["replicas"] == {"min": 2, "max": 2}
 
     def test_replicas_and_groups_rejected(self):
@@ -1241,6 +1209,7 @@ class TestPresetConfiguration:
         assert all(field.description for field in PresetConfiguration.model_fields.values())
         assert all(field.description for field in PresetModelBase.model_fields.values())
         assert all(field.description for field in PresetModelRepo.model_fields.values())
+        assert all(field.description for field in PresetAgentConfig.model_fields.values())
         assert {"type": "string"} in PresetConfiguration.model_json_schema()["properties"][
             "model"
         ]["anyOf"]
@@ -1260,6 +1229,34 @@ class TestPresetConfiguration:
         assert configuration.model.exact_repo is None
         assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
         assert configuration.model.allows_variant_selection
+
+    def test_agent_is_optional_and_carries_provider_model_and_effort(self):
+        assert PresetConfiguration(model="Qwen/Qwen3.5-27B").agent is None
+
+        configuration = PresetConfiguration(
+            model="Qwen/Qwen3.5-27B",
+            agent={"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+        )
+
+        assert configuration.agent == PresetAgentConfig(
+            provider="codex", model="gpt-6-astra", effort="xhigh"
+        )
+        assert PresetConfiguration(
+            model="Qwen/Qwen3.5-27B", agent={"provider": "claude"}
+        ).agent == (PresetAgentConfig(provider="claude", model=None, effort=None))
+
+    @pytest.mark.parametrize("agent", [{}, {"model": "gpt-6-astra"}, {"provider": "gemini"}])
+    def test_agent_requires_a_known_provider(self, agent):
+        with pytest.raises(ValidationError):
+            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+
+    @pytest.mark.parametrize(
+        "agent",
+        [{"provider": "claude", "effort": "ultra"}, {"provider": "codex", "effort": "max"}],
+    )
+    def test_agent_effort_must_exist_for_the_provider(self, agent):
+        with pytest.raises(ValidationError):
+            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
 
     def test_parses_exact_repo_with_client_facing_name(self):
         configuration = PresetConfiguration(

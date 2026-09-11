@@ -43,15 +43,22 @@ $ dstack preset create --help
 
 ##### Agent settings
 
-Preset creation uses the existing `claude` login unless
-`DSTACK_AGENT_ANTHROPIC_API_KEY` is set.
+Presets are created with the `claude` CLI by default, or with `codex` when the
+configuration's `agent` or `DSTACK_AGENT_PROVIDER` selects it. The configuration
+takes precedence over the variables below. Each CLI uses its existing login unless
+its API key variable is set.
 
 | Variable | Description |
 | --- | --- |
-| `DSTACK_AGENT_ANTHROPIC_API_KEY` | Anthropic API key used by the agent. |
+| `DSTACK_AGENT_PROVIDER` | The agent CLI: `claude` (default) or `codex`. |
+| `DSTACK_AGENT_ANTHROPIC_API_KEY` | Anthropic API key used by the `claude` agent. |
 | `DSTACK_AGENT_CLAUDE_PATH` | `claude` executable name or path. Defaults to `claude` from `PATH`. |
-| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. Defaults to `claude-opus-4-8`. |
+| `DSTACK_AGENT_ANTHROPIC_MODEL` | Claude model used by the agent. If unset, the `claude` CLI's built-in default is used. |
 | `DSTACK_AGENT_CLAUDE_EFFORT` | Claude effort level: `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used. |
+| `DSTACK_AGENT_OPENAI_API_KEY` | OpenAI API key used by the `codex` agent. |
+| `DSTACK_AGENT_CODEX_PATH` | `codex` executable name or path. Defaults to `codex` from `PATH`. |
+| `DSTACK_AGENT_OPENAI_MODEL` | Model used by the `codex` agent. If unset, the `codex` CLI's built-in default is used. |
+| `DSTACK_AGENT_CODEX_EFFORT` | Codex reasoning effort: `low`, `medium`, `high`, or `xhigh`. If unset, the `codex` CLI default is used. |
 
 Agent progress is written to `agent.log` under `~/.dstack/presets/<preset-id>/`,
 alongside the effective configuration (`preset.dstack.yml`), the recorded

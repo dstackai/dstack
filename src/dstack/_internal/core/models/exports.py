@@ -24,3 +24,8 @@ class Export(CoreModel):
     imports: list[ExportImport]
     exported_fleets: list[ExportedFleet]
     exported_gateways: list[ExportedGateway] = []
+
+
+class ListExportsResponse(CoreModel):
+    exports: list[Export]
+    warnings: list[str] = []

@@ -5,6 +5,7 @@ import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
 from typing_extensions import assert_never
 
+from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithFilteredOffersCached,
@@ -123,13 +124,13 @@ class VastAICompute(
         volumes: List[Volume],
         placement_group: Optional[PlacementGroup],
         requirements: Requirements,
+        extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(
             run, job, max_length=MAX_INSTANCE_NAME_LEN
         )
-        assert run.run_spec.ssh_key_pub is not None
         commands = get_docker_commands(
-            [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
+            build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
         )
         offer_backend_data = validate_extra_ignore(
             VastAIOfferBackendData, instance_offer.backend_data

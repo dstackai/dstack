@@ -19,8 +19,8 @@ It streamlines development, training, and inference, and is compatible with any 
      dstackai/static-assets repo. The files are self-contained (embedded fonts + logos);
      the pair swaps with the docs theme via .arch-svg in
      mkdocs/assets/stylesheets/cloudscape-docs.css. -->
-<img class="arch-svg arch-svg--light" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
-<img class="arch-svg arch-svg--dark" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-dark.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
+<img class="arch-svg arch-svg--light" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, VMs, bare-metal, and hardware below.">
+<img class="arch-svg arch-svg--dark" src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-dark.svg" alt="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, VMs, bare-metal, and hardware below.">
 
 ### Set up the server
 

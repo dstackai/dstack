@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, Iterable, Literal, Optional, Sequence, Union
+from typing import Dict, Iterable, Optional, Sequence
 
 from sqlalchemy import and_, exists, false, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,11 +43,13 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
+    UpdateMapDateTime,
     Worker,
     log_lock_token_changed_after_processing,
     log_lock_token_mismatch,
@@ -91,6 +93,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.jobs import (
     emit_job_status_change_event,
     find_job,
+    get_extra_authorized_keys,
     get_job_attached_volumes,
     get_job_runtime_data,
     get_job_spec,
@@ -144,6 +147,12 @@ ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS = 30 * 60
 
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 """`The minimum time before terminating active job in case of connectivity issues."""
+
+MAX_DURATION_ENFORCEMENT_GRACE = timedelta(minutes=2)
+"""How long the server waits past `max_duration` before terminating the job itself.
+The runner enforces `max_duration` too and does it gracefully, so it normally stops the job
+well within the grace period. The server only steps in when the runner failed to.
+"""
 
 
 @dataclass
@@ -379,6 +388,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     job_provisioning_data: Optional[str]
     job_runtime_data: Optional[str]
     runner_timestamp: Optional[int]
+    running_at: UpdateMapDateTime
     disconnected_at: Optional[datetime]
     inactivity_secs: Optional[int]
     exit_status: Optional[int]
@@ -816,29 +826,40 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        public_keys = [context.project.ssh_public_key.strip()]
+        extra_authorized_keys = get_extra_authorized_keys(context.run.run_spec)
+        public_keys = [context.project.ssh_public_key.strip(), *extra_authorized_keys]
+        # Host access, unlike container access, is all or nothing -- the user key is added to
+        # the host only if they are allowed to bypass the SSH proxy
         ssh_user: Optional[str] = None
         user_ssh_key: Optional[str] = None
         if not server_settings.SSHPROXY_ENFORCED:
             ssh_user = job_provisioning_data.username
-            assert context.run.run_spec.ssh_key_pub is not None
-            user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
-            public_keys.append(user_ssh_key)
-        success = await run_async(
-            _process_provisioning_with_shim,
-            server_ssh_private_keys,
-            job_provisioning_data,
-            None,
-            run=context.run,
-            job_model=context.job_model,
-            jrd=get_job_runtime_data(context.job_model),
-            jpd=job_provisioning_data,
-            volumes=startup_context.volumes,
-            registry_auth=context.job.job_spec.registry_auth,
-            public_keys=public_keys,
-            ssh_user=ssh_user,
-            ssh_key=user_ssh_key,
-        )
+            user_ssh_key = get_or_error(context.run.run_spec.ssh_key_pub).strip()
+        try:
+            success = await run_async(
+                _process_provisioning_with_shim,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                run=context.run,
+                job_model=context.job_model,
+                jrd=get_job_runtime_data(context.job_model),
+                jpd=job_provisioning_data,
+                volumes=startup_context.volumes,
+                registry_auth=context.job.job_spec.registry_auth,
+                public_keys=public_keys,
+                ssh_user=ssh_user,
+                ssh_key=user_ssh_key,
+            )
+        except client.PeerConnectionError as e:
+            # Expected while the instance is still booting
+            logger.debug("%s: shim is unreachable: %s", fmt(context.job_model), e)
+            success = False
+        except client.ShimResponseError as e:
+            logger.warning(
+                "%s: shim did not accept the task submission: %s", fmt(context.job_model), e
+            )
+            success = False
         if success:
             _set_job_status(context.job_model, result, JobStatus.PULLING)
             result.job_update_map["skip_min_processing_interval"] = True
@@ -849,49 +870,53 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        runner_availability = await run_async(
-            _get_runner_availability,
-            server_ssh_private_keys,
-            job_provisioning_data,
-            None,
-        )
-        if runner_availability == _RunnerAvailability.AVAILABLE:
-            if not await _ensure_job_server_connection(context, result):
-                return
-            file_archives = await _get_job_file_archives(
-                archive_mappings=context.job.job_spec.file_archives,
-                user=context.run_model.user,
-            )
-            code = await _get_job_code(
-                project=context.project,
-                repo=context.repo_model,
-                code_hash=_get_repo_code_hash(context.run, context.job),
-            )
-            submit_result = await run_async(
-                _submit_job_to_runner,
+        try:
+            if await run_async(
+                _is_runner_available,
                 server_ssh_private_keys,
                 job_provisioning_data,
                 None,
-                run=context.run,
-                job_model=context.job_model,
-                job=context.job,
-                jrd=get_job_runtime_data(context.job_model),
-                cluster_info=startup_context.cluster_info,
-                code=code,
-                file_archives=file_archives,
-                secrets=startup_context.secrets,
-                repo_credentials=startup_context.repo_creds,
-                router_env=startup_context.router_env,
-                success_if_not_available=False,
-            )
-            if submit_result is not False:
+            ):
+                if not await _ensure_job_server_connection(context, result):
+                    return
+                file_archives = await _get_job_file_archives(
+                    archive_mappings=context.job.job_spec.file_archives,
+                    user=context.run_model.user,
+                )
+                code = await _get_job_code(
+                    project=context.project,
+                    repo=context.repo_model,
+                    code_hash=_get_repo_code_hash(context.run, context.job),
+                )
+                submit_result = await run_async(
+                    _submit_job_to_runner,
+                    server_ssh_private_keys,
+                    job_provisioning_data,
+                    None,
+                    run=context.run,
+                    job_model=context.job_model,
+                    job=context.job,
+                    jrd=get_job_runtime_data(context.job_model),
+                    cluster_info=startup_context.cluster_info,
+                    code=code,
+                    file_archives=file_archives,
+                    secrets=startup_context.secrets,
+                    repo_credentials=startup_context.repo_creds,
+                    router_env=startup_context.router_env,
+                    success_if_not_available=False,
+                )
                 _apply_submit_job_to_runner_result(
                     job_model=context.job_model,
                     result=result,
                     submit_result=submit_result,
                 )
-            if submit_result is not False and submit_result.success:
-                return
+                if submit_result.success:
+                    return
+        except client.PeerConnectionError as e:
+            # Expected while the instance is still booting
+            logger.debug("%s: runner is unreachable: %s", fmt(context.job_model), e)
+        except client.RunnerResponseError as e:
+            logger.warning("%s: runner healthcheck failed: %s", fmt(context.job_model), e)
 
     provisioning_timeout = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
@@ -922,15 +947,16 @@ async def _process_pulling_status(
         fmt(context.job_model),
         context.job_submission.age,
     )
-    shim_state = await run_async(
-        _sync_shim_pulling_state,
-        server_ssh_private_keys,
-        job_provisioning_data,
-        None,
-        job_model=context.job_model,
-        jrd=_get_result_job_runtime_data(context.job_model, result),
-    )
-    if shim_state is not False:
+    try:
+        shim_state = await run_async(
+            _sync_shim_pulling_state,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            None,
+            job_model=context.job_model,
+            jrd=_get_result_job_runtime_data(context.job_model, result),
+        )
+
         if shim_state.job_runtime_data is not None:
             _set_job_runtime_data(result, shim_state.job_runtime_data)
 
@@ -960,56 +986,59 @@ async def _process_pulling_status(
 
         # _ShimPullingState.READY
         job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
-        runner_availability = await run_async(
-            _get_runner_availability,
+        if not await run_async(
+            _is_runner_available,
             server_ssh_private_keys,
             job_provisioning_data,
             job_runtime_data,
-        )
-        if runner_availability == _RunnerAvailability.UNAVAILABLE:
+        ):
             _reset_disconnected_at(context.job_model, result)
             return
 
-        if runner_availability == _RunnerAvailability.AVAILABLE:
-            if not await _ensure_job_server_connection(context, result):
-                return
-            file_archives = await _get_job_file_archives(
-                archive_mappings=context.job.job_spec.file_archives,
-                user=context.run_model.user,
-            )
-            code = await _get_job_code(
-                project=context.project,
-                repo=context.repo_model,
-                code_hash=_get_repo_code_hash(context.run, context.job),
-            )
-            submit_result = await run_async(
-                _submit_job_to_runner,
-                server_ssh_private_keys,
-                job_provisioning_data,
-                job_runtime_data,
-                run=context.run,
-                job_model=context.job_model,
-                job=context.job,
-                jrd=job_runtime_data,
-                cluster_info=startup_context.cluster_info,
-                code=code,
-                file_archives=file_archives,
-                secrets=startup_context.secrets,
-                repo_credentials=startup_context.repo_creds,
-                router_env=startup_context.router_env,
-                success_if_not_available=True,
-            )
-            if submit_result is not False:
-                _apply_submit_job_to_runner_result(
-                    job_model=context.job_model,
-                    result=result,
-                    submit_result=submit_result,
-                )
-            if submit_result is not False and submit_result.success:
-                _reset_disconnected_at(context.job_model, result)
-                return
+        if not await _ensure_job_server_connection(context, result):
+            return
+        file_archives = await _get_job_file_archives(
+            archive_mappings=context.job.job_spec.file_archives,
+            user=context.run_model.user,
+        )
+        code = await _get_job_code(
+            project=context.project,
+            repo=context.repo_model,
+            code_hash=_get_repo_code_hash(context.run, context.job),
+        )
+        submit_result = await run_async(
+            _submit_job_to_runner,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            job_runtime_data,
+            run=context.run,
+            job_model=context.job_model,
+            job=context.job,
+            jrd=job_runtime_data,
+            cluster_info=startup_context.cluster_info,
+            code=code,
+            file_archives=file_archives,
+            secrets=startup_context.secrets,
+            repo_credentials=startup_context.repo_creds,
+            router_env=startup_context.router_env,
+            success_if_not_available=True,
+        )
+        _apply_submit_job_to_runner_result(
+            job_model=context.job_model,
+            result=result,
+            submit_result=submit_result,
+        )
+        if submit_result.success:
+            _reset_disconnected_at(context.job_model, result)
+            return
+    except client.PeerConnectionError as e:
+        logger.debug("%s: instance is unreachable: %s", fmt(context.job_model), e)
+    except (client.ShimResponseError, client.RunnerResponseError) as e:
+        # Same outcome as a connection error, but the cause is logged instead of being
+        # silently indistinguishable.
+        logger.warning("%s: shim or runner answered unusably: %s", fmt(context.job_model), e)
 
-    # SSH tunnel failed or READY but runner submit failed — treat as disconnect
+    # The peer could not be reached, or it is READY but the runner submit failed
     _handle_instance_unreachable(context, result, job_provisioning_data)
 
 
@@ -1025,20 +1054,34 @@ async def _process_running_status(
         fmt(context.job_model),
         context.job_submission.age,
     )
-    process_running_result = await run_async(
-        _process_running,
-        server_ssh_private_keys,
-        job_provisioning_data,
-        context.job_submission.job_runtime_data,
-        run_model=context.run_model,
-        job_model=context.job_model,
-    )
-    if process_running_result is not False:
-        result.job_update_map.update(process_running_result.job_update_map)
-        _reset_disconnected_at(context.job_model, result)
+    # Checked before pulling the runner: the runner may be stuck or unreachable, and that is
+    # exactly when server-side enforcement is needed.
+    if _terminate_if_max_duration_exceeded(context, result):
+        return
+    try:
+        process_running_result = await run_async(
+            _process_running,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            context.job_submission.job_runtime_data,
+            run_model=context.run_model,
+            job_model=context.job_model,
+        )
+    except client.PeerConnectionError as e:
+        logger.debug("%s: instance is unreachable: %s", fmt(context.job_model), e)
+        _handle_instance_unreachable(context, result, job_provisioning_data)
+        return
+    except client.RunnerResponseError as e:
+        # Same outcome as a connection error, but the cause is logged instead of being
+        # silently indistinguishable.
+        logger.warning(
+            "%s: runner failed to serve the pull request: %s", fmt(context.job_model), e
+        )
+        _handle_instance_unreachable(context, result, job_provisioning_data)
         return
 
-    _handle_instance_unreachable(context, result, job_provisioning_data)
+    result.job_update_map.update(process_running_result.job_update_map)
+    _reset_disconnected_at(context.job_model, result)
 
 
 async def _ensure_job_server_connection(
@@ -1490,11 +1533,6 @@ def _process_provisioning_with_shim(
     return True
 
 
-class _RunnerAvailability(enum.Enum):
-    AVAILABLE = "available"
-    UNAVAILABLE = "unavailable"
-
-
 class _ShimPullingState(enum.Enum):
     WAITING = "waiting"
     READY = "ready"
@@ -1511,11 +1549,16 @@ class _SyncShimPullingStateResult:
 
 
 @runner_ssh_tunnel
-def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
+def _is_runner_available(addresses: Mapping[int, client.LocalAddress]) -> bool:
+    """
+    Whether the runner has started and is ready to accept a job.
+
+    A peer that answers the healthcheck with an error status or an unreadable body is not
+    expected to become a working runner, so `RunnerResponseError` propagates and the callers
+    treat it as an unreachable instance, unlike a runner that has not started yet.
+    """
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    if runner_client.healthcheck() is None:
-        return _RunnerAvailability.UNAVAILABLE
-    return _RunnerAvailability.AVAILABLE
+    return runner_client.healthcheck() is not None
 
 
 @runner_ssh_tunnel
@@ -1523,7 +1566,7 @@ def _sync_shim_pulling_state(
     addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
     jrd: Optional[JobRuntimeData] = None,
-) -> Union[_SyncShimPullingStateResult, Literal[False]]:
+) -> _SyncShimPullingStateResult:
     shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     image_pull_progress: Optional[ImagePullProgress] = None
     if shim_client.is_api_v2_supported():
@@ -1614,7 +1657,7 @@ def _submit_job_to_runner(
     repo_credentials: Optional[RemoteRepoCreds],
     router_env: Optional[Dict[str, str]],
     success_if_not_available: bool,
-) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
+) -> _SubmitJobToRunnerResult:
     logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
         "%s: repo clone URL is %s",
@@ -1628,31 +1671,37 @@ def _submit_job_to_runner(
         instance_env = None
 
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    if runner_client.healthcheck() is None:
-        return _SubmitJobToRunnerResult(success=success_if_not_available)
+    try:
+        if runner_client.healthcheck() is None:
+            return _SubmitJobToRunnerResult(success=success_if_not_available)
 
-    runner_client.submit_job(
-        run=run,
-        job=job,
-        cluster_info=cluster_info,
-        # Do not send all the secrets since interpolation is already done by the server.
-        # TODO: Passing secrets may be necessary for filtering out secret values from logs.
-        secrets={},
-        repo_credentials=repo_credentials,
-        instance_env=instance_env,
-        router_env=router_env,
-    )
-    for archive_id, archive in file_archives:
-        logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
-        runner_client.upload_archive(archive_id, archive)
-    if code is None and not runner_client.is_code_upload_optional():
-        # Old runner, we must call `/api/upload_code` to proceed
-        code = b""
-    if code is not None:
-        logger.debug("%s: uploading code", fmt(job_model))
-        runner_client.upload_code(code)
-    logger.debug("%s: starting job", fmt(job_model))
-    job_info = runner_client.run_job()
+        runner_client.submit_job(
+            run=run,
+            job=job,
+            cluster_info=cluster_info,
+            # Do not send all the secrets since interpolation is already done by the server.
+            # TODO: Passing secrets may be necessary for filtering out secret values from logs.
+            secrets={},
+            repo_credentials=repo_credentials,
+            instance_env=instance_env,
+            router_env=router_env,
+        )
+        for archive_id, archive in file_archives:
+            logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
+            runner_client.upload_archive(archive_id, archive)
+        if code is None and not runner_client.is_code_upload_optional():
+            # Old runner, we must call `/api/upload_code` to proceed
+            code = b""
+        if code is not None:
+            logger.debug("%s: uploading code", fmt(job_model))
+            runner_client.upload_code(code)
+        logger.debug("%s: starting job", fmt(job_model))
+        job_info = runner_client.run_job()
+    except client.RunnerResponseError as e:
+        # The runner answered, but unusably, so retrying the same submission is not
+        # expected to help.
+        logger.warning("%s: runner did not accept the job submission: %s", fmt(job_model), e)
+        return _SubmitJobToRunnerResult(success=False)
     if job_info is not None:
         if jrd is not None:
             jrd = jrd.model_copy(
@@ -1675,17 +1724,24 @@ def _process_running(
     addresses: Mapping[int, client.LocalAddress],
     run_model: RunModel,
     job_model: JobModel,
-) -> Union[_ProcessRunningResult, Literal[False]]:
+) -> _ProcessRunningResult:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
     resp = runner_client.pull(timestamp)
-    logs_services.write_logs(
-        project=run_model.project,
-        run_name=run_model.run_name,
-        job_submission_id=job_model.id,
-        runner_logs=resp.runner_logs,
-        job_logs=resp.job_logs,
-    )
+    try:
+        logs_services.write_logs(
+            project=run_model.project,
+            run_name=run_model.run_name,
+            job_submission_id=job_model.id,
+            runner_logs=resp.runner_logs,
+            job_logs=resp.job_logs,
+        )
+    except logs_services.LogStorageError as e:
+        # The instance is reachable, the log storage is not, so this must not be reported as a
+        # disconnect. Nothing is updated: `runner_timestamp` is not advanced, so the same logs
+        # and job state events are pulled again next time instead of being lost.
+        logger.error("%s: failed to write logs: %s", fmt(job_model), e)
+        return _ProcessRunningResult()
     result = _ProcessRunningResult(
         job_update_map=_JobUpdateMap(runner_timestamp=resp.last_updated)
     )
@@ -1763,6 +1819,48 @@ def _terminate_if_inactivity_duration_exceeded(
                 f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
             ),
         )
+
+
+def _terminate_if_max_duration_exceeded(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> bool:
+    """
+    Terminates the job if it has been running longer than `max_duration` plus a grace period.
+
+    A backstop for the runner, which enforces `max_duration` itself and does it gracefully.
+    The server steps in only when the runner failed to stop the job -- e.g. the workload
+    survived the termination signals and the runner never reported the timeout.
+
+    Returns `True` if the job was terminated.
+    """
+    job_model = context.job_model
+    max_duration = context.job.job_spec.max_duration
+    if max_duration is None:
+        return False
+    if job_model.running_at is None:
+        # Jobs that started running before the server was upgraded have no reference point.
+        # They are still enforced by the runner.
+        return False
+    deadline = (
+        job_model.running_at + timedelta(seconds=max_duration) + MAX_DURATION_ENFORCEMENT_GRACE
+    )
+    if get_current_datetime() < deadline:
+        return False
+    logger.warning(
+        "%s: max duration exceeded and the runner did not stop the job, terminating",
+        fmt(job_model),
+    )
+    _terminate_job(
+        job_model=job_model,
+        job_update_map=result.job_update_map,
+        termination_reason=JobTerminationReason.MAX_DURATION_EXCEEDED,
+        termination_reason_message=(
+            f"The job exceeded the max_duration of {max_duration} seconds"
+            " and did not stop on its own"
+        ),
+    )
+    return True
 
 
 def _should_terminate_job_due_to_disconnect(disconnected_at: Optional[datetime]) -> bool:
@@ -2045,6 +2143,10 @@ def _set_job_update_status(
 ) -> None:
     if job_update_map.get("status", job_model.status) != new_status:
         job_update_map["status"] = new_status
+        if new_status == JobStatus.RUNNING:
+            # Stamped here rather than at the call site so that `running_at` cannot drift from
+            # `status`: it is the reference point for server-side `max_duration` enforcement.
+            job_update_map["running_at"] = NOW_PLACEHOLDER
 
 
 def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: JobStatus) -> None:

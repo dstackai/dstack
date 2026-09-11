@@ -85,7 +85,7 @@ class TestPresetLocalCommands:
         (session_dir / "session.json").write_text(
             json.dumps(
                 get_session_state(
-                    status="interrupted", run=get_session_run(claude_session_id="sid-1")
+                    status="interrupted", run=get_session_run(session_id="sid-1")
                 ).model_dump(mode="json")
             )
         )
@@ -116,7 +116,7 @@ class TestPresetLocalCommands:
             get_session_state(
                 id=preset.id,
                 status="interrupted",
-                run=get_session_run(claude_session_id="sid-1"),
+                run=get_session_run(session_id="sid-1"),
             ).model_dump_json(),
             encoding="utf-8",
         )

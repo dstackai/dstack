@@ -9,18 +9,12 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Literal, Optional, Sequence, get_args
+from typing import Any, AsyncIterator, Callable, Literal, Optional, Sequence
 
 import psutil
-from pydantic import ValidationError
 
-from dstack._internal.cli.models.preset_agent import (
-    AnyClaudeStreamEvent,
-    ClaudeResultEvent,
-    PresetAgentFailure,
-    PresetAgentSuccess,
-    PresetSessionProcess,
-)
+from dstack._internal.cli.models.preset_agent import PresetSessionProcess
+from dstack._internal.cli.services.presets.agents.base import PresetAgent, PresetAgentSpec
 from dstack._internal.cli.services.presets.redaction import redact, redact_structure
 from dstack._internal.cli.services.presets.session import (
     PresetSession,
@@ -43,12 +37,9 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
-_CLAUDE_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
-ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 _RESUME_DELAYS_SECONDS: tuple[int, ...] = (30, 60, 120)
 _TERMINATE_GRACE_SECONDS = 3
 _AGENT_ERROR_MAX_LENGTH = 200
@@ -86,15 +77,6 @@ _WINDOWS_INHERITED_ENV_NAMES = (
 )
 
 
-@dataclass(frozen=True)
-class ClaudeAuth:
-    api_key: Optional[str]
-    executable: str
-    # None uses the claude CLI's own default.
-    effort: Optional[ClaudeEffort]
-    model: str
-
-
 @dataclass
 class PresetAgentProcessOutput:
     report_data: Optional[dict[str, Any]] = None
@@ -103,58 +85,12 @@ class PresetAgentProcessOutput:
     made_progress: bool = False
 
 
-def _get_claude_version(auth: "ClaudeAuth") -> Optional[str]:
-    try:
-        result = subprocess.run(
-            [auth.executable, "--version"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        return result.stdout.strip() or None
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-def _get_claude_auth_status(auth: "ClaudeAuth") -> str:
-    if auth.api_key:
-        return "api-key"
-    try:
-        result = subprocess.run(
-            [auth.executable, "auth", "status", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        return result.stdout.strip() or "unknown"
-    except (OSError, subprocess.SubprocessError):
-        return "unknown"
-
-
-def get_claude_auth() -> ClaudeAuth:
-    api_key = os.getenv("DSTACK_AGENT_ANTHROPIC_API_KEY") or None
-    configured_path = os.getenv("DSTACK_AGENT_CLAUDE_PATH") or "claude"
-    executable = shutil.which(configured_path)
-    if executable is None:
-        raise CLIError(f"Claude executable not found: {configured_path}")
-    effort = os.getenv("DSTACK_AGENT_CLAUDE_EFFORT") or None
-    if effort is not None and effort not in get_args(ClaudeEffort):
-        raise CLIError(
-            f"DSTACK_AGENT_CLAUDE_EFFORT must be one of: {', '.join(get_args(ClaudeEffort))}"
-        )
-    return ClaudeAuth(
-        api_key=api_key,
-        executable=executable,
-        effort=effort,
-        model=os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-opus-4-8"),
-    )
-
-
 def build_preset_agent_env(
     *,
     api: Client,
     preset_env: dict[str, str],
-    auth: ClaudeAuth,
+    agent: PresetAgent,
+    spec: PresetAgentSpec,
     workspace: PresetAgentWorkspace,
     token: str,
 ) -> dict[str, str]:
@@ -179,18 +115,7 @@ def build_preset_agent_env(
     env[PROGRESS_ENV] = str(workspace.progress_path)
     for name in ["TMPDIR", "TEMP", "TMP"]:
         env[name] = str(workspace.temp_path)
-    # Sandbox the agent's Claude config under the workspace home when we pass our
-    # own API key; under subscription auth keep the real HOME so it reuses the
-    # user's existing `claude` login.
-    if auth.api_key is not None:
-        env["ANTHROPIC_API_KEY"] = auth.api_key
-        env["HOME"] = str(workspace.dstack_home)
-        if IS_WINDOWS:
-            env["USERPROFILE"] = str(workspace.dstack_home)
-    else:
-        env["HOME"] = str(Path.home())
-        if IS_WINDOWS:
-            env["USERPROFILE"] = str(Path.home())
+    agent.build_env(spec, workspace, env)
     return env
 
 
@@ -199,7 +124,8 @@ async def run_preset_agent(
     prompt: str,
     env: dict[str, str],
     workspace: PresetAgentWorkspace,
-    auth: ClaudeAuth,
+    agent: PresetAgent,
+    spec: PresetAgentSpec,
     redacted_values: Sequence[str],
     session: PresetSession,
     initial_resume_session_id: Optional[str] = None,
@@ -216,19 +142,20 @@ async def run_preset_agent(
         retry_delays = list(_RESUME_DELAYS_SECONDS)
         while True:
             command = _prepare_subprocess_command(
-                _build_claude_command(auth=auth, resume_session_id=resume_session_id)
+                agent.build_command(spec, workspace, resume_session_id)
             )
-            output, returncode = await _run_claude_process(
+            output, returncode = await _run_agent_process(
                 command=command,
                 prompt=attempt_prompt,
                 env=env,
                 workspace=workspace,
+                agent=agent,
                 redacted_values=redacted_values,
                 session=session,
                 offset_store=offset_store,
             )
             if output.report_data is None and returncode != 0:
-                output.error = output.error or f"Claude exited with return code {returncode}"
+                output.error = output.error or f"The agent exited with return code {returncode}"
             error = output.error
             # Retry any process death without a submitted report; a terminal
             # failure report from the agent returns immediately.
@@ -261,12 +188,13 @@ async def run_preset_agent(
             await asyncio.sleep(delay)
 
 
-async def _run_claude_process(
+async def _run_agent_process(
     *,
     command: list[str],
     prompt: str,
     env: dict[str, str],
     workspace: PresetAgentWorkspace,
+    agent: PresetAgent,
     redacted_values: Sequence[str],
     session: PresetSession,
     offset_store: OffsetStore,
@@ -293,7 +221,7 @@ async def _run_claude_process(
                 # CreateProcess on Windows (WinError 87).
                 close_fds=True,
             )
-        session.record_agent(
+        session.record_session_process(
             PresetSessionProcess(pid=proc.pid, started_at=process_started_at(proc.pid))
         )
         assert proc.stdin is not None
@@ -309,6 +237,7 @@ async def _run_claude_process(
             _collect_agent_output(
                 workspace=workspace,
                 session=session,
+                agent=agent,
                 redacted_values=redacted_values,
                 is_alive=agent_alive,
                 offset_store=offset_store,
@@ -336,45 +265,14 @@ async def _run_claude_process(
     return output, returncode
 
 
-def _build_claude_command(*, auth: ClaudeAuth, resume_session_id: Optional[str]) -> list[str]:
-    command = [
-        auth.executable,
-        "-p",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--tools",
-        _CLAUDE_TOOLS,
-        "--allowedTools",
-        _CLAUDE_TOOLS,
-        "--disallowedTools",
-        "Task,NotebookEdit",
-        "--permission-mode",
-        "bypassPermissions",
-        "--model",
-        auth.model,
-        "--json-schema",
-        json.dumps(_get_report_json_schema()),
-    ]
-    if auth.api_key is None:
-        command[2:2] = ["--setting-sources", "project,local"]
-    else:
-        command[2:2] = ["--bare"]
-    if auth.effort is not None:
-        command[2:2] = ["--effort", auth.effort]
-    if resume_session_id is not None:
-        command += ["--resume", resume_session_id]
-    return command
-
-
 def _prepare_subprocess_command(command: list[str]) -> list[str]:
-    """On Windows a `.bat`/`.cmd` Claude launcher can't be exec'd directly; wrap
+    """On Windows a `.bat`/`.cmd` agent launcher can't be exec'd directly; wrap
     it in `cmd.exe /c`. Every other case is returned unchanged."""
     if not IS_WINDOWS or Path(command[0]).suffix.lower() not in {".bat", ".cmd"}:
         return command
     comspec = os.getenv("COMSPEC") or shutil.which("cmd.exe")
     if comspec is None:
-        raise CLIError("Cannot run the Claude batch launcher because cmd.exe was not found")
+        raise CLIError("Cannot run the agent batch launcher because cmd.exe was not found")
     return [comspec, "/d", "/s", "/c", subprocess.list2cmdline(command)]
 
 
@@ -468,6 +366,7 @@ async def _collect_agent_output(
     *,
     workspace: PresetAgentWorkspace,
     session: PresetSession,
+    agent: PresetAgent,
     redacted_values: Sequence[str],
     is_alive: Callable[[], bool],
     offset_store: OffsetStore,
@@ -482,6 +381,7 @@ async def _collect_agent_output(
                 is_alive=is_alive,
             ),
             stream_name="stdout",
+            agent=agent,
             redacted_values=redacted_values,
             session=session,
         ),
@@ -493,6 +393,7 @@ async def _collect_agent_output(
                 is_alive=is_alive,
             ),
             stream_name="stderr",
+            agent=agent,
             redacted_values=redacted_values,
             session=session,
         ),
@@ -503,6 +404,7 @@ async def _collect_agent_output(
 async def attach_preset_agent(
     *,
     workspace: PresetAgentWorkspace,
+    agent: PresetAgent,
     redacted_values: Sequence[str],
     session: PresetSession,
 ) -> PresetAgentProcessOutput:
@@ -517,11 +419,16 @@ async def attach_preset_agent(
         state = session.read_state()
 
         def agent_alive() -> bool:
-            return state is not None and state.run is not None and process_alive(state.run.agent)
+            return (
+                state is not None
+                and state.run is not None
+                and process_alive(state.run.session_process)
+            )
 
         return await _collect_agent_output(
             workspace=workspace,
             session=session,
+            agent=agent,
             redacted_values=redacted_values,
             is_alive=agent_alive,
             offset_store=offset_store,
@@ -532,6 +439,7 @@ async def _read_process_stream(
     *,
     stream: "FileLineReader",
     stream_name: Literal["stdout", "stderr"],
+    agent: PresetAgent,
     redacted_values: Sequence[str],
     session: PresetSession,
 ) -> PresetAgentProcessOutput:
@@ -552,31 +460,20 @@ async def _read_process_stream(
         )
         if not parse_result:
             continue
-        try:
-            event = validate_json_extra_ignore(AnyClaudeStreamEvent, text)
-        except ValidationError:
+        update = agent.parse_line(text)
+        if update is None:
             continue
-        if output.session_id is None and event.session_id:
-            output.session_id = event.session_id
-            session.record_claude_session_id(event.session_id)
-        if event.type == "assistant":
+        if output.session_id is None and update.session_id:
+            output.session_id = update.session_id
+            session.record_session_id(update.session_id)
+        if update.model:
+            session.record_agent_model(update.model)
+        if update.made_progress:
             output.made_progress = True
-        if not isinstance(event, ClaudeResultEvent):
-            continue
-        if event.is_error:
-            output.error = redact(str(event.result or "Claude failed"), redacted_values)
-        if event.structured_output is not None:
-            output.report_data = event.structured_output
-            continue
-        # An agent may print the report as its final text instead of submitting
-        # it through `StructuredOutput`.
-        if isinstance(event.result, str):
-            try:
-                parsed = json.loads(event.result)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(parsed, dict):
-                output.report_data = parsed
+        if update.error is not None:
+            output.error = redact(update.error, redacted_values)
+        if update.report_data is not None:
+            output.report_data = update.report_data
 
 
 async def _terminate_process(proc: asyncio.subprocess.Process) -> None:
@@ -637,22 +534,3 @@ def _terminate_windows_process_tree(pid: int) -> None:
         with suppress(psutil.NoSuchProcess):
             process.kill()
     psutil.wait_procs(alive, timeout=3)
-
-
-def _get_report_json_schema() -> dict[str, Any]:
-    """The one shape the API can enforce: a single object, no union, only
-    `success` required. `AnyPresetAgentResult` enforces the rest at parse."""
-    success = PresetAgentSuccess.model_json_schema()
-    failure = PresetAgentFailure.model_json_schema()
-    return {
-        "type": "object",
-        "properties": {
-            **success["properties"],
-            **failure["properties"],
-            # Each outcome fixes its own value; only the merged shape offers both.
-            "success": {"type": "boolean"},
-        },
-        "required": ["success"],
-        "additionalProperties": False,
-        "$defs": {**success.get("$defs", {}), **failure.get("$defs", {})},
-    }

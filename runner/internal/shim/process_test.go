@@ -3,7 +3,9 @@ package shim
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"os/user"
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -217,7 +219,15 @@ func newTestRunner(t *testing.T, client docker.APIClient) *DockerRunner {
 		dockerParams: &dockerParametersMock{tasksDir: t.TempDir()},
 		gpuLock:      newTestGpuLock(t),
 		tasks:        NewTaskStorage(),
+		userLookup:   failingUserLookup,
 	}
+}
+
+// failingUserLookup is the host user lookup of a test runner that does not override it.
+// No test may write to a real user's authorized_keys file, therefore reaching the lookup
+// unexpectedly must be an error and not a write
+func failingUserLookup(username string) (*user.User, error) {
+	return nil, fmt.Errorf("user %s not found", username)
 }
 
 func newTestGpuLock(t *testing.T, ids ...string) *GpuLock {

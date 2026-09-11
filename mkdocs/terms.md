@@ -26,7 +26,7 @@ These Terms govern your access to and use of:
 These Terms **do not** cover:
 
 - **dstack OSS** — the open-source dstack project is licensed under the Mozilla Public License 2.0. Your use of dstack OSS is governed solely by that license, which is included in the [project repository](https://github.com/dstackai/dstack).
-- **dstack Enterprise** — commercial deployments of dstack Enterprise are governed by a separate written enterprise agreement between you and dstack. These Terms do not apply to dstack Enterprise.
+- **dstack Factory** (formerly dstack Enterprise) — commercial deployments of dstack Factory are governed by a separate written agreement between you and dstack. These Terms do not apply to dstack Factory.
 
 ## 3. The Service
 
@@ -119,7 +119,7 @@ WITHOUT LIMITING THE ABOVE, DSTACK DOES NOT WARRANT THAT:
 - ANY PARTICULAR COMPUTE CAPACITY, GPU TYPE, REGION, OR PRICE WILL BE AVAILABLE FROM ANY UPSTREAM CLOUD PROVIDER; OR
 - WORKLOADS WILL PRODUCE ANY PARTICULAR RESULT, INCLUDING WITH RESPECT TO MACHINE-LEARNING TRAINING OR INFERENCE OUTPUTS.
 
-DSTACK DOES NOT OFFER A SERVICE-LEVEL AGREEMENT OR UPTIME COMMITMENT UNDER THESE TERMS. ANY SLA OR SERVICE COMMITMENT MUST BE SEPARATELY AGREED IN WRITING (FOR EXAMPLE, UNDER A DSTACK ENTERPRISE AGREEMENT).
+DSTACK DOES NOT OFFER A SERVICE-LEVEL AGREEMENT OR UPTIME COMMITMENT UNDER THESE TERMS. ANY SLA OR SERVICE COMMITMENT MUST BE SEPARATELY AGREED IN WRITING (FOR EXAMPLE, UNDER A SEPARATE WRITTEN AGREEMENT FOR DSTACK FACTORY).
 
 **Not tailored to industry-specific regulations.** The Service is not designed or tailored to comply with industry-specific laws or regulations such as the Health Insurance Portability and Accountability Act (HIPAA), the Federal Information Security Management Act (FISMA), or the Gramm-Leach-Bliley Act (GLBA). You must not use the Service to process data subject to these or similar regulations unless we have separately agreed in writing to support your specific compliance requirements.
 

@@ -14,7 +14,6 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
-    SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_json_extra_ignore
@@ -288,6 +287,22 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
     return validate_json_extra_ignore(JobRuntimeData, job_model.job_runtime_data)
 
 
+def get_extra_authorized_keys(run_spec: RunSpec) -> list[str]:
+    """
+    Returns the public keys, besides the project key, to authorize on a job's container.
+
+    The user key is included unless `DSTACK_SERVER_SSHPROXY_ENFORCED` is set, in which case the
+    user is only let in through the SSH proxy, which authenticates them itself and connects with
+    the project key.
+
+    The keys are unvalidated -- whoever writes them to a container must normalize them first,
+    see `backends.base.authorized_keys`.
+    """
+    if settings.SSHPROXY_ENFORCED:
+        return []
+    return [common.get_or_error(run_spec.ssh_key_pub).strip()]
+
+
 def _get_image_pull_progress(job_model: JobModel) -> Optional[ImagePullProgress]:
     if job_model.image_pull_progress is None:
         return None
@@ -358,8 +373,8 @@ async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
         jrd = get_job_runtime_data(job_model)
         try:
             await run_async(_stop_runner, ssh_private_keys, jpd, jrd, job_model)
-        except SSHError:
-            logger.debug("%s: failed to stop runner", fmt(job_model))
+        except client.PeerConnectionError as e:
+            logger.debug("%s: failed to stop runner: %s", fmt(job_model), e)
 
 
 @runner_ssh_tunnel
@@ -371,7 +386,8 @@ def _stop_runner(
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     try:
         runner_client.stop()
-    except requests.RequestException:
+    except (requests.RequestException, client.RunnerError):
+        # Stopping the runner is best-effort: the job is being terminated either way.
         logger.exception("%s: failed to stop runner gracefully", fmt(job_model))
 
 

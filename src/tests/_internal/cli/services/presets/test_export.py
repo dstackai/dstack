@@ -70,6 +70,30 @@ class TestExportPreset:
         )
         assert ServiceConfiguration.model_validate(data).model is not None
 
+    def test_exports_replica_groups_in_the_groups_syntax(self, tmp_path: Path):
+        store = PresetStore(tmp_path / "presets")
+        preset = get_preset()
+        preset.service = ServiceConfiguration.model_validate(
+            {
+                "port": 8000,
+                "model": "meta-llama/Llama-3.2-3B-Instruct",
+                "groups": [
+                    {"replicas": 1, "commands": ["smg launch"]},
+                    {"replicas": 1, "commands": ["python -m sglang.launch_server"]},
+                ],
+            }
+        )
+        preset_dir = store.save(preset).parent
+        destination = tmp_path / "llama.dstack.yml"
+
+        export_preset(preset, preset_dir=preset_dir, destination=destination, force=False)
+
+        data = yaml.safe_load(destination.read_text())
+        assert "groups" in data
+        assert data.get("replicas") is None
+        assert "replicas" in data["groups"][0]
+        assert "count" not in data["groups"][0]
+
     def test_names_the_service_after_the_preset(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
         preset = get_preset().model_copy(update={"name": "qwen-fast"})

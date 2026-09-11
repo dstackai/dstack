@@ -47,9 +47,14 @@ def _offer(
     )
 
 
+# build_authorized_keys() rejects the project key unless it actually parses
+PROJECT_SSH_PUBLIC_KEY = (
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINOmx0T+hBRaJ6jCi21ZYe2NW3EZS8e0Mdwl+yZJt+kD project"
+)
+
+
 def _run_job(compute: VastAICompute, offer: InstanceOfferWithAvailability):
     run = MagicMock()
-    run.run_spec.ssh_key_pub = "ssh-rsa AAAA test"
     job = MagicMock()
     job.job_spec.image_name = "dstackai/base:latest"
     job.job_spec.registry_auth = None
@@ -67,11 +72,12 @@ def _run_job(compute: VastAICompute, offer: InstanceOfferWithAvailability):
             run=run,
             job=job,
             instance_offer=offer,
-            project_ssh_public_key="ssh-rsa BBBB project",
+            project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
             volumes=[],
             placement_group=None,
             requirements=_requirements(),
+            extra_authorized_keys=[],
         )
 
 

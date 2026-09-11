@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Sequence, Union
 
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.configurations import PresetAgentProvider
 
 _SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent / "resources" / "system_prompt.md"
 
@@ -175,6 +176,7 @@ def get_preset_agent_system_prompt(
     baseline: bool,
     previous: Sequence[str],
     custom_dataset: bool,
+    provider: PresetAgentProvider = "claude",
 ) -> str:
     text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
     variables = {
@@ -185,6 +187,9 @@ def get_preset_agent_system_prompt(
         "previous": ", ".join(previous) if previous else None,
         # Rendered for its presence only; the dataset itself is in constraints.json.
         "dataset": "on" if custom_dataset else None,
+        # Rendered for its presence only: the codex CLI loads skills and takes the
+        # final report differently from claude, whose text is the `else` branch.
+        "codex": "on" if provider == "codex" else None,
     }
     applied: set[str] = set()
     rendered = _render_branch(_parse_directives(text, variables), variables, applied, dedent=False)

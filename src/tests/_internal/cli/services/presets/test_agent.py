@@ -13,19 +13,29 @@ import psutil
 import pytest
 import yaml
 
-from dstack._internal.cli.models.preset_agent import PresetSessionProcess
+from dstack._internal.cli.models.preset_agent import PresetAgentInfo, PresetSessionProcess
 from dstack._internal.cli.services.presets.agent import (
-    ClaudeAuth,
-    _build_claude_command,
     _prepare_subprocess_command,
     _terminate_process,
     build_preset_agent_env,
-    get_claude_auth,
     run_preset_agent,
+)
+from dstack._internal.cli.services.presets.agents.base import (
+    PresetAgentSpec,
+    PresetAgentStreamUpdate,
+)
+from dstack._internal.cli.services.presets.agents.claude import ClaudePresetAgent
+from dstack._internal.cli.services.presets.agents.codex import (
+    CodexPresetAgent,
+    _mcp_server_overrides,
 )
 from dstack._internal.cli.services.presets.redaction import (
     contains_redacted_value,
     redact,
+)
+from dstack._internal.cli.services.presets.report_schema import (
+    get_report_json_schema,
+    get_strict_report_json_schema,
 )
 from dstack._internal.cli.services.presets.session import (
     PresetSession,
@@ -48,9 +58,9 @@ from dstack._internal.cli.services.presets.workspace import (
 )
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.configurations import PresetAgentConfig, PresetConfiguration
 from dstack._internal.core.services.configs import ConfigManager
-from tests._internal.cli.common import get_session_run, get_session_state
+from tests._internal.cli.common import get_agent_spec, get_session_run, get_session_state
 
 
 def _record_run(session, workspace_record):
@@ -63,16 +73,10 @@ def _record_run(session, workspace_record):
 pytestmark = pytest.mark.windows
 
 
-def _claude_auth(*, api_key: str | None = "anthropic-secret", effort=None) -> ClaudeAuth:
-    return ClaudeAuth(
-        api_key=api_key,
-        executable="claude",
-        effort=effort,
-        model="claude-test",
-    )
+_WORKSPACE = PresetAgentWorkspace(path=Path("/w"), dstack_home=Path("/w/h"))
 
 
-class TestClaudeAuth:
+class TestClaudePresetAgent:
     @pytest.mark.parametrize("api_key_env", ["key", None])
     def test_uses_api_key_only_when_env_is_set(self, monkeypatch, api_key_env):
         if api_key_env is None:
@@ -81,19 +85,101 @@ class TestClaudeAuth:
             monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_API_KEY", api_key_env)
         monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
 
-        auth = get_claude_auth()
+        spec = ClaudePresetAgent().get_spec(None)
 
-        assert auth.api_key == api_key_env
+        assert spec.api_key == api_key_env
+
+    @pytest.mark.parametrize("model_env", ["claude-pinned", "", None])
+    def test_leaves_model_to_claude_unless_env_is_set(self, monkeypatch, model_env):
+        if model_env is None:
+            monkeypatch.delenv("DSTACK_AGENT_ANTHROPIC_MODEL", raising=False)
+        else:
+            monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_MODEL", model_env)
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
+
+        spec = ClaudePresetAgent().get_spec(None)
+
+        assert spec.model == (model_env or None)
+
+    def test_the_agent_block_overrides_the_environment(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
+        monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-from-env")
+        monkeypatch.setenv("DSTACK_AGENT_CLAUDE_EFFORT", "low")
+
+        spec = ClaudePresetAgent().get_spec(
+            PresetAgentConfig(provider="claude", model="claude-from-config", effort="max")
+        )
+
+        assert spec.model == "claude-from-config"
+        assert spec.effort == "max"
+
+    def test_an_empty_agent_block_falls_back_to_the_environment(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
+        monkeypatch.setenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-from-env")
+        monkeypatch.delenv("DSTACK_AGENT_CLAUDE_EFFORT", raising=False)
+
+        spec = ClaudePresetAgent().get_spec(PresetAgentConfig(provider="claude"))
+
+        assert spec.model == "claude-from-env"
+        assert spec.effort is None
+
+    def test_rejects_an_effort_the_agent_does_not_have(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/claude")
+        monkeypatch.setenv("DSTACK_AGENT_CLAUDE_EFFORT", "ultra")
+
+        with pytest.raises(CLIError, match="DSTACK_AGENT_CLAUDE_EFFORT must be one of"):
+            ClaudePresetAgent().get_spec(None)
 
     @pytest.mark.parametrize("api_key", ["key", None])
     def test_builds_command_for_selected_auth_mode(self, api_key):
-        command = _build_claude_command(
-            auth=_claude_auth(api_key=api_key, effort="high"), resume_session_id=None
+        command = ClaudePresetAgent().build_command(
+            get_agent_spec(api_key=api_key, effort="high"), _WORKSPACE, None
         )
 
         assert ("--bare" in command) is (api_key is not None)
         assert ("--setting-sources" in command) is (api_key is None)
         assert command[command.index("--effort") + 1] == "high"
+
+    def test_builds_the_exact_command(self):
+        """The full argv, pinned so an agent-neutral refactor cannot change what
+        claude receives: login mode, no model or effort, then a resume."""
+        tools = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
+        expected = [
+            "claude",
+            "-p",
+            "--setting-sources",
+            "project,local",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--tools",
+            tools,
+            "--allowedTools",
+            tools,
+            "--disallowedTools",
+            "Task,NotebookEdit",
+            "--permission-mode",
+            "bypassPermissions",
+            "--json-schema",
+            json.dumps(get_report_json_schema()),
+        ]
+        spec = get_agent_spec(api_key=None, model=None)
+
+        assert ClaudePresetAgent().build_command(spec, _WORKSPACE, None) == expected
+        assert ClaudePresetAgent().build_command(spec, _WORKSPACE, "sid-1") == [
+            *expected,
+            "--resume",
+            "sid-1",
+        ]
+
+    @pytest.mark.parametrize("model", ["claude-pinned", None])
+    def test_passes_model_only_when_pinned(self, model):
+        command = ClaudePresetAgent().build_command(get_agent_spec(model=model), _WORKSPACE, None)
+
+        if model is None:
+            assert "--model" not in command
+        else:
+            assert command[command.index("--model") + 1] == model
 
     @pytest.mark.windows_only
     def test_runs_windows_batch_launcher(self, tmp_path):
@@ -111,6 +197,281 @@ class TestClaudeAuth:
         assert result.stdout.strip() == "batch-ok"
 
 
+def _codex_workspace(tmp_path) -> PresetAgentWorkspace:
+    workspace = PresetAgentWorkspace(path=tmp_path / "w", dstack_home=tmp_path / "h")
+    workspace.path.mkdir()
+    workspace.dstack_home.mkdir()
+    return workspace
+
+
+class TestCodexPresetAgent:
+    def test_reads_the_spec_from_the_environment(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/codex")
+        monkeypatch.setenv("DSTACK_AGENT_OPENAI_API_KEY", "sk-test")
+        monkeypatch.setenv("DSTACK_AGENT_OPENAI_MODEL", "gpt-5.5")
+        monkeypatch.setenv("DSTACK_AGENT_CODEX_EFFORT", "high")
+
+        assert CodexPresetAgent().get_spec(None) == PresetAgentSpec(
+            executable="/usr/bin/codex",
+            api_key="sk-test",
+            model="gpt-5.5",
+            effort="high",
+        )
+
+    def test_the_agent_block_overrides_the_environment(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/codex")
+        monkeypatch.setenv("DSTACK_AGENT_OPENAI_MODEL", "gpt-from-env")
+
+        spec = CodexPresetAgent().get_spec(
+            PresetAgentConfig(provider="codex", model="gpt-6-astra", effort="xhigh")
+        )
+
+        assert spec.model == "gpt-6-astra"
+        assert spec.effort == "xhigh"
+
+    def test_rejects_an_unknown_effort(self, monkeypatch):
+        monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/codex")
+        monkeypatch.setenv("DSTACK_AGENT_CODEX_EFFORT", "max")
+
+        with pytest.raises(CLIError, match="DSTACK_AGENT_CODEX_EFFORT"):
+            CodexPresetAgent().get_spec(None)
+
+    def test_builds_the_exact_command_with_an_api_key(self, tmp_path):
+        workspace = _codex_workspace(tmp_path)
+        schema_path = workspace.path / ".report-schema.json"
+        agent = CodexPresetAgent()
+        agent.build_env(get_agent_spec(executable="codex", api_key="sk-test"), workspace, {})
+
+        command = agent.build_command(
+            get_agent_spec(executable="codex", api_key="sk-test", model="gpt-5.5", effort="high"),
+            workspace,
+            None,
+        )
+
+        assert command == [
+            "codex",
+            "exec",
+            "--json",
+            "--skip-git-repo-check",
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--disable",
+            "multi_agent",
+            "--disable",
+            "apps",
+            "-c",
+            'web_search="live"',
+            "--output-schema",
+            str(schema_path),
+            "--output-last-message",
+            str(workspace.path / ".agent-last-message.json"),
+            "-C",
+            str(workspace.path),
+            "-m",
+            "gpt-5.5",
+            "-c",
+            'model_reasoning_effort="high"',
+            "-",
+        ]
+        assert json.loads(schema_path.read_text()) == get_strict_report_json_schema()
+
+    def test_resume_keeps_the_thread_and_disables_the_user_mcp_servers(
+        self, tmp_path, monkeypatch
+    ):
+        codex_home = tmp_path / "codex-home"
+        codex_home.mkdir()
+        (codex_home / "config.toml").write_text(
+            'model_provider = "proxy"\n'
+            "[mcp_servers.computer-use]\n"
+            'command = "/usr/bin/cua"\n'
+            "[mcp_servers.playwright]\n"
+            'command = "npx"\n'
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agents.codex.get_user_codex_home",
+            lambda: codex_home,
+        )
+        workspace = _codex_workspace(tmp_path)
+
+        command = CodexPresetAgent().build_command(
+            get_agent_spec(executable="codex", api_key=None, model=None), workspace, "thread-1"
+        )
+
+        assert command[:4] == ["codex", "exec", "resume", "thread-1"]
+        # `exec resume` has no `-C`; the thread remembers its working directory.
+        assert "-C" not in command
+        # The user's config, provider, and hooks stay; only the MCP servers go.
+        assert "--ignore-user-config" not in command
+        assert command[-5:] == [
+            "-c",
+            'mcp_servers.computer-use={command="disabled", enabled=false}',
+            "-c",
+            'mcp_servers.playwright={command="disabled", enabled=false}',
+            "-",
+        ]
+
+    def test_env_isolates_the_home_and_uses_our_key(self, tmp_path):
+        workspace = _codex_workspace(tmp_path)
+        env: dict[str, str] = {}
+
+        CodexPresetAgent().build_env(
+            get_agent_spec(executable="codex", api_key="sk-test", model=None), workspace, env
+        )
+
+        assert env["HOME"] == str(workspace.dstack_home)
+        assert env["CODEX_API_KEY"] == "sk-test"
+        assert env["CODEX_HOME"] == str(workspace.dstack_home / ".codex")
+        assert (workspace.dstack_home / ".codex").is_dir()
+
+    def test_env_keeps_the_user_codex_home_without_a_key(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agents.codex.get_user_codex_home",
+            lambda: tmp_path / "user-codex",
+        )
+        workspace = _codex_workspace(tmp_path)
+        env: dict[str, str] = {}
+
+        CodexPresetAgent().build_env(
+            get_agent_spec(executable="codex", api_key=None, model=None), workspace, env
+        )
+
+        # The user's codex as they run it: their home, their CODEX_HOME.
+        assert env["HOME"] == str(Path.home())
+        assert env["CODEX_HOME"] == str(tmp_path / "user-codex")
+        assert "CODEX_API_KEY" not in env
+
+
+class TestMcpServerOverrides:
+    def test_disables_every_server_in_the_user_config(self, tmp_path):
+        config = tmp_path / "config.toml"
+        config.write_text(
+            'model = "gpt-5.5"\n'
+            "[mcp_servers.computer-use]\n"
+            'command = "/usr/bin/cua"\n'
+            'args = ["mcp"]\n'
+            "[mcp_servers.docs]\n"
+            'url = "https://example.com/mcp"\n'
+            '[mcp_servers."acme.docs"]\n'
+            'url = "https://acme.example.com/mcp"\n'
+        )
+
+        # A quoted key has no `-c` dotted path, so it stays as the user has it.
+        assert _mcp_server_overrides(config) == [
+            "-c",
+            'mcp_servers.computer-use={command="disabled", enabled=false}',
+            "-c",
+            'mcp_servers.docs={command="disabled", enabled=false}',
+        ]
+
+    @pytest.mark.parametrize("content", ['model = "gpt-5.5"\n', "not = valid = toml\n", None])
+    def test_nothing_to_disable_adds_nothing(self, tmp_path, content):
+        config = tmp_path / "config.toml"
+        if content is not None:
+            config.write_text(content)
+
+        assert _mcp_server_overrides(config) == []
+
+
+class TestCodexStream:
+    def test_maps_events_onto_stream_updates(self):
+        agent = CodexPresetAgent()
+
+        assert agent.parse_line("not json") is None
+        assert agent.parse_line(
+            '{"type":"thread.started","thread_id":"t-1"}'
+        ) == PresetAgentStreamUpdate(session_id="t-1")
+        assert agent.parse_line('{"type":"turn.started"}') == PresetAgentStreamUpdate()
+        assert agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"ls","exit_code":0}}'
+        ) == PresetAgentStreamUpdate(made_progress=True)
+        assert agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i2","type":"agent_message","text":"{\\"note\\": \\"looks like json\\"}"}}'
+        ) == PresetAgentStreamUpdate(made_progress=True)
+        assert agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i3","type":"agent_message","text":"{\\"success\\": false, \\"failure_summary\\": \\"no\\"}"}}'
+        ) == PresetAgentStreamUpdate(made_progress=True)
+        assert agent.parse_line('{"type":"turn.completed","usage":{}}') == PresetAgentStreamUpdate(
+            report_data={"success": False, "failure_summary": "no"}
+        )
+        assert agent.parse_line(
+            '{"type":"error","message":"stream disconnected"}'
+        ) == PresetAgentStreamUpdate(error="stream disconnected")
+        assert agent.parse_line(
+            '{"type":"turn.failed","error":{"message":"boom"}}'
+        ) == PresetAgentStreamUpdate(error="boom")
+
+    def test_a_turn_ending_in_prose_has_no_report(self):
+        agent = CodexPresetAgent()
+
+        agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i1","type":"agent_message","text":"{\\"success\\": true}"}}'
+        )
+        agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i2","type":"agent_message","text":"done"}}'
+        )
+
+        assert (
+            agent.parse_line('{"type":"turn.completed","usage":{}}') == PresetAgentStreamUpdate()
+        )
+
+    def test_reads_the_model_from_the_session_rollout_once(self, tmp_path, monkeypatch):
+        codex_home = tmp_path / "codex"
+        day = codex_home / "sessions" / "2026" / "09" / "05"
+        day.mkdir(parents=True)
+        (day / "rollout-2026-09-05T18-00-00-t-1.jsonl").write_text(
+            '{"type":"session_meta","payload":{"id":"t-1"}}\n'
+            '{"type":"turn_context","payload":{"model":"gpt-5.5"}}\n'
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agents.codex.get_user_codex_home",
+            lambda: codex_home,
+        )
+        agent = CodexPresetAgent()
+        agent.build_env(
+            get_agent_spec(executable="codex", api_key=None, model=None),
+            _codex_workspace(tmp_path),
+            {},
+        )
+
+        agent.parse_line('{"type":"thread.started","thread_id":"t-1"}')
+        first = agent.parse_line(
+            '{"type":"item.started","item":{"id":"i1","type":"command_execution"}}'
+        )
+        second = agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i1","type":"command_execution"}}'
+        )
+
+        assert first is not None and first.model == "gpt-5.5"
+        assert second is not None and second.model is None
+
+    def test_stops_looking_for_the_model_after_the_turn(self, tmp_path, monkeypatch):
+        codex_home = tmp_path / "codex"
+        day = codex_home / "sessions" / "2026" / "09" / "05"
+        day.mkdir(parents=True)
+        rollout = day / "rollout-2026-09-05T18-00-00-t-1.jsonl"
+        rollout.write_text('{"type":"session_meta","payload":{"id":"t-1"}}\n')
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agents.codex.get_user_codex_home",
+            lambda: codex_home,
+        )
+        agent = CodexPresetAgent()
+        agent.build_env(
+            get_agent_spec(executable="codex", api_key=None, model=None),
+            _codex_workspace(tmp_path),
+            {},
+        )
+        agent.parse_line('{"type":"thread.started","thread_id":"t-1"}')
+        agent.parse_line('{"type":"item.started","item":{"id":"i1","type":"command_execution"}}')
+        agent.parse_line('{"type":"turn.completed","usage":{}}')
+
+        # Written too late: both reads are spent.
+        rollout.write_text('{"type":"turn_context","payload":{"model":"gpt-5.5"}}\n')
+        late = agent.parse_line(
+            '{"type":"item.completed","item":{"id":"i1","type":"command_execution"}}'
+        )
+
+        assert late is not None and late.model is None
+
+
 class TestAgentIsolation:
     def test_inherits_only_required_environment(self, tmp_path, monkeypatch):
         monkeypatch.setenv("PATH", "/usr/bin")
@@ -124,7 +485,8 @@ class TestAgentIsolation:
         env = build_preset_agent_env(
             api=api,
             preset_env={"HF_TOKEN": "hf-secret"},
-            auth=_claude_auth(),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(),
             workspace=PresetAgentWorkspace(
                 path=tmp_path,
                 dstack_home=tmp_path / "home",
@@ -179,7 +541,7 @@ def _session_workspace(tmp_path):
     session_dir.mkdir()
     session = PresetSession(path=session_dir, preset_id="abcd1234")
     session.write_state(get_session_state(id="abcd1234"))
-    workspace, _ = create_agent_workspace(session)
+    workspace, _ = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
     return workspace
 
 
@@ -314,8 +676,9 @@ print(json.dumps({
         )
         (tmp_path / "progress.jsonl").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **_: [sys.executable, str(script)],
+            ClaudePresetAgent,
+            "build_command",
+            lambda self, spec, workspace, resume_session_id: [sys.executable, str(script)],
         )
 
         workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
@@ -331,7 +694,8 @@ print(json.dumps({
             prompt="full preset prompt",
             env=os.environ.copy(),
             workspace=workspace,
-            auth=_claude_auth(),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(),
             redacted_values=("secret-token",),
             session=session,
         )
@@ -370,8 +734,9 @@ print(json.dumps({"type": "result", "structured_output": {"ok": True}}))
         (tmp_path / "trials").mkdir()
         (tmp_path / "service").mkdir()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **_: [sys.executable, str(script)],
+            ClaudePresetAgent,
+            "build_command",
+            lambda self, spec, workspace, resume_session_id: [sys.executable, str(script)],
         )
         workspace = PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home")
         session_path = tmp_path / "session"
@@ -383,7 +748,8 @@ print(json.dumps({"type": "result", "structured_output": {"ok": True}}))
             prompt="p",
             env=os.environ.copy(),
             workspace=workspace,
-            auth=_claude_auth(),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(),
             redacted_values=("secret-token",),
             session=session,
         )
@@ -414,15 +780,17 @@ print(json.dumps({
         session_path.mkdir()
         (session_path / "agent.log").touch()
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._build_claude_command",
-            lambda **_: [sys.executable, str(script)],
+            ClaudePresetAgent,
+            "build_command",
+            lambda self, spec, workspace, resume_session_id: [sys.executable, str(script)],
         )
 
         output = await run_preset_agent(
             prompt="prompt",
             env=os.environ.copy(),
             workspace=PresetAgentWorkspace(path=tmp_path, dstack_home=tmp_path / "home"),
-            auth=_claude_auth(),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(),
             redacted_values=(),
             session=PresetSession(
                 path=session_path,
@@ -615,30 +983,68 @@ class TestDirectoryMirror:
         assert not (tmp_path / "session" / "trials" / "1" / "trial.json").exists()
 
 
-class TestWriteAgentInfo:
-    def test_writes_model_params_and_auth(self, tmp_path, monkeypatch):
+class TestGetAgentInfo:
+    def test_describes_the_spec_without_a_model(self, tmp_path, monkeypatch):
+        probes = {
+            "--version": "2.1.0 (Claude Code)",
+            "--json": '{"authMethod": "claude.ai", "loggedIn": true}',
+        }
         monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._get_claude_version",
-            lambda auth: "2.1.0 (Claude Code)",
-        )
-        monkeypatch.setattr(
-            "dstack._internal.cli.services.presets.agent._get_claude_auth_status",
-            lambda auth: '{"authMethod": "claude.ai", "loggedIn": true}',
+            "dstack._internal.cli.services.presets.agents.claude.probe_cli",
+            lambda args, **_: probes[args[-1]],
         )
         session_dir = tmp_path / "session"
         session_dir.mkdir()
         session = PresetSession(path=session_dir, preset_id="ab12cd34")
 
+        # Even a pinned model is not recorded here: claude reports the model it
+        # runs on its init line, and that is what gets recorded.
         session.write_agent_info(
-            ClaudeAuth(api_key=None, executable="claude", effort=None, model="claude-opus-4-8")
+            ClaudePresetAgent().get_info(
+                get_agent_spec(api_key=None, effort="high", model="claude-pinned")
+            )
         )
 
         assert json.loads((session_dir / "agent.json").read_text()) == {
+            "provider": "claude",
             "executable": "claude",
             "version": "2.1.0 (Claude Code)",
-            "model": {"name": "claude-opus-4-8", "effort": "default"},
             "auth_status": '{"authMethod": "claude.ai", "loggedIn": true}',
+            "effort": "high",
+            "model": None,
         }
+
+
+class TestRecordAgentModel:
+    def test_records_the_model_claude_reports(self, tmp_path):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+        session.write_agent_info(
+            PresetAgentInfo(
+                provider="claude",
+                executable="claude",
+                version=None,
+                auth_status="{}",
+                effort=None,
+                model=None,
+            )
+        )
+
+        session.record_agent_model("claude-opus-5[1m]")
+
+        info = session.read_agent_info()
+        assert info is not None
+        assert info.model == "claude-opus-5[1m]"
+
+    def test_does_not_record_a_model_without_launch_info(self, tmp_path):
+        session_dir = tmp_path / "session"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+
+        session.record_agent_model("claude-opus-5[1m]")
+
+        assert not (session_dir / "agent.json").exists()
 
 
 def _offsets(tmp_path):
@@ -677,10 +1083,74 @@ def _agent_setup(tmp_path):
 
 def _patch_claude_command(monkeypatch, script):
     monkeypatch.setattr(
-        "dstack._internal.cli.services.presets.agent._build_claude_command",
-        lambda **kwargs: [sys.executable, str(script)]
-        + (["--resume", kwargs["resume_session_id"]] if kwargs.get("resume_session_id") else []),
+        ClaudePresetAgent,
+        "build_command",
+        lambda self, spec, workspace, resume_session_id: [sys.executable, str(script)]
+        + (["--resume", resume_session_id] if resume_session_id else []),
     )
+
+
+class TestCodexResume:
+    @pytest.mark.asyncio
+    async def test_resumes_the_thread_after_a_failed_turn(self, tmp_path, monkeypatch):
+        script = _write_fake_claude(
+            tmp_path,
+            """import json
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+with Path("calls.jsonl").open("a") as f:
+    f.write(json.dumps({"args": args, "prompt": sys.stdin.read()}) + "\\n")
+print(json.dumps({"type": "thread.started", "thread_id": "t-1"}))
+if "resume" in args:
+    report = {"success": False, "failure_summary": "resumed"}
+    print(json.dumps({"type": "item.completed", "item": {"id": "i1", "type": "agent_message", "text": json.dumps(report)}}))
+    print(json.dumps({"type": "turn.completed", "usage": {}}))
+else:
+    print(json.dumps({"type": "turn.started"}))
+    print(json.dumps({"type": "turn.failed", "error": {"message": "unexpected status 401"}}))
+    sys.exit(1)
+""",
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.agent._RESUME_DELAYS_SECONDS", (0,)
+        )
+        real_build_command = CodexPresetAgent.build_command
+
+        def fake_build_command(self, spec, workspace, resume_session_id):
+            # The real argv with the fake script as the executable.
+            command = real_build_command(self, spec, workspace, resume_session_id)
+            return [sys.executable, str(script), *command[1:]]
+
+        monkeypatch.setattr(CodexPresetAgent, "build_command", fake_build_command)
+        workspace, session = _agent_setup(tmp_path)
+        workspace.dstack_home.mkdir(exist_ok=True)
+        session.write_state(get_session_state(run=get_session_run(agent_provider="codex")))
+        agent = CodexPresetAgent()
+        spec = get_agent_spec(executable="codex", api_key="sk-test", model=None)
+        agent.build_env(spec, workspace, {})
+
+        output = await run_preset_agent(
+            prompt="system prompt",
+            env=_subprocess_env(),
+            workspace=workspace,
+            agent=agent,
+            spec=spec,
+            redacted_values=(),
+            session=session,
+        )
+
+        assert output.report_data == {"success": False, "failure_summary": "resumed"}
+        assert output.session_id == "t-1"
+        calls = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
+        assert calls[0]["args"][:2] == ["exec", "--json"]
+        assert calls[0]["prompt"] == "system prompt"
+        assert calls[1]["args"][:3] == ["exec", "resume", "t-1"]
+        assert calls[1]["prompt"].startswith("The previous agent process was interrupted")
+        state = session.read_state()
+        assert state is not None and state.run is not None
+        assert state.run.session_id == "t-1"
 
 
 class TestConnectionResume:
@@ -702,7 +1172,7 @@ if "--resume" in args:
         "structured_output": {"resumed": True},
     }))
 else:
-    print(json.dumps({"type": "system", "subtype": "init", "session_id": "sid-123"}))
+    print(json.dumps({"type": "system", "session_id": "sid-123", "model": "claude-effective"}))
     print(json.dumps({
         "type": "result",
         "is_error": True,
@@ -716,17 +1186,32 @@ else:
         )
         _patch_claude_command(monkeypatch, script)
         workspace, session = _agent_setup(tmp_path)
+        session.write_agent_info(
+            PresetAgentInfo(
+                provider="claude",
+                executable="claude",
+                version=None,
+                auth_status="{}",
+                effort=None,
+                model=None,
+            )
+        )
 
         output = await run_preset_agent(
             prompt="system prompt",
             env=_subprocess_env(),
             workspace=workspace,
-            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(api_key=None, model=None),
             redacted_values=(),
             session=session,
         )
 
         assert output.report_data == {"resumed": True}
+        # The model comes from claude's init line, not from our configuration.
+        agent_info = session.read_agent_info()
+        assert agent_info is not None
+        assert agent_info.model == "claude-effective"
         calls = [json.loads(line) for line in (tmp_path / "calls.jsonl").read_text().splitlines()]
         assert len(calls) == 2
         assert calls[0]["args"] == []
@@ -763,7 +1248,8 @@ else:
             prompt="system prompt",
             env=_subprocess_env(),
             workspace=workspace,
-            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(api_key=None, model="m"),
             redacted_values=(),
             session=session,
         )
@@ -802,7 +1288,8 @@ sys.exit(1)
             prompt="system prompt",
             env=_subprocess_env(),
             workspace=workspace,
-            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(api_key=None, model="m"),
             redacted_values=(),
             session=session,
         )
@@ -846,7 +1333,8 @@ sys.exit(1)
             prompt="system prompt",
             env=_subprocess_env(),
             workspace=workspace,
-            auth=ClaudeAuth(api_key=None, executable="claude", effort=None, model="m"),
+            agent=ClaudePresetAgent(),
+            spec=get_agent_spec(api_key=None, model="m"),
             redacted_values=(),
             session=session,
         )
@@ -867,7 +1355,7 @@ class TestWorkspaceLifecycle:
     def test_create_attach_and_remove(self, tmp_path):
         session = self._session(tmp_path)
 
-        workspace, workspace_record = create_agent_workspace(session)
+        workspace, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         _record_run(session, workspace_record)
         alias = Path(workspace_record.alias)
         assert Path(workspace_record.path) == session.path / "workspace"
@@ -886,7 +1374,7 @@ class TestWorkspaceLifecycle:
     @pytest.mark.skipif(IS_WINDOWS, reason="workspace alias symlinks are POSIX-only")
     def test_attach_refuses_occupied_alias(self, tmp_path):
         session = self._session(tmp_path)
-        _, workspace_record = create_agent_workspace(session)
+        _, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         _record_run(session, workspace_record)
         alias = Path(workspace_record.alias)
         os.unlink(alias)
@@ -899,7 +1387,7 @@ class TestWorkspaceLifecycle:
 
     def test_attach_fails_when_workspace_is_gone(self, tmp_path):
         session = self._session(tmp_path)
-        _, workspace_record = create_agent_workspace(session)
+        _, workspace_record = create_agent_workspace(session, ClaudePresetAgent.skills_dir)
         _record_run(session, workspace_record)
         remove_agent_workspace(session)
         with pytest.raises(CLIError, match="no longer exists"):
@@ -977,9 +1465,38 @@ class TestOldFlatSessionState:
         assert state.run.workspace.alias == "/tmp/dpe-1"
         assert state.run.finalize.project == "main"
         assert state.run.finalize.keep_service is True
-        assert state.run.agent == PresetSessionProcess(pid=70521, started_at=1755116374.0)
-        assert state.run.claude_session_id == "71b025f9-fba0-42b9-8734-e357deca5281"
+        assert state.run.session_process == PresetSessionProcess(
+            pid=70521, started_at=1755116374.0
+        )
+        assert state.run.agent_provider == "claude"
+        assert state.run.agent_model == "claude-opus-5"
+        assert state.run.session_id == "71b025f9-fba0-42b9-8734-e357deca5281"
         assert state.previous == []
+
+    def test_reads_a_pre_0_22_run_named_after_claude(self, tmp_path):
+        # Verbatim `run` shape written by the 0.21.5 CLI, before the agent-neutral names.
+        state = get_session_state(id="30a012bf").model_dump(mode="json")
+        state["run"] = {
+            "workspace": {"path": "/tmp/w", "alias": "/tmp/dpe-1"},
+            "finalize": {"project": "main", "keep_service": True},
+            "claude_model": "claude-opus-5",
+            "agent": {"pid": 70521, "started_at": 1755116374.0},
+            "claude_session_id": "71b025f9-fba0-42b9-8734-e357deca5281",
+        }
+        session_dir = tmp_path / "30a012bf"
+        session_dir.mkdir()
+        (session_dir / "session.json").write_text(json.dumps(state))
+        session = PresetSession(path=session_dir, preset_id="30a012bf")
+
+        loaded = session.read_state()
+
+        assert loaded is not None and loaded.run is not None
+        assert loaded.run.agent_provider == "claude"
+        assert loaded.run.agent_model == "claude-opus-5"
+        assert loaded.run.session_id == "71b025f9-fba0-42b9-8734-e357deca5281"
+        assert loaded.run.session_process == PresetSessionProcess(
+            pid=70521, started_at=1755116374.0
+        )
 
 
 class TestLoadResumableSession:
@@ -1000,7 +1517,7 @@ class TestLoadResumableSession:
             {
                 "id": "ab12cd34",
                 "status": "interrupted",
-                "run": get_session_run(claude_session_id="sid-1"),
+                "run": get_session_run(session_id="sid-1"),
                 "created_at": "2026-07-20T10:00:00Z",
             },
         )
@@ -1017,7 +1534,7 @@ class TestLoadResumableSession:
                 "id": "ab12cd34",
                 "status": "running",
                 "owner": {"pid": 4242, "started_at": None},
-                "run": get_session_run(claude_session_id="sid-1"),
+                "run": get_session_run(session_id="sid-1"),
             },
         )
         monkeypatch.setattr(
@@ -1034,7 +1551,7 @@ class TestLoadResumableSession:
             {
                 "id": "ab12cd34",
                 "status": "interrupted",
-                "run": get_session_run(claude_session_id="sid-1"),
+                "run": get_session_run(session_id="sid-1"),
             },
         )
         (path / "preset.yml").write_text("status: verified\n", encoding="utf-8")
@@ -1055,7 +1572,7 @@ class TestLoadResumableSession:
                     "id": "aa000003",
                     "status": "running",
                     "owner": {"pid": 4242, "started_at": None},
-                    "run": get_session_run(claude_session_id="sid-1"),
+                    "run": get_session_run(session_id="sid-1"),
                 },
                 "still being created",
                 id="still-running",
@@ -1257,7 +1774,9 @@ class TestStopOrDetach:
             state = session.read_state()
             assert state is not None
             state.status = "running"
-            state.run = get_session_run(agent=PresetSessionProcess(pid=agent.pid, started_at=None))
+            state.run = get_session_run(
+                session_process=PresetSessionProcess(pid=agent.pid, started_at=None)
+            )
             session.write_state(state)
 
             monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)

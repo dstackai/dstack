@@ -82,7 +82,7 @@ export const router = createBrowserRouter([
                         index: true,
                         element: <ProjectSettings />,
                     },
-                    {
+                    (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
                         path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
                         element: <ProjectEvents />,
                     },
@@ -102,7 +102,7 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.GATEWAY.EDIT.TEMPLATE,
                         element: <EditGateway />,
                     },
-                ],
+                ].filter(Boolean) as RouteObject[],
             },
             {
                 path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
@@ -191,11 +191,13 @@ export const router = createBrowserRouter([
                 element: <ModelDetails />,
             },
 
-            // Events
-            {
-                path: ROUTES.EVENTS.LIST,
-                element: <EventList />,
-            },
+            // Events, Factory and Sky only
+            ...([
+                (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+                    path: ROUTES.EVENTS.LIST,
+                    element: <EventList />,
+                },
+            ].filter(Boolean) as RouteObject[]),
 
             // Fleets
             {
@@ -302,7 +304,7 @@ export const router = createBrowserRouter([
                         path: ROUTES.USER.PROJECTS.TEMPLATE,
                         element: <UserProjects />,
                     },
-                    {
+                    (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
                         path: ROUTES.USER.EVENTS.TEMPLATE,
                         element: <UserEvents />,
                     },

@@ -27,6 +27,8 @@ Pick the offer whose hardware best fits the goal at hand. Only when several offe
 Fetch `https://dstack.ai/docs/concepts/backends.md` and classify backends
 from the fetched document, not from memory.
 
+If the intention is to use PD disaggregation, the fleet must use `placement: cluster`. Since PD disaggregation implies running a router, unlike workers that must run on GPUs, the router normally should run on a CPU instance. Use `dstack fleet` to see existing fleets and `dstack fleet get <fleet name> --json` to inspect a specific fleet.
+
 ## Check Serving Sources
 
 Check serving-framework sources early enough to choose the image, command,
@@ -98,3 +100,20 @@ If service verification fails because the image, install, model download,
 command, resources, cache, or model behavior needs to change, go back to a task.
 If the tested serving setup is still right and only the dstack service
 configuration is wrong, fix the configuration and submit the service again.
+
+## PD disaggregation
+
+If the intention is to use PD disaggregation:
+
+- Use node groups for the task and replica groups for the service: tasks' node
+  groups are the equivalent of services' replica groups.
+- In both cases, you run a router and prefill/decode workers separately, and
+  you need to use a fleet with an interconnect (`placement: cluster`).
+- With tasks, still use `sleep infinity` even when using `groups` (set it in
+  each group's `commands`; top-level `commands` is not allowed with `groups`),
+  and run the actual commands on each node interactively over SSH.
+- When testing inference, call the router endpoint, not the workers directly
+  (unless you want to test if they are alive).
+- Look for "Node groups" and "PD disaggregation" in
+  `https://dstack.ai/docs/concepts/tasks.md` and "Replica groups" and
+  "PD disaggregation" in `https://dstack.ai/docs/concepts/services.md`.

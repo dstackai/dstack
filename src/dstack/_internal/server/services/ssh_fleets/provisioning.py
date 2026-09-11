@@ -1,7 +1,6 @@
 import io
 import json
 import time
-import uuid
 from contextlib import contextmanager, nullcontext
 from textwrap import dedent
 from typing import Any, Dict, Generator, List, Optional
@@ -9,6 +8,9 @@ from typing import Any, Dict, Generator, List, Optional
 import paramiko
 from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
 
+from dstack._internal.core.backends.base.authorized_keys import (
+    get_add_authorized_keys_script,
+)
 from dstack._internal.core.backends.base.compute import (
     DSTACK_SHIM_RESTART_INTERVAL_SECONDS,
     GoArchType,
@@ -91,39 +93,7 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
 
 
 def add_authorized_keys(client: paramiko.SSHClient, authorized_keys: list[str]) -> None:
-    heredoc_lines: list[str] = []
-    for key in authorized_keys:
-        # Not using paramiko.pkey.PublicBlob.from_string() to avoid unnecessary parsing/validation
-        try:
-            key_type, key_blob, *key_comment_parts = key.split()
-        except ValueError as e:
-            logger.warning("Failed to parse authorized key: %r: %s", key, e)
-            continue
-        key_comment_parts.append("# added by dstack")
-        key_comment = " ".join(key_comment_parts)
-        heredoc_lines.append(f"{key_type}\t{key_blob}\t{key_comment}")
-    eof = f"EOF_{uuid.uuid4().hex}"
-    script_parts = [
-        f"""
-            set -eu
-            if [ ! -e ~/.ssh/authorized_keys ]; then
-                mkdir -p ~/.ssh
-                chmod 700 ~/.ssh
-                touch ~/.ssh/authorized_keys
-                chmod 600 ~/.ssh/authorized_keys
-            elif [ -n "$(tail -c1 ~/.ssh/authorized_keys)" ]; then
-                echo >> ~/.ssh/authorized_keys
-            fi
-            while IFS='\t' read -r type blob comment <&3; do
-                if ! grep -qF "$blob" ~/.ssh/authorized_keys; then
-                    echo "$type $blob $comment" >> ~/.ssh/authorized_keys
-                fi
-            done 3<<'{eof}'
-        """.strip(),
-        *heredoc_lines,
-        eof,
-    ]
-    script = "\n".join(script_parts)
+    script = get_add_authorized_keys_script(authorized_keys)
     try:
         _, stdout, stderr = client.exec_command(script, timeout=5)
         out = stdout.read().strip().decode()

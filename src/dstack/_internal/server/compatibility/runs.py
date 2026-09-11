@@ -31,6 +31,20 @@ def patch_run(run: Run, client_version: Optional[Version]) -> None:
 def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None:
     if client_version is None:
         return
+    # Clients prior to 0.21.3 do not support `groups` on services
+    if (
+        client_version < Version("0.21.3")
+        and isinstance(run_spec.configuration, ServiceConfiguration)
+        and run_spec.configuration.groups is not None
+    ):
+        groups = [group.model_dump(mode="json") for group in run_spec.configuration.groups]
+        for group in groups:
+            group["count"] = group.pop("replicas")
+        # `replicas` was a list of replica groups in old clients but is now typed
+        # `Optional[Range[int]]`. Safe to ignore: pydantic validates on parse, not
+        # on assignment, and serializes the value as set.
+        run_spec.configuration.replicas = groups  # type: ignore[assignment]
+        run_spec.configuration.groups = None
     # Clients that type nodes as int reject null. Homogeneous default is 1.
     if (
         isinstance(run_spec.configuration, TaskConfiguration)

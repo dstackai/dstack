@@ -155,7 +155,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SSHPROXY_API_TOKEN`{ #DSTACK_SSHPROXY_API_TOKEN } – Authentication token for the SSH proxy API. Required to enable SSH proxy integration; must match the token configured when deploying [`dstack-sshproxy`](https://github.com/dstackai/sshproxy).
 - `DSTACK_SERVER_SSHPROXY_ADDRESS`{ #DSTACK_SERVER_SSHPROXY_ADDRESS } – Address of the SSH proxy exposed to users, in `HOSTNAME[:PORT]` form. `PORT` defaults to `22` if omitted. Required together with `DSTACK_SSHPROXY_API_TOKEN` to enable SSH proxy integration.
 - `DSTACK_SERVER_SSHPROXY_ENFORCED`{ #DSTACK_SERVER_SSHPROXY_ENFORCED } – When set to any value, restricts all SSH connections to go through the SSH proxy.
-- `DSTACK_SERVER_JOB_NETWORK_MODE`{ #DSTACK_SERVER_JOB_NETWORK_MODE } – Controls the network mode assigned to jobs. Accepts an integer value: `1` forces bridge networking for single-node jobs while distributed tasks still use host networking; `2` uses host networking whenever the job occupies a full instance (default); `3` forces bridge networking for all jobs including distributed tasks.
+- `DSTACK_SERVER_JOB_NETWORK_MODE`{ #DSTACK_SERVER_JOB_NETWORK_MODE } – Controls the network mode assigned to jobs. Accepts an integer value: `1` forces bridge networking for single-node jobs while multi-node tasks still use host networking; `2` uses host networking whenever the job occupies a full instance (default); `3` forces bridge networking for all jobs including multi-node tasks.
 - `DSTACK_SERVER_SSH_CONNECT_TIMEOUT`{ #DSTACK_SERVER_SSH_CONNECT_TIMEOUT } – The SSH `ConnectTimeout` for server-instance connections, in seconds. Defaults to `3`. Increase if there are high-latency links between the server and instances.
 - `DSTACK_SERVER_SSH_POOL_DISABLED`{ #DSTACK_SERVER_SSH_POOL_DISABLED } – Disables the reuse of server SSH connections to instances. If set, significantly decreases server RAM usage, but
 slows down processing and may cause CPU spikes due to frequent SSH-connection establishment.
@@ -173,6 +173,7 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
       `https://dstack.example.com/{arch}/{version}/dstack-runner`.
      * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
       see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
+     * `DSTACK_GATEWAY_PACKAGE_URL` – Overrides the URL the `dstack` package is installed from on gateway instances (used as `dstack[gateway] @ <URL>`).
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
 
 ## CLI
@@ -216,7 +217,12 @@ $ find ~/.dstack/logs/cli/
 </div>
 
 - `DSTACK_PROJECT`{ #DSTACK_PROJECT } – Has the same effect as `--project`. Defaults to `None`.
-- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the preset agent. If unset, the existing `claude` login is used.
+- `DSTACK_AGENT_PROVIDER`{ #DSTACK_AGENT_PROVIDER } – The agent CLI that creates presets: `claude` (default) or `codex`. The preset configuration's `agent` block overrides the `DSTACK_AGENT_*` variables.
+- `DSTACK_AGENT_ANTHROPIC_API_KEY`{ #DSTACK_AGENT_ANTHROPIC_API_KEY } – The Anthropic API key used by the `claude` preset agent. If unset, the existing `claude` login is used.
 - `DSTACK_AGENT_CLAUDE_PATH`{ #DSTACK_AGENT_CLAUDE_PATH } – The `claude` executable name or path used by the preset agent. Defaults to `claude` from `PATH`.
-- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. Defaults to `claude-opus-4-8`.
+- `DSTACK_AGENT_ANTHROPIC_MODEL`{ #DSTACK_AGENT_ANTHROPIC_MODEL } – The Claude model used by the preset agent. If unset, the `claude` CLI's built-in default is used.
 - `DSTACK_AGENT_CLAUDE_EFFORT`{ #DSTACK_AGENT_CLAUDE_EFFORT } – The Claude effort level used by the preset agent. Can be `low`, `medium`, `high`, `xhigh`, or `max`. If unset, the `claude` CLI default is used.
+- `DSTACK_AGENT_OPENAI_API_KEY`{ #DSTACK_AGENT_OPENAI_API_KEY } – The OpenAI API key used by the `codex` preset agent. If unset, the existing `codex` login is used.
+- `DSTACK_AGENT_CODEX_PATH`{ #DSTACK_AGENT_CODEX_PATH } – The `codex` executable name or path used by the preset agent. Defaults to `codex` from `PATH`.
+- `DSTACK_AGENT_OPENAI_MODEL`{ #DSTACK_AGENT_OPENAI_MODEL } – The model used by the `codex` preset agent. If unset, the `codex` CLI's built-in default is used.
+- `DSTACK_AGENT_CODEX_EFFORT`{ #DSTACK_AGENT_CODEX_EFFORT } – The reasoning effort used by the `codex` preset agent. Can be `low`, `medium`, `high`, or `xhigh`. If unset, the `codex` CLI default is used.

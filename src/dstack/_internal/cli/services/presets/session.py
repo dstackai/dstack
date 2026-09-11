@@ -10,7 +10,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
 import psutil
 import yaml
@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from rich.text import Text
 
 from dstack._internal.cli.models.preset_agent import (
+    PresetAgentInfo,
     PresetSessionFinalize,
     PresetSessionProcess,
     PresetSessionRun,
@@ -28,13 +29,9 @@ from dstack._internal.cli.models.preset_agent import (
 from dstack._internal.cli.utils.common import console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.common import validate_extra_ignore
-from dstack._internal.core.models.configurations import PresetConfiguration
+from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
+from dstack._internal.core.models.configurations import PresetAgentProvider, PresetConfiguration
 from dstack._internal.utils.common import get_dstack_dir
-
-if TYPE_CHECKING:
-    from dstack._internal.cli.services.presets.agent import ClaudeAuth
-
 
 _PROGRESS_FILENAME = "progress.jsonl"
 _RUNS_FILENAME = "runs.jsonl"
@@ -45,6 +42,7 @@ VERIFICATION_RESULT_FILENAME = "verification.json"
 _CONSTRAINTS_FILENAME = "constraints.json"
 _FINAL_REPORT_FILENAME = "final_report.json"
 _SESSION_FILENAME = "session.json"
+_AGENT_INFO_FILENAME = "agent.json"
 _USER_PROMPT_FILENAME = "user_prompt.md"
 
 
@@ -114,21 +112,25 @@ class PresetSession:
     def write_final_report(self, report_text: str) -> None:
         _write_private_text(self.path / _FINAL_REPORT_FILENAME, report_text)
 
-    def write_agent_info(self, auth: "ClaudeAuth") -> None:
-        from dstack._internal.cli.services.presets.agent import (
-            _get_claude_auth_status,
-            _get_claude_version,
+    def write_agent_info(self, info: PresetAgentInfo) -> None:
+        _write_private_text(
+            self.path / _AGENT_INFO_FILENAME,
+            info.model_dump_json(indent=2) + "\n",
         )
 
-        # `agent.json`: a debug document written once and read by nothing, so it
-        # is a plain dump, not a model.
-        info = {
-            "executable": auth.executable,
-            "version": _get_claude_version(auth),
-            "model": {"name": auth.model, "effort": auth.effort or "default"},
-            "auth_status": _get_claude_auth_status(auth),
-        }
-        _write_private_text(self.path / "agent.json", json.dumps(info, indent=2) + "\n")
+    def read_agent_info(self) -> Optional[PresetAgentInfo]:
+        try:
+            text = (self.path / _AGENT_INFO_FILENAME).read_text(encoding="utf-8")
+            return validate_json_extra_ignore(PresetAgentInfo, text)
+        except (OSError, ValidationError):
+            return None
+
+    def record_agent_model(self, model: str) -> None:
+        info = self.read_agent_info()
+        if info is None:
+            return
+        info.model = model
+        self.write_agent_info(info)
 
     def append_log(self, line: str) -> None:
         if not self._log_enabled:
@@ -150,6 +152,8 @@ class PresetSession:
             return None
         if isinstance(data, dict) and "run" not in data and ("pid" in data or "workspace" in data):
             data = _upgrade_pre_0_21_2_state(data)
+        if isinstance(data, dict) and isinstance(data.get("run"), dict):
+            data["run"] = _upgrade_pre_0_22_run(data["run"])
         try:
             return validate_extra_ignore(PresetSessionState, data)
         except ValidationError:
@@ -166,10 +170,11 @@ class PresetSession:
         *,
         workspace: PresetSessionWorkspace,
         finalize: PresetSessionFinalize,
-        claude_model: Optional[str],
+        agent_provider: PresetAgentProvider,
+        agent_model: Optional[str],
     ) -> None:
         """This CLI takes ownership and starts (or joins) the agent run. Everything
-        an earlier run established survives: the claude session id and model pin so
+        an earlier run established survives: the agent session id and model pin so
         a resume finds them, and the agent process reference so following a live
         detached agent keeps it alive instead of reading it as dead."""
         state = self.read_state()
@@ -181,26 +186,27 @@ class PresetSession:
         state.run = PresetSessionRun(
             workspace=workspace,
             finalize=finalize,
-            claude_model=claude_model or (earlier.claude_model if earlier else None),
-            agent=earlier.agent if earlier else None,
-            claude_session_id=earlier.claude_session_id if earlier else None,
+            agent_provider=agent_provider,
+            agent_model=agent_model or (earlier.agent_model if earlier else None),
+            session_process=earlier.session_process if earlier else None,
+            session_id=earlier.session_id if earlier else None,
         )
         self.write_state(state)
 
-    def record_agent(self, agent: PresetSessionProcess) -> None:
+    def record_session_process(self, process: PresetSessionProcess) -> None:
         state = self.read_state()
         if state is None or state.run is None:
             return
-        state.run.agent = agent
+        state.run.session_process = process
         self.write_state(state)
 
-    def record_claude_session_id(self, session_id: str) -> None:
+    def record_session_id(self, session_id: str) -> None:
         # An unreadable state stays as it is: rewriting it would fabricate a
         # session record out of one field.
         state = self.read_state()
         if state is None or state.run is None:
             return
-        state.run.claude_session_id = session_id
+        state.run.session_id = session_id
         self.write_state(state)
 
     def detach(self) -> None:
@@ -245,6 +251,7 @@ def _upgrade_pre_0_21_2_state(data: dict[str, Any]) -> dict[str, Any]:
         # Without the finalize context there is no run to reconcile or resume.
         data["run"] = None
     else:
+        # The 0.21.2 shape; `_upgrade_pre_0_22_run` renames its fields next.
         data["run"] = {
             "workspace": {"path": workspace, "alias": alias or workspace},
             "finalize": {"project": project, "keep_service": bool(keep_service)},
@@ -258,6 +265,20 @@ def _upgrade_pre_0_21_2_state(data: dict[str, Any]) -> dict[str, Any]:
         }
     data.setdefault("previous", [])
     return data
+
+
+# TODO: Remove in 0.23
+def _upgrade_pre_0_22_run(run: dict[str, Any]) -> dict[str, Any]:
+    """A run written before 0.22 named its fields after Claude, the only agent
+    then. Pure renaming for backward compatibility."""
+    if "claude_model" not in run and "claude_session_id" not in run:
+        return run
+    run = dict(run)
+    run["agent_model"] = run.pop("claude_model", None)
+    run["session_id"] = run.pop("claude_session_id", None)
+    run["session_process"] = run.pop("agent", None)
+    run.setdefault("agent_provider", "claude")
+    return run
 
 
 def get_presets_dir() -> Path:
@@ -333,7 +354,7 @@ def load_resumable_session(preset_id: str) -> PresetSession:
             f"Preset {preset_id} is still being created;"
             f" follow it with dstack preset logs -f {preset_id}"
         )
-    if state.run is None or state.run.claude_session_id is None:
+    if state.run is None or state.run.session_id is None:
         raise CLIError(f"Preset {preset_id} creation stopped before it started; create a new one")
     return session
 
@@ -356,7 +377,7 @@ def process_alive(process: Optional[PresetSessionProcess]) -> bool:
 def session_process_alive(state: PresetSessionState) -> bool:
     """True if either a live agent (possibly detached) or a live CLI (possibly
     between agent retries) still owns the session."""
-    if state.run is not None and process_alive(state.run.agent):
+    if state.run is not None and process_alive(state.run.session_process):
         return True
     if state.owner is None or state.owner.pid == os.getpid():
         return False
@@ -564,6 +585,7 @@ def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
 
 
 def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+    # TODO: Refactor this crap - must be explicit what is this and where is it used; also dicts are prohibited in dstack repo
     """A trial directory without `trial.json` is still in flight and is not
     counted."""
     records = []
@@ -644,8 +666,44 @@ def _trial_entry(
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:
+    """A trial records its hardware in one of two formats, as described in
+    `system_prompt.md`: `{"resources": {...}}` without node groups, and
+    `{"groups": [[...], ...]}` with them.
+
+    Without node groups it returns that one instance's GPU, e.g. `H200:141GB:1`.
+    With node groups it returns the GPUs of every node, e.g. `H200:141GB:1 x5`
+    for a router plus 2 prefill and 3 decode nodes, or
+    `H200:141GB:1 x2 + H100:80GB:1 x3` when the GPU models differ.
+
+    The value fills the `RESOURCES` column of a session row in
+    `dstack preset list -v`.
+    """
+    counts: dict[str, int] = {}
+    for node in _trial_nodes(record):
+        spec = _format_gpu(node.get("gpu"))
+        if spec:
+            # Insertion order is group order, so the roles read in the order they ran.
+            counts[spec] = counts.get(spec, 0) + 1
+    if not counts:
+        return None
+    return " + ".join(spec if n == 1 else f"{spec} x{n}" for spec, n in counts.items())
+
+
+def _trial_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
+    groups = record.get("groups")
+    if isinstance(groups, list):
+        return [
+            node
+            for group in groups
+            if isinstance(group, list)
+            for node in group
+            if isinstance(node, dict)
+        ]
     resources = record.get("resources")
-    gpu = resources.get("gpu") if isinstance(resources, dict) else None
+    return [resources] if isinstance(resources, dict) else []
+
+
+def _format_gpu(gpu: Any) -> Optional[str]:
     if not isinstance(gpu, dict) or not gpu.get("name"):
         return None
     text = str(gpu["name"])

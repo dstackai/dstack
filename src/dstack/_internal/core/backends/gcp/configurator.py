@@ -191,6 +191,17 @@ class GCPConfigurator(
         subnetworks_client: compute_v1.SubnetworksClient,
         routers_client: compute_v1.RoutersClient,
     ):
+        if config.subnetworks:
+            if config.vpc_name is None:
+                raise ServerClientError(
+                    "`vpc_name` must be specified when `subnetworks` is configured."
+                )
+            unknown_regions = set(config.subnetworks) - set(config.regions or DEFAULT_REGIONS)
+            if unknown_regions:
+                raise ServerClientError(
+                    f"`subnetworks` is configured for regions not in `regions`:"
+                    f" {sorted(unknown_regions)}"
+                )
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         nat_check = config.nat_check if config.nat_check is not None else True
         try:
@@ -200,6 +211,7 @@ class GCPConfigurator(
                 project_id=config.project_id,
                 regions=config.regions or DEFAULT_REGIONS,
                 vpc_name=config.vpc_name,
+                subnetworks=config.subnetworks,
                 shared_vpc_project_id=config.vpc_project_id,
                 allocate_public_ip=allocate_public_ip,
                 nat_check=nat_check,

@@ -64,9 +64,11 @@ export const EventsList = () => {
             header={
                 <Header
                     actions={
-                        <Button onClick={goToFullView} disabled={!jobId}>
-                            {t('common.full_view')}
-                        </Button>
+                        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && (
+                            <Button onClick={goToFullView} disabled={!jobId}>
+                                {t('common.full_view')}
+                            </Button>
+                        )
                     }
                 >
                     {t('navigation.events')}
