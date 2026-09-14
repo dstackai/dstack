@@ -5,7 +5,6 @@ export const ROUTES = {
     LOGOUT: '/logout',
 
     AUTH: {
-        LOGIN: '/auth',
         GITHUB_CALLBACK: `/auth/github/callback`,
         OKTA_CALLBACK: `/auth/okta/callback`,
         ENTRA_CALLBACK: `/auth/entra/callback`,

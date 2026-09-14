@@ -52,7 +52,7 @@ export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
     const navigate = useNavigate();
     const { pathname } = useLocation();
     const breadcrumbs = useAppSelector(selectBreadcrumbs);
-    const isAuth = pathname === ROUTES.AUTH.LOGIN || pathname === ROUTES.AUTH.TOKEN;
+    const isAuth = pathname === ROUTES.BASE || pathname === ROUTES.AUTH.TOKEN;
     const onFollow: BreadcrumbGroupProps['onFollow'] = (event) => {
         event.preventDefault();
         navigate(event.detail.href);
@@ -119,10 +119,10 @@ export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
                         <div className={styles.signIn}>
                             <Button
                                 variant="normal"
-                                href={ROUTES.AUTH.LOGIN}
+                                href={ROUTES.BASE}
                                 onFollow={(event) => {
                                     event.preventDefault();
-                                    navigate(ROUTES.AUTH.LOGIN);
+                                    navigate(ROUTES.BASE);
                                 }}
                             >
                                 {t('common.login')}
@@ -136,7 +136,7 @@ export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
                 <AppLayout
                     headerSelector="#header"
                     contentType="default"
-                    disableContentPaddings={!isSky || isAuth || pathname === ROUTES.BASE}
+                    disableContentPaddings={!isSky || isAuth}
                     navigationHide
                     toolsHide
                     content={children ?? <Outlet />}

@@ -3,7 +3,6 @@ import type { RouteObject } from 'react-router-dom';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
 import { PublicApp } from 'PublicApp';
-import { Home } from 'PublicApp/Home';
 import { PresetApp } from 'PublicApp/PresetApp';
 
 import App from 'App';
@@ -49,8 +48,7 @@ export const router = createBrowserRouter([
                   element: <PublicApp />,
                   errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
                   children: [
-                      { path: ROUTES.BASE, element: <Home /> },
-                      { path: ROUTES.AUTH.LOGIN, element: <LoginByGithub /> },
+                      { path: ROUTES.BASE, element: <LoginByGithub /> },
                       { path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> },
                   ],
               },

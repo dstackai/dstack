@@ -2,7 +2,6 @@
 import React from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { act, create, ReactTestRenderer } from 'react-test-renderer';
-import { Home } from 'PublicApp/Home';
 
 import { ROUTES } from 'routes';
 import { useGetUserDataQuery } from 'services/user';
@@ -55,28 +54,23 @@ jest.mock('@cloudscape-design/design-tokens', () => ({ colorBackgroundHomeHeader
 jest.mock('components', () => {
     const Wrapper = ({ children }: { children: React.ReactNode }) => <>{children}</>;
     return {
-        // Render the real home and login headers without mounting their Cloudscape presentation.
         Box: ({ variant, children }: { variant?: string; children: React.ReactNode }) =>
             variant === 'h1' ? <h1>{children}</h1> : <>{children}</>,
-        BreadcrumbGroup: () => null,
         Button: Wrapper,
         Alert: Wrapper,
         Container: Wrapper,
         Header: Wrapper,
         NavigateLink: Wrapper,
         ContentLayout: ({ header }: { header: React.ReactNode }) => <>{header}</>,
-        Grid: Wrapper,
         Link: Wrapper,
         SpaceBetween: Wrapper,
     };
 });
 
-jest.mock('PublicApp/Home/styles.module.scss', () => ({}));
 jest.mock('./Login/SelfHostedLogin', () => ({ SelfHostedLogin: () => <h1>Server login</h1> }));
 jest.mock('./Loading', () => ({ Loading: () => <p role="status">Loading</p> }));
 jest.mock('./AuthErrorMessage', () => ({ AuthErrorMessage: () => <h1>Storage unavailable</h1> }));
 
-const publicPaths = [ROUTES.BASE, ROUTES.AUTH.LOGIN];
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 let App: React.FC;
 let rendered: ReactTestRenderer | undefined;
@@ -88,8 +82,7 @@ const renderApp = (path: string) => {
         rendered = create(
             <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
-                    <Route path={ROUTES.BASE} element={<Home />} />
-                    <Route path={ROUTES.AUTH.LOGIN} element={<LoginByGithub />} />
+                    <Route path={ROUTES.BASE} element={<LoginByGithub />} />
                     <Route element={<App />}>
                         <Route path="/runs" element={<h1>Runs</h1>} />
                     </Route>
@@ -128,19 +121,19 @@ afterAll(() => {
 });
 
 describe('Sky public and protected pages', () => {
-    test.each(publicPaths)('visitors can open %s without loading account data', (path) => {
-        const view = renderApp(path);
+    test('visitors can open sign-in without loading account data', () => {
+        const view = renderApp(ROUTES.BASE);
 
-        expect(view.root.findByType('output').children).toEqual([path]);
+        expect(view.root.findByType('output').children).toEqual([ROUTES.BASE]);
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(useGetUserDataQuery).toHaveBeenCalledWith({ token: undefined }, { skip: true });
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
-    test.each(publicPaths)('a validated user opening %s reaches their runs', (path) => {
+    test('a validated user opening sign-in reaches their runs', () => {
         mockToken = 'valid-token';
         mockUserQuery.currentData = mockUserQuery.data = { username: 'alice' };
-        const view = renderApp(path);
+        const view = renderApp(ROUTES.BASE);
 
         expect(view.root.findByType('output').children).toEqual(['/runs']);
         expect(view.root.findByType('h1').children).toEqual(['Runs']);
@@ -149,8 +142,7 @@ describe('Sky public and protected pages', () => {
 
     test.each([
         [ROUTES.BASE, ROUTES.BASE],
-        [ROUTES.AUTH.LOGIN, ROUTES.AUTH.LOGIN],
-        [ROUTES.RUNS.LIST, ROUTES.AUTH.LOGIN],
+        [ROUTES.RUNS.LIST, ROUTES.BASE],
     ])('a rejected token at %s settles on %s', (path, expectedPath) => {
         mockToken = 'expired-token';
         mockUserQuery.error = { status: 401 };
@@ -161,13 +153,13 @@ describe('Sky public and protected pages', () => {
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
-    test.each(publicPaths)('a rejected token stays at %s even when its user data is cached', (path) => {
+    test('a rejected token stays at sign-in even when its user data is cached', () => {
         mockToken = 'expired-token';
         mockUserQuery.currentData = mockUserQuery.data = { username: 'alice' };
         mockUserQuery.error = { status: 401 };
-        const view = renderApp(path);
+        const view = renderApp(ROUTES.BASE);
 
-        expect(view.root.findByType('output').children).toEqual([path]);
+        expect(view.root.findByType('output').children).toEqual([ROUTES.BASE]);
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
@@ -178,20 +170,20 @@ describe('Sky public and protected pages', () => {
         mockUserQuery.error = { status: 403 };
         const view = renderApp(ROUTES.RUNS.LIST);
 
-        expect(view.root.findByType('output').children).toEqual([ROUTES.AUTH.LOGIN]);
+        expect(view.root.findByType('output').children).toEqual([ROUTES.BASE]);
         expect(mockDispatch).not.toHaveBeenCalled();
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
-    test('a visitor opening a protected page reaches the auth page', () => {
+    test('a visitor opening a protected page reaches sign-in', () => {
         const view = renderApp('/runs');
 
-        expect(view.root.findByType('output').children).toEqual([ROUTES.AUTH.LOGIN]);
+        expect(view.root.findByType('output').children).toEqual([ROUTES.BASE]);
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
-    test.each([...publicPaths, ROUTES.RUNS.LIST])('%s waits for token validation before showing private content', (path) => {
+    test.each([ROUTES.BASE, ROUTES.RUNS.LIST])('%s waits for token validation before showing private content', (path) => {
         mockToken = 'pending-token';
         mockUserQuery.isFetching = true;
         const view = renderApp(path);
@@ -201,7 +193,7 @@ describe('Sky public and protected pages', () => {
         expect(mockPrivateQuery).not.toHaveBeenCalled();
     });
 
-    test.each([...publicPaths, ROUTES.RUNS.LIST])(
+    test.each([ROUTES.BASE, ROUTES.RUNS.LIST])(
         '%s waits for a new token even when data from the previous token is available',
         (path) => {
             mockToken = 'new-token';
@@ -216,10 +208,10 @@ describe('Sky public and protected pages', () => {
         },
     );
 
-    test.each(publicPaths)('%s remains available when local storage is unavailable', (path) => {
+    test('sign-in remains available when local storage is unavailable', () => {
         Object.defineProperty(globalThis, 'window', { value: {} });
         mockToken = 'saved-token';
-        const view = renderApp(path);
+        const view = renderApp(ROUTES.BASE);
 
         expect(view.root.findByType('h1').children).toEqual(['Welcome to dstack Sky']);
         expect(useGetUserDataQuery).toHaveBeenCalledWith({ token: 'saved-token' }, { skip: true });

@@ -34,7 +34,7 @@ export const TokenLogin: React.FC = () => {
                 >
                     <SpaceBetween size="l">
                         <LoginByTokenForm />
-                        <NavigateLink href={ROUTES.AUTH.LOGIN}>{t('auth.another_login_methods')}</NavigateLink>
+                        <NavigateLink href={ROUTES.BASE}>{t('auth.another_login_methods')}</NavigateLink>
                     </SpaceBetween>
                 </Container>
             </ContentLayout>

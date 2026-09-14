@@ -21,8 +21,7 @@ const IGNORED_AUTH_PATHS = [
     ROUTES.AUTH.TOKEN,
 ];
 
-const LoginFormComponent =
-    process.env.UI_VERSION === 'sky' ? () => <Navigate replace to={ROUTES.AUTH.LOGIN} /> : SelfHostedLogin;
+const LoginFormComponent = process.env.UI_VERSION === 'sky' ? () => <Navigate replace to={ROUTES.BASE} /> : SelfHostedLogin;
 
 const App: React.FC = () => {
     const { t } = useTranslation();

@@ -76,9 +76,7 @@ export const LoginByGithubCallback: React.FC = () => {
         return (
             <UnauthorizedLayout>
                 <AuthErrorMessage title={t('auth.authorization_failed')}>
-                    <NavigateLink href={process.env.UI_VERSION === 'sky' ? ROUTES.AUTH.LOGIN : ROUTES.BASE}>
-                        {t('auth.try_again')}
-                    </NavigateLink>
+                    <NavigateLink href={ROUTES.BASE}>{t('auth.try_again')}</NavigateLink>
                 </AuthErrorMessage>
             </UnauthorizedLayout>
         );
