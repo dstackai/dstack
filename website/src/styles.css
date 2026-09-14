@@ -1132,28 +1132,12 @@ p {
   color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
 }
 
-/* Open-source: the featured card — bigger, but now with an icon tile (like the Sky/Factory rows)
-   and the star count moved beneath the name, so all three controls read consistently. */
+/* Open-source product row. */
 .gs-opt--feat {
   padding: 13px 14px;
   display: flex;
   align-items: flex-start;
   gap: 14px;
-}
-/* Left column: the icon tile with the star count centered beneath it (the icon itself lays out
-   exactly like the Sky / Factory icon tiles). */
-.gs-opt__icwrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.gs-opt__stars {
-  font-size: 12px;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  color: inherit;
 }
 
 /* dstack Sky / Factory: compact rows with an icon. */

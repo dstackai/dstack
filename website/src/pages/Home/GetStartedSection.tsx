@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import CodeView from '@cloudscape-design/code-view/code-view';
 import shHighlight from '@cloudscape-design/code-view/highlight/sh';
 import Button from '@cloudscape-design/components/button';
@@ -7,20 +7,9 @@ import { mainButtonStyle } from '../../cloudscape-theme';
 import { installMethods, maxInstallLines, padYamlToLines } from '../../data/snippets';
 import { DOCS_URL, ROUTES, docsUrl } from '../../routes';
 
-const GITHUB_API_URL = 'https://api.github.com/repos/dstackai/dstack';
-
-// Compact star count: 1340 → "1.3k", 12000 → "12k", 980 → "980" (mirrors the Products menu).
-function formatStars(count: number): string {
-  if (count < 1000) return String(count);
-  const thousands = count / 1000;
-  return `${thousands >= 10 ? Math.round(thousands) : Number(thousands.toFixed(1))}k`;
-}
-
-// Product glyphs. GitHub mark doubles as the open-source star badge; cloud / layers mark the
-// hosted / self-hosted rows (thin-line, matching the Products menu).
-const GithubGlyph = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+const BoxGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
   </svg>
 );
 export const CloudGlyph = () => (
@@ -104,22 +93,6 @@ export function CapList({ items }: { items: { icon: ReactNode; title: string; su
 // and mkdocs/overrides/header-2.html — keep all three in sync.
 export function GetStartedSection() {
   const [method, setMethod] = useState<(typeof installMethods)[number]['id']>(installMethods[0].id);
-  const [stars, setStars] = useState<number | null>(null);
-
-  // Live star count for the open-source tile, fetched once. Best-effort: if the API is rate-limited
-  // or errors, the badge simply doesn't render.
-  useEffect(() => {
-    let active = true;
-    fetch(GITHUB_API_URL)
-      .then(response => (response.ok ? response.json() : null))
-      .then(data => {
-        if (active && data && typeof data.stargazers_count === 'number') setStars(data.stargazers_count);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const activeInstall = installMethods.find(m => m.id === method) ?? installMethods[0];
 
@@ -131,12 +104,7 @@ export function GetStartedSection() {
         <div className="gs-rail">
           <div className="gs-rail__group">Self-hosted</div>
           <div className="gs-opt gs-opt--feat gs-opt--on">
-            <span className="gs-opt__icwrap">
-              <span className="gs-opt__ic"><GithubGlyph /></span>
-              {stars !== null && (
-                <span className="gs-opt__stars" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
-              )}
-            </span>
+            <span className="gs-opt__ic"><BoxGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack</span>
               <span className="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>

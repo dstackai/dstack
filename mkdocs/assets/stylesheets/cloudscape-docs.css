@@ -354,19 +354,6 @@
     line-height: 1.5;
     color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
 }
-.gs-opt__icwrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-}
-.gs-opt__stars {
-    font-size: 12px;
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    color: inherit;
-}
 .gs-opt__ic {
     display: inline-flex;
     align-items: center;

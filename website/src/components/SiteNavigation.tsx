@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, ReactNode, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
@@ -10,20 +10,11 @@ import { BLOG_URL, DOCS_URL, ROUTES } from '../routes';
 import { ThemeMode } from '../theme';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
-const dstackGithubApiUrl = 'https://api.github.com/repos/dstackai/dstack';
 const externalIconAriaLabel = 'External link icon';
 
-// Compact star count: 1340 → "1.3k", 12000 → "12k", 980 → "980".
-function formatStars(count: number): string {
-  if (count < 1000) return String(count);
-  const thousands = count / 1000;
-  return `${thousands >= 10 ? Math.round(thousands) : Number(thousands.toFixed(1))}k`;
-}
-
-// Monochrome product glyphs for the "Products" menu (GitHub mark also doubles as the star badge).
-const GithubGlyph = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+const BoxGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
   </svg>
 );
 const CloudGlyph = () => (
@@ -61,7 +52,7 @@ type ProductLink = {
 // NOTE: the descriptions are duplicated in GetStartedSection.tsx (the product list) and
 // mkdocs/overrides/header-2.html — keep all three in sync.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: asset(ROUTES.HOME), icon: <GithubGlyph />, badge: 'Self-hosted' },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: asset(ROUTES.HOME), icon: <BoxGlyph />, badge: 'Self-hosted' },
   { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted' },
   { id: 'sky-product', text: 'dstack Sky', secondaryText: 'An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
@@ -102,21 +93,6 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
     }, 150);
   };
 
-  // GitHub star count for the open-source repo, fetched once the menu first opens. Best-effort:
-  // if the API is rate-limited or errors, the badge simply doesn't render.
-  const [stars, setStars] = useState<number | null>(null);
-  const starsFetched = useRef(false);
-  useEffect(() => {
-    if (!open || starsFetched.current) return;
-    starsFetched.current = true;
-    fetch(dstackGithubApiUrl)
-      .then(response => (response.ok ? response.json() : null))
-      .then(data => {
-        if (data && typeof data.stargazers_count === 'number') setStars(data.stargazers_count);
-      })
-      .catch(() => {});
-  }, [open]);
-
   return (
     <div
       className="site-hover-menu"
@@ -150,12 +126,7 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
               target="_blank"
               rel="noreferrer"
             >
-              <span className="gs-opt__icwrap">
-                <span className="gs-opt__ic"><GithubGlyph /></span>
-                {stars !== null && (
-                  <span className="gs-opt__stars" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
-                )}
-              </span>
+              <span className="gs-opt__ic">{products[0].icon}</span>
               <span className="gs-opt__body">
                 <span className="gs-opt__name">{products[0].text}</span>
                 <span className="gs-opt__desc">{products[0].secondaryText}</span>
