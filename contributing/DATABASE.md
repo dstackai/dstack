@@ -81,4 +81,6 @@ Keep locked regions short and bounded. See `LOCKING.md` for how to take advisory
 
 ### Settings
 
+`DSTACK_DB_COMMAND_TIMEOUT` (default 300 seconds) bounds every operation on a Postgres connection, so a coroutine waiting on a connection whose socket died silently gets an error and releases the slot instead of holding it forever. It applies to migrations too, since they run on the same engine, so it must leave room for index builds and backfills.
+
 `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW` size the pool per process. Raising them lets more coroutines hold connections at once, which hides a long hold rather than fixing it, and each replica needs `pool_size + max_overflow` connections from the Postgres `max_connections` budget.

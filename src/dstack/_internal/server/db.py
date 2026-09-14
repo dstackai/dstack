@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from alembic import command, config
-from sqlalchemy import AsyncAdaptedQueuePool, event
+from sqlalchemy import AsyncAdaptedQueuePool, event, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -28,6 +28,7 @@ class Database:
                 poolclass=AsyncAdaptedQueuePool,
                 pool_size=settings.DB_POOL_SIZE,
                 max_overflow=settings.DB_MAX_OVERFLOW,
+                connect_args=self._get_connect_args(self.url),
             )
         self.session_maker = async_sessionmaker(
             bind=self.engine,  # type: ignore[assignment]
@@ -54,6 +55,13 @@ class Database:
 
     def get_session(self) -> AsyncSession:
         return self.session_maker()
+
+    def _get_connect_args(self, url: str) -> dict:
+        if make_url(url).get_backend_name() == "postgresql":
+            # TODO: Consider setting "command_timeout" high for migrations
+            # and low for queries – requires a separate Database instance for migrations.
+            return {"command_timeout": settings.DB_COMMAND_TIMEOUT}
+        return {}
 
 
 def get_new_db() -> Database:
