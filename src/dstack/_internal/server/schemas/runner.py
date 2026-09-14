@@ -47,6 +47,10 @@ class PullResponse(CoreModel):
     last_updated: int
     no_connections_secs: Optional[int] = None
     """`no_connections_secs` is optional for compatibility with old runners."""
+    has_more: Optional[bool] = None
+    """`has_more` tells whether the runner may still have logs to hand over.
+    It is optional for compatibility with runners that do not report it.
+    """
 
 
 class JobInfoResponse(CoreModel):

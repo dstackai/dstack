@@ -1,7 +1,8 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, Mock, patch
+from typing import Optional
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from sqlalchemy import select
@@ -13,6 +14,7 @@ from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.volumes import VolumeStatus
+from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingFetcher,
     JobTerminatingPipeline,
@@ -21,6 +23,12 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     _get_related_instance_lock_owner,
 )
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.schemas.runner import LogEvent, PullResponse
+from dstack._internal.server.services.runner.client import (
+    PeerConnectionError,
+    RunnerClient,
+    RunnerError,
+)
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_instance,
@@ -44,6 +52,23 @@ from dstack._internal.utils.common import get_current_datetime
 @pytest.fixture
 def worker() -> JobTerminatingWorker:
     return JobTerminatingWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
+
+
+@pytest.fixture
+def ssh_tunnel_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock = MagicMock(spec_set=SSHTunnel)
+    monkeypatch.setattr("dstack._internal.server.services.runner.pool.SSHTunnel", mock)
+    return mock
+
+
+@pytest.fixture
+def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock = Mock(spec_set=RunnerClient)
+    monkeypatch.setattr(
+        "dstack._internal.server.services.runner.client.RunnerClient.from_address",
+        Mock(return_value=mock),
+    )
+    return mock
 
 
 @pytest.fixture
@@ -107,6 +132,8 @@ class TestJobTerminatingFetcher:
         past_remove_at.remove_at = stale
         past_remove_at.volumes_detached_at = stale - timedelta(seconds=30)
 
+        # `remove_at` is when the container is killed, not a condition for processing the job:
+        # the job is still fetched so that its logs can be collected in the meantime
         future_remove_at = await create_job(
             session=session,
             run=run,
@@ -168,12 +195,14 @@ class TestJobTerminatingFetcher:
         assert [item.id for item in items] == [
             terminating.id,
             past_remove_at.id,
+            future_remove_at.id,
             expired_same_owner.id,
             recent_skip.id,
         ]
         assert {(item.id, item.volumes_detached_at) for item in items} == {
             (terminating.id, None),
             (past_remove_at.id, past_remove_at.volumes_detached_at),
+            (future_remove_at.id, None),
             (expired_same_owner.id, None),
             (recent_skip.id, None),
         }
@@ -190,14 +219,19 @@ class TestJobTerminatingFetcher:
         ]:
             await session.refresh(job)
 
-        fetched_jobs = [terminating, past_remove_at, expired_same_owner, recent_skip]
+        fetched_jobs = [
+            terminating,
+            past_remove_at,
+            future_remove_at,
+            expired_same_owner,
+            recent_skip,
+        ]
         assert all(job.lock_owner == JobTerminatingPipeline.__name__ for job in fetched_jobs)
         assert all(job.lock_expires_at is not None for job in fetched_jobs)
         assert all(job.lock_token is not None for job in fetched_jobs)
         assert all(not job.skip_min_processing_interval for job in fetched_jobs)
         assert len({job.lock_token for job in fetched_jobs}) == 1
 
-        assert future_remove_at.lock_owner is None
         assert non_terminating.lock_owner is None
         assert recent.lock_owner is None
         assert locked.lock_owner == "OtherPipeline"
@@ -343,6 +377,219 @@ class TestJobTerminatingWorker:
 
         events = await list_events(session)
         assert any(event.message == "Graceful job stop requested" for event in events)
+
+    async def test_gives_finished_job_time_to_hand_over_logs(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        """A job that finished on its own is not asked to stop, but its logs are still waited for."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            running_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        _lock_job(job)
+        await session.commit()
+
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.stop_runner",
+                new=AsyncMock(),
+            ) as stop_runner,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_runner.assert_not_awaited()
+        stop_container.assert_not_awaited()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.graceful_termination_attempts is None
+        assert job.remove_at is not None
+
+    async def test_terminates_job_that_never_ran_without_waiting(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        """There are no logs to wait for if the workload never started."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+        )
+        _lock_job(job)
+        await session.commit()
+        assert job.running_at is None and job.runner_timestamp is None
+
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.stop_runner",
+                new=AsyncMock(),
+            ) as stop_runner,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_runner.assert_not_awaited()
+        stop_container.assert_awaited_once()
+
+        await session.refresh(job)
+        assert job.remove_at is None
+
+    @pytest.mark.parametrize(
+        ("has_more", "container_stopped"),
+        [
+            # The runner still has logs buffered, the container must stay up to hand them over
+            pytest.param(True, False, id="has_more"),
+            pytest.param(False, True, id="drained"),
+            # An old runner does not report `has_more`, so there is no way to wait for the end
+            pytest.param(None, True, id="not_reported"),
+        ],
+    )
+    async def test_collects_last_logs_before_terminating_container(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        has_more: Optional[bool],
+        container_stopped: bool,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            running_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        job.graceful_termination_attempts = 1
+        job.remove_at = get_current_datetime() + timedelta(seconds=30)
+        job.runner_timestamp = 1
+        _lock_job(job)
+        await session.commit()
+
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[],
+            job_logs=[LogEvent(timestamp=2, message=b"the tail")],
+            runner_logs=[LogEvent(timestamp=3, message=b"Job state changed")],
+            last_updated=3,
+            has_more=has_more,
+        )
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.logs_services.write_logs"
+            ) as write_logs,
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+                new=AsyncMock(return_value=True),
+            ) as stop_container,
+        ):
+            await worker.process(_job_to_pipeline_item(job))
+
+        runner_client_mock.pull.assert_called_once_with(1)
+        write_logs.assert_called_once()
+        assert write_logs.call_args.kwargs["job_logs"][0].message == b"the tail"
+        assert stop_container.await_count == int(container_stopped)
+
+        await session.refresh(job)
+        # Advanced, so the next pass does not collect the same logs again
+        assert job.runner_timestamp == 3
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            pytest.param(RunnerError("runner is confused"), id="runner_error"),
+            pytest.param(PeerConnectionError("instance is gone"), id="unreachable"),
+        ],
+    )
+    async def test_terminates_container_when_last_logs_cannot_be_collected(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        error: Exception,
+    ):
+        """Collecting the last logs is best-effort: a failure must not hold up the termination."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            running_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        job.graceful_termination_attempts = 1
+        job.remove_at = get_current_datetime() + timedelta(seconds=30)
+        _lock_job(job)
+        await session.commit()
+
+        runner_client_mock.pull.side_effect = error
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+            new=AsyncMock(return_value=True),
+        ) as stop_container:
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_container.assert_awaited_once()
+
+        await session.refresh(job)
+        # The job must not be left locked for the pipeline to trip over
+        assert job.lock_owner is None
+        assert job.lock_token is None
 
     async def test_terminates_gracefully_stopped_job_after_remove_at(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
