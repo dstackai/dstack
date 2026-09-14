@@ -29,7 +29,7 @@ Locksets are an optimization. One can think of them as per-resource-id locks tha
 Postgres resource locking is implemented via standard SELECT FOR UPDATE.
 SQLAlchemy provides `.with_for_update()` that has no effect if SELECT FOR UPDATE is not supported as in SQLite.
 
-There are few places that rely on advisory locks as when generating unique resource names.
+There are few places that rely on advisory locks as when generating unique resource names or serializing server initialization across replicas. See **Advisory locks** below.
 
 ## Working with locks
 
@@ -111,6 +111,32 @@ Note that:
 
 * This pattern works assuming that Postgres is using default isolation level Read Committed. By the time a transaction acquires the advisory lock, all other transactions that can take the name have committed, so their changes can be seen and a unique name is taken.
 * SQLite needs a commit before selecting taken names due to Snapshot Isolation as noted above.
+
+**Advisory locks**
+
+Postgres has two kinds of advisory locks:
+
+* `pg_advisory_xact_lock` is released when the transaction ends. The unique names pattern above uses it.
+* `pg_advisory_lock` is bound to the connection. It survives commit and rollback and is released only by `pg_advisory_unlock` on the same connection or when the connection closes. `advisory_lock_ctx()` in `services/locking.py` wraps this kind for work that must span several transactions, such as migrations or server initialization.
+
+Either use `pg_advisory_xact_lock` within a single transaction, or use `advisory_lock_ctx()` and follow these rules:
+
+* Bind it to an `AsyncConnection` from `engine.connect()`, not to an `AsyncSession`. If the session commits inside the block, its next statement may run on a different pooled connection, and `pg_advisory_unlock` goes to a connection that never held the lock. Postgres only returns `false` with a warning in this case, so the failure is silent: the lock stays on an idle pooled connection until the process exits, and every replica blocks forever on its next acquire. See https://github.com/dstackai/dstack/issues/3881 for an example.
+* Keep the locked block short and bounded. Every waiter is blocked inside `pg_advisory_lock` holding a DB connection of its own, so a long or hung holder pins one connection per waiter. See `DATABASE.md`.
+
+```python
+async with get_db().engine.connect() as connection:
+    async with advisory_lock_ctx(
+        bind=connection,
+        dialect_name=get_db().dialect_name,
+        resource="server_init",
+    ):
+        async with get_session_ctx() as session:
+            # The session may commit freely: the lock lives on `connection`.
+            ...
+```
+
+A released connection goes back to the pool, so a lock that failed to release stays there too. `_release_advisory_lock()` tolerates failures because the common one is an invalidated connection, in which case Postgres has already dropped the lock. A release that fails on a live connection strands the lock.
 
 **Use `AsyncExitStack`**
 

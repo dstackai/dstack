@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHITECTURE.md`,
-`PIPELINES.md`, `LOCKING.md`, `MIGRATIONS.md`, `RUNS-AND-JOBS.md`, `AUTOSCALING.md`,
+`PIPELINES.md`, `LOCKING.md`, `DATABASE.md`, `MIGRATIONS.md`, `RUNS-AND-JOBS.md`, `AUTOSCALING.md`,
 `BACKENDS.md`, `GPUHUNT.md`, `PROXY.md`, `RUNNER-AND-SHIM.md`, `FRONTEND.md`, `DOCS.md`,
 `DEVELOPMENT.md`, `RELEASE.md`.
 
@@ -29,7 +29,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Prefer pydantic-style models in `core/models`.
 - Document attributes when the note adds behavior, compatibility, or semantic context that is not obvious from the name and type. Use attribute docstrings without leading newline.
 - Tests use `test_*.py` modules and `test_*` functions; fixtures live near usage.
-- Never make network calls inside a DB session or transaction. Fetch what you need before opening the session, or commit and close it before the call.
+- Never make network calls inside a DB session or transaction. Fetch what you need before opening the session, or commit and close it before the call. See `contributing/DATABASE.md`.
 - Don't use function-level (inner) imports to break circular imports. Inject the dependency or move the shared code to a lower-level module instead.
 - Never edit a migration that has already been applied or released; add a new migration instead.
 - Derive paths under `SERVER_DIR_PATH` on access (a `get_*` function), not as module-level constants, so that patching `settings.SERVER_DIR_PATH` redirects all of them. Tests rely on this to keep server state out of the real `~/.dstack`.
