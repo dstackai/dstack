@@ -6,6 +6,7 @@ import pytest
 from dstack._internal import settings
 from dstack._internal.core.models.configurations import (
     OPENAI_MODEL_PROBE_TIMEOUT,
+    ROUTER_HEALTH_PROBE_URL,
     ProbeConfig,
     PythonVersion,
     ReplicaGroup,
@@ -13,6 +14,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs.configurators.base import get_default_image
@@ -91,6 +93,67 @@ class TestProbes:
 
         assert len(job_specs) == 1
         assert len(job_specs[0].probes) == 0
+
+    @staticmethod
+    def _router_worker_configuration() -> ServiceConfiguration:
+        return ServiceConfiguration(
+            port=8000,
+            image="debian",
+            model=OpenAIChatModel(
+                name="meta-llama/Meta-Llama-3.1-8B-Instruct",
+                format="openai",
+            ),
+            groups=[
+                ReplicaGroup(
+                    name="router",
+                    replicas=Range[int](min=1, max=1),
+                    router=ReplicaGroupRouterConfig(type="sglang"),
+                ),
+                ReplicaGroup(
+                    name="worker",
+                    replicas=Range[int](min=1, max=1),
+                ),
+            ],
+        )
+
+    async def test_router_group_gets_health_probe(self):
+        """The router must not be probed with chat completions: it only answers those once
+        dstack has registered workers, and registration requires the router to be ready."""
+        run_spec = get_run_spec(
+            run_name="run", repo_id="id", configuration=self._router_worker_configuration()
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="router")
+
+        job_specs = await configurator.get_job_specs(replica_num=0)
+
+        probes = job_specs[0].probes
+        assert len(probes) == 1
+        assert probes[0].url == ROUTER_HEALTH_PROBE_URL
+        assert probes[0].method == "get"
+        assert probes[0].body is None
+
+    async def test_worker_group_gets_no_derived_probe(self):
+        """Workers behind a router may speak gRPC, so no probe can be derived from `model`."""
+        run_spec = get_run_spec(
+            run_name="run", repo_id="id", configuration=self._router_worker_configuration()
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="worker")
+
+        job_specs = await configurator.get_job_specs(replica_num=0)
+
+        assert job_specs[0].probes == []
+
+    async def test_service_wide_explicit_probes_win_in_router_service(self):
+        """`probes` is service-wide, so an explicit list still applies to every group,
+        router and worker alike, taking precedence over the derived probes."""
+        configuration = self._router_worker_configuration()
+        configuration.probes = [ProbeConfig(type="http", url="/custom")]
+        run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
+
+        for group_name in ("router", "worker"):
+            configurator = ServiceJobConfigurator(run_spec, replica_group_name=group_name)
+            job_specs = await configurator.get_job_specs(replica_num=0)
+            assert [p.url for p in job_specs[0].probes] == ["/custom"]
 
     async def test_no_probe_when_no_model(self):
         """When neither model nor probes are set, no probes should be generated."""
