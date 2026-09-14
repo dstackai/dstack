@@ -66,7 +66,6 @@
       {% include "partials/alternate.html" %}
     {% endif %}
 
-    {# Search sits BEFORE the tabs (left of "Docs"), like the user asked. #}
     {% if "material/search" in config.plugins %}
       <label class="md-header__button md-icon" for="__search">
         {% set icon = config.theme.icon.search or "material/magnify" %}
@@ -74,6 +73,50 @@
       </label>
       {% include "partials/search.html" %}
     {% endif %}
+
+    {# Keep product descriptions in sync with SiteNavigation.tsx and GetStartedSection.tsx. #}
+    <div class="cs-products-menu">
+      <button type="button" class="cs-products-menu__trigger" aria-haspopup="true" aria-expanded="false">
+        Products
+        <svg class="cs-products-menu__caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
+      </button>
+      <div class="cs-products-menu__popup" role="menu">
+        <div class="gs-rail">
+          <div class="gs-rail__group">Self-hosted</div>
+          <a class="gs-opt gs-opt--feat gs-opt--on" role="menuitem" href="/" target="_blank" rel="noreferrer">
+            <span class="gs-opt__icwrap">
+              <span class="gs-opt__ic" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+              </span>
+              <span class="gs-opt__stars" data-cs-gh-stars hidden></span>
+            </span>
+            <span class="gs-opt__body">
+              <span class="gs-opt__name">dstack</span>
+              <span class="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
+            </span>
+          </a>
+          <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="https://calendly.com/dstackai/discovery-call" target="_blank" rel="noreferrer">
+            <span class="gs-opt__ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+            </span>
+            <span class="gs-opt__body">
+              <span class="gs-opt__name">dstack Factory</span>
+              <span class="gs-opt__desc">A complete software stack for AI labs, inference providers, and data centers.</span>
+            </span>
+          </a>
+          <div class="gs-rail__group">Hosted by us</div>
+          <a class="gs-opt gs-opt--row" role="menuitem" href="/products/sky" target="_blank" rel="noreferrer">
+            <span class="gs-opt__ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+            </span>
+            <span class="gs-opt__body">
+              <span class="gs-opt__name">dstack Sky</span>
+              <span class="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </div>
 
     {# Tabs rendered directly in the header (not relocated via JS) to avoid a load flash.
        base.html's below-header tabs block is suppressed in main.html. #}
@@ -98,55 +141,6 @@
         </svg>
       </button>
       <a href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
-      {# "Get started" dropdown — the landing's product switcher rail as a popup. The product
-         descriptions are duplicated in website/src/components/SiteNavigation.tsx (products) and
-         website/src/pages/Home/GetStartedSection.tsx — keep all three in sync. Opens below,
-         right-aligned so it never overflows the header's right edge. #}
-      <div class="cs-gs-menu">
-        <button type="button" class="md-button md-button--primary cs-gs-menu__trigger external-skip" aria-haspopup="true" aria-expanded="false">
-          Get started
-          <svg class="cs-gs-menu__caret" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
-        </button>
-        <div class="cs-gs-menu__popup" role="menu">
-          {# The landing's switcher rail, pixel-for-pixel: grouped rows under solid bars, with a
-             white indicator card that slides to the hovered row (JS below). #}
-          <div class="gs-rail">
-            <div class="gs-rail__indicator" aria-hidden="true"></div>
-            <div class="gs-rail__group">Self-hosted</div>
-            <a class="gs-opt gs-opt--feat gs-opt--on" role="menuitem" href="/docs/installation/">
-              <span class="gs-opt__icwrap">
-                <span class="gs-opt__ic" aria-hidden="true">
-                  <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-                </span>
-                <span class="gs-opt__stars" data-cs-gh-stars hidden></span>
-              </span>
-              <span class="gs-opt__body">
-                <span class="gs-opt__name">dstack</span>
-                <span class="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
-              </span>
-            </a>
-            <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="https://calendly.com/dstackai/discovery-call" target="_blank" rel="noreferrer">
-              <span class="gs-opt__ic" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
-              </span>
-              <span class="gs-opt__body">
-                <span class="gs-opt__name">dstack Factory</span>
-                <span class="gs-opt__desc">Extends dstack with a governance and metering layer, and a private preset registry.</span>
-              </span>
-            </a>
-            <div class="gs-rail__group">Hosted by us</div>
-            <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="https://sky.dstack.ai" target="_blank" rel="noreferrer">
-              <span class="gs-opt__ic" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-              </span>
-              <span class="gs-opt__body">
-                <span class="gs-opt__name">dstack Sky</span>
-                <span class="gs-opt__desc">Everything in dstack Factory, plus the GPU marketplace and the public preset registry.</span>
-              </span>
-            </a>
-          </div>
-        </div>
-      </div>
     </div>
     <script>
       (function () {
@@ -158,58 +152,47 @@
           }
         });
 
-        // "Get started" popup: click the trigger to toggle it; click anywhere outside (or the
-        // trigger again, or Escape) to close it.
-        var gsMenu = document.querySelector('.cs-gs-menu');
-        var gsTrigger = gsMenu && gsMenu.querySelector('.cs-gs-menu__trigger');
-        if (gsMenu && gsTrigger) {
-          var gsSetOpen = function (open) {
-            gsMenu.classList.toggle('cs-gs-menu--open', open);
-            gsTrigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        var productsMenu = document.querySelector('.cs-products-menu');
+        var productsTrigger = productsMenu && productsMenu.querySelector('.cs-products-menu__trigger');
+        if (productsTrigger) {
+          var closeTimer;
+          var productOptions = Array.from(productsMenu.querySelectorAll('.gs-opt'));
+          var highlightProduct = function (selected) {
+            productOptions.forEach(function (option) {
+              option.classList.toggle('gs-opt--on', option === selected);
+            });
           };
-          gsTrigger.addEventListener('click', function (e) {
-            e.stopPropagation();
-            gsSetOpen(!gsMenu.classList.contains('cs-gs-menu--open'));
+          var setProductsOpen = function (open) {
+            clearTimeout(closeTimer);
+            productsMenu.classList.toggle('cs-products-menu--open', open);
+            productsTrigger.setAttribute('aria-expanded', String(open));
+          };
+          productsMenu.addEventListener('mouseenter', function () { setProductsOpen(true); });
+          productsMenu.addEventListener('mouseleave', function () {
+            highlightProduct(productOptions[0]);
+            closeTimer = setTimeout(function () {
+              if (!productsMenu.querySelector(':focus-visible')) setProductsOpen(false);
+            }, 150);
+          });
+          productsMenu.addEventListener('focusin', function () { setProductsOpen(true); });
+          productsMenu.addEventListener('focusout', function (e) {
+            if (!productsMenu.contains(e.relatedTarget)) setProductsOpen(false);
+          });
+          productsTrigger.addEventListener('click', function () { setProductsOpen(true); });
+          productOptions.forEach(function (option) {
+            option.addEventListener('mouseenter', function () { highlightProduct(option); });
           });
           document.addEventListener('click', function (e) {
-            if (!gsMenu.contains(e.target)) gsSetOpen(false);
+            if (!productsMenu.contains(e.target)) setProductsOpen(false);
           });
           document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') gsSetOpen(false);
+            if (e.key === 'Escape') {
+              if (productsMenu.contains(document.activeElement)) productsTrigger.focus();
+              setProductsOpen(false);
+            }
           });
         }
 
-        // Sliding selection indicator (mirrors the landing rail): rests on the first row, moves
-        // to the hovered row. The popup is hidden via visibility (not display), so offsets are
-        // measurable even while closed.
-        var gsRail = gsMenu && gsMenu.querySelector('.gs-rail');
-        if (gsRail) {
-          var gsInd = gsRail.querySelector('.gs-rail__indicator');
-          var gsOpts = Array.prototype.slice.call(gsRail.querySelectorAll('.gs-opt'));
-          var gsPlace = function () {
-            var on = gsRail.querySelector('.gs-opt--on');
-            if (!on) return;
-            // Fractional rect math (offsetTop/offsetHeight round to integers and leave 1px slivers).
-            var railBox = gsRail.getBoundingClientRect();
-            var rowBox = on.getBoundingClientRect();
-            var borderTop = parseFloat(getComputedStyle(gsRail).borderTopWidth) || 0;
-            gsInd.style.top = (rowBox.top - railBox.top - borderTop) + 'px';
-            gsInd.style.height = rowBox.height + 'px';
-          };
-          gsOpts.forEach(function (opt) {
-            opt.addEventListener('mouseenter', function () {
-              gsOpts.forEach(function (o) { o.classList.remove('gs-opt--on'); });
-              opt.classList.add('gs-opt--on');
-              gsPlace();
-            });
-          });
-          gsPlace();
-          window.addEventListener('resize', gsPlace);
-          gsTrigger.addEventListener('click', gsPlace);
-        }
-
-        // Live GitHub star count under the "Get started" popup's open-source icon (mirrors the
-        // landing). Best-effort: if the API is rate-limited or errors, the badge stays hidden.
         var el = document.querySelector('[data-cs-gh-stars]');
         if (el) {
           fetch('https://api.github.com/repos/dstackai/dstack')
@@ -221,7 +204,6 @@
               else { var k = n / 1000; label = (k >= 10 ? Math.round(k) : Number(k.toFixed(1))) + 'k'; }
               el.textContent = label;
               el.hidden = false;
-              if (typeof gsPlace === 'function') gsPlace();
             })
             .catch(function () {});
         }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
 import { highlightTerms } from '../../components/highlightTerms';
@@ -42,16 +42,13 @@ const CLOUD_GROUPS = [
   ['AMD Dev Cloud', 'Hot Aisle', 'Vast.ai', 'JarvisLabs'],
 ];
 
-// On-prem capability rows for the merged compute block (same shape as the Factory CapList tabs).
+// On-prem capability rows for the compute block.
 const onPremItems = [
   { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Attach bare-metal servers or VMs with SSH access' },
   { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Attach your existing Kubernetes clusters' },
 ];
 
-// One block for both compute targets: the Get-started panes' tabbed box as the visual (on-prem
-// rows / the clouds grid), with a footer note that swaps with the selected tab (like the dstack
-// Sky pane's notes). The prose beside it is static and condenses the former per-target blocks.
-// These are core dstack capabilities, so they live here rather than under dstack Factory.
+// Tabbed on-prem capabilities and cloud providers for bring-your-own compute.
 function BringComputeBlock() {
   const [pane, setPane] = useState<'onprem' | 'clouds'>('onprem');
   return (
@@ -121,7 +118,7 @@ function BringComputeBlock() {
   );
 }
 
-function KeyConceptsBlock() {
+export function KeyConceptsBlock({ children }: { children?: ReactNode }) {
   return (
     <AlternatingDocBlock
       visual={
@@ -140,10 +137,12 @@ function KeyConceptsBlock() {
       }
       title="AI-native orchestration"
     >
-      Managing AI infrastructure requires first-class primitives for compute management, training, inference, and observability that support heterogeneous AI compute.
-      <br />
-      <br />
-      dstack provides a streamlined interface to efficiently utilize cloud compute, run data-center operations, or run your own AI token factory at planet scale.
+      {children ?? <>
+        Managing AI infrastructure requires first-class primitives for compute management, training, inference, and observability that support heterogeneous AI compute.
+        <br />
+        <br />
+        {highlightTerms('dstack provides a streamlined interface to efficiently utilize cloud compute, run data-center operations, or run your own AI token factory at planet scale.')}
+      </>}
     </AlternatingDocBlock>
   );
 }
