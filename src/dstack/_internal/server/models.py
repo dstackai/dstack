@@ -1061,6 +1061,14 @@ class InstanceHealthCheckModel(BaseModel):
     status: Mapped[HealthStatus] = mapped_column(EnumAsString(HealthStatus, 100))
     response: Mapped[str] = mapped_column(Text)
 
+    __table_args__ = (
+        Index(
+            "ix_instance_health_checks_instance_id_collected_at",
+            instance_id,
+            collected_at,
+        ),
+    )
+
 
 class VolumeModel(PipelineModelMixin, BaseModel):
     __tablename__ = "volumes"
