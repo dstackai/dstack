@@ -130,33 +130,38 @@ async def lifespan(app: FastAPI):
         server_config_loaded = server_config_manager.load_config()
         # Encryption has to be configured before working with users and projects
         await server_config_manager.apply_encryption()
-    async with get_session_ctx() as session:
+    async with get_db().engine.connect() as lock_connection:
+        # The lock is bound to a dedicated connection because the session commits inside the block,
+        # which would move a session-bound lock release to a different pooled connection.
         async with advisory_lock_ctx(
-            bind=session,
+            bind=lock_connection,
             dialect_name=get_db().dialect_name,
             resource="server_init",
         ):
-            admin, _ = await get_or_create_admin_user(session=session)
-            await get_or_create_default_project(
-                session=session,
-                user=admin,
-            )
-            if server_config_manager is not None:
-                server_config_file_path = get_server_config_file_path()
-                server_config_dir = _get_server_config_dir()
-                if not server_config_loaded:
-                    logger.info("Initializing the default configuration...", {"show_path": False})
-                    await server_config_manager.init_config(session=session)
-                    logger.info(
-                        f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
-                        {"show_path": False},
-                    )
-                else:
-                    logger.info(
-                        f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
-                        {"show_path": False},
-                    )
-                    await server_config_manager.apply_config(session=session, owner=admin)
+            async with get_session_ctx() as session:
+                admin, _ = await get_or_create_admin_user(session=session)
+                await get_or_create_default_project(
+                    session=session,
+                    user=admin,
+                )
+                if server_config_manager is not None:
+                    server_config_file_path = get_server_config_file_path()
+                    server_config_dir = _get_server_config_dir()
+                    if not server_config_loaded:
+                        logger.info(
+                            "Initializing the default configuration...", {"show_path": False}
+                        )
+                        await server_config_manager.init_config(session=session)
+                        logger.info(
+                            f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
+                            {"show_path": False},
+                        )
+                    else:
+                        logger.info(
+                            f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
+                            {"show_path": False},
+                        )
+                        await server_config_manager.apply_config(session=session, owner=admin)
 
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
