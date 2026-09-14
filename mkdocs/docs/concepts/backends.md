@@ -591,6 +591,15 @@ gcloud projects list --format="json(projectId)"
     compute.regionUrlMaps.use
     ```
 
+    If you also plan to use gateways with `certificate: { type: gcp-cm }`, additional permissions are required:
+
+    ```
+    certificatemanager.certs.use
+    compute.regionTargetHttpsProxies.create
+    compute.regionTargetHttpsProxies.delete
+    compute.regionTargetHttpsProxies.use
+    ```
+
     If you plan to use TPUs, additional permissions are required:
 
     ```

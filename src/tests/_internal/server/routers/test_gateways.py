@@ -792,8 +792,67 @@ class TestCreateGateway:
                     "load_balancer": {"type": "alb"},
                 },
                 "`load_balancer: { type: alb }` for the `gcp` backend can only be used with"
-                " `certificate: null`",
+                " `certificate: null` or `certificate: { type: gcp-cm }`",
                 id="gcp-load-balancer-with-lets-encrypt-cert",
+            ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                    "certificate": {
+                        "type": "gcp-cm",
+                        "name": "projects/p/locations/us/certificates/c",
+                    },
+                },
+                "gcp-cm certificate type is supported for gcp backend only",
+                id="gcp-cm-cert-with-aws-backend",
+            ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "gcp",
+                    "region": "us",
+                    "certificate": {
+                        "type": "gcp-cm",
+                        "name": "projects/p/locations/us/certificates/c",
+                    },
+                },
+                "`certificate: { type: gcp-cm }` requires `load_balancer: { type: alb }`",
+                id="gcp-cm-cert-without-load-balancer",
+            ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                    "certificate": {
+                        "type": "gcp-cm",
+                        "name": "projects/p/locations/us/certificates/c",
+                    },
+                    "load_balancer": {"type": "alb"},
+                },
+                "`load_balancer: { type: alb }` can only be used with `certificate: null` or"
+                " `certificate: { type: acm }`",
+                id="aws-load-balancer-with-gcp-cm-cert",
+            ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "gcp",
+                    "region": "us",
+                    "replicas": 2,
+                },
+                "The `lets-encrypt` certificate type is not supported for gateways with `replicas`"
+                " greater than `1`. To create a replicated gateway, set the `certificate`"
+                " configuration property to one of the supported values, such as"
+                " `certificate: null` (no HTTPS)"
+                " or `certificate: { type: gcp-cm, name: <name> }` (GCP Certificate Manager)",
+                id="gcp-multi-replica-with-letsencrypt-cert",
             ),
         ],
     )
