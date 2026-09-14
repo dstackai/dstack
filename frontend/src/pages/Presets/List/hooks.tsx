@@ -92,9 +92,10 @@ export const useColumnsDefinitions = () => {
         {
             id: 'name',
             header: t('presets.name'),
-            // The name says which preset it points at today; the id is what
-            // identifies one, so that is what links to it.
-            cell: (item: IPreset) => item.name,
+            cell: (item: IPreset) =>
+                item.name ? (
+                    <NavigateLink href={ROUTES.PRESETS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
+                ) : null,
         },
         {
             id: 'id',
@@ -117,11 +118,6 @@ export const useColumnsDefinitions = () => {
                     {item.project_name}
                 </NavigateLink>
             ),
-        },
-        {
-            id: 'base',
-            header: t('presets.base'),
-            cell: (item: IPreset) => item.base,
         },
         {
             id: 'repo',

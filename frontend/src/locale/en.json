@@ -859,7 +859,6 @@
         "name": "Name",
         "id": "ID",
         "project": "Project",
-        "base": "Base",
         "repo": "Repo",
         "user": "User",
         "created_at": "Created",

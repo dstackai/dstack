@@ -62,6 +62,10 @@ export const PresetDetails: React.FC = () => {
             href: ROUTES.PRESETS.LIST,
         },
         {
+            text: paramProjectName,
+            href: `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: paramProjectName })}`,
+        },
+        {
             text: data?.name ?? paramPresetId,
             href: ROUTES.PRESETS.DETAILS.FORMAT(paramProjectName, paramPresetId),
         },
@@ -166,43 +170,25 @@ export const PresetDetailsOverview: React.FC = () => {
                 <ColumnLayout columns={4} variant="text-grid">
                     <div>
                         <Box variant="awsui-key-label">{t('presets.name')}</Box>
-                        <div>{data.name}</div>
+                        <div>
+                            {data.name && (
+                                <NavigateLink href={ROUTES.PRESETS.DETAILS.FORMAT(data.project_name, data.name)}>
+                                    {data.name}
+                                </NavigateLink>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <Box variant="awsui-key-label">{t('presets.id')}</Box>
-                        <div>{data.id}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.base')}</Box>
-                        <div>{data.base}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.repo')}</Box>
-                        <div>{data.repo}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.project')}</Box>
                         <div>
-                            <NavigateLink
-                                href={
-                                    data.can_delete
-                                        ? ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)
-                                        : `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: data.project_name })}`
-                                }
-                            >
-                                {data.project_name}
+                            <NavigateLink href={ROUTES.PRESETS.DETAILS.FORMAT(data.project_name, data.id)}>
+                                {data.id}
                             </NavigateLink>
                         </div>
                     </div>
                     <div>
-                        <Box variant="awsui-key-label">{t('presets.user')}</Box>
-                        <div>
-                            {data.can_delete ? (
-                                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
-                            ) : (
-                                data.pushed_by
-                            )}
-                        </div>
+                        <Box variant="awsui-key-label">{t('presets.repo')}</Box>
+                        <div>{data.repo}</div>
                     </div>
                     <div>
                         <Box variant="awsui-key-label">{t('presets.created_at')}</Box>
