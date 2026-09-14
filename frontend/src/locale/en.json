@@ -888,7 +888,7 @@
         "output_tokens": "Output tokens",
         "shared_prefix": "Shared prefix",
         "no_fleet_description": "Deploying the service requires a fleet with matching resources.",
-        "fleets": "Fleets",
+        "no_fleet": "No fleet?",
         "superseded_alert": "A later push took this preset's name. It stays available by ID.",
         "fleets_link": "How to create a fleet"
     }

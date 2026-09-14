@@ -36,7 +36,7 @@ import { UserBilling, UserEvents, UserProjects, UserSettings } from 'pages/User/
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
 import { OfferList } from './pages/Offers';
-import { PresetDetails, PresetDetailsOverview, PresetInspect, PresetList, PresetVerifiedOn } from './pages/Presets';
+import { PresetDeploy, PresetDetails, PresetDetailsOverview, PresetInspect, PresetList } from './pages/Presets';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
@@ -65,7 +65,8 @@ export const router = createBrowserRouter([
                           element: <PresetDetails />,
                           children: [
                               { index: true, element: <PresetDetailsOverview /> },
-                              { path: ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE, element: <PresetVerifiedOn /> },
+                              { path: ROUTES.PRESETS.DETAILS.DEPLOY.TEMPLATE, element: <PresetDeploy /> },
+                              { path: 'verified-on', element: <Navigate to=".." replace /> },
                               { path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE, element: <PresetInspect /> },
                           ],
                       },

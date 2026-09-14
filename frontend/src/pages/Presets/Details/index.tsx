@@ -26,11 +26,11 @@ import { useDeletePresetMutation, useGetPresetQuery } from 'services/preset';
 
 import { PresetBenchmark } from './Benchmark';
 import { PresetConstraints } from './Constraints';
-import { Deploy } from './Deploy';
+import { PresetVerifiedOn } from './VerifiedOn';
 
 enum PresetTab {
     Details = 'details',
-    VerifiedOn = 'verified-on',
+    Deploy = 'deploy',
     Inspect = 'inspect',
 }
 
@@ -123,9 +123,9 @@ export const PresetDetails: React.FC = () => {
                                 href: ROUTES.PRESETS.DETAILS.FORMAT(paramProjectName, paramPresetId),
                             },
                             {
-                                label: t('presets.verified_on'),
-                                id: PresetTab.VerifiedOn,
-                                href: ROUTES.PRESETS.DETAILS.VERIFIED_ON.FORMAT(paramProjectName, paramPresetId),
+                                label: t('presets.deploy'),
+                                id: PresetTab.Deploy,
+                                href: ROUTES.PRESETS.DETAILS.DEPLOY.FORMAT(paramProjectName, paramPresetId),
                             },
                             {
                                 label: t('presets.inspect'),
@@ -215,7 +215,7 @@ export const PresetDetailsOverview: React.FC = () => {
 
             <PresetBenchmark />
 
-            <Deploy preset={data} />
+            <PresetVerifiedOn />
         </SpaceBetween>
     );
 };
