@@ -1,26 +1,15 @@
-import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useState } from 'react';
 import CodeView from '@cloudscape-design/code-view/code-view';
 import shHighlight from '@cloudscape-design/code-view/highlight/sh';
 import Button from '@cloudscape-design/components/button';
+import { asset } from '../../asset';
 import { mainButtonStyle } from '../../cloudscape-theme';
-import { gpuOffers } from '../../data/gpus';
 import { installMethods, maxInstallLines, padYamlToLines } from '../../data/snippets';
-import { DOCS_URL, docsUrl } from '../../routes';
+import { DOCS_URL, ROUTES, docsUrl } from '../../routes';
 
-const GITHUB_API_URL = 'https://api.github.com/repos/dstackai/dstack';
-
-// Compact star count: 1340 → "1.3k", 12000 → "12k", 980 → "980" (mirrors the Products menu).
-function formatStars(count: number): string {
-  if (count < 1000) return String(count);
-  const thousands = count / 1000;
-  return `${thousands >= 10 ? Math.round(thousands) : Number(thousands.toFixed(1))}k`;
-}
-
-// Product glyphs. GitHub mark doubles as the open-source star badge; cloud / box mark the
-// hosted / self-hosted rows (thin-line, matching the Products menu).
-const GithubGlyph = () => (
-  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+const BoxGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
   </svg>
 );
 export const CloudGlyph = () => (
@@ -28,34 +17,13 @@ export const CloudGlyph = () => (
     <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
   </svg>
 );
-const BoxGlyph = () => (
+const LayersGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
-  </svg>
-);
-// Factory capability glyphs (thin-line, matching the Products menu). Distinct from the
-// box product mark in the switcher — one icon per capability.
-const KeyGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="7.5" cy="15.5" r="3.5" />
-    <path d="m10 13 8-8M16 3l3 3-2 2-3-3" />
-  </svg>
-);
-const ShieldGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3 5 6v5c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z" />
-    <path d="m9.5 12 1.8 1.8L15 10" />
-  </svg>
-);
-const AuditGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="5" y="4" width="14" height="17" rx="2" />
-    <path d="M9 4V3h6v1" />
-    <path d="M9 10h6M9 14h6M9 18h3" />
+    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
   </svg>
 );
 // GPU chip glyph for the marketplace rows.
-const ChipGlyph = () => (
+export const ChipGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <rect width="16" height="16" x="4" y="4" rx="2" />
     <rect width="6" height="6" x="9" y="9" />
@@ -104,65 +72,10 @@ function ShellCode({ content }: { content: string }) {
   );
 }
 
-type DeployTab = 'oss' | 'sky' | 'factory';
-
-
-const UserGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-const ShareGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="18" cy="5" r="3" />
-    <circle cx="6" cy="12" r="3" />
-    <circle cx="18" cy="19" r="3" />
-    <path d="m8.59 13.51 6.83 3.98" />
-    <path d="m15.41 6.51-6.82 3.98" />
-  </svg>
-);
-// Remaining Factory glyphs, same thin-line style as the capability icons.
-const GaugeGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m12 14 4-4" />
-    <path d="M3.34 19a10 10 0 1 1 17.32 0" />
-  </svg>
-);
-const LayersGlyph = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
-    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
-  </svg>
-);
-
-// dstack Factory tab contents: icon + title + subtitle rows per tab. Only Factory-exclusive
-// capabilities live here — bringing clouds/on-prem is core dstack and is shown in the Explore
-// section's "bring your own compute" block instead.
-// Rendered with column flow (see .gs-caps--cols): the first three fill the left column, the
-// rest the right — and the mobile single column keeps this same order.
-const FACTORY_GOVERNANCE = [
-  { icon: <UserGlyph />, title: 'Single Sign-On (SSO)', sub: 'Okta, Microsoft Entra, Google Workspace' },
-  { icon: <AuditGlyph />, title: 'Audit logs', sub: 'Track system events across tenants (projects and users)' },
-  { icon: <KeyGlyph />, title: 'Fine-grained tokens', sub: 'Multiple user tokens with fine-grained permissions' },
-  { icon: <ShareGlyph />, title: 'Sharable resources', sub: 'Share fleets and gateways across tenants (projects)' },
-  { icon: <GaugeGlyph />, title: 'Compute metering', sub: 'Usage metering and quotas per tenant (project or user)' },
-  { icon: <ShieldGlyph />, title: 'Air-gapped deployment', sub: 'Runs in isolated environments with no Internet access' },
-];
-// The preset registry: private (your own) in dstack Factory, public in dstack Sky.
-const FACTORY_PRESETS = [
-  { icon: <LayersGlyph />, title: 'Private registry', sub: 'Sharing optimized inference serving configurations' },
-  { icon: <GaugeGlyph />, title: 'Token metering', sub: 'Token metering and quotas per tenant (project or user)' },
-];
-const SKY_PRESETS = [
-  { icon: <LayersGlyph />, title: 'Public registry', sub: 'Sharing optimized inference serving configurations' },
-];
-
-// Icon + title + subtitle rows, shared by the Factory tabs and the explore block.
-export function CapList({ items, columnFlow }: { items: { icon: ReactNode; title: string; sub: string }[]; columnFlow?: boolean }) {
+// Icon, title, and description rows shared by the Home and Sky pages.
+export function CapList({ items }: { items: { icon: ReactNode; title: string; sub: string }[] }) {
   return (
-    <ul className={`gs-caps${columnFlow ? ' gs-caps--cols' : ''}`}>
+    <ul className="gs-caps">
       {items.map(cap => (
         <li key={cap.title} className="gs-cap">
           <span className="gs-cap__ic">{cap.icon}</span>
@@ -176,239 +89,77 @@ export function CapList({ items, columnFlow }: { items: { icon: ReactNode; title
   );
 }
 
-// Closing "Get started" section: the product switcher rail (also rendered by the Products menu
-// and the docs header popup) beside each product's detail box. Open-source shows the install
-// code, Factory shows governance and its private preset registry, Sky the GPU marketplace and
-// the public preset registry.
 // NOTE: the three product descriptions below are duplicated in SiteNavigation.tsx (products)
 // and mkdocs/overrides/header-2.html — keep all three in sync.
 export function GetStartedSection() {
-  const [tab, setTab] = useState<DeployTab>('oss');
-  // The selection indicator: one white card that slides to the selected row.
-  const railRef = useRef<HTMLDivElement>(null);
-  const [indicator, setIndicator] = useState<{ top: number; height: number } | null>(null);
   const [method, setMethod] = useState<(typeof installMethods)[number]['id']>(installMethods[0].id);
-  // dstack Sky and Factory panes: which of their tabs is shown (same interaction as the
-  // install-method tabs).
-  const [skyPane, setSkyPane] = useState<'marketplace' | 'presets'>('marketplace');
-  const [factoryPane, setFactoryPane] = useState<'governance' | 'registry'>('governance');
-  const [stars, setStars] = useState<number | null>(null);
-
-  // Live star count for the open-source tile, fetched once. Best-effort: if the API is rate-limited
-  // or errors, the badge simply doesn't render.
-  useEffect(() => {
-    let active = true;
-    fetch(GITHUB_API_URL)
-      .then(response => (response.ok ? response.json() : null))
-      .then(data => {
-        if (active && data && typeof data.stargazers_count === 'number') setStars(data.stargazers_count);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Each option behaves like a tab: click or Enter/Space selects it.
-  const optionProps = (id: DeployTab) => ({
-    role: 'tab',
-    'aria-selected': tab === id,
-    tabIndex: 0,
-    onClick: () => setTab(id),
-    onMouseEnter: () => setTab(id),
-    onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        setTab(id);
-      }
-    },
-  });
 
   const activeInstall = installMethods.find(m => m.id === method) ?? installMethods[0];
-
-  // Keep the indicator glued to the selected row (on selection change, resize, and once the star
-  // count loads — it grows the first row). Fractional rect math, not offsetTop/offsetHeight: those
-  // round to integers while the layout is fractional, leaving up-to-1px slivers at the row edges.
-  useEffect(() => {
-    const update = () => {
-      const rail = railRef.current;
-      const selected = rail?.querySelector<HTMLElement>('.gs-opt--on');
-      if (!rail || !selected) return;
-      const railBox = rail.getBoundingClientRect();
-      const rowBox = selected.getBoundingClientRect();
-      const borderTop = parseFloat(getComputedStyle(rail).borderTopWidth) || 0;
-      setIndicator({ top: rowBox.top - railBox.top - borderTop, height: rowBox.height });
-    };
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, [tab, stars]);
 
   return (
     <section className="docs-section" id="resources">
       <h2>Get started</h2>
 
       <div className="gs-deploy">
-        {/* Left: the popup-style selector. */}
-        <div className="gs-rail" role="tablist" aria-label="Deployment" ref={railRef}>
-          {indicator && <div className="gs-rail__indicator" style={{ top: indicator.top, height: indicator.height }} aria-hidden="true" />}
+        <div className="gs-rail">
           <div className="gs-rail__group">Self-hosted</div>
-          <div className={`gs-opt gs-opt--feat${tab === 'oss' ? ' gs-opt--on' : ''}`} {...optionProps('oss')}>
-            <span className="gs-opt__icwrap">
-              <span className="gs-opt__ic"><GithubGlyph /></span>
-              {stars !== null && (
-                <span className="gs-opt__stars" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
-              )}
-            </span>
+          <div className="gs-opt gs-opt--feat gs-opt--on">
+            <span className="gs-opt__ic"><BoxGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack</span>
               <span className="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
             </span>
           </div>
 
-          <div className={`gs-opt gs-opt--row${tab === 'factory' ? ' gs-opt--on' : ''}`} {...optionProps('factory')}>
-            <span className="gs-opt__ic"><BoxGlyph /></span>
+          <a
+            className="gs-opt gs-opt--row"
+            href="https://calendly.com/dstackai/discovery-call"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="gs-opt__ic"><LayersGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Factory</span>
-              <span className="gs-opt__desc">Extends dstack with a governance and metering layer, and a private preset registry.</span>
+              <span className="gs-opt__desc">A complete software stack for AI labs, inference providers, and data centers.</span>
             </span>
-          </div>
+          </a>
 
           <div className="gs-rail__group">Hosted by us</div>
-          <div className={`gs-opt gs-opt--row${tab === 'sky' ? ' gs-opt--on' : ''}`} {...optionProps('sky')}>
+          <a className="gs-opt gs-opt--row" href={asset(ROUTES.SKY)} target="_blank" rel="noreferrer">
             <span className="gs-opt__ic"><CloudGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Sky</span>
-              <span className="gs-opt__desc">Everything in dstack Factory, plus the GPU marketplace and the public preset registry.</span>
+              <span className="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
             </span>
-          </div>
+          </a>
         </div>
 
         {/* Open-source: install-method tabs + read-only code + footer CTA bar. */}
-        {tab === 'oss' && (
-          <div className="gs-detail" key="oss">
-            <div className="gs-box">
-              <div className="gs-tabs" role="tablist" aria-label="Install method">
-                {installMethods.map(m => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={m.id === method}
-                    className={`gs-tab${m.id === method ? ' gs-tab--on' : ''}`}
-                    onClick={() => setMethod(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <div className="gs-codebody">
-                <ShellCode content={padYamlToLines(activeInstall.code, maxInstallLines)} />
-              </div>
-              <div className="gs-boxfoot">
-                <Button variant="primary" href={docsUrl('installation')} style={mainButtonStyle}>Install open-source</Button>
-                <Button href={DOCS_URL} style={mainButtonStyle}>View docs</Button>
-              </div>
+        <div className="gs-detail">
+          <div className="gs-box">
+            <div className="gs-tabs" role="tablist" aria-label="Install method">
+              {installMethods.map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={m.id === method}
+                  className={`gs-tab${m.id === method ? ' gs-tab--on' : ''}`}
+                  onClick={() => setMethod(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <div className="gs-codebody">
+              <ShellCode content={padYamlToLines(activeInstall.code, maxInstallLines)} />
+            </div>
+            <div className="gs-boxfoot">
+              <Button variant="primary" href={docsUrl('installation')} style={mainButtonStyle}>Install open-source</Button>
+              <Button href={DOCS_URL} style={mainButtonStyle}>View docs</Button>
             </div>
           </div>
-        )}
-
-        {/* dstack Sky: GPU marketplace + the public preset registry; footer CTA. */}
-        {tab === 'sky' && (
-          <div className="gs-detail" key="sky">
-            <div className="gs-box">
-              {/* Real tabs, like the open-source box's uv/pip/Docker — one pane shown at a time. */}
-              <div className="gs-tabs" role="tablist" aria-label="dstack Sky">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={skyPane === 'marketplace'}
-                  className={`gs-tab${skyPane === 'marketplace' ? ' gs-tab--on' : ''}`}
-                  onClick={() => setSkyPane('marketplace')}
-                >
-                  GPU marketplace
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={skyPane === 'presets'}
-                  className={`gs-tab${skyPane === 'presets' ? ' gs-tab--on' : ''}`}
-                  onClick={() => setSkyPane('presets')}
-                >
-                  AI token factory
-                </button>
-              </div>
-              <div className="gs-skybody">
-                {skyPane === 'marketplace' && (
-                  <ul className="gs-col__list gs-col__list--grid gs-col__list--offers">
-                    {gpuOffers.map(gpu => (
-                      <li key={`${gpu.name} ${gpu.memory}`} className="gs-mkt__row">
-                        <span className="gs-mkt__left">
-                          <span className="gs-li__ic"><ChipGlyph /></span>
-                          <span className="gs-mkt__g"><span className="gs-mkt__name">{gpu.name}</span>{' '}{gpu.memory}</span>
-                        </span>
-                        <span className="gs-mkt__p">{gpu.price}/hr</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {skyPane === 'presets' && <CapList items={SKY_PRESETS} />}
-              </div>
-              <div className="gs-boxfoot">
-                {skyPane === 'marketplace' && (
-                  <span className="gs-foot__note">
-                    <span className="gs-foot__full">Access compute from a pool of providers. Sign up to get $5 credit.</span>
-                    <span className="gs-foot__short">Sign up to get $5 credit</span>
-                  </span>
-                )}
-                {skyPane === 'presets' && (
-                  <span className="gs-foot__note">Pull ready-to-deploy presets from the public registry</span>
-                )}
-                <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>
-                <Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign in</Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* dstack Factory: only the Factory-exclusive capabilities — governance first, then the
-            private preset registry. */}
-        {tab === 'factory' && (
-          <div className="gs-detail" key="factory">
-            <div className="gs-box">
-              <div className="gs-tabs" role="tablist" aria-label="dstack Factory">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={factoryPane === 'governance'}
-                  className={`gs-tab${factoryPane === 'governance' ? ' gs-tab--on' : ''}`}
-                  onClick={() => setFactoryPane('governance')}
-                >
-                  Governance
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={factoryPane === 'registry'}
-                  className={`gs-tab${factoryPane === 'registry' ? ' gs-tab--on' : ''}`}
-                  onClick={() => setFactoryPane('registry')}
-                >
-                  AI token factory
-                </button>
-              </div>
-              <div className="gs-skybody">
-                {factoryPane === 'governance' && <CapList items={FACTORY_GOVERNANCE} columnFlow />}
-                {factoryPane === 'registry' && <CapList items={FACTORY_PRESETS} />}
-              </div>
-              <div className="gs-boxfoot">
-                {factoryPane === 'registry' && (
-                  <span className="gs-foot__note">Push and pull presets within your organization</span>
-                )}
-                <Button variant="primary" href="https://calendly.com/dstackai/discovery-call" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Book a demo</Button>
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </section>
   );

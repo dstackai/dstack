@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
 import { applyTheme, Theme } from '@cloudscape-design/components/theming';
 
+import { initAnalytics } from './analytics';
 import { router } from './router';
 import { store } from './store';
 
@@ -15,6 +16,8 @@ import 'ace-builds/css/theme/cloud_editor_dark.css';
 import 'assets/css/index.css';
 
 import 'locale';
+
+initAnalytics();
 
 const container = document.getElementById('root');
 

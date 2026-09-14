@@ -72,9 +72,8 @@ just website-dev            # Vite dev server on http://127.0.0.1:5173
 Docs/blog links on the landing resolve same-origin (`/docs`, `/blog`), which 404 in standalone
 dev. Point them at a live site while iterating: `just website-dev https://dstack.ai`.
 
-The `/old` route is kept as a template for building future product pages (reachable in dev; not
-part of the production deploy). Google Analytics and the social/OG image reuse the same property
-and MkDocs-generated card as the rest of the site.
+The Sky product page is served at `/products/sky/`. Google Analytics and the social/OG image
+reuse the same property and MkDocs-generated card as the rest of the site.
 
 ## Building the whole site
 
@@ -197,7 +196,7 @@ mkdocs/                         # docs_dir for the mkdocs site
 
 website/                        # React (Vite) landing page — served at "/"
 ├── index.html                  # Entry; title, OG/meta, Google Analytics
-├── src/                        # App, pages (Home, Old), components, routes
+├── src/                        # App, pages (Home, Sky), components, routes
 └── public/static/              # Landing assets (namespaced to avoid clashing with /assets)
 
 scripts/docs/

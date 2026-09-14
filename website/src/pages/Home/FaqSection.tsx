@@ -26,17 +26,18 @@ const faqItems = [
 ];
 
 // FAQ block: a single-open accordion of questions beside contact actions.
-export function FaqSection() {
+export function FaqSection({ items = faqItems, imageFirst = false }: {
+  items?: typeof faqItems;
+  imageFirst?: boolean;
+}) {
   const [openQuestion, setOpenQuestion] = useState<string | null>(null);
 
   return (
     <section className="docs-section" id="faq">
-      {/* No imageFirst: the merged compute block above is visual-left, so the FAQ alternates back
-          to visual-right. */}
       <AlternatingDocBlock
         visual={
           <div className="faq-list">
-            {faqItems.map(item => (
+            {items.map(item => (
               <ExpandableSection
                 key={item.q}
                 variant="stacked"
@@ -50,6 +51,7 @@ export function FaqSection() {
           </div>
         }
         title="FAQ"
+        imageFirst={imageFirst}
         action={
           <SpaceBetween direction="horizontal" size="xs">
             <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>

@@ -192,10 +192,10 @@ export const ROUTES = {
             TEMPLATE: `/presets/:projectName/:presetId`,
             FORMAT: (projectName: string, presetId: string) =>
                 buildRoute(ROUTES.PRESETS.DETAILS.TEMPLATE, { projectName, presetId }),
-            VERIFIED_ON: {
-                TEMPLATE: `/presets/:projectName/:presetId/verified-on`,
+            DEPLOY: {
+                TEMPLATE: `/presets/:projectName/:presetId/deploy`,
                 FORMAT: (projectName: string, presetId: string) =>
-                    buildRoute(ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE, { projectName, presetId }),
+                    buildRoute(ROUTES.PRESETS.DETAILS.DEPLOY.TEMPLATE, { projectName, presetId }),
             },
             INSPECT: {
                 TEMPLATE: `/presets/:projectName/:presetId/inspect`,

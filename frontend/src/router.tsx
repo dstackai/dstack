@@ -2,9 +2,12 @@ import React from 'react';
 import type { RouteObject } from 'react-router-dom';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
+import { PublicApp } from 'PublicApp';
+import { PresetApp } from 'PublicApp/PresetApp';
 
 import App from 'App';
 import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
+import { LoginByGithub } from 'App/Login/LoginByGithub';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
@@ -33,12 +36,44 @@ import { UserBilling, UserEvents, UserProjects, UserSettings } from 'pages/User/
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
 import { OfferList } from './pages/Offers';
-import { PresetDetails, PresetDetailsOverview, PresetInspect, PresetList, PresetVerifiedOn } from './pages/Presets';
+import { PresetDeploy, PresetDetails, PresetDetailsOverview, PresetInspect, PresetList } from './pages/Presets';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
+    ...(process.env.UI_VERSION === 'sky'
+        ? [
+              {
+                  element: <PublicApp />,
+                  errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
+                  children: [
+                      { path: ROUTES.BASE, element: <LoginByGithub /> },
+                      { path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> },
+                  ],
+              },
+              {
+                  element: <PresetApp />,
+                  errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
+                  children: [
+                      {
+                          path: ROUTES.PRESETS.LIST,
+                          element: <PresetList />,
+                      },
+                      {
+                          path: ROUTES.PRESETS.DETAILS.TEMPLATE,
+                          element: <PresetDetails />,
+                          children: [
+                              { index: true, element: <PresetDetailsOverview /> },
+                              { path: ROUTES.PRESETS.DETAILS.DEPLOY.TEMPLATE, element: <PresetDeploy /> },
+                              { path: 'verified-on', element: <Navigate to=".." replace /> },
+                              { path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE, element: <PresetInspect /> },
+                          ],
+                      },
+                  ],
+              },
+          ]
+        : []),
     {
         path: '/',
         element: <App />,
@@ -61,15 +96,11 @@ export const router = createBrowserRouter([
                 path: ROUTES.AUTH.GOOGLE_CALLBACK,
                 element: <LoginByGoogleCallback />,
             },
-            {
-                path: ROUTES.AUTH.TOKEN,
-                element: <TokenLogin />,
-            },
+            ...(process.env.UI_VERSION !== 'sky' ? [{ path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> }] : []),
             // hubs
-            {
-                path: ROUTES.BASE,
-                element: <Navigate replace to={ROUTES.RUNS.LIST} />,
-            },
+            ...(process.env.UI_VERSION !== 'sky'
+                ? [{ path: ROUTES.BASE, element: <Navigate replace to={ROUTES.RUNS.LIST} /> }]
+                : []),
             {
                 path: ROUTES.PROJECT.LIST,
                 element: <ProjectList />,
@@ -256,32 +287,6 @@ export const router = createBrowserRouter([
                 path: ROUTES.VOLUMES.LIST,
                 element: <VolumeList />,
             },
-
-            // Presets, which only a server with a registry serves
-            ...([
-                process.env.UI_VERSION === 'sky' && {
-                    path: ROUTES.PRESETS.LIST,
-                    element: <PresetList />,
-                },
-                process.env.UI_VERSION === 'sky' && {
-                    path: ROUTES.PRESETS.DETAILS.TEMPLATE,
-                    element: <PresetDetails />,
-                    children: [
-                        {
-                            index: true,
-                            element: <PresetDetailsOverview />,
-                        },
-                        {
-                            path: ROUTES.PRESETS.DETAILS.VERIFIED_ON.TEMPLATE,
-                            element: <PresetVerifiedOn />,
-                        },
-                        {
-                            path: ROUTES.PRESETS.DETAILS.INSPECT.TEMPLATE,
-                            element: <PresetInspect />,
-                        },
-                    ],
-                },
-            ].filter(Boolean) as RouteObject[]),
 
             // Users
             {

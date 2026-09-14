@@ -3,6 +3,12 @@ declare var Tally: {
     closePopup: (string) => void;
 };
 
+interface Window {
+    dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
+    Kapa?: { open: () => void };
+}
+
 declare type AddedEmptyString<Type> = {
     [Property in keyof Type]: Type[Property] | '';
 };
@@ -23,6 +29,7 @@ declare interface HashMap<T = any> {
 declare namespace NodeJS {
     interface ProcessEnv {
         readonly NODE_ENV: 'development' | 'production' | 'test';
+        readonly GA_MEASUREMENT_ID: string;
         readonly UI_VERSION: 'sky' | 'factory' | 'oss';
         readonly PUBLIC_URL: string;
         readonly API_URL: string;

@@ -73,21 +73,15 @@ const footerColumns: FooterColumn[] = [
   },
 ];
 
-// Global footer: a brand block (logo + social) reserving the leading ~1.5 columns,
-// then the multi-column link grid, with the theme toggle and copyright in a
-// divider-separated bottom bar. On the home page it carries an extra gradient
-// (.site-footer--home).
 export function SiteFooter({
-  home,
   theme,
   onToggleTheme,
 }: {
-  home: boolean;
   theme: ThemeMode;
   onToggleTheme: () => void;
 }) {
   return (
-    <footer className={`site-footer ${home ? 'site-footer--home' : ''}`}>
+    <footer className="site-footer site-footer--home">
       <div className="site-frame footer-content">
         <div className="footer-top">
           <div className="footer-brand">

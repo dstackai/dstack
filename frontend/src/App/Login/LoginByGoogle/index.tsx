@@ -26,7 +26,7 @@ export const LoginByGoogle: React.FC<{ className?: string }> = ({ className }) =
 
     return (
         <div className={cn(styles.signIn, className)}>
-            <Button onClick={signInClick} disabled={isLoading} loading={isLoading} variant="normal">
+            <Button fullWidth onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
                 <span className={styles.loginButtonInner}>
                     <GoogleIcon />
                     <span className={styles.loginButtonLabel}>{t('common.login_google')}</span>

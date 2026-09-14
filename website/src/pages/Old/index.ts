@@ -1,1 +1,0 @@
-export { OldPage } from './OldPage';

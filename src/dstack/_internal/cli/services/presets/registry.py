@@ -45,11 +45,10 @@ def parse_registry_ref(ref: str) -> tuple[str, str]:
     return project, rest
 
 
-def resolve_registry_client(project: str) -> APIClient:
-    """The server hosting the registry a ref points at: the config entry with
-    the project's name, or
-    Sky with any configured Sky token (dstack tokens are user tokens, so one Sky
-    entry authenticates any Sky project the user is a member of)."""
+def resolve_registry_client(project: str, *, allow_anonymous: bool = False) -> APIClient:
+    """Use the project's configured server, or Sky unless fallback is disabled.
+    Prefer a configured Sky token; pulls can opt into anonymous Sky access.
+    """
     projects = ConfigManager().list_project_configs()
     for entry in projects:
         if entry.name == project:
@@ -61,6 +60,9 @@ def resolve_registry_client(project: str) -> APIClient:
                 # know going to a remote default — is the one worth announcing.
                 _print_registry_server(SKY_BASE_URL, project)
                 return APIClient(base_url=SKY_BASE_URL, token=entry.token)
+        if allow_anonymous:
+            _print_registry_server(SKY_BASE_URL, project)
+            return APIClient(base_url=SKY_BASE_URL)
     raise CLIError(
         f"No server is configured for project {project!r}. Log in with `dstack project add`"
     )
@@ -123,7 +125,7 @@ def push_preset_to_registry(store: PresetStore, local_ref: str, registry_ref: st
 
 def pull_preset_from_registry(store: PresetStore, registry_ref: str) -> None:
     project, name_or_id = parse_registry_ref(registry_ref)
-    client = resolve_registry_client(project)
+    client = resolve_registry_client(project, allow_anonymous=True)
     try:
         remote = client.presets.get(project, name_or_id)
     except (URLNotFoundError, MethodNotAllowedError):

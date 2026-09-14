@@ -1,10 +1,26 @@
 import React, { FC } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import { Box, Button, ExpandableSection, Link, Popover, SpaceBetween, StatusIndicator, Tabs, Wizard } from 'components';
+import {
+    Box,
+    Button,
+    Container,
+    ExpandableSection,
+    Header,
+    Link,
+    Loader,
+    Popover,
+    SpaceBetween,
+    StatusIndicator,
+    Tabs,
+    Wizard,
+} from 'components';
 
 import { FLEETS_DOCS_URL } from 'consts';
 import { copyToClipboard } from 'libs';
+import { ROUTES } from 'routes';
+import { useGetPresetQuery } from 'services/preset';
 
 const UV_INSTALL_COMMAND = 'uv tool install dstack -U';
 const PIP_INSTALL_COMMAND = 'pip install dstack -U';
@@ -28,10 +44,26 @@ const CopyableCommand: FC<{ command: string }> = ({ command }) => {
     );
 };
 
-export const Deploy: FC<{ preset: IPresetDetails }> = ({ preset }) => {
+export const PresetDeploy: FC = () => {
     const { t } = useTranslation();
-    const [isExpanded, setIsExpanded] = React.useState(false);
+    const params = useParams();
+    const navigate = useNavigate();
+    const paramProjectName = params.projectName ?? '';
+    const paramPresetId = params.presetId ?? '';
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
+
+    const { data: preset, isLoading } = useGetPresetQuery({
+        project_name: paramProjectName,
+        id: paramPresetId,
+    });
+
+    if (isLoading || !preset)
+        return (
+            <Container>
+                <Loader />
+            </Container>
+        );
+
     // A preset is pulled by whatever reference reaches it: its name while one
     // points at it, its id otherwise.
     const reference = `${preset.project_name}/${preset.name ?? preset.id}`;
@@ -43,23 +75,20 @@ export const Deploy: FC<{ preset: IPresetDetails }> = ({ preset }) => {
     const configurationFile = 'preset.dstack.yml';
 
     return (
-        <ExpandableSection
-            variant="container"
-            headerText={t('presets.deploy')}
-            expanded={isExpanded}
-            onChange={({ detail }) => setIsExpanded(detail.expanded)}
-        >
+        <Container header={<Header variant="h2">{t('presets.deploy')}</Header>}>
             <Wizard
                 i18nStrings={{
                     stepNumberLabel: (stepNumber) => `Step ${stepNumber}`,
                     collapsedStepsLabel: (stepNumber, stepsCount) => `Step ${stepNumber} of ${stepsCount}`,
                     navigationAriaLabel: 'Steps',
+                    cancelButton: t('common.cancel'),
                     previousButton: 'Previous',
                     nextButton: 'Next',
                 }}
                 onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                 activeStepIndex={activeStepIndex}
-                onSubmit={() => setIsExpanded(false)}
+                onCancel={() => navigate(ROUTES.PRESETS.DETAILS.FORMAT(paramProjectName, paramPresetId))}
+                onSubmit={() => navigate(ROUTES.PRESETS.DETAILS.FORMAT(paramProjectName, paramPresetId))}
                 submitButtonText="Done"
                 steps={[
                     {
@@ -106,13 +135,15 @@ export const Deploy: FC<{ preset: IPresetDetails }> = ({ preset }) => {
                             <SpaceBetween size="s">
                                 <CopyableCommand command={`dstack apply -f ${configurationFile}`} />
 
-                                <ExpandableSection headerText={t('presets.fleets')}>
+                                <ExpandableSection headerText={t('presets.no_fleet')}>
                                     <SpaceBetween size="s">
                                         <Box />
-                                        <Box>{t('presets.no_fleet_description')}</Box>
-                                        <Link href={FLEETS_DOCS_URL} external>
-                                            {t('presets.fleets_link')}
-                                        </Link>
+                                        <Box>
+                                            {t('presets.no_fleet_description')}{' '}
+                                            <Link href={FLEETS_DOCS_URL} external>
+                                                {t('presets.fleets_link')}
+                                            </Link>
+                                        </Box>
                                     </SpaceBetween>
                                 </ExpandableSection>
                             </SpaceBetween>
@@ -120,6 +151,6 @@ export const Deploy: FC<{ preset: IPresetDetails }> = ({ preset }) => {
                     },
                 ]}
             />
-        </ExpandableSection>
+        </Container>
     );
 };

@@ -2,7 +2,7 @@ import React, { FC, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
-import { Container, Header, Loader, TreeView } from 'components';
+import { Container, ExpandableSection, Loader, TreeView } from 'components';
 
 import { useGetPresetQuery } from 'services/preset';
 
@@ -59,8 +59,6 @@ export const PresetVerifiedOn: FC = () => {
         id: paramPresetId,
     });
 
-    // Every group starts expanded: a preset has few of them, and the replicas
-    // are the point of the tab.
     const groupNames = useMemo(() => (data?.spec.preset.verified_on ?? []).map(({ name }) => name), [data]);
     const [collapsedItems, setCollapsedItems] = useState<string[]>([]);
     const expandedItems = groupNames.filter((name) => !collapsedItems.includes(name));
@@ -78,12 +76,12 @@ export const PresetVerifiedOn: FC = () => {
         content: t('presets.replica_group', { name: group.name }),
         children: group.replicas.map((replicas, index) => ({
             id: `${group.name}-${index}`,
-            content: `${t('presets.replica', { index: index + 1 })}: ${formatResources(replicas)}`,
+            content: `${t('presets.replica', { index })}: ${formatResources(replicas)}`,
         })),
     }));
 
     return (
-        <Container header={<Header variant="h2">{t('presets.verified_on')}</Header>}>
+        <ExpandableSection variant="container" headerText={t('presets.verified_on')}>
             <TreeView
                 items={items}
                 expandedItems={expandedItems}
@@ -100,6 +98,6 @@ export const PresetVerifiedOn: FC = () => {
                     collapseButtonLabel: () => 'Collapse',
                 }}
             />
-        </Container>
+        </ExpandableSection>
     );
 };

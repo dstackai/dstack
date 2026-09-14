@@ -1,4 +1,5 @@
 import io
+import json
 import logging
 import tarfile
 from datetime import datetime
@@ -8,6 +9,7 @@ from typing import Optional
 from uuid import uuid4
 
 import pytest
+import requests
 import yaml
 
 from dstack._internal.cli.models.presets import PulledPreset
@@ -184,7 +186,9 @@ def _archive_member_texts(blob: bytes) -> dict[str, str]:
 def stub_client(monkeypatch: pytest.MonkeyPatch):
     fake = FakePresetsAPIClient()
     client = SimpleNamespace(presets=fake, files=fake.files, base_url="http://test-server")
-    monkeypatch.setattr(registry_module, "resolve_registry_client", lambda project: client)
+    monkeypatch.setattr(
+        registry_module, "resolve_registry_client", lambda project, **kwargs: client
+    )
     return fake
 
 
@@ -208,19 +212,23 @@ class TestResolveRegistryClient:
             "dstack._internal.core.services.configs.get_dstack_dir", lambda: dstack_dir
         )
 
-    def test_uses_the_matching_config_entry(self, tmp_path, monkeypatch):
+    @pytest.mark.parametrize("allow_anonymous", [False, True])
+    def test_uses_the_matching_config_entry(self, tmp_path, monkeypatch, allow_anonymous):
         self._configure(
             tmp_path,
             monkeypatch,
             [{"name": "main", "url": "http://my-server", "token": "t1", "default": True}],
         )
 
-        client = resolve_registry_client("main")
+        client = resolve_registry_client("main", allow_anonymous=allow_anonymous)
 
         assert client.base_url == "http://my-server"
         assert client.token == "t1"
 
-    def test_falls_back_to_sky_with_a_sky_entry_token(self, tmp_path, monkeypatch):
+    @pytest.mark.parametrize("allow_anonymous", [False, True])
+    def test_falls_back_to_sky_with_a_sky_entry_token(
+        self, tmp_path, monkeypatch, allow_anonymous
+    ):
         self._configure(
             tmp_path,
             monkeypatch,
@@ -230,12 +238,15 @@ class TestResolveRegistryClient:
             ],
         )
 
-        client = resolve_registry_client("someone-elses-project")
+        client = resolve_registry_client("someone-elses-project", allow_anonymous=allow_anonymous)
 
         assert client.base_url == "https://sky.dstack.ai"
         assert client.token == "sky-token"
 
-    def test_no_sky_fallback_env_disables_the_fallback(self, tmp_path, monkeypatch):
+    @pytest.mark.parametrize("allow_anonymous", [False, True])
+    def test_no_sky_fallback_env_disables_the_fallback(
+        self, tmp_path, monkeypatch, allow_anonymous
+    ):
         self._configure(
             tmp_path,
             monkeypatch,
@@ -244,7 +255,7 @@ class TestResolveRegistryClient:
         monkeypatch.setenv("DSTACK_NO_SKY_FALLBACK", "1")
 
         with pytest.raises(CLIError, match="dstack project add"):
-            resolve_registry_client("someone-elses-project")
+            resolve_registry_client("someone-elses-project", allow_anonymous=allow_anonymous)
 
     def test_errors_without_any_usable_entry(self, tmp_path, monkeypatch):
         self._configure(
@@ -438,6 +449,76 @@ class TestPushPresetToRegistry:
 
 
 class TestPullPresetFromRegistry:
+    @pytest.mark.parametrize(
+        "projects",
+        [
+            [],
+            [
+                {
+                    "name": "local",
+                    "url": "http://local-server",
+                    "token": "local-token",
+                    "default": True,
+                }
+            ],
+        ],
+        ids=["no-config", "local-default"],
+    )
+    def test_pulls_from_sky_without_registry_credentials(self, tmp_path, monkeypatch, projects):
+        base_url = registry_module.SKY_BASE_URL
+        dstack_dir = tmp_path / ".dstack"
+        dstack_dir.mkdir()
+        if projects:
+            (dstack_dir / "config.yml").write_text(yaml.safe_dump({"projects": projects}))
+        monkeypatch.setattr(
+            "dstack._internal.core.services.configs.get_dstack_dir", lambda: dstack_dir
+        )
+        monkeypatch.delenv("DSTACK_NO_SKY_FALLBACK", raising=False)
+        monkeypatch.setenv("DSTACK_SERVER_URL", "http://local-server")
+        monkeypatch.setenv("DSTACK_PROJECT", "local")
+        monkeypatch.setenv("DSTACK_TOKEN", "local-environment-token")
+        # Request preparation must not read the developer's own netrc credentials.
+        monkeypatch.setenv("NETRC", str(tmp_path / "no-netrc"))
+        remote = _registry_preset(
+            file_archives=[FileArchiveMapping(id=uuid4(), path="/app/a.txt")],
+            file_mappings=[FilePathMapping(local_path="patch/a.txt", path="/app/a.txt")],
+        )
+        remote.project_name = "dstack"
+        blob = _file_archive_blob(tmp_path, "a.txt", "public preset file")
+        file_path = b"/app/a.txt"
+        stream = (
+            len(file_path).to_bytes(4, "big") + file_path + len(blob).to_bytes(8, "big") + blob
+        )
+        requests_sent = []
+
+        def send(session, request, **kwargs):
+            # Inspect fully prepared requests, after session headers/environment
+            # handling, while keeping both real API calls off the network.
+            requests_sent.append(request)
+            assert request.method == "POST"
+            assert request.headers.get("Authorization") is None
+            response = requests.Response()
+            response.status_code = 200
+            response.request = request
+            if request.url == f"{base_url}/api/project/dstack/presets/get":
+                assert json.loads(request.body) == {"name_or_id": "qwen38"}
+                response.raw = io.BytesIO(remote.model_dump_json().encode())
+            else:
+                assert request.url == f"{base_url}/api/project/dstack/presets/get_files"
+                assert json.loads(request.body) == {"name_or_id": str(remote.id)}
+                response.raw = io.BytesIO(stream)
+            return response
+
+        monkeypatch.setattr(requests.Session, "send", send)
+        store = PresetStore(tmp_path / "presets")
+
+        pull_preset_from_registry(store, "dstack/qwen38")
+
+        assert len(requests_sent) == 2
+        pulled = store.get(str(remote.id))
+        assert pulled.name == "dstack/qwen38"
+        assert Path(pulled.service.files[0].local_path).read_text() == "public preset file"
+
     def test_materializes_the_preset_under_its_qualified_name(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
         stub_client.remote = _registry_preset(
