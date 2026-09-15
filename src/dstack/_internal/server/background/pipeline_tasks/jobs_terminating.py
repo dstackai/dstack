@@ -11,7 +11,7 @@ from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
-from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
+from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import (
@@ -50,6 +50,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     get_instance_ssh_private_keys,
@@ -79,6 +80,12 @@ from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# How long a job is given to finish and hand over its last logs before its container is killed.
+# Covers the runner's own termination staging -- SIGHUP after 5s, SIGKILL after 10s -- and the
+# final log flush that follows it.
+JOB_TERMINATION_DEADLINE = timedelta(seconds=30)
 
 
 @dataclass
@@ -173,10 +180,6 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                     select(JobModel)
                     .where(
                         JobModel.status == JobStatus.TERMINATING,
-                        or_(
-                            JobModel.remove_at.is_(None),
-                            JobModel.remove_at < now,
-                        ),
                         or_(
                             # Processing volumes detach can be less frequent since it may take time.
                             and_(
@@ -302,6 +305,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     termination_reason_message: Optional[str]
     instance_id: Optional[uuid.UUID]
     graceful_termination_attempts: int
+    runner_timestamp: Optional[int]
     volumes_detached_at: UpdateMapDateTime
     registered: bool
     remove_at: UpdateMapDateTime
@@ -659,9 +663,28 @@ async def _process_terminating_job(
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
-    if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
-        result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
-        result.graceful_stop_event_message = "Graceful job stop requested"
+    if job_model.remove_at is None:
+        # The first terminating pass. `graceful_termination_attempts` decides whether the runner
+        # is asked to stop the job; `remove_at` decides when the container is killed regardless.
+        # The two are independent: a job that has already finished on its own is not asked to
+        # stop, but its logs are still drained below.
+        graceful = job_model.graceful_termination_attempts == 0
+        if graceful:
+            await stop_runner(job_model=job_model, instance_model=instance_model)
+            result.job_update_map["graceful_termination_attempts"] = 1
+            result.graceful_stop_event_message = "Graceful job stop requested"
+        if graceful or _has_logs_to_drain(job_model):
+            result.job_update_map["remove_at"] = get_current_datetime() + JOB_TERMINATION_DEADLINE
+            return result
+        # Nothing to wait for, stop the container right away
+    elif get_current_datetime() < job_model.remove_at and not await _drain_job_logs(
+        job_model=job_model,
+        instance_model=instance_model,
+        job_update_map=result.job_update_map,
+    ):
+        # The runner still has logs to hand over and there is time left to collect them. They
+        # must be collected before the container is stopped, since that destroys the runner
+        # along with everything it has buffered.
         return result
 
     jrd = get_job_runtime_data(job_model)
@@ -718,18 +741,82 @@ async def _process_terminating_job(
     return result
 
 
-async def _stop_job_gracefully(
-    job_model: JobModel, instance_model: InstanceModel
-) -> _JobUpdateMap:
+def _has_logs_to_drain(job_model: JobModel) -> bool:
     """
-    Tells the runner to stop the job's command. Records the first graceful-stop attempt and
-    sets `remove_at` so `_process_terminating_job()` stops the container on a later iteration.
+    Whether the runner may still be holding logs for this job.
+
+    `running_at` says the workload started, but it is only stamped by servers new enough to have
+    the column, so `runner_timestamp` -- advanced on every successful pull -- covers jobs that
+    were already running before the upgrade. A job that never started running has neither, and
+    waiting for logs it cannot have would only delay its termination.
     """
-    job_update_map = _JobUpdateMap()
-    await stop_runner(job_model=job_model, instance_model=instance_model)
-    job_update_map["graceful_termination_attempts"] = 1
-    job_update_map["remove_at"] = get_current_datetime() + timedelta(seconds=10)
-    return job_update_map
+    return job_model.running_at is not None or job_model.runner_timestamp is not None
+
+
+async def _drain_job_logs(
+    job_model: JobModel,
+    instance_model: InstanceModel,
+    job_update_map: _JobUpdateMap,
+) -> bool:
+    """
+    Collects the logs the runner has buffered since the last pull.
+
+    Returns whether the runner has nothing left to hand over, or cannot be asked at all -- the
+    caller keeps the container alive until then, or until `remove_at` passes.
+    """
+    jpd = get_job_provisioning_data(job_model)
+    if jpd is None:
+        return True
+    jrd = get_job_runtime_data(job_model)
+    ssh_private_keys = get_instance_ssh_private_keys(instance_model)
+    try:
+        return await common.run_async(
+            _pull_job_logs,
+            ssh_private_keys,
+            jpd,
+            jrd,
+            job_model.run,
+            job_model,
+            job_update_map,
+        )
+    except client.PeerConnectionError as e:
+        # An unreachable runner has nothing left to give, and waiting out the deadline would
+        # only delay terminating a job whose instance is likely gone already.
+        logger.debug("%s: can't collect the last logs: %s", fmt(job_model), e)
+        return True
+    except client.RunnerError as e:
+        # The runner answered, but not usefully. Collecting the logs is best-effort: the job is
+        # being terminated either way, and retrying until the deadline would only delay it.
+        logger.warning("%s: runner failed to hand over the last logs: %s", fmt(job_model), e)
+        return True
+
+
+@runner_ssh_tunnel
+def _pull_job_logs(
+    addresses: Mapping[int, client.LocalAddress],
+    run_model: RunModel,
+    job_model: JobModel,
+    job_update_map: _JobUpdateMap,
+) -> bool:
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
+    resp = runner_client.pull(job_model.runner_timestamp or 0)
+    try:
+        logs_services.write_logs(
+            project=run_model.project,
+            run_name=run_model.run_name,
+            job_submission_id=job_model.id,
+            runner_logs=resp.runner_logs,
+            job_logs=resp.job_logs,
+        )
+    except logs_services.LogStorageError as e:
+        # `runner_timestamp` is not advanced, so the same logs are pulled again on the next pass
+        # instead of being lost.
+        logger.error("%s: failed to write the last logs: %s", fmt(job_model), e)
+        return False
+    job_update_map["runner_timestamp"] = resp.last_updated
+    # An old runner does not report `has_more`, and then there is no way to tell when the logs
+    # are exhausted -- take what this pull returned and stop.
+    return not resp.has_more
 
 
 async def _process_job_volumes_detaching(

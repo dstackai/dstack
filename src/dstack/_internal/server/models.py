@@ -568,8 +568,9 @@ class JobModel(PipelineModelMixin, BaseModel):
     * `>= 1` means at least one graceful stop attempt was sent.
     """
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    """`remove_at` is used to ensure the container/instance is killed after the job is gracefully finished.
-    Cannot kill the container/instance until `remove_at` is set.
+    """`remove_at` is when the job's container is killed, whether or not the runner has handed
+    over its last logs. `None` until the job starts terminating, and only set for jobs that are
+    given time to finish -- the rest are stopped on their first terminating pass.
     """
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)

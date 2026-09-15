@@ -1,7 +1,6 @@
 import itertools
 import json
 from collections.abc import Mapping
-from datetime import timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
 
@@ -329,10 +328,6 @@ def job_spec_updatable_in_place(old_job_spec: JobSpec, new_job_spec: JobSpec) ->
     new_job_spec = new_job_spec.model_copy(deep=True)
     new_job_spec.requirements.resources.cpu.arch = old_job_spec.requirements.resources.cpu.arch
     return old_job_spec == new_job_spec
-
-
-def delay_job_instance_termination(job_model: JobModel):
-    job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
 def is_multinode_job(job: Job) -> bool:
