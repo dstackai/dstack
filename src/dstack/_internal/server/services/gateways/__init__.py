@@ -677,7 +677,6 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
-# TODO: Connect to gateway outside session
 async def get_or_add_gateway_connections(
     gateway_replicas: Sequence[GatewayReplicaModel],
 ) -> List[GatewayConnection]:

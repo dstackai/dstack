@@ -18,7 +18,8 @@ from sqlalchemy.orm import (
 import dstack._internal.server.background.pipeline_tasks.runs.active as active
 import dstack._internal.server.background.pipeline_tasks.runs.pending as pending
 import dstack._internal.server.background.pipeline_tasks.runs.terminating as terminating
-from dstack._internal.core.models.runs import JobStatus, RunStatus
+from dstack._internal.core.models.runs import JobStatus, RunSpec, RunStatus
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
@@ -300,6 +301,7 @@ async def _process_pending_item(item: RunPipelineItem) -> None:
         if context is None:
             return
 
+    context.gateway_stats = await _load_gateway_stats(context.run_model, context.run_spec)
     result = await pending.process_pending_run(context)
     if result is None:
         await _apply_noop_result(
@@ -330,21 +332,11 @@ async def _load_pending_context(
         return None
     secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
     run_spec = get_run_spec(run_model)
-
-    gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway is not None:
-        gateway_stats = await get_combined_gateway_stats(
-            get_gateway_replica_models(run_model.gateway),
-            run_model.project.name,
-            run_model.run_name,
-        )
-
     return pending.PendingContext(
         run_model=run_model,
         run_spec=run_spec,
         secrets=secrets,
         locked_job_ids=locked_job_ids,
-        gateway_stats=gateway_stats,
     )
 
 
@@ -506,6 +498,7 @@ async def _process_active_item(item: RunPipelineItem) -> None:
             return
         context = load_result
 
+    context.gateway_stats = await _load_gateway_stats(context.run_model, context.run_spec)
     result = await active.process_active_run(context)
     await _apply_active_result(item=item, context=context, result=result)
 
@@ -532,21 +525,25 @@ async def _load_active_context(
         return None
     secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
     run_spec = get_run_spec(run_model)
-
-    gateway_stats = None
-    if run_spec.configuration.type == "service" and run_model.gateway is not None:
-        gateway_stats = await get_combined_gateway_stats(
-            get_gateway_replica_models(run_model.gateway),
-            run_model.project.name,
-            run_model.run_name,
-        )
-
     return active.ActiveContext(
         run_model=run_model,
         run_spec=run_spec,
         secrets=secrets,
         locked_job_ids=locked_job_ids,
-        gateway_stats=gateway_stats,
+    )
+
+
+async def _load_gateway_stats(run_model: RunModel, run_spec: RunSpec) -> Optional[PerWindowStats]:
+    """
+    Fetches service stats from the gateway replicas.
+    Talks to gateways over SSH, so it must run outside DB sessions.
+    """
+    if run_spec.configuration.type != "service" or run_model.gateway is None:
+        return None
+    return await get_combined_gateway_stats(
+        get_gateway_replica_models(run_model.gateway),
+        run_model.project.name,
+        run_model.run_name,
     )
 
 
