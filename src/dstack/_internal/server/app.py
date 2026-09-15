@@ -23,7 +23,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks import start_pipeline_tasks
 from dstack._internal.server.background.scheduled_tasks import start_scheduled_tasks
 from dstack._internal.server.background.scheduled_tasks.probes import PROBES_SCHEDULER
-from dstack._internal.server.db import get_db, get_session_ctx, migrate
+from dstack._internal.server.db import get_db, migrate
 from dstack._internal.server.routers import (
     auth,
     backends,
@@ -130,33 +130,43 @@ async def lifespan(app: FastAPI):
         server_config_loaded = server_config_manager.load_config()
         # Encryption has to be configured before working with users and projects
         await server_config_manager.apply_encryption()
-    async with get_session_ctx() as session:
+    async with get_db().engine.connect() as connection:
+        # Running server init using a dedicated connection because there are multiple
+        # transactions/commits happening under the advisory lock
+        # and we need to guarantee the same connection releases the lock.
         async with advisory_lock_ctx(
-            bind=session,
+            bind=connection,
             dialect_name=get_db().dialect_name,
             resource="server_init",
         ):
-            admin, _ = await get_or_create_admin_user(session=session)
-            await get_or_create_default_project(
-                session=session,
-                user=admin,
-            )
-            if server_config_manager is not None:
-                server_config_file_path = get_server_config_file_path()
-                server_config_dir = _get_server_config_dir()
-                if not server_config_loaded:
-                    logger.info("Initializing the default configuration...", {"show_path": False})
-                    await server_config_manager.init_config(session=session)
-                    logger.info(
-                        f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
-                        {"show_path": False},
-                    )
-                else:
-                    logger.info(
-                        f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
-                        {"show_path": False},
-                    )
-                    await server_config_manager.apply_config(session=session, owner=admin)
+            # End the lock statement's transaction so that the session controls its own transactions.
+            # The session-level lock survives the commit.
+            await connection.commit()
+            async with get_db().get_session(bind=connection) as session:
+                admin, _ = await get_or_create_admin_user(session=session)
+                await get_or_create_default_project(
+                    session=session,
+                    user=admin,
+                )
+                if server_config_manager is not None:
+                    server_config_file_path = get_server_config_file_path()
+                    server_config_dir = _get_server_config_dir()
+                    if not server_config_loaded:
+                        logger.info(
+                            "Initializing the default configuration...", {"show_path": False}
+                        )
+                        await server_config_manager.init_config(session=session)
+                        logger.info(
+                            f"Initialized the default configuration at [link=file://{server_config_file_path}]{server_config_dir}[/link]",
+                            {"show_path": False},
+                        )
+                    else:
+                        logger.info(
+                            f"Applying [link=file://{server_config_file_path}]{server_config_dir}[/link]...",
+                            {"show_path": False},
+                        )
+                        await server_config_manager.apply_config(session=session, owner=admin)
+                await session.commit()
 
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,

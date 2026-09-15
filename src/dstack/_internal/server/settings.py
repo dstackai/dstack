@@ -5,6 +5,7 @@ Environment variables read by the dstack server. Documented in reference/env.md
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
 from dstack._internal.server.utils.settings import parse_hostname_port
 from dstack._internal.utils.env import environ
@@ -67,6 +68,9 @@ ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
 # or increase client pool size to support more concurrent requests.
 DB_POOL_SIZE = int(os.getenv("DSTACK_DB_POOL_SIZE", 20))
 DB_MAX_OVERFLOW = int(os.getenv("DSTACK_DB_MAX_OVERFLOW", 20))
+DB_COMMAND_TIMEOUT: Optional[float] = float(os.getenv("DSTACK_DB_COMMAND_TIMEOUT", 300)) or None
+"""Bounds every operation on a Postgres connection so that a connection whose
+socket died silently is released back to the pool instead of being held forever. 0 disables the timeout."""
 
 SERVER_BACKGROUND_PROCESSING_DISABLED = (
     os.getenv("DSTACK_SERVER_BACKGROUND_PROCESSING_DISABLED") is not None

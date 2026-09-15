@@ -1,10 +1,12 @@
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from alembic import command, config
-from sqlalchemy import AsyncAdaptedQueuePool, event
+from sqlalchemy import AsyncAdaptedQueuePool, event, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -13,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import ConnectionPoolEntry
 
 from dstack._internal.server import settings
-from dstack._internal.server.services.locking import advisory_lock_ctx
+from dstack._internal.server.services.locking import try_advisory_lock_ctx
 
 
 class Database:
@@ -28,6 +30,7 @@ class Database:
                 poolclass=AsyncAdaptedQueuePool,
                 pool_size=settings.DB_POOL_SIZE,
                 max_overflow=settings.DB_MAX_OVERFLOW,
+                connect_args=self._get_connect_args(self.url),
             )
         self.session_maker = async_sessionmaker(
             bind=self.engine,  # type: ignore[assignment]
@@ -52,8 +55,22 @@ class Database:
     def dialect_name(self) -> str:
         return self.engine.dialect.name
 
-    def get_session(self) -> AsyncSession:
-        return self.session_maker()
+    def get_session(self, bind: Optional[AsyncConnection] = None) -> AsyncSession:
+        """
+        Returns a new session. If `bind` is given, the session runs on that connection
+        instead of checking connections out of the pool. The connection must not be in
+        a transaction, otherwise the session joins it and its commits do not commit.
+        """
+        if bind is None:
+            return self.session_maker()
+        return self.session_maker(bind=bind)
+
+    def _get_connect_args(self, url: str) -> dict:
+        if make_url(url).get_backend_name() == "postgresql":
+            # TODO: Consider setting "command_timeout" high for migrations
+            # and low for queries – requires a separate Database instance for migrations.
+            return {"command_timeout": settings.DB_COMMAND_TIMEOUT}
+        return {}
 
 
 def get_new_db() -> Database:
@@ -80,15 +97,34 @@ def override_db(new_db: Database):
     _db = new_db
 
 
+_MIGRATIONS_LOCK_POLL_INTERVAL = 1
+_MIGRATIONS_LOCK_MAX_ATTEMPTS = 600
+
+
 async def migrate():
     db = get_db()
+    # The lock is polled instead of awaited in pg_advisory_lock() to avoid this:
+    # migrations waiting for older snapshots to finish (e.g. CREATE INDEX CONCURRENTLY)
+    # wait for the blocked replicas waiting for the "migrations" lock, deadlocking both.
     async with db.engine.connect() as connection:
-        async with advisory_lock_ctx(
-            bind=connection,
-            dialect_name=db.dialect_name,
-            resource="migrations",
-        ):
-            await connection.run_sync(_run_alembic_upgrade)
+        for _ in range(_MIGRATIONS_LOCK_MAX_ATTEMPTS):
+            async with try_advisory_lock_ctx(
+                bind=connection,
+                dialect_name=db.dialect_name,
+                resource="migrations",
+            ) as locked:
+                # End the attempt's transaction so that no snapshot is held while waiting.
+                await connection.commit()
+                if locked:
+                    await connection.run_sync(_run_alembic_upgrade)
+                    return
+            await asyncio.sleep(_MIGRATIONS_LOCK_POLL_INTERVAL)
+    raise TimeoutError(
+        "Timed out waiting for the migrations lock."
+        " Another server replica may be running long migrations, or a replica that lost"
+        " connectivity may still hold it: check pg_locks for the advisory lock"
+        " and terminate the holder's backend if it is gone."
+    )
 
 
 async def get_session():
