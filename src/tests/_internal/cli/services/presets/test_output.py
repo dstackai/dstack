@@ -305,14 +305,15 @@ class TestOrdering:
 
 
 class TestDoneProgress:
-    def test_completed_creation_decorates_preset_row_without_extra_session_row(self, monkeypatch):
+    @pytest.mark.parametrize("session_status", ["success", "interrupted", "failed"])
+    def test_saved_preset_owns_row_regardless_of_session_status(self, monkeypatch, session_status):
         buffer = StringIO()
         monkeypatch.setattr(output_module, "console", plain_console(buffer, width=200))
         preset = get_preset()
         sessions = [
             {
                 "id": preset.id,
-                "status": "success",
+                "status": session_status,
                 "model": preset.base,
                 "trials_num": 4,
                 "trials": {"count": 3},
