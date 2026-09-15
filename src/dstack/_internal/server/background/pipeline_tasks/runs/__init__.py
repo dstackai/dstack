@@ -534,10 +534,6 @@ async def _load_active_context(
 
 
 async def _load_gateway_stats(run_model: RunModel, run_spec: RunSpec) -> Optional[PerWindowStats]:
-    """
-    Fetches service stats from the gateway replicas.
-    Talks to gateways over SSH, so it must run outside DB sessions.
-    """
     if run_spec.configuration.type != "service" or run_model.gateway is None:
         return None
     return await get_combined_gateway_stats(
