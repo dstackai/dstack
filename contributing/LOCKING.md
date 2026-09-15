@@ -119,10 +119,14 @@ Postgres has two kinds of advisory locks:
 * `pg_advisory_xact_lock` is released when the transaction ends. The unique names pattern above uses it.
 * `pg_advisory_lock` is bound to the connection. It survives commit and rollback and is released only by `pg_advisory_unlock` on the same connection or when the connection closes. `advisory_lock_ctx()` in `services/locking.py` wraps this kind for work that must span several transactions, such as migrations or server initialization.
 
-Either use `pg_advisory_xact_lock` within a single transaction, or use `advisory_lock_ctx()` and follow these rules:
+Within a single transaction, prefer `pg_advisory_xact_lock` for automatic release on commit or rollback. When using `advisory_lock_ctx()`, the requirement is to acquire and release the lock on the same physical connection:
 
-* Bind it to an `AsyncConnection` from `engine.connect()`, not to an `AsyncSession`. If the session commits inside the block, its next statement may run on a different pooled connection, and `pg_advisory_unlock` goes to a connection that never held the lock. Postgres only returns `false` with a warning in this case, so the failure is silent: the lock stays on an idle pooled connection until the process exits, and every replica blocks forever on its next acquire. See https://github.com/dstackai/dstack/issues/3881 for an example.
+* An `AsyncSession` is a valid bind when the locked block stays within one transaction. Do not commit, roll back, or close the session before releasing the lock.
+* If the block spans multiple transactions, hold an `AsyncConnection` from `engine.connect()` and bind the lock and any sessions to it. Otherwise, a session's next transaction may use a different pooled connection, and `pg_advisory_unlock` goes to a connection that never held the lock. Postgres only returns `false` with a warning in this case, so the failure is silent: the lock stays on an idle pooled connection until the process exits, and every replica blocks forever on its next acquire. See https://github.com/dstackai/dstack/issues/3881 for an example.
+* Run protected DB work on the connection holding the lock. When binding a new session to an explicit connection, end the lock statement's transaction first so that the session controls its own transactions. If the connection is lost, abort the protected operation instead of reconnecting and continuing without the lock.
 * Keep the locked block short and bounded. Every waiter is blocked inside `pg_advisory_lock` holding a DB connection of its own, so a long or hung holder pins one connection per waiter. See `DATABASE.md`.
+
+For a block that spans multiple transactions:
 
 ```python
 async with get_db().engine.connect() as connection:
@@ -131,9 +135,12 @@ async with get_db().engine.connect() as connection:
         dialect_name=get_db().dialect_name,
         resource="server_init",
     ):
-        async with get_session_ctx() as session:
-            # The session may commit freely: the lock lives on `connection`.
+        # End the lock statement's transaction. The session-level lock survives the commit.
+        await connection.commit()
+        async with get_db().get_session(bind=connection) as session:
+            # Session commits keep using the connection that holds the lock.
             ...
+            await session.commit()
 ```
 
 A released connection goes back to the pool, so a lock that failed to release stays there too. `_release_advisory_lock()` tolerates failures because the common one is an invalidated connection, in which case Postgres has already dropped the lock. A release that fails on a live connection strands the lock.
