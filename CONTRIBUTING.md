@@ -2,11 +2,24 @@
 
 We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with `dstack` codebase and guide you through the contribution process.
 
+## Who can contribute
+
+We'd be happy to see your contribution if you are a `dstack` user, a partner integrating with `dstack`, or any other person genuinely interested in `dstack`.
+
 ## Using AI assistance
 
-You may use AI assistance when contributing to `dstack`.
-The contributor is responsible for the quality of the change: make sure you understand
-what you're submitting, and hold it to the same standard as code you'd write by hand.
+You may use AI assistance when contributing to `dstack`. However, we expect you, the human contributor, to initiate and validate the contribution, ensuring it meets the same standard as something you'd write by hand.
+
+Contributions made entirely without a human in the loop (e.g., PRs filed by an autonomous agent against open issues) are discouraged and will be declined.
+
+## Accepted changes
+
+* Bug fixes that address a bug you've hit while using `dstack`. Include steps to reproduce in the linked issue or the PR.
+* New features that improve `dstack` for you. Before submitting a feature PR, please describe your use case and proposal in a GitHub issue to discuss it with the core team.
+* Minor fixes such as typos.
+* [Examples](examples).
+
+Existing open issues are typically picked up by the core team — please only contribute to one if it actually affects how you use `dstack`.
 
 ## Set up your development environment
 
@@ -22,13 +35,6 @@ If you make a non-trivial change to `dstack`, we recommend you learn about `dsta
 2. Fork the repo.
 3. Commit your changes.
 4. Open a PR. [Link the PR to the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) (if you are solving one).
-
-### Accepted changes
-
-* Bug fixes that address a clearly defined bug. Include steps to reproduce in the linked issue or the PR.
-* New features. Before submitting a feature PR, create an issue with a proposal to discuss it with the core team and other interested parties.
-* Minor fixes such as typos.
-* [Examples](examples).
 
 ### Before pushing your changes
 
