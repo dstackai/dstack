@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import ConnectionPoolEntry
 
 from dstack._internal.server import settings
-from dstack._internal.server.services.locking import advisory_lock_ctx
+from dstack._internal.server.services.locking import try_advisory_lock_ctx
 
 
 class Database:
@@ -88,15 +89,37 @@ def override_db(new_db: Database):
     _db = new_db
 
 
+_MIGRATIONS_LOCK_POLL_INTERVAL = 1
+_MIGRATIONS_LOCK_MAX_ATTEMPTS = 600
+
+
 async def migrate():
     db = get_db()
-    async with db.engine.connect() as connection:
-        async with advisory_lock_ctx(
-            bind=connection,
-            dialect_name=db.dialect_name,
-            resource="migrations",
-        ):
-            await connection.run_sync(_run_alembic_upgrade)
+    # The lock is polled instead of awaited in pg_advisory_lock() to avoid this:
+    # migrations waiting for older snapshots to finish (e.g. CREATE INDEX CONCURRENTLY)
+    # wait for the blocked replicas waiting for the "migrations" lock, deadlocking both.
+    # The lock connection runs in autocommit mode because an idle
+    # transaction between attempts would keep its snapshot and hang both replicas the same way.
+    # Migrations run on a separate, transactional connection.
+    async with db.engine.connect() as lock_connection:
+        await lock_connection.execution_options(isolation_level="AUTOCOMMIT")
+        for _ in range(_MIGRATIONS_LOCK_MAX_ATTEMPTS):
+            async with try_advisory_lock_ctx(
+                bind=lock_connection,
+                dialect_name=db.dialect_name,
+                resource="migrations",
+            ) as locked:
+                if locked:
+                    async with db.engine.connect() as connection:
+                        await connection.run_sync(_run_alembic_upgrade)
+                    return
+            await asyncio.sleep(_MIGRATIONS_LOCK_POLL_INTERVAL)
+    raise TimeoutError(
+        "Timed out waiting for the migrations lock."
+        " Another server replica may be running long migrations, or a replica that lost"
+        " connectivity may still hold it: check pg_locks for the advisory lock"
+        " and terminate the holder's backend if it is gone."
+    )
 
 
 async def get_session():
