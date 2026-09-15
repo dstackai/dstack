@@ -6,6 +6,7 @@ from alembic import command, config
 from sqlalchemy import AsyncAdaptedQueuePool, event, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -54,8 +55,15 @@ class Database:
     def dialect_name(self) -> str:
         return self.engine.dialect.name
 
-    def get_session(self) -> AsyncSession:
-        return self.session_maker()
+    def get_session(self, bind: Optional[AsyncConnection] = None) -> AsyncSession:
+        """
+        Returns a new session. If `bind` is given, the session runs on that connection
+        instead of checking connections out of the pool. The connection must not be in
+        a transaction, otherwise the session joins it and its commits do not commit.
+        """
+        if bind is None:
+            return self.session_maker()
+        return self.session_maker(bind=bind)
 
     def _get_connect_args(self, url: str) -> dict:
         if make_url(url).get_backend_name() == "postgresql":
@@ -98,20 +106,17 @@ async def migrate():
     # The lock is polled instead of awaited in pg_advisory_lock() to avoid this:
     # migrations waiting for older snapshots to finish (e.g. CREATE INDEX CONCURRENTLY)
     # wait for the blocked replicas waiting for the "migrations" lock, deadlocking both.
-    # The lock connection runs in autocommit mode because an idle
-    # transaction between attempts would keep its snapshot and hang both replicas the same way.
-    # Migrations run on a separate, transactional connection.
-    async with db.engine.connect() as lock_connection:
-        await lock_connection.execution_options(isolation_level="AUTOCOMMIT")
+    async with db.engine.connect() as connection:
         for _ in range(_MIGRATIONS_LOCK_MAX_ATTEMPTS):
             async with try_advisory_lock_ctx(
-                bind=lock_connection,
+                bind=connection,
                 dialect_name=db.dialect_name,
                 resource="migrations",
             ) as locked:
+                # End the attempt's transaction so that no snapshot is held while waiting.
+                await connection.commit()
                 if locked:
-                    async with db.engine.connect() as connection:
-                        await connection.run_sync(_run_alembic_upgrade)
+                    await connection.run_sync(_run_alembic_upgrade)
                     return
             await asyncio.sleep(_MIGRATIONS_LOCK_POLL_INTERVAL)
     raise TimeoutError(
