@@ -49,9 +49,34 @@ class ACMGatewayCertificate(CoreModel):
     ]
 
 
+class GCPCertificateManagerGatewayCertificate(CoreModel):
+    type: Annotated[
+        Literal["gcp-cm"],
+        Field(
+            description=(
+                "Certificates by Google Cloud Certificate Manager."
+                " Requires `load_balancer: { type: alb }`"
+            )
+        ),
+    ] = "gcp-cm"
+    name: Annotated[
+        str,
+        Field(
+            description=(
+                "The full resource name of the Certificate Manager certificate for the domain,"
+                " e.g. `projects/my-project/locations/europe-west9/certificates/my-certificate`"
+            )
+        ),
+    ]
+
+
 # TODO: Allow setting up custom ACME certificate (e.g. ZeroSSL) via GatewayConfiguration
 
-AnyGatewayCertificate = Union[LetsEncryptGatewayCertificate, ACMGatewayCertificate]
+AnyGatewayCertificate = Union[
+    LetsEncryptGatewayCertificate,
+    ACMGatewayCertificate,
+    GCPCertificateManagerGatewayCertificate,
+]
 
 
 class GatewayCertificate(RootModel[Annotated[AnyGatewayCertificate, Field(discriminator="type")]]):

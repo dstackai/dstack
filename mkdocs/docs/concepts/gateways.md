@@ -122,7 +122,9 @@ Setting `load_balancer: { type: alb }` provisions an Application Load Balancer (
     replicas: 2
     load_balancer:
       type: alb
-    certificate: null
+    certificate:
+      type: gcp-cm
+      name: projects/my-project/locations/europe-west4/certificates/my-certificate
     ```
 
     </div>
@@ -131,7 +133,7 @@ Setting `load_balancer: { type: alb }` provisions an Application Load Balancer (
         An ALB gateway on `gcp` requires:
 
         - The `gcp` backend.
-        - `certificate: null`.
+        - Either `certificate: { type: gcp-cm, ... }` or `certificate: null`.
         - A VPC with a proxy-only subnet (`purpose: REGIONAL_MANAGED_PROXY`) in the target region — required by GCP for all Envoy-based regional load balancers. See [Proxy-only subnets](https://cloud.google.com/load-balancing/docs/proxy-only-subnets) for how to create one.
 
 The provisioned load balancer provides a hostname (or IP address) you can add to your DNS records. Replica hostnames do not need to be added to DNS.
@@ -162,6 +164,8 @@ If you disable [public IP](#public-ip) (e.g. to make the gateway private) or if 
     * `lets-encrypt` (default) — Automatic certificates via [Let's Encrypt](https://letsencrypt.org/). Requires a [public IP](#public-ip).
     * `acm` — Certificates managed by [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/). AWS-only. TLS is terminated at the load balancer, not at the gateway, and HTTP requests are redirected to HTTPS by the ALB.
       Implies `load_balancer: { type: alb }`.
+    * `gcp-cm` — Certificates managed by [Google Cloud Certificate Manager](https://cloud.google.com/certificate-manager/docs/overview). GCP-only. TLS is terminated at the load balancer, not at the gateway, and the load balancer only serves HTTPS on port 443.
+      Requires `load_balancer: { type: alb }`. The certificate must be a regional certificate created in the same region as the gateway, referenced by its full resource name.
     * `null` — No certificate. Services will use HTTP.
 
 ### Public IP
@@ -244,7 +248,7 @@ $ dstack gateway list
 !!! warning "Experimental"
     Replicated gateways are an experimental feature and currently have limitations:
 
-    - HTTPS is only supported for AWS gateways with the `acm` [certificate type](#certificate). For other gateways, use an external load balancer for TLS termination.
+    - HTTPS is only supported for AWS gateways with the `acm` [certificate type](#certificate) and GCP gateways with the `gcp-cm` [certificate type](#certificate). For other gateways, use an external load balancer for TLS termination.
     - All replicas are bound to the same backend and region.
     - At most 3 replicas are allowed per gateway.
 

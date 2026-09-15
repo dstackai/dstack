@@ -16,6 +16,8 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+CERTIFICATE_MANAGER_API_NAMESPACE = "//certificatemanager.googleapis.com"
+
 DSTACK_INSTANCE_TAG = "dstack-runner-instance"
 DSTACK_GATEWAY_TAG = "dstack-gateway-instance"
 
@@ -691,3 +693,9 @@ def instance_type_supports_persistent_disk(instance_type_name: str) -> bool:
             "g4-",
         ]
     )
+
+
+def get_certificate_manager_certificate_url(certificate_name: str) -> str:
+    if certificate_name.startswith(("//", "https://")):
+        return certificate_name
+    return f"{CERTIFICATE_MANAGER_API_NAMESPACE}/{certificate_name.lstrip('/')}"

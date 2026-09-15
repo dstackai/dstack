@@ -30,6 +30,14 @@ Set to `null` to disable certificates (e.g. for [private gateways](../../concept
           type:
             required: true
 
+=== "GCP Certificate Manager"
+
+    #SCHEMA# dstack._internal.core.models.gateways.GCPCertificateManagerGatewayCertificate
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
 ### `load_balancer`
 
 === "ALB"

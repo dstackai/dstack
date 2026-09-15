@@ -117,7 +117,8 @@ class GCPGatewayBackendData(CoreModel):
     health_check_name: str
     backend_service_name: str
     url_map_name: str
-    target_http_proxy_name: str
+    target_http_proxy_name: Optional[str] = None
+    target_https_proxy_name: Optional[str] = None
     forwarding_rule_name: str
 
 
@@ -158,6 +159,9 @@ class GCPCompute(
             credentials=self.credentials
         )
         self.region_url_maps_client = compute_v1.RegionUrlMapsClient(credentials=self.credentials)
+        self.region_target_https_proxies_client = compute_v1.RegionTargetHttpsProxiesClient(
+            credentials=self.credentials
+        )
         self.region_target_http_proxies_client = compute_v1.RegionTargetHttpProxiesClient(
             credentials=self.credentials
         )
@@ -691,7 +695,7 @@ class GCPCompute(
         self,
         configuration: GatewayLoadBalancerConfiguration,
     ) -> GatewayLoadBalancerData:
-        assert configuration.certificate is None
+        assert configuration.certificate is None or configuration.certificate.type == "gcp-cm"
 
         zone = self._get_gateway_zone(configuration.region)
 
@@ -732,7 +736,7 @@ class GCPCompute(
         health_check_name = f"{name}-hc"
         backend_service_name = f"{name}-bs"
         url_map_name = f"{name}-um"
-        target_http_proxy_name = f"{name}-proxy"
+        target_proxy_name = f"{name}-proxy"
         forwarding_rule_name = f"{name}-fr"
 
         instance_group_resource_name = (
@@ -750,9 +754,12 @@ class GCPCompute(
             f"projects/{self.config.project_id}/regions/{configuration.region}"
             f"/urlMaps/{url_map_name}"
         )
-        target_http_proxy_resource_name = (
+        target_proxy_kind = (
+            "targetHttpProxies" if configuration.certificate is None else "targetHttpsProxies"
+        )
+        target_proxy_resource_name = (
             f"projects/{self.config.project_id}/regions/{configuration.region}"
-            f"/targetHttpProxies/{target_http_proxy_name}"
+            f"/{target_proxy_kind}/{target_proxy_name}"
         )
 
         logger.debug("Creating instance group for gateway %s...", configuration.gateway_name)
@@ -817,25 +824,47 @@ class GCPCompute(
         gcp_resources.wait_for_extended_operation(operation, "URL map creation")
         logger.debug("Created URL map for gateway %s.", configuration.gateway_name)
 
-        logger.debug("Creating target HTTP proxy for gateway %s...", configuration.gateway_name)
-        target_http_proxy = compute_v1.TargetHttpProxy()
-        target_http_proxy.name = target_http_proxy_name
-        target_http_proxy.url_map = url_map_resource_name
-        operation = self.region_target_http_proxies_client.insert(
-            project=self.config.project_id,
-            region=configuration.region,
-            target_http_proxy_resource=target_http_proxy,
-        )
-        gcp_resources.wait_for_extended_operation(operation, "target HTTP proxy creation")
-        logger.debug("Created target HTTP proxy for gateway %s.", configuration.gateway_name)
+        if configuration.certificate is None:
+            logger.debug(
+                "Creating target HTTP proxy for gateway %s...", configuration.gateway_name
+            )
+            target_http_proxy = compute_v1.TargetHttpProxy()
+            target_http_proxy.name = target_proxy_name
+            target_http_proxy.url_map = url_map_resource_name
+            operation = self.region_target_http_proxies_client.insert(
+                project=self.config.project_id,
+                region=configuration.region,
+                target_http_proxy_resource=target_http_proxy,
+            )
+            gcp_resources.wait_for_extended_operation(operation, "target HTTP proxy creation")
+            logger.debug("Created target HTTP proxy for gateway %s.", configuration.gateway_name)
+        else:
+            logger.debug(
+                "Creating target HTTPS proxy for gateway %s...", configuration.gateway_name
+            )
+            target_https_proxy = compute_v1.TargetHttpsProxy()
+            target_https_proxy.name = target_proxy_name
+            target_https_proxy.url_map = url_map_resource_name
+            target_https_proxy.ssl_certificates = [
+                gcp_resources.get_certificate_manager_certificate_url(
+                    configuration.certificate.name
+                )
+            ]
+            operation = self.region_target_https_proxies_client.insert(
+                project=self.config.project_id,
+                region=configuration.region,
+                target_https_proxy_resource=target_https_proxy,
+            )
+            gcp_resources.wait_for_extended_operation(operation, "target HTTPS proxy creation")
+            logger.debug("Created target HTTPS proxy for gateway %s.", configuration.gateway_name)
 
         logger.debug("Creating forwarding rule for gateway %s...", configuration.gateway_name)
         forwarding_rule = compute_v1.ForwardingRule()
         forwarding_rule.name = forwarding_rule_name
         forwarding_rule.load_balancing_scheme = load_balancing_scheme
         forwarding_rule.I_p_protocol = compute_v1.ForwardingRule.IPProtocolEnum.TCP.name
-        forwarding_rule.port_range = "80"
-        forwarding_rule.target = target_http_proxy_resource_name
+        forwarding_rule.port_range = "80" if configuration.certificate is None else "443"
+        forwarding_rule.target = target_proxy_resource_name
         forwarding_rule.network = self.config.vpc_resource_name
         if subnetwork is not None:
             forwarding_rule.subnetwork = subnetwork
@@ -860,7 +889,12 @@ class GCPCompute(
                 health_check_name=health_check_name,
                 backend_service_name=backend_service_name,
                 url_map_name=url_map_name,
-                target_http_proxy_name=target_http_proxy_name,
+                target_http_proxy_name=(
+                    target_proxy_name if configuration.certificate is None else None
+                ),
+                target_https_proxy_name=(
+                    target_proxy_name if configuration.certificate is not None else None
+                ),
                 forwarding_rule_name=forwarding_rule_name,
             ).model_dump_json(),
         )
@@ -888,7 +922,7 @@ class GCPCompute(
         logger.debug(
             "Deleting load balancer resources for gateway %s...", configuration.gateway_name
         )
-        for delete_call, verbose_name in [
+        delete_calls = [
             (
                 lambda: self.forwarding_rules_client.delete(
                     project=self.config.project_id,
@@ -897,14 +931,30 @@ class GCPCompute(
                 ),
                 "forwarding rule deletion",
             ),
-            (
-                lambda: self.region_target_http_proxies_client.delete(
-                    project=self.config.project_id,
-                    region=configuration.region,
-                    target_http_proxy=backend_data_parsed.target_http_proxy_name,
-                ),
-                "target HTTP proxy deletion",
-            ),
+        ]
+        if backend_data_parsed.target_http_proxy_name is not None:
+            delete_calls.append(
+                (
+                    lambda: self.region_target_http_proxies_client.delete(
+                        project=self.config.project_id,
+                        region=configuration.region,
+                        target_http_proxy=backend_data_parsed.target_http_proxy_name,
+                    ),
+                    "target HTTP proxy deletion",
+                )
+            )
+        if backend_data_parsed.target_https_proxy_name is not None:
+            delete_calls.append(
+                (
+                    lambda: self.region_target_https_proxies_client.delete(
+                        project=self.config.project_id,
+                        region=configuration.region,
+                        target_https_proxy=backend_data_parsed.target_https_proxy_name,
+                    ),
+                    "target HTTPS proxy deletion",
+                )
+            )
+        delete_calls += [
             (
                 lambda: self.region_url_maps_client.delete(
                     project=self.config.project_id,
@@ -937,7 +987,8 @@ class GCPCompute(
                 ),
                 "instance group deletion",
             ),
-        ]:
+        ]
+        for delete_call, verbose_name in delete_calls:
             try:
                 operation = delete_call()
                 gcp_resources.wait_for_extended_operation(operation, verbose_name)
