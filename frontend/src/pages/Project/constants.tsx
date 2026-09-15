@@ -41,3 +41,13 @@ export const VISIBILITY_INFO = {
         </>
     ),
 };
+
+export const PRESETS_INFO = {
+    header: <h2>Presets</h2>,
+    body: (
+        <p>
+            Making presets public lets anyone browse them in Sky or pull them with the dstack CLI, without a Sky account. Keep
+            presets private to limit access to project members and global admins.
+        </p>
+    ),
+};

@@ -15,6 +15,7 @@ const buildDir = join(__dirname, '../build');
 const publicDir = join(__dirname, '../public');
 const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
+const gaMeasurementId = process.env.GA_MEASUREMENT_ID || '';
 const uiVersion = ['sky', 'factory'].includes(process.env.UI_VERSION) ? process.env.UI_VERSION : 'oss';
 
 const title = uiVersion === 'sky' ? 'dstack Sky' : 'dstack';
@@ -34,6 +35,7 @@ module.exports = {
     publicDir,
     apiUrl,
     publicUrl,
+    gaMeasurementId,
     title,
     description,
     uiVersion,

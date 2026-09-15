@@ -194,6 +194,17 @@ export const projectApi = createApi({
             providesTags: () => ['ProjectRepos'],
         }),
 
+        updateProjectPublicPresets: builder.mutation<IProject, { project_name: string; public_presets: boolean }>({
+            query: ({ project_name, public_presets }) => ({
+                url: API.PROJECTS.UPDATE_PUBLIC_PRESETS(project_name),
+                method: 'POST',
+                body: { public_presets },
+            }),
+            transformResponse: transformProjectResponse,
+            invalidatesTags: (result, error, { project_name }) =>
+                error ? [] : [{ type: 'Projects' as const, id: project_name }],
+        }),
+
         updateProject: builder.mutation<
             IProject,
             {
@@ -229,4 +240,5 @@ export const {
     useLazyGetProjectLogsQuery,
     useGetProjectReposQuery,
     useUpdateProjectMutation,
+    useUpdateProjectPublicPresetsMutation,
 } = projectApi;

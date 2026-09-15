@@ -100,34 +100,31 @@
         align-items: center;
     }
 
-    /* /old keeps the logo alone on the left and clusters the whole nav on the right.
-       Push the tab group (and the search + buttons that follow it in the DOM) to the
-       right edge, leaving an empty middle. */
-    /* Search is FIRST in the right cluster (it ships before the tabs in the template), so it
-       carries the auto-margin that pushes search → tabs → buttons to the right edge as one group.
-       The tabs then sit a fixed gap to the search's right, just left of "Docs". */
+    /* Keep Search, Products, tabs, and actions together on the right. */
     .md-header .md-search {
         margin-left: auto;
     }
-    /* The theme toggle is the first item in the buttons block (before GitHub); 15px sits it a touch
-       tighter than the 20px GitHub→Get-started gap. */
     .cs-theme-toggle--header {
         margin-right: 15px;
     }
     .md-tabs {
         display: block;       /* was display:none until JS added .ready — tabs now ship in the header */
         flex-grow: 0;
-        margin-left: 10px;    /* makes the search→Docs gap (~22px) match the inter-menu gaps */
+        margin-left: 20px;
         padding-left: 0;
     }
+    .md-header .md-tabs__list {
+        margin-left: 0;
+    }
 
-    /* The buttons block also has margin-left:auto by default, which would split the free
-       space into two gaps. Zero it so the single auto-margin on .md-tabs pushes the whole
-       cluster (tabs → search → buttons) to the right as one group. */
     .md-header__inner .md-header__buttons {
         margin-left: 0;
         display: flex;
         align-items: center;
+    }
+
+    .md-header__buttons .md-button.github {
+        margin-right: 0;
     }
 
     /* No Discord icon in the header. */
@@ -136,29 +133,14 @@
     }
 }
 
-/* Below desktop the header's right cluster (search → GitHub → Get started) loses the desktop flex
-   layout: the buttons fall back to display:block (inline), so search abuts GitHub (0 gap), the
-   GitHub↔Get-started gap is just github's margin (unequal), and the pills sit a px or two off.
-   Restore a flex cluster with equal 16px gaps, vertically centered. */
 @media screen and (max-width: 76.1875em) {
     .md-header__inner .md-header__buttons {
         display: flex;
         align-items: center;
-        /* search↔GitHub gap = the GitHub↔Get-started gap (github's existing margin-right: 20px),
-           so all three sit at an equal 20px. No flex `gap` — that would double with the margin. */
         margin-left: 20px;
     }
 }
-/* Below 60em the search box collapses to a 40px icon button (already padded). The 20px button
-   margin then reads as too much space before GitHub — trim it so the glyph→GitHub gap matches. */
-@media screen and (max-width: 59.9375em) {
-    .md-header__inner .md-header__buttons {
-        margin-left: 4px;
-    }
-}
 
-/* Keep every header pill vertically centered and free of stray vertical margins so GitHub
-   and the Get started split button line up exactly. */
 .md-header__buttons .md-button {
     margin-top: 0;
     margin-bottom: 0;
@@ -204,20 +186,6 @@
     white-space: nowrap;
 }
 
-/* "Get started" trigger uses the landing's primary-button weight (500) — lighter than the GitHub
-   pill (700), mirroring the landing where the primary and normal button variants differ in weight. */
-[data-md-color-primary=white] .md-header__buttons .md-button--primary.cs-gs-menu__trigger {
-    font-weight: 500 !important;
-    /* Inverts with the theme (like the landing's primary button): dark fill + white text in light
-       mode, light fill + dark text in dark mode. The global rgba(0,0,0,.87) stayed dark in both. */
-    background: var(--cs-text) !important;
-    color: var(--cs-bg) !important;
-}
-[data-md-color-primary=white] .md-header__buttons .md-button--primary.cs-gs-menu__trigger:hover {
-    background: color-mix(in srgb, var(--cs-text) 88%, var(--cs-bg)) !important;
-    color: var(--cs-bg) !important;
-}
-
 /* GitHub → outlined (normal) "GitHub" with a trailing external-link glyph, mirroring the landing's
    normal-variant GitHub button (weight 700). */
 [data-md-color-primary=white] .md-header__buttons .md-button--primary.github {
@@ -225,11 +193,6 @@
     color: var(--cs-text);
     border: 1px solid var(--cs-border);
     font-weight: 700 !important;
-}
-
-/* Gap between GitHub and dstack Sky → 20px to match /old (was 5px). */
-.md-header__buttons .md-button.github {
-    margin-right: 20px;
 }
 
 /* landing.css adds a GitHub octocat ::before; /old's button is just "GitHub ↗", so drop it. */
@@ -274,91 +237,71 @@
     mask: var(--cs-ext-icon) center / contain no-repeat;
 }
 
-/* "Get started" header dropdown — mirrors the landing's Products popup (featured open-source +
-   dstack Sky + Factory). Pure-CSS hover/focus-within (the docs are static); right-aligned so the
-   panel never overflows the header's right edge. Reuses the --cs-* tokens (defined in extra.css). */
-.cs-gs-menu {
+/* Products menu matches website/src/styles.css. */
+.cs-products-menu {
     position: relative;
     display: inline-flex;
     align-items: center;
+    margin-left: 20px;
+    font-size: 16px;
+    line-height: 1.15;
 }
-.cs-gs-menu__trigger {
-    display: inline-flex !important;
+.cs-products-menu__trigger {
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
+    min-height: 42px;
+    padding: 10px 0;
+    border: 0;
+    border-radius: 21px;
+    background: transparent;
+    color: var(--cs-text);
+    font: inherit;
+    font-weight: 700;
     cursor: pointer;
-    /* the caret is lighter than a full glyph, so trim the trailing padding (was 18px). */
-    padding-right: 12px !important;
 }
-.cs-gs-menu__caret {
+.cs-products-menu__trigger:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+}
+.cs-products-menu__trigger:focus-visible {
+    background: var(--cs-panel);
+}
+.cs-products-menu__caret {
+    width: 12px;
+    height: 12px;
     transition: transform 0.15s ease;
 }
-.cs-gs-menu--open .cs-gs-menu__caret {
+.cs-products-menu--open .cs-products-menu__caret {
     transform: rotate(180deg);
 }
-.cs-gs-menu__popup {
+.cs-products-menu__popup {
+    display: none;
     position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    top: calc(100% + 6px);
+    left: 0;
     z-index: 1000;
     width: 360px;
-    padding: 0;
-    /* A floating popup can't show a see-through hole between the groups (arbitrary page content
-       sits behind it) — back the rail with the unselected-row color so the gap reads as ground. */
     background: var(--cs-panel);
     border-radius: 8px;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-4px);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
 }
-.cs-gs-menu--open .cs-gs-menu__popup {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
+.cs-products-menu--open .cs-products-menu__popup {
+    display: block;
 }
-/* No hole at all in the popup: the groups sit flush, like one continuous menu. */
-.cs-gs-menu__popup .gs-opt + .gs-rail__group {
+.cs-products-menu__popup .gs-opt + .gs-rail__group {
     margin-top: 0;
 }
-/* Text inside the popup must wrap — Material forces white-space:nowrap on header links/buttons
-   (the group bars keep their own nowrap). */
-.cs-gs-menu__popup,
-.cs-gs-menu__popup .gs-opt,
-.cs-gs-menu__popup .gs-opt * {
-    white-space: normal !important;
-}
 
-/* The switcher rail — copied pixel-for-pixel from the landing (website/src/styles.css, .gs-rail
-   block): grouped rows under solid bars, with a white indicator card that slides to the hovered
-   row. The docs and the landing are separate builds, so the styles can't be shared — any change
-   to the landing's rail must be mirrored here (and vice versa). */
+/* The switcher rail — copied from the landing (website/src/styles.css, .gs-rail block): grouped
+   rows under solid bars, with a selected card. The docs and the landing are separate
+   builds, so changes to the rail styles must be mirrored here (and vice versa). */
 .gs-rail {
     display: flex;
     flex-direction: column;
     padding: 0;
-    position: relative; /* anchors the sliding selection indicator */
     border-radius: 8px;
     overflow: hidden; /* clip the full-width group bars to the rounded corners */
     background: transparent; /* the rows carry the panel ground, so the gap between groups is a true hole */
-}
-.gs-rail__indicator {
-    position: absolute;
-    left: 0;
-    right: 0;
-    z-index: 2; /* above the rows' ground, beneath their content (3) and the bars (4) */
-    background: var(--cs-bg);
-    border: 1px solid var(--cs-text);
-    border-radius: 8px;
-    pointer-events: none;
-}
-/* No z-index on the rows: a row with its own stacking context would trap its content beneath
-   the indicator card, so the content is lifted above the card explicitly instead. */
-.gs-opt__icwrap,
-.gs-opt__ic,
-.gs-opt__body {
-    position: relative;
-    z-index: 3;
 }
 .gs-rail a.gs-opt {
     color: var(--cs-text);
@@ -386,6 +329,11 @@
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
+.gs-opt.gs-opt--on {
+    border-radius: 8px;
+    background: var(--cs-bg);
+    box-shadow: inset 0 0 0 1px var(--cs-text);
+}
 .gs-opt--feat {
     padding: 13px 14px;
     gap: 14px;
@@ -405,19 +353,6 @@
     font-size: 13px;
     line-height: 1.5;
     color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
-}
-.gs-opt__icwrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-}
-.gs-opt__stars {
-    font-size: 12px;
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    color: inherit;
 }
 .gs-opt__ic {
     display: inline-flex;
@@ -453,8 +388,7 @@
     margin-bottom: -2px; /* tuck under the next row past any fractional-pixel rounding */
 }
 /* A group bar that follows a row stands off from it, so the groups read as separate
-   blocks inside the rail (keyed on adjacency, not :first-child — the indicator div
-   is the rail's first DOM child). */
+   blocks inside the rail. */
 .gs-opt + .gs-rail__group {
     margin-top: 10px;
 }
@@ -485,7 +419,21 @@
 }
 /* On tablet/mobile the header buttons collapse; keep the dropdown from overflowing tiny screens. */
 @media (max-width: 76.1875em) {
-    .cs-gs-menu__popup { width: min(360px, calc(100vw - 32px)); }
+    .cs-products-menu {
+        position: static;
+    }
+    .cs-products-menu__popup {
+        left: auto;
+        right: 16px;
+        width: min(360px, calc(100vw - 32px));
+    }
+}
+
+@media (max-width: 360px) {
+    .cs-products-menu,
+    .md-header__inner .md-header__buttons {
+        margin-left: 8px;
+    }
 }
 
 /* GitHub hover: outlined button gets a faint tint (landing.css forces black !important on primary
@@ -560,16 +508,9 @@
 @media screen and (max-width: 76.1875em) {
     .cs-nav-toggle { display: none; }
 
-    /* Tighten the header on mobile so the cluster fits: drop the icon buttons' (burger/search)
-       margins and shrink the gaps (search→GitHub and GitHub→Get started) to 5px. */
+    /* Keep the navigation and search icons compact on smaller screens. */
     .md-header__button.md-icon {
         margin: 0 !important;
-    }
-    .md-header__inner .md-header__buttons {
-        margin-left: 5px;
-    }
-    .md-header__buttons .md-button.github {
-        margin-right: 5px;
     }
 
     /* The theme-aware nav colors below are scoped to the desktop media query, so the MOBILE drawer

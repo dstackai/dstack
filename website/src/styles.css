@@ -32,15 +32,12 @@
   --nav-height: 4.875rem;
   --frame: 80rem;
   --page-gutter: clamp(1.5rem, 5.5vw, 5rem);
-  --section-gap: clamp(2.5rem, 4vw, 4rem);
   --card-gap: 1.25rem;
   --radius: 0;
-  --media-column: minmax(18rem, 40rem);
   --doc-article-width: 49.5rem;
   --doc-rail-width: 17.5rem;
   --doc-right-gap: 2.5rem;
   --doc-gap: var(--doc-right-gap);
-  --doc-main-width: calc(var(--doc-article-width) + var(--doc-right-gap) + var(--doc-rail-width));
 }
 
 :root[data-theme='dark'] {
@@ -220,16 +217,6 @@ p {
   display: none;
 }
 
-/* On the Old page the nav drops the brand gradient accent for a plain 1px hairline in the
-   text color, matching the Cloudscape reference header. */
-.site-nav--old {
-  border-bottom: 1px solid var(--cs-text);
-}
-
-.site-nav--old::after {
-  display: none;
-}
-
 .site-nav__inner {
   position: relative;
   z-index: 1;
@@ -276,10 +263,6 @@ p {
   justify-content: flex-end;
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.site-desktop-trigger {
-  flex: 0 0 auto;
 }
 
 .site-mobile-trigger,
@@ -376,12 +359,14 @@ p {
   pointer-events: none;
 }
 
+.home-hero h1,
 .home-hero h2,
 .home-hero p,
 .home-hero__actions {
   pointer-events: auto;
 }
 
+.home-hero h1,
 .home-hero h2 {
   margin-top: 0;
   max-width: 720px;
@@ -439,6 +424,23 @@ p {
   z-index: 1;
 }
 
+.home-main--sky::before {
+  position: absolute;
+  top: calc(-1 * var(--nav-height));
+  left: 0;
+  right: 0;
+  height: 36rem;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(65, 157, 255, 0.5) 0%,
+    rgba(176, 65, 255, 0.06) 35%,
+    rgba(176, 65, 255, 0) 100%
+  );
+}
+
 .home-stack {
   padding: 0 0 96px;
 }
@@ -450,12 +452,6 @@ p {
     var(--doc-rail-width);
 }
 
-.home-with-rail .image-text-row,
-.home-with-rail .image-text-row:not(.image-first) {
-  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
-  gap: var(--doc-gap);
-}
-
 .media-card h3,
 .doc-media-card h3 {
   margin-bottom: 8px;
@@ -463,47 +459,6 @@ p {
   line-height: 1.2;
 }
 
-.image-text-row {
-  display: grid;
-  grid-template-columns: var(--media-column) minmax(0, 1fr);
-  gap: var(--section-gap);
-  align-items: center;
-  margin-top: 40px;
-}
-
-.image-text-row:not(.image-first) {
-  grid-template-columns: minmax(0, 1fr) var(--media-column);
-}
-
-.image-text-row.image-first .landing-image {
-  order: -1;
-}
-
-.docs-shell--old-page .image-text-row,
-.docs-shell--old-page .image-text-row:not(.image-first) {
-  grid-template-columns: minmax(14rem, 24rem) minmax(0, 1fr);
-  gap: var(--doc-gap);
-}
-
-.docs-shell--old-page .image-text-row:not(.image-first) {
-  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
-}
-
-.landing-image {
-  width: 100%;
-  aspect-ratio: 876 / 528;
-  height: auto;
-  object-fit: cover;
-  border-radius: var(--radius);
-}
-
-.landing-copy {
-  max-width: 604px;
-}
-
-.landing-copy h2,
-.overview-section h2,
-.start-building h2,
 .docs-section > h2 {
   margin-bottom: 12px;
   font-size: 28px;
@@ -538,65 +493,6 @@ p {
   font-size: 16px;
 }
 
-.landing-copy p + p {
-  margin-top: 18px;
-}
-
-.overview-section {
-  margin-top: 56px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--card-gap);
-  margin-top: 20px;
-}
-
-.stat-card {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: var(--card-gap);
-  align-items: center;
-  min-height: 160px;
-  padding: 24px 40px;
-  border-radius: 0;
-  background: var(--cs-panel);
-}
-
-.stat-card span {
-  color: #3867ff;
-  font-size: 44px;
-  line-height: 1;
-  font-weight: 400;
-}
-
-.stat-card p {
-  max-width: 14ch;
-  font-size: 24px;
-  line-height: 1.15;
-}
-
-.core-features {
-  margin-top: 36px;
-}
-
-.core-features > h3 {
-  margin-bottom: 4px;
-  font-size: 20px;
-}
-
-.core-features > p {
-  max-width: 1230px;
-}
-
-.feature-card-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-top: 32px;
-}
-
 .media-card {
   border: 1px solid var(--cs-border); /* 1px / 12px */
   border-radius: 12px;
@@ -625,49 +521,6 @@ p {
   font-size: var(--font-small);
 }
 
-.start-building {
-  margin-top: 64px;
-  padding-top: 48px;
-  border-top: 0.5px solid var(--cs-border);
-}
-
-.start-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--card-gap);
-  margin-top: 20px;
-}
-
-.start-grid article {
-  min-height: 152px;
-  padding: 24px 20px;
-  border: 0.5px solid var(--cs-border);
-  border-radius: 0;
-}
-
-.start-grid h3 {
-  margin-bottom: 18px;
-  font-size: 20px;
-}
-
-.start-grid p {
-  font-size: 16px;
-}
-
-.docs-shell {
-  min-height: calc(100vh - var(--nav-height));
-}
-
-.docs-main {
-  width: min(var(--doc-main-width), calc(100vw - (2 * var(--page-gutter))));
-  padding: 1.625rem 0 6rem;
-}
-
-.docs-shell--navigation-collapsed .docs-main {
-  width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
-  margin-inline: auto;
-}
-
 .docs-body {
   display: grid;
   grid-template-columns: minmax(0, var(--doc-article-width)) var(--doc-right-gap) var(--doc-rail-width);
@@ -678,80 +531,8 @@ p {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.docs-shell--navigation-collapsed .docs-body {
-  grid-template-columns:
-    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
-    var(--doc-right-gap)
-    var(--doc-rail-width);
-}
-
-.docs-shell--old-page .docs-main {
-  width: min(var(--frame), 100%);
-  margin-inline: auto;
-  /* The footer is the last child here; sit it flush at the bottom of the content
-     column instead of leaving the article's bottom padding below it. */
-  padding-bottom: 0;
-}
-
-/* Cloudscape gives the AppLayout content region a 40px bottom margin. With the footer living
-   inside it, that leaves a 40px strip below the footer; drop it so the footer sits flush at the
-   page bottom, matching the global site footer. */
-.docs-shell--old-page [class*='awsui_main_'] {
-  margin-bottom: 0 !important;
-}
-
-.docs-shell--old-page .docs-body {
-  grid-template-columns:
-    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
-    var(--doc-right-gap)
-    var(--doc-rail-width);
-}
-
 .docs-article {
   grid-column: 1;
-}
-
-.docs-right {
-  grid-column: 3;
-  position: sticky;
-  /* Clear the sticky header (banner + nav), matching scroll-padding-top above. */
-  top: calc(var(--nav-height) + 3.25rem);
-  margin-top: 1.5rem;
-}
-
-/* The section divider in the docs side nav is inset by default (unlike the header
-   divider); pull it out to the drawer edges so it spans the full sidebar width. */
-.docs-shell [class*='awsui_divider-default'] {
-  margin-left: -28px !important;
-  margin-right: -24px !important;
-}
-
-/* Cloudscape's expandable nav group renders the caret before the label, indenting the parent
-   past its sibling links, and indents the children 40px. Pull the caret into the left gutter so
-   the parent label lines up with its siblings, and tighten the children to one indent level. */
-.docs-shell [class*='awsui_expandable-link-group'] [class*='awsui_expand-button'] {
-  margin-left: -22px !important;
-}
-
-.docs-shell [class*='awsui_list-variant-expandable-link-group'] {
-  padding-left: 20px !important;
-}
-
-.docs-title {
-  margin-top: 1rem;
-  padding-bottom: 1.125rem;
-  border-bottom: 0.5px solid var(--cs-border);
-}
-
-.docs-title h1 {
-  font-size: 36px;
-  line-height: 1.2;
-}
-
-.docs-title p {
-  margin-top: 8px;
-  color: var(--cs-muted);
-  font-size: 18px;
 }
 
 .docs-section {
@@ -807,31 +588,6 @@ p {
 
 .doc-action {
   margin-top: 20px;
-}
-
-
-.doc-alternating img {
-  width: 100%;
-  aspect-ratio: 980 / 640;
-  height: auto;
-  object-fit: cover;
-  border-radius: var(--radius);
-}
-
-.doc-alternating img.doc-diagram {
-  object-fit: contain;
-}
-
-.doc-diagram--dark {
-  display: none;
-}
-
-:root[data-theme='dark'] .doc-diagram--light {
-  display: none;
-}
-
-:root[data-theme='dark'] .doc-diagram--dark {
-  display: block;
 }
 
 .doc-alternating h2 {
@@ -1256,13 +1012,7 @@ p {
   margin-top: 0;
 }
 
-/* "Get started" deployment switcher. The Products-popup component reused as a vertical switcher:
-   a bordered selector panel on the left whose options carry a caption + description, with the
-   selected option filled by the brand gradient. Open-source is featured (bigger, with a live star
-   count and a Documentation button) and selected by default; dstack Sky / Factory are compact
-   rows. The right column shows the selection's detail — install code for open-source, an included-
-   features list + CTA for the hosted / self-hosted tiers. align-items: stretch keeps the selector
-   and the detail equal height and top-aligned. */
+/* Product links beside the dstack installation controls. */
 .gs-deploy {
   display: grid;
   grid-template-columns: 1fr 2fr; /* selector 1/3, detail 2/3 */
@@ -1276,35 +1026,15 @@ p {
   display: flex;
   flex-direction: column;
   padding: 0;
-  position: relative; /* anchors the sliding selection indicator */
-  border-radius: 8px; /* same radius as the rows and the indicator card */
+  border-radius: 8px;
   overflow: hidden; /* clip the full-width group bars to the rounded corners */
   background: transparent; /* the rows carry the panel ground, so the gap between groups is a true hole */
 }
-/* The selection indicator: a white card (0.5px solid ring) that slides up/down to the selected
-   row. Rows are transparent; bars sit above it so it passes underneath between groups. */
-.gs-rail__indicator {
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 2; /* above the rows' ground, beneath their content (3) and the bars (4) */
-  background: var(--cs-bg);
-  border: 1px solid var(--cs-text);
-  border-radius: 8px;
-  pointer-events: none;
-}
-/* No z-index on the rows: a row with its own stacking context would trap its content beneath
-   the indicator card, so the content is lifted above the card explicitly instead. */
-.gs-opt__icwrap,
-.gs-opt__ic,
-.gs-opt__body {
-  position: relative;
-  z-index: 3;
-}
-/* In the Products popup the rows are links; render them exactly like the section's buttons. */
+/* Product links share the same styling in the section and popup. */
 .gs-rail a.gs-opt {
   color: var(--cs-text);
   text-decoration: none;
+  cursor: pointer;
 }
 .gs-rail__group {
   position: relative;
@@ -1320,8 +1050,6 @@ p {
   font: inherit;
   line-height: 1.15; /* pinned (not inherited) so the rail renders identically on the docs site */
   text-align: left;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 /* Adjacent rows inside a group square off their shared edge, so the group's ground reads as one
@@ -1333,6 +1061,11 @@ p {
 .gs-opt:has(+ .gs-opt) {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+}
+.gs-opt.gs-opt--on {
+  border-radius: 8px;
+  background: var(--cs-bg);
+  box-shadow: inset 0 0 0 1px var(--cs-text);
 }
 
 /* Row names mirror the tab typography: 16px / 700. */
@@ -1356,18 +1089,13 @@ p {
 }
 /* The first bar sits inside the rail's border corner: a 12px outer radius with a 1px border has
    an 11px inner curve, so the bar needs the nested radius to fill it without a sliver. */
-/* A group bar that follows a row stands off from it, so the groups read as separate
-   blocks inside the rail (keyed on adjacency, not :first-child — the indicator div
-   is the rail's first DOM child). */
+/* A group bar that follows a row stands off from it, so the groups read as separate blocks. */
 .gs-opt + .gs-rail__group {
   margin-top: 10px;
 }
 .gs-rail__group:first-child {
   border-radius: 8px 8px 0 0; /* flush with the borderless rail's 8px clip */
 }
-/* A white inset ring around the state fill, like the active tab chip floating in its strip.
-   Drawn as an inset shadow so the rows' borders, radii, and the bar hug stay untouched. */
-
 /* Rows keep their full rounding. The bar hugs the first row's top corners with two
    inverted-radius notch shapes painted over the corners (nothing black sits behind the row's
    antialiased edge, so no hairline outline), and tucks 1px under the row to kill the seam. */
@@ -1404,28 +1132,12 @@ p {
   color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
 }
 
-/* Open-source: the featured card — bigger, but now with an icon tile (like the Sky/Factory rows)
-   and the star count moved beneath the name, so all three controls read consistently. */
+/* Open-source product row. */
 .gs-opt--feat {
   padding: 13px 14px;
   display: flex;
   align-items: flex-start;
   gap: 14px;
-}
-/* Left column: the icon tile with the star count centered beneath it (the icon itself lays out
-   exactly like the Sky / Factory icon tiles). */
-.gs-opt__icwrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.gs-opt__stars {
-  font-size: 12px;
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-  color: inherit;
 }
 
 /* dstack Sky / Factory: compact rows with an icon. */
@@ -1472,10 +1184,66 @@ p {
   border-radius: 12px;
   overflow: hidden;
 }
+.gs-box--compute {
+  height: auto;
+  min-height: 360px;
+}
+.gs-box--compute.gs-box--offers {
+  height: 360px;
+}
+.gs-box--offers .gs-skybody {
+  overflow-y: auto;
+  padding-top: 0;
+}
+.sky-gpu-prices {
+  flex: 0 0 auto;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sky-gpu-prices th,
+.sky-gpu-prices td {
+  padding: 6px 0 6px 14px;
+  text-align: right;
+  vertical-align: top;
+}
+.sky-gpu-prices tr > :first-child {
+  padding-left: 0;
+  text-align: left;
+}
+.sky-gpu-prices thead th {
+  padding-block: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--cs-bg);
+  color: var(--cs-muted);
+  font-weight: 600;
+}
+.sky-gpu-prices td {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .gs-box--offers .gs-skybody {
+    padding-inline: 16px;
+  }
+  .sky-gpu-prices,
+  .sky-gpu-prices .gs-mkt__g {
+    font-size: 12px;
+  }
+  .sky-gpu-prices th,
+  .sky-gpu-prices td {
+    padding-left: 8px;
+  }
+  .gs-box--compute .gs-tabs,
+  .gs-box--compute .gs-tab {
+    padding-inline: 4px;
+  }
+}
 .gs-boxfoot {
   display: flex;
   align-items: center;
-  /* Buttons only (the footer notes are gone) — keep them together at the right edge. */
   justify-content: flex-end;
   gap: 14px;
   padding: 13px 16px 13px 20px;
@@ -1487,17 +1255,13 @@ p {
   min-width: 0; /* allow the note to shrink/wrap so it shares the row with the CTA on narrow screens */
   margin-inline-end: auto; /* note left, button(s) right — the footer itself is flex-end */
 }
-/* Footer note has a full (desktop) and a shorter (mobile) wording; the mobile breakpoint swaps them. */
-.gs-foot__short {
-  display: none;
-}
+
 /* The footer CTA(s) keep their width (never shrink/wrap mid-word); the note takes the rest. */
 .gs-boxfoot > [class*='awsui_button'] {
   flex: 0 0 auto;
 }
 
-/* Tab strip — shared by the open-source code box (uv / pip / Docker) and dstack Sky (GPU
-   marketplace / bring your own clouds), so both boxes read the same: tabs on top, content, footer. */
+/* Shared tabs for installation methods and Sky compute options. */
 .gs-tabs {
   display: flex;
   gap: 2px;
@@ -1570,34 +1334,7 @@ p {
 .gs-sky .gs-col ~ .gs-col {
   border-left: 1px solid color-mix(in srgb, var(--cs-border) 14%, transparent);
 }
-.gs-col__list {
-  list-style: none;
-  margin: 0;
-  padding: 0 2px 14px 0;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  /* soften the cut-off row so the scroll reads cleanly into the footer */
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
-}
 
-/* Sky pane lists — multi-column grids sized so everything fits without scrolling, all
-   top-aligned under the tabs like the GPU marketplace. */
-.gs-col__list--grid {
-  display: grid;
-  column-gap: 28px;
-  align-content: start;
-  overflow-y: visible;
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-.gs-col__list--offers {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
 /* The explore block's categorized clouds grid: one column per group (hyperscalers, top GPU
    neoclouds, smaller GPU clouds), each column an ordered list. Rows match .gs-cloud styling. */
 .gs-cloudcols {
@@ -1624,27 +1361,19 @@ p {
   }
 }
 
-/* Sky tab pane body. The 44px top padding reproduces the offset the GPU marketplace had when
-   its near-full grid was vertically centered — now fixed, so every tab starts at the same line. */
+/* Sky compute tab content. */
 .gs-skybody {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 36px 28px 18px; /* was 44px; trimmed so the 5-item Governance caps grid fits the box */
+  padding: 36px 28px 18px;
 }
-/* The on-prem tab reuses the Factory capability rows, top-aligned like the other Sky tabs. */
 .gs-skybody .gs-caps {
   flex: 1 1 auto;
   align-content: start;
 }
 
-.gs-mkt__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
 .gs-mkt__g {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
@@ -1653,12 +1382,7 @@ p {
 .gs-mkt__name {
   font-weight: 600; /* emphasize the GPU name by weight, not size */
 }
-.gs-mkt__p {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
-  font-weight: 400; /* price is not emphasized — only the GPU name is */
-  white-space: nowrap;
-}
+
 .gs-cloud {
   display: flex;
   align-items: center;
@@ -1684,14 +1408,9 @@ p {
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px 26px; /* row gap was 18px; tightened for the same reason */
+  gap: 12px 26px;
 }
-/* Column-flow variant (Governance): items fill the left column top-to-bottom, then the right —
-   so the array order is the reading order, on desktop and in the single mobile column alike. */
-.gs-caps--cols {
-  grid-auto-flow: column;
-  grid-template-rows: repeat(3, auto);
-}
+
 .gs-cap {
   display: flex;
   align-items: flex-start;
@@ -1757,39 +1476,12 @@ p {
   .gs-sky .gs-col ~ .gs-col { border-left: 0; }
   /* Separate the second pane (its header follows the first list). */
   .gs-sky .gs-col + .gs-skyhalf { margin-top: 12px; }
-  .gs-col__list { overflow-y: visible; -webkit-mask-image: none; mask-image: none; }
   .gs-caps { grid-template-columns: 1fr; }
-  .gs-caps--cols { grid-auto-flow: row; grid-template-rows: none; }
   /* Read-only install code is wider than the phone; let it scroll instead of clipping. */
   .gs-codebody { overflow-x: auto; }
-  /* Footer stays a single row (note + CTA, like desktop), never split onto separate rows. The note
-     uses its shorter wording and the CTAs use tighter padding so the note keeps room beside them. */
+  /* Keep footer notes and buttons on one row. */
   .gs-boxfoot { align-items: center; gap: 10px; }
   .gs-boxfoot [class*='awsui_button'] { padding-inline: 14px !important; }
-  .gs-foot__full { display: none; }
-  .gs-foot__short { display: inline; }
-}
-
-.right-rail-block {
-  margin-top: 32px;
-  padding-top: 28px;
-  border-top: 0.5px solid var(--cs-border);
-}
-
-.docs-right > h2 {
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  line-height: 1.4;
-}
-
-.right-rail-block h2 {
-  margin-bottom: 8px;
-  font-size: 18px;
-}
-
-.right-rail-block p {
-  margin-bottom: 10px;
-  color: var(--cs-muted);
 }
 
 .site-footer {
@@ -1830,23 +1522,6 @@ p {
   z-index: 1;
   padding-top: 48px;
   font-size: 13px;
-}
-
-/* The Old page renders the footer inside the AppLayout content column (so the side nav runs
-   full-height beside it). Fill the column instead of the centered site frame, and reserve
-   space on the right so the last link column isn't flush with the edge (matches the column gap). */
-.docs-main .footer-content {
-  width: auto;
-  max-width: none;
-  margin-inline: 0;
-}
-
-/* Drop the divider line and the opaque block: Cloudscape paints the content area a slightly
-   different grey than --cs-bg, so an opaque footer reads as a mismatched rectangle (most
-   visible in dark mode). Going transparent + borderless lets it blend into the column. */
-.docs-main .site-footer {
-  border-top: 0;
-  background: transparent;
 }
 
 /* Top row: brand block (logo + social) on the left, the link group flush to the
@@ -2004,7 +1679,6 @@ p {
 
 .home-stack a,
 .docs-article a,
-.right-rail-block a,
 .site-footer a {
   text-decoration-line: underline !important;
   text-decoration-color: currentColor !important;
@@ -2013,15 +1687,8 @@ p {
 
 .home-stack a:hover,
 .docs-article a:hover,
-.right-rail-block a:hover,
 .site-footer a:hover {
   text-decoration-thickness: 2px !important;
-}
-
-/* The rail's "Need help?" Discord CTA is a Cloudscape Button (renders an <a>); keep the
-   link-underline rules above from underlining it, matching the landing's Discord button. */
-.right-rail-block a[class*='awsui_button'] {
-  text-decoration-line: none !important;
 }
 
 /* Footer column links: full-strength text, same 16px as the column headings, no underline
@@ -2103,9 +1770,6 @@ p {
     top: 12px;
   }
 
-  .feature-card-grid,
-  .stats-grid,
-  .start-grid,
   .doc-card-grid,
   .product-grid,
   .concept-grid,
@@ -2113,19 +1777,9 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .image-text-row,
-  .image-text-row:not(.image-first),
-  .home-with-rail .image-text-row,
-  .home-with-rail .image-text-row:not(.image-first),
-  .docs-shell--old-page .image-text-row,
-  .docs-shell--old-page .image-text-row:not(.image-first),
   .doc-alternating,
   .doc-alternating:not(.image-first) {
     grid-template-columns: 1fr;
-  }
-
-  .image-text-row.image-first .landing-image {
-    order: initial;
   }
 
   /* Stacked on mobile, always lead with the text block; the visual follows below
@@ -2139,37 +1793,9 @@ p {
     margin-top: 32px;
   }
 
-  .landing-image,
-  .doc-alternating img {
-    width: 100%;
-    height: auto;
-  }
-
-  .docs-shell {
-    display: block;
-  }
-
-  .docs-main {
-    width: calc(100vw - 48px);
-    margin: 0 auto;
-    padding-top: 24px;
-  }
-
   .docs-body {
     display: flex;
     flex-direction: column;
-  }
-
-  .docs-right {
-    display: block;
-    order: -1;
-    position: static;
-    width: 100%;
-    margin: 1.5rem 0 2rem;
-  }
-
-  .right-rail-block {
-    display: none;
   }
 }
 
@@ -2199,10 +1825,6 @@ p {
   .site-mobile-spacer {
     display: block;
     flex: 0 0 28px;
-  }
-
-  .site-desktop-trigger {
-    display: none;
   }
 
   .site-logo {
@@ -2282,21 +1904,13 @@ p {
     text-align: center !important;
   }
 
-  .home-hero h1 {
-    font-size: 36px;
-  }
-
+  .home-hero h1,
   .home-hero h2 {
     font-size: 32px;
   }
 
   .home-stack {
     padding-top: 0;
-  }
-
-  .stat-card {
-    grid-template-columns: 1fr;
-    gap: 10px;
   }
 
   .figma-card,

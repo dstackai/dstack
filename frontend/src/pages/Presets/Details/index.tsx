@@ -26,11 +26,11 @@ import { useDeletePresetMutation, useGetPresetQuery } from 'services/preset';
 
 import { PresetBenchmark } from './Benchmark';
 import { PresetConstraints } from './Constraints';
-import { Deploy } from './Deploy';
+import { PresetVerifiedOn } from './VerifiedOn';
 
 enum PresetTab {
     Details = 'details',
-    VerifiedOn = 'verified-on',
+    Deploy = 'deploy',
     Inspect = 'inspect',
 }
 
@@ -42,17 +42,28 @@ export const PresetDetails: React.FC = () => {
     const paramProjectName = params.projectName ?? '';
     const paramPresetId = params.presetId ?? '';
 
-    const { data, isLoading } = useGetPresetQuery({
+    const {
+        currentData: data,
+        isLoading,
+        isFetching,
+        error,
+    } = useGetPresetQuery({
         project_name: paramProjectName,
         id: paramPresetId,
     });
 
     const [deletePreset, { isLoading: isDeleting }] = useDeletePresetMutation();
+    const isLoadingPreset = isLoading || (isFetching && !data);
+    const canDelete = !!data?.can_delete;
 
     useBreadcrumbs([
         {
             text: t('navigation.presets'),
             href: ROUTES.PRESETS.LIST,
+        },
+        {
+            text: paramProjectName,
+            href: `${ROUTES.PRESETS.LIST}?${new URLSearchParams({ project_name: paramProjectName })}`,
         },
         {
             text: data?.name ?? paramPresetId,
@@ -61,7 +72,8 @@ export const PresetDetails: React.FC = () => {
     ]);
 
     const deleteClickHandle = () => {
-        deletePreset({ project_name: paramProjectName, id: paramPresetId })
+        if (!canDelete || !data) return;
+        deletePreset({ project_name: paramProjectName, id: data.id })
             .unwrap()
             .then(() => navigate(ROUTES.PRESETS.LIST))
             .catch((error) => {
@@ -78,22 +90,30 @@ export const PresetDetails: React.FC = () => {
                 <DetailsHeader
                     title={data?.name ?? paramPresetId}
                     actionButtons={
-                        <ButtonWithConfirmation
-                            disabled={isDeleting || !data}
-                            formAction="none"
-                            onClick={deleteClickHandle}
-                            confirmTitle={t('presets.delete_confirm_title')}
-                            confirmContent={t('presets.delete_confirm_message')}
-                        >
-                            {t('common.delete')}
-                        </ButtonWithConfirmation>
+                        canDelete && !error ? (
+                            <ButtonWithConfirmation
+                                disabled={isDeleting || !data}
+                                formAction="none"
+                                onClick={deleteClickHandle}
+                                confirmTitle={t('presets.delete_confirm_title')}
+                                confirmContent={t('presets.delete_confirm_message')}
+                            >
+                                {t('common.delete')}
+                            </ButtonWithConfirmation>
+                        ) : undefined
                     }
                 />
             }
         >
-            {isLoading && !data && <Loader />}
+            {isLoadingPreset && !data && <Loader />}
 
-            {data && (
+            {!isLoadingPreset && (error || !data) && (
+                <Alert type="error" header={t('presets.unavailable_title')}>
+                    {t('presets.unavailable_message')}
+                </Alert>
+            )}
+
+            {data && !error && (
                 <SpaceBetween size="l">
                     {/* Nothing else on the page explains an empty name. */}
                     {!data.name && <Alert type="info">{t('presets.superseded_alert')}</Alert>}
@@ -107,9 +127,9 @@ export const PresetDetails: React.FC = () => {
                                 href: ROUTES.PRESETS.DETAILS.FORMAT(paramProjectName, paramPresetId),
                             },
                             {
-                                label: t('presets.verified_on'),
-                                id: PresetTab.VerifiedOn,
-                                href: ROUTES.PRESETS.DETAILS.VERIFIED_ON.FORMAT(paramProjectName, paramPresetId),
+                                label: t('presets.deploy'),
+                                id: PresetTab.Deploy,
+                                href: ROUTES.PRESETS.DETAILS.DEPLOY.FORMAT(paramProjectName, paramPresetId),
                             },
                             {
                                 label: t('presets.inspect'),
@@ -150,33 +170,25 @@ export const PresetDetailsOverview: React.FC = () => {
                 <ColumnLayout columns={4} variant="text-grid">
                     <div>
                         <Box variant="awsui-key-label">{t('presets.name')}</Box>
-                        <div>{data.name}</div>
+                        <div>
+                            {data.name && (
+                                <NavigateLink href={ROUTES.PRESETS.DETAILS.FORMAT(data.project_name, data.name)}>
+                                    {data.name}
+                                </NavigateLink>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <Box variant="awsui-key-label">{t('presets.id')}</Box>
-                        <div>{data.id}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.base')}</Box>
-                        <div>{data.base}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.repo')}</Box>
-                        <div>{data.repo}</div>
-                    </div>
-                    <div>
-                        <Box variant="awsui-key-label">{t('presets.project')}</Box>
                         <div>
-                            <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)}>
-                                {data.project_name}
+                            <NavigateLink href={ROUTES.PRESETS.DETAILS.FORMAT(data.project_name, data.id)}>
+                                {data.id}
                             </NavigateLink>
                         </div>
                     </div>
                     <div>
-                        <Box variant="awsui-key-label">{t('presets.user')}</Box>
-                        <div>
-                            <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(data.pushed_by)}>{data.pushed_by}</NavigateLink>
-                        </div>
+                        <Box variant="awsui-key-label">{t('presets.repo')}</Box>
+                        <div>{data.repo}</div>
                     </div>
                     <div>
                         <Box variant="awsui-key-label">{t('presets.created_at')}</Box>
@@ -189,7 +201,7 @@ export const PresetDetailsOverview: React.FC = () => {
 
             <PresetBenchmark />
 
-            <Deploy preset={data} />
+            <PresetVerifiedOn />
         </SpaceBetween>
     );
 };

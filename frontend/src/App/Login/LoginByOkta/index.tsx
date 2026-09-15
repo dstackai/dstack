@@ -26,7 +26,7 @@ export const LoginByOkta: React.FC<{ className?: string }> = ({ className }) => 
 
     return (
         <div className={cn(styles.signIn, className)}>
-            <Button onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
+            <Button fullWidth onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
                 <span className={styles.loginButtonInner}>
                     <OktaIcon />
                     <span className={styles.loginButtonLabel}>{t('common.login_okta')}</span>

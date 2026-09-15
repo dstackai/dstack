@@ -16,6 +16,7 @@
     "eslint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "eslint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
     "test": "jest",
+    "test:auth": "cross-env NODE_ENV=test jest --config jest.auth.config.cjs",
     "test:update-snapshots": "jest -u",
     "generate-api": "npx @rtk-query/codegen-openapi openapi-config.ts",
     "pre-commit": "lint-staged"
