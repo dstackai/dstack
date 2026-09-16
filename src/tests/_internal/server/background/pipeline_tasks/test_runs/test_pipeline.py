@@ -58,6 +58,7 @@ class TestRunFetcher:
             submitted_at=stale - dt.timedelta(seconds=3),
             resubmission_attempt=1,
         )
+        pending_retry.skip_min_processing_interval = True
         pending_scheduled_ready = await create_run(
             session=session,
             project=project,
@@ -162,7 +163,12 @@ class TestRunFetcher:
         assert all(run.lock_owner == RunPipeline.__name__ for run in fetched_runs)
         assert all(run.lock_expires_at is not None for run in fetched_runs)
         assert all(run.lock_token is not None for run in fetched_runs)
-        assert all(not run.skip_min_processing_interval for run in fetched_runs)
+        assert all(
+            not run.skip_min_processing_interval
+            for run in fetched_runs
+            if run.id != pending_retry.id
+        )
+        assert pending_retry.skip_min_processing_interval
         assert len({run.lock_token for run in fetched_runs}) == 1
 
         assert future_scheduled.lock_owner is None

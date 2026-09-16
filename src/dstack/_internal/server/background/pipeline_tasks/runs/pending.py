@@ -25,6 +25,7 @@ class PendingRunUpdateMap(ItemUpdateMap, total=False):
     termination_reason: Optional[RunTerminationReason]
     desired_replica_count: int
     desired_replica_counts: Optional[str]
+    skip_min_processing_interval: bool
 
 
 @dataclass
@@ -60,7 +61,11 @@ async def process_pending_run(context: PendingContext) -> Optional[PendingResult
             new_job_models=[],
         )
 
-    if run_model.resubmission_attempt > 0 and not _is_ready_for_resubmission(run_model):
+    if (
+        run_model.resubmission_attempt > 0
+        and not run_model.skip_min_processing_interval
+        and not _is_ready_for_resubmission(run_model)
+    ):
         return None
 
     if run_spec.configuration.type == "service":
