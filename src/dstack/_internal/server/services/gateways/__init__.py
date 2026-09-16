@@ -1254,10 +1254,13 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
                         " or `certificate: { type: acm }`"
                     )
             elif configuration.backend == BackendType.GCP:
-                if configuration.certificate is not None:
+                if (
+                    configuration.certificate is not None
+                    and configuration.certificate.type != "gcp-cm"
+                ):
                     raise ServerClientError(
                         "`load_balancer: { type: alb }` for the `gcp` backend can only be used"
-                        " with `certificate: null`"
+                        " with `certificate: null` or `certificate: { type: gcp-cm }`"
                     )
             else:
                 raise ServerClientError(
@@ -1271,6 +1274,15 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             )
         if configuration.certificate.type == "acm" and configuration.backend != BackendType.AWS:
             raise ServerClientError("acm certificate type is supported for aws backend only")
+        if configuration.certificate.type == "gcp-cm":
+            if configuration.backend != BackendType.GCP:
+                raise ServerClientError(
+                    "gcp-cm certificate type is supported for gcp backend only"
+                )
+            if configuration.load_balancer is None or configuration.load_balancer.type != "alb":
+                raise ServerClientError(
+                    "`certificate: { type: gcp-cm }` requires `load_balancer: { type: alb }`"
+                )
         if configuration.certificate.type == "lets-encrypt" and replicas > 1:
             err = (
                 "The `lets-encrypt` certificate type is not supported for gateways with `replicas`"
@@ -1280,4 +1292,8 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             )
             if configuration.backend == BackendType.AWS:
                 err += " or `certificate: { type: acm, arn: <arn> }` (AWS ACM)"
+            elif configuration.backend == BackendType.GCP:
+                err += (
+                    " or `certificate: { type: gcp-cm, name: <name> }` (GCP Certificate Manager)"
+                )
             raise ServerClientError(err)
