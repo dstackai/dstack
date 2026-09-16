@@ -63,8 +63,8 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.server.services.services import (
-    get_gateway_https,
-    should_configure_service_https_on_gateway,
+    should_configure_gateway_endpoint_https_on_gateway_replica,
+    should_configure_service_https_on_gateway_replica,
 )
 from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
@@ -1280,8 +1280,12 @@ async def _register_service(
         run_id=run_model.id,
         run_name=run_model.run_name,
         domain=domain,
-        service_https=should_configure_service_https_on_gateway(run_spec, gateway_configuration),
-        gateway_https=get_gateway_https(gateway_configuration),
+        service_https=should_configure_service_https_on_gateway_replica(
+            run_spec, gateway_configuration
+        ),
+        gateway_https=should_configure_gateway_endpoint_https_on_gateway_replica(
+            gateway_configuration
+        ),
         auth=run_spec.configuration.auth,
         client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
         options=service_spec.options,
