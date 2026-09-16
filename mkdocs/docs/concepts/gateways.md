@@ -245,12 +245,7 @@ $ dstack gateway list
 
 </div>
 
-!!! warning "Experimental"
-    Replicated gateways are an experimental feature and currently have limitations:
-
-    - HTTPS is only supported for AWS gateways with the `acm` [certificate type](#certificate) and GCP gateways with the `gcp-cm` [certificate type](#certificate). For other gateways, use an external load balancer for TLS termination.
-    - All replicas are bound to the same backend and region.
-    - At most 3 replicas are allowed per gateway.
+Replicated gateways do not support automatic certificate issuance via Let's Encrypt (`certificate: { type: lets-encrypt }`). For TLS termination, use an external load balancer or one of the other [certificate types](#certificate).
 
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).

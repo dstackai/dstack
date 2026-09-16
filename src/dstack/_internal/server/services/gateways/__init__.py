@@ -159,10 +159,6 @@ GATEWAY_CONNECT_ATTEMPTS = 30
 GATEWAY_CONNECT_DELAY = 10
 GATEWAY_CONFIGURE_ATTEMPTS = 50
 GATEWAY_CONFIGURE_DELAY = 3
-# Artificial limit to avoid doing too many per-replica operations (gateway replica provisioning,
-# service registration, etc) in a single pipeline tick. Can be lifted once the implementation is
-# more mature.
-GATEWAY_MAX_REPLICAS = 3  # documented in gateways.md, keep in sync
 
 
 async def list_project_gateways(
@@ -1237,9 +1233,10 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
         configuration.replicas if configuration.replicas is not None else GATEWAY_REPLICAS_DEFAULT
     )
 
-    if replicas > GATEWAY_MAX_REPLICAS:
+    if replicas > settings.GATEWAY_MAX_REPLICAS:
         raise ServerClientError(
-            f"Cannot provision {replicas} gateway replicas. This server allows at most {GATEWAY_MAX_REPLICAS}"
+            f"Cannot provision {replicas} gateway replicas. This server allows at most"
+            f" {settings.GATEWAY_MAX_REPLICAS}"
         )
 
     if configuration.load_balancer is not None:
