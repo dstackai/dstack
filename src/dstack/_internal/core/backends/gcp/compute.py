@@ -857,6 +857,7 @@ class GCPCompute(
             )
             gcp_resources.wait_for_extended_operation(operation, "target HTTPS proxy creation")
             logger.debug("Created target HTTPS proxy for gateway %s.", configuration.gateway_name)
+            # TODO: HTTP->HTTPS redirect?
 
         logger.debug("Creating forwarding rule for gateway %s...", configuration.gateway_name)
         forwarding_rule = compute_v1.ForwardingRule()
