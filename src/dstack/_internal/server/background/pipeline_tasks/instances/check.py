@@ -5,11 +5,13 @@ from datetime import timedelta
 from typing import Optional
 
 import gpuhunt
+import packaging.version
 import requests
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal import settings
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
     get_dstack_runner_download_url,
@@ -46,6 +48,7 @@ from dstack._internal.server.models import InstanceHealthCheckModel, InstanceMod
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
     ComponentInfo,
+    ComponentName,
     ComponentStatus,
     InstanceHealthResponse,
 )
@@ -482,86 +485,114 @@ def _maybe_install_components(
     installation_requested = False
 
     if (runner_info := components.runner) is not None:
-        installation_requested |= _maybe_install_runner(instance_model, shim_client, runner_info)
+        installation_requested |= _maybe_install_runner(
+            instance_model=instance_model,
+            shim_client=shim_client,
+            runner_info=runner_info,
+            allow_downgrade=settings.DSTACK_RUNNER_ALLOW_DOWNGRADE,
+        )
     else:
-        logger.debug("Instance %s: no runner info", instance_model.name)
+        logger.debug(
+            "Instance %s: %s: no component info", instance_model.name, ComponentName.RUNNER.value
+        )
 
     if (shim_info := components.shim) is not None:
         if shim_info.status == ComponentStatus.INSTALLED:
             installed_shim_version = shim_info.version
-        installation_requested |= _maybe_install_shim(instance_model, shim_client, shim_info)
+        installation_requested |= _maybe_install_shim(
+            instance_model=instance_model,
+            shim_client=shim_client,
+            shim_info=shim_info,
+            allow_downgrade=settings.DSTACK_SHIM_ALLOW_DOWNGRADE,
+        )
     else:
-        logger.debug("Instance %s: no shim info", instance_model.name)
+        logger.debug(
+            "Instance %s: %s: no component info", instance_model.name, ComponentName.SHIM.value
+        )
 
-    # old shim without `dstack-shim` component and `/api/shutdown` support
-    # or the same version is already running
-    # or we just requested installation of at least one component
-    # or at least one component is already being installed
-    # or at least one shim task won't survive restart
     running_shim_version = shim_client.get_version_string()
+    # skip the restart if:
     if (
+        # old shim without `dstack-shim` component and `/api/shutdown` support
         installed_shim_version is None
+        # the same version is already running -- a string comparison on purpose: both sides come
+        # from the same `Version` build-time variable, one read off the on-disk binary, the other
+        # reported by the running process, so the question is whether it's the same build, not
+        # which version is newer
         or installed_shim_version == running_shim_version
+        # we just requested installation of at least one component
         or installation_requested
+        # at least one component is already being installed
         or any(component.status == ComponentStatus.INSTALLING for component in components)
+        # at least one shim task won't survive restart
         or not shim_client.is_safe_to_restart()
     ):
         return
 
     if shim_client.shutdown(force=False):
         logger.debug(
-            "Instance %s: restarting shim %s -> %s",
+            "Instance %s: %s: restarting %r -> %r",
             instance_model.name,
+            ComponentName.SHIM.value,
             running_shim_version,
             installed_shim_version,
         )
     else:
-        logger.debug("Instance %s: cannot restart shim", instance_model.name)
+        logger.debug(
+            "Instance %s: %s: cannot restart", instance_model.name, ComponentName.SHIM.value
+        )
 
 
 def _maybe_install_runner(
     instance_model: InstanceModel,
     shim_client: runner_client.ShimClient,
     runner_info: ComponentInfo,
+    allow_downgrade: bool,
 ) -> bool:
     # For developers:
     # * To install the latest dev build for the current branch from the CI,
     #   set DSTACK_USE_LATEST_FROM_BRANCH=1.
     # * To provide your own build, set DSTACK_RUNNER_VERSION_URL and DSTACK_RUNNER_DOWNLOAD_URL.
-    expected_version = get_dstack_runner_version()
-    if expected_version is None:
-        return False
-
+    name = runner_info.name
     installed_version = runner_info.version
+    expected_version = get_dstack_runner_version()
     logger.debug(
-        "Instance %s: runner status=%s installed_version=%s",
+        "Instance %s: %s: status=%s installed_version=%r expected_version=%r",
         instance_model.name,
+        name,
         runner_info.status.value,
-        installed_version or "(no version)",
+        installed_version,
+        expected_version,
     )
-    if runner_info.status == ComponentStatus.INSTALLING:
-        logger.debug("Instance %s: runner is already being installed", instance_model.name)
-        return False
-    if installed_version and installed_version == expected_version:
-        logger.debug("Instance %s: expected runner version already installed", instance_model.name)
+
+    if not expected_version:
         return False
 
-    url = get_dstack_runner_download_url(
+    if not _should_install_component(
+        instance_model=instance_model,
+        component_info=runner_info,
+        expected_version=expected_version,
+        allow_downgrade=allow_downgrade,
+    ):
+        return False
+
+    download_url = get_dstack_runner_download_url(
         arch=_get_instance_cpu_arch(instance_model),
         version=expected_version,
     )
     logger.debug(
-        "Instance %s: installing runner %s -> %s from %s",
+        "Instance %s: %s: installing %r -> %r from %s",
         instance_model.name,
-        installed_version or "(no version)",
+        name,
+        installed_version,
         expected_version,
-        url,
+        download_url,
     )
     try:
-        shim_client.install_runner(url)
+        shim_client.install_runner(download_url)
         return True
-    except requests.RequestException as exc:
-        logger.warning("Instance %s: shim.install_runner(): %s", instance_model.name, exc)
+    except requests.RequestException as e:
+        logger.warning("Instance %s: %s: failed to install: %s", instance_model.name, name, e)
     return False
 
 
@@ -569,47 +600,127 @@ def _maybe_install_shim(
     instance_model: InstanceModel,
     shim_client: runner_client.ShimClient,
     shim_info: ComponentInfo,
+    allow_downgrade: bool,
 ) -> bool:
     # For developers:
     # * To install the latest dev build for the current branch from the CI,
     #   set DSTACK_USE_LATEST_FROM_BRANCH=1.
     # * To provide your own build, set DSTACK_SHIM_VERSION_URL and DSTACK_SHIM_DOWNLOAD_URL.
-    expected_version = get_dstack_shim_version()
-    if expected_version is None:
-        return False
-
+    name = shim_info.name
     installed_version = shim_info.version
+    expected_version = get_dstack_shim_version()
     logger.debug(
-        "Instance %s: shim status=%s installed_version=%s running_version=%s",
+        "Instance %s: %s: status=%s installed_version=%r expected_version=%r running_version=%r",
         instance_model.name,
+        name,
         shim_info.status.value,
-        installed_version or "(no version)",
+        installed_version,
+        expected_version,
         shim_client.get_version_string(),
     )
-    if shim_info.status == ComponentStatus.INSTALLING:
-        logger.debug("Instance %s: shim is already being installed", instance_model.name)
-        return False
-    if installed_version and installed_version == expected_version:
-        logger.debug("Instance %s: expected shim version already installed", instance_model.name)
+
+    if not expected_version:
         return False
 
-    url = get_dstack_shim_download_url(
+    if not _should_install_component(
+        instance_model=instance_model,
+        component_info=shim_info,
+        expected_version=expected_version,
+        allow_downgrade=allow_downgrade,
+    ):
+        return False
+
+    download_url = get_dstack_shim_download_url(
         arch=_get_instance_cpu_arch(instance_model),
         version=expected_version,
     )
     logger.debug(
-        "Instance %s: installing shim %s -> %s from %s",
+        "Instance %s: %s: installing %r -> %r from %s",
         instance_model.name,
-        installed_version or "(no version)",
+        name,
+        installed_version,
         expected_version,
-        url,
+        download_url,
     )
     try:
-        shim_client.install_shim(url)
+        shim_client.install_shim(download_url)
         return True
-    except requests.RequestException as exc:
-        logger.warning("Instance %s: shim.install_shim(): %s", instance_model.name, exc)
+    except requests.RequestException as e:
+        logger.warning("Instance %s: %s: failed to install: %s", instance_model.name, name, e)
     return False
+
+
+def _should_install_component(
+    instance_model: InstanceModel,
+    component_info: ComponentInfo,
+    expected_version: str,
+    allow_downgrade: bool,
+) -> bool:
+    """
+    Decides whether the component should be installed, comparing the installed and the expected
+    versions. Logs the reason if the installation is skipped.
+
+    Unless `allow_downgrade` is set, the component is not installed if the installed version is
+    newer than the expected one. This keeps server replicas running different versions from
+    reinstalling the component over each other during a rolling deployment.
+    """
+    name = component_info.name
+
+    if component_info.status == ComponentStatus.INSTALLING:
+        logger.debug("Instance %s: %s: already being installed", instance_model.name, name)
+        return False
+
+    expected_version_parsed = _parse_pypa_version(expected_version)
+    if expected_version_parsed is None:
+        logger.warning(
+            "Instance %s: %s: failed to parse expected_version: %r",
+            instance_model.name,
+            name,
+            expected_version,
+        )
+        return False
+
+    installed_version = component_info.version
+    if not installed_version:
+        return True
+
+    installed_version_parsed = _parse_pypa_version(installed_version)
+    if installed_version_parsed is None:
+        # Dev builds report `latest`; treat any unparseable version as the newest one
+        if not allow_downgrade:
+            logger.debug(
+                "Instance %s: %s: cannot parse installed_version, skipping the install",
+                instance_model.name,
+                name,
+            )
+            return False
+    elif installed_version_parsed == expected_version_parsed:
+        logger.debug(
+            "Instance %s: %s: expected version already installed", instance_model.name, name
+        )
+        return False
+    elif installed_version_parsed > expected_version_parsed and not allow_downgrade:
+        logger.debug("Instance %s: %s: newer version already installed", instance_model.name, name)
+        return False
+
+    return True
+
+
+def _parse_pypa_version(version_string: str) -> Optional[packaging.version.Version]:
+    """
+    Parses the version for comparing component versions, keeping the pre-release, dev, post-release,
+    and local segments, that is, `0.20.1rc1` is older than `0.20.1`.
+    Returns `None` if the version is not PyPA-conformant, e.g., `latest` reported by dev builds.
+
+    Not to be confused with `ShimClient.get_version_tuple()`, which is based on
+    `dstack._internal.server.services.runner.client._parse_version` -- it truncates the version to
+    `(major, minor, micro)` and treats unparseable versions as the latest, suiting feature gating
+    but not version comparison.
+    """
+    try:
+        return packaging.version.parse(version_string)
+    except packaging.version.InvalidVersion:
+        return None
 
 
 def _get_instance_cpu_arch(instance_model: InstanceModel) -> Optional[gpuhunt.CPUArchitecture]:
