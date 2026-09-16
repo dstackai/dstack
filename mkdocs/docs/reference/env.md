@@ -148,6 +148,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS`{ #DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS } – Maximum age of metrics samples for running jobs.
 - `DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS`{ #DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS } – Maximum age of metrics samples for finished jobs.
 - `DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS`{ #DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS } – Maximum age of instance health checks.
+- `DSTACK_SERVER_GATEWAY_MAX_REPLICAS`{ #DSTACK_SERVER_GATEWAY_MAX_REPLICAS } - Maximum number of replicas allowed for a gateway. Defaults to `9`.
 - `DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS`{ #DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS } – Minimum time interval between consecutive health checks of the same instance.
 - `DSTACK_SERVER_EVENTS_TTL_SECONDS`{ #DSTACK_SERVER_EVENTS_TTL_SECONDS } - Maximum age of event records. Set to `0` to disable event storage. Defaults to 30 days.
 - `DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY`{ #DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY } – A default Docker registry to use for job images that do not specify an explicit registry. E.g., if set to `registry.example`, then `image: ubuntu` becomes equivalent to `image: registry.example/ubuntu`. **Note**: This setting should only be used for configuring registries that act as a pull-through cache for Docker Hub. The default `dstack` images are also pulled from the configured registry.

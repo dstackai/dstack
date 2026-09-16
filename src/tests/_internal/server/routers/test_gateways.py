@@ -753,9 +753,9 @@ class TestCreateGateway:
                     "backend": "aws",
                     "region": "us",
                     "certificate": None,
-                    "replicas": 4,
+                    "replicas": 10,
                 },
-                "Cannot provision 4 gateway replicas. This server allows at most 3",
+                "Cannot provision 10 gateway replicas. This server allows at most 9",
                 id="replicas-exceed-max",
             ),
             pytest.param(
