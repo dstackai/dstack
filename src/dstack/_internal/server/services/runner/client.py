@@ -855,19 +855,16 @@ _Version = tuple[int, int, int]
 
 def _parse_version(version_string: str) -> Optional[_Version]:
     """
-    Returns a (major, minor, micro) tuple if the version if final.
-    Returns `None`, which means "latest", if:
-    * the version is prerelease or dev build -- assuming that in most cases it's a build based on
-    the latest final release
-    * the version consists of only major part or not valid at all, e.g., staging builds have
-    GitHub run number (e.g., 1234) instead of the version -- assuming that it's a "bleeding edge",
-    not yet released version
+    Returns a (major, minor, micro) tuple for feature gating. The pre-release, dev, post-release,
+    and local segments are ignored, that is, `0.20.1rc1` is treated as `0.20.1` -- assuming that
+    a build carrying a version has the features released in that version.
+    Returns `None`, which means "latest", if the version consists of only major part or not valid
+    at all, e.g., staging builds have GitHub run number (e.g., 1234) instead of the version
+    -- assuming that it's a "bleeding edge", not yet released version.
     """
     try:
         version = packaging.version.parse(version_string)
     except packaging.version.InvalidVersion:
-        return None
-    if version.is_prerelease or version.is_devrelease:
         return None
     release = version.release
     if len(release) <= 1:

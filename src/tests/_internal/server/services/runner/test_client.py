@@ -241,10 +241,9 @@ class TestShimClientNegotiate(BaseShimClientTest):
             # invalid versions, assuming local builds with the latest version
             pytest.param(None, 2, marks=pytest.mark.shim_version("latest")),
             pytest.param(None, 2, marks=pytest.mark.shim_version("0.17.0-next")),
-            # even though this version is less than _FUTURE_API_MIN_VERSION, for the sake of
-            # simplicity we assume that any non-final version is the latest; normally, users
-            # should not use non-latest RC versions
-            pytest.param(None, 2, marks=pytest.mark.shim_version("0.17.0rc1")),
+            # pre-release versions are treated as the final version they lead to
+            pytest.param((0, 17, 0), 1, marks=pytest.mark.shim_version("0.17.0rc1")),
+            pytest.param((0, 18, 34), 2, marks=pytest.mark.shim_version("0.18.34rc1")),
         ],
     )
     def test(
@@ -687,9 +686,17 @@ class TestParseVersion:
     def test_valid_final(self, value: str, expected: tuple[int, int, int]):
         assert _parse_version(value) == expected
 
-    @pytest.mark.parametrize("value", ["1.12alpha1", "1.12.3rc1", "1.12.3.dev0"])
-    def test_valid_pre_dev_local(self, value: str):
-        assert _parse_version(value) is None
+    @pytest.mark.parametrize(
+        ["value", "expected"],
+        [
+            ["1.12alpha1", (1, 12, 0)],
+            ["1.12.3rc1", (1, 12, 3)],
+            ["1.12.3.dev0", (1, 12, 3)],
+            ["1.12.3.post1", (1, 12, 3)],
+        ],
+    )
+    def test_valid_pre_dev_post(self, value: str, expected: tuple[int, int, int]):
+        assert _parse_version(value) == expected
 
     @pytest.mark.parametrize("value", ["1", "1234"])
     def test_valid_major_only(self, value: str):
