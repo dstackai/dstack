@@ -969,13 +969,6 @@ def get_dstack_shim_version() -> Optional[str]:
         return version
     if version := settings.DSTACK_SHIM_VERSION:
         return version
-    if version := settings.DSTACK_RUNNER_VERSION:
-        logger.warning(
-            "DSTACK_SHIM_VERSION is not set, using DSTACK_RUNNER_VERSION."
-            " Future versions will not fall back to DSTACK_RUNNER_VERSION."
-            " Set DSTACK_SHIM_VERSION to supress this warning."
-        )
-        return version
     if version_url := settings.DSTACK_SHIM_VERSION_URL:
         return _fetch_version(version_url)
     if settings.DSTACK_USE_LATEST_FROM_BRANCH:

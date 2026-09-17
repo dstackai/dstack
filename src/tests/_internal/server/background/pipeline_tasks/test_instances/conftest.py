@@ -15,6 +15,12 @@ from dstack._internal.server.background.pipeline_tasks.instances import (
 from dstack._internal.server.schemas.instances import InstanceCheck
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "allow_downgrade: allow the server to install an older component version"
+    )
+
+
 @pytest.fixture
 def fetcher() -> InstanceFetcher:
     return InstanceFetcher(
