@@ -53,7 +53,7 @@ export const EventsList = () => {
             header={
                 <Header
                     actions={
-                        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && (
+                        (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && (
                             <Button onClick={goToFullView}>{t('common.full_view')}</Button>
                         )
                     }

@@ -30,7 +30,7 @@ export const useSideNavigation = () => {
         { type: 'link', text: t('navigation.volumes'), href: ROUTES.VOLUMES.LIST },
         { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
         process.env.UI_VERSION === 'sky' && { type: 'link', text: t('navigation.presets'), href: ROUTES.PRESETS.LIST },
-        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+        (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
             type: 'link',
             text: t('navigation.events'),
             href: ROUTES.EVENTS.LIST,

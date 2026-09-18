@@ -113,7 +113,7 @@ export const router = createBrowserRouter([
                         index: true,
                         element: <ProjectSettings />,
                     },
-                    (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+                    (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
                         path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
                         element: <ProjectEvents />,
                     },
@@ -224,7 +224,7 @@ export const router = createBrowserRouter([
 
             // Events, Factory and Sky only
             ...([
-                (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+                (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
                     path: ROUTES.EVENTS.LIST,
                     element: <EventList />,
                 },
@@ -309,7 +309,7 @@ export const router = createBrowserRouter([
                         path: ROUTES.USER.PROJECTS.TEMPLATE,
                         element: <UserProjects />,
                     },
-                    (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+                    (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
                         path: ROUTES.USER.EVENTS.TEMPLATE,
                         element: <UserEvents />,
                     },

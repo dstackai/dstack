@@ -22,7 +22,7 @@ export const ProjectDetails: React.FC = () => {
             id: 'settings',
             href: ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
         },
-        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+        (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
             label: t('projects.events'),
             id: 'events',
             href: ROUTES.PROJECT.DETAILS.EVENTS.FORMAT(paramProjectName),
