@@ -2,12 +2,13 @@ import React from 'react';
 import type { RouteObject } from 'react-router-dom';
 import { createBrowserRouter } from 'react-router-dom';
 import { Navigate } from 'react-router-dom';
+import { product } from 'product';
 import { PublicApp } from 'PublicApp';
 import { PresetApp } from 'PublicApp/PresetApp';
 
 import App from 'App';
+import { Login } from 'App/Login';
 import { LoginByEntraIDCallback } from 'App/Login/EntraID/LoginByEntraIDCallback';
-import { LoginByGithub } from 'App/Login/LoginByGithub';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
@@ -42,13 +43,13 @@ import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
-    ...(process.env.UI_VERSION === 'sky'
+    ...(product.hasPresets
         ? [
               {
                   element: <PublicApp />,
                   errorElement: <AuthErrorMessage title="Not Found" text="Page not found" />,
                   children: [
-                      { path: ROUTES.BASE, element: <LoginByGithub /> },
+                      { path: ROUTES.BASE, element: <Login /> },
                       { path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> },
                   ],
               },
@@ -96,11 +97,9 @@ export const router = createBrowserRouter([
                 path: ROUTES.AUTH.GOOGLE_CALLBACK,
                 element: <LoginByGoogleCallback />,
             },
-            ...(process.env.UI_VERSION !== 'sky' ? [{ path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> }] : []),
+            ...(!product.hasPresets ? [{ path: ROUTES.AUTH.TOKEN, element: <TokenLogin /> }] : []),
             // hubs
-            ...(process.env.UI_VERSION !== 'sky'
-                ? [{ path: ROUTES.BASE, element: <Navigate replace to={ROUTES.RUNS.LIST} /> }]
-                : []),
+            ...(!product.hasPresets ? [{ path: ROUTES.BASE, element: <Navigate replace to={ROUTES.RUNS.LIST} /> }] : []),
             {
                 path: ROUTES.PROJECT.LIST,
                 element: <ProjectList />,
@@ -113,7 +112,7 @@ export const router = createBrowserRouter([
                         index: true,
                         element: <ProjectSettings />,
                     },
-                    (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
+                    product.hasEvents && {
                         path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
                         element: <ProjectEvents />,
                     },
@@ -185,11 +184,11 @@ export const router = createBrowserRouter([
             },
 
             ...([
-                process.env.UI_VERSION !== 'sky' && {
+                !product.hasBilling && {
                     path: ROUTES.PROJECT.ADD,
                     element: <ProjectAdd />,
                 },
-                process.env.UI_VERSION === 'sky' && {
+                product.hasBilling && {
                     path: ROUTES.PROJECT.ADD,
                     element: <CreateProjectWizard />,
                 },
@@ -222,9 +221,9 @@ export const router = createBrowserRouter([
                 element: <ModelDetails />,
             },
 
-            // Events, Factory and Sky only
+            // Events, Enterprise and above
             ...([
-                (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
+                product.hasEvents && {
                     path: ROUTES.EVENTS.LIST,
                     element: <EventList />,
                 },
@@ -309,7 +308,7 @@ export const router = createBrowserRouter([
                         path: ROUTES.USER.PROJECTS.TEMPLATE,
                         element: <UserProjects />,
                     },
-                    (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
+                    product.hasEvents && {
                         path: ROUTES.USER.EVENTS.TEMPLATE,
                         element: <UserEvents />,
                     },
@@ -318,7 +317,7 @@ export const router = createBrowserRouter([
                         path: ROUTES.USER.PUBLIC_KEYS.TEMPLATE,
                         element: <Navigate replace to=".." />,
                     },
-                    process.env.UI_VERSION === 'sky' && {
+                    product.hasBilling && {
                         path: ROUTES.USER.BILLING.LIST.TEMPLATE,
                         element: <UserBilling />,
                     },

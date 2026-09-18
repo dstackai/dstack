@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useMatch } from 'react-router-dom';
+import { product } from 'product';
 
 import { SideNavigationProps } from 'components';
 
@@ -29,8 +30,8 @@ export const useSideNavigation = () => {
         { type: 'link', text: t('navigation.instances'), href: ROUTES.INSTANCES.LIST },
         { type: 'link', text: t('navigation.volumes'), href: ROUTES.VOLUMES.LIST },
         { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
-        process.env.UI_VERSION === 'sky' && { type: 'link', text: t('navigation.presets'), href: ROUTES.PRESETS.LIST },
-        (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
+        product.hasPresets && { type: 'link', text: t('navigation.presets'), href: ROUTES.PRESETS.LIST },
+        product.hasEvents && {
             type: 'link',
             text: t('navigation.events'),
             href: ROUTES.EVENTS.LIST,
@@ -55,7 +56,7 @@ export const useSideNavigation = () => {
             text: t('users.projects'),
             href: userProjectsUrl,
         },
-        process.env.UI_VERSION === 'sky' && {
+        product.hasBilling && {
             type: 'link',
             text: t('navigation.billing'),
             href: billingUrl,

@@ -1,16 +1,17 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { product } from 'product';
 
 import AppLayout from 'layouts/AppLayout';
 
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { useGetUserDataQuery } from 'services/user';
 
-import { SelfHostedLogin } from './Login/SelfHostedLogin';
 import { ROUTES } from '../routes';
 import { AuthErrorMessage } from './AuthErrorMessage';
 import { Loading } from './Loading';
+import { Login } from './Login';
 import { selectAuthToken, setUserData } from './slice';
 
 const IGNORED_AUTH_PATHS = [
@@ -21,7 +22,7 @@ const IGNORED_AUTH_PATHS = [
     ROUTES.AUTH.TOKEN,
 ];
 
-const LoginFormComponent = process.env.UI_VERSION === 'sky' ? () => <Navigate replace to={ROUTES.BASE} /> : SelfHostedLogin;
+const LoginFormComponent = product.hasPresets ? () => <Navigate replace to={ROUTES.BASE} /> : Login;
 
 const App: React.FC = () => {
     const { t } = useTranslation();

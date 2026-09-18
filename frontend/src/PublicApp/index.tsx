@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { product } from 'product';
 import enMessages from '@cloudscape-design/components/i18n/messages/all.en.json';
 import { applyMode, Mode } from '@cloudscape-design/global-styles';
 
@@ -46,7 +47,6 @@ const HeaderPortal = ({ children }: PortalProps) => {
 };
 
 export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
-    const isSky = process.env.UI_VERSION === 'sky';
     const { t } = useTranslation();
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
@@ -115,7 +115,7 @@ export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
                             },
                         ]}
                     />
-                    {isSky && !isAuth && (
+                    {product.hasPresets && !isAuth && (
                         <div className={styles.signIn}>
                             <Button
                                 variant="normal"
@@ -136,12 +136,12 @@ export const PublicApp: React.FC<React.PropsWithChildren> = ({ children }) => {
                 <AppLayout
                     headerSelector="#header"
                     contentType="default"
-                    disableContentPaddings={!isSky || isAuth}
+                    disableContentPaddings={!product.hasPresets || isAuth}
                     navigationHide
                     toolsHide
                     content={children ?? <Outlet />}
                     breadcrumbs={
-                        isSky && pathname.startsWith(ROUTES.PRESETS.LIST) && breadcrumbs ? (
+                        product.hasPresets && pathname.startsWith(ROUTES.PRESETS.LIST) && breadcrumbs ? (
                             <BreadcrumbGroup items={breadcrumbs} onFollow={onFollow} />
                         ) : undefined
                     }

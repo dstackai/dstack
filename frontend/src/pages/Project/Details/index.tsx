@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useMatch, useParams } from 'react-router-dom';
+import { product } from 'product';
 
 import { ContentLayout, DetailsHeader, Tabs } from 'components';
 
@@ -22,7 +23,7 @@ export const ProjectDetails: React.FC = () => {
             id: 'settings',
             href: ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(paramProjectName),
         },
-        (process.env.UI_VERSION === 'enterprise' || process.env.UI_VERSION === 'sky') && {
+        product.hasEvents && {
             label: t('projects.events'),
             id: 'events',
             href: ROUTES.PROJECT.DETAILS.EVENTS.FORMAT(paramProjectName),

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch } from 'react-redux';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
+import { product } from 'product';
 import { ExpandableSection, Tabs } from '@cloudscape-design/components';
 import { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 
@@ -115,7 +116,6 @@ export const ProjectSettings: React.FC = () => {
         value: data?.owner.username,
     };
 
-    const isSky = process.env.UI_VERSION === 'sky';
     const visibilityOptions = [
         { label: t('projects.edit.visibility.private'), value: 'private' },
         { label: t('projects.edit.visibility.public'), value: 'public' },
@@ -213,7 +213,7 @@ export const ProjectSettings: React.FC = () => {
     };
 
     const openChangeVisibilityDialog = () => {
-        setVisibilityEnabled(isSky ? (data?.public_presets ?? false) : !!data?.isPublic);
+        setVisibilityEnabled(product.hasPresets ? (data?.public_presets ?? false) : !!data?.isPublic);
         setIsChangeVisibilityVisible(true);
     };
 
@@ -221,7 +221,7 @@ export const ProjectSettings: React.FC = () => {
         if (!data || !isProjectAdmin(data) || isUpdatingVisibility) return;
 
         try {
-            if (isSky) {
+            if (product.hasPresets) {
                 await updateProjectPublicPresets({
                     project_name: paramProjectName,
                     public_presets: visibilityEnabled,
@@ -233,7 +233,9 @@ export const ProjectSettings: React.FC = () => {
             setIsChangeVisibilityVisible(false);
             pushNotification({
                 type: 'success',
-                content: t(isSky ? 'projects.edit.update_presets_success' : 'projects.edit.update_visibility_success'),
+                content: t(
+                    product.hasPresets ? 'projects.edit.update_presets_success' : 'projects.edit.update_visibility_success',
+                ),
             });
         } catch (error: unknown) {
             pushNotification({ type: 'error', content: getApiErrorMessage(error) });
@@ -511,18 +513,20 @@ export const ProjectSettings: React.FC = () => {
                                         </>
                                     )}
 
-                                    {(isSky || isAvailableProjectManaging) && (
+                                    {(product.hasPresets || isAvailableProjectManaging) && (
                                         <>
                                             <div className={styles.dangerSectionTitle}>
                                                 <Box variant="h5" color="text-body-secondary">
                                                     {t(
-                                                        isSky
+                                                        product.hasPresets
                                                             ? 'projects.edit.presets_settings'
                                                             : 'projects.edit.project_visibility_settings',
                                                     )}
                                                 </Box>
                                                 <InfoLink
-                                                    onFollow={() => openHelpPanel(isSky ? PRESETS_INFO : VISIBILITY_INFO)}
+                                                    onFollow={() =>
+                                                        openHelpPanel(product.hasPresets ? PRESETS_INFO : VISIBILITY_INFO)
+                                                    }
                                                 />
                                             </div>
 
@@ -607,12 +611,12 @@ export const ProjectSettings: React.FC = () => {
                 visible={isChangeVisibilityVisible}
                 onDiscard={() => setIsChangeVisibilityVisible(false)}
                 onConfirm={confirmChangeVisibility}
-                title={t(isSky ? 'projects.edit.presets_settings' : 'projects.edit.project_visibility_settings')}
+                title={t(product.hasPresets ? 'projects.edit.presets_settings' : 'projects.edit.project_visibility_settings')}
                 confirmButtonLabel={t('projects.edit.change_visibility')}
                 content={
                     <FormField
                         description={
-                            isSky
+                            product.hasPresets
                                 ? t(`projects.edit.presets_${visibilityEnabled ? 'public' : 'private'}_description`)
                                 : t(`projects.edit.visibility.${visibilityEnabled ? 'public' : 'private'}_description`)
                         }

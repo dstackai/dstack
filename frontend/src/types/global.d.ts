@@ -30,7 +30,7 @@ declare namespace NodeJS {
     interface ProcessEnv {
         readonly NODE_ENV: 'development' | 'production' | 'test';
         readonly GA_MEASUREMENT_ID: string;
-        readonly UI_VERSION: 'sky' | 'enterprise' | 'oss';
+        readonly UI_VERSION: 'sky' | 'factory' | 'enterprise' | 'oss';
         readonly PUBLIC_URL: string;
         readonly API_URL: string;
     }

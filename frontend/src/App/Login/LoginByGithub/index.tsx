@@ -1,17 +1,9 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { colorBackgroundHomeHeader } from '@cloudscape-design/design-tokens';
 
-import { Alert, Box, Button, Container, ContentLayout, Header, Link, NavigateLink, SpaceBetween } from 'components';
+import { Alert, Button } from 'components';
 
-import { useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
-import { ROUTES } from 'routes';
 import { useGithubAuthorizeMutation } from 'services/auth';
-import { useGetUserDataQuery } from 'services/user';
-
-import { Loading } from 'App/Loading';
-import { selectAuthToken } from 'App/slice';
 
 const GitHubIcon: React.FC = () => (
     <span>
@@ -25,71 +17,26 @@ const GitHubIcon: React.FC = () => (
 );
 
 export const LoginByGithub: React.FC = () => {
-    const token = useAppSelector(selectAuthToken);
-    const localStorageIsAvailable = 'localStorage' in window;
-    const {
-        currentData: userData,
-        error,
-        isFetching,
-    } = useGetUserDataQuery({ token }, { skip: !token || !localStorageIsAvailable });
     const [githubAuthorize, { isLoading, isError }] = useGithubAuthorizeMutation();
-
     const signInClick = () => {
         githubAuthorize()
             .unwrap()
             .then((data) => goToUrl(data.authorization_url))
             .catch(() => undefined);
     };
-
-    if (token && localStorageIsAvailable && isFetching && !userData) return <Loading />;
-    if (token && localStorageIsAvailable && userData?.username && !error) {
-        return <Navigate replace to={ROUTES.RUNS.LIST} />;
-    }
-
     return (
-        <ContentLayout
-            defaultPadding
-            headerVariant="high-contrast"
-            maxContentWidth={500}
-            headerBackgroundStyle={colorBackgroundHomeHeader}
-            header={
-                <Box variant="h1" padding={{ vertical: 'xxxl' }} textAlign="center">
-                    Welcome to dstack Sky
-                </Box>
-            }
-        >
-            <Container
-                header={
-                    <Box padding={{ bottom: 'xs' }}>
-                        <Header variant="h2">Sign in</Header>
-                    </Box>
-                }
+        <>
+            {isError && <Alert type="error">Unable to start GitHub authentication</Alert>}
+            <Button
+                fullWidth
+                onClick={signInClick}
+                disabled={isLoading}
+                loading={isLoading}
+                variant="primary"
+                iconSvg={<GitHubIcon />}
             >
-                <SpaceBetween size="l">
-                    {isError && <Alert type="error">Unable to start GitHub authentication</Alert>}
-                    <Button
-                        fullWidth
-                        onClick={signInClick}
-                        disabled={isLoading}
-                        loading={isLoading}
-                        variant="primary"
-                        iconSvg={<GitHubIcon />}
-                    >
-                        Continue with GitHub
-                    </Button>
-                    <Box color="text-body-secondary" fontSize="body-s">
-                        By continuing with GitHub, you agree to the{' '}
-                        <Link href="https://dstack.ai/terms/" target="_blank" external>
-                            Terms
-                        </Link>{' '}
-                        and{' '}
-                        <Link href="https://dstack.ai/privacy/" target="_blank" external>
-                            Privacy policy
-                        </Link>
-                    </Box>
-                    <NavigateLink href={ROUTES.AUTH.TOKEN}>Sign in with a token</NavigateLink>
-                </SpaceBetween>
-            </Container>
-        </ContentLayout>
+                Continue with GitHub
+            </Button>
+        </>
     );
 };
