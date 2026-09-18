@@ -28,7 +28,9 @@ from dstack._internal.core.models.backends.base import (
 )
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
-# where dstack images are published
+# Regions where dstack publishes its VM images as OCI Marketplace community listings
+# (see scripts/oci_image_tools.py). Listings are regional, so instances can only be launched
+# in regions that have the images. Extend this set only together with publishing the images.
 SUPPORTED_REGIONS = frozenset(
     [
         "eu-frankfurt-1",
