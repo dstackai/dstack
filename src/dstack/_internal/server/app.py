@@ -4,7 +4,6 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated, Awaitable, Callable, List, Optional
 
 import sentry_sdk
@@ -245,7 +244,14 @@ def add_no_api_version_check_routes(paths: List[str]):
     _NO_API_VERSION_CHECK_ROUTES.extend(paths)
 
 
-def register_routes(app: FastAPI, ui: bool = True):
+def register_routes(app: FastAPI, statics_package: Optional[str] = "dstack._internal.server"):
+    """
+    Registers dstack server routes on `app`.
+
+    `statics_package` is the package whose `statics` directory holds the frontend build.
+    Passing `None` or a package without `statics` disables the UI and redirects `/`
+    to the API docs.
+    """
     app.include_router(server.router)
     app.include_router(users.router)
     app.include_router(auth.router)
@@ -338,10 +344,8 @@ def register_routes(app: FastAPI, ui: bool = True):
     async def healthcheck():
         return CustomJSONResponse(content={"status": "running"})
 
-    if ui and Path(__file__).parent.joinpath("statics").exists():
-        app.mount(
-            "/", CustomStaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
-        )
+    if statics_package is not None and _statics_exist(statics_package):
+        app.mount("/", CustomStaticFiles(packages=[statics_package], html=True), name="statics")
 
         @app.exception_handler(404)
         async def custom_http_exception_handler(request, exc):
@@ -356,7 +360,7 @@ def register_routes(app: FastAPI, ui: bool = True):
                 )
             else:
                 return HTMLResponse(
-                    importlib.resources.files("dstack._internal.server")
+                    importlib.resources.files(statics_package)
                     .joinpath("statics/index.html")
                     .read_text()
                 )
@@ -379,6 +383,10 @@ def _check_client_version(
             client_version=client_version,
             server_version=core_settings.DSTACK_VERSION,
         )
+
+
+def _statics_exist(statics_package: str) -> bool:
+    return importlib.resources.files(statics_package).joinpath("statics").is_dir()
 
 
 def _is_proxy_request(request: Request) -> bool:
