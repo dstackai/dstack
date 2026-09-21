@@ -582,6 +582,7 @@ p {
    Higher specificity than `.docs-article a` so the reset wins regardless of source order. */
 .docs-article .doc-action a,
 .docs-article .figma-card a,
+.docs-article .gs-boxfoot a,
 .docs-article .gs-deploy a {
   text-decoration: none !important;
 }
@@ -992,6 +993,14 @@ p {
   color: var(--cs-text) !important;
 }
 
+.faq-list p {
+  font-size: inherit;
+}
+
+.faq-list p + p {
+  margin-top: 1em;
+}
+
 
 .testimonial-person {
   display: flex;
@@ -1184,15 +1193,15 @@ p {
   border-radius: 12px;
   overflow: hidden;
 }
-.gs-box--compute {
-  height: auto;
-  min-height: 360px;
-}
-.gs-box--compute.gs-box--offers {
+.gs-box.gs-box--compute,
+.gs-box.gs-box--compute-sources {
   height: 360px;
 }
-.gs-box--offers .gs-skybody {
+.gs-box--compute .gs-skybody,
+.gs-box--compute-sources .gs-skybody {
   overflow-y: auto;
+}
+.gs-box--offers .gs-skybody {
   padding-top: 0;
 }
 .sky-gpu-prices {
@@ -1236,10 +1245,6 @@ p {
   .sky-gpu-prices td {
     padding-left: 8px;
   }
-  .gs-box--compute .gs-tabs,
-  .gs-box--compute .gs-tab {
-    padding-inline: 4px;
-  }
 }
 .gs-boxfoot {
   display: flex;
@@ -1259,6 +1264,15 @@ p {
 /* The footer CTA(s) keep their width (never shrink/wrap mid-word); the note takes the rest. */
 .gs-boxfoot > [class*='awsui_button'] {
   flex: 0 0 auto;
+}
+
+@media (max-width: 480px) {
+  .gs-box--compute .gs-boxfoot {
+    flex-wrap: wrap;
+  }
+  .gs-box--compute .gs-foot__note {
+    flex-basis: 100%;
+  }
 }
 
 /* Shared tabs for installation methods and Sky compute options. */

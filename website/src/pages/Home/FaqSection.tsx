@@ -6,7 +6,12 @@ import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { highlightTerms } from '../../components/highlightTerms';
 
-const faqItems = [
+type FaqItem = {
+  q: string;
+  a: string | string[];
+};
+
+const faqItems: FaqItem[] = [
   {
     q: 'How does dstack differ from Slurm?',
     a: 'Slurm is a battle-tested workload manager with decades of production use in HPC environments. dstack is a unified orchestration layer built for containerized AI workloads and heterogeneous AI compute. While both support batch jobs and distributed training, dstack also provides first-class primitives for compute management, inference, and observability, including native cloud provisioning.',
@@ -26,9 +31,9 @@ const faqItems = [
 ];
 
 // FAQ block: a single-open accordion of questions beside contact actions.
-export function FaqSection({ items = faqItems, imageFirst = false }: {
-  items?: typeof faqItems;
-  imageFirst?: boolean;
+export function FaqSection({ items = faqItems, showContact = true }: {
+  items?: FaqItem[];
+  showContact?: boolean;
 }) {
   const [openQuestion, setOpenQuestion] = useState<string | null>(null);
 
@@ -45,25 +50,28 @@ export function FaqSection({ items = faqItems, imageFirst = false }: {
                 expanded={openQuestion === item.q}
                 onChange={({ detail }) => setOpenQuestion(detail.expanded ? item.q : null)}
               >
-                {highlightTerms(item.a)}
+                {(Array.isArray(item.a) ? item.a : [item.a]).map((paragraph, index) => (
+                  <p key={index}>{highlightTerms(paragraph)}</p>
+                ))}
               </ExpandableSection>
             ))}
           </div>
         }
         title="FAQ"
-        imageFirst={imageFirst}
         action={
           <SpaceBetween direction="horizontal" size="xs">
             <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
               Discord
             </Button>
-            <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
-              Contact us
-            </Button>
+            {showContact && (
+              <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+                Talk to us
+              </Button>
+            )}
           </SpaceBetween>
         }
       >
-        Have questions, or need help? Reach out to us on Discord or directly.
+        Have questions, or need help? Reach out to us on Discord{showContact && ' or directly'}.
       </AlternatingDocBlock>
     </section>
   );

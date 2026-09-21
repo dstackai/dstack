@@ -44,6 +44,7 @@ type ProductLink = {
   href: string;
   icon: ReactNode;
   badge: string;
+  external?: boolean;
 };
 
 // The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
@@ -53,8 +54,8 @@ type ProductLink = {
 // mkdocs/overrides/header-2.html — keep all three in sync.
 const products: ProductLink[] = [
   { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: asset(ROUTES.HOME), icon: <BoxGlyph />, badge: 'Self-hosted' },
-  { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted' },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
+  { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted', external: true },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'A GPU cloud marketplace. Rent GPUs on demand or bring your own compute.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
@@ -68,7 +69,7 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
       type: 'link',
       text: p.text,
       href: p.href,
-      external: true,
+      external: p.external,
       externalIconAriaLabel,
     })),
   },
@@ -79,8 +80,6 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
 
 function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string }) {
   const [open, setOpen] = useState(false);
-  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
-  const activeProductId = hoveredProductId ?? selectedProductId;
   const closeTimer = useRef<number | undefined>(undefined);
   const openMenu = () => {
     window.clearTimeout(closeTimer.current);
@@ -97,10 +96,7 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
     <div
       className="site-hover-menu"
       onMouseEnter={openMenu}
-      onMouseLeave={event => {
-        setHoveredProductId(null);
-        scheduleClose(event.currentTarget);
-      }}
+      onMouseLeave={event => scheduleClose(event.currentTarget)}
       onFocus={openMenu}
       onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -119,12 +115,10 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
           <div className="gs-rail" role="menu">
             <div className="gs-rail__group">Self-hosted</div>
             <a
-              className={`gs-opt gs-opt--feat${activeProductId === products[0].id ? ' gs-opt--on' : ''}`}
+              className={`gs-opt gs-opt--feat${selectedProductId === products[0].id ? ' gs-opt--on' : ''}`}
               role="menuitem"
               href={products[0].href}
-              onMouseEnter={() => setHoveredProductId(products[0].id)}
-              target="_blank"
-              rel="noreferrer"
+              aria-current={selectedProductId === products[0].id ? 'page' : undefined}
             >
               <span className="gs-opt__ic">{products[0].icon}</span>
               <span className="gs-opt__body">
@@ -137,11 +131,11 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
                 {product.badge !== products[index].badge && <div className="gs-rail__group">{product.badge}</div>}
                 <a
                   role="menuitem"
-                  className={`gs-opt gs-opt--row${activeProductId === product.id ? ' gs-opt--on' : ''}`}
+                  className={`gs-opt gs-opt--row${selectedProductId === product.id ? ' gs-opt--on' : ''}`}
                   href={product.href}
-                  onMouseEnter={() => setHoveredProductId(product.id)}
-                  target="_blank"
-                  rel="noreferrer"
+                  aria-current={selectedProductId === product.id ? 'page' : undefined}
+                  target={product.external ? '_blank' : undefined}
+                  rel={product.external ? 'noreferrer' : undefined}
                 >
                   <span className="gs-opt__ic">{product.icon}</span>
                   <span className="gs-opt__body">
@@ -226,7 +220,7 @@ export function SiteNavigation({
       {mobileNavigationOpen && (
         <div className="site-mobile-navigation" id="site-mobile-navigation">
           <SideNavigation
-            activeHref={pathname}
+            activeHref={asset(isSkyPage ? ROUTES.SKY : ROUTES.HOME)}
             items={[
               ...mobileNavigationItems,
               { type: 'link', ...menuAction, external: true, externalIconAriaLabel },

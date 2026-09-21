@@ -83,7 +83,7 @@
       <div class="cs-products-menu__popup" role="menu">
         <div class="gs-rail">
           <div class="gs-rail__group">Self-hosted</div>
-          <a class="gs-opt gs-opt--feat gs-opt--on" role="menuitem" href="/" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--feat" role="menuitem" href="/">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             </span>
@@ -102,13 +102,13 @@
             </span>
           </a>
           <div class="gs-rail__group">Hosted by us</div>
-          <a class="gs-opt gs-opt--row" role="menuitem" href="/products/sky" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--row" role="menuitem" href="/products/sky">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack Sky</span>
-              <span class="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
+              <span class="gs-opt__desc">A GPU cloud marketplace. Rent GPUs on demand or bring your own compute.</span>
             </span>
           </a>
         </div>
@@ -153,12 +153,6 @@
         var productsTrigger = productsMenu && productsMenu.querySelector('.cs-products-menu__trigger');
         if (productsTrigger) {
           var closeTimer;
-          var productOptions = Array.from(productsMenu.querySelectorAll('.gs-opt'));
-          var highlightProduct = function (selected) {
-            productOptions.forEach(function (option) {
-              option.classList.toggle('gs-opt--on', option === selected);
-            });
-          };
           var setProductsOpen = function (open) {
             clearTimeout(closeTimer);
             productsMenu.classList.toggle('cs-products-menu--open', open);
@@ -166,7 +160,6 @@
           };
           productsMenu.addEventListener('mouseenter', function () { setProductsOpen(true); });
           productsMenu.addEventListener('mouseleave', function () {
-            highlightProduct(productOptions[0]);
             closeTimer = setTimeout(function () {
               if (!productsMenu.querySelector(':focus-visible')) setProductsOpen(false);
             }, 150);
@@ -176,9 +169,6 @@
             if (!productsMenu.contains(e.relatedTarget)) setProductsOpen(false);
           });
           productsTrigger.addEventListener('click', function () { setProductsOpen(true); });
-          productOptions.forEach(function (option) {
-            option.addEventListener('mouseenter', function () { highlightProduct(option); });
-          });
           document.addEventListener('click', function (e) {
             if (!productsMenu.contains(e.target)) setProductsOpen(false);
           });

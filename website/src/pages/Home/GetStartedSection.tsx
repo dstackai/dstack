@@ -125,11 +125,11 @@ export function GetStartedSection() {
           </a>
 
           <div className="gs-rail__group">Hosted by us</div>
-          <a className="gs-opt gs-opt--row" href={asset(ROUTES.SKY)} target="_blank" rel="noreferrer">
+          <a className="gs-opt gs-opt--row" href={asset(ROUTES.SKY)}>
             <span className="gs-opt__ic"><CloudGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Sky</span>
-              <span className="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
+              <span className="gs-opt__desc">A GPU cloud marketplace. Rent GPUs on demand or bring your own compute.</span>
             </span>
           </a>
         </div>

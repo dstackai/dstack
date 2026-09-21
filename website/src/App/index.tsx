@@ -22,10 +22,10 @@ export function App() {
 
   useEffect(() => {
     const title = isSkyPage
-      ? 'dstack Sky — The AI cloud with AI-native orchestration'
+      ? 'dstack Sky — The GPU cloud marketplace'
       : 'dstack — The orchestration stack for AI infrastructure';
     const description = isSkyPage
-      ? 'A heterogeneous AI cloud with NVIDIA Blackwell, Hopper, and AMD Instinct GPUs. Access on-demand instances, spot capacity, and reserved clusters.'
+      ? 'On-demand compute from multiple GPU clouds with AI-native orchestration powered by dstack. Rent GPUs or bring your own compute.'
       : 'dstack is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters.';
     const url = isSkyPage ? 'https://dstack.ai/products/sky/' : 'https://dstack.ai/';
     document.title = title;
