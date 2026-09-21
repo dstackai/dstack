@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { product } from 'product';
 
 import { NavigateLink } from 'components';
 import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
@@ -41,7 +42,7 @@ export const LoginByGithubCallback: React.FC = () => {
                         .unwrap()
                         .then(async ({ creds: { token } }) => {
                             dispatch(setAuthData({ token }));
-                            if (process.env.UI_VERSION === 'sky') {
+                            if (product.hasPresets) {
                                 const result = await getProjects({}).unwrap();
                                 if (result.data.length === 0) {
                                     navigate(ROUTES.PROJECT.ADD);

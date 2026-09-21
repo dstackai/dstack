@@ -1,9 +1,11 @@
+import { product } from 'product';
+
 import { router } from './router';
 
 const MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID;
 
 export const initAnalytics = () => {
-    if (process.env.UI_VERSION !== 'sky' || !MEASUREMENT_ID) return;
+    if (!product.isSky || !MEASUREMENT_ID) return;
 
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () {

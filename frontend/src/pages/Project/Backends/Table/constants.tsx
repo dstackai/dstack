@@ -1,4 +1,5 @@
 import React from 'react';
+import { product } from 'product';
 
 export const BACKENDS_HELP_SKY = {
     header: <h2>Backends</h2>,
@@ -9,8 +10,8 @@ export const BACKENDS_HELP_SKY = {
             </p>
             <h4>Marketplace</h4>
             <p>
-                By default, <code>dstack Sky</code> includes a preset of backends that let you access compute from the{' '}
-                <code>dstack</code> marketplace and pay through your <code>dstack Sky</code> user billing.
+                By default, <code>{product.name}</code> includes a preset of backends that let you access compute from the{' '}
+                <code>dstack</code> marketplace and pay through your <code>{product.name}</code> user billing.
             </p>
             <h4>Your own cloud accounts</h4>
             <p>
