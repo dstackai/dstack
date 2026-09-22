@@ -103,13 +103,13 @@ export function GetStartedSection() {
       <div className="gs-deploy">
         <div className="gs-rail">
           <div className="gs-rail__group">Self-hosted</div>
-          <div className="gs-opt gs-opt--feat gs-opt--on">
+          <a className="gs-opt gs-opt--feat" href={docsUrl('installation')}>
             <span className="gs-opt__ic"><BoxGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack</span>
               <span className="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
             </span>
-          </div>
+          </a>
 
           <a
             className="gs-opt gs-opt--row"

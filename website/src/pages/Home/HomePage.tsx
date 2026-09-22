@@ -27,9 +27,9 @@ export function HomePage() {
           </h2>
           <p>
             {highlightTerms(
-              'dstack is an open-source orchestration layer for heterogeneous AI compute. ' +
-              'It standardizes how workloads run across GPU clouds, Kubernetes, and on-prem clusters, ' +
-              'across NVIDIA, AMD, Tenstorrent, and TPU accelerators.',
+              'dstack is an open-source orchestration layer for AI workloads on heterogeneous accelerators. ' +
+              'It standardizes how you manage compute and run training and inference on GPU clouds, ' +
+              'Kubernetes, VMs, or bare-metal clusters.',
             )}
           </p>
           <div className="home-hero__actions">
