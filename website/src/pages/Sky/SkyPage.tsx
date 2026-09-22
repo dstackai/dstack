@@ -51,11 +51,12 @@ export function SkyPage() {
             <section className="docs-section explore-section" id="compute">
               <AlternatingDocBlock
                 visual={<MarketplaceTabs />}
-                title="The GPU cloud marketplace"
+                title="Better prices, unified billing"
                 imageFirst
               >
-                dstack Sky offers on-demand and spot GPUs from a wide set of partners. You get
-                competitive pricing and capacity across regions, without depending on a single cloud.
+                The dstack Sky marketplace offers on-demand and spot GPUs from a wide set of partners.
+                You get competitive pricing and capacity across regions, without depending on a
+                single cloud.
                 <br />
                 <br />
                 One dstack Sky account gives you access to all marketplace partners. Billing is unified,
