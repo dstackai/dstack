@@ -25,9 +25,9 @@ export function SkyPage() {
           <h1>The GPU cloud marketplace</h1>
           <p>
             {highlightTerms(
-              'dstack Sky offers on-demand compute from a variety of GPU clouds, ' +
-              'with AI-native orchestration powered by dstack. ' +
-              'You can also bring your own compute.',
+              'dstack Sky combines GPU capacity from multiple cloud partners with competitive pricing, ' +
+              'unified billing, and AI-native orchestration. We host and manage the dstack server for you, ' +
+              'whether you use on-demand and spot GPUs from the marketplace or bring your own cloud and on-prem compute.',
             )}
           </p>
           <div className="home-hero__actions">
