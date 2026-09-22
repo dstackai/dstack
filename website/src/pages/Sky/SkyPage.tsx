@@ -27,7 +27,7 @@ export function SkyPage() {
             {highlightTerms(
               'dstack Sky combines GPU capacity from multiple cloud partners with competitive pricing, ' +
               'unified billing, and AI-native orchestration. We host and manage the dstack server for you, ' +
-              'whether you use on-demand and spot GPUs from the marketplace or bring your own cloud and on-prem compute.',
+              'whether you use the marketplace or bring your own cloud and on-prem compute.',
             )}
           </p>
           <div className="home-hero__actions">
