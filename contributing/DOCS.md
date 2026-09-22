@@ -72,18 +72,8 @@ just website-dev            # Vite dev server on http://127.0.0.1:5173
 Docs/blog links on the landing resolve same-origin (`/docs`, `/blog`), which 404 in standalone
 dev. Point them at a live site while iterating: `just website-dev https://dstack.ai`.
 
-The dstack Sky and dstack Factory product pages are served at `/products/sky/` and
-`/products/factory/`. Google Analytics uses the same property as the rest of the site.
-
-Each landing page has its own 1200×630 social preview using its hero title and squircle.
-The PNGs are published from `static-assets/images/` in
-[`dstackai/static-assets`](https://github.com/dstackai/static-assets), under
-`https://dstack.ai/static-assets/static-assets/images/`. Keep the OG/Twitter image URLs in the
-three HTML entries and `website/src/App/index.tsx` in sync. MkDocs still generates social cards
-for docs and blog pages.
-
-The [sitemap template](../mkdocs/overrides/sitemap.xml) includes these product pages in both
-`sitemap.xml` and `sitemap.xml.gz`. Keep its URLs in sync when adding or moving product pages.
+Keep page metadata in the HTML entries and `website/src/App/index.tsx` in sync.
+When adding or moving product pages, update the [sitemap template](../mkdocs/overrides/sitemap.xml).
 
 ## Building the whole site
 
