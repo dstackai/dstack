@@ -22,7 +22,7 @@ export function SkyPage() {
           </div>
         </div>
         <div className="site-frame home-hero__content">
-          <h1>The GPU cloud marketplace</h1>
+          <h1>One account across GPU clouds</h1>
           <p>
             {highlightTerms(
               'dstack Sky combines GPU capacity from multiple cloud partners with competitive pricing, ' +
@@ -51,7 +51,7 @@ export function SkyPage() {
             <section className="docs-section explore-section" id="compute">
               <AlternatingDocBlock
                 visual={<MarketplaceTabs />}
-                title="One account across GPU clouds"
+                title="The GPU cloud marketplace"
                 imageFirst
               >
                 dstack Sky offers on-demand and spot GPUs from a wide set of partners. You get
