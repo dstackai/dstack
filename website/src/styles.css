@@ -1071,7 +1071,9 @@ p {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
-.gs-opt.gs-opt--on {
+.gs-opt.gs-opt--on,
+.site-products-menu .gs-opt:hover,
+.site-products-menu .gs-opt:focus-visible {
   border-radius: 8px;
   background: var(--cs-bg);
   box-shadow: inset 0 0 0 0.5px var(--cs-text);
