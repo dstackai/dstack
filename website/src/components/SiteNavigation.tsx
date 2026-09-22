@@ -6,7 +6,7 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import { menuButtonStyle } from '../cloudscape-theme';
 import { ThemeToggle } from './ThemeToggle';
 import { asset } from '../asset';
-import { BLOG_URL, DOCS_URL, ROUTES } from '../routes';
+import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
 import { ThemeMode } from '../theme';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
@@ -53,7 +53,7 @@ type ProductLink = {
 // NOTE: the descriptions are duplicated in GetStartedSection.tsx (the product list) and
 // mkdocs/overrides/header-2.html — keep all three in sync.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: asset(ROUTES.HOME), icon: <BoxGlyph />, badge: 'Self-hosted' },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted' },
   { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted', external: true },
   { id: 'sky-product', text: 'dstack Sky', secondaryText: 'A GPU cloud marketplace. Rent GPUs on demand or bring your own compute.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
@@ -78,7 +78,7 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Blog', href: BLOG_URL },
 ];
 
-function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string }) {
+function ProductsHoverMenu({ selectedProductId }: { selectedProductId?: string }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<number | undefined>(undefined);
   const openMenu = () => {
@@ -197,7 +197,7 @@ export function SiteNavigation({
         <nav className="site-menu" aria-label="Global">
           <SpaceBetween direction="horizontal" size="l" alignItems="center">
             {/* Standalone "Products" hover menu — a flat list of the three products. Sits before "Docs". */}
-            <ProductsHoverMenu selectedProductId={isSkyPage ? 'sky-product' : 'open-source'} />
+            <ProductsHoverMenu selectedProductId={isSkyPage ? 'sky-product' : undefined} />
             {audienceNavItems.map(item => (
               <a key={item.label} className="site-menu-link" href={item.href}>
                 {item.label}
@@ -220,7 +220,7 @@ export function SiteNavigation({
       {mobileNavigationOpen && (
         <div className="site-mobile-navigation" id="site-mobile-navigation">
           <SideNavigation
-            activeHref={asset(isSkyPage ? ROUTES.SKY : ROUTES.HOME)}
+            activeHref={isSkyPage ? asset(ROUTES.SKY) : undefined}
             items={[
               ...mobileNavigationItems,
               { type: 'link', ...menuAction, external: true, externalIconAriaLabel },
