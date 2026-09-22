@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import Button from '@cloudscape-design/components/button';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import SpaceBetween from '@cloudscape-design/components/space-between';
@@ -31,15 +31,19 @@ const faqItems: FaqItem[] = [
 ];
 
 // FAQ block: a single-open accordion of questions beside contact actions.
-export function FaqSection({ items = faqItems, showContact = true }: {
+export function FaqSection({ items = faqItems, showContact = true, imageFirst = false, action, children }: {
   items?: FaqItem[];
   showContact?: boolean;
+  imageFirst?: boolean;
+  action?: ReactNode;
+  children?: ReactNode;
 }) {
   const [openQuestion, setOpenQuestion] = useState<string | null>(null);
 
   return (
     <section className="docs-section" id="faq">
       <AlternatingDocBlock
+        imageFirst={imageFirst}
         visual={
           <div className="faq-list">
             {items.map(item => (
@@ -58,7 +62,7 @@ export function FaqSection({ items = faqItems, showContact = true }: {
           </div>
         }
         title="FAQ"
-        action={
+        action={action ?? (
           <SpaceBetween direction="horizontal" size="xs">
             <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
               Discord
@@ -69,9 +73,9 @@ export function FaqSection({ items = faqItems, showContact = true }: {
               </Button>
             )}
           </SpaceBetween>
-        }
+        )}
       >
-        Have questions, or need help? Reach out to us on Discord{showContact && ' or directly'}.
+        {children ?? <>Have questions, or need help? Reach out to us on Discord{showContact && ' or directly'}.</>}
       </AlternatingDocBlock>
     </section>
   );

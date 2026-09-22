@@ -53,8 +53,8 @@ type ProductLink = {
 // NOTE: the descriptions are duplicated in GetStartedSection.tsx (the product list) and
 // mkdocs/overrides/header-2.html — keep all three in sync.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted' },
-  { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted', external: true },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted', external: true },
+  { id: 'factory', text: 'dstack Factory', secondaryText: 'A heterogeneous orchestration stack for AI token factories.', href: asset(ROUTES.FACTORY), icon: <LayersGlyph />, badge: 'Self-hosted' },
   { id: 'sky-product', text: 'dstack Sky', secondaryText: 'One account across GPU clouds. Better prices and unified billing.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
 
@@ -77,6 +77,11 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Case studies', href: `${BLOG_URL}/case-studies/` },
   { type: 'link', text: 'Blog', href: BLOG_URL },
 ];
+
+function isProductLink(target: EventTarget | null) {
+  const href = target instanceof Element ? target.closest('a')?.getAttribute('href') : null;
+  return products.some(product => product.href === href);
+}
 
 function ProductsHoverMenu({ selectedProductId }: { selectedProductId?: string }) {
   const [open, setOpen] = useState(false);
@@ -119,6 +124,8 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId?: string }
               role="menuitem"
               href={products[0].href}
               aria-current={selectedProductId === products[0].id ? 'page' : undefined}
+              target={products[0].external ? '_blank' : undefined}
+              rel={products[0].external ? 'noreferrer' : undefined}
             >
               <span className="gs-opt__ic">{products[0].icon}</span>
               <span className="gs-opt__body">
@@ -162,11 +169,17 @@ export function SiteNavigation({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [mobileProductHovered, setMobileProductHovered] = useState(false);
+  const [mobileProductFocused, setMobileProductFocused] = useState(false);
 
   const isSkyPage = pathname.replace(/\/$/, '') === ROUTES.SKY;
-  const menuAction = isSkyPage
-    ? { text: 'Sign in', href: 'https://sky.dstack.ai/' }
-    : { text: 'GitHub', href: dstackGithubUrl };
+  const isFactoryPage = pathname.replace(/\/$/, '') === ROUTES.FACTORY;
+  const selectedProductId = isSkyPage ? 'sky-product' : isFactoryPage ? 'factory' : undefined;
+  const menuAction = isFactoryPage
+    ? { text: 'Talk to us', href: 'https://calendly.com/dstackai/discovery-call' }
+    : isSkyPage
+      ? { text: 'Sign in', href: 'https://sky.dstack.ai/' }
+      : { text: 'GitHub', href: dstackGithubUrl };
 
   const go = (to: string) => {
     navigate(to);
@@ -183,7 +196,11 @@ export function SiteNavigation({
             ariaLabel={mobileNavigationOpen ? 'Close navigation' : 'Open navigation'}
             ariaExpanded={mobileNavigationOpen}
             ariaControls="site-mobile-navigation"
-            onClick={() => setMobileNavigationOpen(open => !open)}
+            onClick={() => {
+              setMobileNavigationOpen(open => !open);
+              setMobileProductHovered(false);
+              setMobileProductFocused(false);
+            }}
           />
         </div>
         <button
@@ -197,7 +214,7 @@ export function SiteNavigation({
         <nav className="site-menu" aria-label="Global">
           <SpaceBetween direction="horizontal" size="l" alignItems="center">
             {/* Standalone "Products" hover menu — a flat list of the three products. Sits before "Docs". */}
-            <ProductsHoverMenu selectedProductId={isSkyPage ? 'sky-product' : undefined} />
+            <ProductsHoverMenu selectedProductId={selectedProductId} />
             {audienceNavItems.map(item => (
               <a key={item.label} className="site-menu-link" href={item.href}>
                 {item.label}
@@ -218,9 +235,18 @@ export function SiteNavigation({
         <div className="site-mobile-spacer" aria-hidden="true" />
       </div>
       {mobileNavigationOpen && (
-        <div className="site-mobile-navigation" id="site-mobile-navigation">
+        <div
+          className="site-mobile-navigation"
+          id="site-mobile-navigation"
+          onMouseOver={event => setMobileProductHovered(isProductLink(event.target))}
+          onMouseLeave={() => setMobileProductHovered(false)}
+          onFocus={event => setMobileProductFocused(isProductLink(event.target))}
+          onBlur={event => setMobileProductFocused(isProductLink(event.relatedTarget))}
+        >
           <SideNavigation
-            activeHref={isSkyPage ? asset(ROUTES.SKY) : undefined}
+            activeHref={mobileProductHovered || mobileProductFocused
+              ? ''
+              : products.find(product => product.id === selectedProductId)?.href}
             items={[
               ...mobileNavigationItems,
               { type: 'link', ...menuAction, external: true, externalIconAriaLabel },

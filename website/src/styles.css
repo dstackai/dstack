@@ -1075,7 +1075,7 @@ p {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
-.gs-opt.gs-opt--on,
+.gs-rail:not(:has(a.gs-opt:hover, a.gs-opt:focus-visible)) .gs-opt.gs-opt--on,
 .gs-rail a.gs-opt:hover,
 .gs-rail a.gs-opt:focus-visible {
   border-radius: 8px;
@@ -1915,6 +1915,10 @@ p {
     display: grid;
     grid-template-columns: 1fr 1fr;
     width: 100%;
+  }
+
+  .home-hero__actions--single {
+    grid-template-columns: max-content;
   }
   /* Each button fills its half-column; center the label and trim the desktop 34px side
      padding so both fit. !important: Cloudscape sets text-align:start via a boosted rule. */

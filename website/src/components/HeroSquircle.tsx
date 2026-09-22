@@ -1,21 +1,21 @@
+import { useMemo } from 'react';
 import {
   SquircleScene,
   type SquircleGeometryConfig,
   type SquircleLayerConfig,
   type SquircleLayerHoverContext,
+  type SquirclePaletteId,
 } from '@dstackai/sqircle';
 import '@dstackai/sqircle/style.css';
 import type { ThemeMode } from '../theme';
 
-// Live hero object, composed in the squircle constructor (@dstackai/sqircle) and pasted here.
-// Layers, back → front: wireframe slab (dashed inlay) → wireframe slab → solid
-// "GPU" face (dotted inlay). Layers cross-react on hover, and clicking any layer scrolls to
-// Get-started. `theme` stays driven by the app toggle (the snippet hardcodes "light").
+// Home-style layers, back to front: dashed wireframe, transparent, and solid metal.
+// Factory uses the same materials and hover behavior with a different label and palette.
 const HERO_GEOMETRY: SquircleGeometryConfig = {
   angleDegrees: 20,
 };
 
-const HERO_LAYERS: SquircleLayerConfig[] = [
+const createHeroLayers = (topLabel: string, paletteId: SquirclePaletteId): SquircleLayerConfig[] => [
   {
     id: 'layer-1',
     visible: true,
@@ -31,9 +31,9 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     // Hovering this bottom slab itself turns it into a solid metal "dstack" face (no inlay line).
     hover: (ctx: SquircleLayerHoverContext) => {
       if (ctx.hoveredLayerId === 'layer-1')
-        return { material: 'solid', paletteId: '20', effect: 'metal', text: 'dstack', line: false }
-      return false
-    }
+        return { material: 'solid', paletteId, effect: 'metal', text: 'dstack', line: false };
+      return false;
+    },
   },
   {
     id: 'layer-2',
@@ -41,16 +41,12 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     offset: { x: 0, y: 88 },
     base: {
       material: 'transparent',
-      paletteId: '20',
-      // line: false,
+      paletteId,
     },
     stroke: { face: 0 },
-    // Cross-layer hover (0.1.4 resolver API): hovering the top (layer-3) or bottom (layer-1)
-    // slab keeps this middle a wireframe; hovering the middle itself turns it transparent.
     hover: (ctx: SquircleLayerHoverContext) => {
       if (ctx.hoveredLayerId === 'layer-2') return { material: 'wireframe' };
-      if (ctx.hoveredLayerId === 'layer-1')
-        return { material: 'wireframe' };
+      if (ctx.hoveredLayerId === 'layer-1') return { material: 'wireframe' };
       return false;
     },
   },
@@ -60,36 +56,42 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     offset: { x: 0, y: 0 },
     base: {
       material: 'solid',
-      paletteId: '20',
+      paletteId,
       effect: 'metal',
-      text: 'GPU',
+      text: topLabel,
       textColor: 'auto',
       textStyle: 'solid',
-      // line: 'dotted',
       lineColor: 'auto',
       grain: true,
     },
-    // Top "GPU" face hover behavior:
-    //  - hovering itself (layer-3): becomes solid palette 20 with the metal effect;
-    //  - hovering the bottom (layer-1): wireframe, "GPU" text outlined, inlay line removed;
-    //  - hovering the middle (layer-2): wireframe, "GPU" text outlined (line kept).
     hover: (ctx: SquircleLayerHoverContext) => {
-      if (ctx.hoveredLayerId === 'layer-1') return { material: 'wireframe', line: 'dotted', palletteId: 15, textStyle: 'wireframe' };
-      // if (ctx.hoveredLayerId === 'layer-2') return { material: 'wireframe', line: 'dotted', palletteId: 15 };
-      if (ctx.hoveredLayerId === 'layer-3') return { material: 'wireframe', line: 'dotted', palletteId: 15 };
+      if (ctx.hoveredLayerId === 'layer-1') return { material: 'wireframe', line: 'dotted', textStyle: 'wireframe' };
+      if (ctx.hoveredLayerId === 'layer-3') return { material: 'wireframe', line: 'dotted' };
       return false;
     },
   },
 ];
 
-export function HeroSquircle({ theme }: { theme: ThemeMode }) {
+export function HeroSquircle({
+  theme,
+  topLabel = 'GPU',
+  paletteId = '20',
+  ariaLabel = 'dstack orchestration stack',
+}: {
+  theme: ThemeMode;
+  topLabel?: string;
+  paletteId?: SquirclePaletteId;
+  ariaLabel?: string;
+}) {
+  const layers = useMemo(() => createHeroLayers(topLabel, paletteId), [topLabel, paletteId]);
+
   return (
     <div className="hero-squircle">
       <SquircleScene
         theme={theme}
-        layers={HERO_LAYERS}
+        layers={layers}
         geometry={HERO_GEOMETRY}
-        ariaLabel="dstack orchestration stack"
+        ariaLabel={ariaLabel}
         // Clicking any layer scrolls to the Get-started section (like the hero "Get started" CTA).
         onLayerClick={() =>
           document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' })
