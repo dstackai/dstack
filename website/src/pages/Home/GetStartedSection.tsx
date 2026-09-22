@@ -7,7 +7,7 @@ import { mainButtonStyle } from '../../cloudscape-theme';
 import { installMethods, maxInstallLines, padYamlToLines } from '../../data/snippets';
 import { DOCS_URL, ROUTES, docsUrl } from '../../routes';
 
-const BoxGlyph = () => (
+export const BoxGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
   </svg>
@@ -17,7 +17,7 @@ export const CloudGlyph = () => (
     <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
   </svg>
 );
-const LayersGlyph = () => (
+export const LayersGlyph = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
   </svg>
@@ -103,33 +103,31 @@ export function GetStartedSection() {
       <div className="gs-deploy">
         <div className="gs-rail">
           <div className="gs-rail__group">Self-hosted</div>
-          <div className="gs-opt gs-opt--feat gs-opt--on">
+          <a className="gs-opt gs-opt--feat" href={docsUrl('installation')} target="_blank" rel="noreferrer">
             <span className="gs-opt__ic"><BoxGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack</span>
               <span className="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
             </span>
-          </div>
+          </a>
 
           <a
             className="gs-opt gs-opt--row"
-            href="https://calendly.com/dstackai/discovery-call"
-            target="_blank"
-            rel="noreferrer"
+            href={asset(ROUTES.FACTORY)}
           >
             <span className="gs-opt__ic"><LayersGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Factory</span>
-              <span className="gs-opt__desc">A complete software stack for AI labs, inference providers, and data centers.</span>
+              <span className="gs-opt__desc">A heterogeneous orchestration stack for AI token factories.</span>
             </span>
           </a>
 
           <div className="gs-rail__group">Hosted by us</div>
-          <a className="gs-opt gs-opt--row" href={asset(ROUTES.SKY)} target="_blank" rel="noreferrer">
+          <a className="gs-opt gs-opt--row" href={asset(ROUTES.SKY)}>
             <span className="gs-opt__ic"><CloudGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Sky</span>
-              <span className="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
+              <span className="gs-opt__desc">One account across GPU clouds. Better prices and unified billing.</span>
             </span>
           </a>
         </div>

@@ -83,7 +83,7 @@
       <div class="cs-products-menu__popup" role="menu">
         <div class="gs-rail">
           <div class="gs-rail__group">Self-hosted</div>
-          <a class="gs-opt gs-opt--feat gs-opt--on" role="menuitem" href="/" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--feat" role="menuitem" href="/docs/installation">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             </span>
@@ -92,13 +92,13 @@
               <span class="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
             </span>
           </a>
-          <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="https://calendly.com/dstackai/discovery-call" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="/products/factory" target="_blank" rel="noreferrer">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack Factory</span>
-              <span class="gs-opt__desc">A complete software stack for AI labs, inference providers, and data centers.</span>
+              <span class="gs-opt__desc">A heterogeneous orchestration stack for AI token factories.</span>
             </span>
           </a>
           <div class="gs-rail__group">Hosted by us</div>
@@ -108,7 +108,7 @@
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack Sky</span>
-              <span class="gs-opt__desc">An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.</span>
+              <span class="gs-opt__desc">One account across GPU clouds. Better prices and unified billing.</span>
             </span>
           </a>
         </div>
@@ -153,12 +153,6 @@
         var productsTrigger = productsMenu && productsMenu.querySelector('.cs-products-menu__trigger');
         if (productsTrigger) {
           var closeTimer;
-          var productOptions = Array.from(productsMenu.querySelectorAll('.gs-opt'));
-          var highlightProduct = function (selected) {
-            productOptions.forEach(function (option) {
-              option.classList.toggle('gs-opt--on', option === selected);
-            });
-          };
           var setProductsOpen = function (open) {
             clearTimeout(closeTimer);
             productsMenu.classList.toggle('cs-products-menu--open', open);
@@ -166,7 +160,6 @@
           };
           productsMenu.addEventListener('mouseenter', function () { setProductsOpen(true); });
           productsMenu.addEventListener('mouseleave', function () {
-            highlightProduct(productOptions[0]);
             closeTimer = setTimeout(function () {
               if (!productsMenu.querySelector(':focus-visible')) setProductsOpen(false);
             }, 150);
@@ -176,9 +169,6 @@
             if (!productsMenu.contains(e.relatedTarget)) setProductsOpen(false);
           });
           productsTrigger.addEventListener('click', function () { setProductsOpen(true); });
-          productOptions.forEach(function (option) {
-            option.addEventListener('mouseenter', function () { highlightProduct(option); });
-          });
           document.addEventListener('click', function (e) {
             if (!productsMenu.contains(e.target)) setProductsOpen(false);
           });

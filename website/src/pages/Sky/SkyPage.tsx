@@ -1,35 +1,17 @@
-import { KeyboardEvent, useRef, useState } from 'react';
 import Button from '@cloudscape-design/components/button';
 import { useLayoutContext } from '../../App';
-import { heroButtonStyle, mainButtonStyle } from '../../cloudscape-theme';
+import { heroButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
+import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
 import { highlightTerms } from '../../components/highlightTerms';
 import { KeyConceptsBlock } from '../Home/ExploreSection';
 import { FaqSection } from '../Home/FaqSection';
-import { CapList, ChipGlyph, CloudGlyph, KubernetesGlyph, ServerGlyph } from '../Home/GetStartedSection';
 import { TrustedBySection } from '../Home/TrustedBySection';
 import { HeroSquircle } from './HeroSquircle';
-import { gpuPrices } from './pricing';
-
-const computeTabs = ['On-demand', 'Reserved clusters', 'BYOC'];
+import { MarketplaceTabs } from './MarketplaceTabs';
 
 export function SkyPage() {
   const { theme } = useLayoutContext();
-  const [computeTab, setComputeTab] = useState(0);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const nextIndex = {
-      ArrowRight: (index + 1) % computeTabs.length,
-      ArrowLeft: (index + computeTabs.length - 1) % computeTabs.length,
-      Home: 0,
-      End: computeTabs.length - 1,
-    }[event.key];
-    if (nextIndex === undefined) return;
-    event.preventDefault();
-    setComputeTab(nextIndex);
-    tabRefs.current[nextIndex]?.focus();
-  };
 
   return (
     <main className="home-main home-main--sky">
@@ -40,12 +22,12 @@ export function SkyPage() {
           </div>
         </div>
         <div className="site-frame home-hero__content">
-          <h1>The AI cloud with AI-native orchestration</h1>
+          <h1>One account across GPU clouds</h1>
           <p>
             {highlightTerms(
-              'dstack Sky is a heterogeneous AI cloud with NVIDIA Blackwell, Hopper, and AMD Instinct GPUs. ' +
-              'Built on dstack, it combines compute management, training, inference, ' +
-              'and observability in one interface.',
+              'dstack Sky combines GPU capacity from multiple cloud partners with competitive pricing, ' +
+              'unified billing, and AI-native orchestration. We host and manage the dstack server for you, ' +
+              'whether you use the marketplace or bring your own cloud and on-prem compute.',
             )}
           </p>
           <div className="home-hero__actions">
@@ -68,122 +50,53 @@ export function SkyPage() {
           <article className="docs-article">
             <section className="docs-section explore-section" id="compute">
               <AlternatingDocBlock
-                visual={
-                  <div className={`gs-box gs-box--compute${computeTab === 0 ? ' gs-box--offers' : ''}`}>
-                    <div className="gs-tabs" role="tablist" aria-label="Compute options">
-                      {computeTabs.map((label, index) => (
-                        <button
-                          key={label}
-                          ref={element => { tabRefs.current[index] = element; }}
-                          id={`sky-compute-tab-${index}`}
-                          type="button"
-                          role="tab"
-                          aria-selected={computeTab === index}
-                          aria-controls={`sky-compute-panel-${index}`}
-                          tabIndex={computeTab === index ? 0 : -1}
-                          className={`gs-tab${computeTab === index ? ' gs-tab--on' : ''}`}
-                          onClick={() => setComputeTab(index)}
-                          onKeyDown={event => onTabKeyDown(event, index)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <div
-                      key={computeTab}
-                      className="gs-skybody"
-                      id={`sky-compute-panel-${computeTab}`}
-                      role="tabpanel"
-                      aria-labelledby={`sky-compute-tab-${computeTab}`}
-                      tabIndex={0}
-                    >
-                      {computeTab === 0 && (
-                        <table className="sky-gpu-prices" aria-label="GPU prices in USD per GPU-hour">
-                          <thead>
-                            <tr>
-                              <th scope="col">GPU</th>
-                              <th scope="col">On-demand</th>
-                              <th scope="col">Spot</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {gpuPrices.map(gpu => (
-                              <tr key={`${gpu.name} ${gpu.memory}`}>
-                                <th scope="row">
-                                  <span className="gs-mkt__left">
-                                    <span className="gs-li__ic"><ChipGlyph /></span>
-                                    <span className="gs-mkt__g"><span className="gs-mkt__name">{gpu.name}</span>{' '}{gpu.memory}</span>
-                                  </span>
-                                </th>
-                                <td>{gpu.onDemand}</td>
-                                <td>{gpu.spot ?? '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                      {computeTab === 1 && (
-                        <CapList items={[
-                          { icon: <ServerGlyph />, title: 'GPU clusters', sub: 'Reserve for a fixed period at a price agreed in advance' },
-                        ]} />
-                      )}
-                      {computeTab === 2 && (
-                        <CapList items={[
-                          { icon: <CloudGlyph />, title: 'GPU clouds', sub: 'AWS, GCP, Azure, Nebius, Runpod, and more' },
-                          { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Pre-provisioned VMs or bare-metal' },
-                          { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Existing Kubernetes clusters' },
-                        ]} />
-                      )}
-                    </div>
-                    <div className="gs-boxfoot">
-                      {computeTab !== 1 && (
-                        <span className="gs-foot__note">
-                          {computeTab === 0 ? 'Prices in USD per GPU-hour' : 'Bring your own compute'}
-                        </span>
-                      )}
-                      {computeTab === 1 && (
-                        <Button
-                          href="https://calendly.com/dstackai/discovery-call"
-                          target="_blank"
-                          iconName="external"
-                          iconAlign="right"
-                          style={mainButtonStyle}
-                        >
-                          Contact us
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                }
-                title="On-demand GPUs for AI workloads"
+                visual={<MarketplaceTabs />}
+                title="Better prices, unified billing"
                 imageFirst
               >
-                Access affordable on-demand and spot GPUs with pay-as-you-go pricing.
+                The dstack Sky marketplace offers on-demand and spot GPUs from a wide set of partners.
+                You get competitive pricing and capacity across regions, without depending on a
+                single cloud.
                 <br />
                 <br />
-                You can also bring compute from your own cloud accounts or on-prem infrastructure
-                and use it alongside Sky GPUs.
+                One dstack Sky account gives you access to all marketplace partners. Billing is unified,
+                with no separate cloud accounts to manage.
               </AlternatingDocBlock>
 
-              <KeyConceptsBlock>
+              <AlternatingDocBlock
+                visual={<ComputeSourcesTabs cloudsFirst />}
+                title="Bring your own compute"
+              >
+                dstack Sky provisions and manages compute in your own GPU cloud accounts using your
+                credentials. Compute is billed directly to those accounts.
+                <br />
+                <br />
+                You can also bring on-prem compute, including Kubernetes clusters, pre-provisioned
+                VMs, and bare-metal clusters. We host and maintain the dstack server for you.
+              </AlternatingDocBlock>
+
+              <KeyConceptsBlock imageFirst>
                 dstack Sky provides first-class primitives for compute management, training,
-                inference, and observability across heterogeneous AI compute. Use one interface
-                to efficiently utilize cloud GPUs, manage your own clusters, or run your own
-                AI token factory at scale.
+                inference, and observability across heterogeneous AI compute.
                 <br />
                 <br />
-                Sky is built on dstack and uses the same CLI and YAML configurations as a
-                self-hosted dstack server.
+                dstack Sky includes all the features of open-source dstack and uses the same CLI and
+                YAML configurations. It adds a built-in gateway with an HTTPS domain, advanced
+                observability, and usage metering.
               </KeyConceptsBlock>
             </section>
 
-            <FaqSection imageFirst items={[
+            <FaqSection showContact={false} items={[
               {
                 q: 'How is dstack Sky different from dstack?',
-                a: 'dstack is an open-source orchestration stack that you host yourself. ' +
-                  'dstack Sky is hosted by us and provides GPU compute on demand. ' +
-                  'You can also bring compute from your own cloud accounts or on-prem infrastructure. ' +
-                  'Both use the same CLI and YAML configurations.',
+                a: [
+                  'With dstack Sky, we host and maintain the server for you. ' +
+                    'With open-source dstack, you host the server yourself.',
+                  'dstack Sky includes all open-source features and adds a built-in gateway with an HTTPS domain, advanced observability, and usage metering.',
+                  'dstack Sky also provides a GPU marketplace with unified billing. ' +
+                    'Both support your own cloud accounts and on-prem compute. ' +
+                    'The CLI and YAML configurations are the same.',
+                ],
               },
             ]} />
 

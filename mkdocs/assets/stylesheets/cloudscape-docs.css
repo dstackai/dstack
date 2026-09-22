@@ -292,9 +292,8 @@
     margin-top: 0;
 }
 
-/* The switcher rail — copied from the landing (website/src/styles.css, .gs-rail block): grouped
-   rows under solid bars, with a selected card. The docs and the landing are separate
-   builds, so changes to the rail styles must be mirrored here (and vice versa). */
+/* Shared rail visuals match website/src/styles.css. Docs have no current product,
+   so rows are highlighted only on hover or keyboard focus. */
 .gs-rail {
     display: flex;
     flex-direction: column;
@@ -329,10 +328,11 @@
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
-.gs-opt.gs-opt--on {
+.gs-opt:hover,
+.gs-opt:focus-visible {
     border-radius: 8px;
     background: var(--cs-bg);
-    box-shadow: inset 0 0 0 1px var(--cs-text);
+    box-shadow: inset 0 0 0 0.5px var(--cs-text);
 }
 .gs-opt--feat {
     padding: 13px 14px;

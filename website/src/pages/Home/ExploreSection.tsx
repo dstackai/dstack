@@ -1,9 +1,9 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
+import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
 import { highlightTerms } from '../../components/highlightTerms';
 import { docsUrl } from '../../routes';
-import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedSection';
 
 // Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
@@ -34,74 +34,11 @@ export function ExploreSection() {
   );
 }
 
-// Clouds grid for the merged compute block, grouped per column: traditional hyperscalers,
-// top GPU neoclouds, then smaller GPU clouds.
-const CLOUD_GROUPS = [
-  ['AWS', 'GCP', 'Azure', 'OCI', 'DigitalOcean', 'Vultr'],
-  ['Nebius', 'Crusoe', 'Lambda', 'Verda', 'Runpod'],
-  ['AMD Dev Cloud', 'Hot Aisle', 'Vast.ai', 'JarvisLabs'],
-];
-
-// On-prem capability rows for the compute block.
-const onPremItems = [
-  { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Attach bare-metal servers or VMs with SSH access' },
-  { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Attach your existing Kubernetes clusters' },
-];
-
-// Tabbed on-prem capabilities and cloud providers for bring-your-own compute.
+// Tabbed on-prem capabilities and GPU clouds for bring-your-own compute.
 function BringComputeBlock() {
-  const [pane, setPane] = useState<'onprem' | 'clouds'>('onprem');
   return (
     <AlternatingDocBlock
-      visual={
-        <div className="gs-box">
-          <div className="gs-tabs" role="tablist" aria-label="Bring your own compute">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pane === 'onprem'}
-              className={`gs-tab${pane === 'onprem' ? ' gs-tab--on' : ''}`}
-              onClick={() => setPane('onprem')}
-            >
-              On-prem
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pane === 'clouds'}
-              className={`gs-tab${pane === 'clouds' ? ' gs-tab--on' : ''}`}
-              onClick={() => setPane('clouds')}
-            >
-              Clouds
-            </button>
-          </div>
-          <div className="gs-skybody">
-            {pane === 'onprem' && <CapList items={onPremItems} />}
-            {pane === 'clouds' && (
-              <div className="gs-cloudcols">
-                {CLOUD_GROUPS.map(group => (
-                  <ul key={group[0]}>
-                    {group.map(cloud => (
-                      <li key={cloud} className="gs-cloud">
-                        <span className="gs-li__ic"><CloudGlyph /></span>
-                        <span>{cloud}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="gs-boxfoot">
-            {pane === 'onprem' && (
-              <span className="gs-foot__note">Bring bare-metal servers, a Kubernetes cluster, or just VMs</span>
-            )}
-            {pane === 'clouds' && (
-              <span className="gs-foot__note">Configure credentials for your clouds to automate provisioning</span>
-            )}
-          </div>
-        </div>
-      }
+      visual={<ComputeSourcesTabs />}
       title="Bring your own compute"
       imageFirst
     >
@@ -118,7 +55,10 @@ function BringComputeBlock() {
   );
 }
 
-export function KeyConceptsBlock({ children }: { children?: ReactNode }) {
+export function KeyConceptsBlock({ children, imageFirst = false }: {
+  children?: ReactNode;
+  imageFirst?: boolean;
+}) {
   return (
     <AlternatingDocBlock
       visual={
@@ -136,6 +76,7 @@ export function KeyConceptsBlock({ children }: { children?: ReactNode }) {
         </div>
       }
       title="AI-native orchestration"
+      imageFirst={imageFirst}
     >
       {children ?? <>
         Managing AI infrastructure requires first-class primitives for compute management, training, inference, and observability that support heterogeneous AI compute.
