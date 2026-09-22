@@ -129,7 +129,7 @@ export function GetStartedSection() {
             <span className="gs-opt__ic"><CloudGlyph /></span>
             <span className="gs-opt__body">
               <span className="gs-opt__name">dstack Sky</span>
-              <span className="gs-opt__desc">A GPU cloud marketplace. Rent GPUs on demand or bring your own compute.</span>
+              <span className="gs-opt__desc">One account across GPU clouds. Better prices and unified billing.</span>
             </span>
           </a>
         </div>
