@@ -201,7 +201,14 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     ServiceRouterWorkerSyncModel.id == item.id,
                     ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
                 )
-                .options(selectinload(ServiceRouterWorkerSyncModel.run))
+                .options(
+                    joinedload(ServiceRouterWorkerSyncModel.run).load_only(
+                        RunModel.id,
+                        RunModel.deleted,
+                        RunModel.status,
+                        RunModel.run_spec,
+                    )
+                )
             )
             sync_row = res.unique().scalar_one_or_none()
             if sync_row is None:
@@ -229,7 +236,11 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 select(RunModel)
                 .where(RunModel.id == item.run_id)
                 .options(
-                    load_only(RunModel.id, RunModel.run_spec),
+                    load_only(
+                        RunModel.id,
+                        RunModel.run_name,
+                        RunModel.run_spec,
+                    ),
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
@@ -238,6 +249,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     )
                     .load_only(
                         JobModel.id,
+                        JobModel.job_name,
                         JobModel.status,
                         JobModel.job_spec_data,
                         JobModel.job_provisioning_data,
