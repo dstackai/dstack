@@ -35,9 +35,6 @@ class TestSupportedInstances:
             "BM.GPU.L40S.4",
             "BM.GPU.H100.8",
             "BM.GPU.H200.8",
-            "BM.GPU.B200.8",
-            "BM.GPU.B300.8",
-            "BM.GPU.RTXPRO.8",
         ],
     )
     def test_supported(self, shape_name: str):
@@ -57,6 +54,10 @@ class TestSupportedInstances:
             # AMD Instinct: no ROCm image
             "BM.GPU.MI300X.8",
             "BM.GPU.MI355X.8",
+            # Blackwell: not tested on real hardware yet
+            "BM.GPU.B200.8",
+            "BM.GPU.B300.8",
+            "BM.GPU.RTXPRO.8",
             # Deprecated families
             "BM.GPU2.2",
             "VM.GPU2.1",

@@ -41,6 +41,9 @@ from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 # - BM.GPU.MI300X.*, BM.GPU.MI355X.* (AMD Instinct): no ROCm image is published, and
 #   `create_instance` picks the CUDA image for any GPU offer.
 # - BM.GPU.GB200.*, BM.GPU.GB300.* (Grace superchips): arm64 hosts, no arm64 image is published.
+# - BM.GPU.B200.*, BM.GPU.B300.*, BM.GPU.RTXPRO.* (Blackwell): x86-64 NVIDIA hosts that the
+#   images should run, but they have not been tested on real hardware yet, so they are left
+#   out until someone with quota can confirm a run on them.
 # See https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
@@ -59,9 +62,6 @@ SUPPORTED_SHAPE_FAMILIES = [
     "BM.GPU.L40S.",
     "BM.GPU.H100.",
     "BM.GPU.H200.",
-    "BM.GPU.B200.",
-    "BM.GPU.B300.",
-    "BM.GPU.RTXPRO.",
 ]
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("32TB"))
 
