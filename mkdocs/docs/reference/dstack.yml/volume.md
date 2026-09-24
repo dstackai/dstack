@@ -30,11 +30,18 @@ The `volume` configuration type allows creating, registering, and updating [volu
 
     Kubernetes backend volumes are mapped to [`PersistentVolumeClaim`](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) objects.
 
+    Set `region` to an enabled kubeconfig context name from the
+    [backend configuration](../../concepts/backends.md#kubernetes), even if only one context is enabled.
+    The claim is created or looked up in that context's namespace.
+    You can omit `region` only with the legacy backend configuration without `contexts`, which
+    uses the kubeconfig's `current-context` and the backend's `namespace` setting.
+
     To create a new claim, specify `size` and optionally `storage_class_name` and/or `access_modes`:
 
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: new-volume
     size: 100GB
     # By default, storage_class_name is not set, and the decision is delegated to
@@ -51,6 +58,7 @@ The `volume` configuration type allows creating, registering, and updating [volu
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: existing-volume
     claim_name: existing-pvc
     ```

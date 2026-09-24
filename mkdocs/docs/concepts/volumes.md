@@ -43,13 +43,19 @@ size: 100GB
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
 ??? info "Kubernetes"
-    With the `kubernetes` backend, you don't have to specify `region`, but you can optionally specify  `storage_class_name` and/or `access_modes`:
+    With the `kubernetes` backend, set `region` to an enabled kubeconfig context name from the
+    [backend configuration](backends.md#kubernetes), even if only one context is enabled.
+    You can omit `region` only with the legacy backend configuration without `contexts`, which
+    uses the kubeconfig's `current-context` and the backend's `namespace` setting.
+
+    You can optionally specify `storage_class_name` and/or `access_modes`:
 
     <div editor-title="volume.dstack.yml"> 
 
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: my-volume
 
     size: 100GB
@@ -57,7 +63,8 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
     </div>
 
-    This automatically creates a `PersistentVolumeClaim` and associates it with the volume.
+    This creates a `PersistentVolumeClaim` in the selected context's namespace and associates it
+    with the volume.
 
     If you don't specify `storage_class_name`, the decision is delegated to the `DefaultStorageClass` admission controller, if enabled.
     
@@ -110,13 +117,16 @@ If you register an existing volume, you must ensure the volume already has a fil
 
 ??? info "Kubernetes"
 
-    With the `kubernetes` backend, to reuse an existing `PersistentVolumeClaim`, specify its name in `claim_name`:
+    With the `kubernetes` backend, to reuse an existing `PersistentVolumeClaim`, specify its name
+    in `claim_name` and select its cluster with `region`, as when creating a volume.
+    The claim must exist in the selected context's namespace.
 
     <div editor-title="volume.dstack.yml"> 
 
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: my-volume
 
     claim_name: existing-pvc
