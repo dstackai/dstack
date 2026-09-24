@@ -50,12 +50,12 @@ type ProductLink = {
 // The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
 // follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
 // section.
-// NOTE: the descriptions are duplicated in GetStartedSection.tsx (the product list) and
-// mkdocs/overrides/header-2.html — keep all three in sync.
+// Keep menu descriptions in sync with mkdocs/overrides/header-2.html.
+// GetStartedSection.tsx uses a longer dstack description.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted', external: true },
-  { id: 'factory', text: 'dstack Factory', secondaryText: 'A heterogeneous orchestration stack for AI token factories.', href: asset(ROUTES.FACTORY), icon: <LayersGlyph />, badge: 'Self-hosted' },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'One account across GPU clouds. Better prices and unified billing.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
+  { id: 'open-source', text: 'dstack', secondaryText: 'A unified orchestration interface across GPU clouds, Kubernetes, VMs, and bare-metal.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted' },
+  { id: 'factory', text: 'dstack Factory', secondaryText: 'A multi-tenant orchestration stack for AI labs, data centers, and AI token factories.', href: asset(ROUTES.FACTORY), icon: <LayersGlyph />, badge: 'Self-hosted' },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Unified access to GPU clouds. Better prices and one billing.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring

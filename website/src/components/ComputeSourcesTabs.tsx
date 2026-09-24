@@ -1,4 +1,4 @@
-import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from '../pages/Home/GetStartedSection';
+import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph, SlurmGlyph } from './Capabilities';
 import { ContentTabs } from './ContentTabs';
 
 const cloudGroups = [
@@ -10,6 +10,7 @@ const cloudGroups = [
 const onPremItems = [
   { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Connect VMs or bare-metal clusters over SSH' },
   { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Connect your existing Kubernetes clusters' },
+  { icon: <SlurmGlyph />, title: 'Slurm (experimental)', sub: 'Connect your existing Slurm clusters' },
 ];
 
 export function OnPremCapabilities() {
@@ -48,7 +49,7 @@ export function ComputeSourcesTabs({ cloudsFirst = false }: {
     content: <OnPremCapabilities />,
     footer: (
       <span className="gs-foot__note">
-        Use your existing Kubernetes clusters, VMs, or bare-metal clusters
+        Use your existing Kubernetes or Slurm clusters, VMs, or bare-metal
       </span>
     ),
   };

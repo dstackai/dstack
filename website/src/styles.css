@@ -628,11 +628,21 @@ p {
 .arch-diagram {
   display: flex;
   flex-direction: column;
-  gap: 2.66cqw; /* 24u between the four layers */
+  gap: 2.66cqw; /* 24u between the diagram blocks */
   width: 100%;
   color: var(--cs-text);
   --arch-border-width: max(1px, 0.22cqw); /* placeholder badge stroke */
   --arch-gradient: var(--cs-text);
+  --arch-label-padding: 2cqw;
+}
+
+.arch-stack {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0.5px solid currentColor;
+  border-radius: 12px;
+  background: var(--cs-panel);
 }
 
 .arch-row {
@@ -645,9 +655,29 @@ p {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* Keep the logo-heavy cloud block wide, followed by Kubernetes and VMs/bare-metal. */
+/* Give cloud examples the remaining space after the compact compute labels. */
 .arch-row--compute {
-  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  grid-template-columns: minmax(0, 1fr) repeat(4, max-content);
+  gap: 1.26cqw;
+  padding: 3.2cqw var(--arch-label-padding) 3.48cqw;
+}
+
+.arch-row--compute .arch-cell {
+  justify-content: center;
+  gap: 0.55cqw;
+  min-height: calc(8cqw + 6px);
+  padding-inline: 1.5cqw;
+  border: 1px dotted currentColor;
+  border-radius: 12px;
+}
+
+.arch-row--compute .arch-cell--cloud {
+  justify-content: space-between;
+  gap: 1.55cqw;
+}
+
+.arch-cell--cloud .arch-logos {
+  flex-shrink: 0;
 }
 
 /* Pin both input labels left and their logo groups right. */
@@ -661,7 +691,7 @@ p {
   align-items: center;
   gap: 1.55cqw;
   min-height: 9.83cqw; /* 88.7u */
-  padding: 0 2cqw;
+  padding: 0 var(--arch-label-padding);
   border: 1px solid currentColor;
   border-radius: 12px;
 }
@@ -680,17 +710,6 @@ p {
   min-height: 9.83cqw;
 }
 
-/* "Any GPU cloud": logos left, label pushed to the right edge. */
-.arch-cell--gpu {
-  justify-content: space-between;
-  gap: 0.9cqw;
-  padding-inline: 2.1cqw;
-}
-
-.arch-cell--gpu .arch-logos {
-  gap: 0.8cqw;
-}
-
 .arch-cell--platform {
   justify-content: center;
   gap: 0.55cqw;
@@ -699,20 +718,17 @@ p {
 
 .arch-cell--platform .arch-cell__label {
   font-size: 2.55cqw;
+  text-align: center;
+  white-space: normal;
 }
 
-.arch-cell--platform .arch-logo--kubernetes {
-  width: 4.8cqw;
-  height: 4.8cqw;
-}
-
-/* "Any hardware": label pinned left, logos centered across the full row. */
+/* "Any accelerator": label pinned left, logos centered across the full row. */
 .arch-cell--hw {
   justify-content: center;
 }
 .arch-cell--hw > .arch-cell__label {
   position: absolute;
-  left: 2cqw;
+  left: var(--arch-label-padding);
 }
 
 .arch-cell__label {
@@ -722,15 +738,14 @@ p {
   white-space: nowrap;
 }
 
-/* Orchestration layer — gradient band. Title gets more room above the cells than below
-   (≈73 vs ≈31u); cells inset ≈5% each side. */
+/* Orchestration and infrastructure share an outer border and aligned label padding. */
 .arch-orchestration {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3cqw;
-  padding: 3.2cqw 3.2cqw 3.48cqw;
-  border-radius: 1.6cqw;
+  padding: 3.2cqw var(--arch-label-padding) 3.48cqw;
+  border-radius: 0 0 12px 12px;
   background: var(--arch-gradient);
   color: var(--cs-bg);
 }
@@ -766,7 +781,17 @@ p {
   font-size: 2.25cqw;
   font-weight: 500;
   line-height: 1.2;
-  border: 1px solid currentColor;
+  border: 1px dotted currentColor;
+}
+
+.arch-diagram .arch-link {
+  color: inherit;
+  text-decoration: none !important;
+}
+
+.arch-diagram .arch-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
 .arch-logos {
@@ -790,14 +815,12 @@ p {
   mask-size: contain;
 }
 
-/* Per-logo height (cqw, so it scales) + aspect from each source's viewBox. Wide marks (AWS,
-   NVIDIA) are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
-.arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; }
-.arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; }
-.arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; }
+/* Per-logo height (cqw, so it scales) + aspect from each source's viewBox. Wide marks (NVIDIA)
+   are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
 .arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; }
-.arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; }
-.arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; }
+.arch-logo--crusoe { height: 4.8cqw; aspect-ratio: 1; }
+.arch-logo--runpod { height: calc(5.04cqw - 1.5px); aspect-ratio: 120 / 130; }
+.arch-logo--aws { height: calc(4.05cqw - 1.5px); aspect-ratio: 304 / 182; }
 .arch-logo--pytorch { height: 4.9cqw; aspect-ratio: 90.3 / 109.1; }
 .arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; }
 .arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; }
@@ -805,7 +828,7 @@ p {
 .arch-logo--nvidia { height: 4cqw; aspect-ratio: 271.7 / 179.7; }
 .arch-logo--amd { height: 4.8cqw; margin-left: 2px; aspect-ratio: 1600 / 1408; }
 .arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; }
-.arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
+.arch-logo--tpu { height: calc(4.2cqw - 1px); aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
 /* "Any model" marks (top row) — square icons; plus the Docker marker on the orchestration band. */
 /* Heights tuned per-logo for similar optical weight, compensating for differing padding and
    visual density inside each source viewBox. */
@@ -839,26 +862,26 @@ p {
   color: var(--cs-muted);
 }
 
-/* Safety net for very narrow containers (phones): stop shrinking, stack the rows, drop the
+/* Safety net for narrow containers (phones): stop shrinking, stack the rows, drop the
    primitives to two columns, and switch to fixed legible type. */
-@container (max-width: 360px) {
-  .arch-diagram { gap: 12px; }
-  /* Two columns: the wide first cell ("Any framework" / "Any cloud") spans the full width on its
-     own row, and the two narrower cells pair up on the row below. */
+@container (max-width: 480px) {
+  .arch-diagram { gap: 12px; --arch-label-padding: 14px; }
+  .arch-stack { border-radius: 8px; }
+  /* Stack the inputs and cloud examples, then pair the other compute sources. */
   .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .arch-row > :first-child { grid-column: 1 / -1; }
   .arch-row--inputs > .arch-cell { grid-column: 1 / -1; }
-  .arch-row--compute { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .arch-row--compute { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 16px var(--arch-label-padding); }
   .arch-row--compute > :first-child { grid-column: 1 / -1; }
-  .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
+  .arch-row--compute .arch-cell { min-height: 54px; padding: 11px 8px; border-radius: 8px; }
+  .arch-cell { min-height: 52px; padding: 10px var(--arch-label-padding); gap: 12px; border-width: 1px; border-radius: 8px; }
   .arch-cell__label { font-size: 16px; white-space: normal; }
   .arch-cell--platform { min-height: 52px; gap: 6px; padding: 8px 4px; }
   .arch-cell--platform .arch-cell__label { font-size: 16px; }
-  .arch-cell--platform .arch-logo--kubernetes { width: 22px; height: 22px; }
-  /* "Any hardware": label left, logos pushed to the right (the desktop layout centers them). */
+  /* "Any accelerator": label left, logos pushed to the right (the desktop layout centers them). */
   .arch-cell--hw { justify-content: space-between; }
   .arch-cell--hw > .arch-cell__label { position: static; }
-  .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
+  .arch-orchestration { gap: 12px; padding: 16px var(--arch-label-padding); border-radius: 0 0 8px 8px; }
   .arch-orchestration__title { font-size: 15px; }
   .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .arch-orchestration__cells > :last-child { grid-column: 1 / -1; }
@@ -866,6 +889,9 @@ p {
   .arch-logos { gap: 12px; }
   /* !important to beat the per-logo cqw heights. */
   .arch-logo { height: 22px !important; }
+  .arch-logo--runpod,
+  .arch-logo--aws { height: 20.5px !important; }
+  .arch-logo--tpu { height: 21px !important; }
   .arch-logo--placeholder { height: 22px !important; min-width: 22px !important; font-size: 12px; border-width: 1px; border-radius: 5px; }
 }
 
@@ -1025,7 +1051,7 @@ p {
   margin-top: 0;
 }
 
-/* Product links beside the dstack installation controls. */
+/* Product selector and its matching preview. */
 .gs-deploy {
   display: grid;
   grid-template-columns: 1fr 2fr; /* selector 1/3, detail 2/3 */
@@ -1057,12 +1083,14 @@ p {
   position: relative;
   display: block;
   width: 100%;
+  border: 0;
   border-radius: 8px; /* same radius as the tab chips */
   background: var(--cs-panel); /* each row paints its own ground (the rail is transparent) */
   color: var(--cs-text);
   font: inherit;
   line-height: 1.15; /* pinned (not inherited) so the rail renders identically on the docs site */
   text-align: left;
+  cursor: pointer;
 }
 
 /* Adjacent rows inside a group square off their shared edge, so the group's ground reads as one
@@ -1081,6 +1109,10 @@ p {
   border-radius: 8px;
   background: var(--cs-bg);
   box-shadow: inset 0 0 0 0.5px var(--cs-text);
+}
+.gs-rail button.gs-opt:focus-visible {
+  outline: 2px solid var(--cs-text);
+  outline-offset: -3px;
 }
 
 /* Row names mirror the tab typography: 16px / 700. */
@@ -1187,6 +1219,13 @@ p {
 .gs-detail {
   min-width: 0;
 }
+.gs-detail .gs-tabs {
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.gs-detail .gs-tab {
+  white-space: nowrap;
+}
 /* The detail box — shared shell for all three tabs: a bordered container with a fixed height, holding a tab strip, content, and a footer CTA bar. The
    height is tuned a touch taller than the rail, giving the content room to breathe and matching the
    tabbed code cards higher up the page; all three tabs reuse this shell, so they stay equal height. */
@@ -1266,6 +1305,25 @@ p {
   min-width: 0; /* allow the note to shrink/wrap so it shares the row with the CTA on narrow screens */
   margin-inline-end: auto; /* note left, button(s) right — the footer itself is flex-end */
 }
+.gs-foot__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .gs-detail .gs-boxfoot {
+    flex-wrap: wrap;
+  }
+  .gs-detail .gs-foot__note {
+    flex-basis: 100%;
+  }
+  .gs-foot__actions {
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 100%;
+  }
+}
 
 /* The footer CTA(s) keep their width (never shrink/wrap mid-word); the note takes the rest. */
 .gs-boxfoot > [class*='awsui_button'] {
@@ -1310,11 +1368,11 @@ p {
 }
 
 /* Open-source: read-only code fills the body. */
-.gs-codebody {
+.gs-box--install .gs-skybody {
   flex: 1 1 auto;
   min-height: 0;
   padding: 10px 12px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* dstack Sky: two panes (GPU marketplace | bring your own clouds). Source order is header→list,
@@ -1497,8 +1555,6 @@ p {
   /* Separate the second pane (its header follows the first list). */
   .gs-sky .gs-col + .gs-skyhalf { margin-top: 12px; }
   .gs-caps { grid-template-columns: 1fr; }
-  /* Read-only install code is wider than the phone; let it scroll instead of clipping. */
-  .gs-codebody { overflow-x: auto; }
   /* Keep footer notes and buttons on one row. */
   .gs-boxfoot { align-items: center; gap: 10px; }
   .gs-boxfoot [class*='awsui_button'] { padding-inline: 14px !important; }

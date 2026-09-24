@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import Link from '@cloudscape-design/components/link';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
 import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
@@ -23,7 +24,7 @@ export function ExploreSection() {
         dstack gives cloud tenants and data-center operators a unified control plane for managing compute and orchestrating AI workloads.
         <br />
         <br />
-        It improves operational efficiency and removes vendor lock-in. No more hassle of building your own compute stack on top of Kubernetes or Slurm.
+        It improves operational efficiency and removes vendor lock-in. Use your existing infrastructure without building and maintaining your own AI compute stack.
       </AlternatingDocBlock>
 
       <KeyConceptsBlock />
@@ -43,9 +44,10 @@ function BringComputeBlock() {
       imageFirst
     >
       Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH
-      credentials to create an SSH fleet. Have an existing Kubernetes cluster? Point dstack's
-      Kubernetes backend to the kubeconfig. dstack will schedule workloads on them alongside cloud
-      clusters.
+      credentials to create an SSH fleet. Have an existing Kubernetes or Slurm cluster? Connect it
+      through the Kubernetes backend or the <Link href={docsUrl('concepts/backends/#slurm')}>{highlightTerms('experimental Slurm backend')}</Link>.
+      dstack provides a unified workload interface while Kubernetes or Slurm handles scheduling
+      within the cluster.
       <br />
       <br />
       dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
