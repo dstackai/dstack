@@ -43,10 +43,8 @@ size: 100GB
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
 ??? info "Kubernetes"
-    With the `kubernetes` backend, set `region` to an enabled kubeconfig context name from the
-    [backend configuration](backends.md#kubernetes), even if only one context is enabled.
-    You can omit `region` only with the legacy backend configuration without `contexts`, which
-    uses the kubeconfig's `current-context` and the backend's `namespace` setting.
+    Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
+    Omit it only for legacy configurations without `contexts`.
 
     You can optionally specify `storage_class_name` and/or `access_modes`:
 
@@ -63,8 +61,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
     </div>
 
-    This creates a `PersistentVolumeClaim` in the selected context's namespace and associates it
-    with the volume.
+    This creates a `PersistentVolumeClaim` in the context's namespace.
 
     If you don't specify `storage_class_name`, the decision is delegated to the `DefaultStorageClass` admission controller, if enabled.
     
@@ -117,8 +114,7 @@ If you register an existing volume, you must ensure the volume already has a fil
 
 ??? info "Kubernetes"
 
-    With the `kubernetes` backend, to reuse an existing `PersistentVolumeClaim`, specify its name
-    in `claim_name` and select its cluster with `region`, as when creating a volume.
+    To reuse an existing `PersistentVolumeClaim`, specify `claim_name` and `region`.
     The claim must exist in the selected context's namespace.
 
     <div editor-title="volume.dstack.yml"> 
