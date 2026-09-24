@@ -261,7 +261,7 @@ mindful of which specific change was the root cause.
 ```
 
 2. In case the task is using node groups (a router group plus worker
-   groups, see `## Fleet Topology`), instead of a single `resources` it
+   groups, see `## Cluster Placement`), instead of a single `resources` it
    includes `groups`, and the fields are these and no others:
 
 ```
@@ -321,8 +321,8 @@ serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`co
 `shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
 
-In case the task is using a router (see `## Fleet Topology`), run benchmarks
-via SSH inside the router node, directly against the router, never against a
+In case the task is using a router (see `## Cluster Placement`), run benchmarks
+via SSH inside the router node, directly against the router engine, never against a
 worker, so that results stay comparable across trials.
 
 <!--?if dataset-->
@@ -506,31 +506,12 @@ Use these offers when selecting fleet, backend, and hardware.
 To classify each backend's capabilities, fetch `https://dstack.ai/docs/concepts/backends.md` and classify from the fetched document, not from memory. VM-based backends are listed under `## VM-based` (they support idle instances and instance volumes). Kubernetes backend is listed under `## Container-based`, but supports instance volumes and thus is preferred over other container-based backends.
 SSH fleets can be treated as VM-based backends as they support both idle instances (its equivalent) and instance volumes.
 
-## Fleet Topology
+## Cluster Placement
 
-If a fleet has `placement: cluster` and a CPU-only instance, that instance
-must host a router (see `https://dstack.ai/docs/concepts/services/#router`),
-and every trial and the final service run behind it. The GPU instances run
-the serving engine as workers in one of two forms: aggregated, where each
-worker handles both prefill and decode, or PD disaggregated, where the
-workers are split into prefill and decode groups. Use `router: sglang`
-(Shepherd Model Gateway, SMG) and connect the workers over gRPC, not HTTP.
-Report the topology decision via `progress` before trial 1.
-
-Why: with an SMG router, request parsing, serialization, and tokenization
-move from the serving engine to the router, and workers only process already
-tokenized inputs, so latency improves just by introducing the router. With
-multiple workers, the router improves performance in two ways.
-
-First, cache-aware routing tracks each worker's KV-cache state and sends a
-request to the worker that already holds its prefix.
-
-Second, load modeling predicts how long a request will take to complete on
-each worker and the router's `least_load` policy sends the request to the
-worker predicted to finish it soonest.
-
-Connecting the workers over gRPC is required for SMG's cache-aware routing
-and load modeling.
+If a fleet has `placement: cluster`, decide before trial 1 whether to use a
+router, following `## Router` in the
+`<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill, and
+report the decision via `progress`.
 
 # Final Service
 
@@ -591,8 +572,8 @@ trial benchmarks so that the results are comparable with each other. Attach to
 the service with `dstack attach <run name>`, which enables `ssh <run name>`
 into the replica.
 
-In case the service is using a router (see `## Fleet Topology`), run the
-final benchmark inside the router replica, directly against the router.
+In case the service is using a router (see `## Cluster Placement`), run the
+final benchmark inside the router replica, directly against the router engine.
 Attach to it via `dstack attach <run name> --replica <replica num> --job <job num>`.
 
 If the service or its benchmark cannot be completed, stop that service,
