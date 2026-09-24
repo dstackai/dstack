@@ -1,5 +1,5 @@
+import { CapList, ServerGlyph } from '../../components/Capabilities';
 import { ContentTabs } from '../../components/ContentTabs';
-import { CapList, ServerGlyph } from '../Home/GetStartedSection';
 
 const orchestrationItems = [
   {

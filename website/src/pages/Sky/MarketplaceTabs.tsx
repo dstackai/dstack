@@ -1,7 +1,8 @@
+import { ReactNode } from 'react';
 import Button from '@cloudscape-design/components/button';
 import { mainButtonStyle } from '../../cloudscape-theme';
+import { ChipGlyph, CloudGlyph } from '../../components/Capabilities';
 import { ContentTabs } from '../../components/ContentTabs';
-import { ChipGlyph, CloudGlyph } from '../Home/GetStartedSection';
 import { gpuPrices } from './pricing';
 
 // Default marketplace clouds from dstack Sky's /api/backends/list_base_types.
@@ -11,7 +12,10 @@ const partnerGroups = [
   ['Verda', 'Nebius'],
 ];
 
-export function MarketplaceTabs() {
+export function MarketplaceTabs({ marketplaceOnly = false, footer }: {
+  marketplaceOnly?: boolean;
+  footer?: ReactNode;
+}) {
   return (
     <ContentTabs
       ariaLabel="GPU marketplace"
@@ -46,7 +50,7 @@ export function MarketplaceTabs() {
               </tbody>
             </table>
           ),
-          footer: (
+          footer: footer ?? (
             <span className="gs-foot__note">
               One account and unified billing across GPU clouds
             </span>
@@ -86,7 +90,7 @@ export function MarketplaceTabs() {
             </>
           ),
         },
-      ]}
+      ].filter(tab => !marketplaceOnly || tab.id === 'marketplace')}
     />
   );
 }

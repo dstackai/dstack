@@ -74,7 +74,7 @@
       {% include "partials/search.html" %}
     {% endif %}
 
-    {# Keep product descriptions in sync with SiteNavigation.tsx and GetStartedSection.tsx. #}
+    {# Keep menu descriptions in sync with SiteNavigation.tsx. GetStartedSection.tsx uses a longer dstack description. #}
     <div class="cs-products-menu">
       <button type="button" class="cs-products-menu__trigger" aria-haspopup="true" aria-expanded="false">
         Products
@@ -89,7 +89,7 @@
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack</span>
-              <span class="gs-opt__desc">The open-source control plane for AI-native orchestration.</span>
+              <span class="gs-opt__desc">A unified orchestration interface across GPU clouds, Kubernetes, VMs, and bare-metal.</span>
             </span>
           </a>
           <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="/products/factory" target="_blank" rel="noreferrer">
@@ -98,7 +98,7 @@
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack Factory</span>
-              <span class="gs-opt__desc">A heterogeneous orchestration stack for AI token factories.</span>
+              <span class="gs-opt__desc">A multi-tenant orchestration stack for AI labs, data centers, and AI token factories.</span>
             </span>
           </a>
           <div class="gs-rail__group">Hosted by us</div>
@@ -108,7 +108,7 @@
             </span>
             <span class="gs-opt__body">
               <span class="gs-opt__name">dstack Sky</span>
-              <span class="gs-opt__desc">One account across GPU clouds. Better prices and unified billing.</span>
+              <span class="gs-opt__desc">Unified access to GPU clouds. Better prices and one billing.</span>
             </span>
           </a>
         </div>
