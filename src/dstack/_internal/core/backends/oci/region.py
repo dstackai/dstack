@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Any, Dict, Iterable, List, Mapping, Set
 
 import oci
@@ -46,7 +46,21 @@ class OCIRegionClient:
 
     @cached_property
     def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
-        return self.identity_client.list_availability_domains(self.client_config["tenancy"]).data
+        return self.availability_domains_in(self.client_config["tenancy"])
+
+    @lru_cache(maxsize=None)
+    def availability_domains_in(
+        self, compartment_id: str
+    ) -> List[oci.identity.models.AvailabilityDomain]:
+        """
+        Availability domains of the tenancy that owns `compartment_id`.
+
+        The compartment dstack works in need not belong to the tenancy the credentials
+        authenticate against - a compartment can be shared with another tenancy by a
+        cross-tenancy policy. Availability domain names are tenancy-specific, so they
+        have to be resolved from the compartment rather than from the credentials.
+        """
+        return self.identity_client.list_availability_domains(compartment_id).data
 
 
 def make_region_client(region_name: str, creds: AnyOCICreds) -> OCIRegionClient:
