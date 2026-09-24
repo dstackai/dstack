@@ -4,7 +4,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Set
 
 import oci
 
-from dstack._internal.core.backends.oci.auth import get_client_config
+from dstack._internal.core.backends.oci.auth import get_client_config, make_client_kwargs
 from dstack._internal.core.backends.oci.models import AnyOCICreds
 
 
@@ -15,6 +15,7 @@ class OCIRegionClient:
 
     def __init__(self, client_config: Mapping[str, Any]):
         self.client_config = client_config
+        self.client_kwargs = make_client_kwargs(client_config)
 
     @property
     def name(self) -> str:
@@ -22,27 +23,27 @@ class OCIRegionClient:
 
     @cached_property
     def compute_client(self) -> oci.core.ComputeClient:
-        return oci.core.ComputeClient(self.client_config)
+        return oci.core.ComputeClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def identity_client(self) -> oci.identity.IdentityClient:
-        return oci.identity.IdentityClient(self.client_config)
+        return oci.identity.IdentityClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def marketplace_client(self) -> oci.marketplace.MarketplaceClient:
-        return oci.marketplace.MarketplaceClient(self.client_config)
+        return oci.marketplace.MarketplaceClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def object_storage_client(self) -> oci.object_storage.ObjectStorageClient:
-        return oci.object_storage.ObjectStorageClient(self.client_config)
+        return oci.object_storage.ObjectStorageClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def virtual_network_client(self) -> oci.core.VirtualNetworkClient:
-        return oci.core.VirtualNetworkClient(self.client_config)
+        return oci.core.VirtualNetworkClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def work_request_client(self) -> oci.work_requests.WorkRequestClient:
-        return oci.work_requests.WorkRequestClient(self.client_config)
+        return oci.work_requests.WorkRequestClient(self.client_config, **self.client_kwargs)
 
     @cached_property
     def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
