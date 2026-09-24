@@ -61,7 +61,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
     </div>
 
-    This creates a `PersistentVolumeClaim` in the context's namespace.
+    This automatically creates a `PersistentVolumeClaim` and associates it with the volume.
 
     If you don't specify `storage_class_name`, the decision is delegated to the `DefaultStorageClass` admission controller, if enabled.
     
@@ -115,7 +115,6 @@ If you register an existing volume, you must ensure the volume already has a fil
 ??? info "Kubernetes"
 
     To reuse an existing `PersistentVolumeClaim`, specify `claim_name` and `region`.
-    The claim must exist in the selected context's namespace.
 
     <div editor-title="volume.dstack.yml"> 
 

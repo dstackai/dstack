@@ -31,7 +31,6 @@ The `volume` configuration type allows creating, registering, and updating [volu
     Kubernetes backend volumes are mapped to [`PersistentVolumeClaim`](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) objects.
 
     With `contexts` configured in the [backend](../../concepts/backends.md#kubernetes), set `region` to a kubeconfig context name.
-    Claims use that context's namespace.
 
     To create a new claim, specify `size` and optionally `storage_class_name` and/or `access_modes`:
 
