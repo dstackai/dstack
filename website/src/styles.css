@@ -640,7 +640,7 @@ p {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 0.5px solid currentColor;
+  border: 0.5px dotted currentColor;
   border-radius: 12px;
   background: var(--cs-panel);
 }
