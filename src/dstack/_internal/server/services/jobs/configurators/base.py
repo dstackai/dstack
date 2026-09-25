@@ -519,11 +519,9 @@ class JobConfigurator(ABC):
             return [_openai_model_probe_spec(model.name, model.prefix)]
         group = self._replica_group()
         if group is not None and group.router is not None:
-            # A router only answers chat completions once dstack has registered workers
-            # with it, and registration skips routers that are not ready yet. Probing
-            # chat completions here would deadlock: readiness would wait on registration
-            # while registration waits on readiness. Probe the router's own liveness
-            # endpoint instead, which does not depend on any worker.
+            # Probe the router's own liveness endpoint, which does not depend on any
+            # worker. Workers get no default probe: they may not serve HTTP at all
+            # (gRPC workers), and they don't receive traffic directly.
             return [_router_health_probe_spec()]
         return []
 

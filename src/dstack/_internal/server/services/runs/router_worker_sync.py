@@ -566,7 +566,7 @@ async def sync_router_workers_for_run_model(run_model: RunModel) -> None:
     router_job = _get_router_job(run_model, router_group)
     if router_job is None:
         logger.debug(
-            "%s: no ready router job in group %s, skipping worker sync",
+            "%s: no running router job in group %s, skipping worker sync",
             fmt(run_model),
             router_group.name,
         )

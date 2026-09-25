@@ -460,14 +460,12 @@ class TestServiceRouterWorkerSyncWorker:
         assert sync_row.lock_owner is None
         assert sync_row.last_processed_at is not None
 
-    async def test_process_skips_sync_when_router_replica_not_ready(
+    async def test_process_syncs_running_first_node_jobs_regardless_of_probes(
         self,
         test_db,
         session: AsyncSession,
         worker: ServiceRouterWorkerSyncWorker,
-        caplog: pytest.LogCaptureFixture,
     ):
-        caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -480,8 +478,9 @@ class TestServiceRouterWorkerSyncWorker:
             run_spec=_router_service_run_spec(repo.name),
         )
         instance = await create_instance(session=session, project=project)
-        # The router replica is still starting up, the worker replica is already serving.
-        await create_job(
+        # The router's probes may depend on registered workers, so it must be synced before
+        # they pass. Otherwise, neither the probes nor the sync could make progress.
+        router_job = await create_job(
             session=session,
             run=run,
             instance=instance,
@@ -490,15 +489,35 @@ class TestServiceRouterWorkerSyncWorker:
             replica_group_name="router",
             job_provisioning_data=make_job_provisioning_data(),
         )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.RUNNING,
+            ready=False,
+            replica_num=1,
+            replica_group_name="worker",
+            job_provisioning_data=make_job_provisioning_data(),
+        )
+        # Not the first node of the replica
         await create_job(
             session=session,
             run=run,
             instance=instance,
             status=JobStatus.RUNNING,
-            ready=True,
+            job_num=1,
             replica_num=1,
             replica_group_name="worker",
             job_provisioning_data=make_job_provisioning_data(),
+        )
+        # Not running
+        await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.PROVISIONING,
+            replica_num=2,
+            replica_group_name="worker",
         )
         sync_row = await _add_service_router_worker_sync_row(session, run.id)
         sync_row.lock_token = uuid.uuid4()
@@ -507,13 +526,17 @@ class TestServiceRouterWorkerSyncWorker:
         await session.commit()
         item = _sync_row_to_pipeline_item(sync_row)
 
-        await worker.process(item)
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.service_router_worker_sync"
+            ".sync_router_workers_for_run_model",
+            new_callable=AsyncMock,
+        ) as sync_mock:
+            await worker.process(item)
 
-        assert "no ready router job in group router, skipping worker sync" in caplog.text
-        # The run stays eligible for the next sync attempt.
-        await session.refresh(sync_row)
-        assert sync_row.deleted is False
-        assert sync_row.lock_token is None
+        sync_mock.assert_awaited_once()
+        assert sync_mock.await_args is not None
+        called_run = sync_mock.await_args.args[0]
+        assert {j.id for j in called_run.jobs} == {router_job.id, worker_job.id}
 
     async def test_process_logs_router_job_when_router_connection_fails(
         self,

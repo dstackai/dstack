@@ -244,7 +244,16 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
-                            JobModel.ready == True,
+                            # `JobModel.ready` is deliberately not checked. A router only
+                            # passes probes that depend on workers (e.g. `/health_generate`)
+                            # after workers are registered, so waiting for it would deadlock.
+                            # Workers are registered as soon as the sync's own check
+                            # (`/server_info` or `GetServerInfo`) reports them ready, so
+                            # `probes` cannot delay registration.
+                            # Only the first node of a replica is synced. Services don't
+                            # support multi-node replicas yet, so this is a no-op kept for
+                            # forward compatibility.
+                            JobModel.job_num == 0,
                         )
                     )
                     .load_only(
