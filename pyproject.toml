@@ -230,7 +230,8 @@ server = [
     "httpx>=0.28.0",
     "jinja2",
     "watchfiles",
-    "sqlalchemy[asyncio]>=2.0.0",
+    # sqlalchemy_utils is not compatible with SQLAlchemy >= 2.1.0
+    "sqlalchemy[asyncio]>=2.0.0,<2.1",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.16.0",
     "aiosqlite",
