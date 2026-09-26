@@ -20,6 +20,7 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobTerminationReason,
+    RunStatus,
     RunTerminationReason,
 )
 from dstack._internal.server import settings
@@ -294,6 +295,9 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             and result.instance_update_map.get("status") == InstanceStatus.TERMINATING
         ):
             self._pipeline_hinter.hint_fetch(InstanceModel.__name__)
+        if result.unassign_event_message is not None:
+            await _wake_pending_runs_on_capacity_release()
+            self._pipeline_hinter.hint_fetch(RunModel.__name__)
         # TODO: Hint RunPipeline to quickly move run to TERMINATED.
         # Currently not implemented since it also requires making run eligible for processing.
         # (This pipeline cannot modify runs so it's not simple).
@@ -341,6 +345,20 @@ class _VolumeDetachResult:
     all_detached: bool
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     set_volumes_detached_at: bool = False
+
+
+async def _wake_pending_runs_on_capacity_release() -> None:
+    """Allow waiting retries to compete when a real instance releases capacity."""
+    async with get_session_ctx() as session:
+        await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.status == RunStatus.PENDING,
+                RunModel.resubmission_attempt > 0,
+                RunModel.skip_min_processing_interval == False,
+            )
+            .values(skip_min_processing_interval=True)
+        )
 
 
 async def _refetch_locked_job(
