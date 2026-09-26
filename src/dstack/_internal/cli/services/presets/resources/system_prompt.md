@@ -260,9 +260,9 @@ mindful of which specific change was the root cause.
 {"resources": {...}, "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
 ```
 
-2. In case the task is using node groups (e.g. for PD disaggregation),
-   instead of a single `resources` it includes `groups`, and the fields are
-   these and no others:
+2. In case the task is using node groups (a router group plus worker
+   groups, see `## Cluster Placement`), instead of a single `resources` it
+   includes `groups`, and the fields are these and no others:
 
 ```
 {"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmark": {...}, "learned": ..., "failed": ...}
@@ -321,9 +321,9 @@ serving engine: use <!--?if dataset-->`dataset` and `concurrency`<!--?else-->`co
 `shared_prefix_tokens`<!--?end--> from `constraints.json` and measure all trials the same
 way so that their results are comparable with each other.
 
-In case the task is using PD disaggregation, run benchmarks via SSH inside
-the router node, directly against the router engine. Never benchmark prefill
-or decode workers — each handles only part of a request.
+In case the task is using a router (see `## Cluster Placement`), run benchmarks
+via SSH inside the router node, directly against the router engine, never against a
+worker, so that results stay comparable across trials.
 
 <!--?if dataset-->
 Before any benchmark, reset the serving engine's prefix cache, or restart the
@@ -506,6 +506,13 @@ Use these offers when selecting fleet, backend, and hardware.
 To classify each backend's capabilities, fetch `https://dstack.ai/docs/concepts/backends.md` and classify from the fetched document, not from memory. VM-based backends are listed under `## VM-based` (they support idle instances and instance volumes). Kubernetes backend is listed under `## Container-based`, but supports instance volumes and thus is preferred over other container-based backends.
 SSH fleets can be treated as VM-based backends as they support both idle instances (its equivalent) and instance volumes.
 
+## Cluster Placement
+
+If a fleet has `placement: cluster`, decide before trial 1 whether to use a
+router, following `## Router` in the
+`<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill, and
+report the decision via `progress`.
+
 # Final Service
 
 Once the trials are over, pick the best trial that has not been verified yet
@@ -565,9 +572,9 @@ trial benchmarks so that the results are comparable with each other. Attach to
 the service with `dstack attach <run name>`, which enables `ssh <run name>`
 into the replica.
 
-In case the service is using PD disaggregation, run the final benchmark
-inside the router replica, directly against the router engine. Attach to it
-via `dstack attach <run name> --replica <replica num> --job <job num>`.
+In case the service is using a router (see `## Cluster Placement`), run the
+final benchmark inside the router replica, directly against the router engine.
+Attach to it via `dstack attach <run name> --replica <replica num> --job <job num>`.
 
 If the service or its benchmark cannot be completed, stop that service,
 pick the next-best trial, and repeat, until a service is verified or there

@@ -101,19 +101,33 @@ command, resources, cache, or model behavior needs to change, go back to a task.
 If the tested serving setup is still right and only the dstack service
 configuration is wrong, fix the configuration and submit the service again.
 
-## PD disaggregation
+## Router
 
-If the intention is to use PD disaggregation:
+If a fleet has `placement: cluster` and a CPU-only instance, it is generally
+recommended to use a router configuration, regardless of whether the workers
+are aggregated or PD disaggregated, with the router on the CPU-only instance.
+Whenever possible, connect the workers over gRPC, not HTTP: with a gRPC
+router, request parsing, serialization, and tokenization move from the
+serving engine to the router, so latency improves just by introducing it.
+
+When using a router:
 
 - Use node groups for the task and replica groups for the service: tasks' node
   groups are the equivalent of services' replica groups.
-- In both cases, you run a router and prefill/decode workers separately, and
-  you need to use a fleet with an interconnect (`placement: cluster`).
 - With tasks, still use `sleep infinity` even when using `groups` (set it in
   each group's `commands`; top-level `commands` is not allowed with `groups`),
   and run the actual commands on each node interactively over SSH.
 - When testing inference, call the router endpoint, not the workers directly
   (unless you want to test if they are alive).
+- Look for "Prototyping services" in `https://dstack.ai/docs/concepts/tasks.md`
+  and "Router" in `https://dstack.ai/docs/concepts/services.md`.
+
+## PD disaggregation
+
+If the intention is to use PD disaggregation:
+
+- Follow `## Router`: the router and the prefill/decode workers run as
+  separate groups, and the fleet needs an interconnect (`placement: cluster`).
 - Look for "Node groups" and "PD disaggregation" in
   `https://dstack.ai/docs/concepts/tasks.md` and "Replica groups" and
   "PD disaggregation" in `https://dstack.ai/docs/concepts/services.md`.
