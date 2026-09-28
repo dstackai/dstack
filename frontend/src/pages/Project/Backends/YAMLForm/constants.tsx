@@ -1,4 +1,5 @@
 import React from 'react';
+import { product } from 'product';
 
 export const CONFIG_YAML_HELP_SKY = {
     header: <h2>Backend config</h2>,
@@ -11,7 +12,8 @@ export const CONFIG_YAML_HELP_SKY = {
             <h4>Marketplace</h4>
             <p>
                 If you set <code>creds</code>'s <code>type</code> to <code>dstack</code>, you'll get compute from{' '}
-                <code>dstack</code>'s marketplace and will pay for it via your <code>dstack Sky</code> user billing. Example:
+                <code>dstack</code>'s marketplace and will pay for it via your <code>{product.name}</code> user billing.
+                Example:
             </p>
             <p>
                 <pre>

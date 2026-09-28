@@ -1,4 +1,5 @@
 import { asset } from '../asset';
+import { docsUrl } from '../routes';
 
 // Layered "vendor-agnostic" architecture diagram, rebuilt as HTML/CSS (replaces the previous
 // static SVG). Logos are recolored to the current text color via CSS masking (see .arch-logo in
@@ -32,15 +33,27 @@ const MODELS: Logo[] = [
 
 const DOCKER: Logo = { key: 'docker', label: 'Docker', src: logoSrc('docker.svg') };
 
-const GPU_CLOUDS: Logo[] = [
-  { key: 'aws', label: 'AWS', src: logoSrc('aws.svg') },
-  { key: 'gcp', label: 'Google Cloud', src: logoSrc('gcp.svg') },
-  { key: 'lambda', label: 'Lambda', src: logoSrc('lambda.svg') },
-  { key: 'nebius', label: 'Nebius', src: logoSrc('nebius.svg') },
-  { key: 'runpod', label: 'RunPod', src: logoSrc('runpod.svg') },
+const ORCHESTRATION = [
+  { label: 'Fleets', href: docsUrl('concepts/fleets/') },
+  { label: 'Tasks', href: docsUrl('concepts/tasks/') },
+  { label: 'Services', href: docsUrl('concepts/services/') },
+  { label: 'Presets', href: docsUrl('concepts/presets/') },
+  { label: 'Gateways', href: docsUrl('concepts/gateways/') },
 ];
 
-const KUBERNETES: Logo = { key: 'kubernetes', label: 'Kubernetes', src: logoSrc('kubernetes.svg') };
+const PLATFORMS = [
+  { label: 'VMs', href: docsUrl('concepts/fleets/#ssh-fleets') },
+  { label: 'Bare-metal', href: docsUrl('concepts/fleets/#ssh-fleets') },
+  { label: 'K8S', href: docsUrl('concepts/backends/#kubernetes') },
+  { label: 'Slurm', href: docsUrl('concepts/backends/#slurm') },
+];
+
+const CLOUDS: Logo[] = [
+  { key: 'nebius', label: 'Nebius', src: logoSrc('nebius.svg') },
+  { key: 'crusoe', label: 'Crusoe', src: logoSrc('crusoe.svg') },
+  { key: 'runpod', label: 'RunPod', src: logoSrc('runpod.svg') },
+  { key: 'aws', label: 'AWS', src: logoSrc('aws.svg') },
+];
 
 const HARDWARE: Logo[] = [
   { key: 'nvidia', label: 'NVIDIA', src: logoSrc('nvidia.svg') },
@@ -80,7 +93,7 @@ function LogoRow({ logos }: { logos: Logo[] }) {
 export function ArchitectureDiagram() {
   return (
     <div className="arch-diagram-wrap">
-      <div className="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, VMs, bare-metal, and hardware below.">
+      <div className="arch-diagram" role="group" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and any cloud, VMs, bare-metal, Kubernetes, Slurm, and accelerators below.">
         {/* Top: what plugs in on top of the orchestration layer. */}
         <div className="arch-row arch-row--inputs">
           <div className="arch-cell">
@@ -93,38 +106,41 @@ export function ArchitectureDiagram() {
           </div>
         </div>
 
-        {/* Middle: the orchestration layer itself */}
-        <div className="arch-orchestration">
-          <div className="arch-orchestration__title">
-            <span>dstack orchestration</span>
-            <LogoMark logo={DOCKER} />
+        <div className="arch-stack">
+          {/* The orchestration layer and the infrastructure it runs on. */}
+          <div className="arch-orchestration">
+            <div className="arch-orchestration__title">
+              <span>dstack orchestration</span>
+              <LogoMark logo={DOCKER} />
+            </div>
+            <div className="arch-orchestration__cells">
+              {ORCHESTRATION.map(({ label, href }) => (
+                <a className="arch-subcell arch-link" href={href} key={label}>
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
-          <div className="arch-orchestration__cells">
-            {['Fleets', 'Tasks', 'Services', 'Presets', 'Gateways'].map(name => (
-              <div className="arch-subcell" key={name}>
-                {name}
-              </div>
+
+          <div className="arch-row arch-row--compute">
+            <a
+              className="arch-cell arch-cell--cloud arch-link"
+              href={docsUrl('concepts/backends/#vm-based')}
+              aria-label="Any cloud"
+            >
+              <span className="arch-cell__label">Any cloud</span>
+              <LogoRow logos={CLOUDS} />
+            </a>
+            {PLATFORMS.map(({ label, href }) => (
+              <a className="arch-cell arch-cell--platform arch-link" href={href} key={label}>
+                <span className="arch-cell__label">{label}</span>
+              </a>
             ))}
           </div>
         </div>
 
-        {/* Bottom: where workloads run */}
-        <div className="arch-row arch-row--compute">
-          <div className="arch-cell arch-cell--gpu">
-            <LogoRow logos={GPU_CLOUDS} />
-            <span className="arch-cell__label">Clouds</span>
-          </div>
-          <div className="arch-cell arch-cell--platform">
-            <LogoMark logo={KUBERNETES} />
-            <span className="arch-cell__label">Kubernetes</span>
-          </div>
-          <div className="arch-cell arch-cell--platform">
-            <span className="arch-cell__label">VMs or bare-metal</span>
-          </div>
-        </div>
-
         <div className="arch-cell arch-cell--full arch-cell--hw">
-          <span className="arch-cell__label">Any hardware</span>
+          <span className="arch-cell__label">Any accelerator</span>
           <LogoRow logos={HARDWARE} />
         </div>
       </div>

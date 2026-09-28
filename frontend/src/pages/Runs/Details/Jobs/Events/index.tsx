@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
+import { product } from 'product';
 import Button from '@cloudscape-design/components/button';
 
 import { Header, Loader, Table } from 'components';
@@ -64,7 +65,7 @@ export const EventsList = () => {
             header={
                 <Header
                     actions={
-                        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && (
+                        product.hasEvents && (
                             <Button onClick={goToFullView} disabled={!jobId}>
                                 {t('common.full_view')}
                             </Button>

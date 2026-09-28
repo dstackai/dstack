@@ -272,7 +272,7 @@ Presets are pushed to and pulled from the registry hosted at [dstack Sky](https:
 
 Presets are private by default. Set **Presets** to **Public** in the project settings to let anyone browse and pull its presets without signing in, including users of a self-hosted `dstack` server. Only project admins and global admins can change this setting; enabling it does not let anyone join the project.
 
-A self-hosted registry is part of [dstack Factory](https://calendly.com/dstackai/discovery-call){ target="_blank" }.
+A self-hosted registry is part of [dstack Factory](/products/factory/){ target="_blank" }.
 
 ## Export a preset
 

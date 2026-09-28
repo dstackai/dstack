@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { product } from 'product';
 
 import {
     DISCORD_URL,
@@ -80,7 +81,7 @@ export const useTutorials = () => {
                 }),
             );
 
-            if (!tempHideStartUp && process.env.UI_VERSION === 'sky') {
+            if (!tempHideStartUp && product.isSky) {
                 dispatch(openTutorialPanel());
             }
 

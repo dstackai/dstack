@@ -43,13 +43,17 @@ size: 100GB
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
 ??? info "Kubernetes"
-    With the `kubernetes` backend, you don't have to specify `region`, but you can optionally specify  `storage_class_name` and/or `access_modes`:
+    Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
+    Omit it only for legacy configurations without `contexts`.
+
+    You can optionally specify `storage_class_name` and/or `access_modes`:
 
     <div editor-title="volume.dstack.yml"> 
 
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: my-volume
 
     size: 100GB
@@ -110,13 +114,14 @@ If you register an existing volume, you must ensure the volume already has a fil
 
 ??? info "Kubernetes"
 
-    With the `kubernetes` backend, to reuse an existing `PersistentVolumeClaim`, specify its name in `claim_name`:
+    To reuse an existing `PersistentVolumeClaim`, specify `claim_name` and `region`.
 
     <div editor-title="volume.dstack.yml"> 
 
     ```yaml
     type: volume
     backend: kubernetes
+    region: gpu-cluster-a
     name: my-volume
 
     claim_name: existing-pvc

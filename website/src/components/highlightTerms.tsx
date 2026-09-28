@@ -5,7 +5,7 @@ import { Fragment, ReactNode } from 'react';
 // "dstackai/dstack" win over a bare "dstack". Case-sensitive, each bounded by \b so we don't
 // match inside larger words (e.g. "uv" won't hit "uvicorn", "pip" won't hit "pipeline").
 const TERMS_RE =
-  /\bdstackai\/dstack\b|\bdstack Sky\b|\bdstack\b|\bKubernetes\b|\bTenstorrent\b|\bNVIDIA\b|\bSlurm\b|\bAMD\b|\bTPU\b|\buv\b|\bpip\b/g;
+  /\bdstackai\/dstack\b|\bdstack Factory\b|\bdstack Sky\b|\bdstack\b|\bKubernetes\b|\bTenstorrent\b|\bNVIDIA\b|\bSlurm\b|\bAMD\b|\bTPU\b|\buv\b|\bpip\b/g;
 
 function markString(text: string): ReactNode {
   const parts: ReactNode[] = [];

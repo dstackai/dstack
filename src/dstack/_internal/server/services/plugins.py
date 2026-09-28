@@ -13,6 +13,10 @@ logger = get_logger(__name__)
 
 _PLUGINS: list[Plugin] = []
 
+# Plugins registered by extending servers. Unlike `_PLUGINS`, they are not affected by
+# `load_plugins`, so they stay active regardless of the plugins enabled in the server config.
+_REGISTERED_PLUGINS: list[Plugin] = []
+
 _BUILTIN_PLUGINS: Dict[str, str] = {"rest_plugin": "dstack.plugins.builtin.rest_plugin:RESTPlugin"}
 
 
@@ -91,6 +95,14 @@ def load_plugins(enabled_plugins: list[str]):
         logger.warning("Enabled plugins not found: %s", plugins_to_load)
 
 
+def register_plugin(plugin: Plugin):
+    """
+    Extension point for alternative dstack versions.
+    Registers a plugin that is always loaded, independently of `load_plugins`.
+    """
+    _REGISTERED_PLUGINS.append(plugin)
+
+
 async def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> ApplySpec:
     policies = _get_apply_policies()
     for policy in policies:
@@ -105,4 +117,4 @@ async def apply_plugin_policies(user: str, project: str, spec: ApplySpec) -> App
 
 
 def _get_apply_policies() -> list[ApplyPolicy]:
-    return list(itertools.chain(*[p.get_apply_policies() for p in _PLUGINS]))
+    return list(itertools.chain(*[p.get_apply_policies() for p in _REGISTERED_PLUGINS + _PLUGINS]))

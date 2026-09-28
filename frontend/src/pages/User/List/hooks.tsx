@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
+import { product } from 'product';
 
 import { Link, NavigateLink } from 'components';
 
@@ -29,7 +30,7 @@ export const useColumnDefinitions = () => {
                 header: t('users.global_role'),
                 cell: (item: IUser) => t(`roles.${item.global_role}`),
             },
-            process.env.UI_VERSION === 'sky' && {
+            product.hasBilling && {
                 id: 'created_at',
                 header: t('users.created_at'),
                 cell: (item: IUser) => format(new Date(item.created_at), DATE_TIME_FORMAT),

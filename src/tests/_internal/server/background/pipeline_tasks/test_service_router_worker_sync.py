@@ -1,13 +1,15 @@
 import asyncio
+import logging
 import uuid
 from datetime import timedelta
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import parse_run_configuration
-from dstack._internal.core.models.runs import RunStatus
+from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.background.pipeline_tasks.service_router_worker_sync import (
     ServiceRouterWorkerSyncFetcher,
     ServiceRouterWorkerSyncPipeline,
@@ -15,12 +17,18 @@ from dstack._internal.server.background.pipeline_tasks.service_router_worker_syn
     ServiceRouterWorkerSyncWorker,
 )
 from dstack._internal.server.models import RunModel, ServiceRouterWorkerSyncModel
+from dstack._internal.server.services.runs import router_worker_sync
 from dstack._internal.server.testing.common import (
+    create_instance,
+    create_job,
     create_project,
     create_repo,
     create_run,
     create_user,
     get_run_spec,
+)
+from dstack._internal.server.testing.common import (
+    get_job_provisioning_data as make_job_provisioning_data,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -451,3 +459,136 @@ class TestServiceRouterWorkerSyncWorker:
         assert sync_row.lock_expires_at is None
         assert sync_row.lock_owner is None
         assert sync_row.last_processed_at is not None
+
+    async def test_process_syncs_running_first_node_jobs_regardless_of_probes(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: ServiceRouterWorkerSyncWorker,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=_router_service_run_spec(repo.name),
+        )
+        instance = await create_instance(session=session, project=project)
+        # The router's probes may depend on registered workers, so it must be synced before
+        # they pass. Otherwise, neither the probes nor the sync could make progress.
+        router_job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.RUNNING,
+            ready=False,
+            replica_group_name="router",
+            job_provisioning_data=make_job_provisioning_data(),
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.RUNNING,
+            ready=False,
+            replica_num=1,
+            replica_group_name="worker",
+            job_provisioning_data=make_job_provisioning_data(),
+        )
+        # Not the first node of the replica
+        await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.RUNNING,
+            job_num=1,
+            replica_num=1,
+            replica_group_name="worker",
+            job_provisioning_data=make_job_provisioning_data(),
+        )
+        # Not running
+        await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.PROVISIONING,
+            replica_num=2,
+            replica_group_name="worker",
+        )
+        sync_row = await _add_service_router_worker_sync_row(session, run.id)
+        sync_row.lock_token = uuid.uuid4()
+        sync_row.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
+        sync_row.lock_owner = ServiceRouterWorkerSyncPipeline.__name__
+        await session.commit()
+        item = _sync_row_to_pipeline_item(sync_row)
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.service_router_worker_sync"
+            ".sync_router_workers_for_run_model",
+            new_callable=AsyncMock,
+        ) as sync_mock:
+            await worker.process(item)
+
+        sync_mock.assert_awaited_once()
+        assert sync_mock.await_args is not None
+        called_run = sync_mock.await_args.args[0]
+        assert {j.id for j in called_run.jobs} == {router_job.id, worker_job.id}
+
+    async def test_process_logs_router_job_when_router_connection_fails(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: ServiceRouterWorkerSyncWorker,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        caplog.set_level(level=logging.WARNING, logger=router_worker_sync.__name__)
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=_router_service_run_spec(repo.name),
+        )
+        instance = await create_instance(session=session, project=project)
+        router_job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            status=JobStatus.RUNNING,
+            ready=True,
+            replica_group_name="router",
+            # `dockerized` makes `get_container_ssh_credentials()` also read
+            # `instance.project` and `job_runtime_data`.
+            job_provisioning_data=make_job_provisioning_data(dockerized=True),
+        )
+        sync_row = await _add_service_router_worker_sync_row(session, run.id)
+        sync_row.lock_token = uuid.uuid4()
+        sync_row.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
+        sync_row.lock_owner = ServiceRouterWorkerSyncPipeline.__name__
+        await session.commit()
+        item = _sync_row_to_pipeline_item(sync_row)
+
+        # Patching the tunnel itself keeps `get_container_ssh_credentials()` real, so the test
+        # covers the job/instance/project attributes it reads.
+        tunnel_mock = MagicMock()
+        ssh_error = SSHError("connection refused")
+        tunnel_mock.return_value.__aenter__ = AsyncMock(side_effect=ssh_error)
+        tunnel_mock.return_value.__aexit__ = AsyncMock(return_value=False)
+        with patch("dstack._internal.server.services.ssh.SSHTunnel", tunnel_mock):
+            await worker.process(item)
+
+        assert (
+            f"job({router_job.id.hex[:6]}){router_job.job_name}:"
+            f" failed to sync workers with router: {ssh_error!r}" in caplog.text
+        )
+        await session.refresh(sync_row)
+        assert sync_row.deleted is False
+        assert sync_row.lock_token is None

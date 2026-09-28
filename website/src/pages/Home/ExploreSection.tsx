@@ -1,18 +1,22 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
+import { CapList } from '../../components/Capabilities';
+import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
+import { FleetGlyph, GatewayGlyph, PresetGlyph, ProjectGlyph, ServiceGlyph, TaskGlyph } from '../../components/ConceptIcons';
+import { ContentTabs } from '../../components/ContentTabs';
+import { ViewDocsButton } from '../../components/ViewDocsButton';
 import { highlightTerms } from '../../components/highlightTerms';
-import { docsUrl } from '../../routes';
-import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph } from './GetStartedSection';
+import { DOCS_URL, docsUrl } from '../../routes';
 
 // Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
-  { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Cluster provisioning and monitoring' },
-  { name: 'Tasks', href: docsUrl('concepts/tasks'), description: 'Training and other kind of jobs scheduling' },
-  { name: 'Services', href: docsUrl('concepts/services'), description: 'Cache-aware and PD-disaggregated inference' },
-  { name: 'Gateways', href: docsUrl('concepts/gateways'), description: 'HTTPS, auto-scaling, domains, and rate limits' },
-  { name: 'Presets', href: docsUrl('concepts/presets'), description: 'Agent-based optimization toolkit' },
-  { name: 'Projects', href: docsUrl('concepts/projects'), description: 'Tenant isolation and usage metering' },
+  { icon: <FleetGlyph />, title: 'Fleets', href: docsUrl('concepts/fleets'), sub: 'Cluster provisioning and monitoring' },
+  { icon: <TaskGlyph />, title: 'Tasks', href: docsUrl('concepts/tasks'), sub: 'Training and other kind of jobs scheduling' },
+  { icon: <ServiceGlyph />, title: 'Services', href: docsUrl('concepts/services'), sub: 'Cache-aware and PD-disaggregated inference' },
+  { icon: <GatewayGlyph />, title: 'Gateways', href: docsUrl('concepts/gateways'), sub: 'HTTPS, auto-scaling, domains, and rate limits' },
+  { icon: <PresetGlyph />, title: 'Presets', href: docsUrl('concepts/presets'), sub: 'Agent-based optimization toolkit' },
+  { icon: <ProjectGlyph />, title: 'Projects', href: docsUrl('concepts/projects'), sub: 'Tenant isolation and usage metering' },
 ];
 
 // The main marketing content: a sequence of alternating documentation blocks.
@@ -23,7 +27,7 @@ export function ExploreSection() {
         dstack gives cloud tenants and data-center operators a unified control plane for managing compute and orchestrating AI workloads.
         <br />
         <br />
-        It improves operational efficiency and removes vendor lock-in. No more hassle of building your own compute stack on top of Kubernetes or Slurm.
+        It improves operational efficiency and removes vendor lock-in. Use your existing infrastructure without building and maintaining your own AI compute stack.
       </AlternatingDocBlock>
 
       <KeyConceptsBlock />
@@ -34,81 +38,19 @@ export function ExploreSection() {
   );
 }
 
-// Clouds grid for the merged compute block, grouped per column: traditional hyperscalers,
-// top GPU neoclouds, then smaller GPU clouds.
-const CLOUD_GROUPS = [
-  ['AWS', 'GCP', 'Azure', 'OCI', 'DigitalOcean', 'Vultr'],
-  ['Nebius', 'Crusoe', 'Lambda', 'Verda', 'Runpod'],
-  ['AMD Dev Cloud', 'Hot Aisle', 'Vast.ai', 'JarvisLabs'],
-];
-
-// On-prem capability rows for the compute block.
-const onPremItems = [
-  { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Attach bare-metal servers or VMs with SSH access' },
-  { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Attach your existing Kubernetes clusters' },
-];
-
-// Tabbed on-prem capabilities and cloud providers for bring-your-own compute.
+// Tabbed on-prem capabilities and GPU clouds for bring-your-own compute.
 function BringComputeBlock() {
-  const [pane, setPane] = useState<'onprem' | 'clouds'>('onprem');
   return (
     <AlternatingDocBlock
-      visual={
-        <div className="gs-box">
-          <div className="gs-tabs" role="tablist" aria-label="Bring your own compute">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pane === 'onprem'}
-              className={`gs-tab${pane === 'onprem' ? ' gs-tab--on' : ''}`}
-              onClick={() => setPane('onprem')}
-            >
-              On-prem
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={pane === 'clouds'}
-              className={`gs-tab${pane === 'clouds' ? ' gs-tab--on' : ''}`}
-              onClick={() => setPane('clouds')}
-            >
-              Clouds
-            </button>
-          </div>
-          <div className="gs-skybody">
-            {pane === 'onprem' && <CapList items={onPremItems} />}
-            {pane === 'clouds' && (
-              <div className="gs-cloudcols">
-                {CLOUD_GROUPS.map(group => (
-                  <ul key={group[0]}>
-                    {group.map(cloud => (
-                      <li key={cloud} className="gs-cloud">
-                        <span className="gs-li__ic"><CloudGlyph /></span>
-                        <span>{cloud}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="gs-boxfoot">
-            {pane === 'onprem' && (
-              <span className="gs-foot__note">Bring bare-metal servers, a Kubernetes cluster, or just VMs</span>
-            )}
-            {pane === 'clouds' && (
-              <span className="gs-foot__note">Configure credentials for your clouds to automate provisioning</span>
-            )}
-          </div>
-        </div>
-      }
+      visual={<ComputeSourcesTabs />}
       title="Bring your own compute"
       imageFirst
     >
       Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH
-      credentials to create an SSH fleet. Have an existing Kubernetes cluster? Point dstack's
-      Kubernetes backend to the kubeconfig. dstack will schedule workloads on them alongside cloud
-      clusters.
+      credentials to create an SSH fleet. Have an existing Kubernetes or Slurm cluster? Connect it
+      through the Kubernetes backend or the experimental Slurm backend.
+      dstack provides a unified workload interface while Kubernetes or Slurm handles scheduling
+      within the cluster.
       <br />
       <br />
       dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
@@ -118,24 +60,33 @@ function BringComputeBlock() {
   );
 }
 
-export function KeyConceptsBlock({ children }: { children?: ReactNode }) {
+export function KeyConceptsBlock({ children, imageFirst = false }: {
+  children?: ReactNode;
+  imageFirst?: boolean;
+}) {
   return (
     <AlternatingDocBlock
       visual={
-        <div className="concept-grid-wrap">
-          <div className="concept-grid">
-            {keyConcepts.map(concept => (
-              // Whole card is the link so it reads as clickable. Kept as a real <a>
-              // (open-in-new-tab / SEO) rather than Cloudscape's onClick-only ActionCard.
-              <a className="media-card concept-card" href={concept.href} key={concept.name}>
-                <h3>{concept.name}</h3>
-                <p>{highlightTerms(concept.description)}</p>
-              </a>
-            ))}
-          </div>
-        </div>
+        <ContentTabs
+          ariaLabel="AI-native orchestration"
+          className="gs-box--compute-sources"
+          tabs={[{
+            id: 'concepts',
+            label: 'Concepts',
+            content: <CapList items={keyConcepts} />,
+            footer: (
+              <>
+                <span className="gs-foot__note">
+                  A unified interface for managing compute, training, and inference
+                </span>
+                <ViewDocsButton href={DOCS_URL} />
+              </>
+            ),
+          }]}
+        />
       }
       title="AI-native orchestration"
+      imageFirst={imageFirst}
     >
       {children ?? <>
         Managing AI infrastructure requires first-class primitives for compute management, training, inference, and observability that support heterogeneous AI compute.

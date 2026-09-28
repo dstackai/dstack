@@ -8,16 +8,18 @@ import react from '@vitejs/plugin-react';
 // `assetsDir` is namespaced to `website-assets/` (not Vite's default `assets/`) so the
 // build can be overlaid onto the MkDocs `site/` output without colliding with MkDocs's
 // own `/assets/...` tree. Public files live under `public/static/` for the same reason —
-// the HTML entries provide the landing and Sky product routes on static hosting.
+// the HTML entries provide the landing and product routes on static hosting.
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
   plugins: [react()],
+  esbuild: { legalComments: 'inline' },
   build: {
     assetsDir: 'website-assets',
     rollupOptions: {
       input: {
         home: fileURLToPath(new URL('./index.html', import.meta.url)),
         sky: fileURLToPath(new URL('./products/sky/index.html', import.meta.url)),
+        factory: fileURLToPath(new URL('./products/factory/index.html', import.meta.url)),
       },
     },
   },

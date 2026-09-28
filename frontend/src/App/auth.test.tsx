@@ -6,7 +6,7 @@ import { act, create, ReactTestRenderer } from 'react-test-renderer';
 import { ROUTES } from 'routes';
 import { useGetUserDataQuery } from 'services/user';
 
-import { LoginByGithub } from 'App/Login/LoginByGithub';
+import { Login } from 'App/Login';
 
 const mockDispatch = jest.fn();
 const mockPrivateQuery = jest.fn();
@@ -26,6 +26,7 @@ jest.mock('hooks', () => ({
 jest.mock('libs', () => ({ goToUrl: jest.fn() }));
 
 jest.mock('services/auth', () => ({
+    useGetAuthProvidersQuery: () => ({ data: [{ name: 'github', enabled: true }], isLoading: false }),
     useGithubAuthorizeMutation: () => [jest.fn(), { isLoading: false }],
 }));
 
@@ -38,7 +39,11 @@ jest.mock('./slice', () => ({
     setUserData: (payload: unknown) => ({ type: 'app/setUserData', payload }),
 }));
 
-jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+jest.mock('react-i18next', () => ({
+    useTranslation: () => ({
+        t: (key: string, options?: { product: string }) => (options ? `Welcome to ${options.product}` : key),
+    }),
+}));
 
 jest.mock('layouts/AppLayout', () => ({
     __esModule: true,
@@ -61,13 +66,24 @@ jest.mock('components', () => {
         Container: Wrapper,
         Header: Wrapper,
         NavigateLink: Wrapper,
-        ContentLayout: ({ header }: { header: React.ReactNode }) => <>{header}</>,
+        ContentLayout: ({ header, children }: { header: React.ReactNode; children: React.ReactNode }) => (
+            <>
+                {header}
+                {children}
+            </>
+        ),
+        Spinner: Wrapper,
         Link: Wrapper,
         SpaceBetween: Wrapper,
     };
 });
 
-jest.mock('./Login/SelfHostedLogin', () => ({ SelfHostedLogin: () => <h1>Server login</h1> }));
+jest.mock('product', () => ({ product: { ...jest.requireActual('../../product.config.cjs').getProductConfig('sky') } }));
+jest.mock('PublicApp', () => ({ PublicApp: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+jest.mock('./Login/EntraID/LoginByEntraID', () => ({ LoginByEntraID: () => <button>Entra</button> }));
+jest.mock('./Login/LoginByGoogle', () => ({ LoginByGoogle: () => <button>Google</button> }));
+jest.mock('./Login/LoginByOkta', () => ({ LoginByOkta: () => <button>Okta</button> }));
+jest.mock('./Login/LoginByTokenForm', () => ({ LoginByTokenForm: () => <form>Token</form> }));
 jest.mock('./Loading', () => ({ Loading: () => <p role="status">Loading</p> }));
 jest.mock('./AuthErrorMessage', () => ({ AuthErrorMessage: () => <h1>Storage unavailable</h1> }));
 
@@ -82,7 +98,7 @@ const renderApp = (path: string) => {
         rendered = create(
             <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
-                    <Route path={ROUTES.BASE} element={<LoginByGithub />} />
+                    <Route path={ROUTES.BASE} element={<Login />} />
                     <Route element={<App />}>
                         <Route path="/runs" element={<h1>Runs</h1>} />
                     </Route>

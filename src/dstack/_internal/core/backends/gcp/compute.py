@@ -1580,7 +1580,7 @@ def _get_image(instance_type_name: str, gpu_name: Optional[str]) -> GCPImage:
         is_ufw_installed = False
     elif instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
         return GCPImage(
-            id="projects/cos-cloud/global/images/cos-105-17412-535-78",
+            id="projects/cos-cloud/global/images/family/cos-121-lts",
             is_ufw_installed=False,
         )
     elif gpu_name is not None:

@@ -1,12 +1,12 @@
-import { Fragment, ReactNode, useRef, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Button from '@cloudscape-design/components/button';
+import Button, { ButtonProps } from '@cloudscape-design/components/button';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { menuButtonStyle } from '../cloudscape-theme';
 import { ThemeToggle } from './ThemeToggle';
 import { asset } from '../asset';
-import { BLOG_URL, DOCS_URL, ROUTES } from '../routes';
+import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
 import { ThemeMode } from '../theme';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
@@ -44,17 +44,18 @@ type ProductLink = {
   href: string;
   icon: ReactNode;
   badge: string;
+  external?: boolean;
 };
 
 // The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
-// follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
+// follow as rows. Reused by the standalone top-nav menu and the mobile nav's "Products"
 // section.
-// NOTE: the descriptions are duplicated in GetStartedSection.tsx (the product list) and
-// mkdocs/overrides/header-2.html — keep all three in sync.
+// Keep menu descriptions in sync with mkdocs/overrides/header-2.html.
+// GetStartedSection.tsx uses a longer dstack description.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane for AI-native orchestration.', href: asset(ROUTES.HOME), icon: <BoxGlyph />, badge: 'Self-hosted' },
-  { id: 'factory', text: 'dstack Factory', secondaryText: 'A complete software stack for AI labs, inference providers, and data centers.', href: 'https://calendly.com/dstackai/discovery-call', icon: <LayersGlyph />, badge: 'Self-hosted' },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'An AI cloud with AI-native orchestration. Rent GPUs on demand or bring your own compute.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
+  { id: 'open-source', text: 'dstack', secondaryText: 'A unified orchestration interface across GPU clouds, Kubernetes, VMs, and bare-metal.', href: docsUrl('installation'), icon: <BoxGlyph />, badge: 'Self-hosted' },
+  { id: 'factory', text: 'dstack Factory', secondaryText: 'A multi-tenant orchestration stack for AI labs, data centers, and AI token factories.', href: asset(ROUTES.FACTORY), icon: <LayersGlyph />, badge: 'Self-hosted' },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Unified access to GPU clouds. Better prices and one billing.', href: asset(ROUTES.SKY), icon: <CloudGlyph />, badge: 'Hosted by us' },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
@@ -68,7 +69,7 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
       type: 'link',
       text: p.text,
       href: p.href,
-      external: true,
+      external: p.external,
       externalIconAriaLabel,
     })),
   },
@@ -77,54 +78,104 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Blog', href: BLOG_URL },
 ];
 
-function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string }) {
+function isProductLink(target: EventTarget | null) {
+  const href = target instanceof Element ? target.closest('a')?.getAttribute('href') : null;
+  return products.some(product => product.href === href);
+}
+
+function ProductsMenu({ selectedProductId }: { selectedProductId?: string }) {
   const [open, setOpen] = useState(false);
-  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
-  const activeProductId = hoveredProductId ?? selectedProductId;
-  const closeTimer = useRef<number | undefined>(undefined);
-  const openMenu = () => {
-    window.clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const scheduleClose = (menu: HTMLDivElement) => {
-    window.clearTimeout(closeTimer.current);
-    closeTimer.current = window.setTimeout(() => {
-      if (!menu.querySelector(':focus-visible')) setOpen(false);
-    }, 150);
-  };
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<ButtonProps.Ref>(null);
+  const focusLastItem = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const items = menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
+    items?.[focusLastItem.current ? items.length - 1 : 0]?.focus();
+    focusLastItem.current = false;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnWindowBlur = () => setOpen(false);
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    window.addEventListener('blur', closeOnWindowBlur);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      window.removeEventListener('blur', closeOnWindowBlur);
+    };
+  }, [open]);
 
   return (
     <div
-      className="site-hover-menu"
-      onMouseEnter={openMenu}
-      onMouseLeave={event => {
-        setHoveredProductId(null);
-        scheduleClose(event.currentTarget);
-      }}
-      onFocus={openMenu}
+      ref={menuRef}
+      className="site-products-dropdown"
+      data-open={open}
       onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setOpen(false);
         }
       }}
+      onKeyDown={event => {
+        if (!open) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            focusLastItem.current = event.key === 'ArrowUp';
+            setOpen(true);
+          }
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+          triggerRef.current?.focus();
+          return;
+        }
+        const items = Array.from(
+          event.currentTarget.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+        );
+        const index = items.indexOf(document.activeElement as HTMLAnchorElement);
+        let nextIndex: number;
+        switch (event.key) {
+          case 'ArrowDown': nextIndex = (index + 1) % items.length; break;
+          case 'ArrowUp': nextIndex = index <= 0 ? items.length - 1 : index - 1; break;
+          case 'Home': nextIndex = 0; break;
+          case 'End': nextIndex = items.length - 1; break;
+          default: return;
+        }
+        event.preventDefault();
+        items[nextIndex]?.focus();
+      }}
     >
-      <button type="button" className="site-menu-button site-hover-menu__trigger" aria-haspopup="true" aria-expanded={open}>
-        Products
-        <svg className="site-hover-menu__caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 6.5 8 10.5 12 6.5" />
-        </svg>
-      </button>
+      <Button
+        ref={triggerRef}
+        variant="normal"
+        style={{ root: { ...menuButtonStyle.root, paddingInline: '18px var(--products-arrow-gap)' } }}
+        ariaHaspopup="menu"
+        ariaExpanded={open}
+        ariaControls="site-products-menu"
+        onClick={() => setOpen(open => !open)}
+      >
+        <span className="site-products-dropdown__label">
+          Products
+          <svg className="site-products-dropdown__caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M4 6.5 8 10.5 12 6.5" />
+          </svg>
+        </span>
+      </Button>
       {open && (
         <div className="site-products-menu">
-          <div className="gs-rail" role="menu">
+          <div className="gs-rail" id="site-products-menu" role="menu" aria-label="Products">
             <div className="gs-rail__group">Self-hosted</div>
             <a
-              className={`gs-opt gs-opt--feat${activeProductId === products[0].id ? ' gs-opt--on' : ''}`}
+              className={`gs-opt gs-opt--feat${selectedProductId === products[0].id ? ' gs-opt--on' : ''}`}
               role="menuitem"
+              tabIndex={-1}
               href={products[0].href}
-              onMouseEnter={() => setHoveredProductId(products[0].id)}
-              target="_blank"
-              rel="noreferrer"
+              aria-current={selectedProductId === products[0].id ? 'page' : undefined}
+              target={products[0].external ? '_blank' : undefined}
+              rel={products[0].external ? 'noreferrer' : undefined}
             >
               <span className="gs-opt__ic">{products[0].icon}</span>
               <span className="gs-opt__body">
@@ -137,11 +188,12 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId: string })
                 {product.badge !== products[index].badge && <div className="gs-rail__group">{product.badge}</div>}
                 <a
                   role="menuitem"
-                  className={`gs-opt gs-opt--row${activeProductId === product.id ? ' gs-opt--on' : ''}`}
+                  tabIndex={-1}
+                  className={`gs-opt gs-opt--row${selectedProductId === product.id ? ' gs-opt--on' : ''}`}
                   href={product.href}
-                  onMouseEnter={() => setHoveredProductId(product.id)}
-                  target="_blank"
-                  rel="noreferrer"
+                  aria-current={selectedProductId === product.id ? 'page' : undefined}
+                  target={product.external ? '_blank' : undefined}
+                  rel={product.external ? 'noreferrer' : undefined}
                 >
                   <span className="gs-opt__ic">{product.icon}</span>
                   <span className="gs-opt__body">
@@ -168,11 +220,17 @@ export function SiteNavigation({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [mobileProductHovered, setMobileProductHovered] = useState(false);
+  const [mobileProductFocused, setMobileProductFocused] = useState(false);
 
   const isSkyPage = pathname.replace(/\/$/, '') === ROUTES.SKY;
-  const menuAction = isSkyPage
-    ? { text: 'Sign in', href: 'https://sky.dstack.ai/' }
-    : { text: 'GitHub', href: dstackGithubUrl };
+  const isFactoryPage = pathname.replace(/\/$/, '') === ROUTES.FACTORY;
+  const selectedProductId = isSkyPage ? 'sky-product' : isFactoryPage ? 'factory' : undefined;
+  const menuAction = isFactoryPage
+    ? { text: 'Book a demo', href: 'https://calendly.com/dstackai/discovery-call' }
+    : isSkyPage
+      ? { text: 'Sign in', href: 'https://sky.dstack.ai/' }
+      : { text: 'GitHub', href: dstackGithubUrl };
 
   const go = (to: string) => {
     navigate(to);
@@ -189,7 +247,11 @@ export function SiteNavigation({
             ariaLabel={mobileNavigationOpen ? 'Close navigation' : 'Open navigation'}
             ariaExpanded={mobileNavigationOpen}
             ariaControls="site-mobile-navigation"
-            onClick={() => setMobileNavigationOpen(open => !open)}
+            onClick={() => {
+              setMobileNavigationOpen(open => !open);
+              setMobileProductHovered(false);
+              setMobileProductFocused(false);
+            }}
           />
         </div>
         <button
@@ -202,8 +264,8 @@ export function SiteNavigation({
         </button>
         <nav className="site-menu" aria-label="Global">
           <SpaceBetween direction="horizontal" size="l" alignItems="center">
-            {/* Standalone "Products" hover menu — a flat list of the three products. Sits before "Docs". */}
-            <ProductsHoverMenu selectedProductId={isSkyPage ? 'sky-product' : 'open-source'} />
+            {/* Standalone "Products" menu — a flat list of the three products. Sits before "Docs". */}
+            <ProductsMenu selectedProductId={selectedProductId} />
             {audienceNavItems.map(item => (
               <a key={item.label} className="site-menu-link" href={item.href}>
                 {item.label}
@@ -224,9 +286,18 @@ export function SiteNavigation({
         <div className="site-mobile-spacer" aria-hidden="true" />
       </div>
       {mobileNavigationOpen && (
-        <div className="site-mobile-navigation" id="site-mobile-navigation">
+        <div
+          className="site-mobile-navigation"
+          id="site-mobile-navigation"
+          onMouseOver={event => setMobileProductHovered(isProductLink(event.target))}
+          onMouseLeave={() => setMobileProductHovered(false)}
+          onFocus={event => setMobileProductFocused(isProductLink(event.target))}
+          onBlur={event => setMobileProductFocused(isProductLink(event.relatedTarget))}
+        >
           <SideNavigation
-            activeHref={pathname}
+            activeHref={mobileProductHovered || mobileProductFocused
+              ? ''
+              : products.find(product => product.id === selectedProductId)?.href}
             items={[
               ...mobileNavigationItems,
               { type: 'link', ...menuAction, external: true, externalIconAriaLabel },

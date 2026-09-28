@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { product } from 'product';
 
 import { Box, ConfirmationDialog, ContentLayout, Tabs } from 'components';
 import { DetailsHeader } from 'components';
@@ -72,12 +73,12 @@ export const UserDetails: React.FC = () => {
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
         },
-        (process.env.UI_VERSION === 'factory' || process.env.UI_VERSION === 'sky') && {
+        product.hasEvents && {
             label: t('users.events'),
             id: UserDetailsTabTypeEnum.EVENTS,
             href: ROUTES.USER.EVENTS.FORMAT(paramUserName),
         },
-        process.env.UI_VERSION === 'sky' && {
+        product.hasBilling && {
             label: t('billing.title'),
             id: UserDetailsTabTypeEnum.BILLING,
             href: ROUTES.USER.BILLING.LIST.FORMAT(paramUserName),

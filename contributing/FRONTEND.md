@@ -54,3 +54,18 @@ The `webpack` dev server expects the API to be running on `http://127.0.0.1:8000
 ```shell
 dstack server --port 8000
 ```
+
+## Product flavors
+
+The shared frontend supports OSS, Enterprise, Factory, and Sky. From `frontend/`, use
+`npm run build`, `npm run build-enterprise`, `npm run build-factory`, or
+`npm run build-sky`; the corresponding development commands are `start`,
+`start-enterprise`, `start-factory`, and `start-sky`.
+
+`frontend/product.config.cjs` defines product names and inherited UI features for both
+webpack and the application. Components use `product` from `src/product.ts` instead of
+checking `UI_VERSION` directly. Factory and Sky share billing and presets; hosted-service
+content such as Sky terms and onboarding uses `product.isSky`.
+
+All flavors use the same login component. It displays supported providers enabled by
+`/api/auth/list_providers`, independently of the UI flavor, and always offers token login.

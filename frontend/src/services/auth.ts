@@ -12,6 +12,9 @@ export const authApi = createApi({
     tagTypes: ['Auth'],
 
     endpoints: (builder) => ({
+        getAuthProviders: builder.query<{ name: string; enabled: boolean }[], void>({
+            query: () => ({ url: API.AUTH.LIST_PROVIDERS(), method: 'POST' }),
+        }),
         getNextRedirect: builder.mutation<{ redirect_url?: string }, { code: string; state: string }>({
             query: (body) => ({
                 url: API.AUTH.NEXT_REDIRECT(),
@@ -111,6 +114,7 @@ export const authApi = createApi({
 });
 
 export const {
+    useGetAuthProvidersQuery,
     useGetNextRedirectMutation,
     useGithubAuthorizeMutation,
     useGithubCallbackMutation,

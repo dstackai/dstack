@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { product } from 'product';
 
 import { Button, FormCodeEditor, FormUI, InfoLink, SpaceBetween } from 'components';
 
@@ -11,7 +12,7 @@ import { CONFIG_YAML_HELP_SELF_HOSTED, CONFIG_YAML_HELP_SKY } from './constants'
 
 import { FieldPath } from 'react-hook-form/dist/types/path';
 
-const INFO = process.env.UI_VERSION === 'sky' ? CONFIG_YAML_HELP_SKY : CONFIG_YAML_HELP_SELF_HOSTED;
+const INFO = product.hasBilling ? CONFIG_YAML_HELP_SKY : CONFIG_YAML_HELP_SELF_HOSTED;
 
 export interface IProps {
     initialValues?: IBackendConfigYaml;

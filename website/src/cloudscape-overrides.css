@@ -145,8 +145,19 @@ body {
   padding: 0 !important;
 }
 
-/* 11) Thin (0.5px) dividers between stacked FAQ items. The block's outer corners
-       are clipped to 12px by .faq-list; these are the internal separators. */
+/* 11) The FAQ wrapper owns the outer frame. Remove each stacked container's frame
+       and shadow, then draw only the separators between questions. */
+.faq-list > .faq-item {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+.faq-list > .faq-item::before,
+.faq-list > .faq-item::after {
+  display: none !important;
+}
+.faq-list > .faq-item + .faq-item {
+  border-block-start: 0.5px solid var(--cs-border) !important;
+}
 .faq-list * {
   --border-divider-section-width-uwo8my: 0.5px;
 }

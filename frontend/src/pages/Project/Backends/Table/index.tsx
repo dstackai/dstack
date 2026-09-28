@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { product } from 'product';
 
 import { Button, ButtonWithConfirmation, Header, InfoLink, ListEmptyMessage, SpaceBetween, Table } from 'components';
 
@@ -9,7 +10,7 @@ import { BACKENDS_HELP_SELF_HOSTED, BACKENDS_HELP_SKY } from './constants';
 import { useColumnsDefinitions } from './hooks';
 
 import { IProps } from './types';
-const INFO = process.env.UI_VERSION === 'sky' ? BACKENDS_HELP_SKY : BACKENDS_HELP_SELF_HOSTED;
+const INFO = product.hasBilling ? BACKENDS_HELP_SKY : BACKENDS_HELP_SELF_HOSTED;
 
 export const BackendsTable: React.FC<IProps> = ({
     backends,

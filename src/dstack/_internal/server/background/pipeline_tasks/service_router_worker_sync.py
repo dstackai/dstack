@@ -201,7 +201,14 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     ServiceRouterWorkerSyncModel.id == item.id,
                     ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
                 )
-                .options(selectinload(ServiceRouterWorkerSyncModel.run))
+                .options(
+                    joinedload(ServiceRouterWorkerSyncModel.run).load_only(
+                        RunModel.id,
+                        RunModel.deleted,
+                        RunModel.status,
+                        RunModel.run_spec,
+                    )
+                )
             )
             sync_row = res.unique().scalar_one_or_none()
             if sync_row is None:
@@ -229,15 +236,29 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 select(RunModel)
                 .where(RunModel.id == item.run_id)
                 .options(
-                    load_only(RunModel.id, RunModel.run_spec),
+                    load_only(
+                        RunModel.id,
+                        RunModel.run_name,
+                        RunModel.run_spec,
+                    ),
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
-                            JobModel.ready == True,
+                            # `JobModel.ready` is deliberately not checked. A router only
+                            # passes probes that depend on workers (e.g. `/health_generate`)
+                            # after workers are registered, so waiting for it would deadlock.
+                            # Workers are registered as soon as the sync's own check
+                            # (`/server_info` or `GetServerInfo`) reports them ready, so
+                            # `probes` cannot delay registration.
+                            # Only the first node of a replica is synced. Services don't
+                            # support multi-node replicas yet, so this is a no-op kept for
+                            # forward compatibility.
+                            JobModel.job_num == 0,
                         )
                     )
                     .load_only(
                         JobModel.id,
+                        JobModel.job_name,
                         JobModel.status,
                         JobModel.job_spec_data,
                         JobModel.job_provisioning_data,
