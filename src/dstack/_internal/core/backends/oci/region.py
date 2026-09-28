@@ -44,22 +44,10 @@ class OCIRegionClient:
     def work_request_client(self) -> oci.work_requests.WorkRequestClient:
         return oci.work_requests.WorkRequestClient(self.client_config)
 
-    @cached_property
-    def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
-        return self.availability_domains_in(self.client_config["tenancy"])
-
-    @lru_cache(maxsize=None)
+    @lru_cache()
     def availability_domains_in(
         self, compartment_id: str
     ) -> List[oci.identity.models.AvailabilityDomain]:
-        """
-        Availability domains of the tenancy that owns `compartment_id`.
-
-        The compartment dstack works in need not belong to the tenancy the credentials
-        authenticate against - a compartment can be shared with another tenancy by a
-        cross-tenancy policy. Availability domain names are tenancy-specific, so they
-        have to be resolved from the compartment rather than from the credentials.
-        """
         return self.identity_client.list_availability_domains(compartment_id).data
 
 
