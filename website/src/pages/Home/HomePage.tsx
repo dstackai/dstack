@@ -2,6 +2,7 @@ import Button from '@cloudscape-design/components/button';
 import { useLayoutContext } from '../../App';
 import { heroButtonStyle } from '../../cloudscape-theme';
 import { HeroSquircle } from '../../components/HeroSquircle';
+import { ViewDocsButton } from '../../components/ViewDocsButton';
 import { highlightTerms } from '../../components/highlightTerms';
 import { DOCS_URL } from '../../routes';
 import { ExploreSection } from './ExploreSection';
@@ -32,28 +33,20 @@ export function HomePage() {
               'Kubernetes, VMs, or bare-metal clusters.',
             )}
           </p>
-          <div className="home-hero__actions">
-            <span className="cta-with-arrow">
-              <Button
-                variant="primary"
-                href="#resources"
-                onClick={event => {
-                  event.preventDefault();
-                  document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                style={heroButtonStyle}
-              >
-                Get started
-                {/* Same thin arrow as the banner link (shaft + head), sliding right on hover. */}
-                <svg className="cta-arrow" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 12h15" />
-                  <path d="m12.5 5.5 6.5 6.5-6.5 6.5" />
-                </svg>
-              </Button>
-            </span>
-            <Button href={DOCS_URL} style={heroButtonStyle}>
-              View docs
+          <div className="home-hero__actions cta-pair">
+            <Button
+              variant="primary"
+              fullWidth
+              href="#resources"
+              onClick={event => {
+                event.preventDefault();
+                document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={heroButtonStyle}
+            >
+              Get started
             </Button>
+            <ViewDocsButton href={DOCS_URL} style={heroButtonStyle} fullWidth />
           </div>
         </div>
       </section>

@@ -126,6 +126,8 @@ export function FactoryPage() {
               ))}
             </section>
 
+            <TrustedBySection />
+
             <FaqSection
               imageFirst
               action={
@@ -137,7 +139,7 @@ export function FactoryPage() {
                   iconAlign="right"
                   style={mainButtonStyle}
                 >
-                  Talk to us
+                  Book a demo
                 </Button>
               }
               items={[
@@ -157,8 +159,6 @@ export function FactoryPage() {
               Talk to us about your infrastructure, models, and requirements for running an AI
               token factory.
             </FaqSection>
-
-            <TrustedBySection />
           </article>
         </div>
       </div>

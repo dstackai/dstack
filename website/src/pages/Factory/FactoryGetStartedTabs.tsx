@@ -5,6 +5,7 @@ import {
   billingCapability,
   eventsCapability,
   exportsCapability,
+  meteringCapability,
   registryCapability,
 } from './capabilities';
 
@@ -17,19 +18,19 @@ export function FactoryGetStartedTabs({ footer }: { footer?: ReactNode }) {
         {
           id: 'resource-sharing',
           label: 'Multi-tenancy',
-          content: <CapList items={[exportsCapability, billingCapability]} />,
+          content: <CapList items={[exportsCapability, meteringCapability, billingCapability]} />,
+          footer,
+        },
+        {
+          id: 'optimized-inference',
+          label: 'Inference',
+          content: <CapList items={[registryCapability]} />,
           footer,
         },
         {
           id: 'observability',
           label: 'Observability',
           content: <CapList items={[eventsCapability]} />,
-          footer,
-        },
-        {
-          id: 'optimized-inference',
-          label: 'Serverless inference',
-          content: <CapList items={[registryCapability]} />,
           footer,
         },
       ]}

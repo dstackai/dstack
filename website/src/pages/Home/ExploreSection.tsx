@@ -1,19 +1,22 @@
 import { ReactNode } from 'react';
-import Link from '@cloudscape-design/components/link';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
+import { CapList } from '../../components/Capabilities';
 import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
+import { FleetGlyph, GatewayGlyph, PresetGlyph, ProjectGlyph, ServiceGlyph, TaskGlyph } from '../../components/ConceptIcons';
+import { ContentTabs } from '../../components/ContentTabs';
+import { ViewDocsButton } from '../../components/ViewDocsButton';
 import { highlightTerms } from '../../components/highlightTerms';
-import { docsUrl } from '../../routes';
+import { DOCS_URL, docsUrl } from '../../routes';
 
 // Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
-  { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Cluster provisioning and monitoring' },
-  { name: 'Tasks', href: docsUrl('concepts/tasks'), description: 'Training and other kind of jobs scheduling' },
-  { name: 'Services', href: docsUrl('concepts/services'), description: 'Cache-aware and PD-disaggregated inference' },
-  { name: 'Gateways', href: docsUrl('concepts/gateways'), description: 'HTTPS, auto-scaling, domains, and rate limits' },
-  { name: 'Presets', href: docsUrl('concepts/presets'), description: 'Agent-based optimization toolkit' },
-  { name: 'Projects', href: docsUrl('concepts/projects'), description: 'Tenant isolation and usage metering' },
+  { icon: <FleetGlyph />, title: 'Fleets', href: docsUrl('concepts/fleets'), sub: 'Cluster provisioning and monitoring' },
+  { icon: <TaskGlyph />, title: 'Tasks', href: docsUrl('concepts/tasks'), sub: 'Training and other kind of jobs scheduling' },
+  { icon: <ServiceGlyph />, title: 'Services', href: docsUrl('concepts/services'), sub: 'Cache-aware and PD-disaggregated inference' },
+  { icon: <GatewayGlyph />, title: 'Gateways', href: docsUrl('concepts/gateways'), sub: 'HTTPS, auto-scaling, domains, and rate limits' },
+  { icon: <PresetGlyph />, title: 'Presets', href: docsUrl('concepts/presets'), sub: 'Agent-based optimization toolkit' },
+  { icon: <ProjectGlyph />, title: 'Projects', href: docsUrl('concepts/projects'), sub: 'Tenant isolation and usage metering' },
 ];
 
 // The main marketing content: a sequence of alternating documentation blocks.
@@ -45,7 +48,7 @@ function BringComputeBlock() {
     >
       Have bare-metal servers or VMs with SSH access? Point dstack to those hosts and provide SSH
       credentials to create an SSH fleet. Have an existing Kubernetes or Slurm cluster? Connect it
-      through the Kubernetes backend or the <Link href={docsUrl('concepts/backends/#slurm')}>{highlightTerms('experimental Slurm backend')}</Link>.
+      through the Kubernetes backend or the experimental Slurm backend.
       dstack provides a unified workload interface while Kubernetes or Slurm handles scheduling
       within the cluster.
       <br />
@@ -64,18 +67,23 @@ export function KeyConceptsBlock({ children, imageFirst = false }: {
   return (
     <AlternatingDocBlock
       visual={
-        <div className="concept-grid-wrap">
-          <div className="concept-grid">
-            {keyConcepts.map(concept => (
-              // Whole card is the link so it reads as clickable. Kept as a real <a>
-              // (open-in-new-tab / SEO) rather than Cloudscape's onClick-only ActionCard.
-              <a className="media-card concept-card" href={concept.href} key={concept.name}>
-                <h3>{concept.name}</h3>
-                <p>{highlightTerms(concept.description)}</p>
-              </a>
-            ))}
-          </div>
-        </div>
+        <ContentTabs
+          ariaLabel="AI-native orchestration"
+          className="gs-box--compute-sources"
+          tabs={[{
+            id: 'concepts',
+            label: 'Concepts',
+            content: <CapList items={keyConcepts} />,
+            footer: (
+              <>
+                <span className="gs-foot__note">
+                  A unified interface for managing compute, training, and inference
+                </span>
+                <ViewDocsButton href={DOCS_URL} />
+              </>
+            ),
+          }]}
+        />
       }
       title="AI-native orchestration"
       imageFirst={imageFirst}

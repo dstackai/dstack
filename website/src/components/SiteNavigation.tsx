@@ -1,6 +1,6 @@
-import { Fragment, ReactNode, useRef, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Button from '@cloudscape-design/components/button';
+import Button, { ButtonProps } from '@cloudscape-design/components/button';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { menuButtonStyle } from '../cloudscape-theme';
@@ -48,7 +48,7 @@ type ProductLink = {
 };
 
 // The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
-// follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
+// follow as rows. Reused by the standalone top-nav menu and the mobile nav's "Products"
 // section.
 // Keep menu descriptions in sync with mkdocs/overrides/header-2.html.
 // GetStartedSection.tsx uses a longer dstack description.
@@ -83,45 +83,95 @@ function isProductLink(target: EventTarget | null) {
   return products.some(product => product.href === href);
 }
 
-function ProductsHoverMenu({ selectedProductId }: { selectedProductId?: string }) {
+function ProductsMenu({ selectedProductId }: { selectedProductId?: string }) {
   const [open, setOpen] = useState(false);
-  const closeTimer = useRef<number | undefined>(undefined);
-  const openMenu = () => {
-    window.clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const scheduleClose = (menu: HTMLDivElement) => {
-    window.clearTimeout(closeTimer.current);
-    closeTimer.current = window.setTimeout(() => {
-      if (!menu.querySelector(':focus-visible')) setOpen(false);
-    }, 150);
-  };
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<ButtonProps.Ref>(null);
+  const focusLastItem = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const items = menuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
+    items?.[focusLastItem.current ? items.length - 1 : 0]?.focus();
+    focusLastItem.current = false;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const closeOnWindowBlur = () => setOpen(false);
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    window.addEventListener('blur', closeOnWindowBlur);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      window.removeEventListener('blur', closeOnWindowBlur);
+    };
+  }, [open]);
 
   return (
     <div
-      className="site-hover-menu"
-      onMouseEnter={openMenu}
-      onMouseLeave={event => scheduleClose(event.currentTarget)}
-      onFocus={openMenu}
+      ref={menuRef}
+      className="site-products-dropdown"
+      data-open={open}
       onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setOpen(false);
         }
       }}
+      onKeyDown={event => {
+        if (!open) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            focusLastItem.current = event.key === 'ArrowUp';
+            setOpen(true);
+          }
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+          triggerRef.current?.focus();
+          return;
+        }
+        const items = Array.from(
+          event.currentTarget.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]'),
+        );
+        const index = items.indexOf(document.activeElement as HTMLAnchorElement);
+        let nextIndex: number;
+        switch (event.key) {
+          case 'ArrowDown': nextIndex = (index + 1) % items.length; break;
+          case 'ArrowUp': nextIndex = index <= 0 ? items.length - 1 : index - 1; break;
+          case 'Home': nextIndex = 0; break;
+          case 'End': nextIndex = items.length - 1; break;
+          default: return;
+        }
+        event.preventDefault();
+        items[nextIndex]?.focus();
+      }}
     >
-      <button type="button" className="site-menu-button site-hover-menu__trigger" aria-haspopup="true" aria-expanded={open}>
-        Products
-        <svg className="site-hover-menu__caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 6.5 8 10.5 12 6.5" />
-        </svg>
-      </button>
+      <Button
+        ref={triggerRef}
+        variant="normal"
+        style={{ root: { ...menuButtonStyle.root, paddingInline: '18px var(--products-arrow-gap)' } }}
+        ariaHaspopup="menu"
+        ariaExpanded={open}
+        ariaControls="site-products-menu"
+        onClick={() => setOpen(open => !open)}
+      >
+        <span className="site-products-dropdown__label">
+          Products
+          <svg className="site-products-dropdown__caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M4 6.5 8 10.5 12 6.5" />
+          </svg>
+        </span>
+      </Button>
       {open && (
         <div className="site-products-menu">
-          <div className="gs-rail" role="menu">
+          <div className="gs-rail" id="site-products-menu" role="menu" aria-label="Products">
             <div className="gs-rail__group">Self-hosted</div>
             <a
               className={`gs-opt gs-opt--feat${selectedProductId === products[0].id ? ' gs-opt--on' : ''}`}
               role="menuitem"
+              tabIndex={-1}
               href={products[0].href}
               aria-current={selectedProductId === products[0].id ? 'page' : undefined}
               target={products[0].external ? '_blank' : undefined}
@@ -138,6 +188,7 @@ function ProductsHoverMenu({ selectedProductId }: { selectedProductId?: string }
                 {product.badge !== products[index].badge && <div className="gs-rail__group">{product.badge}</div>}
                 <a
                   role="menuitem"
+                  tabIndex={-1}
                   className={`gs-opt gs-opt--row${selectedProductId === product.id ? ' gs-opt--on' : ''}`}
                   href={product.href}
                   aria-current={selectedProductId === product.id ? 'page' : undefined}
@@ -176,7 +227,7 @@ export function SiteNavigation({
   const isFactoryPage = pathname.replace(/\/$/, '') === ROUTES.FACTORY;
   const selectedProductId = isSkyPage ? 'sky-product' : isFactoryPage ? 'factory' : undefined;
   const menuAction = isFactoryPage
-    ? { text: 'Talk to us', href: 'https://calendly.com/dstackai/discovery-call' }
+    ? { text: 'Book a demo', href: 'https://calendly.com/dstackai/discovery-call' }
     : isSkyPage
       ? { text: 'Sign in', href: 'https://sky.dstack.ai/' }
       : { text: 'GitHub', href: dstackGithubUrl };
@@ -213,8 +264,8 @@ export function SiteNavigation({
         </button>
         <nav className="site-menu" aria-label="Global">
           <SpaceBetween direction="horizontal" size="l" alignItems="center">
-            {/* Standalone "Products" hover menu — a flat list of the three products. Sits before "Docs". */}
-            <ProductsHoverMenu selectedProductId={selectedProductId} />
+            {/* Standalone "Products" menu — a flat list of the three products. Sits before "Docs". */}
+            <ProductsMenu selectedProductId={selectedProductId} />
             {audienceNavItems.map(item => (
               <a key={item.label} className="site-menu-link" href={item.href}>
                 {item.label}

@@ -2,18 +2,29 @@ import { ReactNode } from 'react';
 import { asset } from '../asset';
 
 // Icon, title, and description rows shared by the landing and product pages.
-export function CapList({ items }: { items: { icon: ReactNode; title: string; sub: string }[] }) {
+export function CapList({ items }: { items: { icon: ReactNode; title: string; sub: string; href?: string }[] }) {
   return (
     <ul className="gs-caps">
-      {items.map(cap => (
-        <li key={cap.title} className="gs-cap">
-          <span className="gs-cap__ic">{cap.icon}</span>
-          <span className="gs-cap__b">
-            <span className="gs-cap__t">{cap.title}</span>
-            <span className="gs-cap__s">{cap.sub}</span>
-          </span>
-        </li>
-      ))}
+      {items.map(cap => {
+        const content = (
+          <>
+            <span className="gs-cap__ic">{cap.icon}</span>
+            <span className="gs-cap__b">
+              <span className="gs-cap__t">{cap.title}</span>
+              <span className="gs-cap__s">{cap.sub}</span>
+            </span>
+          </>
+        );
+        return (
+          <li key={cap.title}>
+            {cap.href ? (
+              <a className="gs-cap" href={cap.href}>{content}</a>
+            ) : (
+              <div className="gs-cap">{content}</div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

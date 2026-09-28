@@ -1,31 +1,20 @@
-import { CapList, ServerGlyph } from '../../components/Capabilities';
+import { CapList } from '../../components/Capabilities';
+import { GatewayGlyph, ServiceGlyph, TaskGlyph } from '../../components/ConceptIcons';
 import { ContentTabs } from '../../components/ContentTabs';
 
 const orchestrationItems = [
   {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="2" y="4" width="20" height="16" rx="2" />
-        <path d="m6 8 4 4-4 4M14 16h4" />
-      </svg>
-    ),
+    icon: <TaskGlyph />,
     title: 'Tasks',
     sub: 'Training and other kinds of batch jobs',
   },
   {
-    icon: <ServerGlyph />,
+    icon: <ServiceGlyph />,
     title: 'Services',
     sub: 'Cache-aware and disaggregated inference',
   },
   {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="9" y="2" width="6" height="6" rx="1" />
-        <rect x="2" y="16" width="6" height="6" rx="1" />
-        <rect x="16" y="16" width="6" height="6" rx="1" />
-        <path d="M12 8v4M5 16v-4h14v4" />
-      </svg>
-    ),
+    icon: <GatewayGlyph />,
     title: 'Gateways',
     sub: 'HTTPS, domains, rate limits, and auto-scaling',
   },

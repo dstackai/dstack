@@ -2,7 +2,6 @@ import { ReactNode, useState } from 'react';
 import Button from '@cloudscape-design/components/button';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Link from '@cloudscape-design/components/link';
-import SpaceBetween from '@cloudscape-design/components/space-between';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { highlightTerms } from '../../components/highlightTerms';
@@ -64,7 +63,9 @@ export function FaqSection({ items = faqItems, showContact = true, imageFirst = 
   action?: ReactNode;
   children?: ReactNode;
 }) {
-  const [openQuestion, setOpenQuestion] = useState<string | null>(null);
+  const [openQuestion, setOpenQuestion] = useState<string | null>(
+    () => items.length === 1 ? items[0].q : null,
+  );
 
   return (
     <section className="docs-section" id="faq">
@@ -75,6 +76,7 @@ export function FaqSection({ items = faqItems, showContact = true, imageFirst = 
             {items.map(item => (
               <ExpandableSection
                 key={item.q}
+                className="faq-item"
                 variant="stacked"
                 headerText={item.q}
                 expanded={openQuestion === item.q}
@@ -89,16 +91,16 @@ export function FaqSection({ items = faqItems, showContact = true, imageFirst = 
         }
         title="FAQ"
         action={action ?? (
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+          <div className="cta-pair">
+            <Button variant="primary" fullWidth href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
               Discord
             </Button>
             {showContact && (
-              <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+              <Button fullWidth href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
                 Talk to us
               </Button>
             )}
-          </SpaceBetween>
+          </div>
         )}
       >
         {children ?? <>Have questions, or need help? Reach out to us on Discord{showContact && ' or directly'}.</>}

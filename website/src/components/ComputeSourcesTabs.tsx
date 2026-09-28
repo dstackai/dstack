@@ -1,16 +1,36 @@
 import { CapList, CloudGlyph, KubernetesGlyph, ServerGlyph, SlurmGlyph } from './Capabilities';
 import { ContentTabs } from './ContentTabs';
+import { ViewDocsButton } from './ViewDocsButton';
+import { docsUrl } from '../routes';
 
 const cloudGroups = [
-  ['AWS', 'GCP', 'Azure', 'OCI', 'DigitalOcean', 'Vultr'],
-  ['Nebius', 'Crusoe', 'Lambda', 'Verda', 'Runpod'],
-  ['AMD Dev Cloud', 'Hot Aisle', 'Vast.ai', 'JarvisLabs'],
+  [
+    { name: 'AWS', anchor: 'aws' },
+    { name: 'GCP', anchor: 'gcp' },
+    { name: 'Azure', anchor: 'azure' },
+    { name: 'OCI', anchor: 'oci' },
+    { name: 'DigitalOcean', anchor: 'digital-ocean' },
+    { name: 'Vultr', anchor: 'vultr' },
+  ],
+  [
+    { name: 'Nebius', anchor: 'nebius' },
+    { name: 'Crusoe', anchor: 'crusoe' },
+    { name: 'Lambda', anchor: 'lambda' },
+    { name: 'Verda', anchor: 'verda' },
+    { name: 'Runpod', anchor: 'runpod' },
+  ],
+  [
+    { name: 'AMD Dev Cloud', anchor: 'amd-developer-cloud' },
+    { name: 'Hot Aisle', anchor: 'hot-aisle' },
+    { name: 'Vast.ai', anchor: 'vastai' },
+    { name: 'JarvisLabs', anchor: 'jarvislabs' },
+  ],
 ];
 
 const onPremItems = [
-  { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Connect VMs or bare-metal clusters over SSH' },
-  { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Connect your existing Kubernetes clusters' },
-  { icon: <SlurmGlyph />, title: 'Slurm (experimental)', sub: 'Connect your existing Slurm clusters' },
+  { icon: <ServerGlyph />, title: 'SSH fleets', sub: 'Connect VMs or bare-metal clusters over SSH', href: docsUrl('concepts/fleets/#ssh-fleets') },
+  { icon: <KubernetesGlyph />, title: 'Kubernetes', sub: 'Connect your existing Kubernetes clusters', href: docsUrl('concepts/backends/#kubernetes') },
+  { icon: <SlurmGlyph />, title: 'Slurm', sub: 'Connect your existing Slurm clusters (experimental)', href: docsUrl('concepts/backends/#slurm') },
 ];
 
 export function OnPremCapabilities() {
@@ -26,11 +46,13 @@ export function ComputeSourcesTabs({ cloudsFirst = false }: {
     content: (
       <div className="gs-cloudcols">
         {cloudGroups.map(group => (
-          <ul key={group[0]}>
+          <ul key={group[0].name}>
             {group.map(cloud => (
-              <li key={cloud} className="gs-cloud">
-                <span className="gs-li__ic"><CloudGlyph /></span>
-                <span>{cloud}</span>
+              <li key={cloud.name}>
+                <a className="gs-cloud" href={docsUrl(`concepts/backends/#${cloud.anchor}`)}>
+                  <span className="gs-li__ic"><CloudGlyph /></span>
+                  <span>{cloud.name}</span>
+                </a>
               </li>
             ))}
           </ul>
@@ -38,9 +60,12 @@ export function ComputeSourcesTabs({ cloudsFirst = false }: {
       </div>
     ),
     footer: (
-      <span className="gs-foot__note">
-        Configure credentials for your clouds to automate provisioning
-      </span>
+      <>
+        <span className="gs-foot__note">
+          Configure credentials for your clouds to automate provisioning
+        </span>
+        <ViewDocsButton href={docsUrl('concepts/backends/')} />
+      </>
     ),
   };
   const onPremTab = {
@@ -48,9 +73,12 @@ export function ComputeSourcesTabs({ cloudsFirst = false }: {
     label: 'On-prem',
     content: <OnPremCapabilities />,
     footer: (
-      <span className="gs-foot__note">
-        Use your existing Kubernetes or Slurm clusters, VMs, or bare-metal
-      </span>
+      <>
+        <span className="gs-foot__note">
+          Use your existing Kubernetes or Slurm clusters, VMs, or bare-metal
+        </span>
+        <ViewDocsButton href={docsUrl('concepts/backends/')} />
+      </>
     ),
   };
 
