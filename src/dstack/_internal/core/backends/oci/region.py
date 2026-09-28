@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import Any, Dict, Iterable, List, Mapping, Set
 
+import cachetools
 import oci
 
 from dstack._internal.core.backends.oci.auth import get_client_config
@@ -15,6 +16,9 @@ class OCIRegionClient:
 
     def __init__(self, client_config: Mapping[str, Any]):
         self.client_config = client_config
+        self._availability_domains_cache: Dict[
+            str, List[oci.identity.models.AvailabilityDomain]
+        ] = {}
 
     @property
     def name(self) -> str:
@@ -44,7 +48,7 @@ class OCIRegionClient:
     def work_request_client(self) -> oci.work_requests.WorkRequestClient:
         return oci.work_requests.WorkRequestClient(self.client_config)
 
-    @lru_cache()
+    @cachetools.cachedmethod(lambda self: self._availability_domains_cache)
     def availability_domains_in(
         self, compartment_id: str
     ) -> List[oci.identity.models.AvailabilityDomain]:
