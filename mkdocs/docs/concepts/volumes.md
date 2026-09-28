@@ -51,9 +51,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     name: my-volume
     ```
 
-    Volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/),
-    which is unsuitable for database workloads. For formats that seek backwards while writing
-    (such as NumPy `.npz`), save locally and copy the completed files to the volume.
+    Volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
