@@ -22,6 +22,7 @@ from dstack._internal.core.models.volumes import (
     VolumeAttachment,
     VolumeAttachmentData,
     VolumeConfiguration,
+    VolumeConfigurationWithSize,
     VolumeInstance,
     VolumeProvisioningData,
     VolumeSpec,
@@ -474,7 +475,11 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 
 
 def _validate_volume_configuration(configuration: AnyVolumeConfiguration):
-    if configuration.external_volume_id is None and configuration.size is None:
+    if (
+        isinstance(configuration, VolumeConfigurationWithSize)
+        and configuration.external_volume_id is None
+        and configuration.size is None
+    ):
         raise ServerClientError("Volume must specify either existing identifier or size")
     backends_services.check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:

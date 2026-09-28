@@ -23,6 +23,10 @@ from dstack._internal.core.backends.cudo.models import (
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.daytona.models import (
+    DaytonaBackendConfig,
+    DaytonaBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.digitalocean_base.models import (
     BaseDigitalOceanBackendConfig,
     BaseDigitalOceanBackendConfigWithCreds,
@@ -102,6 +106,7 @@ AnyBackendConfigWithoutCreds = Union[
     CloudRiftBackendConfig,
     CrusoeBackendConfig,
     CudoBackendConfig,
+    DaytonaBackendConfig,
     BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
     HotAisleBackendConfig,
@@ -131,6 +136,7 @@ AnyBackendConfigWithCreds = Union[
     CrusoeBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     VerdaBackendConfigWithCreds,
+    DaytonaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
     HotAisleBackendConfigWithCreds,
@@ -175,6 +181,7 @@ AnyBackendFileConfigWithCreds = Union[
     CrusoeBackendFileConfigWithCreds,
     CudoBackendConfigWithCreds,
     VerdaBackendConfigWithCreds,
+    DaytonaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,

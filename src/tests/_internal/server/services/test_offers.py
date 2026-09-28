@@ -6,6 +6,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
@@ -101,6 +102,31 @@ class TestGetOffersByRequirements:
             assert res == [(runpod_backend_mock, runpod_offer2)]
 
     @pytest.mark.asyncio
+    async def test_global_volume_matches_cpu_and_gpu_regions(self):
+        daytona_backend = Mock(TYPE=BackendType.DAYTONA)
+        cpu_offer = get_instance_offer_with_availability(backend=BackendType.DAYTONA, region="us")
+        gpu_offer = get_instance_offer_with_availability(
+            backend=BackendType.DAYTONA, region="earth", gpu_count=1
+        )
+        daytona_backend.compute.return_value.get_offers.return_value = [cpu_offer, gpu_offer]
+        aws_backend = Mock(TYPE=BackendType.AWS)
+        aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS, region="us")
+        aws_backend.compute.return_value.get_offers.return_value = [aws_offer]
+
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            return_value=[daytona_backend, aws_backend],
+        ):
+            offers = await get_offers_by_requirements(
+                project=Mock(),
+                profile=Profile(),
+                requirements=Requirements(resources=ResourcesSpec()),
+                volumes=[[get_volume(configuration=DaytonaVolumeConfiguration())]],
+            )
+
+        assert offers == [(daytona_backend, cpu_offer), (daytona_backend, gpu_offer)]
+
+    @pytest.mark.asyncio
     async def test_returns_volume_offers_without_region(self):
         profile = Profile(name="test")
         requirements = Requirements(resources=ResourcesSpec())
@@ -117,7 +143,10 @@ class TestGetOffersByRequirements:
                 availability_zones=None,
             )
             kubernetes_backend_mock.compute.return_value.get_offers.return_value = [
-                kubernetes_offer
+                kubernetes_offer,
+                get_instance_offer_with_availability(
+                    backend=BackendType.KUBERNETES, region="other-cluster"
+                ),
             ]
             m.return_value = [aws_backend_mock, kubernetes_backend_mock]
             res = await get_offers_by_requirements(

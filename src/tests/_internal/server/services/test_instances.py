@@ -23,6 +23,7 @@ from dstack._internal.core.models.profiles import (
     Profile,
 )
 from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.schemas.runner import TaskListItem, TaskListResponse, TaskStatus
 from dstack._internal.server.services.runner.client import ShimClient
@@ -90,6 +91,67 @@ class TestSwitchInstanceStatus:
 
 
 class TestFilterInstances:
+    @pytest.mark.parametrize("backend", [BackendType.AWS, BackendType.GCP])
+    @pytest.mark.parametrize(
+        ("instance_zone", "volume_zone", "matches"),
+        [
+            (None, None, True),
+            (None, "us-1b", True),
+            ("us-1a", None, False),
+            ("us-1a", "us-1a", True),
+            ("US-1A", "us-1a", True),
+            ("us-1a", "us-1b", False),
+        ],
+    )
+    def test_preserves_volume_availability_zone_matching(
+        self, backend, instance_zone, volume_zone, matches
+    ):
+        instance = InstanceModel(
+            unreachable=False,
+            health=HealthStatus.HEALTHY,
+            total_blocks=1,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=backend, region="US-1", availability_zone=instance_zone
+            ).model_dump_json(),
+        )
+        volume = get_volume(
+            configuration=get_volume_configuration(backend=backend, region="us-1"),
+            provisioning_data=get_volume_provisioning_data(
+                backend=backend, availability_zone=volume_zone
+            ),
+        )
+
+        result = instances_services.filter_instances(
+            instances=[instance], profile=Profile(), volumes=[[volume]]
+        )
+
+        assert result == ([instance] if matches else [])
+
+    def test_global_volume_matches_cpu_and_gpu_regions(self):
+        instances = [
+            InstanceModel(
+                unreachable=False,
+                health=HealthStatus.HEALTHY,
+                total_blocks=1,
+                job_provisioning_data=get_job_provisioning_data(
+                    backend=backend, region=region, gpu_count=gpu_count
+                ).model_dump_json(),
+            )
+            for backend, region, gpu_count in [
+                (BackendType.DAYTONA, "us", 0),
+                (BackendType.DAYTONA, "earth", 1),
+                (BackendType.AWS, "us", 0),
+            ]
+        ]
+
+        result = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(),
+            volumes=[[get_volume(configuration=DaytonaVolumeConfiguration())]],
+        )
+
+        assert result == instances[:2]
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_all_instances(self, test_db, session: AsyncSession):
@@ -257,7 +319,13 @@ class TestFilterInstances:
             project=project,
             backend=BackendType.KUBERNETES,
         )
-        instances = [aws_instance, kubernetes_instance]
+        other_cluster_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.KUBERNETES,
+            region="other-cluster",
+        )
+        instances = [aws_instance, kubernetes_instance, other_cluster_instance]
         volume = get_volume(
             configuration=get_kubernetes_volume_configuration(),
             provisioning_data=get_volume_provisioning_data(

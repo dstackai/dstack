@@ -4,16 +4,25 @@ import gpuhunt
 import pytest
 
 import dstack._internal.server.settings as server_settings
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobSpec, RunSpec
+from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs import (
+    _get_job_mount_point_attached_volume,
     get_job_specs_from_run_spec,
     job_spec_updatable_in_place,
+)
+from dstack._internal.server.testing.common import (
+    get_job_provisioning_data,
+    get_volume,
+    get_volume_configuration,
+    get_volume_provisioning_data,
 )
 
 
@@ -175,3 +184,38 @@ class TestJobSpecUpdatableInPlace:
         job_spec_updatable_in_place(old_job_spec, new_job_spec)
 
         assert new_job_spec.requirements.resources.cpu.arch is None
+
+
+class TestGetJobMountPointAttachedVolume:
+    @pytest.mark.parametrize(("region", "gpu_count"), [("us", 0), ("earth", 1)])
+    def test_global_volume_matches_cpu_and_gpu_regions(self, region, gpu_count):
+        volume = get_volume(configuration=DaytonaVolumeConfiguration())
+        other_backend_volume = get_volume(
+            configuration=get_volume_configuration(backend=BackendType.AWS, region=region)
+        )
+        provisioning_data = get_job_provisioning_data(
+            backend=BackendType.DAYTONA, region=region, gpu_count=gpu_count
+        )
+
+        assert (
+            _get_job_mount_point_attached_volume([other_backend_volume, volume], provisioning_data)
+            == volume
+        )
+
+    def test_regional_volume_preserves_region_and_zone_matching(self):
+        volumes = [
+            get_volume(
+                configuration=get_volume_configuration(backend=BackendType.AWS, region=region),
+                provisioning_data=get_volume_provisioning_data(availability_zone=zone),
+            )
+            for region, zone in [
+                ("eu-west-1", "eu-west-1a"),
+                ("us-east-1", "us-east-1b"),
+                ("us-east-1", "us-east-1a"),
+            ]
+        ]
+        provisioning_data = get_job_provisioning_data(
+            backend=BackendType.AWS, region="US-EAST-1", availability_zone="US-EAST-1A"
+        )
+
+        assert _get_job_mount_point_attached_volume(volumes, provisioning_data) == volumes[2]

@@ -88,6 +88,7 @@ class TestListBackendTypes:
             "cloudrift",
             "crusoe",
             "datacrunch",
+            "daytona",
             "digitalocean",
             "gcp",
             "hotaisle",

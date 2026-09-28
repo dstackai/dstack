@@ -43,7 +43,7 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import Volume, VolumeConfigurationWithRegion
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.models import (
@@ -610,14 +610,17 @@ def filter_instances(
     backend_types: Optional[list[BackendType]] = profile.backends
     regions: Optional[list[str]] = profile.regions
     zones: Optional[list[str]] = profile.availability_zones
-    # (BackendType, region.lower() | "", availability_zone.lower() | None)
-    volumes_locations: Optional[set[tuple[BackendType, str, Optional[str]]]] = None
+    # (BackendType, region.lower() | None, availability_zone.lower() | None).
+    # A None region matches any region; an empty string remains an exact region.
+    volumes_locations: Optional[set[tuple[BackendType, Optional[str], Optional[str]]]] = None
 
     if volumes:
         volumes_locations = set()
         for volume in volumes[0]:
             volume_backend = volume.get_backend()
-            volume_region = volume.get_region().lower()
+            volume_region = None
+            if isinstance(volume.configuration, VolumeConfigurationWithRegion):
+                volume_region = volume.get_region().lower()
             # If the volume has an AZ, it's added twice -- with and without an AZ.
             # When the instance location is checked against the available volumes locations (see
             # below) the instance with an AZ matches only the volume with the same AZ, while
@@ -677,7 +680,12 @@ def filter_instances(
                 instance_zone = jpd.availability_zone
                 if instance_zone is not None:
                     instance_zone = instance_zone.lower()
-                if (instance_backend, instance_region, instance_zone) not in volumes_locations:
+                instance_location = (instance_backend, instance_region, instance_zone)
+                regionless_location = (instance_backend, None, instance_zone)
+                if (
+                    instance_location not in volumes_locations
+                    and regionless_location not in volumes_locations
+                ):
                     continue
         filtered_instances.append(instance)
     return filtered_instances

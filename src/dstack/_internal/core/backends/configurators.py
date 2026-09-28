@@ -54,6 +54,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.daytona.configurator import DaytonaConfigurator
+
+    _CONFIGURATOR_CLASSES.append(DaytonaConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.digitalocean.configurator import (
         DigitalOceanConfigurator,
     )

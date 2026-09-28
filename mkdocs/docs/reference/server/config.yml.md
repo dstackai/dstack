@@ -92,6 +92,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
             type:
                 required: true
 
+##### `projects[n].backends[type=daytona]` { #daytona data-toc-label="daytona" }
+
+#SCHEMA# dstack._internal.core.backends.daytona.models.DaytonaBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: daytona-
+
+###### `projects[n].backends[type=daytona].creds` { #daytona-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.daytona.models.DaytonaAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=gcp]` { #gcp data-toc-label="gcp" }
 
 #SCHEMA# dstack._internal.core.backends.gcp.models.GCPBackendConfigWithCreds

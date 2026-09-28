@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, and `kubernetes` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, and `daytona` backends.
 
 ### Apply a configuration
 
@@ -41,6 +41,19 @@ size: 100GB
 </div>
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
+
+??? info "Daytona"
+    Daytona volumes have no fixed size or region. Omit `size` and `region`:
+
+    ```yaml
+    type: volume
+    backend: daytona
+    name: my-volume
+    ```
+
+    Volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/),
+    which is unsuitable for database workloads. For formats that seek backwards while writing
+    (such as NumPy `.npz`), save locally and copy the completed files to the volume.
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -86,7 +99,7 @@ Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
 Once created, the volume can be attached to dev environments, tasks, and services.
 
-> When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
+> For block volumes in AWS and GCP, `dstack` automatically creates an `ext4` filesystem.
 
 #### Register existing volumes
 
@@ -110,7 +123,7 @@ volume_id: vol1235
 
 </div>
 
-If you register an existing volume, you must ensure the volume already has a filesystem.
+Existing AWS and GCP block volumes must already have a filesystem.
 
 ??? info "Kubernetes"
 
