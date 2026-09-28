@@ -1,8 +1,10 @@
+import threading
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, Dict, Iterable, List, Mapping, Set
 
 import oci
+from cachetools import Cache, cachedmethod
 
 from dstack._internal.core.backends.oci.auth import get_client_config
 from dstack._internal.core.backends.oci.models import AnyOCICreds
@@ -15,6 +17,8 @@ class OCIRegionClient:
 
     def __init__(self, client_config: Mapping[str, Any]):
         self.client_config = client_config
+        self._availability_domains_cache = Cache(maxsize=10)
+        self._availability_domains_lock = threading.Lock()
 
     @property
     def name(self) -> str:
@@ -44,9 +48,14 @@ class OCIRegionClient:
     def work_request_client(self) -> oci.work_requests.WorkRequestClient:
         return oci.work_requests.WorkRequestClient(self.client_config)
 
-    @cached_property
-    def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
-        return self.identity_client.list_availability_domains(self.client_config["tenancy"]).data
+    @cachedmethod(
+        cache=lambda self: self._availability_domains_cache,
+        lock=lambda self: self._availability_domains_lock,
+    )
+    def availability_domains_in(
+        self, compartment_id: str
+    ) -> List[oci.identity.models.AvailabilityDomain]:
+        return self.identity_client.list_availability_domains(compartment_id).data
 
 
 def make_region_client(region_name: str, creds: AnyOCICreds) -> OCIRegionClient:

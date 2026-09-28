@@ -140,7 +140,7 @@ def list_shapes_in_region(region: OCIRegionClient, compartment_id: str) -> Dict[
     """
 
     result = {}
-    for availability_domain in region.availability_domains:
+    for availability_domain in region.availability_domains_in(compartment_id):
         result[availability_domain.name] = list_shapes_in_domain(
             availability_domain.name, region.compute_client, compartment_id
         )
@@ -214,7 +214,7 @@ def check_availability_per_domain(
     all_shapes = set(shape_names)
     available_shapes_per_domain = {}
 
-    for availability_domain in region.availability_domains:
+    for availability_domain in region.availability_domains_in(compartment_id):
         shapes_to_check = {
             shape
             for shape in all_shapes
@@ -277,7 +277,7 @@ def get_available_domains(
     `shape_name` is available and within `shapes_quota`.
     """
     domains = []
-    for domain in region.availability_domains:
+    for domain in region.availability_domains_in(compartment_id):
         if shapes_quota.is_within_domain_quota(
             shape_name, domain.name
         ) and check_availability_in_domain(
