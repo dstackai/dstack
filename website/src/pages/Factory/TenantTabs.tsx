@@ -5,12 +5,12 @@ import { billingCapability, exportsCapability, projectsCapability } from './capa
 export function TenantTabs() {
   return (
     <ContentTabs
-      ariaLabel="Multi-tenancy and billing"
+      ariaLabel="Metering and billing"
       className="gs-box--compute-sources"
       tabs={[
         {
           id: 'usage-and-billing',
-          label: 'Usage and billing',
+          label: 'Metering and billing',
           content: <CapList items={[projectsCapability, exportsCapability, billingCapability]} />,
         },
       ]}

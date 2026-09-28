@@ -5,7 +5,7 @@ import { presetsCapability, registryCapability } from './capabilities';
 export function InferenceTabs() {
   return (
     <ContentTabs
-      ariaLabel="Serverless inference"
+      ariaLabel="Inference optimization"
       className="gs-box--compute-sources"
       tabs={[
         {

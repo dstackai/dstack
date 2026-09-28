@@ -12,6 +12,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
   plugins: [react()],
+  esbuild: { legalComments: 'inline' },
   build: {
     assetsDir: 'website-assets',
     rollupOptions: {

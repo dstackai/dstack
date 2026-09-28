@@ -76,14 +76,16 @@
 
     {# Keep menu descriptions in sync with SiteNavigation.tsx. GetStartedSection.tsx uses a longer dstack description. #}
     <div class="cs-products-menu">
-      <button type="button" class="cs-products-menu__trigger" aria-haspopup="true" aria-expanded="false">
+      <button type="button" class="cs-products-menu__trigger" id="cs-products-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="cs-products-popup">
         Products
-        <svg class="cs-products-menu__caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
+        <span class="cs-products-menu__icon">
+          <svg class="cs-products-menu__caret" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5 8 10.5 12 6.5"/></svg>
+        </span>
       </button>
-      <div class="cs-products-menu__popup" role="menu">
+      <div class="cs-products-menu__popup" id="cs-products-popup" role="menu" aria-labelledby="cs-products-trigger">
         <div class="gs-rail">
           <div class="gs-rail__group">Self-hosted</div>
-          <a class="gs-opt gs-opt--feat" role="menuitem" href="/docs/installation">
+          <a class="gs-opt gs-opt--feat" role="menuitem" tabindex="-1" href="/docs/installation">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
             </span>
@@ -92,7 +94,7 @@
               <span class="gs-opt__desc">A unified orchestration interface across GPU clouds, Kubernetes, VMs, and bare-metal.</span>
             </span>
           </a>
-          <a class="gs-opt gs-opt--row external-skip" role="menuitem" href="/products/factory" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--row external-skip" role="menuitem" tabindex="-1" href="/products/factory" target="_blank" rel="noreferrer">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
             </span>
@@ -102,7 +104,7 @@
             </span>
           </a>
           <div class="gs-rail__group">Hosted by us</div>
-          <a class="gs-opt gs-opt--row" role="menuitem" href="/products/sky" target="_blank" rel="noreferrer">
+          <a class="gs-opt gs-opt--row" role="menuitem" tabindex="-1" href="/products/sky" target="_blank" rel="noreferrer">
             <span class="gs-opt__ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
             </span>
@@ -152,32 +154,62 @@
         var productsMenu = document.querySelector('.cs-products-menu');
         var productsTrigger = productsMenu && productsMenu.querySelector('.cs-products-menu__trigger');
         if (productsTrigger) {
-          var closeTimer;
+          var productsItems = Array.from(productsMenu.querySelectorAll('[role="menuitem"]'));
           var setProductsOpen = function (open) {
-            clearTimeout(closeTimer);
             productsMenu.classList.toggle('cs-products-menu--open', open);
             productsTrigger.setAttribute('aria-expanded', String(open));
           };
-          productsMenu.addEventListener('mouseenter', function () { setProductsOpen(true); });
-          productsMenu.addEventListener('mouseleave', function () {
-            closeTimer = setTimeout(function () {
-              if (!productsMenu.querySelector(':focus-visible')) setProductsOpen(false);
-            }, 150);
+          var focusProduct = function (index) {
+            productsItems.forEach(function (item, itemIndex) {
+              item.tabIndex = itemIndex === index ? 0 : -1;
+            });
+            productsItems[index].focus();
+          };
+          productsTrigger.addEventListener('click', function () {
+            var open = productsTrigger.getAttribute('aria-expanded') !== 'true';
+            setProductsOpen(open);
+            if (open) focusProduct(0);
+            else productsTrigger.focus();
           });
-          productsMenu.addEventListener('focusin', function () { setProductsOpen(true); });
+          productsMenu.addEventListener('keydown', function (e) {
+            var open = productsTrigger.getAttribute('aria-expanded') === 'true';
+            if (e.target === productsTrigger && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              e.preventDefault();
+              setProductsOpen(true);
+              focusProduct(e.key === 'ArrowUp' ? productsItems.length - 1 : 0);
+              return;
+            }
+            if (!open) return;
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              setProductsOpen(false);
+              productsTrigger.focus();
+              return;
+            }
+            var index = productsItems.indexOf(document.activeElement);
+            var nextIndex;
+            if (e.key === 'ArrowDown') nextIndex = (index + 1) % productsItems.length;
+            else if (e.key === 'ArrowUp') nextIndex = index < 0 ? productsItems.length - 1 : (index + productsItems.length - 1) % productsItems.length;
+            else if (e.key === 'Home') nextIndex = 0;
+            else if (e.key === 'End') nextIndex = productsItems.length - 1;
+            else return;
+            e.preventDefault();
+            focusProduct(nextIndex);
+          });
+          productsItems.forEach(function (item) {
+            item.addEventListener('click', function () {
+              setProductsOpen(false);
+              productsTrigger.focus();
+            });
+          });
           productsMenu.addEventListener('focusout', function (e) {
             if (!productsMenu.contains(e.relatedTarget)) setProductsOpen(false);
           });
-          productsTrigger.addEventListener('click', function () { setProductsOpen(true); });
-          document.addEventListener('click', function (e) {
+          document.addEventListener('pointerdown', function (e) {
             if (!productsMenu.contains(e.target)) setProductsOpen(false);
           });
-          document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-              if (productsMenu.contains(document.activeElement)) productsTrigger.focus();
-              setProductsOpen(false);
-            }
-          });
+          window.addEventListener('blur', function () { setProductsOpen(false); });
         }
       })();
     </script>

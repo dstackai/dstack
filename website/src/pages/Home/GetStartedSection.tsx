@@ -2,13 +2,13 @@ import { Fragment, useId, useState } from 'react';
 import CodeView from '@cloudscape-design/code-view/code-view';
 import shHighlight from '@cloudscape-design/code-view/highlight/sh';
 import Button from '@cloudscape-design/components/button';
-import { asset } from '../../asset';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { BoxGlyph, CloudGlyph, LayersGlyph } from '../../components/Capabilities';
 import { ContentTabs } from '../../components/ContentTabs';
+import { ViewDocsButton } from '../../components/ViewDocsButton';
 import { highlightTerms } from '../../components/highlightTerms';
 import { installMethods, maxInstallLines, padYamlToLines } from '../../data/snippets';
-import { DOCS_URL, ROUTES, docsUrl } from '../../routes';
+import { DOCS_URL, docsUrl } from '../../routes';
 import { FactoryGetStartedTabs } from '../Factory/FactoryGetStartedTabs';
 import { MarketplaceTabs } from '../Sky/MarketplaceTabs';
 
@@ -104,7 +104,7 @@ function ProductFooter({ product }: { product: ProductId }) {
         </span>
         <div className="gs-foot__actions">
           <Button variant="primary" href={docsUrl('installation')} style={mainButtonStyle}>Install open-source</Button>
-          <Button href={DOCS_URL} style={mainButtonStyle}>View docs</Button>
+          <ViewDocsButton href={DOCS_URL} />
         </div>
       </>
     );
@@ -131,7 +131,6 @@ function ProductFooter({ product }: { product: ProductId }) {
         >
           {isSky ? 'Sign up' : 'Book a demo'}
         </Button>
-        <Button href={asset(isSky ? ROUTES.SKY : ROUTES.FACTORY)} style={mainButtonStyle}>Learn more</Button>
       </div>
     </>
   );

@@ -141,6 +141,13 @@
     }
 }
 
+/* Both button groups share the header center; clear landing.css's legacy top padding. */
+.md-header__inner .cs-products-menu,
+.md-header__inner .md-header__buttons {
+    align-self: center;
+    padding-block: 0;
+}
+
 .md-header__buttons .md-button {
     margin-top: 0;
     margin-bottom: 0;
@@ -171,6 +178,7 @@
 
 /* Header action buttons → /old pills. Prefixed with the primary color attr to
    out-specify landing.css's button rules. */
+.cs-products-menu__trigger,
 [data-md-color-primary=white] .md-header__buttons .md-button--primary,
 [data-md-color-primary=white] .md-header__buttons .md-button--primary:hover {
     box-sizing: border-box;
@@ -239,6 +247,9 @@
 
 /* Products menu matches website/src/styles.css. */
 .cs-products-menu {
+    --products-arrow-gap: 10px;
+    --cs-hover: rgba(22, 25, 31, 0.03);
+    --products-focus-color: #006ce0;
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -246,28 +257,54 @@
     font-size: 16px;
     line-height: 1.15;
 }
+[data-md-color-scheme="slate"] .cs-products-menu {
+    --cs-hover: rgba(242, 243, 243, 0.05);
+    --products-focus-color: #42b4ff;
+}
 .cs-products-menu__trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    min-height: 42px;
-    padding: 10px 0;
-    border: 0;
-    border-radius: 21px;
+    position: relative;
+    gap: var(--products-arrow-gap);
+    padding-inline: 18px var(--products-arrow-gap);
+    border: 1px solid var(--cs-border);
     background: transparent;
     color: var(--cs-text);
-    font: inherit;
-    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.005em;
     cursor: pointer;
 }
-.cs-products-menu__trigger:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+.cs-products-menu__trigger:hover,
+.cs-products-menu__trigger:active {
+    background: var(--cs-hover);
 }
+.cs-products-menu__trigger:focus {
+    outline: none;
+}
+/* Match the secondary Cloudscape button's keyboard-focus ring. */
 .cs-products-menu__trigger:focus-visible {
-    background: var(--cs-panel);
+    outline: 2px dotted transparent;
+    outline-offset: 3px;
+}
+.cs-products-menu__trigger:focus-visible::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: -4px;
+    inset-block-start: -4px;
+    inline-size: calc(100% + 8px);
+    block-size: calc(100% + 8px);
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px var(--products-focus-color);
+    pointer-events: none;
+}
+.cs-products-menu__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    flex: 0 0 auto;
 }
 .cs-products-menu__caret {
+    display: block;
     width: 12px;
     height: 12px;
     transition: transform 0.15s ease;
@@ -276,6 +313,7 @@
     transform: rotate(180deg);
 }
 .cs-products-menu__popup {
+    box-sizing: border-box;
     display: none;
     position: absolute;
     top: calc(100% + 6px);
@@ -283,10 +321,15 @@
     z-index: 1000;
     width: 360px;
     background: var(--cs-panel);
+    border: 1px solid var(--cs-border);
     border-radius: 8px;
+    overflow: hidden;
 }
 .cs-products-menu--open .cs-products-menu__popup {
     display: block;
+}
+.cs-products-menu__popup .gs-rail {
+    border-radius: 7px;
 }
 .cs-products-menu__popup .gs-opt + .gs-rail__group {
     margin-top: 0;
@@ -333,6 +376,10 @@
     border-radius: 8px;
     background: var(--cs-bg);
     box-shadow: inset 0 0 0 0.5px var(--cs-text);
+}
+.cs-products-menu__popup .gs-opt:hover,
+.cs-products-menu__popup .gs-opt:focus-visible {
+    box-shadow: none;
 }
 .gs-opt--feat {
     padding: 13px 14px;

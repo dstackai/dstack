@@ -1,6 +1,6 @@
 import Button from '@cloudscape-design/components/button';
 import { useLayoutContext } from '../../App';
-import { heroButtonStyle } from '../../cloudscape-theme';
+import { heroButtonStyle, mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ComputeSourcesTabs } from '../../components/ComputeSourcesTabs';
 import { highlightTerms } from '../../components/highlightTerms';
@@ -86,21 +86,49 @@ export function SkyPage() {
               </KeyConceptsBlock>
             </section>
 
-            <FaqSection showContact={false} items={[
-              {
-                q: 'How is dstack Sky different from dstack?',
-                a: [
-                  'With dstack Sky, we host and maintain the server for you. ' +
-                    'With open-source dstack, you host the server yourself.',
-                  'dstack Sky includes all open-source features and adds a built-in gateway with an HTTPS domain, advanced observability, and usage metering.',
-                  'dstack Sky also provides a GPU marketplace with unified billing. ' +
-                    'Both support your own cloud accounts and on-prem compute. ' +
-                    'The CLI and YAML configurations are the same.',
-                ],
-              },
-            ]} />
-
             <TrustedBySection />
+
+            <FaqSection
+              showContact={false}
+              action={
+                <div className="cta-pair">
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    href="https://sky.dstack.ai/"
+                    target="_blank"
+                    iconName="external"
+                    iconAlign="right"
+                    style={mainButtonStyle}
+                  >
+                    Sign up
+                  </Button>
+                  <Button
+                    fullWidth
+                    href="https://discord.gg/u8SmfwPpMd"
+                    target="_blank"
+                    iconName="external"
+                    iconAlign="right"
+                    style={mainButtonStyle}
+                  >
+                    Discord
+                  </Button>
+                </div>
+              }
+              items={[
+                {
+                  q: 'How is dstack Sky different from dstack?',
+                  a: [
+                    'With dstack Sky, we host and maintain the server for you. ' +
+                      'With open-source dstack, you host the server yourself.',
+                    'dstack Sky includes all open-source features and adds a built-in gateway with an HTTPS domain, advanced observability, and usage metering.',
+                    'dstack Sky also provides a GPU marketplace with unified billing. ' +
+                      'Both support your own cloud accounts and on-prem compute. ' +
+                      'The CLI and YAML configurations are the same.',
+                  ],
+                },
+              ]}
+            />
           </article>
         </div>
       </div>

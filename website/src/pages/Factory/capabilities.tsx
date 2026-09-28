@@ -1,4 +1,5 @@
-import { BoxGlyph, LayersGlyph } from '../../components/Capabilities';
+import { LayersGlyph } from '../../components/Capabilities';
+import { BillingGlyph, ExportGlyph, MeteringGlyph, MetricsGlyph, PresetGlyph, ProjectGlyph } from '../../components/ConceptIcons';
 
 export const eventsCapability = {
   icon: (
@@ -12,52 +13,37 @@ export const eventsCapability = {
 };
 
 export const metricsCapability = {
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 3v18h18M7 14l4-4 4 3 6-8" />
-    </svg>
-  ),
+  icon: <MetricsGlyph />,
   title: 'Metrics',
   sub: 'Monitor utilization, accelerator health, and network health',
 };
 
 export const projectsCapability = {
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-      <circle cx="9" cy="7" r="4" />
-    </svg>
-  ),
+  icon: <ProjectGlyph />,
   title: 'Projects',
   sub: 'Tenant isolation and resource access control',
 };
 
 export const exportsCapability = {
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <path d="m8.59 10.49 6.82-3.98m-6.82 6.98 6.82 3.98" />
-    </svg>
-  ),
+  icon: <ExportGlyph />,
   title: 'Exports',
   sub: 'Share selected fleets and gateways across projects',
 };
 
+export const meteringCapability = {
+  icon: <MeteringGlyph />,
+  title: 'Metering',
+  sub: 'Track compute, storage, and token usage per tenant',
+};
+
 export const billingCapability = {
-  icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="M2 10h20M6 15h4" />
-    </svg>
-  ),
+  icon: <BillingGlyph />,
   title: 'Billing',
-  sub: 'Compute and token metering and billing automation',
+  sub: 'Automate customer charges, balances, and payments',
 };
 
 export const presetsCapability = {
-  icon: <BoxGlyph />,
+  icon: <PresetGlyph />,
   title: 'Presets',
   sub: 'Agent-based optimization and kernel generation',
 };
