@@ -176,7 +176,8 @@ class CrusoeCompute(
         result = {}
         for q in quotas:
             prog_name = q.get("programmatic_name", "")
-            available = q.get("available", 0)
+            # The API documents counters as integers but returns them as strings
+            available = int(q.get("available", 0))
             category = q.get("category", "")
             if "Instance" in category:
                 result[prog_name] = available
