@@ -248,6 +248,7 @@ declare interface IJobSpec {
     image_name: string;
     job_name: string;
     job_num: number;
+    replica_num: number;
     max_duration?: number;
     working_dir: string;
     probes?: IJobProbe[];

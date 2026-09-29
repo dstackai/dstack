@@ -46,6 +46,7 @@ export const JobMetrics: React.FC = () => {
         run_name: runData?.run_spec.run_name ?? '',
         run_id: runData?.id ?? '',
         job_num: jobData?.job_spec.job_num ?? 0,
+        replica_num: jobData?.job_spec.replica_num ?? 0,
         limit: 1000,
     });
 
