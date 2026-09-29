@@ -976,20 +976,18 @@ projects:
 </div>
 
 ??? info "Required permissions"
-    The API key must have the following roles assigned:
+    The API key requires the `owner` role for your user and the `operator` and `user` roles for the team specified in `team_handle`.
 
-    * **Owner role for the user** - Required for creating and managing SSH keys
-    * **Operator role for the team** - Required for managing virtual machines within the team
+??? info "Instance types"
+    `dstack` supports Hot Aisle VMs (`vm-mi300x-1`, `vm-mi300x-2`, `vm-mi300x-4`, `vm-mi300x-8`) and bare metal servers (`bm-mi300x-8`). To use a specific type, set [`instance_types`](../reference/dstack.yml/fleet.md#instance_types) in the fleet configuration.
 
-??? info "Pricing"
-    `dstack` shows the hourly price for Hot Aisle instances. Some instances also require an upfront payment for a minimum reservation period, which is usually a few hours. You will be charged for the full minimum period even if you stop the instance early.
-
-    See the Hot Aisle API for the minimum reservation period for each instance type:
+    Some instances are charged upfront for a minimum reservation period (8 hours for bare metal servers), so set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) accordingly. To check the period for each instance type:
 
     <div class="termy">
 
     ```shell
     $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/bare_metal/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
     ```
 
     </div>

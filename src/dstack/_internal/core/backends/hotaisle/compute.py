@@ -1,7 +1,6 @@
 import shlex
 import subprocess
 import tempfile
-from threading import Thread
 from typing import Any, List, Optional
 
 import gpuhunt
@@ -18,6 +17,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.hotaisle.api_client import HotAisleAPIClient
 from dstack._internal.core.backends.hotaisle.models import HotAisleConfig
+from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     CoreModel,
@@ -32,12 +32,15 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 SUPPORTED_GPUS = ["MI300X"]
+SSH_CONNECT_TIMEOUT_SECONDS = 10
+SSH_LAUNCH_TIMEOUT_SECONDS = 60
 
 
 class HotAisleCompute(
@@ -81,11 +84,24 @@ class HotAisleCompute(
         offer_backend_data = validate_extra_ignore(
             HotAisleOfferBackendData, instance_offer.backend_data
         )
-        vm_data = self.api_client.create_virtual_machine(offer_backend_data.vm_specs)
+        if offer_backend_data.bare_metal_specs is not None:
+            server_data = self.api_client.reserve_bare_metal_server(
+                specs=offer_backend_data.bare_metal_specs,
+                description=instance_config.instance_name,
+            )
+            # The deployment ID identifies this reservation, the name identifies the server.
+            instance_id = server_data["deployment_id"]
+            ip_address = server_data["ip_address"]
+        else:
+            vm_data = self.api_client.create_virtual_machine(
+                get_or_error(offer_backend_data.vm_specs)
+            )
+            instance_id = vm_data["name"]
+            ip_address = vm_data["ip_address"]
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
-            instance_id=vm_data["name"],
+            instance_id=instance_id,
             hostname=None,
             internal_ip=None,
             region=instance_offer.region,
@@ -95,7 +111,8 @@ class HotAisleCompute(
             dockerized=True,
             ssh_proxy=None,
             backend_data=HotAisleInstanceBackendData(
-                ip_address=vm_data["ip_address"]
+                ip_address=ip_address,
+                bare_metal=offer_backend_data.bare_metal_specs is not None,
             ).model_dump_json(),
         )
 
@@ -105,27 +122,31 @@ class HotAisleCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
-        vm_state = self.api_client.get_vm_state(provisioning_data.instance_id)
-        if vm_state == "running":
-            if provisioning_data.hostname is None and provisioning_data.backend_data:
-                backend_data = HotAisleInstanceBackendData.load(provisioning_data.backend_data)
-                provisioning_data.hostname = backend_data.ip_address
-            commands = get_shim_commands(arch=provisioning_data.instance_type.resources.cpu_arch)
-            launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
-            thread = Thread(
-                target=_start_runner,
-                kwargs={
-                    "hostname": provisioning_data.hostname,
-                    "project_ssh_private_key": project_ssh_private_key,
-                    "launch_command": launch_command,
-                },
-                daemon=True,
-            )
-            thread.start()
+        backend_data = HotAisleInstanceBackendData.load(provisioning_data.backend_data)
+        if backend_data.bare_metal:
+            server_data = self.api_client.get_bare_metal_server(provisioning_data.instance_id)
+            os_install_status = (server_data.get("os_status") or {}).get("os_install_status")
+            if os_install_status == "failed":
+                raise ProvisioningError("Hot Aisle bare metal server OS installation failed")
+            if os_install_status != "installed":
+                return
+        elif self.api_client.get_vm_state(provisioning_data.instance_id) != "running":
+            return
+        # Retried on the next check until the shim starts.
+        if not _start_runner(
+            hostname=backend_data.ip_address,
+            project_ssh_private_key=project_ssh_private_key,
+            arch=provisioning_data.instance_type.resources.cpu_arch,
+        ):
+            return
+        provisioning_data.hostname = backend_data.ip_address
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
+        if backend_data is not None and HotAisleInstanceBackendData.load(backend_data).bare_metal:
+            self.api_client.release_bare_metal_server(instance_id)
+            return
         vm_name = instance_id
         self.api_client.terminate_virtual_machine(vm_name)
 
@@ -133,9 +154,11 @@ class HotAisleCompute(
 def _start_runner(
     hostname: str,
     project_ssh_private_key: str,
-    launch_command: str,
-):
-    _launch_runner(
+    arch: Optional[str],
+) -> bool:
+    commands = get_shim_commands(arch=arch)
+    launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
+    return _launch_runner(
         hostname=hostname,
         ssh_private_key=project_ssh_private_key,
         launch_command=launch_command,
@@ -146,34 +169,59 @@ def _launch_runner(
     hostname: str,
     ssh_private_key: str,
     launch_command: str,
-):
+) -> bool:
     daemonized_command = f"{launch_command.rstrip('&')} >/tmp/dstack-shim.log 2>&1 & disown"
-    _run_ssh_command(
+    return _run_ssh_command(
         hostname=hostname,
         ssh_private_key=ssh_private_key,
         command=daemonized_command,
     )
 
 
-def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
+def _run_ssh_command(hostname: str, ssh_private_key: str, command: str) -> bool:
     with tempfile.NamedTemporaryFile("w+", 0o600) as f:
         f.write(ssh_private_key)
         f.flush()
-        subprocess.run(
-            [
-                "ssh",
-                "-F",
-                "none",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-i",
-                f.name,
-                f"hotaisle@{hostname}",
-                command,
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        try:
+            proc = subprocess.run(
+                [
+                    "ssh",
+                    "-F",
+                    "none",
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    f"ConnectTimeout={SSH_CONNECT_TIMEOUT_SECONDS}",
+                    "-o",
+                    "ConnectionAttempts=1",
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                    "-o",
+                    "LogLevel=ERROR",
+                    "-i",
+                    f.name,
+                    f"hotaisle@{hostname}",
+                    command,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=SSH_LAUNCH_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            logger.debug("Timed out running SSH command on Hot Aisle instance %s", hostname)
+            return False
+    if proc.returncode != 0:
+        logger.debug(
+            "SSH command failed on Hot Aisle instance %s: exit_code=%s stderr=%r",
+            hostname,
+            proc.returncode,
+            proc.stderr[-1000:],
         )
+        return False
+    return True
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
@@ -184,6 +232,7 @@ def _supported_instances(offer: InstanceOffer) -> bool:
 
 class HotAisleInstanceBackendData(CoreModel):
     ip_address: str
+    bare_metal: bool = False
 
     @classmethod
     def load(cls, raw: Optional[str]) -> "HotAisleInstanceBackendData":
@@ -192,4 +241,5 @@ class HotAisleInstanceBackendData(CoreModel):
 
 
 class HotAisleOfferBackendData(CoreModel):
-    vm_specs: dict[str, Any]
+    vm_specs: Optional[dict[str, Any]] = None
+    bare_metal_specs: Optional[dict[str, Any]] = None
