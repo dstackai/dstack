@@ -27,7 +27,6 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
     OPENAI_MODEL_PROBE_TIMEOUT,
-    ROUTER_HEALTH_PROBE_URL,
     HTTPHeaderSpec,
     NodeGroup,
     PortMapping,
@@ -513,17 +512,17 @@ class JobConfigurator(ABC):
         model = conf.model
         if not isinstance(model, OpenAIChatModel):
             return []
-        if all(group.router is None for group in conf.replica_groups):
-            # No router: every replica serves the model itself, so a chat completions
-            # request is a genuine end-to-end readiness check.
-            return [_openai_model_probe_spec(model.name, model.prefix)]
-        group = self._replica_group()
-        if group is not None and group.router is not None:
-            # Probe the router's own liveness endpoint, which does not depend on any
-            # worker. Workers get no default probe: they may not serve HTTP at all
-            # (gRPC workers), and they don't receive traffic directly.
-            return [_router_health_probe_spec()]
-        return []
+        if any(group.router is not None for group in conf.replica_groups):
+            group = self._replica_group()
+            if group is None or group.router is None:
+                # Workers get no default probe: they may not serve HTTP at all (gRPC
+                # workers), and they don't receive traffic directly.
+                return []
+            # The router answers chat completions only once it has workers, which it gets
+            # regardless of its own readiness. For SGLang routers, dstack registers workers
+            # via `ServiceRouterWorkerSyncWorker`, which doesn't check router readiness.
+            # Dynamo workers register themselves with the router via etcd/NATS.
+        return [_openai_model_probe_spec(model.name, model.prefix)]
 
 
 def interpolate_job_volumes(
@@ -593,19 +592,6 @@ def _openai_model_probe_spec(model_name: str, prefix: str) -> ProbeSpec:
         ],
         body=body,
         timeout=OPENAI_MODEL_PROBE_TIMEOUT,
-        interval=DEFAULT_PROBE_INTERVAL,
-        ready_after=DEFAULT_PROBE_READY_AFTER,
-    )
-
-
-def _router_health_probe_spec() -> ProbeSpec:
-    # Both supported routers (SGLang/SMG and Dynamo) serve `/health` independently of
-    # whether any worker is registered.
-    return ProbeSpec(
-        type="http",
-        method=DEFAULT_PROBE_METHOD,
-        url=ROUTER_HEALTH_PROBE_URL,
-        timeout=DEFAULT_PROBE_TIMEOUT,
         interval=DEFAULT_PROBE_INTERVAL,
         ready_after=DEFAULT_PROBE_READY_AFTER,
     )

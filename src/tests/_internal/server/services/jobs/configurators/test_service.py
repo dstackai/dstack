@@ -6,7 +6,6 @@ import pytest
 from dstack._internal import settings
 from dstack._internal.core.models.configurations import (
     OPENAI_MODEL_PROBE_TIMEOUT,
-    ROUTER_HEALTH_PROBE_URL,
     ProbeConfig,
     PythonVersion,
     ReplicaGroup,
@@ -116,9 +115,9 @@ class TestProbes:
             ],
         )
 
-    async def test_router_group_gets_health_probe(self):
-        """The router must not be probed with chat completions: it only answers those once
-        dstack has registered workers, and registration requires the router to be ready."""
+    async def test_router_group_gets_model_probe(self):
+        """The router is probed with chat completions like a replica serving the model
+        itself: worker registration doesn't wait for the router to be ready."""
         run_spec = get_run_spec(
             run_name="run", repo_id="id", configuration=self._router_worker_configuration()
         )
@@ -128,9 +127,9 @@ class TestProbes:
 
         probes = job_specs[0].probes
         assert len(probes) == 1
-        assert probes[0].url == ROUTER_HEALTH_PROBE_URL
-        assert probes[0].method == "get"
-        assert probes[0].body is None
+        assert probes[0].method == "post"
+        assert probes[0].url == "/v1/chat/completions"
+        assert "meta-llama/Meta-Llama-3.1-8B-Instruct" in (probes[0].body or "")
 
     async def test_worker_group_gets_no_derived_probe(self):
         """Workers behind a router may speak gRPC, so no probe can be derived from `model`."""
