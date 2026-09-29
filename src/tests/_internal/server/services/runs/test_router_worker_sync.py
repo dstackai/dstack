@@ -1,6 +1,7 @@
 import json
 import logging
-from contextlib import contextmanager
+import uuid
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,17 +10,34 @@ import grpc
 import httpx
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.configurations import parse_run_configuration
+from dstack._internal.core.models.runs import JobStatus, RunStatus
+from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import router_worker_sync
 from dstack._internal.server.services.runs.router_worker_sync import (
+    _add_worker_to_router,
     _get_connection_mode_from_workers,
     _get_router_workers,
     _get_runtime_type_from_workers,
     _get_worker,
+    _get_workers_diff,
     _grpc_server_info_to_worker,
     _probe_grpc_worker,
     _probe_http_worker,
+    _TargetWorker,
+    sync_router_workers_for_run_model,
+)
+from dstack._internal.server.testing.common import (
+    create_job,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+    get_run_spec,
 )
 
 
@@ -146,11 +164,71 @@ class TestGetRouterWorkers:
 
 
 @pytest.mark.asyncio
+class TestAddWorkerToRouter:
+    """
+    `_TargetWorker` is sent as the `POST /workers` body as is. `TypedDict` does not reject extra
+    keys at runtime, and the router silently ignores unknown ones, so this test is what catches a
+    field that should not go over the wire.
+    """
+
+    @pytest.mark.parametrize(
+        "worker",
+        [
+            pytest.param(
+                {
+                    "url": "http://10.0.0.1:8000",
+                    "worker_type": "regular",
+                    "connection_mode": "http",
+                    "runtime_type": "sglang",
+                },
+                id="http-regular",
+            ),
+            pytest.param(
+                {
+                    "url": "grpc://10.0.0.1:8000",
+                    "worker_type": "prefill",
+                    "connection_mode": "grpc",
+                    "runtime_type": "vllm",
+                    "bootstrap_port": 8998,
+                    "kv_connector": "NixlConnector",
+                    "kv_role": "kv_producer",
+                },
+                id="grpc-prefill",
+            ),
+        ],
+    )
+    async def test_posts_worker_as_is(self, worker: _TargetWorker):
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return _json_response(202, {"status": "accepted"})
+
+        async with _router_client(handler) as client:
+            assert await _add_worker_to_router(client, worker) is True
+        assert len(requests) == 1
+        assert requests[0].method == "POST"
+        assert requests[0].url.path == "/workers"
+        assert json.loads(requests[0].content) == worker
+
+    async def test_returns_false_when_not_accepted(self, caplog: pytest.LogCaptureFixture):
+        worker: _TargetWorker = {
+            "url": "http://10.0.0.1:8000",
+            "worker_type": "regular",
+            "connection_mode": "http",
+            "runtime_type": "sglang",
+        }
+        async with _router_client(lambda _: _json_response(202, {"status": "rejected"})) as client:
+            assert await _add_worker_to_router(client, worker) is False
+        assert "Unexpected add-worker response for http://10.0.0.1:8000" in caplog.text
+
+
+@pytest.mark.asyncio
 class TestProbeHttpWorker:
     """
     The probe talks to the replica over the tunnel, but the `url` it reports is the address the
     router dials. It must stay byte-identical to what the router echoes back in `/workers`,
-    otherwise `_update_workers_in_router_replica` re-registers every worker on each sync.
+    otherwise `_get_workers_diff` re-registers every worker on each sync.
     """
 
     async def test_regular_worker(self):
@@ -470,3 +548,221 @@ class TestGetWorker:
                     MagicMock(),
                     address="10.0.0.1:8000",
                 )
+
+
+class TestGetWorkersDiff:
+    def test_adds_missing_and_removes_extra_workers(self):
+        kept: _TargetWorker = {
+            "url": "http://10.0.0.1:8000",
+            "worker_type": "regular",
+            "connection_mode": "http",
+            "runtime_type": "sglang",
+        }
+        added: _TargetWorker = {**kept, "url": "http://10.0.0.2:8000"}
+        current = [
+            # The router may echo the URL back with a trailing slash
+            {"id": "1", "url": "http://10.0.0.1:8000/"},
+            {"id": "2", "url": "http://10.0.0.3:8000"},
+        ]
+        diff = _get_workers_diff([kept, added], current)
+        assert diff.to_add == [added]
+        assert diff.to_remove == {"http://10.0.0.3:8000": "2"}
+        assert not diff.is_empty()
+
+    def test_is_empty_when_router_is_in_sync(self):
+        worker: _TargetWorker = {
+            "url": "http://10.0.0.1:8000",
+            "worker_type": "regular",
+            "connection_mode": "http",
+            "runtime_type": "sglang",
+        }
+        diff = _get_workers_diff([worker], [{"id": "1", "url": "http://10.0.0.1:8000"}])
+        assert diff.is_empty()
+
+    def test_removed_worker_without_id(self):
+        diff = _get_workers_diff([], [{"url": "http://10.0.0.1:8000"}])
+        assert diff.to_remove == {"http://10.0.0.1:8000": None}
+
+
+class _FakeRouter:
+    """An in-memory router `/workers` API that counts the connections made to it."""
+
+    def __init__(self, workers: Optional[list[dict]] = None, *, unreachable: bool = False):
+        self.workers = list(workers or [])
+        self.unreachable = unreachable
+        self.connections = 0
+        self.added: list[dict] = []
+        self.removed_ids: list[str] = []
+
+    def handle(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/workers":
+            return _json_response(200, {"workers": self.workers})
+        if request.method == "POST" and request.url.path == "/workers":
+            worker = json.loads(request.content)
+            self.added.append(worker)
+            self.workers.append({"id": f"id-{len(self.added)}", **worker})
+            return _json_response(202, {"status": "accepted"})
+        if request.method == "DELETE" and request.url.path.startswith("/workers/"):
+            worker_id = request.url.path.removeprefix("/workers/")
+            self.removed_ids.append(worker_id)
+            self.workers = [w for w in self.workers if w["id"] != worker_id]
+            return _json_response(202, {"status": "accepted"})
+        return httpx.Response(404)
+
+
+@contextmanager
+def _fake_router_replicas(routers: dict[uuid.UUID, _FakeRouter]):
+    """Route each router job's client to its fake router, keyed by the job id."""
+
+    @asynccontextmanager
+    async def get_service_replica_client(job: JobModel):
+        router = routers[job.id]
+        router.connections += 1
+        if router.unreachable:
+            raise SSHError("connection refused")
+        async with AsyncClient(transport=httpx.MockTransport(router.handle)) as client:
+            yield client
+
+    with patch(
+        "dstack._internal.server.services.runs.router_worker_sync.get_service_replica_client",
+        get_service_replica_client,
+    ):
+        yield
+
+
+async def _create_router_service_run(session: AsyncSession, router_count: int) -> RunModel:
+    project = await create_project(session=session)
+    user = await create_user(session=session)
+    repo = await create_repo(session=session, project_id=project.id)
+    conf = parse_run_configuration(
+        {
+            "type": "service",
+            "port": 8000,
+            "gateway": False,
+            "groups": [
+                {
+                    "name": "router",
+                    "replicas": 1,
+                    "commands": ["smg launch"],
+                    "router": {"type": "sglang"},
+                },
+                {"name": "worker", "replicas": 1, "commands": ["worker"]},
+            ],
+        }
+    )
+    run = await create_run(
+        session=session,
+        project=project,
+        repo=repo,
+        user=user,
+        status=RunStatus.RUNNING,
+        run_spec=get_run_spec(repo_id=repo.name, run_name="test-run", configuration=conf),
+    )
+    # More than one running router means a rolling deployment is replacing the router
+    for replica_num in range(router_count):
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=replica_num,
+            replica_group_name="router",
+        )
+    await session.refresh(run, attribute_names=["jobs"])
+    return run
+
+
+_VLLM_WORKER: _TargetWorker = {
+    "url": "grpc://10.0.0.1:8000",
+    "worker_type": "regular",
+    "connection_mode": "grpc",
+    "runtime_type": "vllm",
+}
+
+
+def _patch_build_target_workers(**kwargs):
+    return patch(
+        "dstack._internal.server.services.runs.router_worker_sync._build_target_workers",
+        new_callable=AsyncMock,
+        **kwargs,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestSyncRouterWorkersForRunModel:
+    async def test_syncs_replacement_router_without_touching_up_to_date_one(
+        self, test_db, session: AsyncSession
+    ):
+        run = await _create_router_service_run(session, router_count=2)
+        old_router = _FakeRouter([{"id": "1", **_VLLM_WORKER}])
+        new_router = _FakeRouter()
+        routers = {run.jobs[0].id: old_router, run.jobs[1].id: new_router}
+
+        with (
+            _fake_router_replicas(routers),
+            _patch_build_target_workers(return_value=[_VLLM_WORKER]) as build_mock,
+        ):
+            await sync_router_workers_for_run_model(run)
+
+        assert new_router.added == [_VLLM_WORKER]
+        assert old_router.added == []
+        assert old_router.removed_ids == []
+        # Read once; reconnected only for the router that needed an update
+        assert old_router.connections == 1
+        assert new_router.connections == 2
+        # Workers are probed once for all routers, with hints taken from all of them: the
+        # replacement router's empty list alone would mean "probe everything"
+        build_mock.assert_awaited_once()
+        assert build_mock.await_args is not None
+        assert build_mock.await_args.kwargs["connection_mode"] == "grpc"
+        assert build_mock.await_args.kwargs["runtime_type"] == "vllm"
+
+    async def test_unreachable_router_does_not_block_others(
+        self, test_db, session: AsyncSession, caplog: pytest.LogCaptureFixture
+    ):
+        caplog.set_level(level=logging.WARNING, logger=router_worker_sync.__name__)
+        run = await _create_router_service_run(session, router_count=2)
+        unreachable_router = _FakeRouter(unreachable=True)
+        reachable_router = _FakeRouter()
+        routers = {run.jobs[0].id: unreachable_router, run.jobs[1].id: reachable_router}
+
+        with (
+            _fake_router_replicas(routers),
+            _patch_build_target_workers(return_value=[_VLLM_WORKER]),
+        ):
+            await sync_router_workers_for_run_model(run)
+
+        assert reachable_router.added == [_VLLM_WORKER]
+        assert unreachable_router.connections == 1
+        assert f"{fmt(run.jobs[0])}: failed to sync workers with router" in caplog.text
+
+    async def test_skips_probing_workers_when_no_router_is_reachable(
+        self, test_db, session: AsyncSession
+    ):
+        run = await _create_router_service_run(session, router_count=1)
+        routers = {run.jobs[0].id: _FakeRouter(unreachable=True)}
+
+        with _fake_router_replicas(routers), _patch_build_target_workers() as build_mock:
+            await sync_router_workers_for_run_model(run)
+
+        build_mock.assert_not_awaited()
+
+    async def test_rereads_router_workers_before_updating(self, test_db, session: AsyncSession):
+        run = await _create_router_service_run(session, router_count=1)
+        router = _FakeRouter([{"id": "1", **_VLLM_WORKER}])
+        routers = {run.jobs[0].id: router}
+
+        def reregister_worker(*args, **kwargs):
+            # Worker ids are assigned by the router. Here, the worker got a new one while the
+            # workers were being probed, so the id read before probing is stale.
+            router.workers = [{"id": "2", **_VLLM_WORKER}]
+            return []
+
+        with (
+            _fake_router_replicas(routers),
+            _patch_build_target_workers(side_effect=reregister_worker),
+        ):
+            await sync_router_workers_for_run_model(run)
+
+        assert router.removed_ids == ["2"]
+        assert router.workers == []
