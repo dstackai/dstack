@@ -103,9 +103,9 @@ configuration is wrong, fix the configuration and submit the service again.
 
 ## Router
 
-If a fleet has `placement: cluster` and a CPU-only instance, it is generally
-recommended to use a router configuration, regardless of whether the workers
-are aggregated or PD disaggregated, with the router on the CPU-only instance.
+If a fleet has `placement: cluster` and a CPU-only instance, you must use a
+configuration with the router on the CPU-only instance, regardless of whether
+the workers are aggregated or PD disaggregated.
 Whenever possible, connect the workers over gRPC, not HTTP: with a gRPC
 router, request parsing, serialization, and tokenization move from the
 serving engine to the router, so latency improves just by introducing it.

@@ -508,10 +508,9 @@ SSH fleets can be treated as VM-based backends as they support both idle instanc
 
 ## Cluster Placement
 
-If a fleet has `placement: cluster`, decide before trial 1 whether to use a
-router, following `## Router` in the
-`<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill, and
-report the decision via `progress`.
+If a fleet has `placement: cluster`, follow `## Router` in the
+`<!--?if codex-->$<!--?else-->/<!--?end-->dstack-prototyping` skill before
+trial 1 and report the resulting configuration via `progress`.
 
 # Final Service
 
