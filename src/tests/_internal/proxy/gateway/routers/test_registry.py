@@ -226,6 +226,13 @@ class TestRegisterService:
                 format_spec=OpenAIChatModelFormat(prefix="/v1"),
             )
         ]
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(),
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
+        assert "proxy_buffering off;" in conf
 
     async def test_register_with_rate_limits(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
@@ -325,6 +332,7 @@ class TestRegisterReplica:
         assert (m1 := re.search(r"server unix:/(.+)/replica.sock;  # replica xxx-xxx", conf))
         assert (m2 := re.search(r"server unix:/(.+)/replica.sock;  # replica yyy-yyy", conf))
         assert m1.group(1) != m2.group(1)
+        assert "proxy_buffering" not in conf
         assert system_mocks.reload_nginx.call_count == 3
         assert system_mocks.open_conn.call_count == 2
 

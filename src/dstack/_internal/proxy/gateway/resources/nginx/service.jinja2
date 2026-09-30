@@ -89,6 +89,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
         proxy_read_timeout 300s;
+        {% if not proxy_buffering %}
+        proxy_buffering off;
+        {% endif %}
         {% else %}
         return 503;
         {% endif %}
