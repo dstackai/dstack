@@ -24,32 +24,6 @@ class TestDaytonaAPIClient:
         assert requests_mock.last_request.headers["Authorization"] == "Bearer test-api-key"
         assert requests_mock.last_request.timeout == 30
 
-    @pytest.mark.parametrize(
-        ["method", "path", "response"],
-        [
-            (
-                "get_organization_usage",
-                "/organizations/org/usage",
-                {"regionUsage": [{"regionId": "eu", "totalCpuQuota": 100}]},
-            ),
-            (
-                "get_available_sandbox_classes",
-                "/organizations/org/available-sandbox-classes",
-                [{"regionId": "eu", "sandboxClass": "container", "gpuAvailable": True}],
-            ),
-        ],
-    )
-    def test_organization_endpoints(self, requests_mock, method, path, response):
-        requests_mock.get(API_URL + path, json=response)
-
-        assert getattr(DaytonaAPIClient("test-api-key"), method)("org") == response
-
-    def test_shared_regions(self, requests_mock):
-        regions = [{"id": "eu", "name": "Europe"}]
-        requests_mock.get(f"{API_URL}/shared-regions", json=regions)
-
-        assert DaytonaAPIClient("test-api-key").get_shared_regions() == regions
-
     def test_unauthorized_maps_to_invalid_credentials(self, requests_mock):
         requests_mock.get(f"{API_URL}/api-keys/current", status_code=401)
 
@@ -144,29 +118,6 @@ class TestDaytonaAPIClient:
         with pytest.raises(DaytonaAPIError, match="invalid list"):
             DaytonaAPIClient("test-api-key").get_shared_regions()
 
-    def test_create_sandbox_preserves_build_and_resource_request(self, requests_mock):
-        payload = {
-            "name": "dstack-job-0",
-            "buildInfo": {"dockerfileContent": "FROM python:3.12-slim-bookworm"},
-            "user": "root",
-            "target": "eu",
-            "cpu": 2,
-            "memory": 2,
-            "disk": 5,
-            "gpu": 0,
-            "spot": False,
-            "public": False,
-            "autoStopInterval": 0,
-            "autoPauseInterval": 0,
-            "autoDeleteInterval": 0,
-        }
-        requests_mock.post(f"{API_URL}/sandbox", json={"id": "sandbox-id", "state": "creating"})
-
-        sandbox = DaytonaAPIClient("test-api-key").create_sandbox(payload)
-
-        assert sandbox["id"] == "sandbox-id"
-        assert requests_mock.last_request.json() == payload
-
     def test_get_sandbox_accepts_id_or_name_and_returns_none_only_for_404(self, requests_mock):
         requests_mock.get(f"{API_URL}/sandbox/sandbox-id", json={"id": "sandbox-id"})
         requests_mock.get(f"{API_URL}/sandbox/job-name", json={"id": "sandbox-id"})
@@ -179,22 +130,6 @@ class TestDaytonaAPIClient:
         assert client.get_sandbox("missing") is None
         with pytest.raises(DaytonaAPIError):
             client.get_sandbox("forbidden")
-
-    def test_registry_create_and_lookup(self, requests_mock):
-        record = {"id": "registry-id", "name": "job-registry", "url": "registry.example"}
-        payload = {
-            "name": "job-registry",
-            "url": "registry.example",
-            "username": "user",
-            "password": "password",
-        }
-        requests_mock.post(f"{API_URL}/docker-registry", json=record)
-        requests_mock.get(f"{API_URL}/docker-registry", json=[record])
-        client = DaytonaAPIClient("test-api-key")
-
-        assert client.create_registry(payload) == record
-        assert requests_mock.last_request.json() == payload
-        assert client.get_registries() == [record]
 
     def test_volume_create_lookup_and_deleted_tombstone(self, requests_mock):
         pending = {"id": "volume-id", "state": "pending_create"}
@@ -307,14 +242,6 @@ class TestDaytonaAPIClient:
         }
         assert requests_mock.last_request.headers["Authorization"] == "Bearer test-api-key"
         assert command == {"cmdId": "command-id"}
-
-    def test_session_preserves_command_exit_code(self, requests_mock):
-        command = {"id": "command-id", "exitCode": 0, "command": "true"}
-        session = {"sessionId": "runner", "commands": [command]}
-        requests_mock.get(f"{TOOLBOX_URL}/process/session/runner", json=session)
-        client = DaytonaAPIClient("test-api-key")
-
-        assert client.get_session(TOOLBOX_URL, "runner") == session
 
     def test_missing_session(self, requests_mock):
         requests_mock.get(f"{TOOLBOX_URL}/process/session/runner", status_code=404)

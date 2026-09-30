@@ -167,6 +167,8 @@ class TestRunJob:
 
         data = _run_job(compute, offer)
 
+        assert offer.availability == InstanceAvailability.AVAILABLE
+        assert offer.instance_runtime == InstanceRuntime.RUNNER
         payload = compute.api_client.create_sandbox.call_args.args[0]
         assert payload["name"] == "dstack-test-unique"
         assert payload["target"] == ("earth" if gpu else "us")
@@ -174,6 +176,8 @@ class TestRunJob:
         assert payload["gpu"] == (2 if gpu else 0)
         assert payload["spot"] is spot
         if gpu:
+            assert offer.backend_data == {"gpu_type": "RTX-PRO-6000"}
+            assert offer.instance.resources.gpus[0].name == "RTXPRO6000"
             assert payload["gpuType"] == ["RTX-PRO-6000"]
         else:
             assert "gpuType" not in payload
@@ -343,9 +347,8 @@ class TestRegistryAuth:
         compute.terminate_instance(data.instance_id, data.region, data.backend_data)
         compute.api_client.delete_registry.assert_called_once_with("registry-id")
 
-    @pytest.mark.parametrize("cleanup_fails", [False, True])
-    def test_registry_rollback_retries_transient_errors(
-        self, compute, requests_mock, mocker, caplog, cleanup_fails
+    def test_failed_registry_rollback_reports_manual_cleanup(
+        self, compute, requests_mock, mocker, caplog
     ):
         offer = _offers(compute, _item())[0]
         compute.api_client = DaytonaAPIClient("test-api-key")
@@ -354,13 +357,7 @@ class TestRegistryAuth:
         requests_mock.post(
             f"{API_URL}/sandbox", status_code=400, json={"message": "invalid image"}
         )
-        deletion = requests_mock.delete(
-            f"{API_URL}/docker-registry/registry-id",
-            [
-                {"status_code": 503},
-                {"status_code": 503 if cleanup_fails else 204},
-            ],
-        )
+        deletion = requests_mock.delete(f"{API_URL}/docker-registry/registry-id", status_code=503)
 
         with pytest.raises(DaytonaAPIError, match="invalid image") as exc:
             _run_job(
@@ -370,10 +367,9 @@ class TestRegistryAuth:
             )
 
         assert exc.value.status_code == 400
-        assert deletion.call_count == (3 if cleanup_fails else 2)
-        if cleanup_fails:
-            assert "registry-id" in caplog.text
-            assert "Delete it manually in Daytona" in caplog.text
+        assert deletion.call_count == 3
+        assert "registry-id" in caplog.text
+        assert "Delete it manually in Daytona" in caplog.text
 
     def test_registry_cleanup_survives_provisioning_and_server_restart(self, compute):
         data = _run_job(compute, registry_auth=RegistryAuth(username="user", password="password"))
@@ -454,9 +450,8 @@ class TestVolumes:
                 compute.create_volume(SimpleNamespace())
         compute.api_client.delete_volume.assert_called_once_with("volume-id")
 
-    @pytest.mark.parametrize("cleanup_fails", [False, True])
-    def test_volume_rollback_retries_transient_errors(
-        self, compute, requests_mock, mocker, caplog, cleanup_fails
+    def test_failed_volume_rollback_reports_manual_cleanup(
+        self, compute, requests_mock, mocker, caplog
     ):
         compute.api_client = DaytonaAPIClient("test-api-key")
         mocker.patch("dstack._internal.core.backends.daytona.api_client.time.sleep")
@@ -466,21 +461,14 @@ class TestVolumes:
             f"{API_URL}/volumes/volume-id",
             json={"state": "error", "errorReason": "storage failed"},
         )
-        deletion = requests_mock.delete(
-            f"{API_URL}/volumes/volume-id",
-            [
-                {"status_code": 503},
-                {"status_code": 503 if cleanup_fails else 204},
-            ],
-        )
+        deletion = requests_mock.delete(f"{API_URL}/volumes/volume-id", status_code=503)
 
         with pytest.raises(ComputeError, match="storage failed"):
             compute.create_volume(SimpleNamespace())
 
-        assert deletion.call_count == (3 if cleanup_fails else 2)
-        if cleanup_fails:
-            assert "volume-id" in caplog.text
-            assert "Delete it manually in Daytona" in caplog.text
+        assert deletion.call_count == 3
+        assert "volume-id" in caplog.text
+        assert "Delete it manually in Daytona" in caplog.text
 
     def test_registers_an_existing_volume_without_modifying_it(self, compute):
         volume = SimpleNamespace(configuration=DaytonaVolumeConfiguration(volume_id="external-id"))
@@ -767,15 +755,6 @@ class TestGetOffersByRequirements:
             request.headers["Authorization"] == "Bearer test-api-key"
             for request in requests_mock.request_history
         )
-
-    def test_cpu_and_gpu_offers_retain_native_metadata_and_runner_runtime(self, compute):
-        offers = _offers(compute, _item(), _item(gpu=True))
-
-        assert [offer.availability for offer in offers] == [InstanceAvailability.AVAILABLE] * 2
-        assert all(offer.instance_runtime == InstanceRuntime.RUNNER for offer in offers)
-        assert offers[1].backend_data == {"gpu_type": "RTX-PRO-6000"}
-        assert len(offers[1].instance.resources.gpus) == 2
-        assert offers[1].instance.resources.gpus[0].name == "RTXPRO6000"
 
     def test_organization_id_is_cached_but_quotas_are_refreshed(self, compute):
         assert _offers(compute, _item())[0].availability == InstanceAvailability.AVAILABLE

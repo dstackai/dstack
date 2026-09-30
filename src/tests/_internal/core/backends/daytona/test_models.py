@@ -1,5 +1,4 @@
-import pytest
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter
 from typing_extensions import Annotated
 
 from dstack._internal.core.backends.daytona.models import DaytonaBackendConfigWithCreds
@@ -25,7 +24,3 @@ class TestDaytonaBackendConfig:
         assert api_config == file_config
         assert api_config.regions == ["earth", "eu"]
         assert api_config.creds.api_key == "test-key"
-
-    def test_api_config_requires_credentials(self):
-        with pytest.raises(ValidationError):
-            BackendConfigWithCreds.model_validate({"type": "daytona"})

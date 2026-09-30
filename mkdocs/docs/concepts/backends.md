@@ -1476,8 +1476,7 @@ projects:
 ### Daytona
 
 Create an API key in the [Daytona dashboard](https://app.daytona.io/) for the organization
-that will own the sandboxes. For private images, include `write:registries` and
-`delete:registries` permissions. Then configure the backend:
+that will own the sandboxes. Then configure the backend:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -1492,6 +1491,15 @@ projects:
 ```
 
 </div>
+
+??? info "Required permissions"
+    The API key requires `write:sandboxes`, `delete:sandboxes`, and `read:limits`.
+
+    Additional permissions depend on the features used:
+
+    * Private images: `write:registries` and `delete:registries`
+    * Creating volumes: `read:volumes`, `write:volumes`, and `delete:volumes`
+    * Registering existing volumes: `read:volumes`
 
 ### Runpod
 

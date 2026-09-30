@@ -12,7 +12,7 @@ from dstack._internal.core.backends.daytona.models import (
     DaytonaCreds,
     DaytonaStoredConfig,
 )
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import BackendInvalidCredentialsError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
 
@@ -23,7 +23,14 @@ class DaytonaConfigurator(Configurator[DaytonaBackendConfig, DaytonaBackendConfi
 
     def validate_config(self, config: DaytonaBackendConfigWithCreds, default_creds_enabled: bool):
         client = DaytonaAPIClient(api_key=config.creds.api_key)
-        client.get_current_api_key()
+        api_key = client.get_current_api_key()
+        required_permissions = {"write:sandboxes", "delete:sandboxes", "read:limits"}
+        missing_permissions = sorted(required_permissions - set(api_key["permissions"]))
+        if missing_permissions:
+            raise BackendInvalidCredentialsError(
+                msg=f"Daytona API key is missing permissions: {', '.join(missing_permissions)}",
+                fields=[["creds", "api_key"]],
+            )
         if not config.regions:
             return
         regions = {GPU_REGION, *(region["id"] for region in client.get_shared_regions())}
