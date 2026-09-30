@@ -986,8 +986,8 @@ projects:
     <div class="termy">
 
     ```shell
-    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
-    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/bare_metal/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    $ curl -sS -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    $ curl -sS -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/bare_metal/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
     ```
 
     </div>
