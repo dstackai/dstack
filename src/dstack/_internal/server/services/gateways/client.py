@@ -45,6 +45,7 @@ class GatewayClient:
         gateway_https: bool,
         auth: bool,
         client_max_body_size: int,
+        read_timeout: int,
         options: dict,
         rate_limits: list[RateLimit],
         ssh_private_key: str,
@@ -52,7 +53,7 @@ class GatewayClient:
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
-            await self.register_openai_entrypoint(project, entrypoint, gateway_https)
+            await self.register_openai_entrypoint(project, entrypoint, gateway_https, read_timeout)
 
         payload = {
             "id": run_id.hex,
@@ -61,6 +62,7 @@ class GatewayClient:
             "https": service_https,
             "auth": auth,
             "client_max_body_size": client_max_body_size,
+            "read_timeout": read_timeout,
             "options": options,
             "rate_limits": [limit.model_dump() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
@@ -160,12 +162,15 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def register_openai_entrypoint(self, project: str, domain: str, https: bool):
+    async def register_openai_entrypoint(
+        self, project: str, domain: str, https: bool, read_timeout: int
+    ):
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/entrypoints/register"),
             json={
                 "domain": domain,
                 "https": https,
+                "read_timeout": read_timeout,
             },
         )
         if resp.status_code == 400:

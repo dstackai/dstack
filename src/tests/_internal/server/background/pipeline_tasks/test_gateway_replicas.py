@@ -20,6 +20,7 @@ from dstack._internal.core.models.gateways import (
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
     GatewayReplicaFetcher,
     GatewayReplicaPipeline,
@@ -817,7 +818,9 @@ class TestGatewayReplicaWorkerRunningStateSync:
         session: AsyncSession,
         worker: GatewayReplicaWorker,
         mock_gateway_connection: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
     ):
+        monkeypatch.setattr(settings, "SERVICE_CLIENT_TIMEOUT", 900)
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -858,6 +861,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
             gateway_https=ANY,
             auth=ANY,
             client_max_body_size=ANY,
+            read_timeout=900,
             options={},
             rate_limits=[],
             ssh_private_key=project.ssh_private_key,
@@ -1432,6 +1436,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
             gateway_https=ANY,
             auth=ANY,
             client_max_body_size=ANY,
+            read_timeout=ANY,
             options={},
             rate_limits=[],
             ssh_private_key=project.ssh_private_key,

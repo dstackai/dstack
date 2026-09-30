@@ -31,8 +31,9 @@ def register_service_payload(
     client_max_body_size: int = 1024,
     options: Optional[dict] = None,
     rate_limits: Optional[list[dict]] = None,
+    read_timeout: Optional[int] = None,
 ) -> dict:
-    return {
+    payload = {
         "id": uuid.uuid4().hex,
         "run_name": run_name,
         "domain": domain,
@@ -43,6 +44,9 @@ def register_service_payload(
         "rate_limits": rate_limits or [],
         "ssh_private_key": "private-key",
     }
+    if read_timeout is not None:
+        payload["read_timeout"] = read_timeout
+    return payload
 
 
 def register_replica_payload(job_id: str = "xxx-xxx") -> dict:
@@ -234,6 +238,26 @@ class TestRegisterService:
         conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
         assert "proxy_buffering off;" in conf
 
+    async def test_register_with_read_timeout(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        repo = GatewayProxyRepo()
+        client = make_client(tmp_path, repo=repo)
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(run_name="test-run", read_timeout=900),
+        )
+        assert resp.status_code == 200
+        service = await repo.get_service("test-proj", "test-run")
+        assert service is not None
+        assert service.read_timeout == 900
+        resp = await client.post(
+            "/api/registry/test-proj/services/test-run/replicas/register",
+            json=register_replica_payload(),
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").read_text()
+        assert conf.count("proxy_read_timeout 900s;") == 2
+        assert "proxy_read_timeout 300s;" not in conf
+
     async def test_register_with_rate_limits(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
         resp = await client.post(
@@ -333,6 +357,7 @@ class TestRegisterReplica:
         assert (m2 := re.search(r"server unix:/(.+)/replica.sock;  # replica yyy-yyy", conf))
         assert m1.group(1) != m2.group(1)
         assert "proxy_buffering" not in conf
+        assert conf.count("proxy_read_timeout 300s;") == 2
         assert system_mocks.reload_nginx.call_count == 3
         assert system_mocks.open_conn.call_count == 2
 
@@ -594,10 +619,24 @@ class TestRegisterEntrypoint:
         assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
         assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
+        assert "proxy_read_timeout 300s;" in conf
         assert "listen 80;" in conf
         assert "listen 443" not in conf
         assert system_mocks.reload_nginx.call_count == 1
         assert system_mocks.run_certbot.call_count == 0
+
+    async def test_register_with_read_timeout(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        repo = GatewayProxyRepo()
+        client = make_client(tmp_path, repo=repo)
+        resp = await client.post(
+            "/api/registry/test-proj/entrypoints/register",
+            json={"domain": "gateway.gtw.test", "https": False, "read_timeout": 900},
+        )
+        assert resp.status_code == 200
+        conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
+        assert "proxy_read_timeout 900s;" in conf
+        [entrypoint] = await repo.list_entrypoints()
+        assert entrypoint.read_timeout == 900
 
     async def test_register_with_https(self, tmp_path: Path, system_mocks: Mocks) -> None:
         client = make_client(tmp_path)
