@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from dstack._internal.core.backends.base.configurator import raise_invalid_credentials_error
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.utils.logging import get_logger
 
 API_URL = "https://admin.hotaisle.app/api"
@@ -106,18 +106,19 @@ class HotAisleAPIClient:
         response.raise_for_status()
         return response.json()
 
-    def release_bare_metal_server(self, server_id: str) -> None:
+    def release_bare_metal_server(self, server_id: str, force: bool = True) -> None:
         url = f"{API_URL}/teams/{self.team_handle}/bare_metal/{server_id}/"
-        response = self._make_request(
-            "DELETE",
-            url,
-            params={
-                "force": "true",  # release even if min reservation time not met
-            },
-        )
+        # force releases even if min reservation time not met
+        params = {"force": "true"} if force else None
+        response = self._make_request("DELETE", url, params=params)
         if response.status_code == 404:
             logger.debug("Hot Aisle bare metal server %s not found", server_id)
             return
+        if response.status_code == 400 and not force:
+            raise BackendError(
+                f"Hot Aisle refused to release bare metal server {server_id}"
+                f" before its minimum reservation period ends: {response.text}"
+            )
         response.raise_for_status()
 
     def _make_request(

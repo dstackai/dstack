@@ -32,6 +32,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
@@ -145,7 +146,9 @@ class HotAisleCompute(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         if backend_data is not None and HotAisleInstanceBackendData.load(backend_data).bare_metal:
-            self.api_client.release_bare_metal_server(instance_id)
+            self.api_client.release_bare_metal_server(
+                instance_id, force=not FeatureFlags.HOTAISLE_BARE_METAL_NO_FORCE_RELEASE
+            )
             return
         vm_name = instance_id
         self.api_client.terminate_virtual_machine(vm_name)

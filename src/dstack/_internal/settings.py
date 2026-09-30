@@ -50,3 +50,12 @@ class FeatureFlags:
     """If DSTACK_FF_CLI_PRINT_JOB_CONNECTION_INFO enabled, `dstack apply` command prints server-provided
     IDE URL(s) and SSH command(s) before job logs (for dev-environments only).
     """
+
+    # TODO: Change the default to "0" before merging https://github.com/dstackai/dstack/pull/4325.
+    HOTAISLE_BARE_METAL_NO_FORCE_RELEASE = (
+        os.getenv("DSTACK_FF_HOTAISLE_BARE_METAL_NO_FORCE_RELEASE", "1") != "0"
+    )
+    """Enabled unless set to `0`. If enabled, Hot Aisle bare metal servers are deleted without `force`,
+    so a server still within its minimum reservation period isn't deleted and must be released
+    manually. This prevents accidentally losing a prepaid server.
+    """

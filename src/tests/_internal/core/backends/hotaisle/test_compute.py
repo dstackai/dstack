@@ -26,6 +26,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.settings import FeatureFlags
 
 VM_SPECS = {
     "cpu_cores": 13,
@@ -280,16 +281,26 @@ class TestTerminateInstance:
 
         compute.api_client.terminate_virtual_machine.assert_called_once_with("vm-name")
 
-    def test_releases_bare_metal_server(self):
+    @pytest.mark.parametrize(
+        ("no_force_release", "force"),
+        [(False, True), (True, False)],
+        ids=["force", "no-force-flag"],
+    )
+    def test_releases_bare_metal_server(self, no_force_release, force):
         compute = _compute_with_mocked_api_client()
 
-        compute.terminate_instance(
-            "deployment-id",
-            "us-michigan-1",
-            HotAisleInstanceBackendData(ip_address="10.0.0.2", bare_metal=True).model_dump_json(),
-        )
+        with patch.object(FeatureFlags, "HOTAISLE_BARE_METAL_NO_FORCE_RELEASE", no_force_release):
+            compute.terminate_instance(
+                "deployment-id",
+                "us-michigan-1",
+                HotAisleInstanceBackendData(
+                    ip_address="10.0.0.2", bare_metal=True
+                ).model_dump_json(),
+            )
 
-        compute.api_client.release_bare_metal_server.assert_called_once_with("deployment-id")
+        compute.api_client.release_bare_metal_server.assert_called_once_with(
+            "deployment-id", force=force
+        )
         compute.api_client.terminate_virtual_machine.assert_not_called()
 
 
