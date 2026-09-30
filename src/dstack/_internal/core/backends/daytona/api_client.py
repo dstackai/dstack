@@ -7,7 +7,7 @@ from gpuhunt.providers.daytona import API_URL
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 
-TIMEOUT = 30
+REQUEST_TIMEOUT_SECONDS = 30
 
 
 class DaytonaAPIError(BackendError):
@@ -192,7 +192,7 @@ class DaytonaAPIClient:
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 json=json,
                 params=params,
-                timeout=TIMEOUT,
+                timeout=REQUEST_TIMEOUT_SECONDS,
                 allow_redirects=False,
             )
         except requests.Timeout as e:

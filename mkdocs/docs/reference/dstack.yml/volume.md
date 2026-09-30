@@ -28,9 +28,6 @@ The `volume` configuration type allows creating, registering, and updating [volu
 
 === "Daytona"
 
-    Daytona volumes can be mounted by multiple CPU or GPU runs. They do not have a fixed
-    `size` or `region`.
-
     #SCHEMA# dstack._internal.core.models.volumes.DaytonaVolumeConfiguration
         overrides:
             show_root_heading: false

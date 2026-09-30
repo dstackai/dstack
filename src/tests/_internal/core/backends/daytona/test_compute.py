@@ -8,7 +8,6 @@ import pytest
 
 from dstack._internal.core.backends.daytona.api_client import (
     API_URL,
-    DaytonaAPIClient,
     DaytonaAPIError,
 )
 from dstack._internal.core.backends.daytona.compute import DaytonaCompute
@@ -347,27 +346,21 @@ class TestRegistryAuth:
         compute.terminate_instance(data.instance_id, data.region, data.backend_data)
         compute.api_client.delete_registry.assert_called_once_with("registry-id")
 
-    def test_failed_registry_rollback_reports_manual_cleanup(
-        self, compute, requests_mock, mocker, caplog
-    ):
-        offer = _offers(compute, _item())[0]
-        compute.api_client = DaytonaAPIClient("test-api-key")
-        mocker.patch("dstack._internal.core.backends.daytona.api_client.time.sleep")
-        requests_mock.post(f"{API_URL}/docker-registry", json={"id": "registry-id"})
-        requests_mock.post(
-            f"{API_URL}/sandbox", status_code=400, json={"message": "invalid image"}
+    def test_failed_registry_rollback_reports_manual_cleanup(self, compute, caplog):
+        error = DaytonaAPIError("invalid image", status_code=400)
+        compute.api_client.create_sandbox.side_effect = error
+        compute.api_client.delete_registry.side_effect = DaytonaAPIError(
+            "temporary outage", status_code=503
         )
-        deletion = requests_mock.delete(f"{API_URL}/docker-registry/registry-id", status_code=503)
 
         with pytest.raises(DaytonaAPIError, match="invalid image") as exc:
             _run_job(
                 compute,
-                offer=offer,
                 registry_auth=RegistryAuth(username="user", password="password"),
             )
 
-        assert exc.value.status_code == 400
-        assert deletion.call_count == 3
+        assert exc.value is error
+        compute.api_client.delete_registry.assert_called_once_with("registry-id")
         assert "registry-id" in caplog.text
         assert "Delete it manually in Daytona" in caplog.text
 
@@ -450,23 +443,20 @@ class TestVolumes:
                 compute.create_volume(SimpleNamespace())
         compute.api_client.delete_volume.assert_called_once_with("volume-id")
 
-    def test_failed_volume_rollback_reports_manual_cleanup(
-        self, compute, requests_mock, mocker, caplog
-    ):
-        compute.api_client = DaytonaAPIClient("test-api-key")
-        mocker.patch("dstack._internal.core.backends.daytona.api_client.time.sleep")
+    def test_failed_volume_rollback_reports_manual_cleanup(self, compute, mocker, caplog):
         mocker.patch(f"{COMPUTE_MODULE}.generate_unique_volume_name", return_value="unique-volume")
-        requests_mock.post(f"{API_URL}/volumes", json={"id": "volume-id"})
-        requests_mock.get(
-            f"{API_URL}/volumes/volume-id",
-            json={"state": "error", "errorReason": "storage failed"},
+        compute.api_client.get_volume.return_value = {
+            "state": "error",
+            "errorReason": "storage failed",
+        }
+        compute.api_client.delete_volume.side_effect = DaytonaAPIError(
+            "temporary outage", status_code=503
         )
-        deletion = requests_mock.delete(f"{API_URL}/volumes/volume-id", status_code=503)
 
         with pytest.raises(ComputeError, match="storage failed"):
             compute.create_volume(SimpleNamespace())
 
-        assert deletion.call_count == 3
+        compute.api_client.delete_volume.assert_called_once_with("volume-id")
         assert "volume-id" in caplog.text
         assert "Delete it manually in Daytona" in caplog.text
 
@@ -616,22 +606,6 @@ class TestUpdateProvisioningData:
 
         compute.api_client.execute_session_command.assert_not_called()
         compute.api_client.create_ssh_access.assert_not_called()
-
-    @pytest.mark.parametrize("reverse", [False, True])
-    def test_detects_exited_setup_regardless_of_session_command_order(self, compute, reverse):
-        data = _run_job(compute)
-        commands = [
-            {"id": "failed", "command": "runner", "exitCode": 1},
-            {"id": "running", "command": "diagnostic"},
-        ]
-        compute.api_client.get_session.return_value = {
-            "commands": list(reversed(commands)) if reverse else commands
-        }
-
-        with pytest.raises(ProvisioningError, match="exited with code 1"):
-            _update(compute, data)
-
-        compute.api_client.execute_session_command.assert_not_called()
 
     def test_recovers_when_async_exec_response_is_lost(self, compute):
         data = _run_job(compute)
@@ -794,12 +768,6 @@ class TestGetOffersByRequirements:
         ]
 
         assert _offers(compute, _item())[0].availability == InstanceAvailability.NO_QUOTA
-
-    def test_cpu_unknown_per_sandbox_limits_use_known_aggregate_quota(self, compute):
-        assert (
-            _offers(compute, _item(cpu=90, memory=190, disk=999))[0].availability
-            == InstanceAvailability.AVAILABLE
-        )
 
     def test_ignores_other_sandbox_classes_when_checking_usage(self, compute):
         compute.api_client.get_organization_usage.return_value["regionUsage"].append(

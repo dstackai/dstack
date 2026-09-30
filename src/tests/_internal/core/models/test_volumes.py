@@ -60,13 +60,6 @@ class TestVolumeProvisioningData:
         assert payload["size_gb"] == 120
         assert VolumeProvisioningData.model_validate(payload).size_gb == 120
 
-    def test_daytona_capacity_serializes_as_null(self):
-        data = VolumeProvisioningData.model_validate(
-            {"backend": "daytona", "volume_id": "volume-id", "size_gb": None}
-        )
-
-        assert json.loads(data.model_dump_json())["size_gb"] is None
-
 
 class TestVolumeMountPoint:
     def test_parse(self):

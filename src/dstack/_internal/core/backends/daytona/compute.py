@@ -48,7 +48,7 @@ RUNNER_SESSION = "dstack-runner"
 # A replacement token revokes the previous one for new connections. Request one
 # ten-year credential at provisioning and reuse it for the sandbox's lifetime.
 SSH_ACCESS_MINUTES = 3650 * 24 * 60
-VOLUME_READY_TIMEOUT = 60
+VOLUME_READY_TIMEOUT_SECONDS = 60
 
 
 class DaytonaCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Compute):
@@ -347,7 +347,7 @@ class DaytonaCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, 
         return _volume_provisioning_data(volume_id)
 
     def _wait_for_volume(self, volume_id: str) -> None:
-        deadline = time.monotonic() + VOLUME_READY_TIMEOUT
+        deadline = time.monotonic() + VOLUME_READY_TIMEOUT_SECONDS
         while True:
             data = self.api_client.get_volume(volume_id)
             if data is None:

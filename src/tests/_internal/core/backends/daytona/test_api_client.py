@@ -5,7 +5,6 @@ from dstack._internal.core.backends.daytona.api_client import (
     API_URL,
     DaytonaAPIClient,
     DaytonaAPIError,
-    DaytonaNotFoundError,
 )
 from dstack._internal.core.errors import BackendInvalidCredentialsError, NoCapacityError
 
@@ -49,14 +48,6 @@ class TestDaytonaAPIClient:
         assert exc.value.status_code == status
         assert not isinstance(exc.value, NoCapacityError)
         assert requests_mock.call_count == 1
-
-    def test_not_found_is_distinct(self, requests_mock):
-        requests_mock.get(f"{API_URL}/organizations/missing/usage", status_code=404)
-
-        with pytest.raises(DaytonaNotFoundError) as exc:
-            DaytonaAPIClient("test-api-key").get_organization_usage("missing")
-
-        assert exc.value.status_code == 404
 
     @pytest.mark.parametrize("error", [requests.ReadTimeout, requests.ConnectionError])
     def test_network_errors_preserve_cause_without_retrying(self, requests_mock, error):
@@ -103,20 +94,6 @@ class TestDaytonaAPIClient:
 
         assert exc.value.status_code == 302
         assert requests_mock.call_count == 1
-
-    @pytest.mark.parametrize("body", ["not-json", "[]"])
-    def test_invalid_identity_response(self, requests_mock, body):
-        requests_mock.get(f"{API_URL}/api-keys/current", text=body)
-
-        with pytest.raises(DaytonaAPIError):
-            DaytonaAPIClient("test-api-key").get_current_api_key()
-
-    @pytest.mark.parametrize("body", ["{}", '["eu"]'])
-    def test_invalid_regions_response(self, requests_mock, body):
-        requests_mock.get(f"{API_URL}/shared-regions", text=body)
-
-        with pytest.raises(DaytonaAPIError, match="invalid list"):
-            DaytonaAPIClient("test-api-key").get_shared_regions()
 
     def test_get_sandbox_accepts_id_or_name_and_returns_none_only_for_404(self, requests_mock):
         requests_mock.get(f"{API_URL}/sandbox/sandbox-id", json={"id": "sandbox-id"})

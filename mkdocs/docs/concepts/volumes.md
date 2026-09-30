@@ -96,7 +96,7 @@ Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
 Once created, the volume can be attached to dev environments, tasks, and services.
 
-> For block volumes in AWS and GCP, `dstack` automatically creates an `ext4` filesystem.
+> When creating a new network volume in AWS or GCP, `dstack` automatically creates an `ext4` filesystem on it.
 
 #### Register existing volumes
 
@@ -120,7 +120,7 @@ volume_id: vol1235
 
 </div>
 
-Existing AWS and GCP block volumes must already have a filesystem.
+If you register an existing volume in AWS or GCP, you must ensure the volume already has a filesystem.
 
 ??? info "Kubernetes"
 
@@ -273,10 +273,10 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
     volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
 
-    Daytona volumes can be mounted in any Daytona region.
-
-    For region-bound volumes, you can create different volumes for different regions
+    If you don't want to limit a run to one particular region, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
+
+    Daytona volumes can be mounted in any Daytona region.
 
 ??? info "Can I attach network volumes to multiple runs or instances?"
     The `runpod` and `daytona` backends support mounting the same volume in multiple runs at the same time.
