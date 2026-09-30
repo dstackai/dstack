@@ -981,13 +981,13 @@ projects:
 ??? info "Instance types"
     `dstack` supports Hot Aisle VMs (`vm-mi300x-1`, `vm-mi300x-2`, `vm-mi300x-4`, `vm-mi300x-8`) and bare metal servers (`bm-mi300x-8`). To use a specific type, set [`instance_types`](../reference/dstack.yml/fleet.md#instance_types) in the fleet configuration.
 
-    Some instances are charged upfront for a minimum reservation period (8 hours for bare metal servers), so set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) accordingly. To check the period for each instance type:
+    Some instances are charged upfront for a minimum reservation period (8 hours for bare metal servers), so set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) accordingly. To check the period for instance types currently in stock:
 
     <div class="termy">
 
     ```shell
-    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
-    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/bare_metal/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/bare_metal/available/ | jq ".[]? | {gpus: .Specs.gpus, MinimumReservationMinutes}"
     ```
 
     </div>
