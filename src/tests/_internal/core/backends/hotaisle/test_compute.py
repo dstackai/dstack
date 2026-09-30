@@ -186,6 +186,7 @@ class TestUpdateProvisioningData:
 
         compute.api_client.get_vm_state.assert_called_once_with("instance-id")
         assert provisioning_data.hostname == "10.0.0.1"
+        assert provisioning_data.ssh_port == 22
         ssh_mock.assert_called_once()
         assert ssh_mock.call_args.kwargs["hostname"] == "10.0.0.1"
 
@@ -210,10 +211,22 @@ class TestUpdateProvisioningData:
         assert provisioning_data.hostname is None
         ssh_mock.assert_not_called()
 
-    def test_starts_shim_on_installed_bare_metal_server(self, ssh_mock):
+    @pytest.mark.parametrize(
+        ("ssh_access", "hostname", "port"),
+        [
+            ({"ip_address": "203.0.113.10", "port": 2222}, "203.0.113.10", 2222),
+            (None, "10.0.0.2", 22),
+        ],
+        ids=["ssh-access", "no-ssh-access"],
+    )
+    def test_starts_shim_on_installed_bare_metal_server(
+        self, ssh_mock, ssh_access, hostname, port
+    ):
         compute = _compute_with_mocked_api_client()
         compute.api_client.get_bare_metal_server.return_value = {
-            "os_status": {"os_install_status": "installed"}
+            "ip_address": "10.0.0.2",
+            "ssh_access": ssh_access,
+            "os_status": {"os_install_status": "installed"},
         }
         provisioning_data = _provisioning_data(
             HotAisleInstanceBackendData(ip_address="10.0.0.2", bare_metal=True)
@@ -223,9 +236,11 @@ class TestUpdateProvisioningData:
 
         compute.api_client.get_bare_metal_server.assert_called_once_with("instance-id")
         compute.api_client.get_vm_state.assert_not_called()
-        assert provisioning_data.hostname == "10.0.0.2"
+        assert provisioning_data.hostname == hostname
+        assert provisioning_data.ssh_port == port
         ssh_mock.assert_called_once()
-        assert ssh_mock.call_args.kwargs["hostname"] == "10.0.0.2"
+        assert ssh_mock.call_args.kwargs["hostname"] == hostname
+        assert ssh_mock.call_args.kwargs["port"] == port
 
     @pytest.mark.parametrize(
         "server_data",
@@ -308,10 +323,11 @@ class TestTerminateInstance:
 class TestLaunchRunner:
     @patch("dstack._internal.core.backends.hotaisle.compute._run_ssh_command", return_value=True)
     def test_daemonizes_without_disown(self, ssh_mock):
-        assert _launch_runner("10.0.0.1", "private-key", "sudo sh -c 'dstack-shim'")
+        assert _launch_runner("10.0.0.1", 22, "private-key", "sudo sh -c 'dstack-shim'")
 
         ssh_mock.assert_called_once_with(
             hostname="10.0.0.1",
+            port=22,
             ssh_private_key="private-key",
             command="nohup sudo sh -c 'dstack-shim' >/tmp/dstack-shim.log 2>&1 </dev/null &",
         )
@@ -322,10 +338,11 @@ class TestRunSSHCommand:
     def test_returns_true_on_success(self, run_mock):
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stderr="")
 
-        assert _run_ssh_command("10.0.0.1", "private-key", "true")
+        assert _run_ssh_command("10.0.0.1", 2222, "private-key", "true")
 
         args = run_mock.call_args.args[0]
         assert "hotaisle@10.0.0.1" in args
+        assert args[args.index("-p") + 1] == "2222"
         assert f"ConnectTimeout={SSH_CONNECT_TIMEOUT_SECONDS}" in args
         assert run_mock.call_args.kwargs["timeout"] == SSH_LAUNCH_TIMEOUT_SECONDS
 
@@ -343,4 +360,4 @@ class TestRunSSHCommand:
         else:
             run_mock.return_value = run_result
 
-        assert not _run_ssh_command("10.0.0.1", "private-key", "true")
+        assert not _run_ssh_command("10.0.0.1", 22, "private-key", "true")

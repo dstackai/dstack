@@ -124,6 +124,8 @@ class HotAisleCompute(
         project_ssh_private_key: str,
     ):
         backend_data = HotAisleInstanceBackendData.load(provisioning_data.backend_data)
+        hostname = backend_data.ip_address
+        port = 22
         if backend_data.bare_metal:
             server_data = self.api_client.get_bare_metal_server(provisioning_data.instance_id)
             os_install_status = (server_data.get("os_status") or {}).get("os_install_status")
@@ -131,16 +133,22 @@ class HotAisleCompute(
                 raise ProvisioningError("Hot Aisle bare metal server OS installation failed")
             if os_install_status != "installed":
                 return
+            # The bare metal server's ip_address is private, SSH is exposed via ssh_access.
+            ssh_access = server_data.get("ssh_access") or {}
+            hostname = ssh_access.get("ip_address") or hostname
+            port = ssh_access.get("port") or port
         elif self.api_client.get_vm_state(provisioning_data.instance_id) != "running":
             return
         # Retried on the next check until the shim starts.
         if not _start_runner(
-            hostname=backend_data.ip_address,
+            hostname=hostname,
+            port=port,
             project_ssh_private_key=project_ssh_private_key,
             arch=provisioning_data.instance_type.resources.cpu_arch,
         ):
             return
-        provisioning_data.hostname = backend_data.ip_address
+        provisioning_data.hostname = hostname
+        provisioning_data.ssh_port = port
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -156,6 +164,7 @@ class HotAisleCompute(
 
 def _start_runner(
     hostname: str,
+    port: int,
     project_ssh_private_key: str,
     arch: Optional[str],
 ) -> bool:
@@ -163,6 +172,7 @@ def _start_runner(
     launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
     return _launch_runner(
         hostname=hostname,
+        port=port,
         ssh_private_key=project_ssh_private_key,
         launch_command=launch_command,
     )
@@ -170,6 +180,7 @@ def _start_runner(
 
 def _launch_runner(
     hostname: str,
+    port: int,
     ssh_private_key: str,
     launch_command: str,
 ) -> bool:
@@ -179,12 +190,13 @@ def _launch_runner(
     )
     return _run_ssh_command(
         hostname=hostname,
+        port=port,
         ssh_private_key=ssh_private_key,
         command=daemonized_command,
     )
 
 
-def _run_ssh_command(hostname: str, ssh_private_key: str, command: str) -> bool:
+def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: str) -> bool:
     with tempfile.NamedTemporaryFile("w+", 0o600) as f:
         f.write(ssh_private_key)
         f.flush()
@@ -208,6 +220,8 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str) -> bool:
                     "LogLevel=ERROR",
                     "-i",
                     f.name,
+                    "-p",
+                    str(port),
                     f"hotaisle@{hostname}",
                     command,
                 ],
