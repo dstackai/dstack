@@ -62,6 +62,7 @@ async def register_service(
         replicas=(),
         has_router_replica=has_router_replica,
         cors_enabled=cors_enabled,
+        proxy_buffering=model is None,
     )
 
     async with lock:
@@ -407,6 +408,7 @@ async def get_nginx_service_config(
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         has_router_replica=service.has_router_replica,
         cors_enabled=service.cors_enabled,
+        proxy_buffering=service.proxy_buffering,
     )
 
 
