@@ -44,7 +44,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 ??? info "Daytona"
     Daytona volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
-    Omit `size` and `region`:
+    Storage grows with usage, and the same volume can be mounted in any Daytona region.
 
     ```yaml
     type: volume
@@ -269,12 +269,12 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 
 ??? info "Can I use network volumes across regions?"
 
-    Daytona volumes can be shared across regions, including CPU runs in `us` and GPU runs in `earth`.
-
     Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
     volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
-    
+
+    Daytona volumes can be mounted in any Daytona region.
+
     For region-bound volumes, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
