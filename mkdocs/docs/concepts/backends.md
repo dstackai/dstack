@@ -981,7 +981,7 @@ projects:
 ??? info "Instance types"
     `dstack` supports Hot Aisle VMs (`vm-mi300x-1`, `vm-mi300x-2`, `vm-mi300x-4`, `vm-mi300x-8`) and bare metal servers (`bm-mi300x-8`). To use a specific type, set [`instance_types`](../reference/dstack.yml/fleet.md#instance_types) in the fleet configuration.
 
-    Some instances are prepaid for a minimum period (8 hours for bare metal), so set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) accordingly. To check it for instance types in stock:
+    Some instances are prepaid for a minimum period (8 hours for bare metal). To avoid releasing them early, use a fleet with a fixed number of [`nodes`](../concepts/fleets.md#nodes), or at least set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) to cover the period. To check it for instance types in stock:
 
     <div class="termy">
 
