@@ -68,8 +68,7 @@ class Service(ImmutableModel):
     """Only used on gateways. Disabled for services with a model so that streamed responses
     reach the client as the replica emits them."""
     read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
-    """Seconds to wait for data from a replica between two successive reads, not for the whole
-    request. For model services, this bounds time to first token."""
+    """Seconds to wait for data from a replica between two successive reads."""
 
     @model_validator(mode="before")
     @classmethod
