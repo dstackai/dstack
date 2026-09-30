@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, and `kubernetes` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, and `daytona` backends.
 
 ### Apply a configuration
 
@@ -41,6 +41,16 @@ size: 100GB
 </div>
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
+
+??? info "Daytona"
+    Daytona volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
+    Storage grows with usage, and the same volume can be mounted in any Daytona region.
+
+    ```yaml
+    type: volume
+    backend: daytona
+    name: my-volume
+    ```
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -86,7 +96,7 @@ Volume my-volume does not exist yet. Create the volume? [y/n]: y
 
 Once created, the volume can be attached to dev environments, tasks, and services.
 
-> When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
+> When creating a new network volume in AWS or GCP, `dstack` automatically creates an `ext4` filesystem on it.
 
 #### Register existing volumes
 
@@ -110,7 +120,7 @@ volume_id: vol1235
 
 </div>
 
-If you register an existing volume, you must ensure the volume already has a filesystem.
+If you register an existing volume in AWS or GCP, you must ensure the volume already has a filesystem.
 
 ??? info "Kubernetes"
 
@@ -254,7 +264,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 
 ??? info "Can I use network volumes across backends?"
 
-    Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
+    Volumes can only be used with their backend. If you need to access
     data across different backends, you should either use object storage or replicate the data across multiple volumes.
 
 ??? info "Can I use network volumes across regions?"
@@ -262,19 +272,22 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
     Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
     volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
-    
+
     If you don't want to limit a run to one particular region, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
+    Daytona volumes can be mounted in any Daytona region.
+
 ??? info "Can I attach network volumes to multiple runs or instances?"
-    You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
+    The `runpod` and `daytona` backends support mounting the same volume in multiple runs at the same time.
+    For `kubernetes`, the storage class and access modes must support sharing, such as `ReadWriteMany`.
 
 ## Instance volumes
 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-> Instance volumes are currently supported for all backends except `runpod` and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+> Instance volumes are currently supported for all backends except `daytona`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ### Attach a volume
 

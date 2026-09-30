@@ -1473,6 +1473,34 @@ projects:
     - **Runs always execute as `root`.** `enroot` is a single-user container runtime: it can only map the invoking host user inside the container to either the same UID/GID or to `root` (`0:0`). `dstack` uses the latter, so runs always execute as `root`, and both the image's default user and the run configuration's `user` property are ignored. The single-user model is a fundamental `enroot` limitation, not specific to the `dstack` integration.
     - **Private registries via `registry_auth` are not supported.** The `registry_auth` run configuration property is rejected. You can still pull images from a private registry by preconfiguring `enroot` credentials on the cluster's compute nodes — see the [enroot import documentation](https://github.com/NVIDIA/enroot/blob/main/doc/cmd/import.md#description).
 
+### Daytona
+
+Create an API key in the [Daytona dashboard](https://app.daytona.io/) for the organization
+that will own the sandboxes. Then configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: daytona
+        creds:
+          type: api_key
+          api_key: YOUR_DAYTONA_API_KEY
+```
+
+</div>
+
+??? info "Required permissions"
+    The API key requires `write:sandboxes`, `delete:sandboxes`, and `read:limits`.
+
+    Additional permissions depend on the features used:
+
+    * Private images: `write:registries` and `delete:registries`
+    * Creating volumes: `read:volumes`, `write:volumes`, and `delete:volumes`
+    * Registering existing volumes: `read:volumes`
+
 ### Runpod
 
 Log into your [Runpod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click

@@ -4,6 +4,7 @@ declare type TBackendType =
     | 'crusoe'
     | 'cudo'
     | 'datacrunch'
+    | 'daytona'
     | 'dstack'
     | 'gcp'
     | 'kubernetes'

@@ -22,7 +22,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import Volume, VolumeConfigurationWithRegion
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import backends as backends_services
 
@@ -49,11 +49,19 @@ async def get_offers_by_requirements(
     regions: Optional[list[str]] = profile.regions
     availability_zones: Optional[list[str]] = profile.availability_zones
     instance_types: Optional[list[str]] = profile.instance_types
-    # (BackendType, region.lower() | "")
-    volumes_locations: Optional[set[tuple[BackendType, str]]] = None
+    # (BackendType, region.lower() | None). None means any region.
+    volumes_locations: Optional[set[tuple[BackendType, Optional[str]]]] = None
 
     if volumes:
-        volumes_locations = {(v.get_backend(), v.get_region().lower()) for v in volumes[0]}
+        volumes_locations = {
+            (
+                v.get_backend(),
+                v.get_region().lower()
+                if isinstance(v.configuration, VolumeConfigurationWithRegion)
+                else None,
+            )
+            for v in volumes[0]
+        }
 
     if multinode:
         if backend_types is None:
@@ -206,7 +214,7 @@ def _filter_offers(
     availability_zones: Optional[List[str]] = None,
     instance_types: Optional[List[str]] = None,
     placement_group: Optional[PlacementGroup] = None,
-    volumes_locations: Optional[Container[tuple[BackendType, str]]] = None,
+    volumes_locations: Optional[Container[tuple[BackendType, Optional[str]]]] = None,
 ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Yields filtered offers. May return modified offers to match the filters.
@@ -246,6 +254,7 @@ def _filter_offers(
         if (
             volumes_locations is not None
             and (offer.backend, offer.region.lower()) not in volumes_locations
+            and (offer.backend, None) not in volumes_locations
         ):
             continue
         yield (b, offer)

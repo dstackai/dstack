@@ -42,10 +42,6 @@ class BaseVolumeConfiguration(CoreModel):
     > Variable is mutable so its type is invariant
     """
     name: Annotated[Optional[str], Field(description="The volume name")] = None
-    size: Annotated[
-        Optional[Memory],
-        Field(description="The volume size. Must be specified when creating new volumes"),
-    ] = None
     auto_cleanup_duration: Annotated[
         OptionalIdleDuration,
         Field(
@@ -81,6 +77,13 @@ class BaseVolumeConfiguration(CoreModel):
     def is_external(self) -> bool:
         return self.external_volume_id is not None
 
+
+class VolumeConfigurationWithSize(BaseVolumeConfiguration):
+    size: Annotated[
+        Optional[Memory],
+        Field(description="The volume size. Must be specified when creating new volumes"),
+    ] = None
+
     @property
     def size_gb(self) -> int:
         return int(get_or_error(self.size))
@@ -108,7 +111,9 @@ class VolumeConfigurationWithVolumeID(BaseVolumeConfiguration):
 
 
 class AWSVolumeConfiguration(
-    VolumeConfigurationWithAvailibilityZone, VolumeConfigurationWithVolumeID
+    VolumeConfigurationWithAvailibilityZone,
+    VolumeConfigurationWithVolumeID,
+    VolumeConfigurationWithSize,
 ):
     backend: Annotated[Literal[BackendType.AWS], Field(description="The volume backend")] = (
         BackendType.AWS
@@ -116,14 +121,18 @@ class AWSVolumeConfiguration(
 
 
 class GCPVolumeConfiguration(
-    VolumeConfigurationWithAvailibilityZone, VolumeConfigurationWithVolumeID
+    VolumeConfigurationWithAvailibilityZone,
+    VolumeConfigurationWithVolumeID,
+    VolumeConfigurationWithSize,
 ):
     backend: Annotated[Literal[BackendType.GCP], Field(description="The volume backend")] = (
         BackendType.GCP
     )
 
 
-class RunpodVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurationWithVolumeID):
+class RunpodVolumeConfiguration(
+    VolumeConfigurationWithRegion, VolumeConfigurationWithVolumeID, VolumeConfigurationWithSize
+):
     backend: Annotated[Literal[BackendType.RUNPOD], Field(description="The volume backend")] = (
         BackendType.RUNPOD
     )
@@ -131,7 +140,7 @@ class RunpodVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurati
     """Runpod doesn't have AZs but we accept this field for compatibility with older clients."""
 
 
-class KubernetesVolumeConfiguration(VolumeConfigurationWithRegion):
+class KubernetesVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurationWithSize):
     backend: Annotated[
         Literal[BackendType.KUBERNETES], Field(description="The volume backend")
     ] = BackendType.KUBERNETES
@@ -173,11 +182,18 @@ class KubernetesVolumeConfiguration(VolumeConfigurationWithRegion):
         return self.claim_name
 
 
+class DaytonaVolumeConfiguration(VolumeConfigurationWithVolumeID):
+    backend: Annotated[Literal[BackendType.DAYTONA], Field(description="The volume backend")] = (
+        BackendType.DAYTONA
+    )
+
+
 AnyVolumeConfiguration = Union[
     AWSVolumeConfiguration,
     GCPVolumeConfiguration,
     RunpodVolumeConfiguration,
     KubernetesVolumeConfiguration,
+    DaytonaVolumeConfiguration,
 ]
 
 
@@ -202,7 +218,8 @@ class VolumeSpec(CoreModel):
 class VolumeProvisioningData(CoreModel):
     backend: Optional[BackendType] = None
     volume_id: str
-    size_gb: int
+    size_gb: Optional[int]
+    """The provisioned capacity, or `None` for volumes without a fixed capacity."""
     availability_zone: Optional[str] = None
     price: Optional[float] = None
     """`price` stores the monthly price."""
@@ -262,6 +279,12 @@ class Volume(CoreModel):
 
     def get_backend(self) -> BackendType:
         return self.configuration.backend
+
+    def matches_location(self, backend: BackendType, region: str) -> bool:
+        return self.get_backend() == backend and (
+            not isinstance(self.configuration, VolumeConfigurationWithRegion)
+            or self.configuration.region.lower() == region.lower()
+        )
 
     def get_region(self) -> str:
         """

@@ -11,6 +11,7 @@ class BackendType(str, enum.Enum):
         CRUSOE (BackendType): Crusoe
         CUDO (BackendType): Cudo
         DATACRUNCH (BackendType): DataCrunch (for backward compatibility)
+        DAYTONA (BackendType): Daytona
         DIGITALOCEAN (BackendType): DigitalOcean
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
@@ -37,6 +38,7 @@ class BackendType(str, enum.Enum):
     CUDO = "cudo"
     DATACRUNCH = "datacrunch"
     """`DATACRUNCH` is kept as a `BackendType` for backward compatibility."""
+    DAYTONA = "daytona"
     DIGITALOCEAN = "digitalocean"
     DSTACK = "dstack"
     GCP = "gcp"

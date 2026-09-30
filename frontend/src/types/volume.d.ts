@@ -11,7 +11,7 @@ declare interface IVolumeConfiguration {
     type: "volume",
     name?: string,
     backend: TBackendType,
-    region: string,
+    region?: string,
     size?: number,
     volume_id?: string
 }
@@ -19,7 +19,7 @@ declare interface IVolumeConfiguration {
 declare interface IVolumeProvisioningData {
     backend?: TBackendType,
     volume_id: string,
-    size_gb: number,
+    size_gb: number | null,
     availability_zone?: string
     price?:number
     attachable: boolean

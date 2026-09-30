@@ -17,6 +17,7 @@ from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
     Volume,
     VolumeConfigurationWithRegion,
+    VolumeConfigurationWithSize,
     VolumePlan,
     VolumeSpec,
     VolumeStatus,
@@ -204,9 +205,6 @@ def _print_plan_header(plan: VolumePlan):
     configuration_table.add_row(th("Type"), plan.spec.configuration.type)
 
     volume_type = "managed"
-    size = "-"
-    if plan.spec.configuration.size is not None:
-        size = str(plan.spec.configuration.size)
     if plan.spec.configuration.is_external:
         volume_type = "external"
 
@@ -214,7 +212,11 @@ def _print_plan_header(plan: VolumePlan):
     configuration_table.add_row(th("Backend"), plan.spec.configuration.backend.value)
     if isinstance(plan.spec.configuration, VolumeConfigurationWithRegion):
         configuration_table.add_row(th("Region"), plan.spec.configuration.region)
-    configuration_table.add_row(th("Size"), size)
+    if isinstance(plan.spec.configuration, VolumeConfigurationWithSize):
+        size = "-"
+        if plan.spec.configuration.size is not None:
+            size = str(plan.spec.configuration.size)
+        configuration_table.add_row(th("Size"), size)
 
     console.print(configuration_table)
     console.print()

@@ -597,9 +597,8 @@ def _get_job_mount_point_attached_volume(
     Returns the volume attached to the job among the list of possible mount point volumes.
     """
     for volume in volumes:
-        if (
-            volume.get_backend() != job_provisioning_data.get_base_backend()
-            or volume.get_region().lower() != job_provisioning_data.region.lower()
+        if not volume.matches_location(
+            job_provisioning_data.get_base_backend(), job_provisioning_data.region
         ):
             continue
         if (

@@ -2724,10 +2724,7 @@ def _get_offer_mount_point_volume(
     offer: InstanceOfferWithAvailability,
 ) -> Volume:
     for volume in volumes:
-        if (
-            volume.get_backend() != offer.backend
-            or volume.get_region().lower() != offer.region.lower()
-        ):
+        if not volume.matches_location(offer.backend, offer.region):
             continue
         return volume
     raise ServerClientError("Failed to find an eligible volume for the mount point")
