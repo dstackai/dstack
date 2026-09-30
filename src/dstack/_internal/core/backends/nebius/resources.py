@@ -11,6 +11,16 @@ from typing import Dict, Optional
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
 from nebius.aio.token.renewable import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENEW_SYNCHRONOUS
+from nebius.api.nebius.billing.v1 import (
+    ComputeInstanceSpec,
+    ComputeInstanceSpecV1,
+    CreatePricingPolicyRequest,
+    DeletePricingPolicyRequest,
+    MaxPriceV1,
+    PricingMethod,
+    PricingPolicyServiceClient,
+    PricingPolicySpec,
+)
 from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
     AttachedDiskSpec,
@@ -37,6 +47,7 @@ from nebius.api.nebius.compute.v1 import (
     PublicIPAddress,
     ResourcesSpec,
     SourceImageFamily,
+    SpotPricingPolicySpec,
 )
 from nebius.api.nebius.iam.v1 import (
     Container,
@@ -299,6 +310,34 @@ def delete_disk(sdk: SDK, disk_id: str) -> None:
     )
 
 
+def create_pricing_policy(
+    sdk: SDK, name: str, project_id: str, platform: str, max_price: str
+) -> SDKOperation[Operation]:
+    client = PricingPolicyServiceClient(sdk)
+    request = CreatePricingPolicyRequest(
+        metadata=ResourceMetadata(name=name, parent_id=project_id),
+        spec=PricingPolicySpec(
+            compute_instance_spec=ComputeInstanceSpec(v1=ComputeInstanceSpecV1(platform=platform)),
+            pricing=PricingMethod(max_price_v1=MaxPriceV1(max_price=max_price)),
+        ),
+    )
+    return LOOP.await_(
+        client.create(
+            request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+        )
+    )
+
+
+def delete_pricing_policy(sdk: SDK, pricing_policy_id: str) -> None:
+    LOOP.await_(
+        PricingPolicyServiceClient(sdk).delete(
+            DeletePricingPolicyRequest(id=pricing_policy_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
+
+
 def create_instance(
     sdk: SDK,
     name: str,
@@ -310,6 +349,7 @@ def create_instance(
     disk_id: str,
     subnet_id: str,
     preemptible: bool,
+    pricing_policy_id: Optional[str],
     labels: Dict[str, str],
 ) -> SDKOperation[Operation]:
     client = InstanceServiceClient(sdk)
@@ -341,6 +381,11 @@ def create_instance(
             if preemptible
             else None,
             recovery_policy=InstanceRecoveryPolicy.FAIL if preemptible else None,
+            spot_pricing_policy=(
+                SpotPricingPolicySpec(id=pricing_policy_id)
+                if pricing_policy_id is not None
+                else None
+            ),
         ),
     )
     with wrap_capacity_errors():

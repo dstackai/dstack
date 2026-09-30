@@ -3,6 +3,7 @@ import random
 import shlex
 import time
 from collections.abc import Iterable
+from decimal import ROUND_CEILING, Decimal
 from functools import cached_property
 from typing import List, Optional
 
@@ -66,6 +67,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](
     max=Memory.parse("8192GB"),  # max for the NETWORK_SSD disk type
 )
 WAIT_FOR_DISK_TIMEOUT = 20
+WAIT_FOR_PRICING_POLICY_TIMEOUT = 10
 WAIT_FOR_INSTANCE_TIMEOUT = 30
 WAIT_FOR_INSTANCE_UPDATE_INTERVAL = 2.5
 DELETE_INSTANCE_TIMEOUT = 25
@@ -136,7 +138,11 @@ class NebiusCompute(
             extra_filter=_supported_instances,
         )
         return [
-            offer.with_availability(availability=InstanceAvailability.UNKNOWN) for offer in offers
+            offer.with_availability(
+                availability=InstanceAvailability.UNKNOWN,
+                price=_get_price_adjusted_for_pricing_policy(offer),
+            )
+            for offer in offers
         ]
 
     def get_offers_modifiers(
@@ -156,6 +162,9 @@ class NebiusCompute(
         # instance.
         instance_name = generate_unique_instance_name(instance_config)
         platform, preset = instance_offer.instance.name.split()
+        offer_backend_data = validate_extra_ignore(
+            NebiusOfferBackendData, instance_offer.backend_data
+        )
         cluster_id = None
         if placement_group:
             assert placement_group.provisioning_data is not None
@@ -186,6 +195,7 @@ class NebiusCompute(
             labels=labels,
         )
         create_instance_op = None
+        create_pricing_policy_op = None
         try:
             logger.debug("Blocking until disk %s is created", create_disk_op.resource_id)
             resources.wait_for_operation(create_disk_op, timeout=WAIT_FOR_DISK_TIMEOUT)
@@ -195,6 +205,27 @@ class NebiusCompute(
                     f"Create disk operation failed. Message: {raw_op.status.message}."
                     f" Details: {raw_op.status.details}"
                 )
+            if (
+                instance_offer.instance.resources.spot
+                and not offer_backend_data.is_preemptible_flat_rate
+            ):
+                create_pricing_policy_op = resources.create_pricing_policy(
+                    sdk=self._sdk,
+                    name=instance_name,
+                    project_id=self._region_to_project_id[instance_offer.region],
+                    platform=platform,
+                    # Prevent the spot price from growing above what dstack shows
+                    max_price=str(_get_pricing_policy_max_price(instance_offer)),
+                )
+                resources.wait_for_operation(
+                    create_pricing_policy_op, timeout=WAIT_FOR_PRICING_POLICY_TIMEOUT
+                )
+                if not create_pricing_policy_op.successful():
+                    raw_op = create_pricing_policy_op.raw()
+                    raise ProvisioningError(
+                        f"Create pricing policy operation failed. Message: {raw_op.status.message}."
+                        f" Details: {raw_op.status.details}"
+                    )
             create_instance_op = resources.create_instance(
                 sdk=self._sdk,
                 name=instance_name,
@@ -209,6 +240,11 @@ class NebiusCompute(
                 disk_id=create_disk_op.resource_id,
                 subnet_id=self._get_subnet_id(instance_offer.region),
                 preemptible=instance_offer.instance.resources.spot,
+                pricing_policy_id=(
+                    create_pricing_policy_op.resource_id
+                    if create_pricing_policy_op is not None
+                    else None
+                ),
                 labels=labels,
             )
             _wait_for_instance(self._sdk, create_instance_op)
@@ -225,6 +261,18 @@ class NebiusCompute(
                 except Exception as e:
                     logger.exception(
                         "Could not delete instance %s: %s", create_instance_op.resource_id, e
+                    )
+            if create_pricing_policy_op is not None:
+                try:
+                    with resources.ignore_errors([StatusCode.NOT_FOUND]):
+                        resources.delete_pricing_policy(
+                            self._sdk, create_pricing_policy_op.resource_id
+                        )
+                except Exception as e:
+                    logger.exception(
+                        "Could not delete pricing policy %s: %s",
+                        create_pricing_policy_op.resource_id,
+                        e,
                     )
             try:
                 with resources.ignore_errors([StatusCode.NOT_FOUND]):
@@ -245,7 +293,12 @@ class NebiusCompute(
             username="ubuntu",
             dockerized=True,
             backend_data=NebiusInstanceBackendData(
-                boot_disk_id=create_disk_op.resource_id
+                boot_disk_id=create_disk_op.resource_id,
+                pricing_policy_id=(
+                    create_pricing_policy_op.resource_id
+                    if create_pricing_policy_op is not None
+                    else None
+                ),
             ).model_dump_json(),
         )
 
@@ -284,6 +337,9 @@ class NebiusCompute(
                 )
         with resources.ignore_errors([StatusCode.NOT_FOUND]):
             resources.delete_disk(self._sdk, backend_data_parsed.boot_disk_id)
+        if backend_data_parsed.pricing_policy_id is not None:
+            with resources.ignore_errors([StatusCode.NOT_FOUND]):
+                resources.delete_pricing_policy(self._sdk, backend_data_parsed.pricing_policy_id)
 
     def create_placement_group(
         self,
@@ -348,6 +404,7 @@ class NebiusCompute(
 
 class NebiusInstanceBackendData(CoreModel):
     boot_disk_id: str
+    pricing_policy_id: str | None = None
 
     @classmethod
     def load(cls, raw: Optional[str]) -> "NebiusInstanceBackendData":
@@ -406,3 +463,25 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
 def _supported_instances(offer: InstanceOffer) -> bool:
     platform, _ = offer.instance.name.split()
     return platform in SUPPORTED_PLATFORMS
+
+
+def _get_price_adjusted_for_pricing_policy(offer: InstanceOffer) -> float:
+    if (
+        not offer.instance.resources.spot
+        or validate_extra_ignore(
+            NebiusOfferBackendData, offer.backend_data
+        ).is_preemptible_flat_rate
+    ):
+        return offer.price
+    max_price = _get_pricing_policy_max_price(offer)
+    return float(max_price * _get_pricing_policy_price_units(offer))
+
+
+def _get_pricing_policy_max_price(offer: InstanceOffer) -> Decimal:
+    # Pricing policies allow at most 3 decimal places. Round upward.
+    price = Decimal(str(offer.price)) / _get_pricing_policy_price_units(offer)
+    return price.quantize(Decimal("0.001"), rounding=ROUND_CEILING)
+
+
+def _get_pricing_policy_price_units(offer: InstanceOffer) -> int:
+    return len(offer.instance.resources.gpus) or 1

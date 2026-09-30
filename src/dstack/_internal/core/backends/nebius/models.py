@@ -182,6 +182,10 @@ class NebiusConfig(NebiusStoredConfig):
 
 class NebiusOfferBackendData(CoreModel):
     fabrics: set[str] = set()
+    is_preemptible_flat_rate: bool = False
+    """
+    True if the price of this spot instance does not change and pricing policies are not supported.
+    """
 
     @field_serializer("fabrics")
     def _serialize_fabrics(self, value: set[str]) -> list[str]:
