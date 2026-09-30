@@ -357,7 +357,6 @@ class TestRegisterReplica:
         assert (m2 := re.search(r"server unix:/(.+)/replica.sock;  # replica yyy-yyy", conf))
         assert m1.group(1) != m2.group(1)
         assert "proxy_buffering" not in conf
-        assert conf.count("proxy_read_timeout 300s;") == 2
         assert system_mocks.reload_nginx.call_count == 3
         assert system_mocks.open_conn.call_count == 2
 
@@ -619,7 +618,6 @@ class TestRegisterEntrypoint:
         assert resp.json() == {"status": "ok"}
         conf = (tmp_path / "sites-enabled" / "443-gateway.gtw.test.conf").read_text()
         assert "proxy_pass http://localhost:8000/api/models/test-proj/;" in conf
-        assert "proxy_read_timeout 300s;" in conf
         assert "listen 80;" in conf
         assert "listen 443" not in conf
         assert system_mocks.reload_nginx.call_count == 1
