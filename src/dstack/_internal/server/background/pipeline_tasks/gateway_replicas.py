@@ -1288,6 +1288,7 @@ async def _register_service(
         ),
         auth=run_spec.configuration.auth,
         client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+        read_timeout=settings.SERVICE_CLIENT_TIMEOUT,
         options=service_spec.options,
         rate_limits=run_spec.configuration.rate_limits,
         ssh_private_key=run_model.project.ssh_private_key,

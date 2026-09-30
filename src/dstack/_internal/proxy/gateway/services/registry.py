@@ -42,6 +42,7 @@ async def register_service(
     rate_limits: tuple[models.RateLimit, ...],
     auth: bool,
     client_max_body_size: int,
+    read_timeout: int,
     model: Optional[schemas.AnyModel],
     ssh_private_key: str,
     repo: GatewayProxyRepo,
@@ -63,6 +64,7 @@ async def register_service(
         has_router_replica=has_router_replica,
         cors_enabled=cors_enabled,
         proxy_buffering=model is None,
+        read_timeout=read_timeout,
     )
 
     async with lock:
@@ -252,6 +254,7 @@ async def register_model_entrypoint(
     project_name: str,
     domain: str,
     https: bool,
+    read_timeout: int,
     repo: GatewayProxyRepo,
     nginx: Nginx,
 ) -> None:
@@ -259,6 +262,7 @@ async def register_model_entrypoint(
         project_name=project_name,
         domain=domain,
         https=https,
+        read_timeout=read_timeout,
     )
     logger.debug("Registering entrypoint %s in project %s", domain, project_name)
     await apply_entrypoint(entrypoint, repo, nginx)
@@ -409,6 +413,7 @@ async def get_nginx_service_config(
         has_router_replica=service.has_router_replica,
         cors_enabled=service.cors_enabled,
         proxy_buffering=service.proxy_buffering,
+        read_timeout=service.read_timeout,
     )
 
 
@@ -419,6 +424,7 @@ async def apply_entrypoint(
         domain=entrypoint.domain,
         https=entrypoint.https,
         project_name=entrypoint.project_name,
+        read_timeout=entrypoint.read_timeout,
     )
     acme = (await repo.get_config()).acme_settings
     await nginx.register(config, acme)

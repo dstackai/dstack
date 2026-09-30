@@ -69,11 +69,13 @@ class ServiceConfig(SiteConfig):
     has_router_replica: bool = False
     cors_enabled: bool = False
     proxy_buffering: bool = True
+    read_timeout: int
 
 
 class ModelEntrypointConfig(SiteConfig):
     type: Literal["entrypoint"] = "entrypoint"
     project_name: str
+    read_timeout: int
 
 
 class Nginx:

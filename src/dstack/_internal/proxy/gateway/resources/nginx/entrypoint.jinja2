@@ -4,7 +4,7 @@ server {
         proxy_pass http://localhost:{{ proxy_port }}/api/models/{{ project_name }}/;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
-        proxy_read_timeout 300s;
+        proxy_read_timeout {{ read_timeout }}s;
     }
     listen 80;
     {% if https %}

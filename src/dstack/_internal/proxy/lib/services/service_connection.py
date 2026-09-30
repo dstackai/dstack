@@ -19,14 +19,11 @@ from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.models import Project, Replica, Service
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.utils.common import get_or_error
-from dstack._internal.utils.env import environ
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
-HTTP_TIMEOUT = environ.get_int("DSTACK_SERVICE_CLIENT_TIMEOUT", default=60)
-# Same as default Nginx proxy timeout; override via DSTACK_SERVICE_CLIENT_TIMEOUT
 
 
 class ServiceClient(httpx.AsyncClient):
@@ -75,7 +72,7 @@ class ServiceConnection:
             # The hostname in base_url is there for troubleshooting, as it may appear in
             # logs and in the Host header. The actual destination is the Unix socket.
             base_url=f"http://{replica.id}-{service.run_name}/",
-            timeout=HTTP_TIMEOUT,
+            timeout=service.read_timeout,
         )
         self._is_open = asyncio.locks.Event()
 
@@ -148,7 +145,7 @@ async def get_service_replica_client(
         return httpx.AsyncClient(
             base_url="http://127.0.0.1",
             headers={"Host": service.domain},
-            timeout=HTTP_TIMEOUT,
+            timeout=service.read_timeout,
         )
     # Nginx not available, forward directly to the tunnel
     replica = random.choice(service.replicas)

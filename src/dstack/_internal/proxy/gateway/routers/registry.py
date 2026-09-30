@@ -35,6 +35,7 @@ async def register_service(
         rate_limits=body.rate_limits,
         auth=body.auth,
         client_max_body_size=body.client_max_body_size,
+        read_timeout=body.read_timeout,
         model=body.options.openai.model if body.options.openai is not None else None,
         ssh_private_key=body.ssh_private_key,
         repo=repo,
@@ -139,6 +140,7 @@ async def register_entrypoint(
         project_name=project_name.lower(),
         domain=body.domain.lower(),
         https=body.https,
+        read_timeout=body.read_timeout,
         repo=repo,
         nginx=nginx,
     )

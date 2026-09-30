@@ -3,6 +3,7 @@ from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT
 from dstack._internal.proxy.lib.models import RateLimit
 
 
@@ -47,6 +48,7 @@ class RegisterServiceRequest(BaseModel):
     ssh_private_key: str
     rate_limits: tuple[RateLimit, ...] = ()
     has_router_replica: bool = False
+    read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
 
 
 class SetServiceIdRequest(BaseModel):
@@ -68,3 +70,4 @@ class RegisterReplicaRequest(BaseModel):
 class RegisterEntrypointRequest(BaseModel):
     domain: str
     https: bool
+    read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT

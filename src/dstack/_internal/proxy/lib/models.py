@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 
@@ -66,6 +67,8 @@ class Service(ImmutableModel):
     proxy_buffering: bool = True
     """Only used on gateways. Disabled for services with a model so that streamed responses
     reach the client as the replica emits them."""
+    read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
+    """Seconds to wait for data from a replica between two successive reads."""
 
     @model_validator(mode="before")
     @classmethod
