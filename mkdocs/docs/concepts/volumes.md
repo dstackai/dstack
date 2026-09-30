@@ -43,15 +43,14 @@ size: 100GB
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
 ??? info "Daytona"
-    Daytona volumes have no fixed size or region. Omit `size` and `region`:
+    Daytona volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
+    Omit `size` and `region`:
 
     ```yaml
     type: volume
     backend: daytona
     name: my-volume
     ```
-
-    Volumes use [S3-backed FUSE storage](https://www.daytona.io/docs/en/volumes/).
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -265,27 +264,30 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 
 ??? info "Can I use network volumes across backends?"
 
-    Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
+    Volumes can only be used with their backend. If you need to access
     data across different backends, you should either use object storage or replicate the data across multiple volumes.
 
 ??? info "Can I use network volumes across regions?"
+
+    Daytona volumes can be shared across regions, including CPU runs in `us` and GPU runs in `earth`.
 
     Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
     volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
     
-    If you don't want to limit a run to one particular region, you can create different volumes for different regions
+    For region-bound volumes, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
 ??? info "Can I attach network volumes to multiple runs or instances?"
-    You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
+    The `runpod` and `daytona` backends support mounting the same volume in multiple runs at the same time.
+    For `kubernetes`, the storage class and access modes must support sharing, such as `ReadWriteMany`.
 
 ## Instance volumes
 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-> Instance volumes are currently supported for all backends except `runpod` and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+> Instance volumes are currently supported for all backends except `daytona`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ### Attach a volume
 
