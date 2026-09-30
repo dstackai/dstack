@@ -93,7 +93,7 @@ class HotAisleAPIClient:
         url = f"{API_URL}/teams/{self.team_handle}/bare_metal/"
         payload = {"specs": specs, "description": description}
         response = self._make_request("POST", url, json=payload)
-        # 403: the team's bare metal server limit is reached.
+        # 403: the team's bare metal server limit is reached or the API key lacks permissions.
         # 404: no available server matches the specs, e.g. another team reserved it.
         if response.status_code in [403, 404]:
             raise NoCapacityError(response.text)

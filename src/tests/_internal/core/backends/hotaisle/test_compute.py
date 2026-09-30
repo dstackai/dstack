@@ -1,6 +1,6 @@
 import subprocess
 from typing import Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from gpuhunt.providers.hotaisle import API_URL
@@ -10,6 +10,7 @@ from dstack._internal.core.backends.hotaisle.compute import (
     SSH_LAUNCH_TIMEOUT_SECONDS,
     HotAisleCompute,
     HotAisleInstanceBackendData,
+    _launch_runner,
     _run_ssh_command,
 )
 from dstack._internal.core.backends.hotaisle.models import HotAisleAPIKeyCreds, HotAisleConfig
@@ -162,11 +163,11 @@ class TestCreateInstance:
             None,
         )
 
-        compute.api_client.upload_ssh_key.assert_called_once_with("ssh-rsa AAAA test")
-        compute.api_client.reserve_bare_metal_server.assert_called_once_with(
-            specs=BARE_METAL_SPECS, description="test-instance"
-        )
-        compute.api_client.create_virtual_machine.assert_not_called()
+        # The key must be uploaded before reserving, so the server accepts it.
+        assert compute.api_client.mock_calls == [
+            call.upload_ssh_key("ssh-rsa AAAA test"),
+            call.reserve_bare_metal_server(specs=BARE_METAL_SPECS, description="test-instance"),
+        ]
         assert provisioning_data.instance_id == "deployment-id"
         assert provisioning_data.username == "hotaisle"
         assert HotAisleInstanceBackendData.load(
@@ -302,6 +303,18 @@ class TestTerminateInstance:
             "deployment-id", force=force
         )
         compute.api_client.terminate_virtual_machine.assert_not_called()
+
+
+class TestLaunchRunner:
+    @patch("dstack._internal.core.backends.hotaisle.compute._run_ssh_command", return_value=True)
+    def test_daemonizes_without_disown(self, ssh_mock):
+        assert _launch_runner("10.0.0.1", "private-key", "sudo sh -c 'dstack-shim'")
+
+        ssh_mock.assert_called_once_with(
+            hostname="10.0.0.1",
+            ssh_private_key="private-key",
+            command="nohup sudo sh -c 'dstack-shim' >/tmp/dstack-shim.log 2>&1 </dev/null &",
+        )
 
 
 @patch("dstack._internal.core.backends.hotaisle.compute.subprocess.run")

@@ -173,7 +173,10 @@ def _launch_runner(
     ssh_private_key: str,
     launch_command: str,
 ) -> bool:
-    daemonized_command = f"{launch_command.rstrip('&')} >/tmp/dstack-shim.log 2>&1 & disown"
+    # nohup instead of disown, which isn't available in all shells and would fail the exit code.
+    daemonized_command = (
+        f"nohup {launch_command.rstrip('&')} >/tmp/dstack-shim.log 2>&1 </dev/null &"
+    )
     return _run_ssh_command(
         hostname=hostname,
         ssh_private_key=ssh_private_key,
