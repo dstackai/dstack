@@ -30,6 +30,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "gcp-dws-calendar-mode",
     "runpod-cpu",
     "runpod-cluster",
+    "hotaisle-bm",
 ]
 
 

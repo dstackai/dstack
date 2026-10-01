@@ -4,6 +4,8 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
+HOTAISLE_BARE_METAL_DEFAULT = False
+
 
 class HotAisleAPIKeyCreds(CoreModel):
     type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
@@ -24,6 +26,15 @@ class HotAisleBackendConfig(CoreModel):
         Optional[List[str]],
         Field(description="The list of Hot Aisle regions. Omit to use all regions"),
     ] = None
+    bare_metal: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether bare metal offers can be suggested in addition to VMs (experimental)."
+                f" Defaults to `{str(HOTAISLE_BARE_METAL_DEFAULT).lower()}`"
+            )
+        ),
+    ] = None
 
 
 class HotAisleBackendConfigWithCreds(HotAisleBackendConfig):
@@ -43,3 +54,9 @@ class HotAisleStoredConfig(HotAisleBackendConfig):
 
 class HotAisleConfig(HotAisleStoredConfig):
     creds: AnyHotAisleCreds
+
+    @property
+    def allow_bare_metal(self) -> bool:
+        if self.bare_metal is not None:
+            return self.bare_metal
+        return HOTAISLE_BARE_METAL_DEFAULT

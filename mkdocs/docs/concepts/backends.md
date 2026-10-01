@@ -976,23 +976,28 @@ projects:
 </div>
 
 ??? info "Required permissions"
-    The API key must have the following roles assigned:
+    The API key requires the `owner` role for your user and the `operator` and `user` roles for the team specified in `team_handle`.
 
-    * **Owner role for the user** - Required for creating and managing SSH keys
-    * **Operator role for the team** - Required for managing virtual machines within the team
+??? info "Bare metal"
+    Bare metal servers (`bm-mi300x-8`) are experimental and disabled by default. To enable them, set `bare_metal: true` in the backend settings:
 
-??? info "Pricing"
-    `dstack` shows the hourly price for Hot Aisle instances. Some instances also require an upfront payment for a minimum reservation period, which is usually a few hours. You will be charged for the full minimum period even if you stop the instance early.
+    <div editor-title="~/.dstack/server/config.yml">
 
-    See the Hot Aisle API for the minimum reservation period for each instance type:
-
-    <div class="termy">
-
-    ```shell
-    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: hotaisle
+          team_handle: hotaisle-team-handle
+          creds:
+            type: api_key
+            api_key: 9c27a4bb7a8e472fae12ab34.3f2e3c1db75b9a0187fd2196c6b3e56d2b912e1c439ba08d89e7b6fcd4ef1d3f
+          bare_metal: true
     ```
 
     </div>
+
+    Bare metal servers are prepaid for 8 hours. To use the full period, use a fleet with a fixed number of [`nodes`](../concepts/fleets.md#nodes), or at least set [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) to cover it. Within the period, `dstack` doesn't terminate them but stops tracking them — terminate them manually in Hot Aisle. After the period, `dstack` terminates them automatically.
 
 ### JarvisLabs
 

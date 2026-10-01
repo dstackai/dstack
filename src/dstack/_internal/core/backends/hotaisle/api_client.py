@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from dstack._internal.core.backends.base.configurator import raise_invalid_credentials_error
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.utils.logging import get_logger
 
 API_URL = "https://admin.hotaisle.app/api"
@@ -86,6 +87,38 @@ class HotAisleAPIClient:
         if response.status_code == 404:
             logger.debug("Hot Aisle virtual machine %s not found", vm_name)
             return
+        response.raise_for_status()
+
+    def reserve_bare_metal_server(self, specs: Dict[str, Any], description: str) -> Dict[str, Any]:
+        url = f"{API_URL}/teams/{self.team_handle}/bare_metal/"
+        payload = {"specs": specs, "description": description}
+        response = self._make_request("POST", url, json=payload)
+        # 403: the team's bare metal server limit is reached or the API key lacks permissions.
+        # 404: no available server matches the specs, e.g. another team reserved it.
+        if response.status_code in [403, 404]:
+            raise NoCapacityError(response.text)
+        response.raise_for_status()
+        return response.json()
+
+    def get_bare_metal_server(self, server_id: str) -> Dict[str, Any]:
+        url = f"{API_URL}/teams/{self.team_handle}/bare_metal/{server_id}/"
+        response = self._make_request("GET", url)
+        response.raise_for_status()
+        return response.json()
+
+    def release_bare_metal_server(self, server_id: str, force: bool = True) -> None:
+        url = f"{API_URL}/teams/{self.team_handle}/bare_metal/{server_id}/"
+        # force releases even if min reservation time not met
+        params = {"force": "true"} if force else None
+        response = self._make_request("DELETE", url, params=params)
+        if response.status_code == 404:
+            logger.debug("Hot Aisle bare metal server %s not found", server_id)
+            return
+        if response.status_code == 400 and not force:
+            raise BackendError(
+                f"Hot Aisle refused to release bare metal server {server_id}"
+                f" before its minimum reservation period ends: {response.text}"
+            )
         response.raise_for_status()
 
     def _make_request(
