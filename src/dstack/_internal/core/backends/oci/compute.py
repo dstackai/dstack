@@ -1,6 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import Container, Iterable
 from concurrent.futures import ThreadPoolExecutor
-from functools import cached_property
+from functools import cached_property, partial
 from typing import List, Optional
 
 import oci
@@ -64,6 +64,10 @@ class OCICompute(
         super().__init__()
         self.config = config
         self.regions = make_region_clients_map(config.regions or [], config.creds)
+        self._supported_instances = partial(
+            _supported_instances,
+            experimental_instance_types=set(self.config.experimental_instance_types or []),
+        )
 
     @cached_property
     def shapes_quota(self) -> resources.ShapesQuota:
@@ -75,7 +79,7 @@ class OCICompute(
         offers = get_catalog_offers(
             backend=BackendType.OCI,
             locations=self.config.regions,
-            extra_filter=_supported_instances,
+            extra_filter=self._supported_instances,
         )
 
         with ThreadPoolExecutor(max_workers=8) as executor:
@@ -206,7 +210,11 @@ class OCICompute(
             provisioning_data.internal_ip = vnic.private_ip
 
 
-def _supported_instances(offer: InstanceOffer) -> bool:
+def _supported_instances(
+    offer: InstanceOffer, experimental_instance_types: Container[str]
+) -> bool:
+    if offer.instance.name in experimental_instance_types:
+        return True
     if "Flex" in offer.instance.name:
         return False
     return any(map(offer.instance.name.startswith, SUPPORTED_SHAPE_FAMILIES))

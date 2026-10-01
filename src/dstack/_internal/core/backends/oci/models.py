@@ -70,6 +70,16 @@ class OCIBackendConfig(CoreModel):
             )
         ),
     ] = None
+    experimental_instance_types: Annotated[
+        Optional[List[str]],
+        Field(
+            description=(
+                "The list of shape names to allow provisioning in addition to"
+                " the standard supported shape families. Only works for shapes"
+                " included in `dstack`'s pricing catalog (`gpuhunt`)"
+            )
+        ),
+    ] = None
 
 
 class OCIBackendConfigWithCreds(OCIBackendConfig):
