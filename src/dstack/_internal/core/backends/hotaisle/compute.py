@@ -67,7 +67,9 @@ class HotAisleCompute(
             backend=BackendType.HOTAISLE,
             locations=self.config.regions or None,
             catalog=self.catalog,
-            extra_filter=_supported_instances,
+            extra_filter=lambda o: (
+                _supported_instances(o) and (self.config.allow_bare_metal or not _is_bare_metal(o))
+            ),
         )
         return [
             offer.with_availability(availability=InstanceAvailability.AVAILABLE)
@@ -248,6 +250,11 @@ def _supported_instances(offer: InstanceOffer) -> bool:
     return len(offer.instance.resources.gpus) > 0 and all(
         gpu.name in SUPPORTED_GPUS for gpu in offer.instance.resources.gpus
     )
+
+
+def _is_bare_metal(offer: InstanceOffer) -> bool:
+    offer_backend_data = validate_extra_ignore(HotAisleOfferBackendData, offer.backend_data)
+    return offer_backend_data.bare_metal_specs is not None
 
 
 class HotAisleInstanceBackendData(CoreModel):

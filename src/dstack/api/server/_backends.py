@@ -6,6 +6,7 @@ from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
     AnyBackendConfigWithCredsTagged,
 )
+from dstack._internal.core.compatibility.backends import get_backend_config_excludes
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest
@@ -27,7 +28,8 @@ class BackendsAPIClient(APIClientGroup):
         self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> AnyBackendConfigWithCreds:
         resp = self._request(
-            f"/api/project/{project_name}/backends/create", body=config.model_dump_json()
+            f"/api/project/{project_name}/backends/create",
+            body=config.model_dump_json(exclude=get_backend_config_excludes(config)),
         )
         return validate_extra_ignore(AnyBackendConfigWithCredsTagged, resp.json())
 
@@ -35,7 +37,8 @@ class BackendsAPIClient(APIClientGroup):
         self, project_name: str, config: AnyBackendConfigWithCreds
     ) -> AnyBackendConfigWithCreds:
         resp = self._request(
-            f"/api/project/{project_name}/backends/update", body=config.model_dump_json()
+            f"/api/project/{project_name}/backends/update",
+            body=config.model_dump_json(exclude=get_backend_config_excludes(config)),
         )
         return validate_extra_ignore(AnyBackendConfigWithCredsTagged, resp.json())
 

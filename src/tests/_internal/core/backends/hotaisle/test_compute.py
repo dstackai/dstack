@@ -46,9 +46,13 @@ BARE_METAL_SPECS = {
 }
 
 
-def _compute() -> HotAisleCompute:
+def _compute(bare_metal: Optional[bool] = None) -> HotAisleCompute:
     return HotAisleCompute(
-        HotAisleConfig(team_handle="test-team", creds=HotAisleAPIKeyCreds(api_key="test-key"))
+        HotAisleConfig(
+            team_handle="test-team",
+            creds=HotAisleAPIKeyCreds(api_key="test-key"),
+            bare_metal=bare_metal,
+        )
     )
 
 
@@ -111,7 +115,18 @@ def _provisioning_data(
 
 
 class TestGetAllOffersWithAvailability:
-    def test_returns_vm_and_bare_metal_offers(self, requests_mock):
+    @pytest.mark.parametrize(
+        ("bare_metal", "expected_instance_types"),
+        [
+            (None, ["vm-mi300x-1"]),
+            (False, ["vm-mi300x-1"]),
+            (True, ["vm-mi300x-1", "bm-mi300x-8"]),
+        ],
+        ids=["default", "disabled", "enabled"],
+    )
+    def test_returns_bare_metal_offers_only_if_enabled(
+        self, requests_mock, bare_metal, expected_instance_types
+    ):
         requests_mock.get(
             f"{API_URL}/teams/test-team/virtual_machines/available/",
             json=[{"OnDemandPrice": 199, "Specs": VM_SPECS}],
@@ -121,11 +136,29 @@ class TestGetAllOffersWithAvailability:
             json=[{"OnDemandPrice": 2712, "Specs": BARE_METAL_SPECS}],
         )
 
-        offers = _compute().get_all_offers_with_availability(unallocated_resources=False)
+        offers = _compute(bare_metal=bare_metal).get_all_offers_with_availability(
+            unallocated_resources=False
+        )
 
-        assert [(offer.instance.name, offer.backend_data) for offer in offers] == [
-            ("vm-mi300x-1", {"vm_specs": VM_SPECS}),
-            ("bm-mi300x-8", {"bare_metal_specs": BARE_METAL_SPECS}),
+        assert [offer.instance.name for offer in offers] == expected_instance_types
+
+    def test_keeps_specs_in_backend_data(self, requests_mock):
+        requests_mock.get(
+            f"{API_URL}/teams/test-team/virtual_machines/available/",
+            json=[{"OnDemandPrice": 199, "Specs": VM_SPECS}],
+        )
+        requests_mock.get(
+            f"{API_URL}/teams/test-team/bare_metal/available/",
+            json=[{"OnDemandPrice": 2712, "Specs": BARE_METAL_SPECS}],
+        )
+
+        offers = _compute(bare_metal=True).get_all_offers_with_availability(
+            unallocated_resources=False
+        )
+
+        assert [offer.backend_data for offer in offers] == [
+            {"vm_specs": VM_SPECS},
+            {"bare_metal_specs": BARE_METAL_SPECS},
         ]
 
 
