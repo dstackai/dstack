@@ -51,7 +51,8 @@ class FeatureFlags:
     IDE URL(s) and SSH command(s) before job logs (for dev-environments only).
     """
 
-    # TODO: Change the default to "0" before merging https://github.com/dstackai/dstack/pull/4325.
+    # TODO: Drop once offers carry the minimum reservation period and `dstack` keeps such instances
+    # idle until it ends.
     HOTAISLE_BARE_METAL_NO_FORCE_RELEASE = (
         os.getenv("DSTACK_FF_HOTAISLE_BARE_METAL_NO_FORCE_RELEASE", "1") != "0"
     )
