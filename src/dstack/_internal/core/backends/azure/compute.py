@@ -186,7 +186,6 @@ class AzureCompute(
             managed_identity_resource_group=managed_identity_resource_group,
             image_reference=_get_image_ref(
                 compute_client=self._compute_client,
-                location=location,
                 variant=VMImageVariant.from_instance_type(instance_offer.instance),
             ),
             vm_size=instance_offer.instance.name,
@@ -527,9 +526,12 @@ def _vm_type_available(vm_resource: ResourceSku) -> bool:
     return False
 
 
+# Public name Azure assigned to the gallery that scripts/publish_azure_image.sh publishes to
+_COMMUNITY_GALLERY_NAME = "dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7"  # Gen2
+
+
 def _get_image_ref(
     compute_client: compute_mgmt.ComputeManagementClient,
-    location: str,
     variant: VMImageVariant,
 ) -> ImageReference:
     if settings.DSTACK_VM_BASE_IMAGE_PREFIX:
@@ -539,12 +541,12 @@ def _get_image_ref(
             image_name=variant.get_image_name(),
         )
         return ImageReference(id=image.id)
-    image = compute_client.community_gallery_images.get(
-        location=location,
-        public_gallery_name="dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7",  # Gen2
-        gallery_image_name=variant.get_image_name(),
+    # Not looked up: the lookup fails with azure-mgmt-compute>=38.2.0 (#4333)
+    return ImageReference(
+        community_gallery_image_id=(
+            f"/CommunityGalleries/{_COMMUNITY_GALLERY_NAME}/Images/{variant.get_image_name()}"
+        )
     )
-    return ImageReference(community_gallery_image_id=image.unique_id)
 
 
 def _get_gateway_image_ref() -> ImageReference:
@@ -676,6 +678,12 @@ def _begin_create_instance(
         if e.error is not None and e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
             message = e.error.message if e.error.message is not None else ""
             raise NoCapacityError(message)
+        raise e
+    except ResourceNotFoundError as e:
+        # The image is not replicated to the location or does not exist
+        if e.error is not None and e.error.code == "GalleryImageNotFound":
+            image_id = image_reference.community_gallery_image_id or image_reference.id
+            raise ComputeError(f"VM image {image_id} is not available in {location}")
         raise e
     return poller
 
