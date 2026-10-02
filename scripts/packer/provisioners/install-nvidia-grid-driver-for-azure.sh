@@ -8,7 +8,7 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install build-essential linux-azure -y
 
 wget --no-verbose -O NVIDIA-Linux-x86_64-grid.run \
-    https://download.microsoft.com/download/2a04ca6a-9eec-40d9-9564-9cdea1ab795f/NVIDIA-Linux-x86_64-570.211.01-grid-azure.run
+    https://download.microsoft.com/download/4efc1974-7b6f-431f-ab2d-b8d99bb8a512/NVIDIA-Linux-x86_64-580.178.04-grid-azure.run
 chmod +x NVIDIA-Linux-x86_64-grid.run
 sudo ./NVIDIA-Linux-x86_64-grid.run --silent --disable-nouveau
 rm NVIDIA-Linux-x86_64-grid.run
