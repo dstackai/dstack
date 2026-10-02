@@ -107,6 +107,39 @@ class TestRunPendingWorker:
         assert run.lock_expires_at is None
         assert run.lock_owner is None
 
+    async def test_capacity_release_wake_skips_retry_delay(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.PENDING,
+            resubmission_attempt=6,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            last_processed_at=get_current_datetime(),
+        )
+        run.skip_min_processing_interval = True
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.SUBMITTED
+        assert run.skip_min_processing_interval is False
+        assert run.lock_token is None
+        assert run.lock_expires_at is None
+        assert run.lock_owner is None
+
     async def test_resubmits_retrying_run_after_delay(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:

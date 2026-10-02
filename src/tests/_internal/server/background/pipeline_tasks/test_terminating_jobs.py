@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
@@ -22,7 +22,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingWorker,
     _get_related_instance_lock_owner,
 )
-from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.models import InstanceModel, JobModel, RunModel, VolumeAttachmentModel
 from dstack._internal.server.schemas.runner import LogEvent, PullResponse
 from dstack._internal.server.services.runner.client import (
     PeerConnectionError,
@@ -693,6 +693,50 @@ class TestJobTerminatingWorker:
         assert any(
             event.message == "Job status changed TERMINATING -> TERMINATED" for event in events
         )
+
+    async def test_wakes_pending_retries_when_capacity_is_released(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="active-run",
+        )
+        pending_run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="pending-retry",
+            status=RunStatus.PENDING,
+            resubmission_attempt=1,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            instance=instance,
+        )
+        _lock_job(job)
+        await session.commit()
+
+        await worker.process(_job_to_pipeline_item(job))
+
+        await session.refresh(pending_run)
+        assert pending_run.skip_min_processing_interval is True
+        cast(Mock, worker._pipeline_hinter.hint_fetch).assert_any_call(RunModel.__name__)
 
     async def test_detaches_job_volumes(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker

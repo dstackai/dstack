@@ -239,7 +239,10 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                     run_model.lock_expires_at = lock_expires_at
                     run_model.lock_token = lock_token
                     run_model.lock_owner = RunPipeline.__name__
-                    run_model.skip_min_processing_interval = False
+                    # Pending retries use this flag to consume a capacity-release wake-up in
+                    # the worker. Other run states consume it when they are fetched.
+                    if run_model.status != RunStatus.PENDING:
+                        run_model.skip_min_processing_interval = False
                     items.append(
                         RunPipelineItem(
                             __tablename__=RunModel.__tablename__,
@@ -406,6 +409,7 @@ async def _apply_pending_result(
     context: pending.PendingContext,
     result: pending.PendingResult,
 ) -> None:
+    result.run_update_map["skip_min_processing_interval"] = False
     set_processed_update_map_fields(result.run_update_map)
     set_unlock_update_map_fields(result.run_update_map)
 
@@ -480,6 +484,7 @@ async def _apply_noop_result(
                 lock_expires_at=None,
                 lock_token=None,
                 lock_owner=None,
+                skip_min_processing_interval=False,
                 last_processed_at=now,
             )
         )
