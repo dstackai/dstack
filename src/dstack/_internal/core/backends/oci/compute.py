@@ -35,6 +35,16 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
+# Shape families that dstack's x86-64 OCI Marketplace images can run. GPU shapes are limited to
+# NVIDIA GPUs on x86-64 hosts because the images ship CUDA drivers only. Other GPU shapes from
+# the gpuhunt catalog are deliberately left out:
+# - BM.GPU.MI300X.*, BM.GPU.MI355X.* (AMD Instinct): no ROCm image is published, and
+#   `create_instance` picks the CUDA image for any GPU offer.
+# - BM.GPU.GB200.*, BM.GPU.GB300.* (Grace superchips): arm64 hosts, no arm64 image is published.
+# - BM.GPU.B200.*, BM.GPU.B300.*, BM.GPU.RTXPRO.* (Blackwell): x86-64 NVIDIA hosts that the
+#   images should run, but they have not been tested on real hardware yet, so they are left
+#   out until someone with quota can confirm a run on them.
+# See https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
     "BM.Standard2.",
@@ -48,6 +58,10 @@ SUPPORTED_SHAPE_FAMILIES = [
     "BM.GPU4.",
     "VM.GPU.A10.",
     "BM.GPU.A10.",
+    "BM.GPU.A100-v2.",
+    "BM.GPU.L40S.",
+    "BM.GPU.H100.",
+    "BM.GPU.H200.",
 ]
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("32TB"))
 
