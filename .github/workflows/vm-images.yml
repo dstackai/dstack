@@ -19,6 +19,15 @@ on:
         description: "Build Azure images"
         type: boolean
         default: true
+      azure_variant:
+        description: "Azure image variants to build"
+        type: choice
+        options: ["all", "standard", "cuda", "grid"]
+        default: "all"
+      azure_new_gallery_version:
+        description: "Rebuild Azure images that already exist and publish them as a new gallery version"
+        type: boolean
+        default: false
       build_gcp:
         description: "Build GCP images"
         type: boolean
@@ -72,7 +81,7 @@ jobs:
       VERSION: ${{ github.run_number }}
     strategy:
       matrix:
-        variant: ["", "-cuda", "-grid"]
+        variant: ${{ fromJSON('{"all":["","-cuda","-grid"],"standard":[""],"cuda":["-cuda"],"grid":["-grid"]}')[inputs.azure_variant] }}
     steps:
       - uses: actions/checkout@v4
       - uses: Azure/login@v2
@@ -86,13 +95,13 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX azure-image${{ matrix.variant }}.json
+          ./packer build ${{ inputs.azure_new_gallery_version && '-force' || '' }} -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
         if: ${{ !inputs.staging }}
         run: |
           IMAGE_DEFINITION=${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           IMAGE_NAME=${VM_IMAGE_BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          ../publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
+          ../publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME ${{ inputs.azure_new_gallery_version }}
 
   build-gcp-images:
     if: inputs.build_gcp
