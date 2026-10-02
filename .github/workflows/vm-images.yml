@@ -25,7 +25,7 @@ on:
         options: ["all", "standard", "cuda", "grid"]
         default: "all"
       azure_new_gallery_version:
-        description: "Publish Azure images that already exist as a new gallery version"
+        description: "Rebuild Azure images that already exist and publish them as a new gallery version"
         type: boolean
         default: false
       build_gcp:

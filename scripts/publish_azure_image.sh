@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o pipefail
+
 image_definition=$1
 image_name=$2
 # If true, publish a new gallery version when the image definition already has versions
@@ -64,7 +66,7 @@ function create_image_version() {
 
 get_image_definition > /dev/null || create_image_definition
 
-latest_version=$(get_latest_image_version)
+latest_version=$(get_latest_image_version) || exit 1
 if [ -z "$latest_version" ]; then
     image_version=0.0.1
 elif [ "$new_gallery_version" = true ]; then
