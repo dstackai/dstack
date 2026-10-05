@@ -33,7 +33,8 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.32",
+    # TODO: Replace with a released gpuhunt version after dstackai/gpuhunt#270 is released.
+    "gpuhunt @ git+https://github.com/dstackai/gpuhunt.git@pr_vultr_vdm",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -74,6 +75,10 @@ artifacts = [
 [tool.hatch.build.targets.wheel.force-include]
 "skills/dstack/SKILL.md" = "dstack/_internal/cli/services/presets/resources/skills/dstack/SKILL.md"
 "skills/dstack-prototyping/SKILL.md" = "dstack/_internal/cli/services/presets/resources/skills/dstack-prototyping/SKILL.md"
+
+[tool.hatch.metadata]
+# TODO: Remove after replacing the temporary gpuhunt Git dependency with a released version.
+allow-direct-references = true
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
