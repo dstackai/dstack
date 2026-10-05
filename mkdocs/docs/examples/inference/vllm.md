@@ -144,7 +144,7 @@ groups:
   - replicas: 1
     python: "3.12"
     commands:
-      - pip install smg
+      - pip install smg==1.11.0
       - |
         smg launch \
           --pd-disaggregation \
@@ -162,36 +162,46 @@ groups:
     scaling:
       metric: rps
       target: 3
-    image: ghcr.io/lightseekorg/smg:1.4.1-vllm-v0.18.0
+    image: ghcr.io/smg-project/smg:1.11.0-vllm-v0.27.1
     commands:
+      - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
       - |
         python3 -m vllm.entrypoints.grpc_server \
           --model "$MODEL_ID" \
           --host 0.0.0.0 \
           --port 8000 \
+          --max-model-len 65536 \
           --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_producer"}'
     resources:
       gpu: H200
+      disk: 200GB..
 
   - replicas: 1..8
     scaling:
       metric: rps
       target: 2
-    image: ghcr.io/lightseekorg/smg:1.4.1-vllm-v0.18.0
+    image: ghcr.io/smg-project/smg:1.11.0-vllm-v0.27.1
     commands:
+      - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
       - |
         python3 -m vllm.entrypoints.grpc_server \
           --model "$MODEL_ID" \
           --host 0.0.0.0 \
           --port 8000 \
+          --max-model-len 65536 \
           --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_consumer"}'
     resources:
       gpu: H200
+      disk: 200GB..
 
 port: 8000
 ```
 
 </div>
+
+Use the same SMG version for the router and the worker images: the worker image bundles the SMG gRPC servicer, which must return the KV transfer parameters that the router relays from prefill to decode.
+
+`VLLM_NIXL_SIDE_CHANNEL_HOST` sets the address of the NIXL handshake listener, which the prefill worker also passes to the decode worker. It defaults to `localhost`, in which case the decode worker connects to itself instead of the prefill worker. `DSTACK_MASTER_NODE_IP` is the internal IP of the replica's instance.
 
 > To use the [Mooncake Transfer](https://github.com/kvcache-ai/Mooncake) backend, set `"kv_connector": "MooncakeConnector"` in `--kv-transfer-config`.
 
@@ -201,6 +211,23 @@ Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics 
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
 
     While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
+
+    For production, use instances with RDMA (InfiniBand or RoCE). Without RDMA, NIXL transfers the KV cache over TCP, which works but may be slower than recomputing the prompt on the decode worker.
+
+??? info "Instances without RDMA"
+    If an instance has both a private and a public network interface and no RDMA, UCX (the default NIXL transport) may advertise the public address, which may be unreachable from other instances. In this case, restrict UCX to the interface that has the instance's internal IP by adding the following command before starting the worker:
+
+    ```yaml
+    - |
+      export UCX_NET_DEVICES=$(python3 -c '
+      import os, psutil
+      ip = os.environ["DSTACK_MASTER_NODE_IP"]
+      ifaces = psutil.net_if_addrs().items()
+      print(next(name for name, addrs in ifaces if any(a.address == ip for a in addrs)))
+      ')
+    ```
+
+    Don't use this on instances with RDMA, as it prevents UCX from using RDMA devices.
 
 ## What's next?
 
