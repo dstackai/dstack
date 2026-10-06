@@ -26,4 +26,8 @@ Presets are used for three kinds of work: finding an optimized baseline, optimiz
 
 Follow the [presets documentation](https://dstack.ai/docs/concepts/presets.md).
 
+Before creating a preset, interview the user about their requirements and get explicit
+confirmation of the resulting configuration, following [references/INTERVIEW.md](references/INTERVIEW.md). Skip
+the interview only when the user hands over a complete configuration to apply as is.
+
 [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/preset.md) | [CLI reference](https://dstack.ai/docs/reference/cli/dstack/preset.md)
