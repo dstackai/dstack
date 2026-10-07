@@ -70,6 +70,8 @@ class TestSystemPrompt:
         )
 
         assert "`workload.dataset`" in text
+        assert "`aiperf profile`" in text
+        assert "For a replay, set `duration_seconds`" in text
         # The request shape is the random dataset's contract, not this one's.
         assert "shared_prefix_tokens" not in text
 
@@ -80,6 +82,8 @@ class TestSystemPrompt:
 
         assert "shared_prefix_tokens" in text
         assert "`dataset`" not in text
+        assert "replay" not in text
+        assert "All verification and benchmark requests must succeed." in text
 
     def test_fails_loudly_when_the_prompt_has_no_directives(self, tmp_path, monkeypatch):
         plain = tmp_path / "system_prompt.md"

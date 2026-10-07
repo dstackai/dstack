@@ -342,10 +342,21 @@ example, the dataset options are:
 | --- | --- |
 | `vllm bench serve` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name, or `--dataset-name hf --dataset-path <dataset>` when it is a Hugging Face dataset ID |
 | `sglang.benchmark.serving` | `--dataset-name <dataset>` when `dataset` is the tool's own dataset name; the tool has no Hugging Face dataset option |
+| `aiperf profile` | `--public-dataset <dataset>` when `dataset` is one of AIPerf's public datasets; for agentic trace datasets such as `semianalysis_cc_traces_weka_062126_256k`, also `--scenario inferencex-agentx-mvp` (SemiAnalysis's AIPerf fork), which replays multi-turn sessions with their timing |
 
 The table is an example and not a full command: the remaining options still
 come from `concurrency`, option names and defaults differ between versions,
 and any other tool needs its own equivalent.
+
+A dataset of recorded multi-turn sessions, such as agent traces, must be
+replayed by a tool that preserves each session's turn order and timing, since
+they determine what the serving engine can reuse between requests. Sending the
+dataset's requests independently does not benchmark that dataset. Such a
+replay runs for a fixed duration rather than a number of requests. Use the same
+replay options in every trial benchmark; the trial benchmarks may use a shorter
+duration than the final benchmark, but all trials use the same one. A replay
+may let a share of requests fail, up to the tool's failure threshold; keep the
+tool's threshold and record the failed requests.
 <!--?else-->
 Before any benchmark, ensure it uses a different seed than the previous
 benchmark. Otherwise the benchmark will depend on what has been cached by the
@@ -373,7 +384,8 @@ works as expected: send real requests and check the responses, including
 reasoning output when the model supports it. These verification requests are
 never part of the measured metrics.
 
-All verification and benchmark requests must succeed.
+All verification and benchmark requests must succeed<!--?if dataset-->, except
+for the failures a replay allows (see above)<!--?end-->.
 
 Record every benchmark using the following structure and field names —
 trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
@@ -400,10 +412,18 @@ trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
 Set `workload.dataset` to `dataset` from `constraints.json`, and compute
 `workload.input_tokens` and `workload.output_tokens` as the measured mean
 input and output token counts of the benchmark, rounded to whole tokens.
+
+For a replay, set `duration_seconds` to the replay duration, not the tool's
+total run time, which also includes the warmup and the wait for in-flight
+requests to finish. Set `per_user_tok_per_s` to the tool's own mean per-user
+output throughput: sessions idle between turns, so fewer than `concurrency`
+requests are in flight on average.
+
 <!--?end-->
 Compute `output_tok_per_s` as `total_output_tokens / duration_seconds` and
-`per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`. These are
-the numbers used to compare trials (see `## Performance`).
+`per_user_tok_per_s` as `output_tok_per_s / workload.concurrency`<!--?if dataset-->,
+except for a replay (see above)<!--?end-->. These are the numbers used to compare
+trials (see `## Performance`).
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free

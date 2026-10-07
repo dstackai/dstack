@@ -216,6 +216,19 @@ The requests every benchmark measures.
 
     The dataset provides the requests, so `input_tokens`, `output_tokens`, and `shared_prefix_tokens` can't be set with it, and the preset records the measured means. A gated dataset requires `HF_TOKEN` in `env`.
 
+    `dataset` can also name a dataset of recorded multi-turn sessions, such as one of the public agentic trace datasets of [SemiAnalysis's AIPerf fork](https://github.com/SemiAnalysisAI/aiperf). The agent then replays the sessions with their turn order and timing, so that prefix reuse matches real traffic:
+
+    ```yaml
+    dataset: semianalysis_cc_traces_weka_062126_256k
+    concurrency: 16
+
+    prompt: |
+      Benchmark with AIPerf `--scenario inferencex-agentx-mvp`. Use a 600-second
+      replay for trials and a 3600-second replay for the final benchmark.
+    ```
+
+    A replay runs for a fixed duration rather than a number of requests, so creation takes much longer than with synthetic prompts. Use `prompt` to set the replay options, such as the duration.
+
 ### Baseline
 
 By default, the first trial is a baseline: the agent serves the model the way the chosen serving framework recommends, without tuning it for performance. Later trials are optimization attempts. Set `baseline: false` to make every trial an optimization attempt.
