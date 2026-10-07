@@ -1,7 +1,12 @@
+import asyncio
+import subprocess
 from pathlib import Path
+from typing import NoReturn, Optional
+from unittest.mock import Mock
 
 import pytest
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh.client import SSHClientInfo
 from dstack._internal.core.services.ssh.tunnel import (
@@ -221,29 +226,107 @@ class TestSSHTunnel:
 
     def test_check_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.check_command()
-        assert command == [
-            "/usr/bin/ssh",
-            "-S",
-            "/tmp/control.sock",
-            "-O",
-            "check",
-            "ubuntu@my-server",
-        ]
+        assert " ".join(command) == (
+            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
+            " -O check ubuntu@my-server"
+        )
 
     def test_close_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.close_command()
-        assert command == [
-            "/usr/bin/ssh",
-            "-S",
-            "/tmp/control.sock",
-            "-O",
-            "exit",
-            "ubuntu@my-server",
-        ]
+        assert " ".join(command) == (
+            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
+            " -O exit ubuntu@my-server"
+        )
 
     def test_exec_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.exec_command()
-        assert command == ["/usr/bin/ssh", "-S", "/tmp/control.sock", "ubuntu@my-server"]
+        assert " ".join(command) == (
+            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
+            " -n ubuntu@my-server"
+        )
+
+
+class TestSSHTunnelControlTimeouts:
+    @pytest.fixture
+    def tunnel(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SSHTunnel:
+        monkeypatch.setattr(
+            "dstack._internal.core.services.ssh.client._ssh_client_info",
+            SSHClientInfo.from_raw_version("OpenSSH_9.7p1", Path("/usr/bin/ssh")),
+        )
+        control_sock_path = tmp_path / "control.sock"
+        control_sock_path.touch()
+        return SSHTunnel(
+            destination="ubuntu@my-server",
+            identity=FilePath("/home/user/.ssh/id_rsa"),
+            control_sock_path=control_sock_path,
+        )
+
+    @pytest.fixture
+    def hanging_process(self, monkeypatch: pytest.MonkeyPatch) -> "_HangingProcess":
+        process = _HangingProcess()
+
+        async def create_subprocess_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", create_subprocess_exec)
+        monkeypatch.setattr("dstack._internal.core.services.ssh.tunnel.SSH_TIMEOUT", 0)
+        return process
+
+    @pytest.fixture
+    def timing_out_run(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        run = Mock(side_effect=subprocess.TimeoutExpired(cmd="ssh", timeout=0))
+        monkeypatch.setattr(subprocess, "run", run)
+        return run
+
+    def test_check_returns_false_on_timeout(self, tunnel: SSHTunnel, timing_out_run: Mock) -> None:
+        assert tunnel.check() is False
+        assert timing_out_run.call_args.kwargs["stdin"] == subprocess.DEVNULL
+
+    def test_close_does_not_raise_on_timeout(
+        self, tunnel: SSHTunnel, timing_out_run: Mock
+    ) -> None:
+        tunnel.close()
+        assert timing_out_run.call_args.kwargs["stdin"] == subprocess.DEVNULL
+
+    @pytest.mark.asyncio
+    async def test_acheck_kills_process_and_returns_false_on_timeout(
+        self, tunnel: SSHTunnel, hanging_process: "_HangingProcess"
+    ) -> None:
+        assert await tunnel.acheck() is False
+        assert hanging_process.killed
+
+    @pytest.mark.asyncio
+    async def test_aclose_kills_process_on_timeout(
+        self, tunnel: SSHTunnel, hanging_process: "_HangingProcess"
+    ) -> None:
+        await tunnel.aclose()
+        assert hanging_process.killed
+
+    @pytest.mark.asyncio
+    async def test_aexec_kills_process_and_raises_on_timeout(
+        self, tunnel: SSHTunnel, hanging_process: "_HangingProcess"
+    ) -> None:
+        with pytest.raises(SSHError, match="did not complete"):
+            await tunnel.aexec("true", timeout=0)
+        assert hanging_process.killed
+
+
+class _HangingProcess:
+    def __init__(self) -> None:
+        self.returncode: Optional[int] = None
+        self.killed = False
+
+    async def communicate(self) -> NoReturn:
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    def kill(self) -> None:
+        self.killed = True
+        self.returncode = -9
+
+    async def wait(self) -> int:
+        assert self.returncode is not None
+        return self.returncode
 
 
 def test_ports_to_forwarded_sockets() -> None:

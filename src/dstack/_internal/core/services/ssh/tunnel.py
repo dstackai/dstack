@@ -18,6 +18,7 @@ from dstack._internal.utils.ssh import normalize_path
 
 logger = get_logger(__name__)
 SSH_TIMEOUT = 15
+SSH_CONTROL_CONNECT_TIMEOUT = 3
 SSH_DEFAULT_OPTIONS = {
     "StrictHostKeyChecking": "no",
     "UserKnownHostsFile": "/dev/null",
@@ -173,13 +174,13 @@ class SSHTunnel:
         return command
 
     def close_command(self) -> List[str]:
-        return [self.ssh_exec_path, "-S", self.control_sock_path, "-O", "exit", self.destination]
+        return [*self._control_command_prefix(), "-O", "exit", self.destination]
 
     def check_command(self) -> List[str]:
-        return [self.ssh_exec_path, "-S", self.control_sock_path, "-O", "check", self.destination]
+        return [*self._control_command_prefix(), "-O", "check", self.destination]
 
     def exec_command(self) -> List[str]:
-        return [self.ssh_exec_path, "-S", self.control_sock_path, self.destination]
+        return [*self._control_command_prefix(), "-n", self.destination]
 
     def open(self) -> None:
         # We cannot use `stderr=subprocess.PIPE` here since the forked process (daemon) does not
@@ -225,9 +226,17 @@ class SSHTunnel:
                 "Control socket does not exist, it seems that ssh process has already exited"
             )
             return
-        proc = subprocess.run(
-            self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
+        try:
+            proc = subprocess.run(
+                self.close_command(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=SSH_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("Failed to close SSH tunnel in %d seconds", SSH_TIMEOUT)
+            return
         if proc.returncode:
             logger.error(
                 "Failed to close SSH tunnel, exit status: %d, output: %s",
@@ -241,37 +250,52 @@ class SSHTunnel:
                 "Control socket does not exist, it seems that ssh process has already exited"
             )
             return
-        proc = await asyncio.create_subprocess_exec(
-            *self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
-        await proc.wait()
-        if proc.returncode:
+        try:
+            returncode, stdout, stderr = await _arun(self.close_command(), SSH_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.error("Failed to close SSH tunnel in %d seconds", SSH_TIMEOUT)
+            return
+        if returncode:
             logger.error(
                 "Failed to close SSH tunnel, exit status: %d, output: %s",
-                proc.returncode,
-                proc.stdout,
+                returncode,
+                stdout + stderr,
             )
 
     def check(self) -> bool:
-        proc = subprocess.run(
-            self.check_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
+        try:
+            proc = subprocess.run(
+                self.check_command(),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=SSH_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            logger.debug("SSH tunnel check did not complete in %d seconds", SSH_TIMEOUT)
+            return False
         return proc.returncode == 0
 
     async def acheck(self) -> bool:
-        proc = await asyncio.create_subprocess_exec(
-            *self.check_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-        )
-        await proc.wait()
-        ok = proc.returncode == 0
-        return ok
+        try:
+            returncode, _, _ = await _arun(self.check_command(), SSH_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.debug("SSH tunnel check did not complete in %d seconds", SSH_TIMEOUT)
+            return False
+        return returncode == 0
 
-    async def aexec(self, command: str) -> str:
-        proc = await asyncio.create_subprocess_exec(
-            *self.exec_command(), command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
+    async def aexec(self, command: str, timeout: float = SSH_TIMEOUT) -> str:
+        """
+        Runs `command` on the remote host over the open tunnel.
+
+        :param timeout: Seconds to wait for `command` to complete before killing it
+            and raising `SSHError`.
+        """
+        try:
+            returncode, stdout, stderr = await _arun([*self.exec_command(), command], timeout)
+        except asyncio.TimeoutError as e:
+            raise SSHError(f"Command did not complete in {timeout} seconds") from e
+        if returncode != 0:
             raise SSHError(stderr.decode())
         return stdout.decode()
 
@@ -288,6 +312,23 @@ class SSHTunnel:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.aclose()
+
+    def _control_command_prefix(self) -> List[str]:
+        # If the master breaks off the initial exchange, ssh falls back to connecting to
+        # `destination` directly, even for `-O` commands. Ignore the user's ssh config and
+        # disable prompts so that such a connection fails instead of waiting for input on
+        # the terminal. `ConnectTimeout` also bounds the initial exchange with the master.
+        return [
+            self.ssh_exec_path,
+            "-F",
+            "none",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            f"ConnectTimeout={SSH_CONTROL_CONNECT_TIMEOUT}",
+            "-S",
+            self.control_sock_path,
+        ]
 
     def _get_proxy_command(self) -> Optional[str]:
         proxy_command: Optional[str] = None
@@ -364,6 +405,25 @@ class SSHTunnel:
         ) as f:
             f.write(identity.content)
         return identity_path
+
+
+async def _arun(command: List[str], timeout: float) -> tuple[int, bytes, bytes]:
+    """
+    Runs `command` with stdin redirected from /dev/null and returns its exit status, stdout,
+    and stderr. Kills the process and raises `asyncio.TimeoutError` if it does not exit in
+    `timeout` seconds.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        *command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise
+    assert proc.returncode is not None
+    return proc.returncode, stdout, stderr
 
 
 def ports_to_forwarded_sockets(
