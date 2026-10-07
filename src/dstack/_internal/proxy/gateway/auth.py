@@ -4,12 +4,15 @@ from aiocache import cached
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
+_AUTH_CACHE_TTL_SECONDS = 60
+"""Seconds to cache allowed or denied access for each project/token pair."""
+
 
 class GatewayProxyAuthProvider(BaseProxyAuthProvider):
     def __init__(self, server_client: httpx.AsyncClient) -> None:
         self._server_client = server_client
 
-    @cached(ttl=60, noself=True, skip_cache_func=lambda r: r is None)
+    @cached(ttl=_AUTH_CACHE_TTL_SECONDS, noself=True, skip_cache_func=lambda r: r is None)
     async def is_project_member(self, project_name: str, token: str) -> bool:
         try:
             resp = await self._server_client.post(
