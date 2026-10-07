@@ -1814,8 +1814,7 @@ class PresetConfiguration(
         Field(
             description=(
                 "The benchmark dataset used during preset creation: a benchmark tool's"
-                " dataset name (e.g. `sharegpt`, `spec_bench`, or an AIPerf public dataset"
-                " such as `semianalysis_cc_traces_weka_062126_256k`) or a Hugging Face dataset ID."
+                " dataset name (e.g. `sharegpt`, `spec_bench`) or a Hugging Face dataset ID."
                 " Omit for synthetic prompts shaped by `input_tokens` and `output_tokens`"
             )
         ),
