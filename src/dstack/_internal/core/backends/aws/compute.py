@@ -169,6 +169,7 @@ class AWSCompute(
         self._subnets_availability_zones_cache = ComputeCache(cache=Cache(maxsize=100))
         self._security_group_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
         self._image_id_and_username_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
+        self._is_capacity_block_cache = ComputeCache(cache=Cache(maxsize=100))
 
     def get_all_offers_with_availability(
         self, unallocated_resources: bool
@@ -527,6 +528,22 @@ class AWSCompute(
         if not _offer_supports_placement_group(instance_offer, placement_group):
             return False
         return placement_group.configuration.region == instance_offer.region
+
+    def are_placement_groups_compatible_with_reservation(
+        self,
+        instance_offer: InstanceOffer,
+        reservation: str,
+    ) -> bool:
+        # AWS rejects launches into Capacity Blocks that specify a placement group.
+        # Capacity Block instances are already placed close together in EC2 UltraClusters.
+        try:
+            is_capacity_block = self._is_capacity_block(
+                region=instance_offer.region, reservation_id=reservation
+            )
+        except botocore.exceptions.ClientError as e:
+            logger.warning("Failed to get reservation %s: %s", reservation, e)
+            return True
+        return not is_capacity_block
 
     def create_gateway_replica(
         self,
@@ -1230,6 +1247,23 @@ class AWSCompute(
         )
         az_to_subnet_id_map = {az: subnet_id for subnet_id, az in subnet_id_to_az_map.items()}
         return list(az_to_subnet_id_map.values())
+
+    def _is_capacity_block_cache_key(self, region: str, reservation_id: str) -> tuple:
+        return hashkey(region, reservation_id)
+
+    @cachedmethod(
+        cache=lambda self: self._is_capacity_block_cache.cache,
+        key=_is_capacity_block_cache_key,
+        lock=lambda self: self._is_capacity_block_cache.lock,
+    )
+    def _is_capacity_block(self, region: str, reservation_id: str) -> bool:
+        reservation = aws_resources.get_reservation(
+            ec2_client=self.session.client("ec2", region_name=region),
+            reservation_id=reservation_id,
+            is_capacity_block=True,
+            active_only=False,
+        )
+        return reservation is not None
 
 
 def get_vpc_id_subnets_ids_or_error(

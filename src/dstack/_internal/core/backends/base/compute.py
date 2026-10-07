@@ -26,7 +26,6 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -559,13 +558,20 @@ class ComputeWithPlacementGroupSupport(ABC):
         """
         pass
 
-    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
+    def are_placement_groups_compatible_with_reservation(
+        self,
+        instance_offer: InstanceOffer,
+        reservation: str,
+    ) -> bool:
         """
-        Whether placement groups can be used for instances provisioned in reservations.
+        Whether a placement group can be used for an instance provisioned in the reservation.
+
+        May perform API calls.
 
         Arguments:
-            backend_type: matches the backend type of this compute, unless this compute is a proxy
-                for other backends (dstack Sky)
+            instance_offer: the offer to provision. Its backend matches the backend type of this
+                compute, unless this compute is a proxy for other backends (dstack Sky)
+            reservation: the reservation to provision the instance in
         """
         return True
 
