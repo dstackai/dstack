@@ -122,6 +122,7 @@ from dstack._internal.server.services.offers import (
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
+    can_use_placement_groups,
     find_or_create_suitable_placement_group,
     get_placement_group_model_for_job,
     placement_group_model_to_placement_group_optional,
@@ -2457,9 +2458,10 @@ async def _provision_new_capacity(
             and is_cloud_cluster(fleet_model)
             and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
-            and (
-                compute.are_placement_groups_compatible_with_reservations(offer.backend)
-                or job.job_spec.requirements.reservation is None
+            and await can_use_placement_groups(
+                compute=compute,
+                instance_offer=offer,
+                reservation=requirements.reservation,
             )
         ):
             placement_group_model = await find_or_create_suitable_placement_group(

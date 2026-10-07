@@ -594,7 +594,11 @@ class GCPCompute(
     ) -> bool:
         return placement_group.configuration.region == instance_offer.region
 
-    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
+    def are_placement_groups_compatible_with_reservation(
+        self,
+        instance_offer: InstanceOffer,
+        reservation: str,
+    ) -> bool:
         # Cannot use our own placement policies when provisioning in a reservation.
         # Instead, we use the placement policy defined in reservation settings.
         return False

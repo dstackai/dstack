@@ -121,6 +121,20 @@ def get_placement_group_model_for_job(
     return placement_group_model
 
 
+async def can_use_placement_groups(
+    compute: ComputeWithPlacementGroupSupport,
+    instance_offer: InstanceOffer,
+    reservation: Optional[str],
+) -> bool:
+    if reservation is None:
+        return True
+    return await run_async(
+        compute.are_placement_groups_compatible_with_reservation,
+        instance_offer,
+        reservation,
+    )
+
+
 async def find_or_create_suitable_placement_group(
     fleet_model: FleetModel,
     placement_groups: list[PlacementGroupModel],
