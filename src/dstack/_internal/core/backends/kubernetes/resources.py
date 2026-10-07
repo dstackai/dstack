@@ -9,10 +9,8 @@ from typing import Callable, Literal, Optional, Union, cast, get_args
 
 import gpuhunt
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
-
-# XXX: kubernetes.utils is missing in the stubs package
-from kubernetes import utils as _kubernetes_utils  # pyright: ignore[reportAttributeAccessIssue]
 from kubernetes.client import CoreV1Api, V1Node, V1Taint
+from kubernetes.utils.quantity import parse_quantity as _parse_quantity
 from typing_extensions import Self
 
 from dstack._internal.core.backends.base.compute import normalize_arch
@@ -344,9 +342,7 @@ def build_dockerconfigjson(image_name: str, username: str, password: str) -> str
     return json.dumps({"auths": {registry: entry}})
 
 
-parse_quantity = cast(
-    Callable[[Union[str, int, float, Decimal]], Decimal], _kubernetes_utils.parse_quantity
-)
+parse_quantity = cast(Callable[[Union[str, int, float, Decimal]], Decimal], _parse_quantity)
 
 
 def format_memory(memory: Memory) -> str:
