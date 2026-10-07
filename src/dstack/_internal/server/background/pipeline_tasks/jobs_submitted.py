@@ -2461,7 +2461,7 @@ async def _provision_new_capacity(
             and await can_use_placement_groups(
                 compute=compute,
                 instance_offer=offer,
-                reservation=job.job_spec.requirements.reservation,
+                reservation=requirements.reservation,
             )
         ):
             placement_group_model = await find_or_create_suitable_placement_group(
