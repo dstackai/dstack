@@ -710,7 +710,7 @@ def get_reservation(
     if instance_count > 0 and reservation["AvailableInstanceCount"] < instance_count:
         return None
 
-    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
+    if is_capacity_block and reservation.get("ReservationType") != "capacity-block":
         return None
 
     return reservation
