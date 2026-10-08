@@ -832,12 +832,14 @@ async def _update_gateway_replica(
         + " "
         + shlex.quote(target_version or "")
     )
-    stdout = await connection.tunnel.aexec(command)
+    stdout = await connection.tunnel.aexec(command, timeout=_GATEWAY_UPDATE_TIMEOUT)
     if "Update successfully completed" in stdout:
         logger.info("Gateway replica %s updated", connection.ip_address)
         return True
     return False
 
+
+_GATEWAY_UPDATE_TIMEOUT = 600
 
 # Blue/green: install the new build into the currently inactive venv and flip to it
 _GATEWAY_UPDATE_SCRIPT = """\

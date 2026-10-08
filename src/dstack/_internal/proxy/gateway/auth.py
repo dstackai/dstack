@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 from aiocache import cached
 
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider

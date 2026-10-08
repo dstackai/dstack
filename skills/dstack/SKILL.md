@@ -172,6 +172,7 @@ Unless you use **Multi-node tasks** (see `### 2. Tasks`) or **Multi-replica serv
 - Prefer giving configurations a `name` property for easier management
 - When configurations need credentials (API keys, tokens), list only env var names in the `env` section (e.g., `- HF_TOKEN`), not values. Recommend storing actual values in a `.envrc` file alongside the configuration, applied via `source .envrc && dstack apply`.
 - `python` and `image` are mutually exclusive in run configurations. If `image` is set, do not set `python`.
+- `commands` items are joined into one shell line with ` && `, so keep multi-line shell such as heredocs inside a single item (a `|` block). A heredoc that ends an item swallows every item after it, and the run exits 0 without running them. The same applies to a trailing `# comment` in an item, which comments out the rest of the line.
 
 ### `files` and `repos` intent policy
 

@@ -528,6 +528,25 @@ class AWSCompute(
             return False
         return placement_group.configuration.region == instance_offer.region
 
+    def are_placement_groups_compatible_with_reservation(
+        self,
+        instance_offer: InstanceOffer,
+        reservation: str,
+    ) -> bool:
+        # AWS rejects launches into Capacity Blocks that specify a placement group.
+        # Capacity Block instances are already placed close together in EC2 UltraClusters.
+        try:
+            capacity_block = aws_resources.get_reservation(
+                ec2_client=self.session.client("ec2", region_name=instance_offer.region),
+                reservation_id=reservation,
+                is_capacity_block=True,
+                active_only=False,
+            )
+        except botocore.exceptions.ClientError as e:
+            logger.warning("Failed to get reservation %s: %s", reservation, e)
+            return True
+        return capacity_block is None
+
     def create_gateway_replica(
         self,
         configuration: GatewayReplicaConfiguration,

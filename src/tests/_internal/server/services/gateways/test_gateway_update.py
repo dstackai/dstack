@@ -125,13 +125,13 @@ def gateway_update_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         gateways._GATEWAY_UPDATE_SCRIPT.replace(remote_root, f"root={shlex.quote(str(root))}"),
     )
 
-    def execute(command: str) -> str:
+    def execute(command: str, timeout: float) -> str:
         return subprocess.run(
             shlex.split(command),
             check=True,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=min(timeout, 5),
             env={
                 "PATH": f"{command_bin}:/usr/bin:/bin",
                 "TEST_EVENTS": str(events),

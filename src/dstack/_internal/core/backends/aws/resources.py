@@ -678,8 +678,11 @@ def get_reservation(
     instance_count: int = 0,
     instance_types: Optional[List[str]] = None,
     is_capacity_block: bool = False,
+    active_only: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    filters = [{"Name": "state", "Values": ["active"]}]
+    filters = []
+    if active_only:
+        filters.append({"Name": "state", "Values": ["active"]})
     if instance_types:
         filters.append({"Name": "instance-type", "Values": instance_types})
     try:
@@ -707,7 +710,7 @@ def get_reservation(
     if instance_count > 0 and reservation["AvailableInstanceCount"] < instance_count:
         return None
 
-    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
+    if is_capacity_block and reservation.get("ReservationType") != "capacity-block":
         return None
 
     return reservation

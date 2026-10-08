@@ -31,6 +31,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     get_fleet_configuration,
     get_fleet_spec,
+    get_instance_configuration,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_placement_group_provisioning_data,
@@ -748,6 +749,66 @@ class TestCloudProvisioning:
         else:
             assert backend_mock.compute.return_value.create_placement_group.call_count == 0
             assert len(placement_groups) == 0
+
+    @pytest.mark.parametrize("compatible", [True, False])
+    async def test_creates_placement_group_in_reservation_only_if_compatible(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        compatible: bool,
+    ) -> None:
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=1),
+                )
+            ),
+        )
+        instance_configuration = get_instance_configuration()
+        instance_configuration.reservation = "test-reservation"
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_configuration=instance_configuration,
+        )
+        await _set_current_master_instance(session, fleet, instance)
+        offer = get_instance_offer_with_availability()
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        compute_mock = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value = compute_mock
+        compute_mock.get_offers.return_value = [offer]
+        compute_mock.are_placement_groups_compatible_with_reservation.return_value = compatible
+        compute_mock.create_instance.return_value = get_job_provisioning_data()
+        compute_mock.create_placement_group.return_value = get_placement_group_provisioning_data()
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PROVISIONING
+        compute_mock.are_placement_groups_compatible_with_reservation.assert_called_once_with(
+            offer, "test-reservation"
+        )
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        created_placement_group = compute_mock.create_instance.call_args[0][2]
+        if compatible:
+            assert compute_mock.create_placement_group.call_count == 1
+            assert len(placement_groups) == 1
+            assert isinstance(created_placement_group, PlacementGroup)
+        else:
+            assert compute_mock.create_placement_group.call_count == 0
+            assert len(placement_groups) == 0
+            assert created_placement_group is None
 
     @pytest.mark.parametrize("can_reuse", [True, False])
     async def test_reuses_placement_group_between_offers_if_the_group_is_suitable(

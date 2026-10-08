@@ -47,6 +47,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_instance_offer_with_restricted_az
 from dstack._internal.server.services.placement import (
+    can_use_placement_groups,
     get_fleet_placement_group_models,
     placement_group_model_to_placement_group,
     placement_group_model_to_placement_group_optional,
@@ -140,9 +141,10 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
             and cluster_context.is_current_instance_master
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
-            and (
-                compute.are_placement_groups_compatible_with_reservations(instance_offer.backend)
-                or instance_configuration.reservation is None
+            and await can_use_placement_groups(
+                compute=compute,
+                instance_offer=instance_offer,
+                reservation=instance_configuration.reservation,
             )
         ):
             (

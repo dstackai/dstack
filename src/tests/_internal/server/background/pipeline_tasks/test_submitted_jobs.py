@@ -803,6 +803,66 @@ class TestJobSubmittedWorker:
         placement_group = (await session.execute(select(PlacementGroupModel))).scalar()
         assert placement_group is not None
 
+    @pytest.mark.parametrize("compatible", [True, False])
+    async def test_creates_placement_group_in_reservation_only_if_compatible(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker, compatible: bool
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.reservation = "test-reservation"
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run, instance_assigned=True)
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.are_placement_groups_compatible_with_reservation.return_value = compatible
+            compute_mock.run_job.return_value = get_job_provisioning_data(
+                backend=BackendType.AWS,
+            )
+            compute_mock.create_placement_group.return_value = (
+                get_placement_group_provisioning_data()
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
+        compute_mock.are_placement_groups_compatible_with_reservation.assert_called_once()
+        assert (
+            compute_mock.are_placement_groups_compatible_with_reservation.call_args[0][1]
+            == "test-reservation"
+        )
+        compute_mock.run_job.assert_called_once()
+        placement_group = (await session.execute(select(PlacementGroupModel))).scalar()
+        if compatible:
+            compute_mock.create_placement_group.assert_called_once()
+            assert isinstance(compute_mock.run_job.call_args[0][6], PlacementGroup)
+            assert placement_group is not None
+        else:
+            compute_mock.create_placement_group.assert_not_called()
+            assert compute_mock.run_job.call_args[0][6] is None
+            assert placement_group is None
+
     async def test_marks_unused_existing_placement_groups_for_cleanup(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
