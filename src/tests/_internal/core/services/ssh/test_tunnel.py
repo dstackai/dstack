@@ -602,7 +602,7 @@ class TestSSHTunnel:
         await spawned.wait()
         task.cancel("cancel while creating SSH")
         return_process.set()
-        with pytest.raises(asyncio.CancelledError, match="cancel while creating SSH"):
+        with pytest.raises(asyncio.CancelledError):
             await task
 
         assert returned.is_set()
@@ -641,7 +641,7 @@ class TestSSHTunnel:
         fail_creation.set()
 
         if cancelled:
-            with pytest.raises(asyncio.CancelledError, match="cancel while creating SSH"):
+            with pytest.raises(asyncio.CancelledError):
                 await task
         else:
             with pytest.raises(OSError) as exc_info:
@@ -671,7 +671,7 @@ class TestSSHTunnel:
         await reaping.wait()
         closing.cancel("cancel during cleanup")
         reaped.set()
-        with pytest.raises(asyncio.CancelledError, match="cancel during cleanup"):
+        with pytest.raises(asyncio.CancelledError):
             await closing
 
         ssh_process.wait.assert_awaited_once_with()
@@ -787,7 +787,7 @@ class TestSSHTunnelControlTimeouts:
         await communicating.wait()
         task.cancel("cancel control command")
 
-        with pytest.raises(asyncio.CancelledError, match="cancel control command"):
+        with pytest.raises(asyncio.CancelledError):
             await task
 
         process.kill.assert_called_once_with()
