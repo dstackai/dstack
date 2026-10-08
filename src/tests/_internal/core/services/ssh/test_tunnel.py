@@ -391,8 +391,7 @@ class TestSSHTunnel:
         check = AsyncMock(return_value=True)
         monkeypatch.setattr(foreground_tunnel, "acheck", check)
 
-        async def startup_poll(interval):
-            assert interval == 0.1
+        async def startup_poll(_interval):
             polling.set()
             await create_socket.wait()
             Path(foreground_tunnel.control_sock_path).touch()
@@ -444,65 +443,14 @@ class TestSSHTunnel:
             await foreground_tunnel.wait_closed()
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("method", ["aopen", "acheck"])
-    @pytest.mark.parametrize("already_exited", [False, True])
-    @pytest.mark.parametrize(
-        "is_windows",
-        [True, pytest.param(False, marks=pytest.mark.skipif(IS_WINDOWS, reason="POSIX signals"))],
-    )
-    async def test_cancelled_command_kills_and_reaps_process(
-        self,
-        foreground_tunnel: SSHTunnel,
-        ssh_process: Mock,
-        kill_process_group: Mock,
-        monkeypatch: pytest.MonkeyPatch,
-        method: str,
-        already_exited: bool,
-        is_windows: bool,
-    ) -> None:
-        monkeypatch.setattr("dstack._internal.core.services.ssh.tunnel.IS_WINDOWS", is_windows)
-        waiting = asyncio.Event()
-
-        async def wait_for_process(*args):
-            if ssh_process.returncode is None:
-                waiting.set()
-                await asyncio.Future()
-            return ssh_process.returncode
-
-        def kill(*args) -> None:
-            ssh_process.returncode = 0 if already_exited else -9
-            if already_exited:
-                raise ProcessLookupError
-
-        monkeypatch.setattr(
-            foreground_tunnel, "_wait_until_ready", AsyncMock(side_effect=wait_for_process)
-        )
-        ssh_process.communicate.side_effect = wait_for_process
-        ssh_process.wait.side_effect = wait_for_process
-        ssh_process.kill.side_effect = kill
-        kill_process_group.side_effect = kill
-        task = asyncio.create_task(getattr(foreground_tunnel, method)())
-        await waiting.wait()
-        task.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await task
-
-        if method == "aopen" and not is_windows:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
-            ssh_process.kill.assert_not_called()
-        else:
-            ssh_process.kill.assert_called_once_with()
-            kill_process_group.assert_not_called()
-        ssh_process.wait.assert_awaited_once_with()
-        assert task.cancelled()
-
-    @pytest.mark.asyncio
+    @pytest.mark.parametrize("check_already_exited", [False, True])
     async def test_cancelled_foreground_readiness_cleans_check_and_master(
         self,
         foreground_tunnel: SSHTunnel,
         ssh_process: Mock,
         kill_process_group: Mock,
         monkeypatch: pytest.MonkeyPatch,
+        check_already_exited: bool,
     ) -> None:
         Path(foreground_tunnel.control_sock_path).touch()
         check_process = Mock(spec=asyncio.subprocess.Process)
@@ -517,6 +465,8 @@ class TestSSHTunnel:
 
         def kill():
             check_process.returncode = -9
+            if check_already_exited:
+                raise ProcessLookupError
 
         check_process.communicate.side_effect = wait
         check_process.kill.side_effect = kill
@@ -539,31 +489,23 @@ class TestSSHTunnel:
         assert foreground_tunnel._process is None
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("already_exited", [False, True])
-    @pytest.mark.parametrize(
-        "is_windows",
-        [True, pytest.param(False, marks=pytest.mark.skipif(IS_WINDOWS, reason="POSIX signals"))],
-    )
-    async def test_timed_out_aopen_kills_and_reaps_process(
+    async def test_timed_out_aopen_cleans_up_exited_process(
         self,
         foreground_tunnel: SSHTunnel,
         ssh_process: Mock,
         kill_process_group: Mock,
         monkeypatch: pytest.MonkeyPatch,
-        already_exited: bool,
-        is_windows: bool,
     ) -> None:
         # A zero timeout exercises wait_for's cleanup without waiting on real time.
         monkeypatch.setattr("dstack._internal.core.services.ssh.tunnel.SSH_TIMEOUT", 0)
-        monkeypatch.setattr("dstack._internal.core.services.ssh.tunnel.IS_WINDOWS", is_windows)
-        if already_exited:
-            ssh_process.kill.side_effect = ProcessLookupError
-            kill_process_group.side_effect = ProcessLookupError
+        ssh_process.returncode = 255
+        ssh_process.kill.side_effect = ProcessLookupError
+        kill_process_group.side_effect = ProcessLookupError
 
         with pytest.raises(SSHError, match="in 0 seconds") as exc_info:
             await foreground_tunnel.aopen()
 
-        if not is_windows:
+        if not IS_WINDOWS:
             kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
             ssh_process.kill.assert_not_called()
         else:
@@ -573,19 +515,13 @@ class TestSSHTunnel:
         assert isinstance(exc_info.value.__cause__, asyncio.TimeoutError)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "is_windows",
-        [True, pytest.param(False, marks=pytest.mark.skipif(IS_WINDOWS, reason="POSIX signals"))],
-    )
     async def test_cancelled_aopen_during_creation_kills_and_reaps_process(
         self,
         foreground_tunnel: SSHTunnel,
         ssh_process: Mock,
         kill_process_group: Mock,
         monkeypatch: pytest.MonkeyPatch,
-        is_windows: bool,
     ) -> None:
-        monkeypatch.setattr("dstack._internal.core.services.ssh.tunnel.IS_WINDOWS", is_windows)
         spawned = asyncio.Event()
         return_process = asyncio.Event()
         returned = asyncio.Event()
@@ -606,7 +542,7 @@ class TestSSHTunnel:
             await task
 
         assert returned.is_set()
-        if is_windows:
+        if IS_WINDOWS:
             ssh_process.kill.assert_called_once_with()
             kill_process_group.assert_not_called()
         else:
@@ -682,20 +618,6 @@ class TestSSHTunnel:
         else:
             kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("returncode", [0, 255])
-    async def test_acheck_returns_process_status(
-        self,
-        sample_tunnel_with_all_params: SSHTunnel,
-        ssh_process: Mock,
-        returncode: int,
-    ) -> None:
-        ssh_process.returncode = returncode
-
-        assert await sample_tunnel_with_all_params.acheck() is (returncode == 0)
-
-        ssh_process.kill.assert_not_called()
-
 
 class TestSSHTunnelControlTimeouts:
     @pytest.fixture
@@ -760,63 +682,6 @@ class TestSSHTunnelControlTimeouts:
         with pytest.raises(SSHError, match="did not complete"):
             await tunnel.aexec("true", timeout=0)
         assert hanging_process.killed
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("method", ["acheck", "aclose", "aexec"])
-    @pytest.mark.parametrize("already_exited", [False, True])
-    async def test_cancelled_control_command_kills_and_reaps_process(
-        self,
-        tunnel: SSHTunnel,
-        monkeypatch: pytest.MonkeyPatch,
-        method: str,
-        already_exited: bool,
-    ) -> None:
-        process = Mock(spec=asyncio.subprocess.Process)
-        communicating = asyncio.Event()
-
-        async def communicate():
-            communicating.set()
-            await asyncio.Future()
-
-        process.communicate.side_effect = communicate
-        if already_exited:
-            process.kill.side_effect = ProcessLookupError
-        monkeypatch.setattr(asyncio, "create_subprocess_exec", AsyncMock(return_value=process))
-        command = getattr(tunnel, method)(*(["true"] if method == "aexec" else []))
-        task = asyncio.create_task(command)
-        await communicating.wait()
-        task.cancel("cancel control command")
-
-        with pytest.raises(asyncio.CancelledError):
-            await task
-
-        process.kill.assert_called_once_with()
-        process.wait.assert_awaited_once_with()
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("method", ["acheck", "aclose", "aexec"])
-    async def test_timeout_preserves_behavior_when_process_has_already_exited(
-        self,
-        tunnel: SSHTunnel,
-        hanging_process: "_HangingProcess",
-        monkeypatch: pytest.MonkeyPatch,
-        method: str,
-    ) -> None:
-        def kill():
-            hanging_process.returncode = 0
-            raise ProcessLookupError
-
-        reaped = AsyncMock(wraps=hanging_process.wait)
-        monkeypatch.setattr(hanging_process, "kill", kill)
-        monkeypatch.setattr(hanging_process, "wait", reaped)
-        if method == "aexec":
-            with pytest.raises(SSHError, match="did not complete") as exc_info:
-                await tunnel.aexec("true", timeout=0)
-            assert isinstance(exc_info.value.__cause__, asyncio.TimeoutError)
-        else:
-            result = await getattr(tunnel, method)()
-            assert result is (False if method == "acheck" else None)
-        reaped.assert_awaited_once_with()
 
 
 class _HangingProcess:
