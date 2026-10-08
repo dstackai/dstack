@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Container, Dict, Generator, List
 
-import httpx
+import httpx2 as httpx
 
 logger = logging.getLogger(__name__)
 BASE_URL = "http://dstack/"  # any hostname will work
@@ -13,22 +13,25 @@ BASE_URL = "http://dstack/"  # any hostname will work
 
 @dataclass
 class CachedClientInfo:
+    """HTTP client and connection-failure history for one server, owned by HTTPMultiClient."""
+
     client: httpx.AsyncClient
     socket: Path
     connect_errors: List[datetime.datetime] = field(default_factory=lambda: [])
 
     def seems_disconnected(self) -> bool:
+        # Only ConnectError is recorded; a returned HTTP response clears this history.
         if len(self.connect_errors) < 2:
             return False
         return self.connect_errors[-1] - self.connect_errors[0] >= datetime.timedelta(minutes=2)
 
 
 class HTTPMultiClient(httpx.AsyncClient):
-    """
-    An HTTP client that sends requests to randomly chosen Unix sockets from a specified
-    directory. This allows to balance the load between multiple HTTP server replicas.
-    Automatically deletes sockets that stop responding.
-    Used for requesting random dstack-server replicas from the gateway.
+    """Gateway HTTP client for uncached project-access checks against dstack-server.
+
+    GatewayProxyAuthProvider uses this client and owns authorization decisions and
+    their cache. Return the server's HTTP response, including error statuses. Raise
+    httpx.RequestError when no connected server can complete the request.
     """
 
     def __init__(self, sockets_dir: Path):
@@ -40,6 +43,7 @@ class HTTPMultiClient(httpx.AsyncClient):
         errors: List[httpx.RequestError] = []
         clients_count = 0
 
+        # Try another replica after request errors; HTTP error responses are returned.
         for clients_count, client in enumerate(self._iter_clients_rand(), start=1):
             try:
                 resp = await client.client.send(request, *args, **kwargs)
@@ -69,6 +73,7 @@ class HTTPMultiClient(httpx.AsyncClient):
     def _iter_clients_rand(self) -> Generator[CachedClientInfo, None, None]:
         sockets = list(self._sockets_dir.glob("*.sock"))
         self._evict_clients(stems_to_keep={s.stem for s in sockets})
+        # Each socket forwards to a server replica; shuffle to distribute auth checks.
         random.shuffle(sockets)
 
         for socket in sockets:

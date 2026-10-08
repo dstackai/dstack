@@ -9,6 +9,7 @@ User=ubuntu
 Group=ubuntu
 Restart=always
 RestartSec=5
+LimitNOFILE=65535
 
 [Install]
 WantedBy=default.target

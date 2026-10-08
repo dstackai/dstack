@@ -222,6 +222,8 @@ gateway = [
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",
+    # Gateway authorization needs the pool cancellation and recovery fixes in httpx2 (#4338).
+    "httpx2>=2.13.1",
     "jinja2",
 ]
 server = [
