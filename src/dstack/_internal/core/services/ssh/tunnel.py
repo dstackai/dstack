@@ -88,6 +88,9 @@ class SSHTunnel:
             configured `destination` with `ProxyJump` in the `ssh_config_path` config, the proxy
             jump connection will ignore this option -- in that case, you should replace `ProxyJump`
             with explicit `ProxyCommand=ssh [...] -o BatchMode=yes` in your config.
+            Control commands (`check`, `close`, `exec`) always run in batch mode, since they
+            only talk to the local master and must not prompt if ssh falls back to a direct
+            connection.
         """
         self.destination = destination
         self.forwarded_sockets = list(forwarded_sockets)
@@ -179,7 +182,7 @@ class SSHTunnel:
         return [*self._control_command_prefix(), "-O", "check", self.destination]
 
     def exec_command(self) -> List[str]:
-        return [*self._control_command_prefix(), "-n", self.destination]
+        return [*self._control_command_prefix(), self.destination]
 
     def open(self) -> None:
         # We cannot use `stderr=subprocess.PIPE` here since the forked process (daemon) does not

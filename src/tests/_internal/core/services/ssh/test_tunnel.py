@@ -239,7 +239,7 @@ class TestSSHTunnel:
     def test_exec_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.exec_command()
         assert " ".join(command) == (
-            "/usr/bin/ssh -F none -o BatchMode=yes -S /tmp/control.sock -n ubuntu@my-server"
+            "/usr/bin/ssh -F none -o BatchMode=yes -S /tmp/control.sock ubuntu@my-server"
         )
 
 
