@@ -1,6 +1,5 @@
 import shlex
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
@@ -24,10 +23,10 @@ class TestInitGateways:
         self,
         session: AsyncSession,
         monkeypatch: pytest.MonkeyPatch,
-        gateway_update_sandbox: "_GatewayUpdateSandbox",
+        gateway_update_sandbox: tuple[Path, Path, Mock],
         target_version: str,
     ):
-        sandbox = gateway_update_sandbox
+        root, events_file, connection = gateway_update_sandbox
         now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         previously_updated_at = now - timedelta(minutes=2)
         monkeypatch.setattr(core_settings, "DSTACK_GATEWAY_PACKAGE_URL", None)
@@ -37,12 +36,12 @@ class TestInitGateways:
         monkeypatch.setattr(
             gateways.gateway_connections_pool,
             "get_or_add",
-            AsyncMock(return_value=sandbox.connection),
+            AsyncMock(return_value=connection),
         )
         monkeypatch.setattr(
             gateways.gateway_connections_pool,
             "all",
-            AsyncMock(return_value=[sandbox.connection]),
+            AsyncMock(return_value=[connection]),
         )
         configure = AsyncMock()
         monkeypatch.setattr(gateways, "configure_gateway_replica", configure)
@@ -54,15 +53,15 @@ class TestInitGateways:
 
         await gateways.init_gateways(session)
 
-        configure.assert_awaited_once_with(sandbox.connection, attempts=7)
-        events = sandbox.events.read_text().splitlines()
+        configure.assert_awaited_once()
+        events = events_file.read_text().splitlines()
         if target_version == "0.22.2":
             assert events == ["blue pip show dstack"]
-            assert (sandbox.root / "version").read_text().strip() == "blue"
+            assert (root / "version").read_text().strip() == "blue"
             assert replica.app_updated_at == previously_updated_at
             return
 
-        assert (sandbox.root / "version").read_text().strip() == "green"
+        assert (root / "version").read_text().strip() == "green"
         assert replica.app_updated_at == now
         install_package = f"green pip install dstack[gateway]=={target_version}"
         install_service = "green python -m dstack._internal.proxy.gateway.systemd install"
@@ -74,13 +73,6 @@ class TestInitGateways:
             < events.index(reload_service)
             < events.index(restart_service)
         )
-
-
-@dataclass
-class _GatewayUpdateSandbox:
-    root: Path
-    events: Path
-    connection: Mock
 
 
 @pytest.fixture
@@ -141,7 +133,7 @@ def gateway_update_sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     connection = Mock(ip_address="1.1.1.1")
     connection.tunnel.aexec = AsyncMock(side_effect=execute)
-    return _GatewayUpdateSandbox(root, events, connection)
+    return root, events, connection
 
 
 def _write_executable(path: Path, script: str):

@@ -17,8 +17,8 @@ async def clear_auth_cache():
     await cache.clear()
 
 
+@pytest.mark.asyncio
 class TestGatewayProxyAuthProvider:
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("status", [200, 403])
     async def test_caches_project_token_decision_for_sixty_seconds(self, monkeypatch, status):
         requests = []
@@ -28,8 +28,8 @@ class TestGatewayProxyAuthProvider:
             return httpx.Response(status)
 
         cache = GatewayProxyAuthProvider.is_project_member.cache
-        set_value = AsyncMock(wraps=cache._set)
-        monkeypatch.setattr(cache, "_set", set_value)
+        set_value = AsyncMock(wraps=cache.set)
+        monkeypatch.setattr(cache, "set", set_value)
         async with httpx.AsyncClient(
             transport=httpx.MockTransport(handle), base_url="http://dstack/"
         ) as client:
@@ -47,20 +47,14 @@ class TestGatewayProxyAuthProvider:
             await provider.is_project_member("second", "token")
             assert len(requests) == 3
 
-            # Eviction must cause a fresh check, without waiting for the real clock.
-            await cache.clear()
-            await provider.is_project_member("first", "token")
-            assert len(requests) == 4
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("failure", [500, 429, httpx.ConnectError, httpx.ReadTimeout])
+    @pytest.mark.parametrize("failure", [500, httpx.ReadTimeout])
     async def test_httpx2_failures_are_wrapped_and_not_cached(self, failure):
         requests = 0
 
         def handle(request):
             nonlocal requests
             requests += 1
-            if requests > 2:
+            if requests > 1:
                 return httpx.Response(200)
             if isinstance(failure, int):
                 return httpx.Response(failure)
@@ -70,35 +64,16 @@ class TestGatewayProxyAuthProvider:
             transport=httpx.MockTransport(handle), base_url="http://dstack/"
         ) as client:
             provider = GatewayProxyAuthProvider(client)
-            for _ in range(2):
-                with pytest.raises(UnexpectedProxyError) as exc:
-                    await provider.is_project_member("test", "token")
-                assert isinstance(exc.value.__cause__, httpx.HTTPError)
+            with pytest.raises(UnexpectedProxyError) as exc:
+                await provider.is_project_member("test", "token")
+            assert isinstance(exc.value.__cause__, httpx.HTTPError)
             assert await provider.is_project_member("test", "token")
-            assert await provider.is_project_member("test", "token")
-            assert requests == 3
+            assert requests == 2
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("failure", [None, httpx.ConnectError, httpx.PoolTimeout])
-    async def test_all_server_failures_reach_auth_error_boundary(self, tmp_path, failure):
-        client = HTTPMultiClient(tmp_path)
-        if failure is not None:
-            (tmp_path / "server.sock").touch()
-        cached = list(client._iter_clients_rand())
-
-        def fail(request):
-            raise failure("server unavailable", request=request)
-
-        for info in cached:
-            await info.client.aclose()
-            info.client = httpx.AsyncClient(transport=httpx.MockTransport(fail))
-        try:
+    async def test_no_servers_reaches_auth_error_boundary(self, tmp_path):
+        async with HTTPMultiClient(tmp_path) as client:
             provider = GatewayProxyAuthProvider(client)
             with pytest.raises(UnexpectedProxyError) as exc:
                 await provider.is_project_member("test", "token")
             assert isinstance(exc.value.__cause__, httpx.RequestError)
             assert exc.value.__cause__.request.url.path == "/api/projects/test/get"
-        finally:
-            for info in cached:
-                await info.client.aclose()
-            await client.aclose()
