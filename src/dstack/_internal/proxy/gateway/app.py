@@ -1,6 +1,7 @@
 """FastAPI app running on a gateway."""
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Optional
 
@@ -29,6 +30,7 @@ from dstack._internal.proxy.gateway.services.registry import ACCESS_LOG_PATH, ap
 from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClient
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.routers.model_proxy import router as model_proxy_router
+from dstack._internal.proxy.lib.services.service_connection import maintain_service_connections
 from dstack._internal.utils.common import run_async
 from dstack.version import __version__
 
@@ -45,9 +47,13 @@ async def lifespan(app: FastAPI):
     service_conn_pool = await injector.get_service_connection_pool()
     await run_async(nginx.write_global_conf)
     await apply_all(repo, nginx, service_conn_pool)
+    maintenance = asyncio.create_task(maintain_service_connections(service_conn_pool))
 
     yield
 
+    maintenance.cancel()
+    with suppress(asyncio.CancelledError):
+        await maintenance
     await service_conn_pool.remove_all()
 
 

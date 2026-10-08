@@ -18,12 +18,15 @@ from dstack._internal.core.services.ssh.tunnel import (
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.models import Project, Replica, Service
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_or_error, run_async
+from dstack._internal.utils.env import environ
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
+TUNNEL_CHECK_INTERVAL = environ.get_int("DSTACK_PROXY_TUNNEL_CHECK_INTERVAL", default=15)
+"""Seconds between checks that reopen replica SSH tunnels whose ssh process has exited."""
 
 
 class ServiceClient(httpx.AsyncClient):
@@ -75,6 +78,9 @@ class ServiceConnection:
             timeout=service.read_timeout,
         )
         self._is_open = asyncio.locks.Event()
+        self._replica_id = replica.id
+        self._lock = asyncio.Lock()
+        self._closed = False
 
     @property
     def app_socket_path(self) -> Path:
@@ -85,9 +91,33 @@ class ServiceConnection:
         self._is_open.set()
 
     async def close(self) -> None:
-        self._is_open.clear()
-        await self._client.aclose()
-        await self._tunnel.aclose()
+        async with self._lock:
+            self._closed = True
+            self._is_open.clear()
+            await self._client.aclose()
+            await self._tunnel.aclose()
+
+    async def reopen_if_exited(self) -> bool:
+        """
+        Reopen the SSH tunnel if its ssh process has exited, e.g. after the replica's SSH server
+        dropped the connection because the gateway missed keepalives. The local app socket path
+        is kept, so nginx and the HTTP client keep working without reconfiguration.
+
+        Returns `True` if the tunnel was reopened.
+        """
+        if self._closed or not self._is_open.is_set():
+            return False
+        if await self._tunnel.acheck():
+            return False
+        async with self._lock:
+            if self._closed or await self._tunnel.acheck():
+                return False
+            logger.warning("SSH tunnel to service replica %s exited, reopening", self._replica_id)
+            # The control socket of a killed ssh process stays on disk. A new ssh with
+            # `ControlMaster=auto` would then run without a control socket and fail every check.
+            await run_async(_remove_file, Path(self._tunnel.control_sock_path))
+            await self._tunnel.aopen()
+        return True
 
     async def client(self) -> ServiceClient:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
@@ -121,6 +151,20 @@ class ServiceConnectionPool:
         connection = self.connections.pop(replica_id, None)
         if connection is not None:
             await connection.close()
+
+    async def reopen_exited(self) -> None:
+        connections = list(self.connections.items())
+        results = await asyncio.gather(
+            *(connection.reopen_if_exited() for _, connection in connections),
+            return_exceptions=True,
+        )
+        for (replica_id, _), result in zip(connections, results):
+            if isinstance(result, BaseException):
+                logger.warning(
+                    "Failed to reopen SSH tunnel to service replica %s: %r", replica_id, result
+                )
+            elif result:
+                logger.info("Reopened SSH tunnel to service replica %s", replica_id)
 
     async def remove_all(self) -> None:
         replica_ids = list(self.connections)
@@ -158,3 +202,22 @@ async def get_service_replica_client(
             )
         connection = await service_conn_pool.get_or_add(project, service, replica)
     return await connection.client()
+
+
+async def maintain_service_connections(
+    service_conn_pool: ServiceConnectionPool, interval: float = TUNNEL_CHECK_INTERVAL
+) -> None:
+    """Periodically reopen replica SSH tunnels whose ssh process has exited."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await service_conn_pool.reopen_exited()
+        except Exception:
+            logger.exception("Failed to check service replica SSH tunnels")
+
+
+def _remove_file(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
