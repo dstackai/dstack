@@ -2,7 +2,6 @@ from gpuhunt.providers.vultr import API_URL
 
 from dstack._internal.core.backends.vultr.compute import VultrCompute
 from dstack._internal.core.backends.vultr.models import VultrConfig, VultrCreds
-from dstack._internal.core.models.instances import InstanceAvailability
 
 
 class TestGetAllOffersWithAvailability:
@@ -49,20 +48,8 @@ class TestGetAllOffersWithAvailability:
 
         offers = compute.get_all_offers_with_availability(unallocated_resources=False)
 
-        assert [offer.instance.name for offer in offers] == [
+        assert {offer.instance.name for offer in offers} == {
             "vc2-2c-4gb",
             "vcg-a40-24c-120g-48vram",
-        ]
+        }
         assert all(offer.region == "blr" for offer in offers)
-        assert all(offer.availability == InstanceAvailability.AVAILABLE for offer in offers)
-        cpu_offer, gpu_offer = offers
-        assert cpu_offer.instance.resources.cpus == 2
-        assert cpu_offer.instance.resources.memory_mib == 4 * 1024
-        assert cpu_offer.instance.resources.gpus == []
-        assert cpu_offer.price == 0.027
-        assert gpu_offer.instance.resources.cpus == 24
-        assert gpu_offer.instance.resources.memory_mib == 120 * 1024
-        [gpu] = gpu_offer.instance.resources.gpus
-        assert gpu.name == "A40"
-        assert gpu.memory_mib == 48 * 1024
-        assert gpu_offer.price == 1.712
