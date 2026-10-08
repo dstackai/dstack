@@ -2,7 +2,9 @@ import json
 import re
 from typing import List, Optional
 
+import gpuhunt
 import requests
+from gpuhunt.providers.vultr import VultrProvider
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -46,6 +48,10 @@ class VultrCompute(
         super().__init__()
         self.config = config
         self.api_client = VultrApiClient(config.creds.api_key)
+        self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
+        self.catalog.add_provider(
+            VultrProvider(api_key=config.creds.api_key, regions=config.regions)
+        )
 
     def get_all_offers_with_availability(
         self, unallocated_resources: bool
@@ -55,6 +61,7 @@ class VultrCompute(
             requirements=None,
             locations=self.config.regions or None,
             extra_filter=_supported_instances,
+            catalog=self.catalog,
         )
         offers = [
             offer.with_availability(availability=InstanceAvailability.AVAILABLE)
