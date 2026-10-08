@@ -217,6 +217,8 @@ gateway = [
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
+    # Supervise long-lived SSH children without a waiting thread for each replica.
+    "uvloop>=0.18.0; sys_platform != 'win32' and platform_python_implementation != 'PyPy'",
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",

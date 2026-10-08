@@ -24,6 +24,9 @@ from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
+# Bound SSH startup work during a shared outage, without limiting service requests.
+MAX_CONCURRENT_TUNNEL_RECONNECTS = 8
+MAX_TUNNEL_RECONNECT_DELAY = 30
 
 
 class ServiceClient(httpx.AsyncClient):
@@ -33,7 +36,19 @@ class ServiceClient(httpx.AsyncClient):
 
 
 class ServiceConnection:
-    def __init__(self, project: Project, service: Service, replica: Replica) -> None:
+    """Forward a replica's HTTP traffic over SSH to a stable local Unix socket.
+
+    Gateways supervise and reconnect the SSH process so Nginx can keep
+    using the same socket path. The in-server proxy opens connections on demand.
+    """
+
+    def __init__(
+        self,
+        project: Project,
+        service: Service,
+        replica: Replica,
+        reconnect_semaphore: asyncio.Semaphore,
+    ) -> None:
         self._temp_dir = TemporaryDirectory()
         options = {
             **SSH_DEFAULT_OPTIONS,
@@ -66,6 +81,7 @@ class ServiceConnection:
                 ),
             ],
             options=options,
+            background=service.domain is None,
         )
         self._client = ServiceClient(
             transport=AsyncHTTPTransport(uds=str(self._app_socket_path)),
@@ -75,29 +91,93 @@ class ServiceConnection:
             timeout=service.read_timeout,
         )
         self._is_open = asyncio.locks.Event()
+        self._lifecycle_lock = asyncio.Lock()
+        self._closed = False
+        self._monitor_task: Optional[asyncio.Task] = None
+        self._auto_reconnect = service.domain is not None
+        self._replica_id = replica.id
+        self._reconnect_semaphore = reconnect_semaphore
 
     @property
     def app_socket_path(self) -> Path:
         return self._app_socket_path
 
     async def open(self) -> None:
-        await self._tunnel.aopen()
-        self._is_open.set()
+        async with self._lifecycle_lock:
+            if self._closed:
+                raise UnexpectedProxyError("Cannot open a closed service connection")
+            if self._is_open.is_set():
+                return
+            await self._tunnel.aopen()
+            if self._closed:
+                # Removal may have started while SSH was connecting.
+                raise UnexpectedProxyError("Service connection was removed while opening")
+            self._is_open.set()
+            if self._auto_reconnect:
+                self._monitor_task = asyncio.create_task(self._monitor_tunnel())
 
     async def close(self) -> None:
-        self._is_open.clear()
-        await self._client.aclose()
-        await self._tunnel.aclose()
+        self._closed = True
+        # Removal must finish cleaning up even if its caller is cancelled.
+        cleanup = asyncio.create_task(self._close())
+        cancelled = None
+        while not cleanup.done():
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError as e:
+                cancelled = e
+        cleanup.result()
+        if cancelled is not None:
+            raise cancelled
 
     async def client(self) -> ServiceClient:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
         return self._client
+
+    async def _close(self) -> None:
+        async with self._lifecycle_lock:
+            if self._monitor_task is not None:
+                self._monitor_task.cancel()
+                await asyncio.gather(self._monitor_task, return_exceptions=True)
+                self._monitor_task = None
+            self._is_open.clear()
+            try:
+                await self._client.aclose()
+            finally:
+                await self._tunnel.aclose()
+
+    async def _monitor_tunnel(self) -> None:
+        loop = asyncio.get_running_loop()
+        retry_delay = 0
+        while True:
+            started_at = loop.time()
+            await self._tunnel.wait_closed()
+            if loop.time() - started_at >= MAX_TUNNEL_RECONNECT_DELAY:
+                retry_delay = 0
+            logger.warning("SSH tunnel to replica %s exited, reconnecting", self._replica_id)
+            # Reap any surviving ProxyCommand children before opening a replacement.
+            await self._tunnel.aclose()
+            while True:
+                if retry_delay:
+                    await asyncio.sleep(random.uniform(retry_delay / 2, retry_delay))
+                # Back off failed starts and tunnels that repeatedly exit just after startup.
+                retry_delay = min(max(1, retry_delay * 2), MAX_TUNNEL_RECONNECT_DELAY)
+                try:
+                    async with self._reconnect_semaphore:
+                        # Keep the socket path configured in Nginx. SSH replaces stale sockets.
+                        await self._tunnel.aopen()
+                except Exception as e:
+                    logger.warning("Could not reconnect to replica %s: %s", self._replica_id, e)
+                else:
+                    logger.info("SSH tunnel to replica %s reconnected", self._replica_id)
+                    break
 
 
 class ServiceConnectionPool:
     def __init__(self) -> None:
         # TODO(#2238): remove connections to stopped replicas in-server
         self.connections: Dict[str, ServiceConnection] = {}
+        self._reconnect_semaphore = asyncio.Semaphore(MAX_CONCURRENT_TUNNEL_RECONNECTS)
 
     async def get(self, replica_id: str) -> Optional[ServiceConnection]:
         return self.connections.get(replica_id)
@@ -108,12 +188,17 @@ class ServiceConnectionPool:
         connection = self.connections.get(replica.id)
         if connection is not None:
             return connection
-        connection = ServiceConnection(project, service, replica)
+        connection = ServiceConnection(project, service, replica, self._reconnect_semaphore)
         self.connections[replica.id] = connection
         try:
             await connection.open()
         except BaseException:
-            self.connections.pop(replica.id, None)
+            if self.connections.get(replica.id) is connection:
+                self.connections.pop(replica.id)
+            try:
+                await connection.close()
+            except Exception:
+                logger.exception("Error closing failed connection to replica %s", replica.id)
             raise
         return connection
 
