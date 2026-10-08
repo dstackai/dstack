@@ -227,22 +227,19 @@ class TestSSHTunnel:
     def test_check_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.check_command()
         assert " ".join(command) == (
-            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
-            " -O check ubuntu@my-server"
+            "/usr/bin/ssh -F none -o BatchMode=yes -S /tmp/control.sock -O check ubuntu@my-server"
         )
 
     def test_close_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.close_command()
         assert " ".join(command) == (
-            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
-            " -O exit ubuntu@my-server"
+            "/usr/bin/ssh -F none -o BatchMode=yes -S /tmp/control.sock -O exit ubuntu@my-server"
         )
 
     def test_exec_command(self, sample_tunnel_with_all_params: SSHTunnel) -> None:
         command = sample_tunnel_with_all_params.exec_command()
         assert " ".join(command) == (
-            "/usr/bin/ssh -F none -o BatchMode=yes -o ConnectTimeout=3 -S /tmp/control.sock"
-            " -n ubuntu@my-server"
+            "/usr/bin/ssh -F none -o BatchMode=yes -S /tmp/control.sock -n ubuntu@my-server"
         )
 
 

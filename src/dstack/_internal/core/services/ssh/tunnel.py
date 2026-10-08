@@ -18,7 +18,6 @@ from dstack._internal.utils.ssh import normalize_path
 
 logger = get_logger(__name__)
 SSH_TIMEOUT = 15
-SSH_CONTROL_CONNECT_TIMEOUT = 3
 SSH_DEFAULT_OPTIONS = {
     "StrictHostKeyChecking": "no",
     "UserKnownHostsFile": "/dev/null",
@@ -314,18 +313,16 @@ class SSHTunnel:
         await self.aclose()
 
     def _control_command_prefix(self) -> List[str]:
-        # If the master breaks off the initial exchange, ssh falls back to connecting to
-        # `destination` directly, even for `-O` commands. Ignore the user's ssh config and
-        # disable prompts so that such a connection fails instead of waiting for input on
-        # the terminal. `ConnectTimeout` also bounds the initial exchange with the master.
+        # If the master does not complete the initial exchange (or, for exec, the control socket
+        # is missing), OpenSSH falls back to connecting to `destination` directly, even for `-O`
+        # commands. Ignore the user's ssh config and disable prompts so that such a connection
+        # fails instead of waiting for input on the terminal.
         return [
             self.ssh_exec_path,
             "-F",
             "none",
             "-o",
             "BatchMode=yes",
-            "-o",
-            f"ConnectTimeout={SSH_CONTROL_CONNECT_TIMEOUT}",
             "-S",
             self.control_sock_path,
         ]
