@@ -31,6 +31,7 @@ from dstack._internal.server.models import (
     ServiceRouterWorkerSyncModel,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.runs.router_worker_sync import (
     run_model_has_sglang_router_replica_group,
@@ -287,7 +288,12 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 await _update_sync_row_or_log_lock_token_changed(session, item, cleanup_update_map)
             return
 
-        await sync_router_workers_for_run_model(run_for_sync)
+        try:
+            await sync_router_workers_for_run_model(run_for_sync)
+        except Exception:
+            logger.exception(
+                "%s: unexpected error when syncing workers with router", fmt(run_for_sync)
+            )
 
         update_map: _SyncRowUpdateMap = {}
         set_processed_update_map_fields(update_map)
