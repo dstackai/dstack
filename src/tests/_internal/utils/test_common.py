@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 import pytest
-from freezegun import freeze_time
 
 from dstack._internal.utils.common import (
     batched,
@@ -31,7 +30,7 @@ def test_local_time(dt: datetime, result: str) -> None:
     assert local_time(dt) == result
 
 
-@freeze_time(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc))
+@pytest.mark.time_machine(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc), tick=False)
 class TestPrettyDate:
     def test_now(self):
         now = datetime.now(tz=timezone.utc)

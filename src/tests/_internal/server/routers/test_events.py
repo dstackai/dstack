@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,14 +49,14 @@ class TestListEventsGeneral:
         )
         event_ids = [uuid.uuid4() for _ in range(2)]
         with patch("uuid.uuid4", side_effect=event_ids):
-            with freeze_time(datetime(2026, 1, 1, 12, 0, 0)):
+            with time_machine.travel(datetime(2026, 1, 1, 12, 0, 0), tick=False):
                 events.emit(
                     session,
                     "User added to project",
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(user), events.Target.from_model(project)],
                 )
-            with freeze_time(datetime(2026, 1, 1, 12, 0, 1)):
+            with time_machine.travel(datetime(2026, 1, 1, 12, 0, 1), tick=False):
                 events.emit(
                     session,
                     "Project updated",
@@ -1409,7 +1409,7 @@ class TestListEventsPagination:
         for i in range(5):
             user = await create_user(session=session, name=f"user_{i}")
             users.append(user)
-            with freeze_time(datetime(2026, 1, 1, 12, 0, 0, i)):
+            with time_machine.travel(datetime(2026, 1, 1, 12, 0, 0, i), tick=False):
                 events.emit(
                     session,
                     "User created",
@@ -1480,14 +1480,14 @@ class TestListEventsPagination:
         self, session: AsyncSession, client: AsyncClient
     ) -> None:
         users = [await create_user(session=session, name=f"user_{i}") for i in range(3)]
-        with freeze_time(datetime(2026, 1, 1, 12, 0, 0, 0)):
+        with time_machine.travel(datetime(2026, 1, 1, 12, 0, 0, 0), tick=False):
             events.emit(
                 session,
                 "Users batch created",
                 actor=events.SystemActor(),
                 targets=[events.Target.from_model(users[0]), events.Target.from_model(users[1])],
             )
-        with freeze_time(datetime(2026, 1, 1, 12, 0, 0, 1)):
+        with time_machine.travel(datetime(2026, 1, 1, 12, 0, 0, 1), tick=False):
             events.emit(
                 session,
                 "User created",

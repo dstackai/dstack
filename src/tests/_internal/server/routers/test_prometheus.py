@@ -4,7 +4,6 @@ from typing import Optional
 from unittest.mock import patch
 
 import pytest
-from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,7 +66,7 @@ def enable_metrics(monkeypatch: pytest.MonkeyPatch):
 FAKE_NOW = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
 
 
-@freeze_time(FAKE_NOW)
+@pytest.mark.time_machine(FAKE_NOW, tick=False)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("image_config_mock", "test_db", "enable_metrics")

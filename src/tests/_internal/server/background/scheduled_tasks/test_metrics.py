@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,7 +93,7 @@ class TestCollectMetrics:
 class TestDeleteMetrics:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_deletes_old_metrics_running_job(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -141,7 +141,7 @@ class TestDeleteMetrics:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_deletes_old_metrics_finished_job(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)

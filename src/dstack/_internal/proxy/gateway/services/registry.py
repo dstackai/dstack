@@ -1,6 +1,5 @@
 import asyncio
 from asyncio import Lock
-from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -26,6 +25,7 @@ from dstack._internal.proxy.lib.services.service_connection import (
     ServiceConnection,
     ServiceConnectionPool,
 )
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 ACCESS_LOG_PATH = Path("/var/log/nginx/dstack.access.log")
@@ -97,7 +97,7 @@ async def register_service(
                 models.ChatModel(
                     project_name=project_name,
                     name=model.name,
-                    created_at=datetime.now(),
+                    created_at=get_current_datetime(),
                     run_name=run_name,
                     format_spec=model_schema_to_format_spec(model),
                 ),

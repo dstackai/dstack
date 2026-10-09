@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,7 +118,7 @@ class TestAddUserPublicKey:
 
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.usefixtures("test_db")
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_adds_valid_public_key(
         self,
         session: AsyncSession,

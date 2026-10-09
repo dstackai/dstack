@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
@@ -115,7 +115,7 @@ class TestGetVolumeCost:
         )
         assert _get_volume_cost(volume) == 0.0
 
-    @freeze_time(datetime(2025, 1, 31, 0, 0, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2025, 1, 31, 0, 0, tzinfo=timezone.utc), tick=False)
     def test_calculates_active_volume_cost(self):
         volume = get_volume(
             status=VolumeStatus.ACTIVE,
@@ -125,7 +125,7 @@ class TestGetVolumeCost:
         )
         assert _get_volume_cost(volume) == pytest.approx(30.0)
 
-    @freeze_time(datetime(2025, 1, 31, 0, 0, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2025, 1, 31, 0, 0, tzinfo=timezone.utc), tick=False)
     def test_calculates_finished_volume_cost(self):
         volume = get_volume(
             provisioning_data=get_volume_provisioning_data(price=30),
@@ -136,7 +136,7 @@ class TestGetVolumeCost:
         # Cost should be for 15 days out of a 30-day pricing period
         assert _get_volume_cost(volume) == pytest.approx(15.0)
 
-    @freeze_time(datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc), tick=False)
     def test_calculates_zero_cost_for_zero_duration_active(self):
         volume = get_volume(
             status=VolumeStatus.ACTIVE,

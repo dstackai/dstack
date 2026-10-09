@@ -3,7 +3,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -928,7 +928,7 @@ class TestCreateProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_creates_project(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
@@ -1070,7 +1070,7 @@ class TestCreateProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_creates_public_project(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1099,7 +1099,7 @@ class TestCreateProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_creates_private_project_by_default(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1128,7 +1128,7 @@ class TestCreateProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_creates_private_project_explicitly(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
