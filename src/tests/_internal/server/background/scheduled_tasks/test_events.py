@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server import settings
@@ -16,7 +16,7 @@ from dstack._internal.server.testing.common import create_user, list_events
 async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
     user = await create_user(session=session)
     for i in range(10):
-        with freeze_time(datetime(2026, 1, 1, i)):
+        with time_machine.travel(datetime(2026, 1, 1, i), tick=False):
             events.emit(
                 session,
                 message=f"Event {i}",
@@ -30,7 +30,7 @@ async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
 
     with (
         patch.multiple(settings, SERVER_EVENTS_TTL_SECONDS=5 * 3600),
-        freeze_time(datetime(2026, 1, 1, 10)),
+        time_machine.travel(datetime(2026, 1, 1, 10), tick=False),
     ):
         await delete_events()
 

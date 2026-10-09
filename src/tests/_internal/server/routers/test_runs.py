@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -3571,7 +3571,7 @@ class TestApplyPlan:
             repo_id=repo.name,
         )
         run_spec.configuration.schedule = Schedule(cron=["5 * * * *", "10 * * * *"])
-        with freeze_time(datetime(2023, 1, 2, 3, 9, tzinfo=timezone.utc)):
+        with time_machine.travel(datetime(2023, 1, 2, 3, 9, tzinfo=timezone.utc), tick=False):
             response = await client.post(
                 f"/api/project/{project.name}/runs/apply",
                 headers=get_auth_headers(user.token),

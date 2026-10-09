@@ -1,12 +1,12 @@
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import httpx
 import pytest
-from freezegun import freeze_time
+import time_machine
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.proxy.gateway.app import make_app
@@ -209,7 +209,7 @@ class TestRegisterService:
         assert (tmp_path / "sites-enabled" / "443-test-run.gtw.test.conf").exists()
         assert system_mocks.reload_nginx.call_count == 1
 
-    @freeze_time(datetime(2024, 12, 12, 0, 30))
+    @time_machine.travel(datetime(2024, 12, 12, 0, 30, tzinfo=timezone.utc), tick=False)
     async def test_register_with_model(self, tmp_path: Path, system_mocks: Mocks) -> None:
         repo = GatewayProxyRepo()
         client = make_client(tmp_path, repo=repo)
@@ -225,7 +225,7 @@ class TestRegisterService:
             ChatModel(
                 project_name="test-proj",
                 name="test-model",
-                created_at=datetime(2024, 12, 12, 0, 30),
+                created_at=datetime(2024, 12, 12, 0, 30, tzinfo=timezone.utc),
                 run_name="test-run",
                 format_spec=OpenAIChatModelFormat(prefix="/v1"),
             )

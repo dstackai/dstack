@@ -4,7 +4,7 @@ from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import TaskConfiguration
@@ -187,7 +187,7 @@ class TestRunTerminatingWorker:
         assert run.lock_expires_at is None
         assert run.lock_owner is None
 
-    @freeze_time(datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc), tick=False)
     async def test_reschedules_scheduled_run_and_clears_fleet(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import ProbeConfig, ServiceConfiguration
@@ -138,7 +138,7 @@ class TestProcessProbes:
             session, job, probe_num=1, due=datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
         )
         processing_time = datetime(2025, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
-        with freeze_time(processing_time):
+        with time_machine.travel(processing_time, tick=False):
             with patch(
                 "dstack._internal.server.background.scheduled_tasks.probes.PROBES_SCHEDULER"
             ) as scheduler_mock:

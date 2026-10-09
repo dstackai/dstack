@@ -3,14 +3,14 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 
 from dstack._internal.proxy.gateway.schemas.stats import Stat
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 
 
 @pytest.mark.asyncio
-@freeze_time(datetime(2024, 12, 6, 12, 10, tzinfo=timezone.utc))
+@time_machine.travel(datetime(2024, 12, 6, 12, 10, tzinfo=timezone.utc), tick=False)
 @pytest.mark.parametrize(
     ("access_log", "expected_result"),
     [
@@ -128,7 +128,7 @@ async def test_collect_stats(access_log: str, expected_result: dict, tmp_path: P
 
 
 @pytest.mark.asyncio
-@freeze_time(datetime(2024, 12, 6, 12, 10, tzinfo=timezone.utc))
+@time_machine.travel(datetime(2024, 12, 6, 12, 10, tzinfo=timezone.utc), tick=False)
 async def test_collect_stats_after_log_update(tmp_path: Path) -> None:
     access_log_path = tmp_path / "dstack.access.log"
     collector = StatsCollector(access_log_path)

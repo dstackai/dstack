@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 import pytest_asyncio
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,7 +83,7 @@ class TestCollectPrometheusMetrics:
         ) as ShimClientMock:
             yield ShimClientMock.return_value
 
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_inserts_new_record(
         self, session: AsyncSession, job: JobModel, ssh_tunnel_mock: Mock, shim_client_mock: Mock
     ):
@@ -100,7 +100,7 @@ class TestCollectPrometheusMetrics:
         assert metrics.text == "# prom response"
         assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc)
 
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_updates_record(
         self, session: AsyncSession, job: JobModel, ssh_tunnel_mock: Mock, shim_client_mock: Mock
     ):
@@ -125,7 +125,7 @@ class TestCollectPrometheusMetrics:
         assert metrics.text == "# prom new response"
         assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc)
 
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_skips_recently_updated(
         self, session: AsyncSession, job: JobModel, ssh_tunnel_mock: Mock, shim_client_mock: Mock
     ):
@@ -150,7 +150,7 @@ class TestCollectPrometheusMetrics:
         assert metrics.text == "# prom old response"
         assert metrics.collected_at == datetime(2023, 1, 2, 3, 5, 15, tzinfo=timezone.utc)
 
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     @pytest.mark.dockerized(False)
     async def test_skips_non_dockerized_jobs(
         self, session: AsyncSession, job: JobModel, ssh_tunnel_mock: Mock, shim_client_mock: Mock
@@ -170,7 +170,7 @@ class TestCollectPrometheusMetrics:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("test_db", "image_config_mock")
 class TestDeletePrometheusMetrics:
-    @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc), tick=False)
     async def test_deletes_old_metrics(self, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)

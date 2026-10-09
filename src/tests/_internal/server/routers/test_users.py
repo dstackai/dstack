@@ -3,7 +3,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -413,7 +413,7 @@ class TestCreateUser:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_creates_user(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(name="admin", session=session)
         with patch("uuid.uuid4") as uuid_mock:
@@ -448,7 +448,7 @@ class TestCreateUser:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_return_400_if_username_taken(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -501,7 +501,7 @@ class TestCreateUser:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    @time_machine.travel(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc), tick=False)
     async def test_returns_400_if_username_invalid(
         self,
         test_db,

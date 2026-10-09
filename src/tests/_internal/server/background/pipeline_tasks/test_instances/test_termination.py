@@ -4,7 +4,7 @@ from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendError, NotYetTerminated
@@ -126,7 +126,7 @@ class TestTermination:
         await session.commit()
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=1), tick=False),
             self.mock_terminate_in_backend(error=error) as mock,
         ):
             await process_instance(session, worker, instance)
@@ -135,7 +135,7 @@ class TestTermination:
         assert instance.status == InstanceStatus.TERMINATING
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=2)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=2), tick=False),
             self.mock_terminate_in_backend(error=None) as mock,
         ):
             await process_instance(session, worker, instance)
@@ -162,7 +162,7 @@ class TestTermination:
         await session.commit()
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=1), tick=False),
             self.mock_terminate_in_backend(error=BackendError("err")) as mock,
         ):
             await process_instance(session, worker, instance)
@@ -174,7 +174,7 @@ class TestTermination:
         await session.commit()
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=1, seconds=11)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=1, seconds=11), tick=False),
             self.mock_terminate_in_backend(error=None) as mock,
         ):
             await process_instance(session, worker, instance)
@@ -201,7 +201,7 @@ class TestTermination:
         await session.commit()
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=1)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=1), tick=False),
             self.mock_terminate_in_backend(error=BackendError("err")) as mock,
         ):
             await process_instance(session, worker, instance)
@@ -210,7 +210,7 @@ class TestTermination:
         assert instance.status == InstanceStatus.TERMINATING
 
         with (
-            freeze_time(initial_time + dt.timedelta(minutes=15, seconds=55)),
+            time_machine.travel(initial_time + dt.timedelta(minutes=15, seconds=55), tick=False),
             self.mock_terminate_in_backend(error=None) as mock,
         ):
             await process_instance(session, worker, instance)

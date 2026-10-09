@@ -8,7 +8,7 @@ from uuid import UUID
 import botocore.exceptions
 import pytest
 import pytest_asyncio
-from freezegun import freeze_time
+import time_machine
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ServerClientError
@@ -799,7 +799,7 @@ class TestCloudWatchLogStorage:
     FAKE_NOW = datetime(2023, 10, 6, 10, 1, 54, tzinfo=timezone.utc)
 
     @pytest_asyncio.fixture
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def project(self, test_db, session: AsyncSession) -> ProjectModel:
         project = await create_project(session=session, name="test-proj")
         return project
@@ -1163,7 +1163,7 @@ class TestCloudWatchLogStorage:
             log_storage.poll_logs(project, poll_logs_request)
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs(
         self,
         project: ProjectModel,
@@ -1215,7 +1215,7 @@ class TestCloudWatchLogStorage:
         mock_client.put_log_events.assert_has_calls(expected_put_log_events_calls, any_order=True)
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_resource_not_found(
         self,
         project: ProjectModel,
@@ -1250,7 +1250,7 @@ class TestCloudWatchLogStorage:
         assert mock_client.put_log_events.call_count == 2
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_other_exception(
         self,
         project: ProjectModel,
@@ -1271,7 +1271,7 @@ class TestCloudWatchLogStorage:
             )
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_not_in_chronological_order(
         self,
         caplog: pytest.LogCaptureFixture,
@@ -1309,7 +1309,7 @@ class TestCloudWatchLogStorage:
         assert "events are not in chronological order" in caplog.text
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_past_and_future_events(
         self,
         caplog: pytest.LogCaptureFixture,
@@ -1375,7 +1375,7 @@ class TestCloudWatchLogStorage:
         ],
     )
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_batching_by_size(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -1422,7 +1422,7 @@ class TestCloudWatchLogStorage:
         ],
     )
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_batching_by_count(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -1454,7 +1454,7 @@ class TestCloudWatchLogStorage:
         assert actual == expected
 
     @pytest.mark.asyncio
-    @freeze_time(FAKE_NOW)
+    @time_machine.travel(FAKE_NOW, tick=False)
     async def test_write_logs_batching_by_timestamp(
         self,
         project: ProjectModel,
