@@ -103,6 +103,8 @@ class ServerCommand(BaseCommand):
             reload_excludes=reload_excludes,
             log_level=uvicorn_log_level,
             workers=1,
+            # uvloop spawns subprocesses with fork(), which can hang the server (#4362).
+            loop="asyncio",
         )
 
     def _configure_logging(self) -> None:
