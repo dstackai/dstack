@@ -33,6 +33,7 @@ from nebius.api.nebius.compute.v1 import (
     DiskServiceClient,
     DiskSpec,
     ExistingDisk,
+    FollowsSpotPriceSpec,
     GetInstanceRequest,
     GpuClusterServiceClient,
     GpuClusterSpec,
@@ -385,6 +386,9 @@ def create_instance(
                 SpotPricingPolicySpec(id=pricing_policy_id)
                 if pricing_policy_id is not None
                 else None
+            ),
+            follows_spot_price=(
+                FollowsSpotPriceSpec() if preemptible and pricing_policy_id is None else None
             ),
         ),
     )
