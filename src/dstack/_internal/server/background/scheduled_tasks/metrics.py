@@ -3,7 +3,7 @@ import json
 from collections.abc import Mapping
 from typing import List, Optional
 
-from sqlalchemy import Delete, delete, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
@@ -57,30 +57,23 @@ async def delete_metrics():
     finished_timestamp_micro_cutoff = (
         now_timestamp_micro - settings.SERVER_METRICS_FINISHED_TTL_SECONDS * 1_000_000
     )
-    await asyncio.gather(
-        _execute_delete_statement(
+    async with get_session_ctx() as session:
+        await session.execute(
             delete(JobMetricsPoint).where(
                 JobMetricsPoint.job_id.in_(
                     select(JobModel.id).where(JobModel.status.in_([JobStatus.RUNNING]))
                 ),
                 JobMetricsPoint.timestamp_micro < running_timestamp_micro_cutoff,
             )
-        ),
-        _execute_delete_statement(
+        )
+        await session.execute(
             delete(JobMetricsPoint).where(
                 JobMetricsPoint.job_id.in_(
                     select(JobModel.id).where(JobModel.status.in_(JobStatus.finished_statuses()))
                 ),
                 JobMetricsPoint.timestamp_micro < finished_timestamp_micro_cutoff,
             )
-        ),
-    )
-
-
-async def _execute_delete_statement(stmt: Delete) -> None:
-    async with get_session_ctx() as session:
-        await session.execute(stmt)
-        await session.commit()
+        )
 
 
 async def _collect_jobs_metrics(job_models: List[JobModel]):

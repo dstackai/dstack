@@ -10,7 +10,7 @@ import pydantic
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, joinedload, noload, selectinload
+from sqlalchemy.orm import aliased, joinedload, raiseload, selectinload
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -332,7 +332,7 @@ async def list_projects_run_models(
         .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(noload(RunModel.jobs))
+        .options(raiseload(RunModel.jobs))
         .order_by(*order_by)
         .limit(limit)
     )
