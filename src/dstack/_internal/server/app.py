@@ -18,7 +18,7 @@ from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
-from dstack._internal.server import settings
+from dstack._internal.server import bootstrap, settings
 from dstack._internal.server.background.pipeline_tasks import start_pipeline_tasks
 from dstack._internal.server.background.scheduled_tasks import start_scheduled_tasks
 from dstack._internal.server.background.scheduled_tasks.probes import PROBES_SCHEDULER
@@ -105,6 +105,11 @@ def create_app() -> FastAPI:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    if not bootstrap.is_process_set_up():
+        logger.warning(
+            "dstack._internal.server.bootstrap.set_up_process() was not called."
+            " Server entry points must call it before importing other dstack modules."
+        )
     if settings.SENTRY_DSN is not None:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
