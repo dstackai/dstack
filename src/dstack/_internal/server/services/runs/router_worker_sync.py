@@ -1,7 +1,6 @@
 """Reconcile SGLang router /workers with dstack's ready worker replicas (async, SSH-tunneled)."""
 
 import asyncio
-import json
 import logging
 from collections.abc import Awaitable
 from contextlib import AsyncExitStack
@@ -327,6 +326,7 @@ _ROUTER_MAX_WORKERS_LIST_ITEMS = 8192
 
 _WORKER_BASE_URL = "http://worker"
 _WORKER_PROBE_TIMEOUT = 30.0
+_WORKER_MAX_MODELS_RESPONSE_BYTES = 256 * 1024
 _WORKER_MAX_SERVER_INFO_RESPONSE_BYTES = 256 * 1024
 _WORKER_LABEL_DSTACK_JOB_ID = "dstack.ai/job-id"
 
@@ -390,6 +390,39 @@ _ConnectionMode = Literal["http", "grpc"]
 # https://github.com/smg-project/smg/blob/3be823a700fabaff3add8a390cf78f163479d686/crates/protocols/src/worker.rs#L227
 # Only types we support are included
 _RuntimeType = Literal["sglang", "vllm"]
+
+
+# https://github.com/sgl-project/sglang/blob/e00930c5489053f26d86b179cee0d087f846acbb/python/sglang/srt/entrypoints/openai/protocol.py#L81
+# https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/serve/engine/protocol.py#L105
+# Only fields used to detect the runtime are included
+class _ModelCard(TypedDict):
+    owned_by: str
+
+
+# https://github.com/sgl-project/sglang/blob/e00930c5489053f26d86b179cee0d087f846acbb/python/sglang/srt/entrypoints/openai/protocol.py#L93
+# https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/serve/engine/protocol.py#L116
+class _ModelList(TypedDict):
+    data: Annotated[list[_ModelCard], Field(min_length=1)]
+
+
+_model_list_ta = TypeAdapter(_ModelList)
+
+
+# https://github.com/smg-project/smg/blob/3be823a700fabaff3add8a390cf78f163479d686/grpc_servicer/smg_grpc_servicer/sglang/servicer.py#L484
+# Only fields used to build the target worker are included
+class _SGLangServerArgs(TypedDict):
+    disaggregation_mode: NotRequired[Literal["null", "prefill", "decode"]]
+    disaggregation_bootstrap_port: NotRequired[int]
+
+
+# https://github.com/sgl-project/sglang/blob/e00930c5489053f26d86b179cee0d087f846acbb/python/sglang/srt/entrypoints/http_server.py#L841
+# Server args merged with scheduler info
+class _SGLangServerInfo(_SGLangServerArgs):
+    status: str
+
+
+_sglang_server_args_ta = TypeAdapter(_SGLangServerArgs)
+_sglang_server_info_ta = TypeAdapter(_SGLangServerInfo)
 
 
 class _ResponseTooLargeError(DstackError):
@@ -599,66 +632,148 @@ async def _probe_http_worker(
     worker_url = f"http://{address}"
     logger.debug("%s: %s: probing", log_prefix, worker_url)
 
+    # Until the runtime is detected, failures that are expected from a gRPC worker, a worker that
+    # is still starting, or an HTTP server that is not a worker at all are logged at debug level:
+    # they repeat every sync.
     try:
         status_code, raw_response = await _request_json_limited(
             client,
             "GET",
-            f"{_WORKER_BASE_URL}/server_info",
-            max_response_bytes=_WORKER_MAX_SERVER_INFO_RESPONSE_BYTES,
+            f"{_WORKER_BASE_URL}/v1/models",
+            max_response_bytes=_WORKER_MAX_MODELS_RESPONSE_BYTES,
             timeout=_WORKER_PROBE_TIMEOUT,
         )
     except RequestError as e:
-        logger.debug("%s: %s: GET /server_info: request failed: %r", log_prefix, worker_url, e)
+        logger.debug("%s: %s: GET /v1/models: request failed: %r", log_prefix, worker_url, e)
         return None
     except _ResponseTooLargeError:
-        logger.warning("%s: %s: GET /server_info: response too large", log_prefix, worker_url)
+        logger.debug("%s: %s: GET /v1/models: response too large", log_prefix, worker_url)
         return None
 
+    if status_code == 404:
+        logger.debug(
+            "%s: %s: GET /v1/models: status code: %s", log_prefix, worker_url, status_code
+        )
+        return None
+
+    # E.g., 401 from a worker that requires an API key
     if status_code != 200:
         logger.warning(
-            "%s: %s: GET /server_info: unexpected status code: %s",
+            "%s: %s: GET /v1/models: unexpected status code: %s",
             log_prefix,
             worker_url,
             status_code,
         )
         return None
 
-    # ValueError, not JSONDecodeError: a body that is not valid UTF-8 raises UnicodeDecodeError
     try:
-        data = json.loads(raw_response)
-    except ValueError as e:
-        logger.warning(
-            "%s: %s: GET /server_info: response parsing failed: %s", log_prefix, worker_url, e
+        response = _model_list_ta.validate_json(raw_response)
+    except ValidationError as e:
+        logger.debug(
+            "%s: %s: GET /v1/models: response parsing failed: %s", log_prefix, worker_url, e
         )
         return None
-    if isinstance(data, dict):
-        if data.get("status") != "ready":
+
+    # The same way as SMG detects it, see
+    # https://github.com/smg-project/smg/blob/3be823a700fabaff3add8a390cf78f163479d686/model_gateway/src/workflow/steps/local/detect_backend.rs#L121
+    match owned_by := response["data"][0]["owned_by"]:
+        case "sglang":
+            return await _probe_sglang_http_worker(client, log_prefix=log_prefix, address=address)
+        case "vllm":
+            logger.warning(
+                "%s: %s: %s: HTTP workers are not supported, use gRPC",
+                log_prefix,
+                worker_url,
+                owned_by,
+            )
             return None
-        mode = data.get("disaggregation_mode", "")
-        if mode == "prefill":
-            bootstrap_port = data.get("disaggregation_bootstrap_port")
-            worker: _TargetWorker = {
-                "url": worker_url,
-                "worker_type": "prefill",
-                "connection_mode": "http",
-                "runtime_type": "sglang",
-            }
-            if bootstrap_port is not None:
-                worker["bootstrap_port"] = bootstrap_port
-            return worker
-        if mode == "decode":
-            return {
-                "url": worker_url,
-                "worker_type": "decode",
-                "connection_mode": "http",
-                "runtime_type": "sglang",
-            }
-        return {
-            "url": worker_url,
-            "worker_type": "regular",
-            "connection_mode": "http",
-            "runtime_type": "sglang",
-        }
+        case _:
+            logger.warning(
+                "%s: %s: GET /v1/models: unsupported runtime: %s", log_prefix, worker_url, owned_by
+            )
+            return None
+
+
+async def _probe_sglang_http_worker(
+    client: AsyncClient, *, log_prefix: str, address: str
+) -> Optional[_TargetWorker]:
+    runtime_type: _RuntimeType = "sglang"
+    worker_url = f"http://{address}"
+
+    # The runtime is already detected, so any failure is unexpected
+    path = "/server_info"
+    try:
+        status_code, raw_response = await _request_sglang_server_info(client, path=path)
+        # SGLang < 0.5.6 only serves the deprecated endpoint
+        if status_code == 404:
+            path = "/get_server_info"
+            status_code, raw_response = await _request_sglang_server_info(client, path=path)
+    except RequestError as e:
+        logger.warning(
+            "%s: %s: %s: GET %s: request failed: %r",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            path,
+            e,
+        )
+        return None
+    except _ResponseTooLargeError:
+        logger.warning(
+            "%s: %s: %s: GET %s: response too large",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            path,
+        )
+        return None
+
+    if status_code != 200:
+        logger.warning(
+            "%s: %s: %s: GET %s: unexpected status code: %s",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            path,
+            status_code,
+        )
+        return None
+
+    try:
+        response = _sglang_server_info_ta.validate_json(raw_response)
+    except ValidationError as e:
+        logger.warning(
+            "%s: %s: %s: GET %s: response parsing failed: %s",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            path,
+            e,
+        )
+        return None
+
+    if response["status"] != "ready":
+        logger.warning(
+            "%s: %s: %s: GET %s: status is not ready: %s",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            path,
+            response["status"],
+        )
+        return None
+
+    return _get_sglang_target_worker(response, url=worker_url, connection_mode="http")
+
+
+async def _request_sglang_server_info(client: AsyncClient, *, path: str) -> tuple[int, bytes]:
+    return await _request_json_limited(
+        client,
+        "GET",
+        f"{_WORKER_BASE_URL}{path}",
+        max_response_bytes=_WORKER_MAX_SERVER_INFO_RESPONSE_BYTES,
+        timeout=_WORKER_PROBE_TIMEOUT,
+    )
 
 
 async def _probe_sglang_grpc_worker(
@@ -667,7 +782,7 @@ async def _probe_sglang_grpc_worker(
     runtime_type: _RuntimeType = "sglang"
     # The RPC goes over the tunnel, `worker_url` is the address the router itself dials.
     worker_url = f"grpc://{address}"
-    logger.debug("%s: %s: probing %s", log_prefix, worker_url, runtime_type)
+    logger.debug("%s: %s: %s: probing", log_prefix, worker_url, runtime_type)
 
     stub = sglang_scheduler_pb2_grpc.SglangSchedulerStub(channel)
     request = sglang_scheduler_pb2.GetServerInfoRequest()
@@ -675,12 +790,37 @@ async def _probe_sglang_grpc_worker(
     try:
         response = await stub.GetServerInfo(request, timeout=_WORKER_PROBE_TIMEOUT)
     except grpc.aio.AioRpcError as e:
-        _log_failed_grpc_worker_probe(
-            log_prefix=log_prefix, worker_url=worker_url, runtime_type=runtime_type, error=e
+        _log_failed_grpc_worker_request(
+            log_prefix=log_prefix,
+            worker_url=worker_url,
+            runtime_type=runtime_type,
+            method="GetServerInfo",
+            error=e,
         )
         return None
 
-    server_args = MessageToDict(response.server_args, preserving_proto_field_name=True)
+    # MessageToDict raises ValueError, validate_python raises ValidationError, which is a subclass
+    # of ValueError
+    try:
+        server_args = _sglang_server_args_ta.validate_python(
+            MessageToDict(response.server_args, preserving_proto_field_name=True)
+        )
+    except ValueError as e:
+        logger.warning(
+            "%s: %s: %s: GetServerInfo: server_args parsing failed: %s",
+            log_prefix,
+            worker_url,
+            runtime_type,
+            e,
+        )
+        return None
+
+    return _get_sglang_target_worker(server_args, url=worker_url, connection_mode="grpc")
+
+
+def _get_sglang_target_worker(
+    server_args: _SGLangServerArgs, *, url: str, connection_mode: _ConnectionMode
+) -> _TargetWorker:
     worker_type: _WorkerType
     match disaggregation_mode := server_args.get("disaggregation_mode"):
         case "prefill" | "decode":
@@ -688,15 +828,15 @@ async def _probe_sglang_grpc_worker(
         case _:
             worker_type = "regular"
     worker: _TargetWorker = {
-        "url": worker_url,
+        "url": url,
         "worker_type": worker_type,
-        "connection_mode": "grpc",
-        "runtime_type": runtime_type,
+        "connection_mode": connection_mode,
+        "runtime_type": "sglang",
     }
     if worker_type == "prefill":
         bootstrap_port = server_args.get("disaggregation_bootstrap_port")
         if bootstrap_port is not None:
-            worker["bootstrap_port"] = int(bootstrap_port)
+            worker["bootstrap_port"] = bootstrap_port
     return worker
 
 
@@ -706,7 +846,7 @@ async def _probe_vllm_grpc_worker(
     runtime_type: _RuntimeType = "vllm"
     # The RPC goes over the tunnel, `worker_url` is the address the router itself dials.
     worker_url = f"grpc://{address}"
-    logger.debug("%s: %s: probing %s", log_prefix, worker_url, runtime_type)
+    logger.debug("%s: %s: %s: probing", log_prefix, worker_url, runtime_type)
 
     stub = vllm_engine_pb2_grpc.VllmEngineStub(channel)
     request = vllm_engine_pb2.GetServerInfoRequest()
@@ -714,8 +854,12 @@ async def _probe_vllm_grpc_worker(
     try:
         response = await stub.GetServerInfo(request, timeout=_WORKER_PROBE_TIMEOUT)
     except grpc.aio.AioRpcError as e:
-        _log_failed_grpc_worker_probe(
-            log_prefix=log_prefix, worker_url=worker_url, runtime_type=runtime_type, error=e
+        _log_failed_grpc_worker_request(
+            log_prefix=log_prefix,
+            worker_url=worker_url,
+            runtime_type=runtime_type,
+            method="GetServerInfo",
+            error=e,
         )
         return None
 
@@ -740,16 +884,21 @@ async def _probe_vllm_grpc_worker(
     return worker
 
 
-def _log_failed_grpc_worker_probe(
-    log_prefix: str, worker_url: str, runtime_type: _RuntimeType, error: grpc.aio.AioRpcError
+def _log_failed_grpc_worker_request(
+    log_prefix: str,
+    worker_url: str,
+    runtime_type: _RuntimeType,
+    method: str,
+    error: grpc.aio.AioRpcError,
 ):
     log_level = logging.DEBUG if _is_expected_grpc_error(error) else logging.WARNING
     logger.log(
         log_level,
-        "%s: %s: %s probe failed: %s: %s",
+        "%s: %s: %s: %s: request failed: %s: %s",
         log_prefix,
         worker_url,
         runtime_type,
+        method,
         error.code(),
         error.details(),
     )

@@ -33,6 +33,7 @@ from dstack._internal.server.services.runs.router_worker_sync import (
     _get_worker_jobs_with_addresses,
     _probe_http_worker,
     _probe_sglang_grpc_worker,
+    _probe_sglang_http_worker,
     _probe_vllm_grpc_worker,
     _probe_worker_replica,
     _remove_worker_from_router,
@@ -277,7 +278,7 @@ class TestSyncRouterWorkersForRunModel:
 class TestProbeWorkerReplica:
     async def test_detects_http_sglang_worker(self):
         with _fake_replica_transports(
-            http_handler=lambda _: httpx.Response(200, json={"status": "ready"}),
+            http_handler=_sglang_http_handler({"status": "ready"}),
             # The HTTP/1.1 server answers the HTTP/2 preface with an error
             grpc_channel=_FakeGrpcChannel(unknown_method_code=grpc.StatusCode.UNAVAILABLE),
         ):
@@ -324,7 +325,7 @@ class TestProbeWorkerReplica:
 
     async def test_returns_none_when_no_probe_succeeds(self):
         with _fake_replica_transports(
-            http_handler=lambda _: httpx.Response(200, json={"status": "starting"}),
+            http_handler=_sglang_http_handler({"status": "starting"}),
             grpc_channel=_FakeGrpcChannel(unknown_method_code=grpc.StatusCode.UNAVAILABLE),
         ):
             assert await _probe_worker_replica(_job(), address="10.0.0.1:8000") is None
@@ -332,7 +333,7 @@ class TestProbeWorkerReplica:
     async def test_cancels_pending_probes_after_success(self):
         grpc_channel = _FakeGrpcChannel(hang=True)
         with _fake_replica_transports(
-            http_handler=lambda _: httpx.Response(200, json={"status": "ready"}),
+            http_handler=_sglang_http_handler({"status": "ready"}),
             grpc_channel=grpc_channel,
         ):
             worker = await _probe_worker_replica(_job(), address="10.0.0.1:8000")
@@ -690,6 +691,87 @@ class TestRemoveWorkerFromRouter:
 
 @pytest.mark.asyncio
 class TestProbeHttpWorker:
+    async def test_detects_sglang_worker(self):
+        async with _mock_client(_sglang_http_handler({"status": "ready"})) as client:
+            worker = await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+        assert worker == {
+            "url": "http://10.0.0.1:8000",
+            "worker_type": "regular",
+            "connection_mode": "http",
+            "runtime_type": "sglang",
+        }
+
+    @pytest.mark.parametrize(
+        "response",
+        [
+            pytest.param(httpx.Response(404), id="not-found"),
+            pytest.param(httpx.Response(200, content=b"<!doctype html>"), id="not-json"),
+            pytest.param(httpx.Response(200, json={"status": "ok"}), id="not-model-list"),
+            pytest.param(httpx.Response(200, json={"data": []}), id="no-models"),
+            pytest.param(httpx.Response(200, json={"data": [{"id": "m"}]}), id="no-owned-by"),
+            pytest.param(httpx.Response(200, content=b" " * (256 * 1024 + 1)), id="too-large"),
+        ],
+    )
+    async def test_returns_none_quietly_when_not_worker(
+        self, caplog: pytest.LogCaptureFixture, response: httpx.Response
+    ):
+        caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
+        async with _mock_client(lambda _: response) as client:
+            assert (
+                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                is None
+            )
+        # Repeats every sync if the service port is served by an HTTP server that is not a
+        # worker, so it must not be logged as an error.
+        assert "Worker: http://10.0.0.1:8000: GET /v1/models: " in caplog.text
+        assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
+
+    async def test_returns_none_quietly_on_request_error(self, caplog: pytest.LogCaptureFixture):
+        caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
+        async with _mock_client(_grpc_server_http_handler) as client:
+            assert (
+                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                is None
+            )
+        # Repeats every sync until the worker is up, or forever if it is a gRPC worker, so it
+        # must not be logged as an error, see https://github.com/dstackai/dstack/issues/4300.
+        assert "GET /v1/models: request failed" in caplog.text
+        assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
+
+    @pytest.mark.parametrize(
+        ["response", "message"],
+        [
+            pytest.param(
+                # A worker that requires an API key
+                httpx.Response(401),
+                "Worker: http://10.0.0.1:8000: GET /v1/models: unexpected status code: 401",
+                id="unauthorized",
+            ),
+            pytest.param(
+                httpx.Response(200, json={"data": [{"owned_by": "vllm"}]}),
+                "Worker: http://10.0.0.1:8000: vllm: HTTP workers are not supported, use gRPC",
+                id="vllm",
+            ),
+            pytest.param(
+                httpx.Response(200, json={"data": [{"owned_by": "tgi"}]}),
+                "Worker: http://10.0.0.1:8000: GET /v1/models: unsupported runtime: tgi",
+                id="unsupported-runtime",
+            ),
+        ],
+    )
+    async def test_warns_when_worker_not_supported(
+        self, caplog: pytest.LogCaptureFixture, response: httpx.Response, message: str
+    ):
+        async with _mock_client(lambda _: response) as client:
+            assert (
+                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                is None
+            )
+        assert message in caplog.text
+
+
+@pytest.mark.asyncio
+class TestProbeSglangHttpWorker:
     """
     The probe talks to the replica over the tunnel, but the `url` it reports is the address the
     router dials.
@@ -721,7 +803,9 @@ class TestProbeHttpWorker:
     )
     async def test_reports_worker(self, server_info: dict, expected: dict):
         async with _mock_client(lambda _: httpx.Response(200, json=server_info)) as client:
-            worker = await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+            worker = await _probe_sglang_http_worker(
+                client, log_prefix="Worker", address="10.0.0.1:8000"
+            )
         assert worker == {
             "url": "http://10.0.0.1:8000",
             "connection_mode": "http",
@@ -729,54 +813,109 @@ class TestProbeHttpWorker:
             **expected,
         }
 
-    async def test_returns_none_when_not_ready(self):
+    async def test_falls_back_to_deprecated_endpoint(self):
+        # SGLang < 0.5.6
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/get_server_info":
+                return httpx.Response(200, json={"status": "ready"})
+            return httpx.Response(404)
+
+        async with _mock_client(handler) as client:
+            worker = await _probe_sglang_http_worker(
+                client, log_prefix="Worker", address="10.0.0.1:8000"
+            )
+        assert worker == {
+            "url": "http://10.0.0.1:8000",
+            "worker_type": "regular",
+            "connection_mode": "http",
+            "runtime_type": "sglang",
+        }
+
+    async def test_returns_none_when_not_ready(self, caplog: pytest.LogCaptureFixture):
         response = httpx.Response(200, json={"status": "starting"})
         async with _mock_client(lambda _: response) as client:
             assert (
-                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                await _probe_sglang_http_worker(
+                    client, log_prefix="Worker", address="10.0.0.1:8000"
+                )
                 is None
             )
+        assert (
+            "Worker: http://10.0.0.1:8000: sglang: GET /server_info: status is not ready: starting"
+            in caplog.text
+        )
 
     @pytest.mark.parametrize(
         "body",
         [
             pytest.param(b"not json", id="not-json"),
-            # Detected as UTF-16 by its BOM, but not valid UTF-16
-            pytest.param(b"\xff\xfe\xfa", id="not-text"),
+            pytest.param(b"\xff\xfe\xfa", id="not-utf-8"),
+            pytest.param(b"[]", id="not-object"),
+            pytest.param(b"{}", id="no-status"),
+            pytest.param(
+                json.dumps({"status": "ready", "disaggregation_mode": "encode"}).encode(),
+                id="unknown-disaggregation-mode",
+            ),
+            pytest.param(
+                json.dumps(
+                    {
+                        "status": "ready",
+                        "disaggregation_mode": "prefill",
+                        "disaggregation_bootstrap_port": "auto",
+                    }
+                ).encode(),
+                id="non-integer-bootstrap-port",
+            ),
         ],
     )
-    async def test_returns_none_on_unparsable_body(
+    async def test_returns_none_on_invalid_body(
         self, caplog: pytest.LogCaptureFixture, body: bytes
     ):
         async with _mock_client(lambda _: httpx.Response(200, content=body)) as client:
             assert (
-                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                await _probe_sglang_http_worker(
+                    client, log_prefix="Worker", address="10.0.0.1:8000"
+                )
                 is None
             )
         assert (
-            "Worker: http://10.0.0.1:8000: GET /server_info: response parsing failed"
+            "Worker: http://10.0.0.1:8000: sglang: GET /server_info: response parsing failed"
             in caplog.text
         )
 
-    async def test_returns_none_on_unexpected_status(self, caplog: pytest.LogCaptureFixture):
-        async with _mock_client(lambda _: httpx.Response(404)) as client:
+    @pytest.mark.parametrize(
+        ["status_code", "message"],
+        [
+            pytest.param(500, "GET /server_info: unexpected status code: 500", id="error"),
+            pytest.param(404, "GET /get_server_info: unexpected status code: 404", id="not-found"),
+        ],
+    )
+    async def test_returns_none_on_unexpected_status(
+        self, caplog: pytest.LogCaptureFixture, status_code: int, message: str
+    ):
+        async with _mock_client(lambda _: httpx.Response(status_code)) as client:
             assert (
-                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                await _probe_sglang_http_worker(
+                    client, log_prefix="Worker", address="10.0.0.1:8000"
+                )
                 is None
             )
-        assert "GET /server_info: unexpected status code: 404" in caplog.text
+        assert f"Worker: http://10.0.0.1:8000: sglang: {message}" in caplog.text
 
     async def test_returns_none_on_request_error(self, caplog: pytest.LogCaptureFixture):
-        caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
-        async with _mock_client(_grpc_server_http_handler) as client:
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ReadError("connection reset")
+
+        async with _mock_client(handler) as client:
             assert (
-                await _probe_http_worker(client, log_prefix="Worker", address="10.0.0.1:8000")
+                await _probe_sglang_http_worker(
+                    client, log_prefix="Worker", address="10.0.0.1:8000"
+                )
                 is None
             )
-        # Repeats every sync until the worker is up, or forever if it is a gRPC worker, so it
-        # must not be logged as an error, see https://github.com/dstackai/dstack/issues/4300.
-        assert "GET /server_info: request failed" in caplog.text
-        assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
+        assert (
+            "Worker: http://10.0.0.1:8000: sglang: GET /server_info: request failed" in caplog.text
+        )
 
 
 @pytest.mark.asyncio
@@ -850,7 +989,37 @@ class TestProbeSglangGrpcWorker:
             is None
         )
         assert (
-            "Worker: grpc://10.0.0.1:8000: sglang probe failed: StatusCode.PERMISSION_DENIED"
+            "Worker: grpc://10.0.0.1:8000: sglang: GetServerInfo: request failed:"
+            " StatusCode.PERMISSION_DENIED"
+        ) in caplog.text
+
+    @pytest.mark.parametrize(
+        "server_args",
+        [
+            pytest.param({"disaggregation_mode": "encode"}, id="unknown-disaggregation-mode"),
+            pytest.param(
+                {"disaggregation_mode": "prefill", "disaggregation_bootstrap_port": 8998.5},
+                id="non-integer-bootstrap-port",
+            ),
+            # `MessageToDict` fails on any non-finite number, including in fields the probe
+            # doesn't use
+            pytest.param(
+                {"disaggregation_mode": "null", "max_total_tokens": float("inf")},
+                id="non-finite-number",
+            ),
+        ],
+    )
+    async def test_returns_none_on_invalid_server_args(
+        self, caplog: pytest.LogCaptureFixture, server_args: dict
+    ):
+        response = sglang_scheduler_pb2.GetServerInfoResponse(server_args=server_args)
+        channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: response})
+        assert (
+            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            is None
+        )
+        assert (
+            "Worker: grpc://10.0.0.1:8000: sglang: GetServerInfo: server_args parsing failed"
             in caplog.text
         )
 
@@ -937,9 +1106,9 @@ class TestProbeVllmGrpcWorker:
             is None
         )
         assert (
-            "Worker: grpc://10.0.0.1:8000: vllm probe failed: StatusCode.PERMISSION_DENIED"
-            in caplog.text
-        )
+            "Worker: grpc://10.0.0.1:8000: vllm: GetServerInfo: request failed:"
+            " StatusCode.PERMISSION_DENIED"
+        ) in caplog.text
 
 
 def _service_configuration() -> ServiceConfiguration:
@@ -1146,6 +1315,19 @@ def _fake_replica_transports(
         ),
     ):
         yield
+
+
+def _sglang_http_handler(server_info: dict) -> Callable[[httpx.Request], httpx.Response]:
+    """An SGLang HTTP worker replica that reports the given server info"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "model", "owned_by": "sglang"}]})
+        if request.url.path == "/server_info":
+            return httpx.Response(200, json=server_info)
+        return httpx.Response(404)
+
+    return handler
 
 
 def _grpc_server_http_handler(request: httpx.Request) -> httpx.Response:
