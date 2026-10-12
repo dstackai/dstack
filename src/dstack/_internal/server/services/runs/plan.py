@@ -8,7 +8,8 @@ from typing import Optional, Union
 
 from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, noload
+from sqlalchemy.orm import contains_eager, raiseload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.common import EntityReference
@@ -336,10 +337,13 @@ async def select_run_candidate_fleet_models_with_filters(
                 not_(and_(*instance_filters)),
             )
         )
-        .options(noload(FleetModel.instances))
+        .options(raiseload(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
+    for fleet_model in fleet_models_without_instances:
+        # No instances match the filters, consistent with contains_eager() in the first query
+        set_committed_value(fleet_model, "instances", [])
     return fleet_models_with_instances, fleet_models_without_instances
 
 
