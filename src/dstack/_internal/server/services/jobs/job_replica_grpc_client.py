@@ -21,7 +21,7 @@ _GRPC_CHANNEL_OPTIONS = (
 @asynccontextmanager
 async def get_service_replica_grpc_channel_over_uds(
     uds_path: Path,
-) -> AsyncGenerator[Any, None]:
+) -> AsyncGenerator[grpc.aio.Channel, None]:
     target = f"unix://{uds_path}"
     channel = grpc.aio.insecure_channel(target, options=_GRPC_CHANNEL_OPTIONS)
     try:

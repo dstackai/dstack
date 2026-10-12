@@ -586,9 +586,49 @@ class TestServiceRouterWorkerSyncWorker:
             await worker.process(item)
 
         assert (
-            f"job({router_job.id.hex[:6]}){router_job.job_name}:"
-            f" failed to sync workers with router: {ssh_error!r}" in caplog.text
+            f"Router job({router_job.id.hex[:6]}){router_job.job_name}:"
+            f" failed to connect: {ssh_error!r}" in caplog.text
         )
         await session.refresh(sync_row)
         assert sync_row.deleted is False
         assert sync_row.lock_token is None
+
+    async def test_process_unlocks_when_sync_fails_unexpectedly(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: ServiceRouterWorkerSyncWorker,
+        caplog: pytest.LogCaptureFixture,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+            run_spec=_router_service_run_spec(repo.name),
+        )
+        sync_row = await _add_service_router_worker_sync_row(session, run.id)
+        sync_row.lock_token = uuid.uuid4()
+        sync_row.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
+        sync_row.lock_owner = ServiceRouterWorkerSyncPipeline.__name__
+        await session.commit()
+        item = _sync_row_to_pipeline_item(sync_row)
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.service_router_worker_sync"
+            ".sync_router_workers_for_run_model",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("boom"),
+        ):
+            await worker.process(item)
+
+        assert "unexpected error when syncing workers with router" in caplog.text
+        await session.refresh(sync_row)
+        assert sync_row.deleted is False
+        assert sync_row.lock_token is None
+        assert sync_row.lock_expires_at is None
+        assert sync_row.lock_owner is None
