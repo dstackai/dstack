@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dstack._internal.proxy.gateway import otel
 from dstack._internal.proxy.gateway.auth import GatewayProxyAuthProvider
 from dstack._internal.proxy.gateway.const import (
     DSTACK_DIR_ON_GATEWAY,
@@ -43,6 +44,8 @@ async def lifespan(app: FastAPI):
     repo = await get_gateway_proxy_repo(await injector.get_repo().__anext__())
     nginx = injector.get_nginx()
     service_conn_pool = await injector.get_service_connection_pool()
+    # Before anything else to capture the telemetry of the startup
+    otel.apply_settings((await repo.get_config()).otel_settings)
     await run_async(nginx.write_global_conf)
     await apply_all(repo, nginx, service_conn_pool)
 

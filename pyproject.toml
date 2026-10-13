@@ -225,6 +225,13 @@ gateway = [
     # Gateway authorization needs the pool cancellation and recovery fixes in httpx2 (#4338).
     "httpx2>=2.13.1",
     "jinja2",
+    # Always installed so that OpenTelemetry can be enabled without reinstalling the gateway.
+    "opentelemetry-sdk>=1.30.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.30.0",
+    "opentelemetry-instrumentation-fastapi>=0.51b0",
+    "opentelemetry-instrumentation-httpx>=0.51b0",
+    "opentelemetry-instrumentation-system-metrics>=0.51b0",
+    "opentelemetry-instrumentation-logging>=0.61b0",
 ]
 server = [
     "fastapi",

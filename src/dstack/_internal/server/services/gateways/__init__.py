@@ -6,7 +6,6 @@ import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
-from functools import partial
 from typing import List, Optional, Sequence
 
 import httpx
@@ -52,6 +51,7 @@ from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, format_diff_fields_for_event
 from dstack._internal.core.services.gateways import diff_gateway_configurations
 from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
+from dstack._internal.proxy.gateway.models import OTelSettings
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
@@ -71,6 +71,10 @@ from dstack._internal.server.services.backends import (
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.services.gateways.telemetry import (
+    get_gateway_replica_otel_settings,
+    validate_gateway_otel_config,
+)
 from dstack._internal.server.services.locking import (
     advisory_lock_ctx,
     get_locker,
@@ -78,6 +82,7 @@ from dstack._internal.server.services.locking import (
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import (
@@ -88,7 +93,7 @@ from dstack._internal.utils.common import (
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-_CONF_UPDATABLE_FIELDS = frozenset({"domain", "default", "replicas"})
+_CONF_UPDATABLE_FIELDS = frozenset({"domain", "default", "replicas", "otel"})
 
 
 def switch_gateway_status(
@@ -174,7 +179,11 @@ async def list_project_gateways(
         load_backend_type=True,
     )
     return [
-        gateway_model_to_gateway(g, default_gateway_id=project.default_gateway_id)
+        _hide_owner_only_fields(
+            gateway_model_to_gateway(g, default_gateway_id=project.default_gateway_id),
+            gateway_model=g,
+            viewer_project=project,
+        )
         for g in gateways
     ]
 
@@ -191,7 +200,25 @@ async def get_gateway_by_name(
     )
     if gateway is None:
         return None
-    return gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id)
+    return _hide_owner_only_fields(
+        gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id),
+        gateway_model=gateway,
+        viewer_project=project,
+    )
+
+
+def _hide_owner_only_fields(
+    gateway: Gateway, gateway_model: GatewayModel, viewer_project: ProjectModel
+) -> Gateway:
+    """
+    Hides the gateway configuration fields that projects importing the gateway must not see.
+    Not done in `gateway_model_to_gateway`, since plans compare its result with new configurations.
+    """
+    if gateway_model.project_id == viewer_project.id:
+        return gateway
+    # May contain secret values, e.g. OTLP auth headers
+    gateway.configuration.otel = None
+    return gateway
 
 
 def create_gateway_replica_model(
@@ -252,6 +279,7 @@ async def create_gateway(
         )
         effective_configuration = spec.configuration
         _validate_gateway_configuration(effective_configuration)
+        await validate_gateway_otel_config(session, project, effective_configuration)
     configuration = effective_configuration
 
     backend_model, _ = await get_project_backend_with_model_by_type_or_error(
@@ -739,13 +767,31 @@ def _merge_per_window_stats(stats_per_gateway_replica: list[PerWindowStats]) -> 
 
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
-        select(GatewayReplicaModel).where(
+        select(GatewayReplicaModel)
+        .where(
             GatewayReplicaModel.status == GatewayReplicaStatus.RUNNING,
             GatewayReplicaModel.active == True,
             GatewayReplicaModel.deleted == False,
         )
+        .options(
+            *(
+                joinedload(gateway_attr).options(
+                    joinedload(GatewayModel.project),
+                    joinedload(GatewayModel.backend).load_only(BackendModel.type),
+                )
+                for gateway_attr in (
+                    GatewayReplicaModel.gateway,
+                    GatewayReplicaModel.legacy_gateway,
+                )
+            )
+        )
     )
-    gateway_replicas = res.scalars().all()
+    gateway_replicas = res.unique().scalars().all()
+    otel_settings: dict[uuid.UUID, Optional[OTelSettings]] = {}
+    for gateway_replica in gateway_replicas:
+        otel_settings[gateway_replica.id] = await resolve_gateway_replica_otel_settings(
+            session, gateway_replica.gateway or gateway_replica.legacy_gateway, gateway_replica
+        )
 
     if len(gateway_replicas) > 0:
         logger.info(
@@ -757,19 +803,22 @@ async def init_gateways(session: AsyncSession):
         dialect_name=get_db().dialect_name,
         resource="gateway_tunnels",
     ):
-        for gateway_replica, error in await gather_map_async(
+        connections: dict[uuid.UUID, GatewayConnection] = {}
+        for gateway_replica, connection_or_error in await gather_map_async(
             [r for r in gateway_replicas if r.ip_address],
             lambda r: gateway_connections_pool.get_or_add(
                 get_or_error(r.ip_address), r.ssh_private_key, True
             ),
             return_exceptions=True,
         ):
-            if isinstance(error, Exception):
+            if isinstance(connection_or_error, BaseException):
                 logger.warning(
                     "Failed to connect to gateway replica %s: %s",
                     gateway_replica.ip_address,
-                    error,
+                    connection_or_error,
                 )
+            else:
+                connections[gateway_replica.id] = connection_or_error
 
         if settings.SKIP_GATEWAY_UPDATE:
             logger.debug(
@@ -790,15 +839,19 @@ async def init_gateways(session: AsyncSession):
                 elif isinstance(res, bool) and res:
                     gateway_replica.app_updated_at = get_current_datetime()
 
-        for connection, error in await gather_map_async(
-            await gateway_connections_pool.all(),
+        for gateway_replica, error in await gather_map_async(
+            [r for r in gateway_replicas if r.id in connections],
             # Need several attempts to handle short gateway replica downtime after update
-            partial(configure_gateway_replica, attempts=7),
+            lambda r: configure_gateway_replica(
+                connections[r.id], otel_settings[r.id], attempts=7
+            ),
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
                 logger.warning(
-                    "Failed to configure gateway replica %s: %r", connection.ip_address, error
+                    "Failed to configure gateway replica %s: %r",
+                    gateway_replica.ip_address,
+                    error,
                 )
 
 
@@ -884,11 +937,15 @@ def _recently_updated(gateway_replica_model: GatewayReplicaModel) -> bool:
 
 async def configure_gateway_replica(
     connection: GatewayConnection,
+    otel_settings: Optional[OTelSettings],
     attempts: int = GATEWAY_CONFIGURE_ATTEMPTS,
 ) -> None:
     """
     Try submitting gateway config to the replica several times in case its HTTP server is not
     running yet
+
+    Args:
+        otel_settings: See `get_gateway_replica_otel_settings`.
     """
 
     logger.debug("Configuring gateway replica %s", connection.ip_address)
@@ -896,7 +953,7 @@ async def configure_gateway_replica(
     for attempt in range(attempts - 1):
         try:
             async with connection.client() as client:
-                await client.submit_gateway_config()
+                await client.submit_gateway_config(otel_settings)
             break
         except httpx.RequestError as e:
             logger.debug(
@@ -909,9 +966,47 @@ async def configure_gateway_replica(
             await asyncio.sleep(GATEWAY_CONFIGURE_DELAY)
     else:
         async with connection.client() as client:
-            await client.submit_gateway_config()
+            await client.submit_gateway_config(otel_settings)
 
+    connection.otel_settings = otel_settings
     logger.info("Gateway replica %s configured", connection.ip_address)
+
+
+async def update_gateway_replica_otel_settings(
+    connection: GatewayConnection, otel_settings: Optional[OTelSettings]
+) -> None:
+    """
+    Submits the gateway config to the replica if `otel_settings` changed since the replica
+    was configured, e.g. after a gateway configuration update or a secret change.
+    """
+    if otel_settings == connection.otel_settings:
+        return
+    logger.info("Updating OpenTelemetry settings on gateway replica %s", connection.ip_address)
+    async with connection.client() as client:
+        await client.submit_gateway_config(otel_settings)
+    connection.otel_settings = otel_settings
+
+
+async def resolve_gateway_replica_otel_settings(
+    session: AsyncSession,
+    gateway_model: Optional[GatewayModel],
+    replica_model: GatewayReplicaModel,
+) -> Optional[OTelSettings]:
+    """
+    Returns the replica's OpenTelemetry settings with secrets resolved,
+    or None if OpenTelemetry is disabled.
+
+    Requires `gateway_model.configuration`, `gateway_model.project`, and `gateway_model.backend`
+    to be loaded.
+    """
+    if gateway_model is None:
+        return None
+    configuration = get_gateway_configuration(gateway_model)
+    if configuration.otel is None:
+        return None
+    # The gateway's own project, never the projects that import the gateway
+    secrets = await get_project_secrets_mapping(session=session, project=gateway_model.project)
+    return get_gateway_replica_otel_settings(gateway_model, configuration, replica_model, secrets)
 
 
 def get_gateway_replica_models(gateway_model: GatewayModel) -> List[GatewayReplicaModel]:
@@ -1047,6 +1142,7 @@ async def get_plan(
         spec=spec,
     )
     _validate_gateway_configuration(effective_spec.configuration)
+    await validate_gateway_otel_config(session, project, effective_spec.configuration)
 
     action = ApplyAction.CREATE
     current_gateway: Optional[Gateway] = None
@@ -1105,6 +1201,7 @@ async def apply_plan(
     )
     new_configuration = spec.configuration
     _validate_gateway_configuration(new_configuration)
+    await validate_gateway_otel_config(session, project, new_configuration)
 
     if new_configuration.name is None:
         return await create_gateway(

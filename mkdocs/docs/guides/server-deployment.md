@@ -459,6 +459,10 @@ $ DSTACK_OTEL_TRACES_ENABLED=1 \
     `rate()` queries may be empty. Set e.g. `OTEL_METRIC_EXPORT_INTERVAL=30000`,
     and make sure the datasource's `timeInterval` reflects the cadence you choose.
 
+#### Gateways
+
+Gateways can export their own telemetry. It is configured per gateway, see [gateway OpenTelemetry](../concepts/gateways.md#opentelemetry).
+
 ## Encryption
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 

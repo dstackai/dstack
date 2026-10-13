@@ -150,6 +150,16 @@ The update process looks like this:
 3. Swap the active venv name in `~/dstack/version`.
 4. Restart the systemd service.
 
+### OpenTelemetry
+
+OpenTelemetry is configured per gateway in `GatewayConfiguration.otel`. The gateway app has no access to the `dstack` server's database, so the server delivers the settings:
+
+1. The server resolves `${{ secrets.* }}` references in the gateway's `otel` configuration using the secrets of the gateway's project, never of the importer projects, and builds `OTelSettings` with the replica's identity (`resolve_gateway_replica_otel_settings`). The `otel` configuration is hidden from importer projects in API responses.
+2. The server sends the settings in `POST /api/config` when configuring a replica (on server start and after provisioning). The running replica pipeline resends them if they change, e.g. after an in-place configuration update or a secret change. The gateway saves them in its state file, so they're also applied on startup.
+3. The gateway app instruments FastAPI and HTTP clients on startup, which is a no-op until the OpenTelemetry providers are set. OpenTelemetry providers can only be set once per process, so the gateway sets them when it receives the first enabling settings. If it later receives different settings, it restarts itself with `SIGTERM` (systemd's `Restart=always` starts it again), and the new settings are applied on startup.
+
+The OpenTelemetry packages are part of the `gateway` extra, so enabling OpenTelemetry doesn't require reinstalling the gateway.
+
 ## Gateway development
 
 The gateway app needs to interact with Nginx and certbot, so running it locally can be challenging. You can test your development version by deploying it to a live gateway.

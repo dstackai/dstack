@@ -8,11 +8,14 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal import settings as core_settings
+from dstack._internal.core.models.gateways import GatewayOTelConfig
 from dstack._internal.server.services import gateways
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_gateway,
     create_gateway_replica,
     create_project,
+    create_secret,
 )
 
 
@@ -73,6 +76,49 @@ class TestInitGateways:
             < events.index(reload_service)
             < events.index(restart_service)
         )
+
+    async def test_configures_replicas_with_otel_settings(
+        self, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ):
+        connection = Mock(ip_address="1.1.1.1")
+        monkeypatch.setattr(gateways.settings, "SKIP_GATEWAY_UPDATE", True)
+        monkeypatch.setattr(
+            gateways.gateway_connections_pool, "get_or_add", AsyncMock(return_value=connection)
+        )
+        configure = AsyncMock()
+        monkeypatch.setattr(gateways, "configure_gateway_replica", configure)
+        project = await create_project(session=session, name="main")
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="my-gateway"
+        )
+        configuration = gateways.get_gateway_configuration(gateway)
+        configuration.otel = GatewayOTelConfig(
+            endpoint="https://otlp",
+            headers={"Authorization": "Bearer ${{ secrets.token }}"},
+            traces=True,
+        )
+        gateway.configuration = configuration.model_dump_json()
+        await create_secret(session=session, project=project, name="token", value="s3cret")
+        replica = await create_gateway_replica(
+            session=session, backend=backend, gateway_id=gateway.id, replica_num=1
+        )
+        await session.commit()
+        # Relationships must be loaded by init_gateways, not come from the identity map
+        session.expunge_all()
+
+        await gateways.init_gateways(session)
+
+        configure.assert_awaited_once()
+        assert configure.await_args.args[0] is connection
+        otel_settings = configure.await_args.args[1]
+        assert otel_settings.traces_enabled
+        assert otel_settings.headers == {"Authorization": "Bearer s3cret"}
+        attributes = otel_settings.resource_attributes
+        assert attributes["service.instance.id"] == str(replica.id)
+        assert attributes["dstack.project.name"] == "main"
+        assert attributes["dstack.gateway.name"] == "my-gateway"
+        assert attributes["dstack.backend"] == backend.type.value
 
 
 @pytest.fixture

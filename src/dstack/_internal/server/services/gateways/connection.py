@@ -17,6 +17,7 @@ from dstack._internal.proxy.gateway.const import (
     PROXY_PORT_ON_GATEWAY,
     SERVER_CONNECTIONS_DIR_ON_GATEWAY,
 )
+from dstack._internal.proxy.gateway.models import OTelSettings
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server import settings
 from dstack._internal.server.services.gateways.client import GatewayClient
@@ -72,6 +73,8 @@ class GatewayConnection:
         )
         self.tunnel_id = uuid.uuid4()
         self._client = GatewayClient(uds=str(self.gateway_socket_path))
+        self.otel_settings: Optional[OTelSettings] = None
+        """The OpenTelemetry settings last submitted to the gateway replica."""
 
     async def check_or_restart(self) -> bool:
         async with self._lock.writer_lock:

@@ -69,5 +69,7 @@ def _get_gateway_configuration_excludes(
         configuration_excludes["default"] = True
     if configuration.load_balancer is None:
         configuration_excludes["load_balancer"] = True
+    if configuration.otel is None:
+        configuration_excludes["otel"] = True
 
     return configuration_excludes

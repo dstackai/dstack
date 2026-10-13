@@ -247,6 +247,63 @@ $ dstack gateway list
 
 Replicated gateways do not support automatic certificate issuance via Let's Encrypt (`certificate: { type: lets-encrypt }`). For TLS termination, use an external load balancer or one of the other [certificate types](#certificate).
 
+### OpenTelemetry
+
+The gateway can export its own traces, logs, and metrics to an OpenTelemetry backend via OTLP over HTTP.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+
+backend: aws
+region: eu-west-1
+
+domain: example.com
+
+otel:
+  endpoint: https://otlp.example.com:4318
+  headers:
+    Authorization: Bearer ${{ secrets.otlp_token }}
+  traces: true
+  logs: true
+  metrics: true
+```
+
+</div>
+
+- `traces` – Traces of the gateway app: requests from the `dstack` server, authorization checks, and the OpenAI-compatible API.
+  When the `dstack` server also [exports traces](../guides/server-deployment.md#opentelemetry), gateway traces are linked with the server's.
+- `logs` – Logs of the gateway app.
+- `metrics` – HTTP server and client request durations, process CPU/memory/GC metrics, etc.
+
+The `endpoint` and `headers` values can reference the project's [secrets](secrets.md), which is recommended
+for credentials. Gateway configurations are visible to all project members, while secret values are only visible
+to project admins. If the gateway is [exported](#export-gateways), the `otel` configuration is hidden from the
+importer projects, and secrets are always resolved in the gateway's project.
+
+The endpoint must be reachable from the gateway replicas. The `otel` configuration can be updated in-place,
+and changes to the referenced secrets are applied automatically. Each change restarts the gateway app on all replicas,
+which briefly interrupts traffic to services.
+
+??? info "Identifying gateway replicas"
+    Telemetry from gateways has `service.name` set to `dstack-gateway`.
+    The following resource attributes identify the replica:
+
+    - `dstack.project.name` and `dstack.gateway.name` – The gateway.
+    - `dstack.gateway.replica.num` – The replica number, as shown by `dstack gateway list`.
+      The number is reused when a replica is replaced.
+    - `service.instance.id` – The unique replica ID, which is never reused.
+    - `host.name` – The replica's IP address or hostname.
+    - `dstack.backend` and `cloud.region` – Where the replica runs.
+
+??? info "Trace sampling"
+    Nginx makes an authorization subrequest to the gateway app for each request to a service
+    with authorization enabled. To limit the trace volume, these subrequests are sampled at `0.01`
+    by default. Set `traces_auth_sample_rate` and `traces_sample_rate` to change the rates.
+    Traces started by the `dstack` server, e.g. service registration, follow the server's sampling decision.
+
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 

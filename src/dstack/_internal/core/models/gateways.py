@@ -90,6 +90,53 @@ class ALBGatewayLoadBalancer(CoreModel):
 AnyGatewayLoadBalancer = Union[ALBGatewayLoadBalancer]
 
 
+class GatewayOTelConfig(CoreModel):
+    endpoint: Annotated[
+        str,
+        Field(
+            description=(
+                "The OTLP over HTTP endpoint, e.g. `https://otlp.example.com:4318`."
+                " Signal paths such as `/v1/traces` are appended to it."
+                " Can reference secrets, e.g. `${{ secrets.otlp_endpoint }}`"
+            ),
+        ),
+    ]
+    headers: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "Headers sent with OTLP requests, e.g. for authorization."
+                " Values can reference secrets, e.g. `Bearer ${{ secrets.otlp_token }}`"
+            ),
+        ),
+    ] = None
+    traces: Annotated[bool, Field(description="Whether to export traces")] = False
+    logs: Annotated[bool, Field(description="Whether to export logs")] = False
+    metrics: Annotated[bool, Field(description="Whether to export metrics")] = False
+    traces_sample_rate: Annotated[
+        float,
+        Field(
+            description=(
+                "The head sampling rate for traces."
+                " The default assumes sampling is done downstream, e.g. in an OTel Collector"
+            ),
+            ge=0,
+            le=1,
+        ),
+    ] = 1.0
+    traces_auth_sample_rate: Annotated[
+        float,
+        Field(
+            description=(
+                "The head sampling rate for traces of authorization subrequests,"
+                " which Nginx makes for every request to services with authorization enabled"
+            ),
+            ge=0,
+            le=1,
+        ),
+    ] = 0.01
+
+
 class GatewayConfiguration(CoreModel):
     type: Literal["gateway"] = "gateway"
     name: Annotated[Optional[str], Field(description="The gateway name")] = None
@@ -163,6 +210,16 @@ class GatewayConfiguration(CoreModel):
                 "The custom tags to associate with the gateway."
                 " The tags are also propagated to the underlying backend resources."
                 " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
+    otel: Annotated[
+        Optional[GatewayOTelConfig],
+        Field(
+            description=(
+                "The OpenTelemetry export configuration of the gateway app."
+                " Hidden from projects that import the gateway. Can be updated in-place."
+                " Updates restart the gateway app on all replicas"
             )
         ),
     ] = None
