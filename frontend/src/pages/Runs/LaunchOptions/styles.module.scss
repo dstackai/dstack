@@ -1,0 +1,62 @@
+.filter {
+    max-width: 640px;
+}
+
+.columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+// Not visibility: Cloudscape buttons set visibility: visible on themselves.
+.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.cliColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.cliFill {
+    flex: 1 1 auto;
+}
+
+.templatesCell {
+    position: relative;
+}
+
+.templatesFill {
+    position: absolute;
+    inset: 0;
+}
+
+// Stacked on narrow screens, where the templates take their full height and the page scrolls.
+@media (max-width: 960px) {
+    .columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .templatesFill {
+        position: static;
+    }
+}
+
+.codeWrapper {
+    position: relative;
+
+    // Commands scroll instead of wrapping.
+    .code {
+        padding: 12px 48px 12px 12px;
+        white-space: pre;
+        overflow-x: auto;
+    }
+
+    .copy {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+    }
+}

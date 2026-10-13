@@ -5,9 +5,10 @@ const oss = {
     hasEvents: false,
     hasBilling: false,
     hasPresets: false,
+    hasTemplates: false,
     isSky: false,
 };
-const enterprise = { ...oss, id: 'enterprise', name: 'dstack Enterprise', hasEvents: true };
+const enterprise = { ...oss, id: 'enterprise', name: 'dstack Enterprise', hasEvents: true, hasTemplates: true };
 const factory = { ...enterprise, id: 'factory', name: 'dstack Factory', hasBilling: true, hasPresets: true };
 const sky = { ...factory, id: 'sky', name: 'dstack Sky', isSky: true };
 

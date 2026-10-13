@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -30,6 +30,7 @@ import { useApplyRunMutation } from 'services/run';
 import { useGetAllTemplatesQuery } from 'services/templates';
 
 import { OfferList } from 'pages/Offers/List';
+import { getOfferFilters } from 'pages/Offers/List/hooks/useFilters';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { ParamsWizardStep } from './components/ParamsWizardStep';
@@ -81,7 +82,11 @@ export const Launch: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: t('runs.launch.wizard.title'),
+            text: t('runs.launch_page.title'),
+            href: ROUTES.RUNS.LAUNCH,
+        },
+        {
+            text: t('runs.launch_page.template_title'),
             href: ROUTES.RUNS.CREATE_DEV_ENV,
         },
     ]);
@@ -92,6 +97,7 @@ export const Launch: React.FC = () => {
         resolver,
         defaultValues: {
             project: searchParams.get('project_name') ?? undefined,
+            template: searchParams.getAll('template'),
         },
     });
 
@@ -124,7 +130,8 @@ export const Launch: React.FC = () => {
     }, [templatesData]);
 
     useEffect(() => {
-        if (!defaultProject && projectOptions?.[0]?.value) {
+        // A project passed in the URL takes precedence over the first one.
+        if (!defaultProject && !getValues(FORM_FIELD_NAMES.project) && projectOptions?.[0]?.value) {
             setValue(FORM_FIELD_NAMES.project, projectOptions[0].value);
             setDefaultProject(projectOptions[0].value);
         }
@@ -134,10 +141,44 @@ export const Launch: React.FC = () => {
         setSelectedTemplate(templatesData?.find((t) => t.name === formValues.template?.[0]));
     }, [templatesData, formValues.template]);
 
+    // `step=resources` (from Next on the Launch page) skips the template step once the template is loaded.
+    const templateStepSkipped = useRef(false);
+
+    useEffect(() => {
+        if (
+            templateStepSkipped.current ||
+            searchParams.get('step') !== 'resources' ||
+            !selectedTemplate ||
+            selectedTemplate.name !== searchParams.get('template')
+        ) {
+            return;
+        }
+
+        templateStepSkipped.current = true;
+        setActiveStepIndex(1);
+    }, [selectedTemplate]);
+
+    // Offer filters from the Launch page, e.g. carried over from the Offers page.
+    const urlOfferFilters = useMemo(() => {
+        const filters = { ...getOfferFilters(searchParams) };
+        // The project comes from the wizard's own field.
+        delete filters.project_name;
+        return filters;
+    }, [searchParams]);
+
+    // An offer picked on the Offers page: one GPU name with an exact memory.
+    const preselectedGpu = useMemo(() => {
+        const { gpu_name: names, gpu_memory: memory } = urlOfferFilters;
+        const memoryGb = typeof memory === 'string' && !memory.includes('..') ? parseFloat(memory) : NaN;
+        return Array.isArray(names) && names.length === 1 && memoryGb ? { name: names[0], memoryGb } : undefined;
+    }, [urlOfferFilters]);
+
+    const hasGpuFilters = Object.keys(urlOfferFilters).some((key) => key.startsWith('gpu_'));
+
     useEffect(() => {
         setSelectedOffers([]);
         setValue(FORM_FIELD_NAMES.offer, undefined);
-        setValue(FORM_FIELD_NAMES.gpu_enabled, hasConfiguredGpu(selectedTemplate));
+        setValue(FORM_FIELD_NAMES.gpu_enabled, hasConfiguredGpu(selectedTemplate) || hasGpuFilters);
     }, [selectedTemplate, setValue]);
 
     const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
@@ -186,11 +227,12 @@ export const Launch: React.FC = () => {
         unregister(FORM_FIELD_NAMES.ide);
     };
 
-    const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
-        const newSelectedOffers = detail?.selectedItems ?? [];
-        setSelectedOffers(newSelectedOffers);
-        setValue(FORM_FIELD_NAMES.offer, newSelectedOffers?.[0] ?? undefined);
+    const selectOffers = (offers: IGpu[]) => {
+        setSelectedOffers(offers);
+        setValue(FORM_FIELD_NAMES.offer, offers[0] ?? undefined);
     };
+
+    const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => selectOffers(detail?.selectedItems ?? []);
 
     const onSubmitWizard = async () => {
         const isValid = await trigger();
@@ -255,8 +297,9 @@ export const Launch: React.FC = () => {
         () => ({
             spot_policy: 'on-demand',
             ...configuredOfferFilters,
+            ...urlOfferFilters,
         }),
-        [configuredOfferFilters],
+        [configuredOfferFilters, urlOfferFilters],
     );
     const yaml = useGenerateYaml({
         formValues,
@@ -376,6 +419,8 @@ export const Launch: React.FC = () => {
                                 showFleetFilter
                                 selectedItems={selectedOffers}
                                 onSelectionChange={onChangeOffer}
+                                preselectedGpu={preselectedGpu}
+                                onPreselect={(gpu) => selectOffers([gpu])}
                                 onChangeBackendFilter={setSelectedBackends}
                                 onChangeFleetFilter={setSelectedFleets}
                                 permanentFilters={{ project_name: formValues.project ?? '' }}

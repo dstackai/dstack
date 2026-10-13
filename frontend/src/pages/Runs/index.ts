@@ -6,3 +6,4 @@ export { EventsList } from './Details/Events/List';
 export { JobLogs } from './Details/Logs';
 export { Artifacts } from './Details/Artifacts';
 export { Launch } from './Launch';
+export { LaunchOptions } from './LaunchOptions';

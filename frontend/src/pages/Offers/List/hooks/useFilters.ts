@@ -32,6 +32,8 @@ export type UseFiltersArgs = {
     showFleetFilter?: boolean;
     permanentFilters?: Partial<Record<RequestParamsKeys, string>>;
     defaultFilters?: Partial<Record<RequestParamsKeys, string | string[]>>;
+    /** Loads offers for GPU name and backend suggestions, for a page that doesn't list offers itself. */
+    loadGpus?: (projectName: string) => Promise<void>;
 };
 
 export const filterKeys: Record<string, RequestParamsKeys> = {
@@ -45,6 +47,21 @@ export const filterKeys: Record<string, RequestParamsKeys> = {
 };
 
 const multipleChoiceKeys: RequestParamsKeys[] = ['gpu_name', 'backend', 'fleet'];
+
+/** The offer filters in a URL, as `defaultFilters` takes them. */
+export const getOfferFilters = (searchParams: URLSearchParams): UseFiltersArgs['defaultFilters'] => {
+    const filters: UseFiltersArgs['defaultFilters'] = {};
+
+    Object.values(filterKeys).forEach((key) => {
+        const values = searchParams.getAll(key);
+
+        if (values.length) {
+            filters[key] = multipleChoiceKeys.includes(key) ? values : values[0];
+        }
+    });
+
+    return filters;
+};
 
 const spotPolicyOptions = [
     {
@@ -61,13 +78,15 @@ const spotPolicyOptions = [
     },
 ];
 
+const projectFilteringProperty = {
+    key: filterKeys.PROJECT_NAME,
+    operators: ['='],
+    propertyLabel: 'Project',
+    groupValuesLabel: 'Project values',
+};
+
 const filteringProperties = [
-    {
-        key: filterKeys.PROJECT_NAME,
-        operators: ['='],
-        propertyLabel: 'Project',
-        groupValuesLabel: 'Project values',
-    },
+    projectFilteringProperty,
     {
         key: filterKeys.GPU_NAME,
         operators: ['='],
@@ -117,19 +136,24 @@ export const useFilters = ({
     showFleetFilter = false,
     permanentFilters = {},
     defaultFilters,
+    loadGpus,
 }: UseFiltersArgs) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
     const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
     const [getProjects] = useLazyGetProjectsQuery();
     const [getProjectFleets] = useLazyGetProjectFleetsQuery();
-    const { data: projectsData } = useGetProjectsQuery({ limit: 1 });
+    const { data: projectsData } = useGetProjectsQuery({ limit: 2 });
+    const propertyFilterRef = useRef<PropertyFilterProps.Ref>(null);
     const projectNameIsChecked = useRef(false);
     const prevSelectedProjectName = useRef<string | undefined>();
 
+    // Without search params, the page URL belongs to another page, e.g. the Launch wizard.
+    const initialSearchParams = withSearchParams ? searchParams : new URLSearchParams();
+
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
         const queryFromSearchParams = requestParamsToTokens<RequestParamsKeys>({
-            searchParams,
+            searchParams: initialSearchParams,
             filterKeys,
             defaultFilterValues: defaultFilters,
         });
@@ -152,7 +176,7 @@ export const useFilters = ({
 
     const [groupBy, setGroupBy] = useState<MultiselectProps.Options>(() => {
         const selectedGroupBy = requestParamsToArray<RequestParamsKeys>({
-            searchParams,
+            searchParams: initialSearchParams,
             paramName: groupByRequestParamName,
         });
 
@@ -163,12 +187,14 @@ export const useFilters = ({
         return [gpuFilterOption];
     });
 
+    const hasCustomFilters = propertyFilterQuery.tokens.some((token) => token.propertyKey !== filterKeys.PROJECT_NAME);
+
+    // Keeps the project and the group by, so that clearing leads back to the project's offers.
     const clearFilter = () => {
-        if (withSearchParams) {
-            setSearchParams({});
-        }
-        setPropertyFilterQuery(EMPTY_QUERY);
-        setGroupBy([]);
+        onChangePropertyFilterHandle({
+            tokens: propertyFilterQuery.tokens.filter((token) => token.propertyKey === filterKeys.PROJECT_NAME),
+            operation: propertyFilterQuery.operation,
+        });
     };
 
     const filteringOptions = useMemo(() => {
@@ -324,6 +350,12 @@ export const useFilters = ({
                 .then(setDynamicFilteringOptions);
         }
 
+        const isGpuProperty = filteringProperty?.key === filterKeys.GPU_NAME || filteringProperty?.key === filterKeys.BACKEND;
+
+        if (loadGpus && isGpuProperty && selectedProjectName) {
+            await loadGpus(selectedProjectName);
+        }
+
         if (showFleetFilter && filteringProperty?.key === filterKeys.FLEET && selectedProjectName) {
             await getProjectFleets({
                 projectName: selectedProjectName,
@@ -345,24 +377,49 @@ export const useFilters = ({
         setFilteringStatusType(undefined);
     };
 
-    useEffect(() => {
-        if (!projectNameIsChecked.current && projectsData?.data?.length) {
-            projectNameIsChecked.current = true;
+    // Cloudscape can only focus the filter, so typing "Project = " into it lists the projects.
+    const openProjectValues = () => {
+        propertyFilterRef.current?.focus();
 
-            if (!filteringRequestParams['project_name']) {
-                onChangePropertyFilterHandle({
-                    tokens: [
-                        ...propertyFilterQuery.tokens,
-                        {
-                            operator: '=',
-                            propertyKey: filterKeys.PROJECT_NAME,
-                            value: projectsData.data[0].project_name,
-                        },
-                    ],
-                    operation: 'and',
-                });
-            }
+        const input = document.activeElement;
+        const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+
+        if (!(input instanceof HTMLInputElement) || !setInputValue) {
+            return;
         }
+
+        setInputValue.call(input, `${projectFilteringProperty.propertyLabel} = `);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    useEffect(() => {
+        if (projectNameIsChecked.current || !projectsData?.data?.length) {
+            return;
+        }
+
+        projectNameIsChecked.current = true;
+
+        if (filteringRequestParams['project_name']) {
+            return;
+        }
+
+        // With several projects, guessing is usually wrong, so the user picks one.
+        if (projectsData.data.length > 1) {
+            openProjectValues();
+            return;
+        }
+
+        onChangePropertyFilterHandle({
+            tokens: [
+                ...propertyFilterQuery.tokens,
+                {
+                    operator: '=',
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    value: projectsData.data[0].project_name,
+                },
+            ],
+            operation: 'and',
+        });
     }, [projectsData]);
 
     useEffect(() => {
@@ -386,6 +443,8 @@ export const useFilters = ({
     return {
         filteringRequestParams,
         clearFilter,
+        hasCustomFilters,
+        propertyFilterRef,
         propertyFilterQuery,
         onChangePropertyFilter,
         filteringOptions,

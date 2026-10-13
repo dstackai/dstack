@@ -3,6 +3,8 @@ import { Provider as BusProvider } from 'react-bus';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
+import { I18nProvider } from '@cloudscape-design/components/i18n';
+import enMessages from '@cloudscape-design/components/i18n/messages/all.en.json';
 import { applyTheme, Theme } from '@cloudscape-design/components/theming';
 
 import { initAnalytics } from './analytics';
@@ -39,11 +41,14 @@ if (container) {
 
     root.render(
         <React.StrictMode>
-            <Provider store={store}>
-                <BusProvider>
-                    <RouterProvider router={router} />
-                </BusProvider>
-            </Provider>
+            {/* Cloudscape's default labels, e.g. the property filter's Apply and Cancel, for any a page leaves out. */}
+            <I18nProvider locale="en" messages={[enMessages]}>
+                <Provider store={store}>
+                    <BusProvider>
+                        <RouterProvider router={router} />
+                    </BusProvider>
+                </Provider>
+            </I18nProvider>
         </React.StrictMode>,
     );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Alert, Cards, CardsProps, MultiselectCSD, Popover, PropertyFilter } from 'components';
@@ -8,11 +8,11 @@ import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
 import { useFilters, UseFiltersArgs } from './hooks/useFilters';
-import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round } from './helpers';
+import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round, sortGpusByPriceDesc } from './helpers';
 
 import styles from './styles.module.scss';
 
-const getRequestParams = ({
+export const getRequestParams = ({
     project_name,
     gpu_name,
     backend,
@@ -80,6 +80,11 @@ type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange
     onChangeProjectName?: (value: string) => void;
     onChangeBackendFilter?: (backends: string[]) => void;
     onChangeFleetFilter?: (fleets: string[]) => void;
+    /** A GPU to select once offers load; `onPreselect` receives the matching offer. */
+    preselectedGpu?: { name: string; memoryGb: number };
+    onPreselect?: (gpu: IGpu) => void;
+    /** Called with whether the project has no offers without custom filters. */
+    onChangeNoOffers?: (noOffers: boolean) => void;
 };
 
 export const OfferList: React.FC<OfferListProps> = ({
@@ -91,6 +96,9 @@ export const OfferList: React.FC<OfferListProps> = ({
     onChangeFleetFilter,
     permanentFilters,
     defaultFilters,
+    preselectedGpu,
+    onPreselect,
+    onChangeNoOffers,
     ...props
 }) => {
     const { t } = useTranslation();
@@ -108,6 +116,8 @@ export const OfferList: React.FC<OfferListProps> = ({
     const {
         filteringRequestParams,
         clearFilter,
+        hasCustomFilters,
+        propertyFilterRef,
         propertyFilterQuery,
         onChangePropertyFilter,
         filteringOptions,
@@ -153,12 +163,46 @@ export const OfferList: React.FC<OfferListProps> = ({
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
-        projectNameSelected: Boolean(requestParams?.['project_name']),
+        projectName: requestParams?.['project_name'],
         groupBySelected: Boolean(requestParams?.['group_by']?.length),
+        hasCustomFilters,
     });
 
+    const gpus = useMemo(() => sortGpusByPriceDesc(data?.gpus ?? []), [data]);
+
+    const noOffers =
+        !!requestParams?.project_name &&
+        !!requestParams?.group_by?.length &&
+        !isLoading &&
+        !isFetching &&
+        !isError &&
+        !hasCustomFilters &&
+        gpus.length === 0;
+
+    useEffect(() => {
+        onChangeNoOffers?.(noOffers);
+    }, [noOffers]);
+
+    const isPreselected = useRef(false);
+
+    useEffect(() => {
+        if (!preselectedGpu || isPreselected.current) {
+            return;
+        }
+
+        const gpu = gpus.find(
+            ({ name, memory_mib }) =>
+                name === preselectedGpu.name && round(convertMiBToGB(memory_mib)) === preselectedGpu.memoryGb,
+        );
+
+        if (gpu) {
+            isPreselected.current = true;
+            onPreselect?.(gpu);
+        }
+    }, [gpus]);
+
     const { items, collectionProps } = useCollection(
-        requestParams?.['project_name'] && requestParams?.['group_by']?.length ? (data?.gpus ?? []) : [],
+        requestParams?.['project_name'] && requestParams?.['group_by']?.length ? gpus : [],
         {
             filtering: {
                 empty: renderEmptyMessage(),
@@ -264,7 +308,7 @@ export const OfferList: React.FC<OfferListProps> = ({
                 {...props}
                 entireCardClickable
                 items={disabled ? [] : items}
-                empty={disabled ? ' ' : undefined}
+                empty={disabled ? ' ' : collectionProps.empty}
                 cardDefinition={{
                     header: (gpu) => gpu.name,
                     sections,
@@ -277,6 +321,7 @@ export const OfferList: React.FC<OfferListProps> = ({
                         <div className={styles.selectFilters}>
                             <div className={styles.propertyFilter}>
                                 <PropertyFilter
+                                    ref={propertyFilterRef}
                                     disabled={isLoading || isFetching}
                                     query={propertyFilterQuery}
                                     onChange={onChangePropertyFilter}
