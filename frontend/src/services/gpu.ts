@@ -30,4 +30,4 @@ export const gpuApi = createApi({
     }),
 });
 
-export const { useGetGpusListQuery } = gpuApi;
+export const { useGetGpusListQuery, useLazyGetGpusListQuery } = gpuApi;

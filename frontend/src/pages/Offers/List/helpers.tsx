@@ -40,6 +40,17 @@ export const getPropertyFilterOptions = (gpus: IGpu[]) => {
     };
 };
 
+const AVAILABLE_STATUSES = new Set<TAvailability>(['unknown', 'available', 'idle']);
+
+const isGpuAvailable = (gpu: IGpu) => gpu.availability.some((availability) => AVAILABLE_STATUSES.has(availability));
+
+// Available first, as the server sorts, but the most expensive (best) GPUs before cheaper ones.
+export const sortGpusByPriceDesc = (gpus: IGpu[]): IGpu[] =>
+    [...gpus].sort(
+        (a, b) =>
+            Number(isGpuAvailable(b)) - Number(isGpuAvailable(a)) || b.price.min - a.price.min || b.price.max - a.price.max,
+    );
+
 export const getFleetFilterValue = (fleet: IFleet, selectedProjectName?: string) => {
     if (selectedProjectName && fleet.project_name === selectedProjectName) {
         return fleet.name;

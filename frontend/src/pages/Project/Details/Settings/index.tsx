@@ -159,7 +159,8 @@ export const ProjectSettings: React.FC = () => {
     useEffect(() => {
         if (location.hash === '#danger-zone') {
             setTimeout(() => {
-                dangerZoneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Not smooth: sections that finish rendering meanwhile cancel a smooth scroll.
+                dangerZoneRef.current?.scrollIntoView({ block: 'start' });
             }, 0);
         }
     }, [location.hash, isLoadingPage]);
@@ -559,7 +560,7 @@ export const ProjectSettings: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {isAvailableProjectManaging && (
+                                    {product.hasTemplates && isAvailableProjectManaging && (
                                         <>
                                             <div className={styles.dangerSectionTitle}>
                                                 <Box variant="h5" color="text-body-secondary">

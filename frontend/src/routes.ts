@@ -124,7 +124,8 @@ export const ROUTES = {
 
     RUNS: {
         LIST: '/runs',
-        CREATE_DEV_ENV: '/runs/launch',
+        LAUNCH: '/runs/launch',
+        CREATE_DEV_ENV: '/runs/launch/template',
     },
 
     OFFERS: {

@@ -8,23 +8,23 @@ import { goToUrl } from 'libs';
 
 export const useEmptyMessages = ({
     clearFilter,
-    noData,
+    hasNoRuns,
     isDisabledClearFilter,
 }: {
     clearFilter?: () => void;
-    noData?: boolean;
+    hasNoRuns?: boolean;
     isDisabledClearFilter?: boolean;
 }) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = useCallback<() => React.ReactNode>(() => {
-        if (noData && isDisabledClearFilter) {
+        if (hasNoRuns) {
             return (
                 <ListEmptyMessage
                     title={t('projects.run.empty_message_title')}
                     message={t('projects.run.quickstart_message_text')}
                 >
-                    <Button variant="primary" external onClick={() => goToUrl(QUICK_START_URL, true)}>
+                    <Button external onClick={() => goToUrl(QUICK_START_URL, true)}>
                         {t('common.quickstart')}
                     </Button>
                 </ListEmptyMessage>
@@ -38,7 +38,7 @@ export const useEmptyMessages = ({
                 </Button>
             </ListEmptyMessage>
         );
-    }, [isDisabledClearFilter, clearFilter]);
+    }, [hasNoRuns, isDisabledClearFilter, clearFilter]);
 
     const renderNoMatchMessage = useCallback<() => React.ReactNode>(() => {
         return (

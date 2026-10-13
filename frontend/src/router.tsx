@@ -27,7 +27,16 @@ import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { EventsList as RunEvents, JobLogs, JobMetrics, Launch, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import {
+    EventsList as RunEvents,
+    JobLogs,
+    JobMetrics,
+    Launch,
+    LaunchOptions,
+    RunDetails,
+    RunDetailsPage,
+    RunList,
+} from 'pages/Runs';
 import { RunInspect } from 'pages/Runs/Details/Inspect';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
@@ -201,9 +210,11 @@ export const router = createBrowserRouter([
             },
 
             {
-                path: ROUTES.RUNS.CREATE_DEV_ENV,
-                element: <Launch />,
+                path: ROUTES.RUNS.LAUNCH,
+                element: <LaunchOptions />,
             },
+
+            ...(product.hasTemplates ? [{ path: ROUTES.RUNS.CREATE_DEV_ENV, element: <Launch /> }] : []),
 
             // Offers
             {

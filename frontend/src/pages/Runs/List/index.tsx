@@ -8,7 +8,7 @@ import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { ROUTES } from 'routes';
-import { useLazyGetRunsQuery } from 'services/run';
+import { useGetRunsQuery, useLazyGetRunsQuery } from 'services/run';
 
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
@@ -67,10 +67,20 @@ export const RunList: React.FC = () => {
 
     const { columns } = useColumnsDefinitions();
 
+    const hasNoOtherFilters = Object.keys(filteringRequestParams).length <= 1;
+    const isDisabledClearFilter = hasNoOtherFilters && !filteringRequestParams.only_active;
+    const isOnlyActiveFilter = hasNoOtherFilters && !!filteringRequestParams.only_active;
+
+    // "Active runs" is on by default, so an empty list under it alone doesn't say whether the user has any runs.
+    const { data: anyRuns } = useGetRunsQuery(
+        { limit: 1, only_active: false, job_submissions_limit: 0 },
+        { skip: !isOnlyActiveFilter || isLoading || data.length > 0 },
+    );
+
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
-        noData: !data.length,
-        isDisabledClearFilter: Object.keys(filteringRequestParams).length <= 1 && !filteringRequestParams.only_active,
+        hasNoRuns: !data.length && (isDisabledClearFilter || (isOnlyActiveFilter && anyRuns?.length === 0)),
+        isDisabledClearFilter,
     });
 
     const { items, actions, collectionProps } = useCollection(data ?? [], {
@@ -113,12 +123,14 @@ export const RunList: React.FC = () => {
     // };
 
     const launchHandle = () => {
+        const projectName = filteringRequestParams.project_name;
         navigate(
-            `${ROUTES.RUNS.CREATE_DEV_ENV}${
-                filteringRequestParams.project_name ? `?project_name=${filteringRequestParams.project_name}` : ''
-            }`,
+            typeof projectName === 'string'
+                ? `${ROUTES.RUNS.LAUNCH}?${new URLSearchParams({ project_name: projectName })}`
+                : ROUTES.RUNS.LAUNCH,
         );
     };
+
     const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
     return (
@@ -145,7 +157,9 @@ export const RunList: React.FC = () => {
                         variant="awsui-h1-sticky"
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={launchHandle}>{t('runs.launch_button')}</Button>
+                                <Button variant="primary" onClick={launchHandle}>
+                                    {t('runs.launch_button')}
+                                </Button>
 
                                 <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
                                     {t('common.abort')}

@@ -496,14 +496,28 @@
     },
     "runs": {
         "launch_button": "Launch",
+        "launch_page": {
+            "title": "Launch",
+            "select_project": "Select a project to see how to launch a run.",
+            "cli_title": "Run with the CLI",
+            "docs": "Docs",
+            "cli_install": "1. Install the CLI",
+            "cli_add_project": "2. Add this project",
+            "cli_define": "3. Define a configuration",
+            "cli_define_text": "Define a configuration in <code>.dstack.yml</code>.",
+            "cli_apply": "4. Apply the configuration",
+            "agents_title": "Run with agents",
+            "agents_description": "Let AI agents define configurations, run them, and manage <code>dstack</code> for you",
+            "template_title": "From a template",
+            "no_templates_text": "If you configure a repo with templates, you can run them from here."
+        },
         "no_templates_alert": {
-            "title": "No templates configured",
+            "title": "No templates",
             "description": "The selected project has no templates available for Launch.",
             "action": "Settings"
         },
         "launch": {
             "wizard": {
-                "title": "Launch",
                 "submit": "Apply",
                 "project": "Project",
                 "project_description": "Select a project",
@@ -573,9 +587,9 @@
         "empty_message_title_select_groupBy": "Select a group by",
         "empty_message_text_select_groupBy": "Use the field above to select a group by",
         "empty_message_title": "No offers",
-        "empty_message_text": "No offers to display.",
+        "empty_message_text": "A backend may not be configured for this project.",
         "nomatch_message_title": "No matches",
-        "nomatch_message_text": "We can't find a match."
+        "nomatch_message_text": "We can't find a match. Try to clear filter."
     },
 
     "models": {

@@ -29,7 +29,7 @@ export const TEMPLATES_REPO_INFO = {
         <>
             <p>
                 Specify a project-level templates Git repository URL. Templates from this repo are shown on the Launch page in
-                Runs, and setting it enables the Launch button when templates are available.
+                Runs.
             </p>
             <p>If set, project templates override global templates configured on the server.</p>
             <p>
