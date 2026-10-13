@@ -11,6 +11,7 @@ from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.configurations import RateLimit, ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
+from dstack._internal.proxy.gateway.models import OTelSettings
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
@@ -187,13 +188,17 @@ class GatewayClient:
         self.is_server_ready = True
         return resp_parsed.services
 
-    async def submit_gateway_config(self) -> None:
+    async def submit_gateway_config(self, otel_settings: Optional[OTelSettings]) -> None:
         resp = await self._client.post(
             self._url("/api/config"),
             json={
                 "acme_server": settings.ACME_SERVER,
                 "acme_eab_kid": settings.ACME_EAB_KID,
                 "acme_eab_hmac_key": settings.ACME_EAB_HMAC_KEY,
+                # Ignored by older gateways
+                "otel_settings": (
+                    otel_settings.model_dump(mode="json") if otel_settings is not None else None
+                ),
             },
         )
         if resp.status_code == 400:

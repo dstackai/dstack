@@ -295,6 +295,7 @@ async def _load_gateway_replica(
     replica_fields: list[InstrumentedAttribute[Any]],
     gateway_fields: list[InstrumentedAttribute[Any]],
     load_backends: bool = False,
+    load_gateway_project: bool = False,
     load_gateway_backend_type: bool = False,
 ) -> Optional[GatewayReplicaModel]:
     def build_gateway_options(
@@ -306,6 +307,8 @@ async def _load_gateway_replica(
             options.append(
                 gateway_load.joinedload(GatewayModel.project).selectinload(ProjectModel.backends)
             )
+        elif load_gateway_project:
+            options.append(gateway_load.joinedload(GatewayModel.project))
         if load_gateway_backend_type:
             options.append(
                 gateway_load.joinedload(GatewayModel.backend).load_only(BackendModel.type)
@@ -515,6 +518,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
             GatewayReplicaModel.instance_id,
             GatewayReplicaModel.backend_id,
             GatewayReplicaModel.configuration,
+            GatewayReplicaModel.region,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -539,7 +543,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
     if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
         await _commit_update(item, replica_model, update_map={})
         return
-    error = await _connect_and_configure_gateway_replica(replica_model)
+    error = await _connect_and_configure_gateway_replica(gateway_model, replica_model)
     if error is not None:
         await _commit_update(
             item,
@@ -605,6 +609,7 @@ async def _register_replica_with_load_balancer(
 
 
 async def _connect_and_configure_gateway_replica(
+    gateway_model: GatewayModel,
     gateway_replica: GatewayReplicaModel,
 ) -> Optional[str]:
     """Returns an error message on failure, None on success."""
@@ -619,7 +624,11 @@ async def _connect_and_configure_gateway_replica(
     if connection is None:
         return "Failed to connect to gateway replica"
     try:
-        await gateways_services.configure_gateway_replica(connection)
+        async with get_session_ctx() as session:
+            otel_settings = await gateways_services.resolve_gateway_replica_otel_settings(
+                session, gateway_model, gateway_replica
+            )
+        await gateways_services.configure_gateway_replica(connection, otel_settings)
     except Exception:
         logger.exception("%s: failed to configure gateway replica", fmt(gateway_replica))
         return "Failed to configure gateway replica"
@@ -635,6 +644,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             GatewayReplicaModel.scale_in,
             GatewayReplicaModel.ip_address,
             GatewayReplicaModel.ssh_private_key,
+            GatewayReplicaModel.region,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -642,6 +652,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             GatewayModel.region,
             GatewayModel.wildcard_domain,
         ],
+        load_gateway_project=True,
         load_gateway_backend_type=True,
     )
     if replica_model is None:
@@ -713,8 +724,12 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         # lost its global config along with its services, and certbot would fall back to
         # its default ACME server, so resend the config first.
         try:
+            async with get_session_ctx() as session:
+                otel_settings = await gateways_services.resolve_gateway_replica_otel_settings(
+                    session, gateway_model, replica_model
+                )
             async with connection.client() as client:
-                await client.submit_gateway_config()
+                await client.submit_gateway_config(otel_settings)
         except Exception as e:
             logger.warning("%s: failed to submit gateway config: %r", fmt(replica_model), e)
             await _commit_update(item, replica_model, update_map={})

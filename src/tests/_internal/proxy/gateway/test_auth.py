@@ -4,6 +4,10 @@ import httpx2 as httpx
 import pytest
 import pytest_asyncio
 from aiocache.base import BaseCache
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from dstack._internal.proxy.gateway.auth import GatewayProxyAuthProvider
 from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClient
@@ -47,6 +51,30 @@ class TestGatewayProxyAuthProvider:
             await provider.is_project_member("first", "other-token")
             await provider.is_project_member("second", "token")
             assert len(requests) == 3
+
+    async def test_propagates_trace_context_to_server(self, monkeypatch):
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        # A local provider, as the global one can only be set once per process
+        monkeypatch.setattr(trace, "get_tracer", provider.get_tracer)
+        requests = []
+
+        def handle(request):
+            requests.append(request)
+            return httpx.Response(403)
+
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handle), base_url="http://dstack/"
+        ) as client:
+            assert await GatewayProxyAuthProvider(client).is_project_member("main", "t") is False
+
+        (span,) = exporter.get_finished_spans()
+        assert span.attributes is not None
+        assert span.attributes["dstack.project.name"] == "main"
+        assert span.attributes["http.response.status_code"] == 403
+        assert span.context is not None
+        assert f"{span.context.trace_id:032x}" in requests[0].headers["traceparent"]
 
     @pytest.mark.parametrize("failure", [500, httpx.ReadTimeout])
     async def test_httpx2_failures_are_wrapped_and_not_cached(self, failure):

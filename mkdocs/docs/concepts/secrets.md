@@ -84,7 +84,7 @@ OK
 
 ## Use secrets
 
-You can use the `${{ secrets.<secret_name> }}` syntax to reference secrets in run configurations. Currently, secrets interpolation is supported in `env` and `registry_auth` properties.
+You can use the `${{ secrets.<secret_name> }}` syntax to reference secrets in run configurations. Currently, secrets interpolation is supported in `env` and `registry_auth` properties. Gateway configurations also support secrets in [`otel`](gateways.md#opentelemetry) `endpoint` and `headers`.
 
 ### `env`
 

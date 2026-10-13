@@ -1,7 +1,10 @@
+import os
+import signal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
+from dstack._internal.proxy.gateway import otel
 from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
@@ -15,6 +18,7 @@ router = APIRouter()
 async def update_global_config(
     body: ConfigRequest,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+    background_tasks: BackgroundTasks,
 ) -> OkResponse:
     await repo.set_config(
         GlobalProxyConfig(
@@ -23,6 +27,10 @@ async def update_global_config(
                 eab_kid=body.acme_eab_kid,
                 eab_hmac_key=body.acme_eab_hmac_key,
             ),
+            otel_settings=body.otel_settings,
         ),
     )
+    if otel.apply_settings(body.otel_settings):
+        # Saved settings are applied on startup. systemd restarts the app (`Restart=always`)
+        background_tasks.add_task(os.kill, os.getpid(), signal.SIGTERM)
     return OkResponse()
