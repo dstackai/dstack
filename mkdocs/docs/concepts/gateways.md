@@ -247,6 +247,40 @@ $ dstack gateway list
 
 Replicated gateways do not support automatic certificate issuance via Let's Encrypt (`certificate: { type: lets-encrypt }`). For TLS termination, use an external load balancer or one of the other [certificate types](#certificate).
 
+### OpenTelemetry
+
+The gateway can export its traces, logs, and metrics via OTLP over HTTP.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+
+backend: aws
+region: eu-west-1
+
+domain: example.com
+
+otel:
+  endpoint: https://otlp.example.com:4318
+  headers:
+    Authorization: Bearer ${{ secrets.otlp_token }}
+  traces: true
+  logs: true
+  metrics: true
+```
+
+</div>
+
+!!! warning "Use secrets for credentials"
+    The `otel` configuration is visible to everyone who can view the gateway, including members of
+    projects the gateway is [exported](exports.md) to. Store credentials, such as authorization
+    headers, in [secrets](secrets.md) and reference them as `${{ secrets.<name> }}`. Only the
+    references are visible, not the secret values.
+
+Telemetry is reported with `service.name` set to `dstack-gateway` and resource attributes identifying the gateway and its replica.
+
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 

@@ -109,6 +109,10 @@ server {
         proxy_set_header Content-Length "";
         proxy_set_header X-Original-URI $request_uri;
         proxy_set_header Authorization $http_authorization;
+        # Don't let public clients control the gateway app's tracing
+        proxy_set_header traceparent "";
+        proxy_set_header tracestate "";
+        proxy_set_header baggage "";
     }
     {% endif %}
 
