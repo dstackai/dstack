@@ -23,6 +23,11 @@ export const ROUTES = {
                 FORMAT: (projectName: string) => buildRoute(ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE, { projectName }),
             },
 
+            QUOTAS: {
+                TEMPLATE: `/projects/:projectName/quotas`,
+                FORMAT: (projectName: string) => buildRoute(ROUTES.PROJECT.DETAILS.QUOTAS.TEMPLATE, { projectName }),
+            },
+
             EVENTS: {
                 TEMPLATE: `/projects/:projectName/events`,
                 FORMAT: (projectName: string) => buildRoute(ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE, { projectName }),

@@ -24,7 +24,15 @@ import { InstanceInspect } from 'pages/Instances/Details/Inspect';
 import { InstanceDetails } from 'pages/Instances/Details/InstanceDetails';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
-import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
+import {
+    CreateProjectWizard,
+    ProjectAdd,
+    ProjectDetails,
+    ProjectEvents,
+    ProjectList,
+    ProjectQuotas,
+    ProjectSettings,
+} from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import {
@@ -120,6 +128,10 @@ export const router = createBrowserRouter([
                     {
                         index: true,
                         element: <ProjectSettings />,
+                    },
+                    product.hasBilling && {
+                        path: ROUTES.PROJECT.DETAILS.QUOTAS.TEMPLATE,
+                        element: <ProjectQuotas />,
                     },
                     product.hasEvents && {
                         path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
