@@ -1066,7 +1066,7 @@ class ReplicaGroup(CoreModel):
     router: Annotated[
         Optional[ReplicaGroupRouterConfig],
         Field(
-            description="When set, replicas in this group run the in-service HTTP router (e.g. SGLang).",
+            description="When set, replicas in this group run the in-service HTTP router (e.g. SMG)",
         ),
     ] = None
 

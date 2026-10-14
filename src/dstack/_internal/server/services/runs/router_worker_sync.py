@@ -1,4 +1,4 @@
-"""Reconcile SGLang router /workers with dstack's ready worker replicas (async, SSH-tunneled)."""
+"""Reconcile SMG /workers with dstack's ready worker replicas (async, SSH-tunneled)."""
 
 import asyncio
 import logging
@@ -42,14 +42,14 @@ from dstack._internal.server.utils.common import gather_async, gather_map_async
 from dstack._internal.utils.logging import get_logger
 
 from .replicas import job_belongs_to_group
-from .service_router_worker_sync import run_spec_has_sglang_router_replica_group
+from .service_router_worker_sync import run_spec_has_smg_router_replica_group
 
 logger = get_logger(__name__)
 
 
-def run_model_has_sglang_router_replica_group(run_model: RunModel) -> bool:
+def run_model_has_smg_router_replica_group(run_model: RunModel) -> bool:
     run_spec = get_run_spec(run_model)
-    return run_spec_has_sglang_router_replica_group(run_spec)
+    return run_spec_has_smg_router_replica_group(run_spec)
 
 
 async def sync_router_workers_for_run_model(run_model: RunModel) -> None:

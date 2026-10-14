@@ -1871,7 +1871,7 @@ def _router_worker_service_configuration() -> ServiceConfiguration:
                 {"name": "worker", "commands": ["echo worker"], "count": 1},
                 {
                     "name": "router",
-                    "router": {"type": "sglang"},
+                    "router": {"type": "smg"},
                     "commands": ["echo router"],
                     "count": 1,
                 },

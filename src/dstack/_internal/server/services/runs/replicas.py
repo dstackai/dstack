@@ -233,7 +233,7 @@ def get_router_env_for_job(
     router_group = get_router_replica_group(run_spec)
     if router_group is None or router_group.name is None:
         return None
-    # DSTACK_ROUTER_INTERNAL_IP is Dynamo-specific. SGLang workers
+    # DSTACK_ROUTER_INTERNAL_IP is Dynamo-specific. SMG workers
     # are registered via the worker-sync pipeline (ServiceRouterWorkerSyncModel)
     if router_group.router is None or router_group.router.type != RouterType.DYNAMO:
         return None

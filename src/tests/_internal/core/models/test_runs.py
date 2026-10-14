@@ -116,7 +116,7 @@ def test_run_get_error_returns_none_for_specific_reasons():
 def _service_run_spec_dict(router_type=None, retry=None, top_level_extras=None):
     """Build a minimal RunSpec dict for a service.
 
-    `router_type`: None | "sglang" | "dynamo" — controls whether/how the
+    `router_type`: None | "smg" | "dynamo" — controls whether/how the
     second replica group has a router field.
     `retry`: optional dict passed as `profile.retry`.
     `top_level_extras`: optional dict merged into the service configuration.
@@ -177,12 +177,12 @@ class TestDynamoNoRetryValidator:
         # Should not raise:
         RunSpec.model_validate(spec)
 
-    def test_sglang_router_with_retry_is_accepted(self):
+    def test_smg_router_with_retry_is_accepted(self):
         spec = _service_run_spec_dict(
-            router_type="sglang",
+            router_type="smg",
             retry={"on_events": ["error"]},
         )
-        # SGLang services are unaffected by the validator.
+        # SMG services are unaffected by the validator.
         RunSpec.model_validate(spec)
 
     def test_service_without_router_with_retry_is_accepted(self):

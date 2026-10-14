@@ -1122,7 +1122,7 @@ def _service_configuration() -> ServiceConfiguration:
                     "name": "router",
                     "replicas": 1,
                     "commands": ["smg launch"],
-                    "router": {"type": "sglang"},
+                    "router": {"type": "smg"},
                 },
                 {"name": "worker", "replicas": 1, "commands": ["worker"]},
             ],

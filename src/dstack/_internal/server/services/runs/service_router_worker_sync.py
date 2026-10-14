@@ -32,14 +32,14 @@ def _reactivate_sync_row_update_map(*, now: datetime) -> _SyncRowUpdateMap:
     }
 
 
-def run_spec_has_sglang_router_replica_group(run_spec: RunSpec) -> bool:
+def run_spec_has_smg_router_replica_group(run_spec: RunSpec) -> bool:
     if run_spec.configuration.type != "service":
         return False
     cfg = run_spec.configuration
     if not isinstance(cfg, ServiceConfiguration):
         return False
     return any(
-        g.router is not None and g.router.type == RouterType.SGLANG for g in cfg.replica_groups
+        g.router is not None and g.router.type == RouterType.SMG for g in cfg.replica_groups
     )
 
 
@@ -48,7 +48,7 @@ async def ensure_service_router_worker_sync_row(
     run_model: RunModel,
     run_spec: RunSpec,
 ) -> None:
-    if not run_spec_has_sglang_router_replica_group(run_spec):
+    if not run_spec_has_smg_router_replica_group(run_spec):
         return
     res = await session.execute(
         select(ServiceRouterWorkerSyncModel).where(

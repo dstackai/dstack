@@ -166,7 +166,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         resources:
           cpu: 4
         router:
-          type: sglang
+          type: smg
 
       - replicas: 1..4
         scaling:
@@ -240,7 +240,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
                   --port 8000 \
                   --prefill-policy cache_aware
             router:
-              type: sglang
+              type: smg
             resources:
               cpu: 4
 
@@ -321,7 +321,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         resources:
           cpu: 4..
         router:
-          type: sglang
+          type: smg
 
       - replicas: 1..2
         scaling:

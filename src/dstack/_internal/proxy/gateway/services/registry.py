@@ -349,8 +349,8 @@ async def get_nginx_service_config(
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
-    sglang_limits: dict[str, LimitReqConfig] = {}
-    sglang_prefix_lengths: dict[str, int] = {}  # Track prefix lengths for most-specific selection
+    router_limits: dict[str, LimitReqConfig] = {}
+    router_prefix_lengths: dict[str, int] = {}  # Track prefix lengths for most-specific selection
 
     for i, rate_limit in enumerate(service.rate_limits):
         zone_name = f"{i}.{service.domain_safe}"
@@ -368,13 +368,13 @@ async def get_nginx_service_config(
                 if rate_limit.prefix == path or path.startswith(rate_limit.prefix):
                     # Use the longest prefix if multiple prefixes match the same path
                     current_prefix_len = len(rate_limit.prefix)
-                    if path not in sglang_limits or current_prefix_len > sglang_prefix_lengths.get(
+                    if path not in router_limits or current_prefix_len > router_prefix_lengths.get(
                         path, 0
                     ):
-                        sglang_limits[path] = LimitReqConfig(
+                        router_limits[path] = LimitReqConfig(
                             zone=zone_name, burst=rate_limit.burst
                         )
-                        sglang_prefix_lengths[path] = current_prefix_len
+                        router_prefix_lengths[path] = current_prefix_len
         else:
             locations.append(
                 LocationConfig(
@@ -388,10 +388,10 @@ async def get_nginx_service_config(
         for path in ROUTER_WHITELISTED_PATHS:
             # Use prefix match for paths that end with a slash and exact match for paths that don't
             if path.endswith("/"):
-                locations.append(LocationConfig(prefix=path, limit_req=sglang_limits.get(path)))
+                locations.append(LocationConfig(prefix=path, limit_req=router_limits.get(path)))
             else:
                 locations.append(
-                    LocationConfig(prefix=f"= {path}", limit_req=sglang_limits.get(path))
+                    LocationConfig(prefix=f"= {path}", limit_req=router_limits.get(path))
                 )
 
     # Don't auto-add / location for router-based services (catch-all 403 handles it)

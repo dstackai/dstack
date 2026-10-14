@@ -2968,7 +2968,7 @@ class TestJobRunningWorker:
             run_spec=get_run_spec(
                 run_name="test",
                 repo_id=repo.name,
-                configuration=_router_service_configuration("sglang", gateway="test-gateway"),
+                configuration=_router_service_configuration("smg", gateway="test-gateway"),
             ),
             gateway=gateway,
         )
@@ -3046,7 +3046,7 @@ class TestJobRunningWorker:
                 run_name="test",
                 repo_id=repo.name,
                 configuration=_router_service_configuration(
-                    "sglang",
+                    "smg",
                     probes=[ProbeConfig(type="http", url="/health", ready_after=1)],
                 ),
             ),
@@ -3645,7 +3645,7 @@ class TestFetchRunModelDynamoBranch:
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(
             repo_id=repo.name,
-            configuration=_router_service_configuration("sglang"),
+            configuration=_router_service_configuration("smg"),
         )
         run = await create_run(
             session=session, project=project, repo=repo, user=user, run_spec=run_spec
@@ -3674,7 +3674,7 @@ class TestFetchRunModelDynamoBranch:
         )
         assert {j.replica_num for j in run_model.jobs} == {0}
 
-    async def test_sglang_with_replica_ip_refs_loads_all_replicas(
+    async def test_smg_with_replica_ip_refs_loads_all_replicas(
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session=session)
@@ -3683,7 +3683,7 @@ class TestFetchRunModelDynamoBranch:
         run_spec = get_run_spec(
             repo_id=repo.name,
             configuration=_router_service_configuration(
-                "sglang",
+                "smg",
                 router_commands=["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
             ),
         )
@@ -3714,7 +3714,7 @@ class TestFetchRunModelDynamoBranch:
         )
         assert {j.replica_num for j in run_model.jobs} == {0, 1}
 
-    async def test_sglang_without_replica_ip_refs_loads_only_own_replica(
+    async def test_smg_without_replica_ip_refs_loads_only_own_replica(
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session=session)
@@ -3722,7 +3722,7 @@ class TestFetchRunModelDynamoBranch:
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(
             repo_id=repo.name,
-            configuration=_router_service_configuration("sglang"),
+            configuration=_router_service_configuration("smg"),
         )
         run = await create_run(
             session=session, project=project, repo=repo, user=user, run_spec=run_spec
@@ -3751,7 +3751,7 @@ class TestFetchRunModelDynamoBranch:
         )
         assert {j.replica_num for j in run_model.jobs} == {1}
 
-    async def test_sglang_with_replica_ip_refs_drops_terminated_replicas(
+    async def test_smg_with_replica_ip_refs_drops_terminated_replicas(
         self, test_db, session: AsyncSession
     ):
         project = await create_project(session=session)
@@ -3760,7 +3760,7 @@ class TestFetchRunModelDynamoBranch:
         run_spec = get_run_spec(
             repo_id=repo.name,
             configuration=_router_service_configuration(
-                "sglang",
+                "smg",
                 router_commands=["echo ${{ groups[0].replicas[0].IP_ADDRESS }}"],
             ),
         )

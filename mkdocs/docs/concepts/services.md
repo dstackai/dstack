@@ -197,7 +197,7 @@ Below is an example for running `Qwen/Qwen3.8-Flash-Next` on `H200`:
         resources:
           cpu: 4
         router:
-          type: sglang
+          type: smg
 
       - replicas: 2
         commands:
@@ -363,7 +363,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
         resources:
           cpu: 4
         router:
-          type: sglang
+          type: smg
 
       - replicas: 4
         commands:
@@ -537,7 +537,7 @@ groups:
     resources:
       cpu: 4..
     router:
-      type: sglang
+      type: smg
 
   - replicas: 2
     commands:
