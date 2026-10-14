@@ -78,11 +78,26 @@ def test_job_termination_reason_to_retry_event_works_with_all_enum_variants():
         assert retry_event is None or isinstance(retry_event, RetryEvent)
 
 
+class TestJobTerminationReason:
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+        ],
+    )
+    def test_blocked_offers_preserve_no_capacity_retry_policy(self, reason):
+        assert reason.to_status() == JobStatus.FAILED
+        assert reason.to_retry_event() == RetryEvent.NO_CAPACITY
+
+
 # Will fail if JobTerminationReason value is added without updating JobSubmission._get_error
 def test_get_error_returns_expected_messages():
     # already handled and shown in status_message
     no_error_reasons = [
         JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
         JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
         JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
         JobTerminationReason.TERMINATED_BY_USER,

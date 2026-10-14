@@ -23,6 +23,7 @@ from dstack._internal.core.errors import (
     SkipOffer,
 )
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceTerminationReason,
@@ -116,7 +117,24 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         include_only_create_instance_supported_backends=True,
     )
 
-    offers_iter = iter(offers)
+    available_offers = offers.offers
+    for availability, message in (
+        (InstanceAvailability.NO_QUOTA, "No quota"),
+        (InstanceAvailability.NO_BALANCE, "No balance"),
+    ):
+        if offers.unavailable_reason == availability:
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.TERMINATED,
+                termination_reason=InstanceTerminationReason.NO_OFFERS,
+                # TODO: Store NO_QUOTA/NO_BALANCE once the minimum supported rolling-upgrade
+                # source version handles them on every replica.
+                termination_reason_message=message,
+            )
+            return result
+
+    offers_iter = iter(available_offers)
     offers_tried = 0
     # Limit number of offers tried to prevent long-running processing in case all offers fail.
     while offers_tried < server_settings.MAX_OFFERS_TRIED:
@@ -241,7 +259,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATED,
         termination_reason=InstanceTerminationReason.NO_OFFERS,
-        termination_reason_message="All offers failed" if offers else "No offers found",
+        termination_reason_message="All offers failed" if available_offers else "No offers found",
     )
     return result
 

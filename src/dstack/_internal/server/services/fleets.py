@@ -3,13 +3,12 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from typing import List, Literal, Optional, Tuple, TypeVar, Union
+from typing import List, Literal, Optional, TypeVar, Union
 
 from sqlalchemy import and_, exists, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload, selectinload
 
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.features import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.errors import (
     ForbiddenError,
@@ -32,7 +31,6 @@ from dstack._internal.core.models.fleets import (
     SSHParams,
 )
 from dstack._internal.core.models.instances import (
-    InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceTerminationReason,
     SSHConnectionParams,
@@ -470,7 +468,7 @@ async def get_plan(
                 include_only_create_instance_supported_backends
             ),
         )
-        offers = [offer for _, offer in offers_with_backends]
+        offers = [offer for _, offer in offers_with_backends.offers]
 
     _remove_fleet_spec_sensitive_info(effective_spec)
     if current_fleet is not None:
@@ -501,7 +499,7 @@ async def get_fleet_offers(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     infer_master_job_provisioning_data_from_fleet_instances: bool = True,
     include_only_create_instance_supported_backends: bool = True,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+) -> offers_services.Offers:
     """
     Return offers for fleet planning and provisioning.
 
@@ -536,13 +534,10 @@ async def get_fleet_offers(
         master_job_provisioning_data=master_job_provisioning_data,
         placement_group=placement_group,
         blocks=blocks,
+        supported_backend_types=BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        if include_only_create_instance_supported_backends
+        else None,
     )
-    if include_only_create_instance_supported_backends:
-        offers = [
-            (backend, offer)
-            for backend, offer in offers
-            if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-        ]
     return offers
 
 

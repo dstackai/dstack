@@ -108,7 +108,10 @@ class TestCloudProvisioning:
                 total_blocks=expected_blocks,
             )
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.get_offers.return_value = [
+                offer.model_copy(update={"availability": InstanceAvailability.NO_QUOTA}),
+                offer,
+            ]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -130,6 +133,7 @@ class TestCloudProvisioning:
         assert instance.status == InstanceStatus.PROVISIONING
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
+        backend_mock.compute.return_value.create_instance.assert_called_once()
 
     @pytest.mark.parametrize("err", [RuntimeError("Unexpected"), ProvisioningError("Expected")])
     async def test_tries_second_offer_if_first_fails(
@@ -217,6 +221,57 @@ class TestCloudProvisioning:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+
+    @pytest.mark.parametrize(
+        ("availabilities", "message"),
+        [
+            ([InstanceAvailability.NO_QUOTA] * 2, "No quota"),
+            (
+                [InstanceAvailability.NO_QUOTA, InstanceAvailability.NOT_AVAILABLE],
+                "No offers found",
+            ),
+            ([InstanceAvailability.NO_BALANCE] * 2, "No balance"),
+            (
+                [InstanceAvailability.NO_QUOTA, InstanceAvailability.NO_BALANCE],
+                "No offers found",
+            ),
+            (
+                [InstanceAvailability.NO_BALANCE, InstanceAvailability.NOT_AVAILABLE],
+                "No offers found",
+            ),
+        ],
+    )
+    async def test_fails_without_attempting_unavailable_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        availabilities: list[InstanceAvailability],
+        message: str,
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        backend = Mock(TYPE=BackendType.DSTACK)
+        compute = Mock(spec=ComputeMockSpec)
+        backend.compute.return_value = compute
+        compute.get_offers.return_value = [
+            get_instance_offer_with_availability(availability=availability)
+            for availability in availabilities
+        ]
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            return_value=[backend],
+        ):
+            await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+        assert instance.termination_reason_message == message
+        compute.get_offers.assert_called_once()
+        compute.create_instance.assert_not_called()
 
     async def test_waits_when_fleet_has_no_current_master(
         self,

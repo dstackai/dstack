@@ -31,6 +31,7 @@ from dstack._internal.core.models.fleets import (
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
 )
@@ -485,7 +486,7 @@ class _NewCapacityAttempts:
 class _FailedNewCapacityProvisioning:
     placement_group_cleanup: Optional[_PlacementGroupCleanup]
     message: Optional[str] = None
-    """Why the job could not be provisioned. `None` if the offers were never tried."""
+    """Why the job could not be provisioned."""
 
 
 @dataclass
@@ -2420,8 +2421,21 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
+    available_offers = offers.offers
+    for availability, message in (
+        (InstanceAvailability.NO_QUOTA, "No quota"),
+        (InstanceAvailability.NO_BALANCE, "No balance"),
+    ):
+        if offers.unavailable_reason == availability:
+            return _FailedNewCapacityProvisioning(
+                placement_group_cleanup=None,
+                # TODO: Store FAILED_TO_START_DUE_TO_NO_QUOTA/NO_BALANCE once the minimum
+                # supported rolling-upgrade source version handles them on every replica.
+                message=message,
+            )
+
     extra_authorized_keys = get_extra_authorized_keys(run.run_spec)
-    offers_iter = iter(offers)
+    offers_iter = iter(available_offers)
     offers_tried = 0
     offers_taken = 0
     skip_reasons: list[str] = []
@@ -2573,12 +2587,12 @@ async def _provision_new_capacity(
         message=_get_new_capacity_failure_message(
             fleet_name=fleet_model.name,
             attempts=_NewCapacityAttempts(
-                total=len(offers),
+                total=len(available_offers),
                 tried=offers_tried,
                 skip_reasons=skip_reasons,
                 errors=offer_errors,
                 # Offers are left only if the attempt limit, not the offer list, ended the loop.
-                limit_reached=offers_taken < len(offers),
+                limit_reached=offers_taken < len(available_offers),
             ),
         ),
         placement_group_cleanup=_build_placement_group_cleanup(

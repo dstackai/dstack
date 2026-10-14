@@ -138,6 +138,9 @@ class RunTerminationReason(str, Enum):
 class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
+    # Add read support before emission so server replicas can be upgraded gradually.
+    FAILED_TO_START_DUE_TO_NO_QUOTA = "failed_to_start_due_to_no_quota"
+    FAILED_TO_START_DUE_TO_NO_BALANCE = "failed_to_start_due_to_no_balance"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     INSTANCE_UNREACHABLE = "instance_unreachable"
     INSTANCE_ACCESS_REVOKED = "instance_access_revoked"
@@ -163,6 +166,8 @@ class JobTerminationReason(str, Enum):
     def to_status(self) -> JobStatus:
         mapping = {
             self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
+            self.FAILED_TO_START_DUE_TO_NO_QUOTA: JobStatus.FAILED,
+            self.FAILED_TO_START_DUE_TO_NO_BALANCE: JobStatus.FAILED,
             self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
             self.INSTANCE_UNREACHABLE: JobStatus.FAILED,
             self.INSTANCE_ACCESS_REVOKED: JobStatus.FAILED,
@@ -194,6 +199,9 @@ class JobTerminationReason(str, Enum):
         """
         mapping = {
             self.FAILED_TO_START_DUE_TO_NO_CAPACITY: RetryEvent.NO_CAPACITY,
+            # Preserve existing no-capacity retry configurations for blocked offers.
+            self.FAILED_TO_START_DUE_TO_NO_QUOTA: RetryEvent.NO_CAPACITY,
+            self.FAILED_TO_START_DUE_TO_NO_BALANCE: RetryEvent.NO_CAPACITY,
             self.INTERRUPTED_BY_NO_CAPACITY: RetryEvent.INTERRUPTION,
         }
         default = RetryEvent.ERROR if self.to_status() == JobStatus.FAILED else None

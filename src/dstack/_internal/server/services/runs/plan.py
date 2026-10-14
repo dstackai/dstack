@@ -794,7 +794,7 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        backend_offers = await get_offers_by_requirements(
+        offers_result = await get_offers_by_requirements(
             project=project,
             profile=profile,
             requirements=requirements,
@@ -807,6 +807,7 @@ async def _get_backend_offers_in_fleet(
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,
         )
+        backend_offers = offers_result.offers
     return backend_offers
 
 
@@ -874,7 +875,7 @@ async def get_non_fleet_offers(
     if skip_backend_offers:
         backend_offers = []
     else:
-        backend_offers = await get_offers_by_requirements(
+        offers_result = await get_offers_by_requirements(
             project=project,
             profile=run_spec.merged_profile,
             requirements=job.job_spec.requirements,
@@ -886,6 +887,7 @@ async def get_non_fleet_offers(
             full_offers=full_offers,
             unallocated_resources=unallocated_resources,
         )
+        backend_offers = offers_result.offers
     return instance_offers, backend_offers
 
 

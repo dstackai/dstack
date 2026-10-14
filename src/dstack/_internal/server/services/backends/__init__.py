@@ -40,7 +40,6 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
-from dstack._internal.server.services.offers import merge_offer_iterables
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -472,26 +471,17 @@ async def get_backend_offers(
     requirements: Requirements,
     full_offers: bool,
     unallocated_resources: bool,
-    exclude_not_available: bool = False,
-) -> Iterable[Tuple[Backend, InstanceOfferWithAvailability]]:
+) -> list[tuple[Backend, Iterable[InstanceOfferWithAvailability]]]:
     """
-    Returns a lazy iterable of backend offers satisfying `requirements` sorted by price.
+    Return each backend's lazy offers satisfying `requirements`.
     """
-
-    def get_filtered_offers_with_backends(
-        backend: Backend,
-        offers: Iterable[InstanceOfferWithAvailability],
-    ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
-        for offer in offers:
-            if not exclude_not_available or offer.availability.is_available():
-                yield (backend, offer)
 
     logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [
         run_async(get_offers_tracked, backend, requirements, full_offers, unallocated_resources)
         for backend in backends
     ]
-    offers_by_backend: list[Iterable[tuple[Backend, InstanceOfferWithAvailability]]] = []
+    offers_by_backend: list[tuple[Backend, Iterable[InstanceOfferWithAvailability]]] = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):
             logger.warning(
@@ -507,8 +497,8 @@ async def get_backend_offers(
                 exc_info=result,
             )
             continue
-        offers_by_backend.append(get_filtered_offers_with_backends(backend, result))
-    return merge_offer_iterables(*offers_by_backend)
+        offers_by_backend.append((backend, result))
+    return offers_by_backend
 
 
 def check_backend_type_available(backend_type: BackendType):
