@@ -25,6 +25,7 @@ from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume, VolumeConfigurationWithRegion
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.utils.common import run_async
 
 
 async def get_offers_by_requirements(
@@ -123,6 +124,14 @@ async def get_offers_by_requirements(
     if max_offers is not None:
         offers = itertools.islice(offers, max_offers)
 
+    # Sorting consumes the lazy offers chain, which is CPU-bound,
+    # so it must not run on the event loop.
+    return await run_async(_sort_offers_by_availability, offers)
+
+
+def _sort_offers_by_availability(
+    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     # Put NOT_AVAILABLE and NO_QUOTA offers at the end.
     # We have to do this after taking max_offers to avoid processing all offers
     # if all/most offers are unavailable.

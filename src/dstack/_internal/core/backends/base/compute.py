@@ -20,7 +20,11 @@ from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base.models import JobConfiguration
-from dstack._internal.core.backends.base.offers import OfferModifier, filter_offers_by_requirements
+from dstack._internal.core.backends.base.offers import (
+    OfferDiskFitter,
+    OfferModifier,
+    filter_offers_by_requirements,
+)
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
@@ -40,6 +44,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -237,11 +242,24 @@ class ComputeWithAllOffersCached(ABC):
         """
         Returns functions that modify offers before they are filtered by requirements.
         A modifier function can return `None` to exclude the offer.
-        E.g. can be used to set appropriate disk size based on requirements.
+        E.g. can be used to fit node resources to the requested resources.
+        A modifier must not modify the offer passed to it, since it is a cached offer.
+
+        Modifiers run on every cached offer, so prefer `get_offer_disk_size_range()`
+        and `get_offers_post_filter()` when they are enough.
 
         See `Compute.get_offers()` for the `full_offers` argument description.
         """
         return []
+
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        """
+        Returns disk sizes the offer can be provisioned with, or `None` if the offer's disk is fixed.
+        `get_offers()` sets the offer's disk to the smallest size that satisfies requirements.
+        """
+        return None
 
     def get_offers_post_filter(
         self, requirements: Requirements
@@ -262,7 +280,8 @@ class ComputeWithAllOffersCached(ABC):
         offers = self.__apply_modifiers(
             cached_offers, self.get_offers_modifiers(requirements, full_offers)
         )
-        offers = filter_offers_by_requirements(offers, requirements)
+        offers = filter_offers_by_requirements(offers, requirements, ignore_disk=True)
+        offers = self.__fit_disk_size(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
             offers = (o for o in offers if post_filter(o))
@@ -294,6 +313,15 @@ class ComputeWithAllOffersCached(ABC):
                     break
             else:
                 yield offer
+
+    def __fit_disk_size(
+        self, offers: Iterable[InstanceOfferWithAvailability], requirements: Requirements
+    ) -> Iterator[InstanceOfferWithAvailability]:
+        disk_fitter = OfferDiskFitter(requirements)
+        for offer in offers:
+            fitted_offer = disk_fitter.fit(offer, self.get_offer_disk_size_range(offer))
+            if fitted_offer is not None:
+                yield fitted_offer
 
 
 class ComputeWithFilteredOffersCached(ABC):

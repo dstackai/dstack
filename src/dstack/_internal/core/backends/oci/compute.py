@@ -1,4 +1,4 @@
-from collections.abc import Container, Iterable
+from collections.abc import Container
 from concurrent.futures import ThreadPoolExecutor
 from functools import cached_property, partial
 from typing import List, Optional
@@ -15,11 +15,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_user_data,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
 from dstack._internal.core.backends.oci.models import OCIConfig
 from dstack._internal.core.backends.oci.region import make_region_clients_map
@@ -33,7 +29,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
@@ -106,10 +102,10 @@ class OCICompute(
 
         return offers_with_availability
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

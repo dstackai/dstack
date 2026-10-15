@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from typing import List, Optional
 
 import gpuhunt
@@ -15,11 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.crusoe.models import CrusoeConfig
 from dstack._internal.core.backends.crusoe.resources import CrusoeClient
 from dstack._internal.core.errors import BackendError, NotYetTerminated
@@ -37,7 +32,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -183,21 +178,13 @@ class CrusoeCompute(
                 result[prog_name] = available
         return result
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        # Only adjust disk size for types without ephemeral NVMe (disk_gb == 0).
-        # Types with ephemeral NVMe already have their disk_size set by gpuhunt.
-        base_modifier = get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
-
-        def modifier(
-            offer: InstanceOfferWithAvailability,
-        ) -> Optional[InstanceOfferWithAvailability]:
-            if _has_ephemeral_disk(offer):
-                return offer
-            return base_modifier(offer)
-
-        return [modifier]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        # Types with ephemeral NVMe (disk_gb > 0) already have their disk_size set by gpuhunt.
+        if _has_ephemeral_disk(offer):
+            return None
+        return CONFIGURABLE_DISK_SIZE
 
     def create_instance(
         self,

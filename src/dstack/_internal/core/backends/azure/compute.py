@@ -1,7 +1,6 @@
 import base64
 import enum
 import re
-from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
@@ -52,11 +51,7 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
     requires_nvidia_proprietary_kernel_modules,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -73,7 +68,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -117,10 +112,10 @@ class AzureCompute(
         )
         return offers_with_availability
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def create_instance(
         self,

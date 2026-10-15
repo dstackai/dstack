@@ -1,6 +1,5 @@
 import json
 import uuid
-from collections.abc import Iterable
 from datetime import timedelta
 from typing import Callable, List, Optional
 
@@ -17,17 +16,11 @@ from dstack._internal.core.backends.base.compute import (
     get_job_instance_name,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, RunpodApiClientError
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import (
-    ComputeError,
-)
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
@@ -91,27 +84,16 @@ class RunpodCompute(
         ]
         return offers
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        gpu_disk_modifier = get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
-
-        def disk_modifier(
-            offer: InstanceOfferWithAvailability,
-        ) -> Optional[InstanceOfferWithAvailability]:
-            if len(offer.instance.resources.gpus) > 0:
-                return gpu_disk_modifier(offer)
-
-            # For Runpod CPU offers, gpuhunt disk is the per-flavor max.
-            # Choose requested disk within [1GB, max] or filter the offer out.
-            cpu_max_disk_size_gb = Memory(offer.instance.resources.disk.size_mib / 1024)
-            cpu_configurable_disk_size = Range[Memory](
-                min=Memory.parse("1GB"),
-                max=cpu_max_disk_size_gb,
-            )
-            return get_offers_disk_modifier(cpu_configurable_disk_size, requirements)(offer)
-
-        return [disk_modifier]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        if len(offer.instance.resources.gpus) > 0:
+            return CONFIGURABLE_DISK_SIZE
+        # For Runpod CPU offers, gpuhunt disk is the per-flavor max.
+        return Range[Memory](
+            min=Memory.parse("1GB"),
+            max=Memory(offer.instance.resources.disk.size_mib / 1024),
+        )
 
     def get_offers_post_filter(
         self, requirements: Requirements

@@ -1,7 +1,6 @@
 import shlex
 import subprocess
 import tempfile
-from collections.abc import Iterable
 from typing import Callable, List, Optional, cast
 
 import gpuhunt
@@ -18,11 +17,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.jarvislabs.api_client import JarvisLabsAPIClient
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig
 from dstack._internal.core.errors import ProvisioningError
@@ -100,10 +95,10 @@ class JarvisLabsCompute(
             for offer in offers
         ]
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def get_offers_post_filter(
         self, requirements: Requirements
