@@ -475,7 +475,7 @@ async def get_backend_offers(
     exclude_not_available: bool = False,
 ) -> Iterable[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
-    Yields backend offers satisfying `requirements` sorted by price.
+    Returns a lazy iterable of backend offers satisfying `requirements` sorted by price.
     """
 
     def get_filtered_offers_with_backends(

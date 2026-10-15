@@ -169,28 +169,6 @@ class TestFilterOffersByRequirementsDiskSize:
 class TestOfferDiskFitter:
     def test_sets_min_disk_size_within_configurable_and_required_ranges(self):
         offer = get_instance_offer_with_availability(gpu_count=1, disk_gib=100)
-        requirements = Requirements(resources=ResourcesSpec(disk="200GB..300GB"))
-        configurable = Range[Memory](min=Memory.parse("250GB"), max=None)
-
-        fitted = OfferDiskFitter(requirements).fit(offer, configurable)
-
-        assert fitted is not None
-        assert fitted.instance.resources.disk == Disk(size_mib=250 * 1024)
-        assert offer.instance.resources.disk == Disk(size_mib=100 * 1024)
-        assert fitted.instance.resources.gpus is offer.instance.resources.gpus
-
-    def test_uses_default_disk_if_requirements_have_no_disk(self):
-        offer = get_instance_offer_with_availability(disk_gib=1)
-        requirements = Requirements(resources=ResourcesSpec(disk=None))
-        configurable = Range[Memory](min=Memory.parse("10GB"), max=None)
-
-        fitted = OfferDiskFitter(requirements).fit(offer, configurable)
-
-        assert fitted is not None
-        assert fitted.instance.resources.disk == Disk(size_mib=100 * 1024)
-
-    def test_fits_each_configurable_range_separately(self):
-        offer = get_instance_offer_with_availability(disk_gib=1)
         requirements = Requirements(resources=ResourcesSpec(disk="200GB.."))
         fitter = OfferDiskFitter(requirements)
 
@@ -201,8 +179,19 @@ class TestOfferDiskFitter:
         assert fitted_a is not None and fitted_b is not None and fitted_c is not None
         assert fitted_a.instance.resources.disk == Disk(size_mib=200 * 1024)
         assert fitted_b.instance.resources.disk == Disk(size_mib=300 * 1024)
-        assert fitted_c.instance.resources.disk == Disk(size_mib=200 * 1024)
         assert fitted_c.instance.resources.disk is fitted_a.instance.resources.disk
+        assert fitted_a.instance.resources.gpus is offer.instance.resources.gpus
+        assert offer.instance.resources.disk == Disk(size_mib=100 * 1024)
+
+    def test_uses_default_disk_if_requirements_have_no_disk(self):
+        offer = get_instance_offer_with_availability(disk_gib=1)
+        requirements = Requirements(resources=ResourcesSpec(disk=None))
+        configurable = Range[Memory](min=Memory.parse("10GB"), max=None)
+
+        fitted = OfferDiskFitter(requirements).fit(offer, configurable)
+
+        assert fitted is not None
+        assert fitted.instance.resources.disk == Disk(size_mib=100 * 1024)
 
     def test_returns_none_if_configurable_range_does_not_fit(self):
         offer = get_instance_offer_with_availability()

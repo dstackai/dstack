@@ -24,10 +24,15 @@ from dstack._internal.server.testing.common import (
 )
 
 
-class _ComputeWithConfigurableDisk(ComputeWithAllOffersCached):
-    def __init__(self, offers: list[InstanceOfferWithAvailability]) -> None:
+class _ComputeWithCachedOffers(ComputeWithAllOffersCached):
+    def __init__(
+        self,
+        offers: list[InstanceOfferWithAvailability],
+        disk_size_ranges: dict[str, Optional[Range[Memory]]],
+    ) -> None:
         super().__init__()
         self.offers = offers
+        self.disk_size_ranges = disk_size_ranges
         self.disk_size_range_calls: list[InstanceOfferWithAvailability] = []
 
     def get_all_offers_with_availability(
@@ -39,16 +44,21 @@ class _ComputeWithConfigurableDisk(ComputeWithAllOffersCached):
         self, offer: InstanceOfferWithAvailability
     ) -> Optional[Range[Memory]]:
         self.disk_size_range_calls.append(offer)
-        if offer.instance.name == "fixed":
-            return None
-        return Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("500GB"))
+        return self.disk_size_ranges[offer.instance.name]
 
 
 class TestComputeWithAllOffersCachedGetOffers:
     def test_fits_disk_only_for_offers_matching_other_requirements(self):
-        gpu_offer = get_instance_offer_with_availability(gpu_count=1, disk_gib=100)
-        cpu_offer = get_instance_offer_with_availability(gpu_count=0, disk_gib=100)
-        compute = _ComputeWithConfigurableDisk([gpu_offer, cpu_offer])
+        gpu_offer = get_instance_offer_with_availability(
+            instance_type="gpu", gpu_count=1, disk_gib=100
+        )
+        cpu_offer = get_instance_offer_with_availability(
+            instance_type="cpu", gpu_count=0, disk_gib=100
+        )
+        configurable = Range[Memory](min=Memory.parse("50GB"), max=None)
+        compute = _ComputeWithCachedOffers(
+            [gpu_offer, cpu_offer], {"gpu": configurable, "cpu": configurable}
+        )
         requirements = Requirements(resources=ResourcesSpec(gpu=1, disk="200GB.."))
 
         offers = list(compute.get_offers(requirements, False, False))
@@ -58,14 +68,19 @@ class TestComputeWithAllOffersCachedGetOffers:
         assert gpu_offer.instance.resources.disk == Disk(size_mib=100 * 1024)
 
     def test_excludes_offers_whose_disk_does_not_fit(self):
-        configurable_offer = get_instance_offer_with_availability(disk_gib=100)
+        configurable_offer = get_instance_offer_with_availability(
+            instance_type="configurable", disk_gib=100
+        )
         fixed_offer = get_instance_offer_with_availability(instance_type="fixed", disk_gib=100)
-        compute = _ComputeWithConfigurableDisk([configurable_offer, fixed_offer])
+        compute = _ComputeWithCachedOffers(
+            [configurable_offer, fixed_offer],
+            {"configurable": Range[Memory](min=Memory.parse("50GB"), max=None), "fixed": None},
+        )
         requirements = Requirements(resources=ResourcesSpec(disk="200GB.."))
 
         offers = list(compute.get_offers(requirements, False, False))
 
-        assert [o.instance.name for o in offers] == ["instance"]
+        assert [o.instance.name for o in offers] == ["configurable"]
 
 
 class TestGenerateUniqueInstanceName:

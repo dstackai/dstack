@@ -246,10 +246,11 @@ class OfferDiskFitter:
     """
 
     def __init__(self, requirements: Requirements) -> None:
-        self._requirements_disk = requirements.resources.disk
-        self._requirements_disk_range = DEFAULT_DISK.size
-        if self._requirements_disk is not None:
-            self._requirements_disk_range = self._requirements_disk.size
+        disk_spec = requirements.resources.disk
+        # The range fixed disks are checked against, `None` if fixed disks are not checked.
+        self._fixed_disk_range = disk_spec.size if disk_spec is not None else None
+        # The range configurable disks are fitted to.
+        self._target_disk_range = disk_spec.size if disk_spec is not None else DEFAULT_DISK.size
         self._disk_by_range: dict[tuple[Optional[float], Optional[float]], Optional[Disk]] = {}
 
     def fit(
@@ -283,20 +284,19 @@ class OfferDiskFitter:
         return offer.model_copy(update={"instance": instance})
 
     def _fixed_disk_fits(self, disk_size_mib: int) -> bool:
-        if self._requirements_disk is None or disk_size_mib == 0:
+        if self._fixed_disk_range is None or disk_size_mib == 0:
             return True
         disk_size = disk_size_mib / 1024
-        required = self._requirements_disk.size
-        if required.min is not None and disk_size < required.min:
+        if self._fixed_disk_range.min is not None and disk_size < self._fixed_disk_range.min:
             return False
-        if required.max is not None and disk_size > required.max:
+        if self._fixed_disk_range.max is not None and disk_size > self._fixed_disk_range.max:
             return False
         return True
 
     def _get_disk(self, configurable_disk_size: Range[Memory]) -> Optional[Disk]:
         key = (configurable_disk_size.min, configurable_disk_size.max)
         if key not in self._disk_by_range:
-            disk_size_range = self._requirements_disk_range.intersect(configurable_disk_size)
+            disk_size_range = self._target_disk_range.intersect(configurable_disk_size)
             disk = None
             if disk_size_range is not None:
                 disk = Disk(size_mib=round(get_or_error(disk_size_range.min) * 1024))
