@@ -2,7 +2,6 @@ import json
 import random
 import shlex
 import time
-from collections.abc import Iterable
 from decimal import ROUND_CEILING, Decimal
 from functools import cached_property
 from typing import List, Optional
@@ -24,11 +23,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.models import (
     NebiusConfig,
@@ -58,7 +53,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -145,10 +140,10 @@ class NebiusCompute(
             for offer in offers
         ]
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def create_instance(
         self,

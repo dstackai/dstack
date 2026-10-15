@@ -1,8 +1,11 @@
+from typing import Optional
+
 import gpuhunt
 import pytest
 
 from dstack._internal.core.backends.base.offers import (
     filter_offers_by_requirements,
+    fit_offer_disk_size,
     gpu_matches_gpu_spec,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -13,8 +16,9 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
+from dstack._internal.core.models.resources import GPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.server.testing.common import get_instance_offer_with_availability
 
 NVIDIA = gpuhunt.AcceleratorVendor.NVIDIA
 AMD = gpuhunt.AcceleratorVendor.AMD
@@ -152,3 +156,67 @@ class TestFilterOffersByRequirementsDiskSize:
         requirements = Requirements(resources=ResourcesSpec(disk="100GB..200GB"))
 
         assert list(filter_offers_by_requirements([offer], requirements)) == [offer]
+
+    def test_ignore_disk_skips_disk_requirement(self):
+        offer = self.make_offer(disk_size_mib=50 * 1024)
+        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+
+        assert list(filter_offers_by_requirements([offer], requirements, ignore_disk=True)) == [
+            offer
+        ]
+
+
+class TestFitOfferDiskSize:
+    def test_sets_min_disk_size_within_configurable_and_required_ranges(self):
+        offer = get_instance_offer_with_availability(gpu_count=1, disk_gib=100)
+        requirements = Requirements(resources=ResourcesSpec(disk="200GB..300GB"))
+        configurable = Range[Memory](min=Memory.parse("250GB"), max=None)
+
+        fitted = fit_offer_disk_size(offer, configurable, requirements)
+
+        assert fitted is not None
+        assert fitted.instance.resources.disk == Disk(size_mib=250 * 1024)
+        assert offer.instance.resources.disk == Disk(size_mib=100 * 1024)
+        assert fitted.instance.resources.gpus is offer.instance.resources.gpus
+
+    def test_uses_default_disk_if_requirements_have_no_disk(self):
+        offer = get_instance_offer_with_availability(disk_gib=1)
+        requirements = Requirements(resources=ResourcesSpec(disk=None))
+        configurable = Range[Memory](min=Memory.parse("10GB"), max=None)
+
+        fitted = fit_offer_disk_size(offer, configurable, requirements)
+
+        assert fitted is not None
+        assert fitted.instance.resources.disk == Disk(size_mib=100 * 1024)
+
+    def test_returns_none_if_configurable_range_does_not_fit(self):
+        offer = get_instance_offer_with_availability()
+        requirements = Requirements(resources=ResourcesSpec(disk="..50GB"))
+        configurable = Range[Memory](min=Memory.parse("100GB"), max=None)
+
+        assert fit_offer_disk_size(offer, configurable, requirements) is None
+
+    def test_returns_same_offer_if_disk_size_unchanged(self):
+        offer = get_instance_offer_with_availability(disk_gib=100)
+        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+        configurable = Range[Memory](min=Memory.parse("10GB"), max=None)
+
+        assert fit_offer_disk_size(offer, configurable, requirements) is offer
+
+    @pytest.mark.parametrize(
+        ["disk_gib", "required_disk", "fits"],
+        [
+            pytest.param(150, "100GB..200GB", True, id="within-range"),
+            pytest.param(50, "100GB..", False, id="below-min"),
+            pytest.param(300, "..200GB", False, id="above-max"),
+            pytest.param(0, "100GB..200GB", True, id="unknown-size"),
+            pytest.param(50, None, True, id="no-disk-requirement"),
+        ],
+    )
+    def test_checks_fixed_disk(self, disk_gib: int, required_disk: Optional[str], fits: bool):
+        offer = get_instance_offer_with_availability(disk_gib=disk_gib)
+        requirements = Requirements(resources=ResourcesSpec(disk=required_disk))
+
+        fitted = fit_offer_disk_size(offer, None, requirements)
+
+        assert fitted is (offer if fits else None)

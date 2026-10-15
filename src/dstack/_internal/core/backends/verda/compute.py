@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 from typing import Dict, List, Optional
 
 from verda import VerdaClient
@@ -14,11 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import (
-    OfferModifier,
-    get_catalog_offers,
-    get_offers_disk_modifier,
-)
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.verda.models import VerdaConfig
 from dstack._internal.core.errors import (
     BackendError,
@@ -36,7 +31,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("verda.compute")
@@ -74,10 +69,10 @@ class VerdaCompute(
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
 
-    def get_offers_modifiers(
-        self, requirements: Requirements, full_offers: bool
-    ) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]

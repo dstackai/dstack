@@ -45,7 +45,6 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import (
     OfferModifier,
     get_catalog_offers,
-    get_offers_disk_modifier,
 )
 from dstack._internal.core.backends.gcp.features import tcpx as tcpx_features
 from dstack._internal.core.backends.gcp.models import GCPConfig
@@ -242,8 +241,12 @@ class GCPCompute(
 
             modifiers.append(reservation_modifier)
 
-        modifiers.append(get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements))
         return modifiers
+
+    def get_offer_disk_size_range(
+        self, offer: InstanceOfferWithAvailability
+    ) -> Optional[Range[Memory]]:
+        return CONFIGURABLE_DISK_SIZE
 
     def get_offers_post_filter(
         self, requirements: Requirements

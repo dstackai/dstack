@@ -161,7 +161,9 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
     )
 
 
-def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFilter:
+def requirements_to_query_filter(
+    req: Optional[Requirements], ignore_disk: bool = False
+) -> gpuhunt.QueryFilter:
     q = gpuhunt.QueryFilter(allowed_flags=SUPPORTED_GPUHUNT_FLAGS)
     if req is None:
         return q
@@ -178,7 +180,7 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     if res.memory:
         q.min_memory = res.memory.min
         q.max_memory = res.memory.max
-    if res.disk:
+    if res.disk and not ignore_disk:
         q.min_disk_size = res.disk.size.min
         q.max_disk_size = res.disk.size.max
 
@@ -206,8 +208,9 @@ InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvail
 def filter_offers_by_requirements(
     offers: Iterable[InstanceOfferT],
     requirements: Optional[Requirements],
+    ignore_disk: bool = False,
 ) -> Iterator[InstanceOfferT]:
-    query_filter = requirements_to_query_filter(requirements)
+    query_filter = requirements_to_query_filter(requirements, ignore_disk=ignore_disk)
     for offer in offers:
         catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, q=query_filter):
@@ -234,28 +237,45 @@ def choose_disk_size_mib(
 OfferModifier = Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
 
 
-def get_offers_disk_modifier(
-    configurable_disk_size: Range[Memory], requirements: Requirements
-) -> OfferModifier:
+def fit_offer_disk_size(
+    offer: InstanceOfferWithAvailability,
+    configurable_disk_size: Optional[Range[Memory]],
+    requirements: Requirements,
+) -> Optional[InstanceOfferWithAvailability]:
     """
-    Returns a func that modifies offers disk by setting min value that satisfies both
-    `configurable_disk_size` and `requirements`.
-    """
+    Fits the offer's disk to the `requirements` disk. Returns `None` if the offer doesn't fit.
 
-    def modifier(offer: InstanceOfferWithAvailability) -> Optional[InstanceOfferWithAvailability]:
-        requirements_disk_range = DEFAULT_DISK.size
-        if requirements.resources.disk is not None:
-            requirements_disk_range = requirements.resources.disk.size
-        disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
-        if disk_size_range is None:
+    If `configurable_disk_size` is `None`, the offer's disk is fixed and is only checked against
+    `requirements`, the same way `filter_offers_by_requirements()` checks it. Otherwise, the disk
+    is set to the smallest size within both `configurable_disk_size` and the required range
+    (`DEFAULT_DISK` if `requirements` don't specify disk).
+
+    Never modifies `offer`. A changed offer shares all objects with `offer` except those on
+    the path to the disk.
+    """
+    requirements_disk = requirements.resources.disk
+    disk_size_mib = offer.instance.resources.disk.size_mib
+    if configurable_disk_size is None:
+        if requirements_disk is None or disk_size_mib == 0:
+            return offer
+        disk_size = Memory(disk_size_mib / 1024)
+        if requirements_disk.size.intersect(Range[Memory](min=disk_size, max=disk_size)) is None:
             return None
-        offer_copy = offer.model_copy(deep=True)
-        offer_copy.instance.resources.disk = Disk(
-            size_mib=get_or_error(disk_size_range.min) * 1024
-        )
-        return offer_copy
-
-    return modifier
+        return offer
+    requirements_disk_range = DEFAULT_DISK.size
+    if requirements_disk is not None:
+        requirements_disk_range = requirements_disk.size
+    disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
+    if disk_size_range is None:
+        return None
+    new_disk_size_mib = round(get_or_error(disk_size_range.min) * 1024)
+    if new_disk_size_mib == disk_size_mib:
+        return offer
+    resources = offer.instance.resources.model_copy(
+        update={"disk": Disk(size_mib=new_disk_size_mib)}
+    )
+    instance = offer.instance.model_copy(update={"resources": resources})
+    return offer.model_copy(update={"instance": instance})
 
 
 def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:
