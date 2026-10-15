@@ -519,7 +519,7 @@ class JobConfigurator(ABC):
                 # workers), and they don't receive traffic directly.
                 return []
             # The router answers chat completions only once it has workers, which it gets
-            # regardless of its own readiness. For SGLang routers, dstack registers workers
+            # regardless of its own readiness. For SMG routers, dstack registers workers
             # via `ServiceRouterWorkerSyncWorker`, which doesn't check router readiness.
             # Dynamo workers register themselves with the router via etcd/NATS.
         return [_openai_model_probe_spec(model.name, model.prefix)]

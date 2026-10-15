@@ -18,7 +18,7 @@ from dstack._internal.core.models.configurations import (
     parse_run_configuration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig, RouterType
 
 
 class TestParseConfiguration:
@@ -154,8 +154,8 @@ class TestParseConfiguration:
                 {
                     "name": "router",
                     "count": 1,
-                    "commands": ["sglang serve"],
-                    "router": {"type": "sglang"},
+                    "commands": ["smg launch"],
+                    "router": {"type": "smg"},
                 },
                 {"name": "worker", "count": 2, "commands": ["worker"]},
             ],
@@ -165,7 +165,7 @@ class TestParseConfiguration:
         assert parsed.groups is not None
         router_g = next(g for g in parsed.groups if g.name == "router")
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
-        assert router_g.router.type == "sglang"
+        assert router_g.router.type == RouterType.SMG
 
     def test_spot_policy_set_at_both_service_and_group_rejected(self):
         with pytest.raises(

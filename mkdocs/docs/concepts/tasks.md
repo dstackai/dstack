@@ -209,7 +209,7 @@ and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for r
     master node.
 
     > In a service, worker registration happens automatically when the router group sets
-    > [`router`](services.md#router) to `type: sglang`.
+    > [`router`](services.md#router) to `type: smg`.
 
     <div editor-title=".dstack.yml">
 

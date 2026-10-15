@@ -13,7 +13,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
-from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig, RouterType
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs.configurators.base import get_default_image
@@ -106,7 +106,7 @@ class TestProbes:
                 ReplicaGroup(
                     name="router",
                     replicas=Range[int](min=1, max=1),
-                    router=ReplicaGroupRouterConfig(type="sglang"),
+                    router=ReplicaGroupRouterConfig(type=RouterType.SMG),
                 ),
                 ReplicaGroup(
                     name="worker",

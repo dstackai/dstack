@@ -414,7 +414,7 @@ class _StartupContext:
     """Dynamo-specific env (e.g. DSTACK_ROUTER_INTERNAL_IP) computed from the
     router replica's state. Passed through to RunnerClient.submit_job, which
     merges it into a deep-copied job_spec.env so the shared job_spec is not
-    mutated. None for SGLang services, non-router runs, and the router
+    mutated. None for SMG services, non-router runs, and the router
     replica itself."""
 
 

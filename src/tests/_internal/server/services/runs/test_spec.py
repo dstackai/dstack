@@ -482,15 +482,15 @@ class TestRunSpecHasReplicaIpRefs:
 
 
 class TestCheckCanUpdateConfigurationRouterType:
-    def test_sglang_to_dynamo_router_type_change_is_rejected(self):
-        current = _run_spec(_service_configuration(router_type="sglang"))
+    def test_smg_to_dynamo_router_type_change_is_rejected(self):
+        current = _run_spec(_service_configuration(router_type="smg"))
         new = _run_spec(_service_configuration(router_type="dynamo"))
         with pytest.raises(ServerClientError, match="router.type"):
             check_can_update_run_spec(current, new)
 
-    def test_dynamo_to_sglang_router_type_change_is_rejected(self):
+    def test_dynamo_to_smg_router_type_change_is_rejected(self):
         current = _run_spec(_service_configuration(router_type="dynamo"))
-        new = _run_spec(_service_configuration(router_type="sglang"))
+        new = _run_spec(_service_configuration(router_type="smg"))
         with pytest.raises(ServerClientError, match="router.type"):
             check_can_update_run_spec(current, new)
 
@@ -592,10 +592,10 @@ class TestCheckCanUpdateConfigurationWorkerOnlyChangesAllowed:
 
 
 class TestCheckCanUpdateConfigurationNonDynamoUnchanged:
-    def test_sglang_top_level_image_change_is_allowed(self):
-        current = _run_spec(_service_configuration(router_type="sglang", image="img:1"))
-        new = _run_spec(_service_configuration(router_type="sglang", image="img:2"))
-        # Top-level changes on SGLang services flow through to the existing
+    def test_smg_top_level_image_change_is_allowed(self):
+        current = _run_spec(_service_configuration(router_type="smg", image="img:1"))
+        new = _run_spec(_service_configuration(router_type="smg", image="img:2"))
+        # Top-level changes on SMG services flow through to the existing
         # rolling-deployment path; no Dynamo gate fires.
         check_can_update_run_spec(current, new)
 
@@ -609,8 +609,8 @@ class TestCheckCanUpdateConfigurationFieldAllowlist:
     """`_check_can_update_configuration` is also called directly with configs only."""
 
     def test_non_dynamo_image_change_passes_configuration_gate(self):
-        current = _service_configuration(router_type="sglang", image="img:1")
-        new = _service_configuration(router_type="sglang", image="img:2")
+        current = _service_configuration(router_type="smg", image="img:1")
+        new = _service_configuration(router_type="smg", image="img:2")
         _check_can_update_configuration(current, new, ignore_files=True)
 
 

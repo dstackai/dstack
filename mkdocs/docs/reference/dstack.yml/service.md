@@ -89,8 +89,12 @@ The `service` configuration type allows running [services](../../concepts/servic
 #SCHEMA# dstack._internal.core.models.configurations.ReplicaGroup
     overrides:
       show_root_heading: false
-      type:
-        required: true
+
+##### `groups[n].router` { #router data-toc-label="router" }
+
+#SCHEMA# dstack._internal.core.models.routers.ReplicaGroupRouterConfig
+    overrides:
+      show_root_heading: false
 
 ### `retry`
 

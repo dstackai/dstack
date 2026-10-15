@@ -154,7 +154,7 @@ groups:
           --port 8000 \
           --prefill-policy cache_aware
     router:
-      type: sglang
+      type: smg
     resources:
       cpu: 4
 

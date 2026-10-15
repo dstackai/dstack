@@ -43,8 +43,8 @@ def _router_service_run_spec(repo_id: str, run_name: str = "test-run"):
                 {
                     "name": "router",
                     "count": 1,
-                    "commands": ["sglang serve"],
-                    "router": {"type": "sglang"},
+                    "commands": ["smg launch"],
+                    "router": {"type": "smg"},
                 },
                 {"name": "worker", "count": 2, "commands": ["worker"]},
             ],
