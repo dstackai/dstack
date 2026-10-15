@@ -237,45 +237,71 @@ def choose_disk_size_mib(
 OfferModifier = Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
 
 
-def fit_offer_disk_size(
-    offer: InstanceOfferWithAvailability,
-    configurable_disk_size: Optional[Range[Memory]],
-    requirements: Requirements,
-) -> Optional[InstanceOfferWithAvailability]:
+class OfferDiskFitter:
     """
-    Fits the offer's disk to the `requirements` disk. Returns `None` if the offer doesn't fit.
+    Fits offers' disks to the `requirements` disk.
 
-    If `configurable_disk_size` is `None`, the offer's disk is fixed and is only checked against
-    `requirements`, the same way `filter_offers_by_requirements()` checks it. Otherwise, the disk
-    is set to the smallest size within both `configurable_disk_size` and the required range
-    (`DEFAULT_DISK` if `requirements` don't specify disk).
-
-    Never modifies `offer`. A changed offer shares all objects with `offer` except those on
-    the path to the disk.
+    Create one per `requirements` and reuse it for all offers: the fitted disk is computed
+    once per distinct configurable disk size range and shared by all offers it is set on.
     """
-    requirements_disk = requirements.resources.disk
-    disk_size_mib = offer.instance.resources.disk.size_mib
-    if configurable_disk_size is None:
-        if requirements_disk is None or disk_size_mib == 0:
-            return offer
-        disk_size = Memory(disk_size_mib / 1024)
-        if requirements_disk.size.intersect(Range[Memory](min=disk_size, max=disk_size)) is None:
+
+    def __init__(self, requirements: Requirements) -> None:
+        self._requirements_disk = requirements.resources.disk
+        self._requirements_disk_range = DEFAULT_DISK.size
+        if self._requirements_disk is not None:
+            self._requirements_disk_range = self._requirements_disk.size
+        self._disk_by_range: dict[tuple[Optional[float], Optional[float]], Optional[Disk]] = {}
+
+    def fit(
+        self,
+        offer: InstanceOfferWithAvailability,
+        configurable_disk_size: Optional[Range[Memory]],
+    ) -> Optional[InstanceOfferWithAvailability]:
+        """
+        Returns the offer with the fitted disk, or `None` if the offer doesn't fit.
+
+        If `configurable_disk_size` is `None`, the offer's disk is fixed and is only checked
+        against `requirements`, the same way `filter_offers_by_requirements()` checks it.
+        Otherwise, the disk is set to the smallest size within both `configurable_disk_size`
+        and the required range (`DEFAULT_DISK` if `requirements` don't specify disk).
+
+        Never modifies `offer`. A changed offer shares all objects with `offer` except those on
+        the path to the disk.
+        """
+        disk_size_mib = offer.instance.resources.disk.size_mib
+        if configurable_disk_size is None:
+            if self._fixed_disk_fits(disk_size_mib):
+                return offer
             return None
-        return offer
-    requirements_disk_range = DEFAULT_DISK.size
-    if requirements_disk is not None:
-        requirements_disk_range = requirements_disk.size
-    disk_size_range = requirements_disk_range.intersect(configurable_disk_size)
-    if disk_size_range is None:
-        return None
-    new_disk_size_mib = round(get_or_error(disk_size_range.min) * 1024)
-    if new_disk_size_mib == disk_size_mib:
-        return offer
-    resources = offer.instance.resources.model_copy(
-        update={"disk": Disk(size_mib=new_disk_size_mib)}
-    )
-    instance = offer.instance.model_copy(update={"resources": resources})
-    return offer.model_copy(update={"instance": instance})
+        disk = self._get_disk(configurable_disk_size)
+        if disk is None:
+            return None
+        if disk.size_mib == disk_size_mib:
+            return offer
+        resources = offer.instance.resources.model_copy(update={"disk": disk})
+        instance = offer.instance.model_copy(update={"resources": resources})
+        return offer.model_copy(update={"instance": instance})
+
+    def _fixed_disk_fits(self, disk_size_mib: int) -> bool:
+        if self._requirements_disk is None or disk_size_mib == 0:
+            return True
+        disk_size = disk_size_mib / 1024
+        required = self._requirements_disk.size
+        if required.min is not None and disk_size < required.min:
+            return False
+        if required.max is not None and disk_size > required.max:
+            return False
+        return True
+
+    def _get_disk(self, configurable_disk_size: Range[Memory]) -> Optional[Disk]:
+        key = (configurable_disk_size.min, configurable_disk_size.max)
+        if key not in self._disk_by_range:
+            disk_size_range = self._requirements_disk_range.intersect(configurable_disk_size)
+            disk = None
+            if disk_size_range is not None:
+                disk = Disk(size_mib=round(get_or_error(disk_size_range.min) * 1024))
+            self._disk_by_range[key] = disk
+        return self._disk_by_range[key]
 
 
 def gpu_matches_gpu_spec(gpu: Gpu, gpu_spec: GPUSpec) -> bool:

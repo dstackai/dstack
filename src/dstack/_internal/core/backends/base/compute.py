@@ -21,9 +21,9 @@ from gpuhunt import CPUArchitecture
 from dstack._internal import settings
 from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import (
+    OfferDiskFitter,
     OfferModifier,
     filter_offers_by_requirements,
-    fit_offer_disk_size,
 )
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
@@ -258,13 +258,6 @@ class ComputeWithAllOffersCached(ABC):
         """
         Returns disk sizes the offer can be provisioned with, or `None` if the offer's disk is fixed.
         `get_offers()` sets the offer's disk to the smallest size that satisfies requirements.
-
-        Optimization note:
-        Disk is not set by a modifier because modifiers run before filtering. The requirements
-        filter can't check disk until the disk is set, and setting it requires copying
-        the offer, so every cached offer would be copied on every `get_offers()` call.
-        Instead, `get_offers()` filters by the other requirements first and then sets disk
-        only for offers that match.
         """
         return None
 
@@ -324,9 +317,9 @@ class ComputeWithAllOffersCached(ABC):
     def __fit_disk_size(
         self, offers: Iterable[InstanceOfferWithAvailability], requirements: Requirements
     ) -> Iterator[InstanceOfferWithAvailability]:
+        disk_fitter = OfferDiskFitter(requirements)
         for offer in offers:
-            disk_size_range = self.get_offer_disk_size_range(offer)
-            fitted_offer = fit_offer_disk_size(offer, disk_size_range, requirements)
+            fitted_offer = disk_fitter.fit(offer, self.get_offer_disk_size_range(offer))
             if fitted_offer is not None:
                 yield fitted_offer
 
