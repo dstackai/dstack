@@ -29,10 +29,11 @@ const LayersGlyph = () => (
 );
 
 // Primary links in the desktop top navigation (plain same-origin MkDocs links). The blog
-// categories are listed individually (Case studies / Blog) to mirror the docs
+// categories are listed individually (Benchmarks / Case studies / Blog) to mirror the docs
 // header tabs — no "Resources" dropdown.
 const audienceNavItems: Array<{ label: string; href: string }> = [
   { label: 'Docs', href: DOCS_URL },
+  { label: 'Benchmarks', href: `${BLOG_URL}/benchmarks/` },
   { label: 'Case studies', href: `${BLOG_URL}/case-studies/` },
   { label: 'Blog', href: BLOG_URL },
 ];
@@ -74,6 +75,7 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
     })),
   },
   { type: 'link', text: 'Docs', href: DOCS_URL },
+  { type: 'link', text: 'Benchmarks', href: `${BLOG_URL}/benchmarks/` },
   { type: 'link', text: 'Case studies', href: `${BLOG_URL}/case-studies/` },
   { type: 'link', text: 'Blog', href: BLOG_URL },
 ];
