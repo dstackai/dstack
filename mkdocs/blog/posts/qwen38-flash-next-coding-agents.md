@@ -29,8 +29,6 @@ Comparing our engine’s performance with Alibaba’s serving in [OpenRouter](ht
 === "Request latency"
     <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-3.png" width="750" />
 
-> Alibaba is the only provider that publishes per-request latency and throughput for this model, so it is the only endpoint we can compare against. Others serve Flash-Next, including Featherless, TensorX, FlexAI and Lyceum, but none publish performance percentiles.
-
 ## Purpose
 
 We want to serve the fastest Qwen3.8-Flash-Next coding agents on a single 4xH200 Jarvislabs node and see how far the engine can be optimized beyond the SGLang cookbook recipe.
@@ -126,6 +124,7 @@ Splitting the optimization process into two phases paid off: almost all the winn
 1. The fast-feedback workload could be designed better. Its requests are independent, not sessions: they arrive and finish together, so the engine never has to hold many long contexts while they sit idle waiting for their next turn. Running out of room for those waiting contexts is exactly what limited us to 32 agents, and since the fast-feedback benchmark cannot show it, the agent never worked on it. A better fast workload would keep the shape of a session while still finishing in under a minute.
 2. Real traffic shape but generated text. The full-replay traces keep the real session structure, token counts and think gaps, but the prompt tokens are generated. Anything that depends on what the text says can differ from production, for example how many tokens speculative decoding guesses correctly.
 3. We capped each session at three trials for budget reasons. In several sessions the agent still had untried ideas when the session ended, so more trials or more sessions would likely find more improvements.
+4. Only one provider to compare against. Alibaba is the only provider that publishes per-request latency and throughput for this model. Other providers serve Flash-Next, but none publish performance percentiles.
 
 ## Deploy the optimized preset to your hardware
 
