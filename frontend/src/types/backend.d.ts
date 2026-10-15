@@ -47,3 +47,8 @@ declare interface IProjectBackend {
     name: string;
     config: TBackendConfig;
 }
+
+declare interface IBackendQuota {
+    name: string;
+    value: number;
+}

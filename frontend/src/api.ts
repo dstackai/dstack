@@ -137,6 +137,8 @@ export const API = {
 
     PROJECT_BACKENDS: {
         BASE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/backends`,
+        QUOTAS: (projectName: IProject['project_name'], backendName: string) =>
+            `${API.BASE()}/project/${projectName}/backend/${backendName}/quotas/list`,
         LIST: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/list`,
         CREATE: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/create`,
         UPDATE: (projectName: IProject['project_name']) => `${API.PROJECT_BACKENDS.BASE(projectName)}/update`,
