@@ -18,7 +18,7 @@ This work was made possible through the generous support of our partners at [Jar
 
 <!-- more -->
 
-Comparing our engine’s performance with Alibaba’s serving in [OpenRouter](https://openrouter.ai/qwen/qwen3.8-flash#performance) we get roughly 3x lower latency and about 2.5x higher output speed per user, at both the median and p99, as shown in the charts below. Alibaba runs two endpoints there; we compare against the faster one, using OpenRouter's own figures for the week of 6 to 13 October 2026.
+Comparing our engine’s performance with Alibaba’s serving in [OpenRouter](https://openrouter.ai/qwen/qwen3.8-flash#performance) we get roughly 3x lower latency and about 2x higher output speed per user, at both the median and p99, as shown in the charts below. Alibaba runs two endpoints there; we compare against the faster one, using OpenRouter's own figures for the week of 6 to 13 October 2026.
 
 === "Output speed per user"
     <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-1.png" width="750" />
@@ -29,11 +29,13 @@ Comparing our engine’s performance with Alibaba’s serving in [OpenRouter](ht
 === "Request latency"
     <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-3.png" width="750" />
 
+> Alibaba is the only provider that publishes per-request latency and throughput for this model, so it is the only endpoint we can compare against. Others serve Flash-Next, including Featherless, TensorX, FlexAI and Lyceum, but none publish performance percentiles.
+
 ## Purpose
 
-We want to serve the fastest Qwen3.8-Flash-Next coding agents on a single 4xH200 Jarvislabs node and see how far the engine can be optimized beyond SGLang Cookbook.
+We want to serve the fastest Qwen3.8-Flash-Next coding agents on a single 4xH200 Jarvislabs node and see how far the engine can be optimized beyond the SGLang cookbook recipe.
 
-We also want to know how many such coding agents this node can serve. This has to be measured because the usual metrics, request per second or tokens per second do not answer it.
+We also want to know how many such coding agents this node can serve. This has to be measured because the usual metrics, requests per second or tokens per second, do not answer it.
 
 We chose a single 4xH200 node for two reasons. First, it fits the workload: Qwen3.8-Flash-Next-FP8 is 173 GB of weights, and 4 × 141 GB of HBM leaves enough room to hold several concurrent agents with their own 100–150k-token contexts, which is the input length a coding agent actually sends. Second, the SGLang cookbook publishes a recipe for exactly this configuration, which gives us a credible baseline to measure against, and shows that 4xH200 is a common hardware to serve the model rather than one chosen because it is easy to beat.
 
@@ -51,47 +53,43 @@ In our setup, the SMG router and SGLang inference backend are separated. The SMG
 * Orchestration: `dstack`
 * Optimization: `dstack` presets with model: Claude Opus 5
 
-### Methodology
+## Methodology
 
-We used `dstack` [presets](../../docs/concepts/presets.md), an agent-based inference optimization toolkit, to find the fastest configuration for serving Qwen3.8-Flash-Next coding agents on a single 4xH200 Jarvislabs node plus a CPU node for a router in the same VPC.
+We used `dstack` [presets](../../docs/concepts/presets.md), an agent-based inference optimization toolkit, to find the fastest configuration for serving Qwen3.8-Flash-Next coding agents.
 
-`dstack` presets use a locally installed Codex or Claude CLI as the optimization agent with its own optimization harness. We supplied a preset configuration that defines the model, synthetic workload (`input_tokens`, `output_tokens`, `shared_prefix_tokens`) or dataset, constraints (`min_context_length`, `max_ttft`), concurrency and number of trials. Presets then provide the agent with a harness for running optimization trials, submitting `dstack` runs, benchmarking candidate configurations, and finally verifying the selected configuration as a deployable service. They also support chained sessions, allowing later optimization runs to inherit from previous trial records.
+### Preset configuration
 
-For our purpose, we divided the optimization process into two phases based on time spent on benchmarks.
+`dstack` presets use a locally installed Codex or Claude CLI as the optimization agent. We supplied a preset configuration that defines the model, the workload, the concurrency, the number of trials and the constraints: a 1M-token context and a median TTFT of at most 1.5 s. Presets then provide the agent with a harness for running optimization trials, benchmarking candidate configurations, and verifying the selected configuration as a deployable service. They also support chained sessions, allowing later optimization runs to inherit from previous trial records.
 
-The first phase is the fast-feedback phase. Here we shaped the workload like one agent turn: 108k input tokens of which 97.2k are a shared prefix, 800 output tokens, with all requests sent at once. The purpose of this phase is to give the agent fast feedback through a quick benchmark. In this phase, each benchmark run completes in 33 to 70 seconds, so the agent can try the changes and know their effect faster.
+### Fast and full phases
 
-The second is the full-replay phase, where the workload is the real agentic sessions instead of the burst of requests we used in the fast-feedback phase. We explicitly instructed the preset agent to use SemiAnalysis's AgentX benchmark. It is built from recorded Claude Code sessions. Each session is a multi-turn conversation: a first short prompt, then turns that grow as the agent reads files and accumulates context, with the gaps where the user was thinking or a tool was running preserved exactly as they happened, and the places where the agent spawned subagents and issued several requests at once. Each benchmark run takes 90 minutes, so compared with the fast-feedback phase the agent gets its feedback far more slowly, and the optimization takes much longer.
+We divided the optimization process into two phases based on time spent on benchmarks, because GPU time is limited. In the fast-feedback phase, we shaped the workload like one agent turn: 108k input tokens with a 97.2k shared prefix and 800 output tokens, one request per agent, all sent at once. Each benchmark run took 33 to 70 seconds, so the agent could quickly find and discard optimization changes.
 
-We split the work this way because GPU time is limited. The fast-feedback phase let the agent find and discard optimization changes in under a minute, so by the time we moved to the full-replay phase the engine was already carrying everything the quick benchmark could establish, and the expensive runs were spent only on what real traffic could reveal. Chaining multiple preset optimization sessions, we inherited all the optimization changes from the fast-feedback phase into the full-replay phase.
+In the full-replay phase, the workload was SemiAnalysis's AgentX benchmark, which we explicitly instructed the preset agent to use. It replays recorded Claude Code sessions with their growing context, the pauses between turns, and the subagents that fire several requests at once. Each benchmark run took 90 minutes. Chaining the preset sessions carried all the optimization changes from the fast-feedback phase into the full-replay phase, so the expensive runs were spent only on what real traffic could reveal.
 
-To verify whether `dstack` presets improved on the baseline, we explicitly instructed the preset agent to use SemiAnalysis's benchmark script, because it runs the SGLang cookbook recipe with the AgentX benchmark. We did not compare against SemiAnalysis's published figures, because those were measured on their own cluster with an earlier SGLang build, so we took only the methodology from them and ran everything ourselves: the same SGLang build, the same Jarvislabs 4xH200 node, the same AgentX replay at 16 sessions for 3600 s, and the same pinned speculative acceptance of 2.32 on both sides. The only difference between the two runs is the engine configuration: the preset's optimized configuration against the cookbook recipe.
+### Baseline
+
+SemiAnalysis's published figures for the SGLang cookbook recipe come from an earlier SGLang build, so they cannot be compared directly. To verify whether `dstack` presets improved on the baseline, we ran SemiAnalysis's exact benchmark on the SGLang build the preset used. The only difference between the two runs is the engine configuration.
 
 ## Results
 
-### Fast-feedback phase
-
 Across four sessions of the fast-feedback phase, the agent raised throughput 29% over the SGLang cookbook baseline (1,088 to 1,407 tok/s), but no session met the 1.5s TTFT constraint.
 
-The largest single win in this phase was not a setting but a patch. The agent profiled the engine, changed the source code and measured the result. The patch raised throughput by 16% (1,128 to 1,311 tok/s).
+The largest single win in this phase was not a setting but a patch. The agent profiled the engine, changed the source code and measured the result. The patch raised throughput by 16% (1,128 to 1,311 tok/s). It increases the prefill workspace of the QSA indexer, which picks the tokens each query attends to in the model's sparse attention, from 128 MiB to 3 GiB, so long prefill chunks are no longer split into many small pieces.
 
-TTFT only fell when we lowered the number of agents, reaching 2.5s at 16 agents in the first trial of session 4. The next two trials of session 4 improved neither TTFT nor throughput. At this point we decided to switch to the full-replay phase.
+TTFT significantly fell only when we lowered the number of agents, reaching 2.5s at 16 agents in the first trial of session 4. The next two trials of session 4 improved neither TTFT nor throughput. At this point we decided to switch to the full-replay phase.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-4.png" width="750" />
-
-### Full-replay phase
 
 We started the full-replay phase with 16 agents because that is where the TTFT constraint had come closest in the fast-feedback phase. The TTFT constraint was met from the very first trial of this phase, 520ms against the 1.5s constraint. With TTFT no longer a constraint, the agent worked on throughput. It raised the throughput by 8% (669 to 720 tok/s) while TTFT improved further to 504ms.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-5.png" width="750" />
 
-### Comparison with the SGLang cookbook recipe
-
 Now the question is whether our methodology actually produced a configuration better than the SGLang cookbook recipe. To answer it, we explicitly asked the preset agent to run SemiAnalysis's benchmark script unchanged on our own node, using the same four H200s, the same SGLang build, the same AgentX replay at 16 agents for 3600 s, and the same pinned speculative acceptance of 2.32.
 
 Our optimized configuration gives 13% higher throughput (628 to 708 tok/s), 37% lower TTFT at the median (793 to 502 ms) and 43% lower at p99 (5.2 to 2.9 s), and 9% lower inter-token latency at the median (7.61 to 6.91 ms) and 74% lower at p99 (83.6 to 21.6 ms). End-to-end request latency is 24% lower at the median and 40% lower at p99. The tails are better throughout, which suggests a steadier service.
 
-So yes, the methodology worked. The preset's configuration beats the SGLang cookbook recipe with the AgentX benchmark on every metric under identical conditions, and it is more than 3 times faster than the only provider serving this model publicly today.
+So yes, the methodology worked. The preset's configuration beats the SGLang cookbook recipe with the AgentX benchmark on every metric under identical conditions, and it is more than 3 times faster than Alibaba's serving in OpenRouter.
 
 === "Output throughput"
     <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-6.png" width="750" />
@@ -105,25 +103,29 @@ So yes, the methodology worked. The preset's configuration beats the SGLang cook
 === "Time to first token"
     <img src="https://dstack.ai/static-assets/static-assets/images/qwen38-flash-next-coding-agents-fig-9.png" width="750" />
 
-### More agents
-
 Since TTFT of 502 ms leaves a wide margin under the 1.5 s constraint, we checked whether the node could carry more agents. At 32 agents throughput fell to 580 tok/s and TTFT rose to 848 ms at the median and 34 s at p99, against 502 ms and 2.9 s at 16. So with 16 agents this setup gives the best performance.
 
 ## Conclusion
 
-On a single 4xH200 node, the optimized configuration serves 16 coding agents at 708 tok/s with 502 ms to first token, which is 13% more throughput and 37% lower TTFT than the SGLang cookbook recipe measured on the same node, and roughly 3x lower latency than the providers serving this model publicly today. So the answer to the first question is that the cookbook recipe is not the end: there is room beyond it, and we found that room in both phases, 29% over the baseline on the fast-feedback workload (1,088 to 1,407 tok/s) and 13% on the full replay. A cookbook recipe is written for a generic deployment, and every real deployment differs. The model may be the same, but the traffic shape, the concurrency and the latency target are not.
+On a single 4xH200 node, the optimized configuration serves 16 coding agents with 13% more throughput and 37% lower TTFT than the SGLang cookbook recipe measured on the same node, and roughly 3x lower latency than the providers serving this model publicly today.
 
-The answer to the second question is 16 agents, and it had to be measured rather than derived from requests per second and tokens per second, because both of these metrics say nothing about how many coding agents a node can serve. An agent is not a request: it holds a 100–150k-token context for its whole session, idles between turns while it runs tools or waits for the user, and occasionally spawns subagents that fire several requests at once. Our two phases show the gap directly. In the fast-feedback phase, 16 requests meant 16 requests in flight; in the full replay, the same 16 agents produced about 5 concurrent requests on average, 17 at p99 and 20 at peak.
+### Optimizing beyond the baseline
 
-Our methodology of splitting the optimization process into a fast-feedback phase and a full-replay phase paid off in two ways. First, almost all the winning changes came from the fast phase, and only one came from the full-replay phase. Second, the changes that did not work were discarded in the fast phase within minutes instead of spending 90 minutes in the full-replay phase.
+The answer to the first question is that the cookbook recipe is not the end: we found room beyond it in both phases, 29% more throughput on the fast-feedback workload and 13% on the full replay, from both engine settings and patches to SGLang's source code. A recipe is written for a generic deployment, while every real deployment has its own traffic shape, concurrency and latency target.
 
-For anyone self-hosting coding agents, three things follow. Start optimization with a fast benchmark that looks like your traffic, so changes that do not work are thrown out quickly, then move to the real workload for the rest. Do not assume the published recipe is the end, because it was written for a generic deployment that is probably not yours. And when estimating agent serving capacity, plan on the number of agents rather than requests, and measure it with a full replay.
+### Count agents, not requests
+
+The answer to the second question is 16 agents, and it had to be measured, because requests per second and tokens per second say nothing about how many coding agents a node can serve. An agent is not a request: it holds its context for the whole session, idles between turns, and occasionally spawns subagents. In the full replay, 16 agents produced about 5 concurrent requests on average and 20 at peak, so when estimating agent serving capacity, plan on the number of agents rather than requests.
+
+### Fast-feedback phase
+
+Splitting the optimization process into two phases paid off: almost all the winning changes came from the fast-feedback phase, and the ones that did not work were discarded within minutes instead of 90 minutes.
 
 ## Limitations
 
-1. The fast-feedback workload could be designed better. We shaped it only by request size: 108k input tokens with a 97.2k shared prefix and 800 output tokens, all sent at once. Those are independent requests, not sessions. They arrive together and finish together, so the engine never has to hold many long contexts in memory while they sit idle waiting for their next turn. Running out of room for those waiting contexts is exactly what limited us to 32 agents, and the current fast-feedback benchmark cannot show it, so the agent never worked on it. A better fast workload would keep the shape of a session, while still finishing in under a minute.
-2. Real traffic shape but generated text. Even in the full-replay phase the text is not real: the traces keep the real session structure, token counts and think gaps, but the prompt tokens are generated. Anything that depends on what the text says can therefore differ from production. For example: speculative decoding guesses the next few tokens from the preceding text and keeps the guesses the model agrees with, and generated text can be easier or harder to guess than real text.
-3. We capped each session at three trials. Every session ran three trials, and in several of them the agent still had untried ideas when the session ended. The cap was a conservative budget decision rather than a sign that the configuration had stopped improving, so more trials per session, or more sessions, would likely find more changes for improvement.
+1. The fast-feedback workload could be designed better. Its requests are independent, not sessions: they arrive and finish together, so the engine never has to hold many long contexts while they sit idle waiting for their next turn. Running out of room for those waiting contexts is exactly what limited us to 32 agents, and since the fast-feedback benchmark cannot show it, the agent never worked on it. A better fast workload would keep the shape of a session while still finishing in under a minute.
+2. Real traffic shape but generated text. The full-replay traces keep the real session structure, token counts and think gaps, but the prompt tokens are generated. Anything that depends on what the text says can differ from production, for example how many tokens speculative decoding guesses correctly.
+3. We capped each session at three trials for budget reasons. In several sessions the agent still had untried ideas when the session ended, so more trials or more sessions would likely find more improvements.
 
 ## Deploy the optimized preset to your hardware
 
@@ -193,7 +195,7 @@ $ dstack apply -f qwen3-8-flash-next-h200.dstack.yml
 
 </div>
 
-## Acknowledgments
+## Thanks to our partners
 
 ### Jarvislabs
 
