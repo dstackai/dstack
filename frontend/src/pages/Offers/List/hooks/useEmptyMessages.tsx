@@ -10,12 +10,16 @@ export const useEmptyMessages = ({
     clearFilter,
     projectName,
     groupBySelected,
+    ungrouped,
     hasCustomFilters,
+    isFleet,
 }: {
     clearFilter?: () => void;
     projectName?: string;
     groupBySelected?: boolean;
+    ungrouped?: boolean;
     hasCustomFilters?: boolean;
+    isFleet?: boolean;
 }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -38,7 +42,7 @@ export const useEmptyMessages = ({
             );
         }
 
-        if (!groupBySelected) {
+        if (!groupBySelected && !ungrouped) {
             return (
                 <ListEmptyMessage
                     title={t('offer.empty_message_title_select_groupBy')}
@@ -52,13 +56,16 @@ export const useEmptyMessages = ({
         }
 
         return (
-            <ListEmptyMessage title={t('offer.empty_message_title')} message={t('offer.empty_message_text')}>
-                <Button onClick={() => navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(projectName))}>
+            <ListEmptyMessage
+                title={t('offer.empty_message_title')}
+                message={t(isFleet ? 'offer.empty_message_text_fleet' : 'offer.empty_message_text')}
+            >
+                <Button onClick={() => navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(projectName) + '#backends')}>
                     {t('common.settings')}
                 </Button>
             </ListEmptyMessage>
         );
-    }, [projectName, groupBySelected, hasCustomFilters, renderNoMatchMessage]);
+    }, [projectName, groupBySelected, ungrouped, hasCustomFilters, renderNoMatchMessage, isFleet]);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };

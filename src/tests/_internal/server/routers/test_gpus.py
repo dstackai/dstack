@@ -16,9 +16,11 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, ProjectModel
+from dstack._internal.server.services import gpus as gpus_services
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
@@ -139,6 +141,7 @@ async def call_gpus_api(
     group_by: Optional[List[str]] = None,
     full_offers: Optional[bool] = None,
     unallocated_resources: Optional[bool] = None,
+    reverse: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
     json_data = {"run_spec": run_spec.model_dump()}
@@ -148,6 +151,8 @@ async def call_gpus_api(
         json_data["full_offers"] = full_offers
     if unallocated_resources is not None:
         json_data["unallocated_resources"] = unallocated_resources
+    if reverse is not None:
+        json_data["reverse"] = reverse
 
     return await client.post(
         f"/api/project/{project_name}/gpus/list",
@@ -157,6 +162,157 @@ async def call_gpus_api(
 
 
 class TestListGpus:
+    def test_reverse_sorts_by_whole_offer_price(self):
+        offers = [
+            create_gpu_offer(BackendType.AWS, "H100", 81920, 8, gpu_count=8),
+            create_gpu_offer(BackendType.AWS, "A10", 24576, 2),
+        ]
+        groups = gpus_services._get_gpus_grouped(offers, set(), reverse=True)
+        assert [group.name for group in groups] == ["H100", "A10"]
+        assert groups[0].price.min == 1
+        assert groups[0].offer_price is not None
+        assert groups[0].offer_price.min == 8
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("reverse", [None, False, True])
+    @pytest.mark.parametrize(
+        "group_by",
+        [
+            [],
+            ["backend"],
+            ["backend", "region"],
+            ["count"],
+            ["backend", "count"],
+            ["backend", "region", "count"],
+        ],
+    )
+    async def test_price_order(
+        self, test_db, session: AsyncSession, client: AsyncClient, reverse, group_by
+    ):
+        user, project, _, run_spec = await gpu_test_setup(session)
+        offers = [
+            create_gpu_offer(BackendType.AWS, "A10", 24576, 2),
+            create_gpu_offer(BackendType.AWS, "H100", 81920, 2),
+            create_gpu_offer(BackendType.AWS, "H200", 144384, 5),
+            create_gpu_offer(BackendType.AWS, "A10", 24576, 12, gpu_count=2),
+            create_gpu_offer(BackendType.AWS, "H100", 81920, 16, gpu_count=2),
+            create_gpu_offer(
+                BackendType.AWS, "L4", 24576, 0.5, availability=InstanceAvailability.UNKNOWN
+            ),
+            create_gpu_offer(
+                BackendType.AWS, "T4", 16384, 100, availability=InstanceAvailability.NO_QUOTA
+            ),
+        ]
+        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
+            mock.return_value = create_mock_backends_with_offers({BackendType.AWS: offers})
+            response = await call_gpus_api(
+                client, project.name, user.token, run_spec, group_by=group_by, reverse=reverse
+            )
+
+        assert response.status_code == 200, response.json()
+        assert "cpus" not in response.json()
+        gpus = response.json()["gpus"]
+        if "count" in group_by:
+            expected = (
+                ["H100", "A10", "H200", "A10", "H100", "L4", "T4"]
+                if reverse
+                else ["L4", "A10", "H100", "H200", "A10", "H100", "T4"]
+            )
+        else:
+            expected = (
+                ["H200", "H100", "A10", "L4", "T4"]
+                if reverse
+                else ["L4", "A10", "H100", "H200", "T4"]
+            )
+            h100 = next(gpu for gpu in gpus if gpu["name"] == "H100")
+            assert h100["price"] == {"min": 2, "max": 8}
+            assert h100["offer_price"] == {"min": 2, "max": 16}
+        assert [gpu["name"] for gpu in gpus] == expected
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("reverse", [False, True])
+    @pytest.mark.parametrize(
+        ("group_by", "prices"),
+        [
+            ([], [(1, 10)]),
+            (["backend"], [(1, 4), (10, 10)]),
+            (["backend", "region"], [(1, 4), (2, 2), (10, 10)]),
+            (["count"], [(1, 2), (4, 4), (10, 10)]),
+            (["backend", "count"], [(1, 2), (4, 4), (10, 10)]),
+            (["backend", "region", "count"], [(1, 1), (2, 2), (4, 4), (10, 10)]),
+        ],
+    )
+    async def test_cpu_groups(
+        self, test_db, session: AsyncSession, client: AsyncClient, reverse, group_by, prices
+    ):
+        user, project, _, run_spec = await gpu_test_setup(session)
+        run_spec.configuration.resources = ResourcesSpec.unconstrained()
+        run_spec.configuration.resources.gpu = GPUSpec(count=Range[int](min=0, max=0))
+        aws = [
+            get_instance_offer_with_availability(
+                cpu_count=2, memory_gib=4, price=1, region="west"
+            ),
+            get_instance_offer_with_availability(
+                cpu_count=8, memory_gib=16, price=4, region="west", spot=True
+            ),
+            get_instance_offer_with_availability(
+                cpu_count=2, memory_gib=8, price=2, region="east"
+            ),
+        ]
+        for offer, arch in zip(aws, ["x86", "arm", "x86"]):
+            offer.instance.resources.cpu_arch = gpuhunt.CPUArchitecture(arch)
+        unavailable = get_instance_offer_with_availability(
+            backend=BackendType.AZURE,
+            cpu_count=4,
+            memory_gib=8,
+            price=10,
+            region="east",
+            availability=InstanceAvailability.NO_QUOTA,
+        )
+        unavailable.instance.resources.cpu_arch = gpuhunt.CPUArchitecture.X86
+        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
+            mock.return_value = create_mock_backends_with_offers(
+                {BackendType.AWS: aws, BackendType.AZURE: [unavailable]}
+            )
+            response = await call_gpus_api(
+                client,
+                project.name,
+                user.token,
+                run_spec,
+                group_by=group_by,
+                reverse=reverse,
+                full_offers=True,
+            )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["gpus"] == []
+        cpus = response.json()["cpus"]
+        # Availability takes priority over descending price, just as for GPU groups.
+        expected_prices = list(reversed(prices[:-1])) + prices[-1:] if reverse else prices
+        assert [group["price"] for group in cpus] == [
+            {"min": low, "max": high} for low, high in expected_prices
+        ]
+        if not group_by:
+            assert cpus == [
+                {
+                    "cpu_arch": ["arm", "x86"],
+                    "count": {"min": 2, "max": 8},
+                    "memory_mib": {"min": 4096, "max": 16384},
+                    "price": {"min": 1, "max": 10},
+                    "availability": ["available", "no_quota"],
+                    "spot": ["on-demand", "spot"],
+                    "backends": ["aws", "azure"],
+                }
+            ]
+        if "count" in group_by:
+            assert all(group["count"]["min"] == group["count"]["max"] for group in cpus)
+        if "backend" in group_by:
+            assert all("backend" in group and "backends" not in group for group in cpus)
+        if "region" in group_by:
+            assert all("region" in group and "regions" not in group for group in cpus)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(

@@ -150,6 +150,7 @@ async def get_plan(
         unallocated_resources=body.unallocated_resources,
         legacy_repo_dir=legacy_repo_dir,
         for_offers_only=for_offers_only,
+        reverse_offers=body.reverse_offers,
     )
     patch_run_plan(run_plan, client_version)
     return CustomJSONResponse(run_plan)

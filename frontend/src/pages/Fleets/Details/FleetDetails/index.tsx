@@ -3,18 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
+import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, SpaceBetween, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import {
-    formatFleetBackend,
-    formatFleetResources,
-    getFleetInstancesLinkText,
-    getFleetPrice,
-    getFleetStatusIconType,
-} from 'libs/fleet';
+import { formatFleetBackend, formatFleetResources, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useGetFleetDetailsQuery } from 'services/fleet';
+
+import { InstanceList } from 'pages/Instances/List';
 
 export const FleetDetails = () => {
     const { t } = useTranslation();
@@ -41,73 +37,66 @@ export const FleetDetails = () => {
             )}
 
             {data && (
-                <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                    <ColumnLayout columns={4} variant="text-grid">
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.fleet')}</Box>
-                            <div>{data.name}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.status')}</Box>
+                <SpaceBetween size="l">
+                    <Container header={<Header variant="h2">{t('common.general')}</Header>}>
+                        <ColumnLayout columns={4} variant="text-grid">
+                            <div>
+                                <Box variant="awsui-key-label">{t('fleets.fleet')}</Box>
+                                <div>{data.name}</div>
+                            </div>
 
                             <div>
-                                <StatusIndicator type={getFleetStatusIconType(data.status)}>
-                                    {t(`fleets.statuses.${data.status}`)}
-                                </StatusIndicator>
-                            </div>
-                        </div>
+                                <Box variant="awsui-key-label">{t('fleets.instances.status')}</Box>
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.project')}</Box>
+                                <div>
+                                    <StatusIndicator type={getFleetStatusIconType(data.status)}>
+                                        {t(`fleets.statuses.${data.status}`)}
+                                    </StatusIndicator>
+                                </div>
+                            </div>
 
                             <div>
-                                <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)}>
-                                    {data.project_name}
-                                </NavigateLink>
+                                <Box variant="awsui-key-label">{t('fleets.instances.project')}</Box>
+
+                                <div>
+                                    <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(data.project_name)}>
+                                        {data.project_name}
+                                    </NavigateLink>
+                                </div>
                             </div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.backend')}</Box>
-                            <div>{formatFleetBackend(data.spec.configuration)}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.resources')}</Box>
-                            <div>
-                                {data.spec.configuration.ssh_config
-                                    ? '-'
-                                    : formatFleetResources(data.spec.configuration.resources)}
-                            </div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.title')}</Box>
 
                             <div>
-                                <NavigateLink href={ROUTES.INSTANCES.LIST + `?fleet_ids=${data.id}`}>
-                                    {getFleetInstancesLinkText(data)}
-                                </NavigateLink>
+                                <Box variant="awsui-key-label">{t('fleets.instances.backend')}</Box>
+                                <div>{formatFleetBackend(data.spec.configuration)}</div>
                             </div>
-                        </div>
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.created')}</Box>
-                            <div>{format(new Date(data.created_at), DATE_TIME_FORMAT)}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
                             <div>
-                                {(() => {
-                                    const p = getFleetPrice(data);
-                                    return typeof p === 'number' ? `$${p}` : '-';
-                                })()}
+                                <Box variant="awsui-key-label">{t('fleets.instances.resources')}</Box>
+                                <div>
+                                    {data.spec.configuration.ssh_config
+                                        ? '-'
+                                        : formatFleetResources(data.spec.configuration.resources)}
+                                </div>
                             </div>
-                        </div>
-                    </ColumnLayout>
-                </Container>
+
+                            <div>
+                                <Box variant="awsui-key-label">{t('fleets.instances.created')}</Box>
+                                <div>{format(new Date(data.created_at), DATE_TIME_FORMAT)}</div>
+                            </div>
+
+                            <div>
+                                <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
+                                <div>
+                                    {(() => {
+                                        const p = getFleetPrice(data);
+                                        return typeof p === 'number' ? `$${p}` : '-';
+                                    })()}
+                                </div>
+                            </div>
+                        </ColumnLayout>
+                    </Container>
+                    <InstanceList key={data.id} fleetId={data.id} />
+                </SpaceBetween>
             )}
         </>
     );

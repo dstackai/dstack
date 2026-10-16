@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gpus import BackendGpu, BackendGpus, GpuGroup
+from dstack._internal.core.models.gpus import BackendGpu, BackendGpus, CpuGroup, GpuGroup
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import CreationPolicy
 from dstack._internal.core.models.resources import Range
@@ -18,7 +18,7 @@ from dstack._internal.server.services.runs.plan import (
     get_offers_in_run_candidate_fleets,
     get_targeted_instance_offers,
 )
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_or_error, run_async
 
 
 async def list_gpus_grouped(
@@ -28,6 +28,7 @@ async def list_gpus_grouped(
     group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
+    reverse: bool = False,
 ) -> ListGpusResponse:
     """Retrieves available GPU specifications based on a run spec, with optional grouping."""
     offers = await _get_gpu_offers(
@@ -37,11 +38,23 @@ async def list_gpus_grouped(
         full_offers=full_offers,
         unallocated_resources=unallocated_resources,
     )
-    backend_gpus = _process_offers_into_backend_gpus(offers)
-    group_by_set = set(group_by) if group_by else set()
+    group_by_set: set[str] = set(group_by or [])
     if "region" in group_by_set and "backend" not in group_by_set:
         raise ServerClientError("Cannot group by 'region' without also grouping by 'backend'")
 
+    gpu = run_spec.configuration.resources.gpu
+    if gpu is not None and gpu.count.max == 0:
+        cpus = await run_async(_get_cpus_grouped, offers, group_by_set, reverse)
+        return ListGpusResponse(gpus=[], cpus=cpus)
+
+    gpus = await run_async(_get_gpus_grouped, offers, group_by_set, reverse)
+    return ListGpusResponse(gpus=gpus)
+
+
+def _get_gpus_grouped(
+    offers: list[InstanceOfferWithAvailability], group_by_set: set[str], reverse: bool
+) -> list[GpuGroup]:
+    backend_gpus = _process_offers_into_backend_gpus(offers)
     # Determine grouping strategy based on combination
     has_backend = "backend" in group_by_set
     has_region = "region" in group_by_set
@@ -59,7 +72,69 @@ async def list_gpus_grouped(
     else:
         gpus = _get_gpus_with_no_grouping(backend_gpus)
 
-    return ListGpusResponse(gpus=gpus)
+    if reverse:
+        gpus.sort(
+            key=lambda g: (
+                not any(av.is_available() for av in g.availability),
+                -get_or_error((g.offer_price or g.price).min),
+                -get_or_error((g.offer_price or g.price).max),
+            ),
+        )
+    return gpus
+
+
+def _get_cpus_grouped(
+    offers: list[InstanceOfferWithAvailability], group_by: set[str], reverse: bool
+) -> list[CpuGroup]:
+    groups: dict[tuple, list[InstanceOfferWithAvailability]] = {}
+    for offer in offers:
+        if offer.instance.resources.gpus:
+            continue
+        key = (
+            offer.backend if "backend" in group_by else None,
+            offer.region if "region" in group_by else None,
+            offer.instance.resources.cpus if "count" in group_by else None,
+        )
+        groups.setdefault(key, []).append(offer)
+
+    rows = []
+    for (backend, region, _), group in groups.items():
+        resources = [offer.instance.resources for offer in group]
+        rows.append(
+            CpuGroup(
+                cpu_arch=sorted({r.cpu_arch for r in resources if r.cpu_arch is not None}),
+                count=Range[int](
+                    min=min(r.cpus for r in resources), max=max(r.cpus for r in resources)
+                ),
+                memory_mib=Range[int](
+                    min=min(r.memory_mib for r in resources),
+                    max=max(r.memory_mib for r in resources),
+                ),
+                price=Range[float](
+                    min=min(offer.price for offer in group),
+                    max=max(offer.price for offer in group),
+                ),
+                availability=list(dict.fromkeys(offer.availability for offer in group)),
+                spot=sorted({"spot" if r.spot else "on-demand" for r in resources}),
+                backend=backend,
+                backends=sorted({offer.backend for offer in group}) if backend is None else None,
+                region=region,
+                regions=sorted({offer.region for offer in group})
+                if backend is not None and region is None
+                else None,
+            )
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            not any(av.is_available() for av in row.availability),
+            (-1 if reverse else 1) * get_or_error(row.price.min),
+            (-1 if reverse else 1) * get_or_error(row.price.max),
+            row.backend or "",
+            row.region or "",
+            get_or_error(row.count.min),
+        ),
+    )
 
 
 async def _get_gpu_offers(
@@ -203,6 +278,9 @@ def _update_gpu_group(row: GpuGroup, gpu: BackendGpu, backend_type: BackendType)
     per_gpu_price = gpu.price / gpu.count
     row.price.min = min(row.price.min, per_gpu_price)
     row.price.max = max(row.price.max, per_gpu_price)
+    if row.offer_price is not None:
+        row.offer_price.min = min(get_or_error(row.offer_price.min), gpu.price)
+        row.offer_price.max = max(get_or_error(row.offer_price.max), gpu.price)
 
 
 def _get_gpus_with_no_grouping(backend_gpus: List[BackendGpus]) -> List[GpuGroup]:
@@ -223,6 +301,7 @@ def _get_gpus_with_no_grouping(backend_gpus: List[BackendGpus]) -> List[GpuGroup
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=price_range,
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backends=[backend.backend_type],
                 )
             else:
@@ -258,6 +337,7 @@ def _get_gpus_grouped_by_backend(backend_gpus: List[BackendGpus]) -> List[GpuGro
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=Range[float](min=per_gpu_price, max=per_gpu_price),
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backend=backend.backend_type,
                     regions=backend.regions.copy(),
                 )
@@ -293,6 +373,7 @@ def _get_gpus_grouped_by_backend_and_region(backend_gpus: List[BackendGpus]) -> 
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=Range[float](min=per_gpu_price, max=per_gpu_price),
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backend=backend.backend_type,
                     region=gpu.region,
                 )
@@ -329,6 +410,7 @@ def _get_gpus_grouped_by_count(backend_gpus: List[BackendGpus]) -> List[GpuGroup
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=Range[float](min=per_gpu_price, max=per_gpu_price),
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backends=[backend.backend_type],
                 )
             else:
@@ -363,6 +445,7 @@ def _get_gpus_grouped_by_backend_and_count(backend_gpus: List[BackendGpus]) -> L
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=Range[float](min=per_gpu_price, max=per_gpu_price),
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backend=backend.backend_type,
                     regions=backend.regions.copy(),
                 )
@@ -408,6 +491,7 @@ def _get_gpus_grouped_by_backend_region_and_count(
                     spot=["spot" if gpu.spot else "on-demand"],
                     count=Range[int](min=gpu.count, max=gpu.count),
                     price=Range[float](min=per_gpu_price, max=per_gpu_price),
+                    offer_price=Range[float](min=gpu.price, max=gpu.price),
                     backend=backend.backend_type,
                     region=gpu.region,
                 )

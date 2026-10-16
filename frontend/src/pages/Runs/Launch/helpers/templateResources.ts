@@ -7,6 +7,10 @@ type TGpuFilterDefaults = {
 };
 
 type TOfferFilterDefaults = TGpuFilterDefaults & {
+    gpu_vendor?: string;
+    cpu_count?: string;
+    cpu_arch?: string;
+    memory?: string;
     backend?: string | string[];
     fleet?: string | string[];
     spot_policy?: string;
@@ -53,6 +57,9 @@ const formatRangeForFilter = (
         const maxValue = normalizeToken(max);
         const hasMin = !!minValue;
         const hasMax = !!maxValue;
+        if (hasMin && minValue === maxValue) {
+            return minValue;
+        }
         if (hasMin && hasMax) {
             return `${minValue}..${maxValue}`;
         }
@@ -76,25 +83,17 @@ const getTemplateGpuSpec = (template?: ITemplate): TResourceRequest['gpu'] | und
     return getRunSpecConfigurationResources(resources)?.gpu;
 };
 
-export const hasConfiguredGpu = (template?: ITemplate): boolean => {
-    const gpu = getTemplateGpuSpec(template);
-    if (typeof gpu === 'number') {
-        return gpu > 0;
-    }
-    if (typeof gpu === 'string') {
-        const normalizedGpu = gpu.trim();
-        return normalizedGpu !== '' && normalizedGpu !== '0';
-    }
-    if (gpu && typeof gpu === 'object') {
-        return Object.keys(gpu as Record<string, unknown>).length > 0;
-    }
-
-    return false;
-};
-
 export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilterDefaults => {
     const gpu = getTemplateGpuSpec(template);
     const configuration = template?.configuration;
+    const resources = configuration?.resources as TResourceRequest | undefined;
+    const cpu = resources?.cpu;
+    const cpuTokens = typeof cpu === 'string' ? cpu.split(':') : [];
+    const cpuArch = typeof cpu === 'object' ? cpu?.arch : cpuTokens.find((token) => ['arm', 'x86'].includes(token));
+    const cpuCount = formatRangeForFilter(
+        typeof cpu === 'object' ? cpu?.count : typeof cpu === 'number' ? cpu : cpuTokens.find((token) => token !== cpuArch),
+    );
+    const memory = formatRangeForFilter(resources?.memory, { appendGBToNumber: true });
 
     const spotPolicy =
         configuration && typeof configuration === 'object' && typeof configuration.spot_policy === 'string'
@@ -114,13 +113,19 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
         configuration.fleets.every((fleet) => typeof fleet === 'string')
             ? (configuration.fleets as string[])
             : undefined;
+    const commonFilters = {
+        ...(cpuArch ? { cpu_arch: cpuArch } : {}),
+        ...(cpuCount ? { cpu_count: cpuCount } : {}),
+        ...(memory ? { memory } : {}),
+        ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
+        ...(backends?.length ? { backend: backends } : {}),
+        ...(fleets?.length ? { fleet: fleets } : {}),
+    };
 
     if (typeof gpu === 'number') {
         return {
-            ...(gpu > 0 ? { gpu_count: String(gpu) } : {}),
-            ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
-            ...(backends?.length ? { backend: backends } : {}),
-            ...(fleets?.length ? { fleet: fleets } : {}),
+            gpu_count: String(gpu),
+            ...commonFilters,
         };
     }
 
@@ -138,9 +143,7 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
         return {
             ...(gpuNames?.length === 1 ? { gpu_name: gpuNames[0] } : {}),
             ...(gpuNames && gpuNames.length > 1 ? { gpu_name: gpuNames } : {}),
-            ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
-            ...(backends?.length ? { backend: backends } : {}),
-            ...(fleets?.length ? { fleet: fleets } : {}),
+            ...commonFilters,
         };
     }
 
@@ -162,12 +165,13 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
             : undefined;
 
     return {
+        ...commonFilters,
+        ...(gpu && typeof gpu === 'object' && gpu.vendor ? { gpu_vendor: gpu.vendor } : {}),
         ...(typeof gpuName === 'string' ? { gpu_name: gpuName } : {}),
-        ...(Array.isArray(gpuName) && gpuName.every((name) => typeof name === 'string') ? { gpu_name: gpuName } : {}),
+        ...(Array.isArray(gpuName) && gpuName.every((name) => typeof name === 'string')
+            ? { gpu_name: gpuName.length === 1 ? gpuName[0] : gpuName }
+            : {}),
         ...(gpuCount ? { gpu_count: gpuCount } : {}),
         ...(gpuMemory ? { gpu_memory: gpuMemory } : {}),
-        ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
-        ...(backends?.length ? { backend: backends } : {}),
-        ...(fleets?.length ? { fleet: fleets } : {}),
     };
 };

@@ -10,6 +10,11 @@
     width: 240px;
   }
 
+  .gpuToggle {
+    flex-shrink: 0;
+    padding-top: 7px;
+  }
+
   .propertyFilter {
     max-width: 640px;
     flex-grow: 1;
@@ -23,4 +28,11 @@
 
 .greenText {
   color: awsui.$color-text-status-success;
+}
+
+.cardContent {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: awsui.$space-scaled-m awsui.$space-scaled-xs;
+  overflow-wrap: anywhere;
 }

@@ -5,6 +5,7 @@ const oss = {
     hasEvents: false,
     hasBilling: false,
     hasPresets: false,
+    /** Whether this product allows templates, even when none are configured. */
     hasTemplates: false,
     isSky: false,
 };

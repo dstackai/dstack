@@ -1533,6 +1533,63 @@ class TestGetRun:
 class TestGetRunPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("reverse_offers", [None, False, True])
+    @pytest.mark.parametrize("for_offers_only", [False, True])
+    @pytest.mark.parametrize("gpu_count", [0, 2])
+    async def test_sorts_offers_before_limit(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        reverse_offers,
+        for_offers_only,
+        gpu_count,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(session=session, project=project, spec=get_fleet_spec())
+        run_spec = get_run_spec(repo_id=repo.name)
+        offers = [
+            get_instance_offer_with_availability(
+                price=price, gpu_count=gpu_count, instance_type=f"instance-{price}"
+            )
+            for price in range(1, 61)
+        ]
+        offers.append(
+            get_instance_offer_with_availability(
+                price=100, gpu_count=gpu_count, availability=InstanceAvailability.NO_BALANCE
+            )
+        )
+        backend = Mock()
+        backend.TYPE = BackendType.AWS
+        backend.compute.return_value.get_offers.return_value = offers
+        body = {
+            "run_spec": run_spec.model_dump(),
+            "for_offers_only": for_offers_only,
+            "max_offers": 3,
+        }
+        if reverse_offers is not None:
+            body["reverse_offers"] = reverse_offers
+        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
+            mock.return_value = [backend]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        plan = response.json()["job_plans"][0]
+        assert [offer["price"] for offer in plan["offers"]] == (
+            [60, 59, 58] if reverse_offers else [1, 2, 3]
+        )
+        assert plan["total_offers"] == 61
+        assert plan["max_price"] == 100
+        assert [offer.price for offer in offers] == [*range(1, 61), 100]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

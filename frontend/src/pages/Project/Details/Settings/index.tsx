@@ -129,6 +129,7 @@ export const ProjectSettings: React.FC = () => {
     const [isResetTemplatesRepoVisible, setIsResetTemplatesRepoVisible] = useState(false);
     const changeTemplatesRepoInputWrapperRef = React.useRef<HTMLDivElement | null>(null);
     const dangerZoneRef = React.useRef<HTMLDivElement | null>(null);
+    const backendsRef = React.useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setTemplatesRepoValue(data?.templates_repo ?? '');
@@ -157,11 +158,13 @@ export const ProjectSettings: React.FC = () => {
     const isLoadingPage = isLoading || !data || isLoadingGateways;
 
     useEffect(() => {
-        if (location.hash === '#danger-zone') {
-            setTimeout(() => {
+        if (location.hash === '#danger-zone' || location.hash === '#backends') {
+            const timer = setTimeout(() => {
                 // Not smooth: sections that finish rendering meanwhile cancel a smooth scroll.
-                dangerZoneRef.current?.scrollIntoView({ block: 'start' });
+                const sectionRef = location.hash === '#backends' ? backendsRef : dangerZoneRef;
+                sectionRef.current?.scrollIntoView({ block: 'start' });
             }, 0);
+            return () => clearTimeout(timer);
         }
     }, [location.hash, isLoadingPage]);
 
@@ -465,17 +468,19 @@ export const ProjectSettings: React.FC = () => {
                         </ExpandableSection>
                     )}
 
-                    <BackendsTable
-                        backends={backendsData}
-                        {...(isProjectManager(data)
-                            ? {
-                                  onClickAddBackend: addBackend,
-                                  editBackend: editBackend,
-                                  deleteBackends: deleteBackend,
-                                  isDisabledDelete: isDeletingBackend,
-                              }
-                            : {})}
-                    />
+                    <div id="backends" ref={backendsRef}>
+                        <BackendsTable
+                            backends={backendsData}
+                            {...(isProjectManager(data)
+                                ? {
+                                      onClickAddBackend: addBackend,
+                                      editBackend: editBackend,
+                                      deleteBackends: deleteBackend,
+                                      isDisabledDelete: isDeletingBackend,
+                                  }
+                                : {})}
+                        />
+                    </div>
 
                     <GatewaysTable gateways={gatewaysData} projectName={paramProjectName} />
 

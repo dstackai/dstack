@@ -6,6 +6,7 @@ import { Button, ContentLayout, DetailsHeader, Tabs } from 'components';
 
 enum CodeTab {
     Details = 'details',
+    Offers = 'offers',
     Events = 'events',
     Inspect = 'inspect',
 }
@@ -91,6 +92,11 @@ export const FleetDetails: React.FC = () => {
                             label: 'Details',
                             id: CodeTab.Details,
                             href: ROUTES.FLEETS.DETAILS.FORMAT(paramProjectName, paramFleetId),
+                        },
+                        {
+                            label: t('offer.title'),
+                            id: CodeTab.Offers,
+                            href: ROUTES.FLEETS.DETAILS.OFFERS.FORMAT(paramProjectName, paramFleetId),
                         },
                         {
                             label: 'Events',

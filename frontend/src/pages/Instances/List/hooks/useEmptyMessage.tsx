@@ -18,9 +18,7 @@ export const useEmptyMessages = ({
                 title={t('fleets.instances.empty_message_title')}
                 message={t('fleets.instances.empty_message_text')}
             >
-                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
-                    {t('common.clearFilter')}
-                </Button>
+                {!isDisabledClearFilter && <Button onClick={clearFilter}>{t('common.clearFilter')}</Button>}
             </ListEmptyMessage>
         );
     }, [clearFilter, isDisabledClearFilter]);
@@ -31,9 +29,7 @@ export const useEmptyMessages = ({
                 title={t('fleets.instances.nomatch_message_title')}
                 message={t('fleets.instances.nomatch_message_text')}
             >
-                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
-                    {t('common.clearFilter')}
-                </Button>
+                {!isDisabledClearFilter && <Button onClick={clearFilter}>{t('common.clearFilter')}</Button>}
             </ListEmptyMessage>
         );
     }, [clearFilter, isDisabledClearFilter]);
