@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, and `daytona` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, `daytona`, and `lium` backends.
 
 ### Apply a configuration
 
@@ -51,6 +51,22 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     backend: daytona
     name: my-volume
     ```
+
+??? info "Lium"
+    Lium volumes use S3-backed storage and grow with usage. Omit `size` and `region`:
+
+    ```yaml
+    type: volume
+    backend: lium
+    name: my-volume
+    ```
+
+    A run can mount one volume. Lium forces files on the volume to be owned by `root`,
+    so `dstack` rejects volume mounts for non-root jobs. Jobs without network volumes
+    can run as non-root users normally.
+
+    Lium bills storage and read traffic separately from compute. Use these volumes for
+    datasets and checkpoints; do not assume local-disk performance or POSIX semantics.
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -287,7 +303,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-> Instance volumes are currently supported for all backends except `daytona`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+> Instance volumes are currently supported for all backends except `daytona`, `lium`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ### Attach a volume
 

@@ -19,6 +19,7 @@ class BackendType(str, enum.Enum):
         JARVISLABS (BackendType): JarvisLabs
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
+        LIUM (BackendType): Lium
         NEBIUS (BackendType): Nebius AI Cloud
         OCI (BackendType): Oracle Cloud Infrastructure
         RUNPOD (BackendType): Runpod Cloud
@@ -46,6 +47,7 @@ class BackendType(str, enum.Enum):
     JARVISLABS = "jarvislabs"
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
+    LIUM = "lium"
     REMOTE = "remote"
     NEBIUS = "nebius"
     OCI = "oci"

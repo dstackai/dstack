@@ -113,6 +113,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.lium.configurator import LiumConfigurator
+
+    _CONFIGURATOR_CLASSES.append(LiumConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.nebius.configurator import (
         NebiusConfigurator,
     )

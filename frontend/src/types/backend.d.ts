@@ -9,6 +9,7 @@ declare type TBackendType =
     | 'gcp'
     | 'kubernetes'
     | 'lambda'
+    | 'lium'
     | 'local'
     | 'nebius'
     | 'remote'
