@@ -92,6 +92,7 @@ async def get_job_plans(
     full_offers: bool,
     unallocated_resources: bool,
     for_offers_only: bool,
+    reverse_offers: bool = False,
 ) -> list[JobPlan]:
     """
     Returns job plans for the given run spec.
@@ -195,11 +196,13 @@ async def get_job_plans(
             )
 
         for job in jobs:
-            job_plan = _get_job_plan(
+            job_plan = await common_utils.run_async(
+                _get_job_plan,
                 instance_offers=instance_offers,
                 backend_offers=backend_offers,
                 job=job,
                 max_offers=max_offers,
+                reverse_offers=reverse_offers,
             )
             job_plans.append(job_plan)
 
@@ -1040,11 +1043,15 @@ def _get_job_plan(
     backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
     job: Job,
     max_offers: Optional[int],
+    reverse_offers: bool = False,
 ) -> JobPlan:
     job_offers: list[InstanceOfferWithAvailability] = []
     job_offers.extend(offer for _, offer in instance_offers)
     job_offers.extend(offer for _, offer in backend_offers)
-    job_offers.sort(key=lambda offer: not offer.availability.is_available())
+    if reverse_offers:
+        job_offers.sort(key=lambda offer: (not offer.availability.is_available(), -offer.price))
+    else:
+        job_offers.sort(key=lambda offer: not offer.availability.is_available())
     remove_job_spec_sensitive_info(job.job_spec)
     return JobPlan(
         job_spec=job.job_spec,

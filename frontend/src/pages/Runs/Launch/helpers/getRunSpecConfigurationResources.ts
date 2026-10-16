@@ -1,6 +1,6 @@
 const isVendor = (value: string) => ['amd', 'nvidia', 'google', 'tpu', 'intel'].includes(value);
-const isMemory = (value: string) => /^\d+GB/.test(value);
-const isCount = (value: string) => /^\d+(?:\.\.)*(?:\d+)*$/.test(value);
+const isMemory = (value: string) => /^(?:\d+(?:\.\d+)?GB|\.\.\d+(?:\.\d+)?GB)/i.test(value);
+const isCount = (value: string) => /^(?:\d+(?:\.\.\d*)?|\.\.\d+)$/.test(value);
 
 const parseRange = (rangeString: string) => {
     const [min, max] = rangeString.split('..');
@@ -9,8 +9,8 @@ const parseRange = (rangeString: string) => {
         return rangeString;
     }
 
-    const numberMin = parseInt(min, 10);
-    const numberMax = parseInt(max, 10);
+    const numberMin = parseFloat(min);
+    const numberMax = rangeString.includes('..') ? parseFloat(max) : numberMin;
 
     return {
         ...(!isNaN(numberMin) ? { min: numberMin } : {}),
@@ -75,15 +75,8 @@ export const getRunSpecConfigurationResources = (json: unknown): TDevEnvironment
         }
     }
 
-    if (cpu) {
-        const cpuStr = String(cpu);
-        const cpuNum = parseInt(cpuStr, 10);
-
-        if (!isNaN(cpuNum)) {
-            result['cpu'] = cpuNum;
-        } else {
-            result['cpu'] = cpuStr;
-        }
+    if (cpu !== undefined) {
+        result['cpu'] = cpu as TResourceRequest['cpu'];
     }
 
     if (typeof disk === 'string' && isMemory(disk)) {

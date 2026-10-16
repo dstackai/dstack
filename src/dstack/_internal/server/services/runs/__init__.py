@@ -558,6 +558,7 @@ async def get_plan(
     unallocated_resources: bool,
     for_offers_only: bool,
     legacy_repo_dir: bool = False,
+    reverse_offers: bool = False,
 ) -> RunPlan:
     effective_run_spec = RunSpec.model_validate(run_spec.model_dump())
     effective_run_spec = await apply_plugin_policies(
@@ -598,6 +599,7 @@ async def get_plan(
         full_offers=full_offers,
         unallocated_resources=unallocated_resources,
         for_offers_only=for_offers_only,
+        reverse_offers=reverse_offers,
     )
     run_plan = RunPlan(
         project_name=project.name,

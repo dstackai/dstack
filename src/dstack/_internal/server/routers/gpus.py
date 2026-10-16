@@ -35,5 +35,6 @@ async def list_gpus(
         group_by=body.group_by,
         full_offers=body.full_offers,
         unallocated_resources=body.unallocated_resources,
+        reverse=body.reverse,
     )
     return resp

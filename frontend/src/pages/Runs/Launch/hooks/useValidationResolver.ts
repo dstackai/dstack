@@ -29,8 +29,7 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                         break;
 
                     case 'resources':
-                        // Offer selection is optional when GPU is enabled.
-                        // If no offer is selected, YAML generation applies template GPU or a default fallback.
+                        // Without a selection, keep template resources or the default GPU request.
                         schema['offer'] = yup.object().nullable();
                         break;
 

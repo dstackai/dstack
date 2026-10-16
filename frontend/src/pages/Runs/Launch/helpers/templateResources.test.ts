@@ -10,6 +10,13 @@ const makeTemplate = (configuration: Record<string, unknown>): ITemplate =>
     }) as ITemplate;
 
 describe('templateResources', () => {
+    test('includes CPU, RAM and vendor constraints in the resource filters', () => {
+        expect(
+            getTemplateOfferDefaultFilters(
+                makeTemplate({ resources: { gpu: { vendor: 'amd' }, cpu: 'arm:2..8', memory: '1.5GB..4GB' } }),
+            ),
+        ).toMatchObject({ gpu_vendor: 'amd', cpu_arch: 'arm', cpu_count: '2..8', memory: '1.5GB..4GB' });
+    });
     test('returns full gpu name list from object gpu spec', () => {
         const template = makeTemplate({
             type: 'task',

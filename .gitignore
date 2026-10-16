@@ -23,6 +23,8 @@ venv/
 .envrc
 uv.lock
 
+.playwright-mcp
+
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
 

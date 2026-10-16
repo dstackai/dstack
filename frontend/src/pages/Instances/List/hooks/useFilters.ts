@@ -23,7 +23,7 @@ const filterKeys: Record<string, RequestParamsKeys> = {
 
 const limit = 100;
 
-export const useFilters = () => {
+export const useFilters = (fleetId?: string) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [onlyActive, setOnlyActive] = useLocalStorageState('instance-list-filter-only-active', true);
     const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
@@ -31,11 +31,11 @@ export const useFilters = () => {
     const [getProjects] = useLazyGetProjectsQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
-        return requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys });
+        return fleetId ? EMPTY_QUERY : requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys });
     });
 
     const clearFilter = () => {
-        setSearchParams({});
+        if (!fleetId) setSearchParams({});
         setPropertyFilterQuery(EMPTY_QUERY);
     };
 
@@ -61,7 +61,7 @@ export const useFilters = () => {
     const onChangePropertyFilter: PropertyFilterProps['onChange'] = ({ detail }) => {
         const { tokens, operation } = detail;
 
-        setSearchParams(tokensToSearchParams<RequestParamsKeys>(tokens, onlyActive));
+        if (!fleetId) setSearchParams(tokensToSearchParams<RequestParamsKeys>(tokens, onlyActive));
 
         setPropertyFilterQuery({
             operation,
@@ -81,12 +81,13 @@ export const useFilters = () => {
 
         return {
             ...params,
+            ...(fleetId ? { fleet_ids: [fleetId] } : {}),
             only_active: onlyActive,
             include_imported: true,
         } as Partial<TInstanceListRequestParams>;
-    }, [propertyFilterQuery, onlyActive]);
+    }, [propertyFilterQuery, onlyActive, fleetId]);
 
-    const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
+    const isDisabledClearFilter = !propertyFilterQuery.tokens.length;
 
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setDynamicFilteringOptions([]);

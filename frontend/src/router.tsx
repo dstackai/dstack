@@ -18,6 +18,7 @@ import { FleetAdd, FleetDetails, FleetList } from 'pages/Fleets';
 import { EventsList as FleetEventsList } from 'pages/Fleets/Details/Events';
 import { FleetDetails as FleetDetailsGeneral } from 'pages/Fleets/Details/FleetDetails';
 import { FleetInspect } from 'pages/Fleets/Details/Inspect';
+import { FleetOffers } from 'pages/Fleets/Details/Offers';
 import { InstanceDetailsPage, InstanceList } from 'pages/Instances';
 import { EventsList as InstanceEventsList } from 'pages/Instances/Details/Events';
 import { InstanceInspect } from 'pages/Instances/Details/Inspect';
@@ -268,6 +269,10 @@ export const router = createBrowserRouter([
                     {
                         index: true,
                         element: <FleetDetailsGeneral />,
+                    },
+                    {
+                        path: ROUTES.FLEETS.DETAILS.OFFERS.TEMPLATE,
+                        element: <FleetOffers />,
                     },
                     {
                         path: ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE,
