@@ -1,3 +1,4 @@
+from dstack._internal.core.backends.gcp.models import GCPBackendConfigWithCreds
 from dstack._internal.core.backends.hotaisle.models import HotAisleBackendConfigWithCreds
 from dstack._internal.core.backends.models import AnyBackendConfigWithCreds
 from dstack._internal.core.models.common import IncludeExcludeDictType
@@ -10,6 +11,8 @@ def get_backend_config_excludes(config: AnyBackendConfigWithCreds) -> IncludeExc
     clients backward-compatibility with older servers.
     """
     excludes: IncludeExcludeDictType = {}
+    if isinstance(config, GCPBackendConfigWithCreds) and config.tpu is None:
+        excludes["tpu"] = True
     if isinstance(config, HotAisleBackendConfigWithCreds) and config.bare_metal is None:
         excludes["bare_metal"] = True
     return excludes

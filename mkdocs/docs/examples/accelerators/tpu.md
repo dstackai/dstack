@@ -9,6 +9,9 @@ If you've configured the `gcp` backend in `dstack`, you can run dev environments
 Choose a TPU instance by specifying the TPU version and the number of cores (e.g. `v5litepod-8`) in the `gpu` property under `resources`,
 or request TPUs by specifying `tpu` as `vendor` ([see examples](../../guides/protips.md#gpu)).
 
+TPU support is experimental and disabled by default. Before using these examples, set `tpu: true`
+in your [GCP backend settings](../../concepts/backends.md#gcp).
+
 Below are a few examples on using TPUs for deployment and fine-tuning.
 
 !!! info "Multi-host TPUs"
