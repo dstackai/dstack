@@ -159,6 +159,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=lium]` { #lium data-toc-label="lium" }
+
+#SCHEMA# dstack._internal.core.backends.lium.models.LiumBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: lium-
+
+###### `projects[n].backends[type=lium].creds` { #lium-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.lium.models.LiumAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=nebius]` { #nebius data-toc-label="nebius" }
 
 #SCHEMA# dstack._internal.core.backends.nebius.models.NebiusBackendFileConfigWithCreds
