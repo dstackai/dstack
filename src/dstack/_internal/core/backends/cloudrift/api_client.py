@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 CLOUDRIFT_SERVER_ADDRESS = "https://api.cloudrift.ai"
-CLOUDRIFT_API_VERSION = "2025-05-29"
+CLOUDRIFT_API_VERSION = "2026-10-12"
 
 
 class RiftClient:
@@ -138,8 +138,14 @@ class RiftClient:
     def list_instances(self, instance_ids: Optional[List[str]] = None) -> List[Dict]:
         request_data = {
             "selector": {
-                "ByStatus": ["Initializing", "Active", "Deactivating"],
+                "ById": instance_ids,
             }
+            if instance_ids is not None
+            else {
+                "ByStatus": {"statuses": ["Initializing", "Active", "Deactivating"]},
+            },
+            # SSH instructions require both masks and include the port when mappings are empty.
+            "mask": {"with_connection_info": True, "with_credentials": True},
         }
         logger.debug("Listing instances with request data: %s", request_data)
         response_data = self._make_request("instances/list", request_data)
@@ -149,15 +155,8 @@ class RiftClient:
         return []
 
     def get_instance_by_id(self, instance_id: str) -> Optional[Dict]:
-        request_data = {"selector": {"ById": [instance_id]}}
-        logger.debug("Getting instance with request data: %s", request_data)
-        response_data = self._make_request("instances/list", request_data)
-        if isinstance(response_data, dict):
-            instances = response_data.get("instances", [])
-            if isinstance(instances, list) and len(instances) > 0:
-                return instances[0]
-
-        return None
+        instances = self.list_instances(instance_ids=[instance_id])
+        return instances[0] if instances else None
 
     def terminate_instance(self, instance_id: str) -> bool:
         request_data = {"selector": {"ById": [instance_id]}}
@@ -172,10 +171,9 @@ class RiftClient:
                 instance_info = self.get_instance_by_id(instance_id)
                 is_terminated = instance_info is None or instance_info.get("status") == "Inactive"
                 logger.debug(
-                    "Instance %s is already terminated: %s response: %s",
+                    "Instance %s is already terminated: %s",
                     instance_id,
                     is_terminated,
-                    instance_info,
                 )
             return is_terminated
 
