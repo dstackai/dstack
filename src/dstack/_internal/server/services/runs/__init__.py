@@ -1132,7 +1132,11 @@ def _get_run_status_message(run_model: RunModel, job_models: List[JobModel]) -> 
             last_job_termination_reason = _get_last_job_termination_reason(job_models)
             if (
                 last_job_termination_reason
-                == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                in (
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+                )
                 and RetryEvent.NO_CAPACITY in retry_on_events
             ):
                 # TODO: Show `retrying` for other retry events

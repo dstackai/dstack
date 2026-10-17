@@ -246,6 +246,8 @@ class InstanceTerminationReason(str, Enum):
     JOB_FINISHED = "job_finished"
     UNREACHABLE = "unreachable"
     NO_OFFERS = "no_offers"
+    # Add read support before emission so server replicas can be upgraded gradually.
+    NO_QUOTA = "no_quota"
     MASTER_FAILED = "master_failed"
     MAX_INSTANCES_LIMIT = "max_instances_limit"
     FLEET_SPEC_MISMATCH = "fleet_spec_mismatch"

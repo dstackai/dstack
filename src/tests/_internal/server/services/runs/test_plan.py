@@ -24,6 +24,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory, Range, ResourcesSpec
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
+from dstack._internal.server.services.offers import Offers
 from dstack._internal.server.services.projects import get_project_model_by_name
 from dstack._internal.server.services.runs import get_plan
 from dstack._internal.server.services.runs.plan import (
@@ -837,7 +838,7 @@ class TestGetBackendOffersInFleet:
         )
         offer = get_instance_offer_with_availability()
         backend = AsyncMock()
-        get_offers_by_requirements_mock.return_value = [(backend, offer)]
+        get_offers_by_requirements_mock.return_value = Offers(offers=[(backend, offer)])
 
         offers = await _get_backend_offers_in_fleet(
             project=project,

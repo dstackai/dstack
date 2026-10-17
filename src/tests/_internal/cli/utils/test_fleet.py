@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
+import pytest
 from rich.table import Table
 from rich.text import Text
 
@@ -24,6 +25,7 @@ from dstack._internal.core.models.instances import (
     Gpu,
     Instance,
     InstanceStatus,
+    InstanceTerminationReason,
     InstanceType,
     Resources,
     SSHKey,
@@ -214,6 +216,22 @@ def create_ssh_fleet(
 
 
 class TestGetFleetsTable:
+    @pytest.mark.parametrize(
+        ("message", "expected"),
+        [("No quota", "no quota"), ("No balance", "no balance"), ("Other error", "no_offers")],
+    )
+    def test_blocked_offers_with_legacy_reason(self, message, expected):
+        instance = create_test_instance(status=InstanceStatus.TERMINATED)
+        instance.termination_reason = InstanceTerminationReason.NO_OFFERS.value
+        instance.termination_reason_message = message
+        fleet = create_backend_fleet(instances=[instance])
+
+        cells = get_table_cells(
+            get_fleets_table([fleet], current_project="test-project", verbose=True)
+        )
+
+        assert cells[1]["ERROR"] == expected
+
     def test_backend_fleet_without_verbose(self):
         instance = create_test_instance(
             instance_num=0,

@@ -625,7 +625,15 @@ def _get_job_status_message(job_model: JobModel) -> str:
                 and "No matching fleet found" in job_model.termination_reason_message
             ):
                 return "no fleets"
+            if job_model.termination_reason_message in ("No quota", "No balance"):
+                return job_model.termination_reason_message.lower()
             return "no capacity"
+        elif job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA:
+            return "no quota"
+        elif (
+            job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE
+        ):
+            return "no balance"
         elif job_model.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
             return "interrupted"
         else:

@@ -1,6 +1,7 @@
 import heapq
 import itertools
 from collections.abc import Container, Iterable, Iterator
+from dataclasses import dataclass
 from typing import List, Literal, Optional, Tuple, TypeVar, Union
 
 import gpuhunt
@@ -15,6 +16,7 @@ from dstack._internal.core.backends.features import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
@@ -28,11 +30,18 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.utils.common import run_async
 
 
+@dataclass
+class Offers:
+    offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    unavailable_reason: Optional[InstanceAvailability] = None
+    """Common reason for excluded matching offers if none are available; None otherwise."""
+
+
 async def get_offers_by_requirements(
     project: ProjectModel,
     profile: Profile,
     requirements: Requirements,
-    exclude_not_available=False,
+    exclude_not_available: bool = False,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
@@ -43,7 +52,8 @@ async def get_offers_by_requirements(
     max_offers: Optional[int] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    supported_backend_types: Optional[Container[BackendType]] = None,
+) -> Offers:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
     backend_types: Optional[list[BackendType]] = profile.backends
@@ -99,24 +109,60 @@ async def get_offers_by_requirements(
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
 
-    offers = await backends_services.get_backend_offers(
+    offer_filter = _OfferFilter(
+        backend_types=backend_types,
+        regions=None if regions is None else [r.lower() for r in regions],
+        availability_zones=None
+        if availability_zones is None
+        else [z.lower() for z in availability_zones],
+        instance_types=None if instance_types is None else [i.lower() for i in instance_types],
+        placement_group=placement_group,
+        volumes_locations=volumes_locations,
+        supported_backend_types=supported_backend_types,
+    )
+
+    offers_by_backend = await backends_services.get_backend_offers(
         backends=backends,
         requirements=requirements,
         full_offers=full_offers,
         unallocated_resources=unallocated_resources,
-        exclude_not_available=exclude_not_available,
+    )
+    return await run_async(
+        _select_offers, offers_by_backend, offer_filter, blocks, exclude_not_available, max_offers
     )
 
-    offers = _filter_offers(
-        offers=offers,
-        # Double filtering by backends if backend returns offers for other backend.
-        backend_types=backend_types,
-        regions=regions,
-        availability_zones=availability_zones,
-        instance_types=instance_types,
-        placement_group=placement_group,
-        volumes_locations=volumes_locations,
-    )
+
+def _select_offers(
+    offers_by_backend: list[tuple[Backend, Iterable[InstanceOfferWithAvailability]]],
+    offer_filter: "_OfferFilter",
+    blocks: Union[int, Literal["auto"]],
+    exclude_not_available: bool,
+    max_offers: Optional[int],
+) -> Offers:
+    unavailable: set[InstanceAvailability] = set()
+
+    def available_offers(
+        backend: Backend, backend_offers: Iterable[InstanceOfferWithAvailability]
+    ) -> Iterator[tuple[Backend, InstanceOfferWithAvailability]]:
+        for offer in backend_offers:
+            if offer.availability.is_available():
+                yield backend, offer
+            elif (
+                offer.availability not in unavailable
+                and offer_filter.matches(backend, offer)
+                and (blocks == 1 or _get_offer_blocks(offer, blocks)[0])
+            ):
+                unavailable.add(offer.availability)
+
+    iterables = [
+        available_offers(backend, backend_offers)
+        if exclude_not_available
+        else _with_backend(backend, backend_offers)
+        for backend, backend_offers in offers_by_backend
+    ]
+
+    # Availability must be filtered before merging to preserve backend-specific order.
+    offers = _filter_offers(merge_offer_iterables(*iterables), offer_filter)
 
     if blocks != 1:
         offers = _get_shareable_offers(offers, blocks)
@@ -124,18 +170,21 @@ async def get_offers_by_requirements(
     if max_offers is not None:
         offers = itertools.islice(offers, max_offers)
 
-    # Sorting consumes the lazy offers chain, which is CPU-bound,
-    # so it must not run on the event loop.
-    return await run_async(_sort_offers_by_availability, offers)
-
-
-def _sort_offers_by_availability(
-    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     # Put NOT_AVAILABLE and NO_QUOTA offers at the end.
     # We have to do this after taking max_offers to avoid processing all offers
     # if all/most offers are unavailable.
-    return sorted(offers, key=lambda i: not i[1].availability.is_available())
+    selected = sorted(offers, key=lambda i: not i[1].availability.is_available())
+    unavailable_reason = (
+        next(iter(unavailable)) if not selected and len(unavailable) == 1 else None
+    )
+    return Offers(offers=selected, unavailable_reason=unavailable_reason)
+
+
+def _with_backend(
+    backend: Backend, offers: Iterable[InstanceOfferWithAvailability]
+) -> Iterator[tuple[Backend, InstanceOfferWithAvailability]]:
+    for offer in offers:
+        yield backend, offer
 
 
 T = TypeVar("T")
@@ -216,56 +265,81 @@ def get_instance_offer_with_restricted_az(
     return instance_offer
 
 
-def _filter_offers(
-    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
-    backend_types: Optional[List[BackendType]] = None,
-    regions: Optional[List[str]] = None,
-    availability_zones: Optional[List[str]] = None,
-    instance_types: Optional[List[str]] = None,
-    placement_group: Optional[PlacementGroup] = None,
-    volumes_locations: Optional[Container[tuple[BackendType, Optional[str]]]] = None,
-) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
-    """
-    Yields filtered offers. May return modified offers to match the filters.
-    """
-    if regions is not None:
-        regions = [r.lower() for r in regions]
-    if instance_types is not None:
-        instance_types = [i.lower() for i in instance_types]
-    if availability_zones is not None:
-        availability_zones = [z.lower() for z in availability_zones]
+@dataclass
+class _OfferFilter:
+    backend_types: Optional[List[BackendType]]
+    regions: Optional[List[str]]
+    availability_zones: Optional[List[str]]
+    instance_types: Optional[List[str]]
+    placement_group: Optional[PlacementGroup]
+    volumes_locations: Optional[Container[tuple[BackendType, Optional[str]]]]
+    supported_backend_types: Optional[Container[BackendType]]
 
-    for b, offer in offers:
-        if backend_types is not None and offer.backend not in backend_types:
-            continue
-        if regions is not None and offer.region.lower() not in regions:
-            continue
-        if instance_types is not None and offer.instance.name.lower() not in instance_types:
-            continue
-        if placement_group is not None:
-            compute = b.compute()
+    def matches(
+        self,
+        backend: Backend,
+        offer: InstanceOfferWithAvailability,
+        check_availability_zones: bool = True,
+    ) -> bool:
+        # Backends such as dstack can return offers for other backend types.
+        if self.backend_types is not None and offer.backend not in self.backend_types:
+            return False
+        if (
+            self.supported_backend_types is not None
+            and offer.backend not in self.supported_backend_types
+        ):
+            return False
+        if self.regions is not None and offer.region.lower() not in self.regions:
+            return False
+        if (
+            self.instance_types is not None
+            and offer.instance.name.lower() not in self.instance_types
+        ):
+            return False
+        if self.placement_group is not None:
+            compute = backend.compute()
             if not isinstance(
                 compute, ComputeWithPlacementGroupSupport
-            ) or not compute.is_suitable_placement_group(placement_group, offer):
-                continue
-        if availability_zones is not None:
+            ) or not compute.is_suitable_placement_group(self.placement_group, offer):
+                return False
+        if (
+            check_availability_zones
+            and self.availability_zones is not None
+            and (
+                offer.availability_zones is None
+                or not any(z.lower() in self.availability_zones for z in offer.availability_zones)
+            )
+        ):
+            return False
+        # Offer is futher filtered against volumes AZs in Compute implementation, see
+        # ComputeWithCreateInstanceSupport._restrict_instance_offer_az_to_volumes_az()
+        if (
+            self.volumes_locations is not None
+            and (offer.backend, offer.region.lower()) not in self.volumes_locations
+            and (offer.backend, None) not in self.volumes_locations
+        ):
+            return False
+        return True
+
+
+def _filter_offers(
+    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
+    offer_filter: _OfferFilter,
+) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+    for b, offer in offers:
+        # Check AZs once while preparing the restricted offer below.
+        if not offer_filter.matches(b, offer, check_availability_zones=False):
+            continue
+        if offer_filter.availability_zones is not None:
             if offer.availability_zones is None:
                 continue
             new_offer = offer.model_copy()
             new_offer.availability_zones = [
-                z for z in offer.availability_zones if z.lower() in availability_zones
+                z for z in offer.availability_zones if z.lower() in offer_filter.availability_zones
             ]
             if not new_offer.availability_zones:
                 continue
             offer = new_offer
-        # Offer is futher filtered against volumes AZs in Compute implementation, see
-        # ComputeWithCreateInstanceSupport._restrict_instance_offer_az_to_volumes_az()
-        if (
-            volumes_locations is not None
-            and (offer.backend, offer.region.lower()) not in volumes_locations
-            and (offer.backend, None) not in volumes_locations
-        ):
-            continue
         yield (b, offer)
 
 
@@ -277,15 +351,20 @@ def _get_shareable_offers(
     Yields offers that can be shared with `total_blocks` set.
     """
     for backend, offer in offers:
-        resources = offer.instance.resources
-        cpu_count = resources.cpus
-        gpu_count = len(resources.gpus)
-        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
-            # TPUs cannot be shared
-            gpu_count = 1
-        divisible, total_blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
+        divisible, total_blocks = _get_offer_blocks(offer, blocks)
         if not divisible:
             continue
         new_offer = offer.model_copy()
         new_offer.total_blocks = total_blocks
         yield (backend, new_offer)
+
+
+def _get_offer_blocks(
+    offer: InstanceOfferWithAvailability, blocks: Union[int, Literal["auto"]]
+) -> tuple[bool, int]:
+    resources = offer.instance.resources
+    gpu_count = len(resources.gpus)
+    if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
+        # TPUs cannot be shared
+        gpu_count = 1
+    return is_divisible_into_blocks(resources.cpus, gpu_count, blocks)

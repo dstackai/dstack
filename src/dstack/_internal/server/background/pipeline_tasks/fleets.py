@@ -819,8 +819,8 @@ def _set_fail_instances_on_master_bootstrap_failure(
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
 ) -> None:
     """
-    Terminates instances with MASTER_FAILED if the master dies with NO_OFFERS in a cluster with node.min == 0.
-    This is needed to avoid master re-election loop and fail fast.
+    Terminates unprovisioned siblings when the cluster master has no usable offers.
+    For nodes.min == 0, this prevents a master re-election loop.
     """
     fleet_spec = get_fleet_spec(fleet_model)
     if (
@@ -841,7 +841,12 @@ def _set_fail_instances_on_master_bootstrap_failure(
 
     if (
         current_master_instance_model.status != InstanceStatus.TERMINATED
-        or current_master_instance_model.termination_reason != InstanceTerminationReason.NO_OFFERS
+        or current_master_instance_model.termination_reason
+        not in (
+            InstanceTerminationReason.NO_OFFERS,
+            InstanceTerminationReason.NO_QUOTA,
+            InstanceTerminationReason.NO_BALANCE,
+        )
     ):
         return
 
