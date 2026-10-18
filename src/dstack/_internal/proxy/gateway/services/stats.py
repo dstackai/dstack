@@ -121,10 +121,14 @@ class StatsCollector:
                 line = self._file.readline()
                 if not line:
                     break
-                cells = line.split()
+                cells = line.rstrip("\n").split(" ")
                 if len(cells) == 4:  # compatibility with pre-0.19.11 logs
                     cells.append("0" if cells[2] in ["403", "404"] else "1")
                 timestamp_str, host, status, request_time, dstack_replica_hit = cells
+                if not dstack_replica_hit:
+                    # Nginx rejected the request before the server-level `set`, e.g. a
+                    # malformed request answered with 400, so it never reached a replica
+                    dstack_replica_hit = "0"
                 timestamp = datetime.datetime.fromisoformat(timestamp_str)
                 if timestamp < after:
                     continue
