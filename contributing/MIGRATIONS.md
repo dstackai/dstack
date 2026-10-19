@@ -73,3 +73,24 @@ with op.get_context().autocommit_block():
         postgresql_concurrently=True,
     )
 ```
+
+Keep concurrent index creation in a separate migration. Do not combine `autocommit_block()`
+with other schema changes such as `add_column`/`batch_alter_table` in the same migration.
+`autocommit_block()` commits the migration's transaction before running the index statements,
+so a failure inside the block leaves the earlier changes committed while the migration is not
+marked as applied. A retry then re-runs those changes and fails. For example:
+
+```python
+def upgrade() -> None:
+    with op.batch_alter_table("table", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("col", sa.String(length=12), nullable=True))
+    with op.get_context().autocommit_block():
+        # If this fails, "col" is already committed. A retry fails on add_column
+        # with "column already exists".
+        op.create_index("ix_table_col", "table", ["col"], postgresql_concurrently=True)
+```
+
+Instead, add the column in one migration and create the index in the next one.
+
+Indexes on a table created in the same migration do not need `CONCURRENTLY`, since the table is
+empty. Create them without `autocommit_block()` so that the whole migration stays transactional.
