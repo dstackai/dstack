@@ -12,6 +12,7 @@ class OwnerType(str, Enum):
 
 
 class OrphanCleanupMode(str, Enum):
+    OFF = "off"
     REPORT = "report"
     DELETE = "delete"
 

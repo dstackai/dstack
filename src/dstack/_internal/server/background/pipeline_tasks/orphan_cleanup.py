@@ -57,12 +57,16 @@ class OrphanCleanupPipeline(Pipeline[PipelineItem]):
         workers_num: int = 10,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=15),
+        min_processing_interval: Optional[timedelta] = None,
         lock_timeout: timedelta = timedelta(seconds=60),
         heartbeat_trigger: timedelta = timedelta(seconds=20),
         *,
         pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
+        if min_processing_interval is None:
+            if settings.ORPHAN_CLEANUP_INTERVAL_SECONDS <= 0:
+                raise ValueError("DSTACK_SERVER_ORPHAN_CLEANUP_INTERVAL_SECONDS must be positive")
+            min_processing_interval = timedelta(seconds=settings.ORPHAN_CLEANUP_INTERVAL_SECONDS)
         super().__init__(
             workers_num=workers_num,
             queue_lower_limit_factor=queue_lower_limit_factor,
@@ -210,7 +214,7 @@ class OrphanCleanupWorker(Worker[PipelineItem]):
         process_context = await _load_process_context(item)
         if process_context is None:
             return
-        result = await _process_orphan_cleanup(process_context, self._cleanup_mode)
+        result = await _process_orphan_cleanup(process_context)
         await _apply_process_result(item, process_context, result)
 
 
@@ -220,10 +224,9 @@ class _ProcessContext:
 
 
 class _OrphanCleanupUpdateMap(ItemUpdateMap, total=False):
-    last_cleanup_at: UpdateMapDateTime
     cleanup_attempt: int
     clean_at: UpdateMapDateTime
-    cleanup_mode: OrphanCleanupMode
+    clean_mode: OrphanCleanupMode
 
 
 @dataclass
@@ -236,14 +239,6 @@ class _ResourceGroupDecision(str, Enum):
     SKIP = "skip"
     ORPHAN = "orphan"
     TRACKED = "tracked"
-
-
-_CLEANUP_RETRY_DELAYS = [
-    timedelta(hours=1),
-    timedelta(hours=2),
-    timedelta(hours=6),
-    timedelta(hours=24),
-]
 
 
 def _eligibility_filter() -> ColumnElement[bool]:
@@ -261,26 +256,32 @@ def _eligibility_filter() -> ColumnElement[bool]:
     )
     return or_(
         OrphanCleanupModel.clean_at.is_(None),
-        OrphanCleanupModel.cleanup_mode != settings.ORPHAN_CLEANUP_MODE,
+        OrphanCleanupModel.clean_mode != settings.ORPHAN_CLEANUP_MODE,
         has_new_activity,
     )
+
+
+_CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
+"""Retry delays after failed or unclean cleanups, as multiples of the cleanup interval."""
 
 
 def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
     """
     SQL-portable way to filter by retry delay depending on `cleanup_attempt`.
     """
+    interval = timedelta(seconds=settings.ORPHAN_CLEANUP_INTERVAL_SECONDS)
     filters = [
         and_(
             OrphanCleanupModel.cleanup_attempt == i,
-            OrphanCleanupModel.last_processed_at < now - delay,
+            OrphanCleanupModel.last_processed_at < now - interval * multiplier,
         )
-        for i, delay in enumerate(_CLEANUP_RETRY_DELAYS[:-1], start=1)
+        for i, multiplier in enumerate(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
     ]
     filters.append(
         and_(
-            OrphanCleanupModel.cleanup_attempt >= len(_CLEANUP_RETRY_DELAYS),
-            OrphanCleanupModel.last_processed_at < now - _CLEANUP_RETRY_DELAYS[-1],
+            OrphanCleanupModel.cleanup_attempt >= len(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
+            OrphanCleanupModel.last_processed_at
+            < now - interval * _CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
         )
     )
     return or_(OrphanCleanupModel.cleanup_attempt == 0, *filters)
@@ -307,9 +308,7 @@ async def _load_process_context(item: PipelineItem) -> Optional[_ProcessContext]
     return _ProcessContext(orphan_cleanup_model=orphan_cleanup_model)
 
 
-async def _process_orphan_cleanup(
-    process_context: _ProcessContext, cleanup_mode: OrphanCleanupMode
-) -> _ProcessResult:
+async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessResult:
     orphan_cleanup_model = process_context.orphan_cleanup_model
     backend = await backends_services.get_project_backend_by_type(
         project=orphan_cleanup_model.backend.project,
@@ -344,25 +343,20 @@ async def _process_orphan_cleanup(
         return _get_failed_cleanup_process_result(orphan_cleanup_model)
     decisions: list[_ResourceGroupDecision] = []
     for resource_group in resource_groups:
-        decision = await _process_resource_group(
-            compute, process_context, resource_group, cleanup_mode
-        )
+        decision = await _process_resource_group(compute, process_context, resource_group)
         decisions.append(decision)
     if any(d is _ResourceGroupDecision.SKIP for d in decisions):
         return _get_skips_cleanup_process_result(orphan_cleanup_model)
-    return _get_success_cleanup_process_result(orphan_cleanup_model, cleanup_mode, listed_at)
+    return _get_success_cleanup_process_result(listed_at)
 
 
 async def _process_resource_group(
     compute: ComputeWithResourceListingSupport,
     process_context: _ProcessContext,
     resource_group: ListedResourceGroup,
-    cleanup_mode: OrphanCleanupMode,
 ) -> _ResourceGroupDecision:
     if resource_group.owner_type == OwnerType.INSTANCE:
-        return await _process_instance_group(
-            compute, process_context, resource_group, cleanup_mode
-        )
+        return await _process_instance_group(compute, process_context, resource_group)
     raise RuntimeError(f"Unknown resource_group.owner_type: {resource_group.owner_type}")
 
 
@@ -370,13 +364,12 @@ async def _process_instance_group(
     compute: ComputeWithResourceListingSupport,
     process_context: _ProcessContext,
     resource_group: ListedResourceGroup,
-    cleanup_mode: OrphanCleanupMode,
 ) -> _ResourceGroupDecision:
     decision = await _get_instance_group_decision(
         process_context.orphan_cleanup_model, resource_group
     )
     if decision == _ResourceGroupDecision.ORPHAN:
-        if cleanup_mode == OrphanCleanupMode.REPORT:
+        if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
             sentry_sdk.capture_message(
                 "Detected orphaned instance {} in {}/{}".format(
                     resource_group.provider_ref,
@@ -477,15 +470,12 @@ def _get_skips_cleanup_process_result(
     )
 
 
-def _get_success_cleanup_process_result(
-    orphan_cleanup_model: OrphanCleanupModel,
-    listed_at: datetime,
-) -> _ProcessResult:
+def _get_success_cleanup_process_result(listed_at: datetime) -> _ProcessResult:
     return _ProcessResult(
         update_map=_OrphanCleanupUpdateMap(
-            cleanup_attempt=orphan_cleanup_model.cleanup_attempt + 1,
+            cleanup_attempt=0,
             clean_at=listed_at,
-            cleanup_mode=settings.ORPHAN_CLEANUP_MODE,
+            clean_mode=settings.ORPHAN_CLEANUP_MODE,
         )
     )
 
