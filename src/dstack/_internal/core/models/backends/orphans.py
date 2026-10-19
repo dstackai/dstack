@@ -34,6 +34,7 @@ class ListedResourceGroup(CoreModel):
     """
     region: Optional[str]
     created_at: datetime
+    """Provider's creation time of the owner resource or, if it's gone, the earliest internal resource."""
     description: str
     """Human-readable summary for events and logs"""
     backend_data: Optional[str]

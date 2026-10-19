@@ -347,7 +347,9 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
         resource_groups=resource_groups,
     )
     decisions = [
-        _get_resource_group_decision(orphan_cleanup_model, resource_group, owner_records)
+        _get_resource_group_decision(
+            orphan_cleanup_model, resource_group, owner_records, listed_at
+        )
         for resource_group in resource_groups
     ]
     final_decisions: list[_ResourceGroupDecision] = []
@@ -414,12 +416,14 @@ def _get_resource_group_decision(
     orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
     owner_records: _OwnerRecords,
+    listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if resource_group.owner_type == OwnerType.INSTANCE:
         return _get_instance_group_decision(
             orphan_cleanup_model,
             resource_group,
             owner_records.instances.get(resource_group.provider_ref),
+            listed_at,
         )
     raise RuntimeError(f"Unknown resource_group.owner_type: {resource_group.owner_type}")
 
@@ -478,14 +482,32 @@ async def _handle_orphaned_resource_group(
     return _ResourceGroupDecision.ORPHAN
 
 
+_STUCK_PENDING_THRESHOLD = timedelta(hours=1)
+
+
 def _get_instance_group_decision(
     orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
     instance_model: Optional[InstanceModel],
+    listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if instance_model is None:
         return _ResourceGroupDecision.IGNORE
-    if instance_model.status in [InstanceStatus.PENDING, InstanceStatus.TERMINATING]:
+    if instance_model.status == InstanceStatus.PENDING:
+        if resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD:
+            # Stuck pending instances are unexpected. If this changes,
+            # we may treat them as orphans instead of error log and skip.
+            logger.error(
+                "Resource group %s in %s/%s was created at %s for instance %s"
+                " that is still pending. The instance may be stuck in pending.",
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                resource_group.created_at,
+                instance_model.name,
+            )
+        return _ResourceGroupDecision.SKIP
+    if instance_model.status == InstanceStatus.TERMINATING:
         return _ResourceGroupDecision.SKIP
     if instance_model.status == InstanceStatus.TERMINATED:
         return _ResourceGroupDecision.ORPHAN
