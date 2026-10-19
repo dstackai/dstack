@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.backends.base.configurator import Configurator
@@ -36,6 +37,10 @@ def _get_backends_with_compute_feature(
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,
     compute_feature_class=ComputeWithCreateInstanceSupport,
+)
+BACKENDS_WITH_RESOURCE_LISTING_SUPPORT = _get_backends_with_compute_feature(
+    configurator_classes=_configurator_classes,
+    compute_feature_class=ComputeWithResourceListingSupport,
 )
 BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT = _get_backends_with_compute_feature(
     configurator_classes=_configurator_classes,

@@ -30,6 +30,7 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -470,6 +471,30 @@ class ComputeWithCreateInstanceSupport(ABC):
                 for z in instance_offer.availability_zones
                 if z == volume.provisioning_data.availability_zone
             ]
+
+
+class ComputeWithResourceListingSupport(ABC):
+    """
+    Implement this mixin for automatic cleanup of orphaned resources.
+    """
+
+    @abstractmethod
+    def list_resource_groups(self) -> list[ListedResourceGroup]:
+        """
+        Lists all groups carrying a dstack `provider_ref` across the configured backend regions.
+        esources with missing or unparsable `provider_ref` should be skipped.
+        """
+        pass
+
+    @abstractmethod
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        """
+        Deletes everything in the group in the order the provider requires.
+        Must be idempotent. Raises `NotYetTerminated` while waiting, for
+        example for the VM to be gone before its disk can be deleted; the
+        next sweep re-lists and calls again.
+        """
+        pass
 
 
 class ComputeWithGroupProvisioningSupport(ABC):
