@@ -67,17 +67,21 @@ class TestVolumeLifecycle:
 
 
 class TestVolumeMount:
-    @pytest.mark.parametrize("user", [None, UnixUser(uid=0), UnixUser(username="root")])
-    def test_root_custom_path(self, user):
+    @pytest.mark.parametrize(
+        "user",
+        [
+            None,
+            UnixUser(uid=0),
+            UnixUser(username="root"),
+            UnixUser(uid=10001),
+            UnixUser(username="app"),
+        ],
+    )
+    def test_custom_path(self, user):
         commands = _volume_commands(user=user, path="/checkpoints")
 
         assert commands[0] == "grep -q ' /mnt .* - fuse.s3fs ' /proc/self/mountinfo"
         assert commands[1:] == ["mkdir -p -- /checkpoints", "mount --bind /mnt /checkpoints"]
-
-    @pytest.mark.parametrize("user", [UnixUser(uid=10001), UnixUser(username="app")])
-    def test_nonroot_rejected(self, user):
-        with pytest.raises(ComputeError, match="root jobs only"):
-            _volume_commands(user=user)
 
     def test_native_mount_path_needs_no_bind(self):
         assert len(_volume_commands(path="/mnt")) == 1

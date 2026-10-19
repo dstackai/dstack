@@ -10,6 +10,7 @@ import gpuhunt
 import paramiko
 import pytest
 
+from dstack._internal.core.backends.base.authorized_keys import DSTACK_PUBLIC_KEY_MARKER
 from dstack._internal.core.backends.lium.api_client import LiumAPIError
 from dstack._internal.core.backends.lium.compute import (
     LiumCompute,
@@ -43,7 +44,10 @@ STARTUP_COMMANDS = ["install runner", "runner --key 'a key with spaces'"]
 
 @pytest.fixture
 def compute():
-    with patch(f"{COMPUTE_MODULE}.LiumAPIClient", autospec=True) as client_class:
+    with (
+        patch(f"{COMPUTE_MODULE}.LiumAPIClient", autospec=True) as client_class,
+        patch(f"{COMPUTE_MODULE}.get_docker_commands", return_value=list(STARTUP_COMMANDS)),
+    ):
         compute = LiumCompute(LiumConfig(creds=LiumCreds(api_key="test-api-key")))
         client = client_class.return_value
         client.create_template.return_value = {"id": "template-id"}
@@ -103,9 +107,9 @@ def _run_job(compute, **overrides):
         volumes=[],
         user=None,
     )
-    for name in ("image_name", "registry_auth", "user", "mount_points"):
+    for name in ("image_name", "registry_auth", "user"):
         if name in overrides:
-            setattr(job_spec, "volumes" if name == "mount_points" else name, overrides.pop(name))
+            setattr(job_spec, name, overrides.pop(name))
     kwargs = {
         "run": SimpleNamespace(),
         "job": SimpleNamespace(job_spec=job_spec),
@@ -118,12 +122,9 @@ def _run_job(compute, **overrides):
         "extra_authorized_keys": [],
         **overrides,
     }
-    with (
-        patch(
-            f"{COMPUTE_MODULE}.generate_unique_instance_name_for_job",
-            return_value="dstack-test-unique",
-        ),
-        patch(f"{COMPUTE_MODULE}.get_docker_commands", return_value=list(STARTUP_COMMANDS)),
+    with patch(
+        f"{COMPUTE_MODULE}.generate_unique_instance_name_for_job",
+        return_value="dstack-test-unique",
     ):
         return compute.run_job(**kwargs)
 
@@ -137,6 +138,30 @@ def _terminate(compute, data):
 
 
 class TestRunJob:
+    def test_authorizes_cli_keys_for_root_ssh_forwarding(self, compute, tmp_path):
+        client_key = (
+            "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBE8x"
+            "Pz2OD5CXgZyHY6D70lMVk5IZyiWQRw5h9HHFrsqMp0v7SKEp89dBKAEPhq2h/4LfTFuH3aycKs/oZpbFbWM= client"
+        )
+        with patch(
+            f"{COMPUTE_MODULE}.get_docker_commands", return_value=STARTUP_COMMANDS
+        ) as commands:
+            _run_job(compute, extra_authorized_keys=[client_key])
+
+        command = shlex.split(commands.call_args.kwargs["pre_runner_commands"][0])
+        assert command[:4] == ["env", "HOME=/root", "/bin/sh", "-c"]
+        keys = tmp_path / ".ssh" / "authorized_keys"
+        keys.parent.mkdir()
+        keys.write_text(PUBLIC_KEY + "\n")
+        # Execute the actual script against an isolated home: the existing project
+        # key must retain shell access while the new CLI key only allows forwarding.
+        subprocess.run(command[2:], env={"HOME": str(tmp_path)}, check=True, timeout=5)
+
+        assert keys.read_text().splitlines() == [
+            PUBLIC_KEY,
+            f'command="/bin/false" {client_key} {DSTACK_PUBLIC_KEY_MARKER}',
+        ]
+
     def test_uses_offer_and_configures_root_ssh_bootstrap(self, compute):
         offer = _offer(compute)
         user = UnixUser.parse("10001:10001")
@@ -288,9 +313,10 @@ class TestUpdateProvisioningData:
         assert (data.hostname, data.ssh_port) == ("192.0.2.10", 40100)
         assert data.ssh_proxy is None
 
-    def test_uses_provider_proxy_when_runner_port_is_not_mapped(self, compute):
+    @pytest.mark.parametrize("ports_mapping", [{"22": 40022}, '{"22": 40022}', None])
+    def test_uses_provider_proxy_without_usable_runner_mapping(self, compute, ports_mapping):
         data = _run_job(compute)
-        compute.api_client.get_pod.return_value = _pod(ports_mapping={"22": 40022})
+        compute.api_client.get_pod.return_value = _pod(ports_mapping=ports_mapping)
 
         with patch(f"{COMPUTE_MODULE}._bootstrap_runner"):
             _update(compute, data)

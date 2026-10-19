@@ -1,4 +1,3 @@
-import re
 import shlex
 import uuid
 from datetime import datetime, timedelta
@@ -9,7 +8,10 @@ import gpuhunt
 import paramiko
 from gpuhunt.providers.lium import LiumProvider
 
-from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
+from dstack._internal.core.backends.base.authorized_keys import (
+    build_authorized_keys,
+    get_add_authorized_keys_script,
+)
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithFilteredOffersCached,
@@ -113,16 +115,19 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
         requirements: Requirements,
         extra_authorized_keys: list[str],
     ) -> JobProvisioningData:
-        image_name = job.job_spec.image_name
-        if not image_name or re.search(r"\s", image_name):
-            raise ComputeError("Invalid Lium container image name")
         volume_commands = _get_volume_commands(run, job, volumes)
         instance_name = generate_unique_instance_name_for_job(
             run, job, max_length=MAX_INSTANCE_NAME_LEN
         )
+        authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
+        # CLI keys also need forwarding access through Lium's root SSH service.
+        add_keys = get_add_authorized_keys_script(authorized_keys, options='command="/bin/false"')
         commands = get_docker_commands(
-            build_authorized_keys(project_ssh_public_key, extra_authorized_keys),
-            pre_runner_commands=volume_commands,
+            authorized_keys,
+            pre_runner_commands=[
+                shlex.join(["env", "HOME=/root", "/bin/sh", "-c", add_keys]),
+                *volume_commands,
+            ],
         )
         data = LiumInstanceBackendData(
             pod_name=instance_name,
@@ -150,7 +155,7 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
                 {
                     "name": instance_name,
                     # Follow the official SDK: Lium splits the complete image reference.
-                    "docker_image": image_name,
+                    "docker_image": job.job_spec.image_name,
                     "docker_image_tag": "",
                     "docker_image_digest": "",
                     "entrypoint": "/bin/sh",
@@ -235,8 +240,8 @@ class LiumCompute(ComputeWithFilteredOffersCached, ComputeWithVolumeSupport, Com
             # Lium marks RUNNING before its separate SSH bootstrap finishes.
             logger.debug("Waiting for Lium pod %s SSH", provisioning_data.instance_id)
             return
-        ports = pod.get("ports_mapping") or {}
-        runner_port = ports.get(str(DSTACK_RUNNER_SSH_PORT))
+        ports = pod.get("ports_mapping")
+        runner_port = ports.get(str(DSTACK_RUNNER_SSH_PORT)) if isinstance(ports, dict) else None
         if runner_port is not None:
             provisioning_data.hostname = ssh.hostname
             provisioning_data.ssh_port = _port(runner_port)
@@ -419,12 +424,6 @@ def _get_volume_commands(run: Run, job: Job, volumes: List[Volume]) -> list[str]
         return []
     if len(volumes) > 1:
         raise ComputeError("Lium supports mounting only one network volume per pod")
-    user = job.job_spec.user
-    if user is not None and user.uid != 0 and user.username != "root":
-        raise ComputeError(
-            "Lium network volumes support root jobs only. "
-            "Lium forces file ownership to root, so non-root jobs cannot update files."
-        )
     mount_points = job.job_spec.volumes
     if mount_points is None:
         mount_points = run.run_spec.configuration.volumes
@@ -552,8 +551,6 @@ command -v xargs env tr wc nohup > /dev/null || exit 1
 mkdir -p {BOOTSTRAP_DIR} || exit 1
 if test -f {exit_path}; then
     printf exited
-elif test -d {BOOTSTRAP_DIR}/started; then
-    printf running
 elif mkdir {BOOTSTRAP_DIR}/started 2>/dev/null; then
     printf %s {shlex.quote(runner_script)} > {runner_path} || exit 1
     printf %s {shlex.quote(monitor)} > {monitor_path} || exit 1

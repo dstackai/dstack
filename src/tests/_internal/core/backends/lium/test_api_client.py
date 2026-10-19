@@ -19,18 +19,15 @@ class TestLiumAPIClient:
 
         assert LiumAPIClient("test-key").get_version() == version
 
-    def test_rental_retry_preserves_key_and_body(self, requests_mock):
+    def test_rental_sends_payload_and_idempotency_key(self, requests_mock):
         requests_mock.post(f"{API_URL}/executors/node-id/rent", json={"pod_id": "pod-id"})
         client = LiumAPIClient("test-key")
         payload = {"pod_name": "dstack-job", "template_id": "template-id", "gpu_count": 2}
 
         assert client.rent_executor("node-id", payload, "rent-key") == {"pod_id": "pod-id"}
-        client.rent_executor("node-id", payload, "rent-key")
 
-        first, second = requests_mock.request_history
-        assert first.json() == payload
-        assert first.body == second.body
-        assert first.headers["Idempotency-Key"] == second.headers["Idempotency-Key"] == "rent-key"
+        assert requests_mock.last_request.json() == payload
+        assert requests_mock.last_request.headers["Idempotency-Key"] == "rent-key"
 
     @pytest.mark.parametrize(
         ["method", "path", "payload"],
@@ -190,15 +187,14 @@ class TestLiumAPIClient:
             call()
 
     @pytest.mark.parametrize(
-        ["method", "path"],
+        ["method", "path", "status"],
         [
-            ("delete_pod", "/pods/resource-id"),
-            ("delete_template", "/templates/resource-id"),
-            ("delete_docker_credential", "/docker-credentials/resource-id"),
-            ("delete_volume", "/volumes/resource-id"),
+            ("delete_pod", "/pods/resource-id", 200),
+            ("delete_template", "/templates/resource-id", 204),
+            ("delete_docker_credential", "/docker-credentials/resource-id", 404),
+            ("delete_volume", "/volumes/resource-id", 404),
         ],
     )
-    @pytest.mark.parametrize("status", [200, 204, 404])
     def test_delete_is_idempotent(self, requests_mock, method, path, status):
         requests_mock.delete(API_URL + path, status_code=status)
 

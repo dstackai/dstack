@@ -117,6 +117,7 @@ include = [
     "src/dstack/_internal/core/backends/aws",
     "src/dstack/_internal/core/backends/daytona",
     "src/dstack/_internal/core/backends/kubernetes",
+    "src/dstack/_internal/core/backends/lium",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
     "src/dstack/_internal/cli/services/configurators",

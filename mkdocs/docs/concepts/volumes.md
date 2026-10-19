@@ -53,7 +53,8 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     ```
 
 ??? info "Lium"
-    Lium volumes use S3-backed storage and grow with usage. Omit `size` and `region`:
+    Lium volumes use S3-backed storage, grow with usage, and can be mounted in any Lium region.
+    Omit `size` and `region`. Each run can mount one volume.
 
     ```yaml
     type: volume
@@ -61,12 +62,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     name: my-volume
     ```
 
-    A run can mount one volume. Lium forces files on the volume to be owned by `root`,
-    so `dstack` rejects volume mounts for non-root jobs. Jobs without network volumes
-    can run as non-root users normally.
-
-    Lium bills storage and read traffic separately from compute. Use these volumes for
-    datasets and checkpoints; do not assume local-disk performance or POSIX semantics.
+    > Files on Lium volumes are owned by root and accessible to all users in the container.
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -159,7 +155,7 @@ For all volume configuration options, refer to the [reference](../reference/dsta
 
 ### Attach a volume { #attach-network-volume }
 
-Dev environments, tasks, and services let you attach any number of network volumes.
+Dev environments, tasks, and services let you attach network volumes.
 To attach a network volume, simply specify its name using the `volumes` property
 and specify where to mount its contents:
 
@@ -292,7 +288,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
     If you don't want to limit a run to one particular region, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
-    Daytona volumes can be mounted in any Daytona region.
+    Daytona and Lium volumes can be mounted in any region of their respective backend.
 
 ??? info "Can I attach network volumes to multiple runs or instances?"
     The `runpod` and `daytona` backends support mounting the same volume in multiple runs at the same time.

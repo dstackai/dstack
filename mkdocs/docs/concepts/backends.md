@@ -1508,7 +1508,7 @@ projects:
 
 ### Lium
 
-The Lium backend is experimental. Create an API key under **Access → API Keys** in the
+Create an API key under **Access → API Keys** in the
 [Lium dashboard](https://lium.io/ssh-keys), then configure the backend:
 
 <div editor-title="~/.dstack/server/config.yml">
@@ -1525,24 +1525,10 @@ projects:
 
 </div>
 
-To restrict provisioning to specific regions, set `regions`, for example `regions: [us-ca, de-he]`.
-Omit it to use all available regions.
-
-Private Docker images are supported through the run configuration's
-[`registry_auth`](../reference/dstack.yml/task.md#registry_auth) property.
-
-!!! info "Storage and supported features"
-    Local disk is unencrypted and is deleted with the pod. The backend does not support
-    GPU blocks, instance volumes, or multi-node runs.
-
-    Lium splits local disk between `/root` (two thirds) and the container filesystem
-    (one third). The total allocation is not available in a single directory.
-
-    Persistent [network volumes](volumes.md#network-volumes) use S3-backed storage and support
-    jobs running as `root` only. You can attach one volume per pod at the path specified in
-    the run configuration. Storage grows with usage, and volumes can be attached in any Lium
-    region. Omit `size` and `region` from the volume configuration.
-    Do not rely on local-disk POSIX semantics or concurrent-writer consistency.
+??? info "Disk"
+    Local disk is unencrypted and deleted with the pod. Lium allocates two thirds to `/root`
+    and one third to the container filesystem; these are separate quotas.
+    For persistent storage, use [network volumes](volumes.md#network-volumes).
 
 ### Runpod
 

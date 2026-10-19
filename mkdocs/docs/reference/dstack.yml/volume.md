@@ -36,9 +36,6 @@ The `volume` configuration type allows creating, registering, and updating [volu
 
 === "Lium"
 
-    Lium volumes grow with usage and do not take `size` or `region`.
-    A run can mount one volume and must run as `root`.
-
     #SCHEMA# dstack._internal.core.models.volumes.LiumVolumeConfiguration
         overrides:
             show_root_heading: false
