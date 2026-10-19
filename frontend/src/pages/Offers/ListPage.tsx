@@ -6,7 +6,7 @@ import { product } from 'product';
 import { useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
 
-import { convertMiBToGB, round } from './List/helpers';
+import { getOfferSearchParams, OfferCard } from './List/helpers';
 import { Button, Header } from '../../components';
 import { OfferList } from './List';
 
@@ -14,7 +14,7 @@ export const ListPage: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const [selectedGpus, setSelectedGpus] = useState<IGpu[]>([]);
+    const [selectedOffers, setSelectedOffers] = useState<OfferCard[]>([]);
     const [noOffers, setNoOffers] = useState(false);
 
     useBreadcrumbs([
@@ -24,37 +24,21 @@ export const ListPage: React.FC = () => {
         },
     ]);
 
-    // Carries the filters over; a picked GPU narrows them to its name and memory.
     const launch = () => {
-        const params = new URLSearchParams(searchParams);
-        params.delete('group_by');
-
-        const [gpu] = selectedGpus;
-
-        if (gpu) {
-            params.set('gpu_name', gpu.name);
-            params.set('gpu_memory', `${round(convertMiBToGB(gpu.memory_mib))}GB`);
-        }
-
+        const params = getOfferSearchParams(searchParams, selectedOffers[0]);
         navigate(`${ROUTES.RUNS.LAUNCH}?${params}`);
     };
-
-    // Selecting an offer only matters for templates.
-    const selectionProps = product.hasTemplates
-        ? {
-              selectionType: 'single' as const,
-              selectedItems: selectedGpus,
-              onSelectionChange: ({ detail }: { detail: { selectedItems: IGpu[] } }) => setSelectedGpus(detail.selectedItems),
-          }
-        : {};
 
     return (
         <OfferList
             variant="full-page"
             showFleetFilter
-            onChangeProjectName={() => setSelectedGpus([])}
+            allowUngrouped
+            onChangeFilters={() => setSelectedOffers([])}
             onChangeNoOffers={setNoOffers}
-            {...selectionProps}
+            selectionType={product.hasTemplates ? 'single' : undefined}
+            selectedItems={selectedOffers}
+            onSelectionChange={({ detail }) => setSelectedOffers(detail.selectedItems)}
             header={
                 <Header
                     variant="awsui-h1-sticky"

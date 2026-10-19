@@ -45,6 +45,13 @@ class GetRunPlanRequest(CoreModel):
     max_offers: Optional[int] = Field(
         default=None, description="The maximum number of offers to return", ge=1, le=10000
     )
+    reverse_offers: Annotated[
+        bool,
+        Field(
+            description="Sort returned offers by descending price, keeping available offers first. "
+            "Applied before max_offers. Does not affect fleet selection or run scheduling."
+        ),
+    ] = False
     full_offers: Annotated[
         bool, Field(description="Return full offers not adjusted by requirements")
     ] = False

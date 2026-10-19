@@ -14,7 +14,6 @@ import {
     FormField,
     FormSelect,
     FormSelectProps,
-    FormToggle,
     InfoLink,
     SpaceBetween,
     Wizard,
@@ -30,11 +29,12 @@ import { useApplyRunMutation } from 'services/run';
 import { useGetAllTemplatesQuery } from 'services/templates';
 
 import { OfferList } from 'pages/Offers/List';
-import { getOfferFilters } from 'pages/Offers/List/hooks/useFilters';
+import { convertMiBToGB, getCpuMemory, OfferCard, renderRange } from 'pages/Offers/List/helpers';
+import { getOfferFilters, UseFiltersArgs } from 'pages/Offers/List/hooks/useFilters';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { ParamsWizardStep } from './components/ParamsWizardStep';
-import { getTemplateOfferDefaultFilters, hasConfiguredGpu } from './helpers/templateResources';
+import { getTemplateOfferDefaultFilters } from './helpers/templateResources';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
 import { useYupValidationResolver } from './hooks/useValidationResolver';
@@ -66,7 +66,8 @@ export const Launch: React.FC = () => {
         undefined,
     );
     const [activeStepIndex, setActiveStepIndex] = useState(0);
-    const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
+    const [selectedOffers, setSelectedOffers] = useState<OfferCard[]>([]);
+    const [resourceFilters, setResourceFilters] = useState<UseFiltersArgs['defaultFilters']>();
     const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
     const [selectedBackends, setSelectedBackends] = useState<string[]>([]);
     const [selectedFleets, setSelectedFleets] = useState<string[]>([]);
@@ -166,19 +167,35 @@ export const Launch: React.FC = () => {
         return filters;
     }, [searchParams]);
 
-    // An offer picked on the Offers page: one GPU name with an exact memory.
-    const preselectedGpu = useMemo(() => {
-        const { gpu_name: names, gpu_memory: memory } = urlOfferFilters;
-        const memoryGb = typeof memory === 'string' && !memory.includes('..') ? parseFloat(memory) : NaN;
-        return Array.isArray(names) && names.length === 1 && memoryGb ? { name: names[0], memoryGb } : undefined;
-    }, [urlOfferFilters]);
+    // A selected offer is carried in the same filters used by Launch.
+    const preselectedOffer = useMemo(() => {
+        const [offer] = selectedOffers;
+        if (offer) {
+            return {
+                name: offer.name,
+                memoryGb: convertMiBToGB(offer.memory_mib),
+                cpuCount: offer.cpu ? renderRange(offer.count) : undefined,
+                cpuMemory: offer.cpu ? getCpuMemory(offer) : undefined,
+                cpuArch: offer.cpu?.cpu_arch,
+                backend: offer.backend,
+                region: offer.region,
+            };
+        }
+        if (resourceFilters) return;
 
-    const hasGpuFilters = Object.keys(urlOfferFilters).some((key) => key.startsWith('gpu_'));
+        const { gpu_name: names, gpu_memory, gpu_count, cpu_count, memory: ram } = urlOfferFilters;
+        const memory = gpu_count === '0' ? ram : gpu_memory;
+        const memoryGb = typeof memory === 'string' && !memory.includes('..') ? parseFloat(memory) : NaN;
+        if (gpu_count === '0' && typeof cpu_count === 'string' && typeof ram === 'string') {
+            return { cpuCount: cpu_count, cpuMemory: ram };
+        }
+        return Array.isArray(names) && names.length === 1 && memoryGb ? { name: names[0], memoryGb } : undefined;
+    }, [urlOfferFilters, selectedOffers, resourceFilters]);
 
     useEffect(() => {
         setSelectedOffers([]);
+        setResourceFilters(undefined);
         setValue(FORM_FIELD_NAMES.offer, undefined);
-        setValue(FORM_FIELD_NAMES.gpu_enabled, hasConfiguredGpu(selectedTemplate) || hasGpuFilters);
     }, [selectedTemplate, setValue]);
 
     const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
@@ -227,12 +244,12 @@ export const Launch: React.FC = () => {
         unregister(FORM_FIELD_NAMES.ide);
     };
 
-    const selectOffers = (offers: IGpu[]) => {
+    const selectOffers = (offers: OfferCard[]) => {
         setSelectedOffers(offers);
         setValue(FORM_FIELD_NAMES.offer, offers[0] ?? undefined);
     };
 
-    const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => selectOffers(detail?.selectedItems ?? []);
+    const onChangeOffer: CardsProps<OfferCard>['onSelectionChange'] = ({ detail }) => selectOffers(detail?.selectedItems ?? []);
 
     const onSubmitWizard = async () => {
         const isValid = await trigger();
@@ -294,18 +311,20 @@ export const Launch: React.FC = () => {
     const hasResourcesParam = selectedTemplate?.parameters?.some((p) => p.type === 'resources') ?? false;
     const configuredOfferFilters = getTemplateOfferDefaultFilters(selectedTemplate);
     const defaultOfferFilters = useMemo(
-        () => ({
-            spot_policy: 'on-demand',
-            ...configuredOfferFilters,
-            ...urlOfferFilters,
-        }),
-        [configuredOfferFilters, urlOfferFilters],
+        () =>
+            resourceFilters ?? {
+                spot_policy: 'on-demand',
+                ...configuredOfferFilters,
+                ...urlOfferFilters,
+            },
+        [configuredOfferFilters, urlOfferFilters, resourceFilters],
     );
     const yaml = useGenerateYaml({
         formValues,
         configuration: selectedTemplate?.configuration,
         envParam,
         hasResourcesParam,
+        filters: defaultOfferFilters,
         backends: selectedBackends,
         fleets: selectedFleets,
     });
@@ -413,32 +432,23 @@ export const Launch: React.FC = () => {
                         title: 'Resources',
                         content: (
                             <OfferList
+                                key={`${formValues.project}/${selectedTemplate?.name}`}
                                 selectionType="single"
-                                disabled={!formValues.gpu_enabled}
+                                allowUngrouped
                                 withSearchParams={false}
                                 showFleetFilter
                                 selectedItems={selectedOffers}
                                 onSelectionChange={onChangeOffer}
-                                preselectedGpu={preselectedGpu}
+                                preselectedOffer={preselectedOffer}
                                 onPreselect={(gpu) => selectOffers([gpu])}
+                                onChangeFilters={(filters) => {
+                                    setResourceFilters(filters);
+                                    selectOffers([]);
+                                }}
                                 onChangeBackendFilter={setSelectedBackends}
                                 onChangeFleetFilter={setSelectedFleets}
                                 permanentFilters={{ project_name: formValues.project ?? '' }}
                                 defaultFilters={defaultOfferFilters}
-                                header={
-                                    <FormToggle
-                                        control={control}
-                                        defaultValue={false}
-                                        toggleLabel={t('runs.launch.wizard.gpu')}
-                                        toggleDescription={t(
-                                            formValues.gpu_enabled
-                                                ? 'runs.launch.wizard.gpu_description_enabled'
-                                                : 'runs.launch.wizard.gpu_description_disabled',
-                                        )}
-                                        errorText={formValues.gpu_enabled ? formState.errors.offer?.message : undefined}
-                                        name={FORM_FIELD_NAMES.gpu_enabled}
-                                    />
-                                }
                             />
                         ),
                     },

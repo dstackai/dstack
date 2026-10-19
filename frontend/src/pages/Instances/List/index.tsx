@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Box, Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
@@ -26,6 +26,11 @@ export const List: React.FC = () => {
         },
     ]);
 
+    return <InstanceList />;
+};
+
+export const InstanceList: React.FC<{ fleetId?: string }> = ({ fleetId }) => {
+    const { t } = useTranslation();
     const { columns } = useColumnsDefinitions();
 
     const {
@@ -40,7 +45,7 @@ export const List: React.FC = () => {
         isDisabledClearFilter,
         filteringStatusType,
         handleLoadItems,
-    } = useFilters();
+    } = useFilters(fleetId);
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IInstance, TInstanceListRequestParams>({
         useLazyQuery: useLazyGetInstancesQuery,
@@ -74,10 +79,16 @@ export const List: React.FC = () => {
         deleteFleets([...selectedItems]).catch(console.log);
     };
 
+    const activeInstancesToggle = (
+        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
+            {t('fleets.instances.active_only')}
+        </Toggle>
+    );
+
     return (
         <Table
             {...collectionProps}
-            variant="full-page"
+            variant={fleetId ? 'container' : 'full-page'}
             columnDefinitions={columns}
             items={items}
             loading={isLoading}
@@ -86,9 +97,10 @@ export const List: React.FC = () => {
             selectionType="multi"
             header={
                 <Header
-                    variant="awsui-h1-sticky"
+                    variant={fleetId ? 'h2' : 'awsui-h1-sticky'}
                     actions={
-                        <SpaceBetween size="xs" direction="horizontal">
+                        <SpaceBetween size="xs" direction="horizontal" alignItems="center">
+                            {fleetId && <Box margin={{ right: 's' }}>{activeInstancesToggle}</Box>}
                             <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
                                 {t('common.delete')}
                             </Button>
@@ -106,35 +118,32 @@ export const List: React.FC = () => {
                 </Header>
             }
             filter={
-                <div className={styles.filters}>
-                    <div className={styles.propertyFilter}>
-                        <PropertyFilter
-                            query={propertyFilterQuery}
-                            onChange={onChangePropertyFilter}
-                            expandToViewport
-                            hideOperations
-                            i18nStrings={{
-                                clearFiltersText: t('common.clearFilter'),
-                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
-                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
-                                operationAndText: 'and',
-                                enteredTextLabel: (value) => `Use: ${value}`,
-                            }}
-                            filteringOptions={filteringOptions}
-                            filteringProperties={filteringProperties}
-                            filteringStatusType={filteringStatusType}
-                            onLoadItems={handleLoadItems}
-                        />
+                !fleetId && (
+                    <div className={styles.filters}>
+                        <div className={styles.propertyFilter}>
+                            <PropertyFilter
+                                query={propertyFilterQuery}
+                                onChange={onChangePropertyFilter}
+                                expandToViewport
+                                hideOperations
+                                i18nStrings={{
+                                    clearFiltersText: t('common.clearFilter'),
+                                    filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                    filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                    operationAndText: 'and',
+                                    enteredTextLabel: (value) => `Use: ${value}`,
+                                }}
+                                filteringOptions={filteringOptions}
+                                filteringProperties={filteringProperties}
+                                filteringStatusType={filteringStatusType}
+                                onLoadItems={handleLoadItems}
+                            />
+                        </div>
+                        <div className={styles.activeOnly}>{activeInstancesToggle}</div>
                     </div>
-
-                    <div className={styles.activeOnly}>
-                        <Toggle onChange={onChangeOnlyActive} checked={onlyActive}>
-                            {t('fleets.instances.active_only')}
-                        </Toggle>
-                    </div>
-                </div>
+                )
             }
-            footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
+            footer={isLoadingMore && <Loader padding={{ vertical: 'm' }} />}
         />
     );
 };
