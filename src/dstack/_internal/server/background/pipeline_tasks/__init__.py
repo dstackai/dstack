@@ -1,5 +1,7 @@
 import asyncio
 
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import Pipeline
 from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupPipeline
 from dstack._internal.server.background.pipeline_tasks.fleets import FleetPipeline
@@ -15,6 +17,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingPipeline,
 )
+from dstack._internal.server.background.pipeline_tasks.orphan_cleanup import OrphanCleanupPipeline
 from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
@@ -47,6 +50,8 @@ class PipelineManager:
             VolumePipeline(pipeline_hinter=self._hinter),
         ]:
             self.register_pipeline(builtin_pipeline)
+        if settings.ORPHAN_CLEANUP_MODE != OrphanCleanupMode.OFF:
+            self.register_pipeline(OrphanCleanupPipeline(pipeline_hinter=self._hinter))
 
     def register_pipeline(self, pipeline: Pipeline):
         self._pipelines.append(pipeline)
