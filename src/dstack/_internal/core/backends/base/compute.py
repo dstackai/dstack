@@ -482,7 +482,14 @@ class ComputeWithResourceListingSupport(ABC):
     def list_resource_groups(self) -> list[ListedResourceGroup]:
         """
         Lists all groups carrying a dstack `provider_ref` across the configured backend regions.
-        esources with missing or unparsable `provider_ref` should be skipped.
+
+        Resources without `provider_ref` must be skipped. Resources whose `provider_ref`
+        is present but unparsable must be skipped and logged as a warning with the resource id.
+
+        `primary_id=None` may be reported only if the owner resource type was listed
+        completely. If any listing fails, raise instead of returning partial results.
+        Otherwise, resources of a tracked instance may be reported as left without
+        the instance and deleted.
         """
         pass
 
@@ -492,7 +499,7 @@ class ComputeWithResourceListingSupport(ABC):
         Deletes everything in the group in the order the provider requires.
         Must be idempotent. Raises `NotYetTerminated` while waiting, for
         example for the VM to be gone before its disk can be deleted; the
-        next sweep re-lists and calls again.
+        next cleanup re-lists and calls again.
         """
         pass
 
