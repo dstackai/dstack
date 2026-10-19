@@ -6,6 +6,8 @@ from typing_extensions import Self
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
+GCP_TPU_DEFAULT = False
+
 
 class GCPServiceAccountCreds(CoreModel):
     type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
@@ -33,6 +35,15 @@ class GCPBackendConfig(CoreModel):
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Annotated[
         Optional[List[str]], Field(description="The list of GCP regions. Omit to use all regions")
+    ] = None
+    tpu: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether TPU offers can be suggested in addition to CPU and GPU VMs (experimental)."
+                f" Defaults to `{str(GCP_TPU_DEFAULT).lower()}`"
+            )
+        ),
     ] = None
     vpc_name: Annotated[
         Optional[str],
@@ -154,6 +165,12 @@ class GCPStoredConfig(GCPBackendConfig):
 
 class GCPConfig(GCPStoredConfig):
     creds: Annotated[AnyGCPCreds, Field(discriminator="type")]
+
+    @property
+    def allow_tpu(self) -> bool:
+        if self.tpu is not None:
+            return self.tpu
+        return GCP_TPU_DEFAULT
 
     @property
     def allocate_public_ips(self) -> bool:

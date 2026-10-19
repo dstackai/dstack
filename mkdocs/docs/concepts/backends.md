@@ -627,6 +627,30 @@ gcloud projects list --format="json(projectId)"
     gcloud services enable compute.googleapis.com
     ```
 
+??? info "TPUs"
+    TPU support is experimental and disabled by default. To enable it, set `tpu: true` in the backend settings:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+          tpu: true
+    ```
+
+    </div>
+
+    Enable the Cloud TPU API in your GCP project:
+
+    ```shell
+    gcloud services enable tpu.googleapis.com --project=gcp-project-id
+    ```
+
 ??? info "VPC"
 
     === "VPC"
