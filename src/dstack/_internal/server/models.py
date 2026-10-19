@@ -936,7 +936,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
     # TODO: drop `pool_id` after the release without pools.
@@ -1039,7 +1041,7 @@ class InstanceModel(PipelineModelMixin, BaseModel):
         cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
 
-    provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True)
+    provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
     """Set on provider resources for orphans matching. `None` for older instances."""
 
     __table_args__ = (
