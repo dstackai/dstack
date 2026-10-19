@@ -3,10 +3,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional, Sequence
+from typing import Iterable, Optional, Sequence
 
 import sentry_sdk
 from sqlalchemy import ColumnElement, and_, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithResourceListingSupport
@@ -45,7 +46,7 @@ from dstack._internal.server.services.instances import get_instance_provisioning
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import tracing
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -341,92 +342,149 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             orphan_cleanup_model.backend.type.value,
         )
         return _get_failed_cleanup_process_result(orphan_cleanup_model)
-    decisions: list[_ResourceGroupDecision] = []
-    for resource_group in resource_groups:
-        decision = await _process_resource_group(compute, process_context, resource_group)
-        decisions.append(decision)
-    if any(d is _ResourceGroupDecision.SKIP for d in decisions):
+    owner_records = await _load_owner_records(
+        project_id=orphan_cleanup_model.backend.project_id,
+        resource_groups=resource_groups,
+    )
+    decisions = [
+        _get_resource_group_decision(orphan_cleanup_model, resource_group, owner_records)
+        for resource_group in resource_groups
+    ]
+    final_decisions: list[_ResourceGroupDecision] = []
+    for resource_group, decision in zip(resource_groups, decisions):
+        if decision == _ResourceGroupDecision.ORPHAN:
+            decision = await _handle_orphaned_resource_group(
+                compute, orphan_cleanup_model, resource_group
+            )
+        final_decisions.append(decision)
+    if any(d is _ResourceGroupDecision.SKIP for d in final_decisions):
         return _get_skips_cleanup_process_result(orphan_cleanup_model)
     return _get_success_cleanup_process_result(listed_at)
 
 
-async def _process_resource_group(
-    compute: ComputeWithResourceListingSupport,
-    process_context: _ProcessContext,
+_PROVIDER_REF_BATCH_SIZE = 100
+
+
+@dataclass
+class _OwnerRecords:
+    instances: dict[str, InstanceModel]
+
+
+async def _load_owner_records(
+    project_id: uuid.UUID, resource_groups: list[ListedResourceGroup]
+) -> _OwnerRecords:
+    instance_refs = {
+        resource_group.provider_ref
+        for resource_group in resource_groups
+        if resource_group.owner_type == OwnerType.INSTANCE
+    }
+    async with get_session_ctx() as session:
+        instances = await _load_instances_by_provider_ref(session, project_id, instance_refs)
+    return _OwnerRecords(instances=instances)
+
+
+async def _load_instances_by_provider_ref(
+    session: AsyncSession, project_id: uuid.UUID, provider_refs: Iterable[str]
+) -> dict[str, InstanceModel]:
+    # Soft-deleted instances are included since termination sets `deleted`.
+    instances: dict[str, InstanceModel] = {}
+    for batch in batched(provider_refs, _PROVIDER_REF_BATCH_SIZE):
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.project_id == project_id,
+                InstanceModel.provider_ref.in_(batch),
+            )
+            .options(
+                load_only(
+                    InstanceModel.id,
+                    InstanceModel.name,
+                    InstanceModel.provider_ref,
+                    InstanceModel.status,
+                    InstanceModel.job_provisioning_data,
+                )
+            )
+        )
+        for instance_model in res.scalars().all():
+            instances[get_or_error(instance_model.provider_ref)] = instance_model
+    return instances
+
+
+def _get_resource_group_decision(
+    orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
+    owner_records: _OwnerRecords,
 ) -> _ResourceGroupDecision:
     if resource_group.owner_type == OwnerType.INSTANCE:
-        return await _process_instance_group(compute, process_context, resource_group)
+        return _get_instance_group_decision(
+            orphan_cleanup_model,
+            resource_group,
+            owner_records.instances.get(resource_group.provider_ref),
+        )
     raise RuntimeError(f"Unknown resource_group.owner_type: {resource_group.owner_type}")
 
 
-async def _process_instance_group(
+async def _handle_orphaned_resource_group(
     compute: ComputeWithResourceListingSupport,
-    process_context: _ProcessContext,
+    orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
 ) -> _ResourceGroupDecision:
-    decision = await _get_instance_group_decision(
-        process_context.orphan_cleanup_model, resource_group
+    if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        sentry_sdk.capture_message(
+            "Detected orphaned {} {} in {}/{}".format(
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+        )
+        return _ResourceGroupDecision.ORPHAN
+    try:
+        await run_async(compute.delete_resource_group, resource_group)
+    except Exception as e:
+        if isinstance(e, NotYetTerminated):
+            logger.info(
+                "Cleanup of orphaned %s %s in %s/%s is skipped because the termination is in progress",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+        elif isinstance(e, BackendError):
+            logger.warning(
+                "Cleanup of orphaned %s %s in %s/%s is skipped due to error: %s",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                repr(e),
+            )
+        else:
+            logger.exception(
+                "Cleanup of orphaned %s %s in %s/%s is skipped because of unexpected exception",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+        return _ResourceGroupDecision.SKIP
+    logger.info(
+        "Cleaned up orphaned %s %s in %s/%s",
+        resource_group.owner_type.value,
+        resource_group.provider_ref,
+        orphan_cleanup_model.backend.project.name,
+        orphan_cleanup_model.backend.type.value,
     )
-    if decision == _ResourceGroupDecision.ORPHAN:
-        if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
-            sentry_sdk.capture_message(
-                "Detected orphaned instance {} in {}/{}".format(
-                    resource_group.provider_ref,
-                    process_context.orphan_cleanup_model.backend.project.name,
-                    process_context.orphan_cleanup_model.backend.type.value,
-                )
-            )
-            return decision
-        try:
-            await run_async(compute.delete_resource_group, resource_group)
-        except Exception as e:
-            if isinstance(e, NotYetTerminated):
-                logger.info(
-                    "Cleanup of orphaned instance %s in %s/%s is skipped because the instance termination is in progress",
-                    resource_group.provider_ref,
-                    process_context.orphan_cleanup_model.backend.project.name,
-                    process_context.orphan_cleanup_model.backend.type.value,
-                )
-            elif isinstance(e, BackendError):
-                logger.warning(
-                    "Cleanup of orphaned instance %s in %s/%s is skipped due to error: %s",
-                    resource_group.provider_ref,
-                    process_context.orphan_cleanup_model.backend.project.name,
-                    process_context.orphan_cleanup_model.backend.type.value,
-                    repr(e),
-                )
-            else:
-                logger.exception(
-                    "Cleanup of orphaned instance %s in %s/%s is skipped because of unexpected exception",
-                    resource_group.provider_ref,
-                    process_context.orphan_cleanup_model.backend.project.name,
-                    process_context.orphan_cleanup_model.backend.type.value,
-                )
-            return _ResourceGroupDecision.SKIP
-        logger.info(
-            "Cleaned up orphaned instance %s in %s/%s",
-            resource_group.provider_ref,
-            process_context.orphan_cleanup_model.backend.project.name,
-            process_context.orphan_cleanup_model.backend.type.value,
-        )
-    return decision
+    return _ResourceGroupDecision.ORPHAN
 
 
-async def _get_instance_group_decision(
-    orphan_cleanup_model: OrphanCleanupModel, resource_group: ListedResourceGroup
+def _get_instance_group_decision(
+    orphan_cleanup_model: OrphanCleanupModel,
+    resource_group: ListedResourceGroup,
+    instance_model: Optional[InstanceModel],
 ) -> _ResourceGroupDecision:
-    assert resource_group.owner_type == OwnerType.INSTANCE
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(InstanceModel).where(
-                InstanceModel.provider_ref == resource_group.provider_ref,
-                InstanceModel.project_id == orphan_cleanup_model.backend.project_id,
-            )
-        )
-        instance_model = res.scalar_one_or_none()
-        if instance_model is None:
-            return _ResourceGroupDecision.IGNORE
+    if instance_model is None:
+        return _ResourceGroupDecision.IGNORE
     if instance_model.status in [InstanceStatus.PENDING, InstanceStatus.TERMINATING]:
         return _ResourceGroupDecision.SKIP
     if instance_model.status == InstanceStatus.TERMINATED:
