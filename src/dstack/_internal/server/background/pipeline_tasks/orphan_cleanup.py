@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Iterable, Optional, Sequence
@@ -42,6 +42,7 @@ from dstack._internal.server.models import (
     ProjectModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -231,8 +232,15 @@ class _OrphanCleanupUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
+class _OrphanEvent:
+    message: str
+    target: events.Target
+
+
+@dataclass
 class _ProcessResult:
     update_map: _OrphanCleanupUpdateMap
+    orphan_events: list[_OrphanEvent] = field(default_factory=list)
 
 
 class _ResourceGroupDecision(str, Enum):
@@ -353,15 +361,21 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
         for resource_group in resource_groups
     ]
     final_decisions: list[_ResourceGroupDecision] = []
+    orphan_events: list[_OrphanEvent] = []
     for resource_group, decision in zip(resource_groups, decisions):
         if decision == _ResourceGroupDecision.ORPHAN:
             decision = await _handle_orphaned_resource_group(
                 compute, orphan_cleanup_model, resource_group
             )
+            if decision == _ResourceGroupDecision.ORPHAN:
+                orphan_events.append(_get_orphan_event(resource_group, owner_records))
         final_decisions.append(decision)
     if any(d is _ResourceGroupDecision.SKIP for d in final_decisions):
-        return _get_skips_cleanup_process_result(orphan_cleanup_model)
-    return _get_success_cleanup_process_result(listed_at)
+        result = _get_skips_cleanup_process_result(orphan_cleanup_model)
+    else:
+        result = _get_success_cleanup_process_result(listed_at)
+    result.orphan_events = orphan_events
+    return result
 
 
 _PROVIDER_REF_BATCH_SIZE = 100
@@ -400,6 +414,8 @@ async def _load_instances_by_provider_ref(
             .options(
                 load_only(
                     InstanceModel.id,
+                    InstanceModel.project_id,
+                    InstanceModel.fleet_id,
                     InstanceModel.name,
                     InstanceModel.provider_ref,
                     InstanceModel.status,
@@ -480,6 +496,37 @@ async def _handle_orphaned_resource_group(
         orphan_cleanup_model.backend.type.value,
     )
     return _ResourceGroupDecision.ORPHAN
+
+
+def _get_orphan_event(
+    resource_group: ListedResourceGroup, owner_records: _OwnerRecords
+) -> _OrphanEvent:
+    assert resource_group.owner_type == OwnerType.INSTANCE
+    owner_model = owner_records.instances[resource_group.provider_ref]
+    return _OrphanEvent(
+        message=_get_orphan_event_message(resource_group),
+        target=events.Target.from_model(owner_model),
+    )
+
+
+def _get_orphan_event_message(resource_group: ListedResourceGroup) -> str:
+    # Built from the required fields so that the message is useful
+    # even if the backend fills `description` poorly.
+    if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        action = "found"
+    else:
+        action = "deleted"
+    location = resource_group.backend.value
+    if resource_group.region is not None:
+        location += f"/{resource_group.region}"
+    message = (
+        f"Orphaned resources {action} in {location}, provider_ref {resource_group.provider_ref}"
+    )
+    if resource_group.primary_id is not None:
+        message += f", {resource_group.owner_type.value} id {resource_group.primary_id}"
+    if resource_group.description:
+        message += f": {resource_group.description}"
+    return message
 
 
 _STUCK_PENDING_THRESHOLD = timedelta(hours=1)
@@ -580,3 +627,11 @@ async def _apply_process_result(
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
+            return
+        for orphan_event in result.orphan_events:
+            events.emit(
+                session,
+                orphan_event.message,
+                actor=events.SystemActor(),
+                targets=[orphan_event.target],
+            )
