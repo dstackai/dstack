@@ -10,6 +10,9 @@ def get_provisioning_timeout(backend_type: BackendType, instance_type_name: str)
     """
     if backend_type == BackendType.LAMBDA:
         return timedelta(minutes=30)
+    if backend_type == BackendType.CLOUDRIFT:
+        # CloudRift may download a large VM image before booting and starting the shim.
+        return timedelta(minutes=30)
     if backend_type == BackendType.RUNPOD:
         return timedelta(minutes=20)
     if backend_type == BackendType.DAYTONA:

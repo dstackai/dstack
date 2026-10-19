@@ -610,6 +610,54 @@ class TestJobRunningWorker:
         assert job_runtime_data.working_dir == "/dstack/run"
         assert job_runtime_data.username == "dstack"
 
+    @pytest.mark.parametrize(
+        ("age_minutes", "expected_status"),
+        [(20, JobStatus.PROVISIONING), (31, JobStatus.TERMINATING)],
+    )
+    async def test_cloudrift_provisioning_waits_for_shim_within_timeout(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        age_minutes: int,
+        expected_status: JobStatus,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+            backend=BackendType.CLOUDRIFT,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            submitted_at=get_current_datetime() - timedelta(minutes=age_minutes),
+            job_provisioning_data=get_job_provisioning_data(
+                dockerized=True, backend=BackendType.CLOUDRIFT
+            ),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.healthcheck.return_value = None
+
+        await _process_job(session, worker, job)
+        await session.refresh(job)
+
+        assert job.status == expected_status
+        assert job.termination_reason == (
+            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+            if expected_status == JobStatus.TERMINATING
+            else None
+        )
+        shim_client_mock.submit_task.assert_not_called()
+
     @pytest.mark.parametrize("sshproxy_enforced", [False, True])
     async def test_provisioning_shim(
         self,
