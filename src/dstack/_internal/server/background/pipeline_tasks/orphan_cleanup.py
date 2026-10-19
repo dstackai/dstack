@@ -54,7 +54,7 @@ logger = get_logger(__name__)
 class OrphanCleanupPipeline(Pipeline[PipelineItem]):
     def __init__(
         self,
-        workers_num: int = 10,
+        workers_num: int = 5,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
         min_processing_interval: Optional[timedelta] = None,
@@ -427,25 +427,23 @@ async def _get_instance_group_decision(
         instance_model = res.scalar_one_or_none()
         if instance_model is None:
             return _ResourceGroupDecision.IGNORE
-    if instance_model.backend != orphan_cleanup_model.backend.type:
-        # Comparing backend type because InstanceModel does not store reference to BackendModel
-        # What about DstackBackend?
-        return _ResourceGroupDecision.ORPHAN
-    provisioning_data = get_instance_provisioning_data(instance_model)
     if instance_model.status in [InstanceStatus.PENDING, InstanceStatus.TERMINATING]:
         return _ResourceGroupDecision.SKIP
+    if instance_model.status == InstanceStatus.TERMINATED:
+        return _ResourceGroupDecision.ORPHAN
+    provisioning_data = get_instance_provisioning_data(instance_model)
     if provisioning_data is None:
         logger.error(
-            "Failed to cleanup orphaned instance %s in %s/%s: provisioning_data is None for non-pending instance",
+            "Failed to classify resource group %s in %s/%s: provisioning_data is None for active instance",
             instance_model.name,
             orphan_cleanup_model.backend.project.name,
             orphan_cleanup_model.backend.type.value,
         )
         return _ResourceGroupDecision.IGNORE
     if (
-        instance_model.status.is_active()
-        and provisioning_data.instance_id != resource_group.primary_id
-    ) or instance_model.status == InstanceStatus.TERMINATED:
+        provisioning_data.get_base_backend() != resource_group.backend
+        or provisioning_data.instance_id != resource_group.primary_id
+    ):
         return _ResourceGroupDecision.ORPHAN
     return _ResourceGroupDecision.TRACKED
 
