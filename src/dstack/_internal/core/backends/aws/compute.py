@@ -1533,7 +1533,15 @@ def _list_resource_groups(
     Elastic IPs whose instance is gone form groups of their own.
     """
     instances = aws_resources.list_instances_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
-    addresses = aws_resources.list_addresses_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
+    try:
+        addresses = aws_resources.list_addresses_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
+    except botocore.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] != "UnauthorizedOperation":
+            raise
+        # Elastic IP permissions are optional. They are only needed for multi-EFA instances
+        # with public IPs, so without them there are no Elastic IPs to clean up.
+        logger.debug("Skipping Elastic IPs in %s: not authorized to list them", region)
+        addresses = []
 
     addresses_by_instance_id: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     instance_ids = {instance["InstanceId"] for instance in instances}

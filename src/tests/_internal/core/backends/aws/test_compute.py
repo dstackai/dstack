@@ -137,6 +137,19 @@ class TestListResourceGroups:
         )
         assert compute.list_resource_groups() == []
 
+    def test_lists_instances_without_elastic_ip_permissions(
+        self, compute: AWSCompute, ec2_client: Stubber
+    ):
+        ec2_client.add_response(
+            "describe_instances",
+            {"Reservations": [{"Instances": [_get_instance("i-1")]}]},
+        )
+        ec2_client.add_client_error(
+            "describe_addresses", service_error_code="UnauthorizedOperation"
+        )
+        groups = compute.list_resource_groups()
+        assert [g.primary_id for g in groups] == ["i-1"]
+
 
 class TestDeleteResourceGroup:
     def test_terminates_instance_and_releases_elastic_ip(
