@@ -7,11 +7,9 @@ import boto3
 import pytest
 from botocore.stub import Stubber
 
-from dstack._internal.core.backends.aws.compute import (
-    AWSCompute,
-    _allocate_and_associate_eip,
-)
+from dstack._internal.core.backends.aws.compute import AWSCompute
 from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfig
+from dstack._internal.core.backends.aws.resources import allocate_and_associate_eip
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 
@@ -220,7 +218,7 @@ class TestAllocateAndAssociateEip:
                 "AllowReassociation": False,
             },
         )
-        assert _allocate_and_associate_eip(
+        assert allocate_and_associate_eip(
             ec2_client=ec2_client.client,
             instance=instance,
             project_name="main",
