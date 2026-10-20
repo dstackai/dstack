@@ -509,7 +509,15 @@ def _get_resource_group_decision(
                 orphan_cleanup_model, resource_group, job_model, listed_at
             )
         return _ResourceGroupDecision.IGNORE
-    raise RuntimeError(f"Unknown resource_group.owner_type: {resource_group.owner_type}")
+    # Backends may list owner types that orphan cleanup does not support yet
+    logger.warning(
+        "Ignoring resource group %s in %s/%s with unsupported owner type %s",
+        resource_group.provider_ref,
+        orphan_cleanup_model.backend.project.name,
+        orphan_cleanup_model.backend.type.value,
+        resource_group.owner_type.value,
+    )
+    return _ResourceGroupDecision.IGNORE
 
 
 async def _handle_orphaned_resource_group(
