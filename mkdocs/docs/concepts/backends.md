@@ -1408,7 +1408,7 @@ projects:
 
     Limitations:
 
-    * Slices with the same memory (e.g., `3g.40gb` and `4g.40gb`) and `+me` variants can't be requested specifically.
+    * Slices are matched by memory only, so `gpu: A100:40GB` can get either a `3g.40gb` or a `4g.40gb` slice.
     * `dstack metrics` doesn't show GPU metrics for slices.
 
 > To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
