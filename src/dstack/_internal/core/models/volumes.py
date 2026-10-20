@@ -188,12 +188,19 @@ class DaytonaVolumeConfiguration(VolumeConfigurationWithVolumeID):
     )
 
 
+class LiumVolumeConfiguration(VolumeConfigurationWithVolumeID):
+    backend: Annotated[Literal[BackendType.LIUM], Field(description="The volume backend")] = (
+        BackendType.LIUM
+    )
+
+
 AnyVolumeConfiguration = Union[
     AWSVolumeConfiguration,
     GCPVolumeConfiguration,
     RunpodVolumeConfiguration,
     KubernetesVolumeConfiguration,
     DaytonaVolumeConfiguration,
+    LiumVolumeConfiguration,
 ]
 
 

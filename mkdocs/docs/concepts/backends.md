@@ -1530,6 +1530,25 @@ projects:
     * Creating volumes: `read:volumes`, `write:volumes`, and `delete:volumes`
     * Registering existing volumes: `read:volumes`
 
+### Lium
+
+Create an API key under **Access → API Keys** in the
+[Lium dashboard](https://lium.io/ssh-keys), then configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: lium
+        creds:
+          type: api_key
+          api_key: YOUR_LIUM_API_KEY
+```
+
+</div>
+
 ### Runpod
 
 Log into your [Runpod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click

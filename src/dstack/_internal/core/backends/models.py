@@ -59,6 +59,10 @@ from dstack._internal.core.backends.lambdalabs.models import (
     LambdaBackendConfig,
     LambdaBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.lium.models import (
+    LiumBackendConfig,
+    LiumBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.nebius.models import (
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
@@ -113,6 +117,7 @@ AnyBackendConfigWithoutCreds = Union[
     JarvisLabsBackendConfig,
     KubernetesBackendConfig,
     LambdaBackendConfig,
+    LiumBackendConfig,
     NebiusBackendConfig,
     OCIBackendConfig,
     RunpodBackendConfig,
@@ -143,6 +148,7 @@ AnyBackendConfigWithCreds = Union[
     JarvisLabsBackendConfigWithCreds,
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
+    LiumBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
     NebiusBackendConfigWithCreds,
     RunpodBackendConfigWithCreds,
@@ -188,6 +194,7 @@ AnyBackendFileConfigWithCreds = Union[
     JarvisLabsBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
+    LiumBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
     NebiusBackendFileConfigWithCreds,
     RunpodBackendConfigWithCreds,
