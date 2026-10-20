@@ -12,6 +12,12 @@ class ListProjectsRequest(CoreModel):
     include_not_joined: Annotated[
         bool, Field(description="Include public projects where user is not a member.")
     ] = True
+    username: Annotated[
+        Optional[str],
+        Field(
+            description="Include only projects owned by or joined by this user, with this user's membership."
+        ),
+    ] = None
     return_total_count: Annotated[
         bool, Field(description="Return `total_count` with the total number of projects.")
     ] = False

@@ -768,6 +768,11 @@
         "account_settings": "User settings",
         "settings": "Settings",
         "projects": "Projects",
+        "projects_table": {
+            "project": "Project",
+            "role": "Role",
+            "empty_message": "This user doesn't own or belong to any projects."
+        },
         "events": "Events",
         "public_keys": {
             "title": "SSH keys",

@@ -1,24 +1,34 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import {
-    ListEmptyMessage,
-    NavigateLink,
-    // Pagination,
-    Table,
-} from 'components';
+import { Button, ListEmptyMessage, Loader, NavigateLink, Table } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useAppSelector, useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGetProjectsQuery } from 'services/project';
+import { useLazyGetProjectsQuery } from 'services/project';
+
+import { selectUserData } from 'App/slice';
+import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 
 export const UserProjectList: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramUserName = params.userName ?? '';
+    const navigate = useNavigate();
+    const userData = useAppSelector(selectUserData);
+    const isCurrentUser = userData?.username === paramUserName;
+    const { isAvailableProjectManaging } = useCheckAvailableProjectPermission();
 
-    const { isLoading, isFetching, data } = useGetProjectsQuery({ limit: 200 });
+    const { data, isLoading, isLoadingMore } = useInfiniteScroll<IProject, TGetProjectListParams>({
+        useLazyQuery: useLazyGetProjectsQuery,
+        args: { username: paramUserName, limit: DEFAULT_TABLE_PAGE_SIZE },
+        getPaginationParams: (project) => ({
+            prev_created_at: project.created_at,
+            prev_id: project.project_id,
+        }),
+    });
 
     useBreadcrumbs([
         {
@@ -36,37 +46,41 @@ export const UserProjectList: React.FC = () => {
     ]);
 
     const renderEmptyMessage = (): React.ReactNode => {
-        return <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')} />;
+        if (isLoading) return null;
+
+        return (
+            <ListEmptyMessage title={t('projects.empty_message_title')} message={t('users.projects_table.empty_message')}>
+                {isCurrentUser && isAvailableProjectManaging && (
+                    <Button onClick={() => navigate(ROUTES.PROJECT.ADD)}>{t('common.create')}</Button>
+                )}
+            </ListEmptyMessage>
+        );
     };
 
-    const filteredData = useMemo<IProject[]>(() => {
-        if (!data?.data) return [];
-
-        // eslint-disable-next-line no-unsafe-optional-chaining
-        return [...data?.data]
-            .filter((p) => p.owner.username === paramUserName)
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }, [data]);
-
-    const {
-        items,
-        collectionProps,
-        // paginationProps
-    } = useCollection(filteredData, {
+    const { items, collectionProps } = useCollection(data, {
         filtering: {
             empty: renderEmptyMessage(),
         },
-        // pagination: { pageSize: 20 },
         selection: {},
     });
 
     const columns = [
         {
             id: 'project_name',
-            header: `${t('projects.edit.project_name')}`,
+            header: t('users.projects_table.project'),
             cell: (project: IProject) => (
                 <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(project.project_name)}>{project.project_name}</NavigateLink>
             ),
+        },
+        {
+            id: 'role',
+            header: t('users.projects_table.role'),
+            cell: (project: IProject) => {
+                if (project.owner.username === paramUserName) return t('projects.edit.owner');
+
+                const member = project.members.find(({ user }) => user.username === paramUserName);
+                return member ? t(`roles.${member.project_role}`) : '-';
+            },
         },
     ];
 
@@ -75,9 +89,9 @@ export const UserProjectList: React.FC = () => {
             {...collectionProps}
             columnDefinitions={columns}
             items={items}
-            loading={isLoading || isFetching}
+            loading={isLoading}
             loadingText={t('common.loading')}
-            // pagination={<Pagination {...paginationProps} disabled={isLoading} />}
+            footer={isLoadingMore ? <Loader padding={{ vertical: 'm' }} /> : undefined}
         />
     );
 };
