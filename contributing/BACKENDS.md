@@ -144,6 +144,7 @@ Refer to examples:
 
 Go to `compute.py` and implement `Compute` methods.
 Optionally, extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, extend `ComputeWithCreateInstanceSupport` to support fleets.
+To support the cleanup of orphaned resources, extend `ComputeWithResourceListingSupport` as described in [Orphan cleanup support](#32-orphan-cleanup-support).
 
 Refer to examples:
 [verda](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/verda/compute.py),
@@ -228,3 +229,32 @@ To support a container-based backend, `dstack` expects the following:
 - A way to override the container user to root (as in `docker run --user root ...`)
 
 Examples of container-based backends include: `kubernetes`, `vastai`, `runpod`.
+
+### 3.2. Orphan cleanup support
+
+`dstack` can find and delete cloud resources it created but no longer tracks, e.g. if the server
+crashed after the provider created an instance but before it was recorded, or if instance
+termination failed. The `OrphanCleanupPipeline` lists resources of backends that extend
+`ComputeWithResourceListingSupport` and matches them with instances and jobs by `provider_ref`.
+
+To support it in a backend:
+
+1. Set `provider_ref` on every resource created for an instance or a job. It's
+   `InstanceConfiguration.provider_ref` in `create_instance()` and `get_job_provider_ref(job)` in
+   `run_job()`. Internal resources that outlive the instance if left behind (disks, keys, IPs)
+   need it too, while resources deleted together with the instance don't.
+    * If the provider supports tags, set the `PROVIDER_REF_TAG_KEY` tag and keep instance names as is.
+      If the provider does not allow this key, use another one.
+    * Otherwise, encode `provider_ref` in names with `generate_unique_instance_name(..., with_provider_ref=True)`
+      and parse it with `parse_provider_ref_from_name()`.
+    * Do not set it on resources of `run_jobs()` since orphan cleanup does not support compute groups yet.
+2. Implement `list_resource_groups()`. It returns a `ListedResourceGroup` per provisioning attempt: the instance
+   (`primary_id`) together with internal resources created for it. Skip resources without `provider_ref`.
+   List resources of each region all or nothing: if any listing in a region fails, return no groups
+   of the region and report it in `ResourceListing.failures`. Otherwise, a tracked instance's resources
+   may be listed without the instance and deleted.
+3. Implement `delete_resource_group()`. Delete everything in the group in the order the provider requires.
+   The method must be idempotent, raise `NotYetTerminated` while waiting, and never delete resources
+   that don't carry the group's `provider_ref`, such as attached volumes.
+
+Refer to the [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py) example.
