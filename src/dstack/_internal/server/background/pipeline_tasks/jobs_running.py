@@ -404,20 +404,6 @@ class _ProcessResult:
     new_probe_models: list[ProbeModel] = field(default_factory=list)
 
 
-@dataclass
-class _StartupContext:
-    cluster_info: ClusterInfo
-    volumes: list[Volume]
-    secrets: dict[str, str]
-    repo_creds: Optional[RemoteRepoCreds]
-    router_env: Optional[Dict[str, str]] = None
-    """Dynamo-specific env (e.g. DSTACK_ROUTER_INTERNAL_IP) computed from the
-    router replica's state. Passed through to RunnerClient.submit_job, which
-    merges it into a deep-copied job_spec.env so the shared job_spec is not
-    mutated. None for SMG services, non-router runs, and the router
-    replica itself."""
-
-
 async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         job_model = await _refetch_locked_job_model(session=session, item=item)
@@ -436,8 +422,9 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
         else:
             # PROVISIONING/PULLING jobs need same-replica siblings for cluster
             # coordination, plus — when the run has a router replica group —
-            # the router replica's job (cross-replica) so the env-injection
-            # gate in _prepare_startup_context can read its status / IP.
+            # the router replica's job (cross-replica) so the router checks in
+            # _terminate_if_router_unavailable and _prepare_runner_submission
+            # can read its status / IP.
             # _fetch_run_model handles both: same-replica jobs always, plus
             # all non-terminated jobs when one exists.
             run_spec = validate_json_extra_ignore(RunSpec, job_model.run.run_spec)
@@ -490,19 +477,13 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
         return result
 
     if context.job_model.status == JobStatus.PROVISIONING:
-        startup_context = await _prepare_startup_context(context=context, result=result)
-        if startup_context is None:
+        if _terminate_if_router_unavailable(context=context, result=result):
             return result
-        await _process_provisioning_status(
-            context=context, startup_context=startup_context, result=result
-        )
+        await _process_provisioning_status(context=context, result=result)
     elif context.job_model.status == JobStatus.PULLING:
-        startup_context = await _prepare_startup_context(context=context, result=result)
-        if startup_context is None:
+        if _terminate_if_router_unavailable(context=context, result=result):
             return result
-        await _process_pulling_status(
-            context=context, startup_context=startup_context, result=result
-        )
+        await _process_pulling_status(context=context, result=result)
     elif context.job_model.status == JobStatus.RUNNING:
         if _server_access_enabled(context):
             await job_server_connections_pool.ensure(
@@ -528,49 +509,21 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
     return result
 
 
-async def _prepare_startup_context(
-    context: _ProcessContext,
-    result: _ProcessResult,
-) -> Optional[_StartupContext]:
-    job_provisioning_data = get_or_error(context.job_provisioning_data)
+def _terminate_if_router_unavailable(context: _ProcessContext, result: _ProcessResult) -> bool:
+    """
+    Terminates a worker job whose router replica is in a terminal state or did not acquire an
+    internal IP in time. Waiting for the router IP is up to `_prepare_runner_submission`.
 
-    # `_get_cluster_info` below requires every job in the replica to have provisioning
-    # data, so gate on that rather than on job statuses. A `SUBMITTED` job is simply not
-    # provisioned yet, while a job that has no provisioning data and is no longer
-    # `SUBMITTED` reached a terminal state without ever provisioning (e.g. due to no
-    # capacity) and never will. Deferring in the latter case is what allows recovery:
-    # the run pipeline retries or fails the replica, but it can only lock the run's jobs
-    # once this job is unlocked, which does not happen if we raise here.
-    for other_job in context.run.jobs:
-        if other_job.job_spec.replica_num != context.job.job_spec.replica_num:
-            continue
-        other_job_submission = other_job.job_submissions[-1]
-        if other_job_submission.job_provisioning_data is not None:
-            continue
-        if other_job_submission.status == JobStatus.SUBMITTED:
-            logger.debug(
-                "%s: waiting for all jobs in the replica to be provisioned",
-                fmt(context.job_model),
-            )
-        else:
-            logger.debug(
-                "%s: job %s in the replica has no provisioning data, waiting for the run"
-                " to be retried or terminated",
-                fmt(context.job_model),
-                other_job.job_spec.job_name,
-            )
-        return None
-
-    # If this run has a router replica group and this job is a worker, gate
-    # startup on the router replica's state. The helper returns None for the
-    # router itself and for runs without a router group, so this whole block
-    # is a no-op in those cases.
-    router_env_outcome = get_router_env_for_job(
+    Returns `True` if the job was terminated.
+    """
+    # `get_router_env_for_job` returns None for the router itself and for runs without
+    # a router group, so this check is a no-op in those cases.
+    router_env = get_router_env_for_job(
         run_model=context.run_model,
         run_spec=context.run.run_spec,
         job_model=context.job_model,
     )
-    if router_env_outcome is RouterEnvStatus.FAILED:
+    if router_env is RouterEnvStatus.FAILED:
         # Router has reached a terminal state — the worker cannot recover by
         # waiting. Terminate it now with a clear reason instead of letting it
         # idle until the run-level reconciler tears the whole run down.
@@ -583,100 +536,24 @@ async def _prepare_startup_context(
                 "without a running router."
             ),
         )
-        return None
-    if router_env_outcome is RouterEnvStatus.NOT_PROVISIONED:
-        # Router is alive but its internal_ip is not yet known. Defer this
-        # worker — the next pipeline tick will re-check. Bound the wait so a
-        # router that is genuinely stuck can't burn worker instance-hours
-        # forever; see ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS.
-        waited_seconds = (get_current_datetime() - context.job_model.submitted_at).total_seconds()
-        if waited_seconds > ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS:
-            _terminate_job(
-                job_model=context.job_model,
-                job_update_map=result.job_update_map,
-                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
-                termination_reason_message=(
-                    f"Router replica did not acquire an internal IP within "
-                    f"{ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS}s; terminating worker."
-                ),
-            )
-            return None
-        logger.debug(
-            "%s: waiting for router replica to be provisioned",
-            fmt(context.job_model),
-        )
-        return None
-    # Past the enum branches, router_env_outcome is either None or a Dict.
-    # We don't mutate job_spec.env here — RunnerClient.submit_job merges it
-    # into a deep-copied spec, mirroring how instance_env is handled.
-    router_env: Optional[Dict[str, str]] = (
-        router_env_outcome if isinstance(router_env_outcome, dict) else None
+        return True
+    if router_env is not RouterEnvStatus.NOT_PROVISIONED:
+        return False
+    # Bound the wait for the router IP so a router that is genuinely stuck can't burn
+    # worker instance-hours forever; see ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS.
+    waited_seconds = (get_current_datetime() - context.job_model.submitted_at).total_seconds()
+    if waited_seconds <= ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS:
+        return False
+    _terminate_job(
+        job_model=context.job_model,
+        job_update_map=result.job_update_map,
+        termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+        termination_reason_message=(
+            f"Router replica did not acquire an internal IP within "
+            f"{ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS}s; terminating worker."
+        ),
     )
-
-    cluster_info = _get_cluster_info(
-        jobs=context.run.jobs,
-        replica_num=context.job.job_spec.replica_num,
-        job_provisioning_data=job_provisioning_data,
-        job_runtime_data=context.job_submission.job_runtime_data,
-    )
-
-    async with get_session_ctx() as session:
-        volumes = await get_job_attached_volumes(
-            session=session,
-            project=context.project,
-            run_spec=context.run.run_spec,
-            job_num=context.job.job_spec.job_num,
-            job_provisioning_data=job_provisioning_data,
-        )
-        repo_creds_model = await get_repo_creds(
-            session=session,
-            repo=context.repo_model,
-            user=context.run_model.user,
-        )
-        secrets = await get_project_secrets_mapping(session=session, project=context.project)
-
-    repo_creds = repo_model_to_repo_head_with_creds(
-        context.repo_model,
-        repo_creds_model,
-    ).repo_creds
-
-    try:
-        interpolate_job_spec_secrets(context.job.job_spec, secrets)
-    except InterpolatorError as e:
-        _terminate_job(
-            job_model=context.job_model,
-            job_update_map=result.job_update_map,
-            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
-            termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
-        )
-        return None
-
-    commands = context.job.job_spec.commands
-    try:
-        for c in commands:
-            validate_groups_refs(c)
-        if not _substitute_groups_ip_refs(commands, context):
-            logger.debug(
-                "%s: waiting for referenced group IPs",
-                fmt(context.job_model),
-            )
-            return None
-    except InterpolatorError as e:
-        _terminate_job(
-            job_model=context.job_model,
-            job_update_map=result.job_update_map,
-            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
-            termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
-        )
-        return None
-
-    return _StartupContext(
-        cluster_info=cluster_info,
-        volumes=volumes,
-        secrets=secrets,
-        repo_creds=repo_creds,
-        router_env=router_env,
-    )
+    return True
 
 
 async def _refetch_locked_job_model(
@@ -808,7 +685,6 @@ async def _is_instance_access_revoked(session: AsyncSession, job_model: JobModel
 
 async def _process_provisioning_status(
     context: _ProcessContext,
-    startup_context: _StartupContext,
     result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
@@ -826,6 +702,18 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
+        async with get_session_ctx() as session:
+            volumes = await get_job_attached_volumes(
+                session=session,
+                project=context.project,
+                run_spec=context.run.run_spec,
+                job_num=context.job.job_spec.job_num,
+                job_provisioning_data=job_provisioning_data,
+            )
+            secrets = await get_project_secrets_mapping(session=session, project=context.project)
+        # The shim pulls the image with the interpolated `registry_auth`
+        if not _interpolate_secrets_or_terminate(context, result, secrets):
+            return
         extra_authorized_keys = get_extra_authorized_keys(context.run.run_spec)
         public_keys = [context.project.ssh_public_key.strip(), *extra_authorized_keys]
         # Host access, unlike container access, is all or nothing -- the user key is added to
@@ -845,7 +733,7 @@ async def _process_provisioning_status(
                 job_model=context.job_model,
                 jrd=get_job_runtime_data(context.job_model),
                 jpd=job_provisioning_data,
-                volumes=startup_context.volumes,
+                volumes=volumes,
                 registry_auth=context.job.job_spec.registry_auth,
                 public_keys=public_keys,
                 ssh_user=ssh_user,
@@ -877,6 +765,11 @@ async def _process_provisioning_status(
                 job_provisioning_data,
                 None,
             ):
+                runner_submission = await _prepare_runner_submission(context, result)
+                if runner_submission is None:
+                    # The runner is up, so the provisioning timeout below does not apply
+                    # while waiting for other jobs.
+                    return
                 if not await _ensure_job_server_connection(context, result):
                     return
                 file_archives = await _get_job_file_archives(
@@ -897,12 +790,11 @@ async def _process_provisioning_status(
                     job_model=context.job_model,
                     job=context.job,
                     jrd=get_job_runtime_data(context.job_model),
-                    cluster_info=startup_context.cluster_info,
+                    cluster_info=runner_submission.cluster_info,
                     code=code,
                     file_archives=file_archives,
-                    secrets=startup_context.secrets,
-                    repo_credentials=startup_context.repo_creds,
-                    router_env=startup_context.router_env,
+                    repo_credentials=runner_submission.repo_creds,
+                    router_env=runner_submission.router_env,
                     success_if_not_available=False,
                 )
                 _apply_submit_job_to_runner_result(
@@ -936,7 +828,6 @@ async def _process_provisioning_status(
 
 async def _process_pulling_status(
     context: _ProcessContext,
-    startup_context: _StartupContext,
     result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
@@ -995,6 +886,10 @@ async def _process_pulling_status(
             _reset_disconnected_at(context.job_model, result)
             return
 
+        runner_submission = await _prepare_runner_submission(context, result)
+        if runner_submission is None:
+            _reset_disconnected_at(context.job_model, result)
+            return
         if not await _ensure_job_server_connection(context, result):
             return
         file_archives = await _get_job_file_archives(
@@ -1015,12 +910,11 @@ async def _process_pulling_status(
             job_model=context.job_model,
             job=context.job,
             jrd=job_runtime_data,
-            cluster_info=startup_context.cluster_info,
+            cluster_info=runner_submission.cluster_info,
             code=code,
             file_archives=file_archives,
-            secrets=startup_context.secrets,
-            repo_credentials=startup_context.repo_creds,
-            router_env=startup_context.router_env,
+            repo_credentials=runner_submission.repo_creds,
+            router_env=runner_submission.router_env,
             success_if_not_available=True,
         )
         _apply_submit_job_to_runner_result(
@@ -1426,6 +1320,155 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
     return False
 
 
+def _interpolate_secrets_or_terminate(
+    context: _ProcessContext,
+    result: _ProcessResult,
+    secrets: Mapping[str, str],
+) -> bool:
+    """
+    Interpolates secrets into `context.job.job_spec` in place.
+
+    Returns `False` if the job was terminated due to an interpolation error.
+    """
+    try:
+        interpolate_job_spec_secrets(context.job.job_spec, secrets)
+    except InterpolatorError as e:
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
+        )
+        return False
+    return True
+
+
+@dataclass
+class _RunnerSubmissionContext:
+    cluster_info: ClusterInfo
+    repo_creds: Optional[RemoteRepoCreds]
+    router_env: Optional[Dict[str, str]] = None
+    """Dynamo-specific env (e.g. DSTACK_ROUTER_INTERNAL_IP) computed from the
+    router replica's state. Passed through to RunnerClient.submit_job, which
+    merges it into a deep-copied job_spec.env so the shared job_spec is not
+    mutated. None for SMG services, non-router runs, and the router
+    replica itself."""
+
+
+async def _prepare_runner_submission(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> Optional[_RunnerSubmissionContext]:
+    """
+    Waits for the other jobs that the runner submission depends on, collects the submission
+    data, and interpolates secrets and groups IP refs into `context.job.job_spec` in place.
+
+    Returns `None` if the submission has to wait or the job was terminated.
+    """
+    if _should_wait_for_replica_provisioning(context):
+        return None
+
+    router_env = get_router_env_for_job(
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+        job_model=context.job_model,
+    )
+    if isinstance(router_env, RouterEnvStatus):
+        # `FAILED` and a timed-out wait are handled by `_terminate_if_router_unavailable`
+        logger.debug(
+            "%s: waiting for router replica to be provisioned",
+            fmt(context.job_model),
+        )
+        return None
+
+    cluster_info = _get_cluster_info(
+        jobs=context.run.jobs,
+        replica_num=context.job.job_spec.replica_num,
+        job_provisioning_data=get_or_error(context.job_provisioning_data),
+        job_runtime_data=context.job_submission.job_runtime_data,
+    )
+
+    async with get_session_ctx() as session:
+        repo_creds_model = await get_repo_creds(
+            session=session,
+            repo=context.repo_model,
+            user=context.run_model.user,
+        )
+        secrets = await get_project_secrets_mapping(session=session, project=context.project)
+
+    repo_creds = repo_model_to_repo_head_with_creds(
+        context.repo_model,
+        repo_creds_model,
+    ).repo_creds
+
+    if not _interpolate_secrets_or_terminate(context, result, secrets):
+        return None
+
+    commands = context.job.job_spec.commands
+    try:
+        for c in commands:
+            validate_groups_refs(c)
+        if not _substitute_groups_ip_refs(commands, context):
+            logger.debug(
+                "%s: waiting for referenced group IPs",
+                fmt(context.job_model),
+            )
+            return None
+    except InterpolatorError as e:
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=f"Groups IP interpolation error: {e.args[0]}",
+        )
+        return None
+
+    return _RunnerSubmissionContext(
+        cluster_info=cluster_info,
+        repo_creds=repo_creds,
+        router_env=router_env,
+    )
+
+
+def _should_wait_for_replica_provisioning(context: _ProcessContext) -> bool:
+    """
+    Whether any job in the replica has no provisioning data or no hostname yet.
+    `_get_cluster_info` needs the IPs of all of them.
+    """
+    # A `SUBMITTED` job is simply not provisioned yet, while a job that has no provisioning
+    # data and is no longer `SUBMITTED` reached a terminal state without ever provisioning
+    # (e.g. due to no capacity) and never will. Deferring in the latter case is what allows
+    # recovery: the run pipeline retries or fails the replica, but it can only lock the run's
+    # jobs once this job is unlocked, which does not happen if `_get_cluster_info` raises.
+    for other_job in context.run.jobs:
+        if other_job.job_spec.replica_num != context.job.job_spec.replica_num:
+            continue
+        other_job_submission = other_job.job_submissions[-1]
+        other_jpd = other_job_submission.job_provisioning_data
+        if other_jpd is not None and other_jpd.hostname is not None:
+            continue
+        if other_jpd is not None:
+            logger.debug(
+                "%s: waiting for job %s in the replica to have IP assigned",
+                fmt(context.job_model),
+                other_job.job_spec.job_name,
+            )
+        elif other_job_submission.status == JobStatus.SUBMITTED:
+            logger.debug(
+                "%s: waiting for all jobs in the replica to be provisioned",
+                fmt(context.job_model),
+            )
+        else:
+            logger.debug(
+                "%s: job %s in the replica has no provisioning data, waiting for the run"
+                " to be retried or terminated",
+                fmt(context.job_model),
+                other_job.job_spec.job_name,
+            )
+        return True
+    return False
+
+
 @runner_ssh_tunnel
 def _process_provisioning_with_shim(
     addresses: Mapping[int, client.LocalAddress],
@@ -1653,7 +1696,6 @@ def _submit_job_to_runner(
     cluster_info: ClusterInfo,
     code: Optional[bytes],
     file_archives: Iterable[tuple[uuid.UUID, bytes]],
-    secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     router_env: Optional[Dict[str, str]],
     success_if_not_available: bool,

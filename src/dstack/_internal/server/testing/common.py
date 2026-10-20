@@ -510,7 +510,7 @@ def get_job_provisioning_data(
     cpu_count: int = 1,
     memory_gib: float = 0.5,
     spot: bool = False,
-    hostname: str = "127.0.0.4",
+    hostname: Optional[str] = "127.0.0.4",
     internal_ip: Optional[str] = "127.0.0.4",
     price: float = 10.5,
     instance_type: Optional[InstanceType] = None,
