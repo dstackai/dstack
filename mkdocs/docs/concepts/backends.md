@@ -1402,7 +1402,7 @@ projects:
     `dstack` treats each MIG slice as a GPU with the slice's memory. For example, a `1g.10gb` slice of an A100 is an `A100:10GB` GPU.
 
     To run on slices, specify the GPU memory, e.g., `gpu: A100:10GB` for one slice or `gpu: A100:10GB:2` for two.
-    With just a GPU name (e.g., `gpu: A100`) or memory without a maximum (e.g., `gpu: 24GB..`), the run gets whole GPUs only, never slices.
+    If the GPU memory isn't specified or has no maximum (e.g., `gpu: A100` or `gpu: 24GB..`), the run gets whole GPUs only.
     `dstack offer` and `dstack apply` show offers the same way, unless you pass `--full-offers`.
     Slices are listed separately from whole GPUs, e.g., `A100:10GB:14` and `A100:80GB:4` on the same node.
 
