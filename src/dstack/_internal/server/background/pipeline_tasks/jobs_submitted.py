@@ -1719,6 +1719,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
             _promote_placeholder_instance(
                 instance_model=instance_model,
                 compute_group_model=compute_group_model,
+                job_model=provisioned_job_model,
                 job_provisioning_data=job_provisioning_data,
                 offer=offer,
                 profile=effective_profile,
@@ -1821,12 +1822,14 @@ def _create_instance_model_for_job(
         volume_attachments=[],
         total_blocks=1,
         busy_blocks=1,
+        provider_ref=_get_job_instance_provider_ref(job_model, compute_group_model),
     )
 
 
 def _promote_placeholder_instance(
     instance_model: InstanceModel,
     compute_group_model: Optional[ComputeGroupModel],
+    job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
     profile: Profile,
@@ -1852,6 +1855,19 @@ def _promote_placeholder_instance(
     instance_model.termination_idle_time = termination_idle_time
     instance_model.total_blocks = 1
     instance_model.busy_blocks = 1
+    instance_model.provider_ref = _get_job_instance_provider_ref(job_model, compute_group_model)
+
+
+def _get_job_instance_provider_ref(
+    job_model: JobModel, compute_group_model: Optional[ComputeGroupModel]
+) -> Optional[str]:
+    # Compute group instances must not be cleaned up individually.
+    # TODO: Orphan cleanup for compute groups is not implemented. Backends set the provider_ref
+    # of the first job on all compute group resources. Store it on the compute group and
+    # clean up compute group resources as one unit.
+    if compute_group_model is not None:
+        return None
+    return job_model.provider_ref
 
 
 async def _process_volume_attachments(

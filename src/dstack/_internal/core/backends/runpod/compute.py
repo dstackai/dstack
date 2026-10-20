@@ -14,6 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_volume_name,
     get_docker_commands,
     get_job_instance_name,
+    get_job_provider_ref,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -124,6 +125,7 @@ class RunpodCompute(
             instance_name=get_job_instance_name(run, job),
             ssh_keys=[],
             user=run.user,
+            provider_ref=get_job_provider_ref(job),
         )
 
         pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)

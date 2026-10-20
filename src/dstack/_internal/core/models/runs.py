@@ -455,6 +455,9 @@ class JobSubmission(CoreModel):
     error: Optional[str] = None
     probes: list[Probe] = []
     image_pull_progress: Optional[ImagePullProgress] = None
+    provider_ref: Optional[str] = None
+    """`provider_ref` is set on provider resources created for this submission to identify orphaned resources.
+    """
 
     @property
     def age(self) -> timedelta:

@@ -166,6 +166,9 @@ class InstanceConfiguration(CoreModel):
     reservation: Optional[str] = None
     volumes: Optional[List[Volume]] = None
     tags: Optional[Dict[str, str]] = None
+    provider_ref: Optional[str] = None
+    """`provider_ref` is set on provider resources created for this instance to identify orphaned resources.
+    """
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]

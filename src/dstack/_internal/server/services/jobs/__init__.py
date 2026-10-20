@@ -270,6 +270,7 @@ def job_model_to_job_submission(
         job_runtime_data=get_job_runtime_data(job_model),
         error=error,
         probes=probes,
+        provider_ref=job_model.provider_ref,
         image_pull_progress=_get_image_pull_progress(job_model),
     )
 

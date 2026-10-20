@@ -606,6 +606,9 @@ class JobModel(PipelineModelMixin, BaseModel):
     should be processed only one-by-one.
     """
     image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
+    provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
+    """Set on provider resources for orphans matching. The job's instance inherits it.
+    `None` for older jobs."""
 
     service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
         back_populates="job"

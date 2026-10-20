@@ -445,6 +445,7 @@ class ComputeWithCreateInstanceSupport(ABC):
             volumes=volumes,
             reservation=requirements.reservation,
             tags=run.run_spec.merged_profile.tags,
+            provider_ref=get_job_provider_ref(job),
         )
         instance_offer = instance_offer.model_copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
@@ -490,6 +491,9 @@ class ComputeWithResourceListingSupport(ABC):
         completely. If any listing fails, raise instead of returning partial results.
         Otherwise, resources of a tracked instance may be reported as left without
         the instance and deleted.
+
+        Compute group resources (created by `run_jobs()`) must not be listed
+        since orphan cleanup for compute groups is not supported yet.
         """
         pass
 
@@ -931,6 +935,29 @@ def generate_unique_name(
     if prefix is None:
         return suffix
     return f"{prefix}-{suffix}"
+
+
+PROVIDER_REF_LEN = 12
+
+
+def generate_provider_ref() -> str:
+    """
+    Generates a `provider_ref` that is set on provider resources for orphan cleanup.
+    Uses lowercase letters and digits only, so it's valid in resource names and tags
+    on all backends.
+    """
+    return "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(PROVIDER_REF_LEN)
+    )
+
+
+def get_job_provider_ref(job: Job) -> Optional[str]:
+    """
+    Returns the `provider_ref` of the job's latest submission.
+    """
+    if len(job.job_submissions) == 0:
+        return None
+    return job.job_submissions[-1].provider_ref
 
 
 def get_cloud_config(**config) -> str:

@@ -9,6 +9,7 @@ from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only
 
+from dstack._internal.core.backends.base.compute import generate_provider_ref
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
     requirements_to_query_filter,
@@ -902,6 +903,7 @@ def create_instance_model(
     )
     if instance_id is None:
         instance_id = uuid.uuid4()
+    provider_ref = generate_provider_ref()
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
@@ -914,6 +916,7 @@ def create_instance_model(
         instance_id=str(instance_id),
         reservation=reservation,
         tags=tags,
+        provider_ref=provider_ref,
     )
     now = common_utils.get_current_datetime()
     instance = InstanceModel(
@@ -932,6 +935,7 @@ def create_instance_model(
         termination_idle_time=termination_idle_time,
         total_blocks=None if blocks == "auto" else blocks,
         busy_blocks=0,
+        provider_ref=provider_ref,
     )
     session.add(instance)
     return instance

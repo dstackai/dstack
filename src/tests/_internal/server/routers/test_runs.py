@@ -76,7 +76,7 @@ from dstack._internal.server.testing.common import (
     get_ssh_fleet_configuration,
     list_events,
 )
-from dstack._internal.server.testing.matchers import SomeUUID4Str
+from dstack._internal.server.testing.matchers import SomeProviderRef, SomeUUID4Str
 from dstack._internal.utils.common import render_datetime_as_api
 
 pytestmark = pytest.mark.usefixtures("image_config_mock", "disable_sshproxy")
@@ -373,6 +373,7 @@ def get_dev_env_run_dict(
     privileged: bool = False,
     docker: Optional[bool] = None,
     deleted: bool = False,
+    provider_ref: Union[None, str, SomeProviderRef] = None,
 ) -> Dict:
     # When docker=True, commands should start with start-dockerd and use dind image
     if docker:
@@ -619,6 +620,7 @@ def get_dev_env_run_dict(
                         "job_runtime_data": None,
                         "probes": [],
                         "image_pull_progress": None,
+                        "provider_ref": provider_ref,
                     }
                 ],
                 "job_connection_info": None,
@@ -642,6 +644,7 @@ def get_dev_env_run_dict(
             "job_runtime_data": None,
             "probes": [],
             "image_pull_progress": None,
+            "provider_ref": provider_ref,
         },
         "cost": 0.0,
         "service": None,
@@ -787,6 +790,7 @@ class TestListRuns:
                                 "job_runtime_data": None,
                                 "probes": [],
                                 "image_pull_progress": None,
+                                "provider_ref": None,
                             }
                         ],
                         "job_connection_info": None,
@@ -810,6 +814,7 @@ class TestListRuns:
                     "job_runtime_data": None,
                     "probes": [],
                     "image_pull_progress": None,
+                    "provider_ref": None,
                 },
                 "cost": 0.0,
                 "service": None,
@@ -981,6 +986,7 @@ class TestListRuns:
                                 "job_runtime_data": None,
                                 "probes": [],
                                 "image_pull_progress": None,
+                                "provider_ref": None,
                             }
                         ],
                         "job_connection_info": None,
@@ -1004,6 +1010,7 @@ class TestListRuns:
                     "job_runtime_data": None,
                     "probes": [],
                     "image_pull_progress": None,
+                    "provider_ref": None,
                 },
                 "cost": 0.0,
                 "service": None,
@@ -3285,6 +3292,7 @@ class TestApplyPlan:
         run_dict = get_dev_env_run_dict(
             run_id=SomeUUID4Str(),
             job_id=SomeUUID4Str(),
+            provider_ref=SomeProviderRef(),
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
@@ -3335,6 +3343,7 @@ class TestApplyPlan:
         run_dict = get_dev_env_run_dict(
             run_id=SomeUUID4Str(),
             job_id=SomeUUID4Str(),
+            provider_ref=SomeProviderRef(),
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,

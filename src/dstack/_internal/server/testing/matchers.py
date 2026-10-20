@@ -29,3 +29,17 @@ class SomeUUID4Str:
 
     def __repr__(self):
         return "SomeUUID4Str()"
+
+
+class SomeProviderRef:
+    """
+    A matcher that compares equal to any valid `provider_ref`
+    """
+
+    _provider_ref_regex = re.compile(r"^[0-9a-z]{12}$")
+
+    def __eq__(self, other):
+        return isinstance(other, str) and self._provider_ref_regex.match(other) is not None
+
+    def __repr__(self):
+        return "SomeProviderRef()"

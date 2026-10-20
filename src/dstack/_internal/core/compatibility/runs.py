@@ -127,4 +127,5 @@ def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> Include
     submission_excludes["job_provisioning_data"] = {
         "instance_type": {"resources": {"description": True}}
     }
+    submission_excludes["provider_ref"] = True
     return submission_excludes
