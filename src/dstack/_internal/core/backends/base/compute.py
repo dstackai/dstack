@@ -30,7 +30,7 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
-from dstack._internal.core.models.backends.orphans import ListedResourceGroup
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup, ResourceListing
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -480,16 +480,18 @@ class ComputeWithResourceListingSupport(ABC):
     """
 
     @abstractmethod
-    def list_resource_groups(self) -> list[ListedResourceGroup]:
+    def list_resource_groups(self) -> ResourceListing:
         """
         Lists all groups carrying a dstack `provider_ref` across the configured backend regions.
 
         Resources without `provider_ref` must be skipped. Resources whose `provider_ref`
         is present but unparsable must be skipped and logged as a warning with the resource id.
 
-        `primary_id=None` may be reported only if the owner resource type was listed
-        completely. If any listing fails, raise instead of returning partial results.
-        Otherwise, resources of a tracked owner may be reported as left without an owner and deleted.
+        Resources of a backend region are listed all or nothing: if any listing in a region
+        fails, return no groups of the region and report it in `ResourceListing.failures`.
+        Otherwise, `primary_id=None` may be reported for resources of a tracked owner
+        whose owner resource was not listed, and they would be deleted.
+        Raise if nothing could be listed.
         """
         pass
 

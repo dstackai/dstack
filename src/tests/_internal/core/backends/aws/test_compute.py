@@ -4,6 +4,7 @@ from typing import Iterator
 from unittest.mock import Mock
 
 import boto3
+import botocore.exceptions
 import pytest
 from botocore.stub import Stubber
 
@@ -97,7 +98,7 @@ class TestListResourceGroups:
             instances=[_get_instance("i-1")],
             addresses=[_get_address("eipalloc-1", "i-1")],
         )
-        groups = compute.list_resource_groups()
+        groups = compute.list_resource_groups().resource_groups
         assert len(groups) == 1
         group = groups[0]
         assert group.backend == BackendType.AWS
@@ -118,7 +119,7 @@ class TestListResourceGroups:
         _add_list_responses(
             ec2_client, instances=[], addresses=[_get_address("eipalloc-1", "i-gone")]
         )
-        groups = compute.list_resource_groups()
+        groups = compute.list_resource_groups().resource_groups
         assert len(groups) == 1
         group = groups[0]
         assert group.provider_ref == PROVIDER_REF
@@ -135,7 +136,7 @@ class TestListResourceGroups:
         _add_list_responses(
             ec2_client, instances=[_get_instance("i-1", provider_ref="Invalid-Ref")], addresses=[]
         )
-        assert compute.list_resource_groups() == []
+        assert compute.list_resource_groups().resource_groups == []
 
     def test_lists_instances_without_elastic_ip_permissions(
         self, compute: AWSCompute, ec2_client: Stubber
@@ -147,8 +148,44 @@ class TestListResourceGroups:
         ec2_client.add_client_error(
             "describe_addresses", service_error_code="UnauthorizedOperation"
         )
-        groups = compute.list_resource_groups()
+        groups = compute.list_resource_groups().resource_groups
         assert [g.primary_id for g in groups] == ["i-1"]
+
+    def test_reports_failed_region_and_lists_other_regions(self, ec2_client: Stubber):
+        other_ec2_client = boto3.client(
+            "ec2",
+            region_name="eu-west-1",
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+        )
+        compute = AWSCompute(
+            AWSConfig(
+                creds=AWSAccessKeyCreds(access_key="test", secret_key="test"),
+                regions=[REGION, "eu-west-1"],
+            )
+        )
+        compute.session = Mock()
+        compute.session.client.side_effect = lambda service, region_name: {
+            REGION: ec2_client.client,
+            "eu-west-1": other_ec2_client,
+        }[region_name]
+        _add_list_responses(ec2_client, instances=[_get_instance("i-1")], addresses=[])
+        with Stubber(other_ec2_client) as other_stubber:
+            other_stubber.add_client_error(
+                "describe_instances", service_error_code="RequestLimitExceeded"
+            )
+            listing = compute.list_resource_groups()
+        assert [g.primary_id for g in listing.resource_groups] == ["i-1"]
+        assert [(f.backend, f.region) for f in listing.failures] == [
+            (BackendType.AWS, "eu-west-1")
+        ]
+
+    def test_raises_if_all_regions_fail(self, compute: AWSCompute, ec2_client: Stubber):
+        ec2_client.add_client_error(
+            "describe_instances", service_error_code="RequestLimitExceeded"
+        )
+        with pytest.raises(botocore.exceptions.ClientError):
+            compute.list_resource_groups()
 
 
 class TestDeleteResourceGroup:

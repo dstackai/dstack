@@ -55,7 +55,12 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    OwnerType,
+    ResourceListing,
+    ResourceListingFailure,
+)
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -269,12 +274,22 @@ class AWSCompute(
                 allocation_id=instance_backend_data.eip_allocation_id,
             )
 
-    def list_resource_groups(self) -> List[ListedResourceGroup]:
-        resource_groups = []
-        for region in get_or_error(self.config.regions):
+    def list_resource_groups(self) -> ResourceListing:
+        regions = get_or_error(self.config.regions)
+        listing = ResourceListing(resource_groups=[])
+        for region in regions:
             ec2_client = self.session.client("ec2", region_name=region)
-            resource_groups.extend(_list_resource_groups(ec2_client, region))
-        return resource_groups
+            try:
+                listing.resource_groups.extend(_list_resource_groups(ec2_client, region))
+            except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as e:
+                if len(regions) == 1:
+                    raise
+                listing.failures.append(
+                    ResourceListingFailure(backend=BackendType.AWS, region=region, message=str(e))
+                )
+        if len(listing.failures) == len(regions):
+            raise ComputeError(f"Failed to list resources in all regions: {listing.failures}")
+        return listing
 
     def delete_resource_group(self, group: ListedResourceGroup) -> None:
         backend_data = validate_json_extra_ignore(

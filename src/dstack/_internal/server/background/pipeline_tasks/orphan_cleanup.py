@@ -351,7 +351,7 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
     assert isinstance(compute, ComputeWithResourceListingSupport)
     listed_at = get_current_datetime()
     try:
-        resource_groups = await run_async(compute.list_resource_groups)
+        resource_listing = await run_async(compute.list_resource_groups)
     except BackendError as e:
         logger.warning(
             "Failed to list resource groups in %s/%s due to backend error: %s",
@@ -367,6 +367,16 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             orphan_cleanup_model.backend.type.value,
         )
         return _get_failed_cleanup_process_result(orphan_cleanup_model)
+    for failure in resource_listing.failures:
+        logger.warning(
+            "Failed to list resources of %s in %s for orphan cleanup in %s/%s: %s",
+            failure.backend.value,
+            failure.region if failure.region is not None else "all regions",
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+            failure.message,
+        )
+    resource_groups = resource_listing.resource_groups
     owner_records = await _load_owner_records(
         project_id=orphan_cleanup_model.backend.project_id,
         resource_groups=resource_groups,
@@ -389,6 +399,8 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
         final_decisions.append(decision)
     if any(d is _ResourceGroupDecision.SKIP for d in final_decisions):
         result = _get_skips_cleanup_process_result(orphan_cleanup_model)
+    elif len(resource_listing.failures) > 0:
+        result = _get_partial_cleanup_process_result()
     else:
         result = _get_success_cleanup_process_result(listed_at)
     result.orphan_events = orphan_events
@@ -680,6 +692,13 @@ def _get_skips_cleanup_process_result(
             cleanup_attempt=orphan_cleanup_model.cleanup_attempt + 1
         )
     )
+
+
+def _get_partial_cleanup_process_result() -> _ProcessResult:
+    # The backend stays eligible since `clean_at` is not updated.
+    # It's retried after the cleanup interval rather than backed off,
+    # so that the listed parts are cleaned up as usual while other parts fail.
+    return _ProcessResult(update_map=_OrphanCleanupUpdateMap(cleanup_attempt=0))
 
 
 def _get_success_cleanup_process_result(listed_at: datetime) -> _ProcessResult:

@@ -40,3 +40,25 @@ class ListedResourceGroup(CoreModel):
     """Human-readable summary for events and logs"""
     backend_data: Optional[str]
     """Everything the backend needs to delete the group. Opaque to the server."""
+
+
+class ResourceListingFailure(CoreModel):
+    """
+    A part of the resources that could not be listed. It covers all owner types
+    in `backend` and `region`.
+    """
+
+    backend: BackendType
+    """The backend whose resources could not be listed, as in `ListedResourceGroup.backend`."""
+    region: Optional[str]
+    """The region whose resources could not be listed. `None` if all regions."""
+    message: str
+
+
+class ResourceListing(CoreModel):
+    resource_groups: list[ListedResourceGroup]
+    failures: list[ResourceListingFailure] = []
+    """
+    Parts of the resources that could not be listed. Resources of a part are listed
+    all or nothing, so `resource_groups` has no groups of the parts in `failures`.
+    """
