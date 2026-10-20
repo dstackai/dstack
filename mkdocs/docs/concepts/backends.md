@@ -1404,7 +1404,9 @@ projects:
     A slice is offered as a GPU with the slice's memory, e.g., a `1g.10gb` slice of an A100 is `A100:10GB`.
 
     A run gets slices only if it sets an upper limit on GPU memory (e.g., `gpu: A100:10GB`); with `gpu: A100`, it gets whole GPUs only.
-    The same applies to `dstack offer`, unless you pass `--full-offers`.
+
+    Offers in `dstack offer` and `dstack apply` follow the same rule; `--full-offers` shows all of them.
+    A node's whole GPUs and each of its slice sizes are separate offers, e.g., `A100:80GB:4` and `A100:10GB:14`.
 
     Limitations:
 
