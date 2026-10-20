@@ -1,4 +1,4 @@
-from dstack._internal.core.backends.features import BACKENDS_WITH_RESOURCE_LISTING_SUPPORT
+from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
@@ -106,5 +106,5 @@ def _is_to_be_deleted_by_orphan_cleanup(
     return (
         settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.DELETE
         and instance_model.provider_ref is not None
-        and job_provisioning_data.backend in BACKENDS_WITH_RESOURCE_LISTING_SUPPORT
+        and job_provisioning_data.backend in get_backends_with_resource_listing_support()
     )

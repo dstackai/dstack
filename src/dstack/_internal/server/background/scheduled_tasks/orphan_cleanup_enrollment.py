@@ -4,7 +4,7 @@ from sqlalchemy import false, or_, select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.features import BACKENDS_WITH_RESOURCE_LISTING_SUPPORT
+from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
@@ -81,7 +81,7 @@ async def _select_backend_ids_to_enroll(session: AsyncSession) -> list[uuid.UUID
         .join(ProjectModel, ProjectModel.id == BackendModel.project_id)
         .where(
             ProjectModel.deleted == false(),
-            BackendModel.type.in_(BACKENDS_WITH_RESOURCE_LISTING_SUPPORT),
+            BackendModel.type.in_(get_backends_with_resource_listing_support()),
             ~is_enrolled,
             or_(has_instances_with_provider_ref, has_jobs_with_provider_ref),
         )

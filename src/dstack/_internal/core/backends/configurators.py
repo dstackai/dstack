@@ -195,11 +195,19 @@ def list_available_backend_types() -> List[BackendType]:
     return _BACKEND_TYPES
 
 
-def list_available_configurator_classes() -> List[type[Configurator]]:
+def list_builtin_configurator_classes() -> List[type[Configurator]]:
     """
-    Lists all backend configurator classes available on the server.
+    Lists all built-in backend configurator classes available on the server.
     """
     return _CONFIGURATOR_CLASSES
+
+
+def list_builtin_and_registered_configurator_classes() -> List[type[Configurator]]:
+    """
+    Lists all built-in backend configurator classes available on the server
+    and those added with `register_configurator()`.
+    """
+    return list(_BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.values())
 
 
 def register_configurator(configurator: Type[Configurator]):

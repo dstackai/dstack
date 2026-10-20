@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithResourceListingSupport
-from dstack._internal.core.backends.features import BACKENDS_WITH_RESOURCE_LISTING_SUPPORT
+from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.orphans import (
     ListedResourceGroup,
@@ -150,7 +150,7 @@ class OrphanCleanupFetcher(Fetcher[PipelineItem]):
                     .join(ProjectModel, ProjectModel.id == BackendModel.project_id)
                     .where(
                         ProjectModel.deleted == False,
-                        BackendModel.type.in_(BACKENDS_WITH_RESOURCE_LISTING_SUPPORT),
+                        BackendModel.type.in_(get_backends_with_resource_listing_support()),
                         _eligibility_filter(),
                         _retry_delay_filter(now),
                         or_(
