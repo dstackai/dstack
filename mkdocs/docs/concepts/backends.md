@@ -1397,6 +1397,42 @@ projects:
 
     This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
 
+??? info "Multi-Instance GPU (MIG)"
+    The `kubernetes` backend supports NVIDIA [MIG](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/latest/index.html) slices
+    configured with the NVIDIA GPU Operator's [MIG Manager](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html),
+    with either the `single` or the `mixed` [MIG strategy](https://docs.nvidia.com/datacenter/cloud-native/kubernetes/latest/index.html).
+
+    A MIG slice is offered as a GPU of the same model with the slice's memory, taken from the MIG profile name.
+    For example, a `1g.10gb` slice of an A100 is `A100:10GB`.
+
+    To run on a slice, set an upper limit on GPU memory:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    ide: vscode
+
+    resources:
+      gpu: A100:10GB
+    ```
+
+    </div>
+
+    Without an upper limit on GPU memory (e.g., `gpu: A100` or `gpu: 24GB..`), runs only get whole GPUs.
+    To see slices in `dstack offer`, set the limit (e.g., `--gpu A100:10GB`) or pass `--full-offers`.
+
+    With the `mixed` strategy, a node that has whole GPUs and slices of several sizes appears as several offers, one per GPU type.
+    With `--full-offers`, each of them shows the node's full CPU, memory, and disk, which they share.
+
+    Limitations:
+
+    * NVIDIA doesn't support NCCL with MIG, so a run with several slices (e.g., `gpu: A100:10GB:2`) can't use NCCL-based multi-GPU training.
+      Several slices suit independent processes, one per slice (a single process can use several slices only with NVIDIA driver R570 or newer).
+      To run several copies of a model, use a service with `replicas`, each on one slice.
+    * Slices with the same memory (e.g., `3g.40gb` and `4g.40gb`) and media-engine variants (e.g., `1g.10gb+me`) can't be requested specifically.
+    * `dstack metrics` doesn't show GPU metrics for slices.
+
 > To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
 
 ### Slurm
