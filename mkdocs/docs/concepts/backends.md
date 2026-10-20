@@ -1408,7 +1408,6 @@ projects:
 
     Limitations:
 
-    * NVIDIA doesn't support NCCL with MIG, so several slices per run (e.g., `gpu: A100:10GB:2`) suit independent processes, not multi-GPU training.
     * Slices with the same memory (e.g., `3g.40gb` and `4g.40gb`) and `+me` variants can't be requested specifically.
     * `dstack metrics` doesn't show GPU metrics for slices.
 
