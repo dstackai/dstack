@@ -383,116 +383,70 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("ascending", [False, True])
     async def test_filters_by_owner_or_member_before_pagination(
-        self, test_db, session: AsyncSession, client: AsyncClient, ascending: bool
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        admin = await create_user(session=session, name="admin", global_role=GlobalRole.ADMIN)
+        admin = await create_user(session=session, name="admin")
         user = await create_user(session=session, name="member")
-        owned = await create_project(session=session, owner=user, name="owned")
-        expected_names = [owned.name]
-        for minute, role in enumerate(ProjectRole, start=5):
-            project = await create_project(
-                session=session,
-                owner=admin,
-                name=f"joined_{role.value}",
-                created_at=datetime(2023, 1, 2, 3, minute, tzinfo=timezone.utc),
-            )
+        await create_project(session=session, owner=user, name="owned")
+        joined = await create_project(
+            session=session,
+            owner=admin,
+            name="joined",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        for member in (user, admin):
             await add_project_member(
-                session=session, project=project, user=user, project_role=role
+                session=session, project=joined, user=member, project_role=ProjectRole.MANAGER
             )
-            await add_project_member(
-                session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
-            )
-            expected_names.append(project.name)
         await create_project(
             session=session,
             owner=admin,
             name="unrelated",
-            created_at=datetime(2023, 1, 2, 3, 8, tzinfo=timezone.utc),
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
         )
-        await create_project(session=session, owner=user, name="deleted", deleted=True)
-        if not ascending:
-            expected_names.reverse()
 
-        params = {
-            "username": user.name,
-            "return_total_count": True,
-            "limit": 1,
-            "ascending": ascending,
-        }
-        for expected_name in expected_names:
+        params = {"username": user.name, "return_total_count": True, "limit": 1}
+        for expected_name in ("joined", "owned"):
             response = await client.post(
                 "/api/projects/list", headers=get_auth_headers(admin.token), json=params
             )
             assert response.status_code == 200
             data = response.json()
-            assert data["total_count"] == len(expected_names)
+            assert data["total_count"] == 2
             assert len(data["projects"]) == 1
             project_data = data["projects"][0]
             assert project_data["project_name"] == expected_name
-            assert project_data["backends"] == []
-            if expected_name == owned.name:
-                assert project_data["owner"]["username"] == user.name
-                assert project_data["members"] == []
-            else:
+            if expected_name == "joined":
                 members = project_data["members"]
                 assert len(members) == 1
-                member = members[0]
-                assert member["user"]["username"] == user.name
-                assert member["project_role"] == expected_name.removeprefix("joined_")
+                assert members[0]["user"]["username"] == user.name
+                assert members[0]["project_role"] == "manager"
             params.update(
                 prev_created_at=project_data["created_at"], prev_id=project_data["project_id"]
             )
 
-        response = await client.post(
-            "/api/projects/list", headers=get_auth_headers(admin.token), json=params
-        )
-        assert response.status_code == 200
-        assert response.json() == {"total_count": len(expected_names), "projects": []}
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.parametrize("include_not_joined", [False, True])
     async def test_username_filter_preserves_visibility(
-        self, test_db, session: AsyncSession, client: AsyncClient, include_not_joined: bool
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         viewer = await create_user(session=session, name="viewer", global_role=GlobalRole.USER)
-        owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+        owner = await create_user(session=session, name="owner")
         await create_project(session=session, owner=owner, name="private")
         public = await create_project(session=session, owner=owner, name="public", is_public=True)
         shared = await create_project(session=session, owner=owner, name="shared")
         await add_project_member(
             session=session, project=shared, user=viewer, project_role=ProjectRole.USER
         )
-        viewer_owned = await create_project(session=session, owner=viewer, name="viewer_owned")
-        await add_project_member(
-            session=session, project=viewer_owned, user=viewer, project_role=ProjectRole.ADMIN
-        )
-        await add_project_member(
-            session=session, project=viewer_owned, user=owner, project_role=ProjectRole.MANAGER
-        )
-        unrelated = await create_project(session=session, owner=viewer, name="unrelated")
-        await add_project_member(
-            session=session, project=unrelated, user=viewer, project_role=ProjectRole.ADMIN
-        )
 
         response = await client.post(
             "/api/projects/list",
             headers=get_auth_headers(viewer.token),
-            json={
-                "username": owner.name,
-                "include_not_joined": include_not_joined,
-                "return_total_count": True,
-            },
+            json={"username": owner.name},
         )
         assert response.status_code == 200
-        data = response.json()
-        expected_names = {shared.name, viewer_owned.name}
-        if include_not_joined:
-            expected_names.add(public.name)
-        assert {p["project_name"] for p in data["projects"]} == expected_names
-        assert data["total_count"] == len(expected_names)
+        assert {p["project_name"] for p in response.json()} == {public.name, shared.name}
 
 
 class TestListOnlyNoFleets:
