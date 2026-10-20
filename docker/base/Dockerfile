@@ -10,6 +10,11 @@ FROM nvidia/cuda:13.0.3-base-ubuntu${UBUNTU_VERSION}.04 AS common
 # ARGs before FROM must be redeclared to be used after FROM
 ARG UBUNTU_VERSION
 
+ARG _UV_VERSION="0.13.3"
+# Python versions preinstalled into ${_UV_HOME}/python
+# To use preinstalled builds, the caller should set UV_PYTHON_INSTALL_DIR
+# (--install-dir is only supported by `uv python install`)
+ARG _UV_PYTHON_VERSIONS="3.11 3.12 3.13 3.14 3.15"
 ARG _UV_HOME="/opt/uv"
 
 ENV UV_INSTALL_DIR="${_UV_HOME}/bin"
@@ -53,8 +58,8 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 sh \
-    && uv python install --preview --default
+RUN curl -LsSf https://astral.sh/uv/${_UV_VERSION}/install.sh | UV_NO_MODIFY_PATH=1 sh \
+    && uv python install --no-cache --install-dir ${_UV_HOME}/python --no-bin ${_UV_PYTHON_VERSIONS}
 
 # ============================================================================
 # builder: builds NCCL and nccl-tests from source for the base/devel flavors.
