@@ -1,4 +1,5 @@
 import threading
+from collections import defaultdict
 from collections.abc import Container
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from dstack._internal.core.backends.aws.models import (
     AWSOSImageConfig,
 )
 from dstack._internal.core.backends.base.compute import (
+    PROVIDER_REF_TAG_KEY,
     Compute,
     ComputeCache,
     ComputeTTLCache,
@@ -33,6 +35,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -40,6 +43,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_volume_name,
     get_gateway_user_data,
     get_user_data,
+    is_valid_provider_ref,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -51,6 +55,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -108,6 +113,11 @@ class AWSInstanceBackendData(CoreModel):
     """
 
 
+class AWSResourceGroupBackendData(CoreModel):
+    instance_id: Optional[str] = None
+    eip_allocation_ids: List[str] = []
+
+
 def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
     return hashkey(*args, **kwargs)
 
@@ -129,6 +139,7 @@ class AWSCompute(
     ComputeWithGatewayLoadBalancerSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithVolumeSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     def __init__(
@@ -258,6 +269,24 @@ class AWSCompute(
                 allocation_id=instance_backend_data.eip_allocation_id,
             )
 
+    def list_resource_groups(self) -> List[ListedResourceGroup]:
+        resource_groups = []
+        for region in get_or_error(self.config.regions):
+            ec2_client = self.session.client("ec2", region_name=region)
+            resource_groups.extend(_list_resource_groups(ec2_client, region))
+        return resource_groups
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        backend_data = validate_json_extra_ignore(
+            AWSResourceGroupBackendData, get_or_error(group.backend_data)
+        )
+        region = get_or_error(group.region)
+        if backend_data.instance_id is not None:
+            self.terminate_instance(instance_id=backend_data.instance_id, region=region)
+        ec2_client = self.session.client("ec2", region_name=region)
+        for allocation_id in backend_data.eip_allocation_ids:
+            _release_eip(ec2_client=ec2_client, allocation_id=allocation_id)
+
     def create_instance(
         self,
         instance_offer: InstanceOfferWithAvailability,
@@ -280,6 +309,8 @@ class AWSCompute(
             "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user,
         }
+        if instance_config.provider_ref is not None:
+            base_tags[PROVIDER_REF_TAG_KEY] = instance_config.provider_ref
         tags = merge_tags(
             base_tags=base_tags,
             backend_tags=self.config.tags,
@@ -463,7 +494,10 @@ class AWSCompute(
             public_ip, allocation_id = _allocate_and_associate_eip(
                 ec2_client=ec2_client,
                 instance=instance,
-                project_name=_get_project_name_from_instance_tags(instance),
+                project_name=aws_resources.get_tag_value(instance.tags or [], "dstack_project"),
+                provider_ref=aws_resources.get_tag_value(
+                    instance.tags or [], PROVIDER_REF_TAG_KEY
+                ),
                 backend_tags=self.config.tags,
             )
             provisioning_data.backend_data = AWSInstanceBackendData(
@@ -1490,17 +1524,11 @@ def _parse_instance_backend_data(backend_data: Optional[str]) -> "AWSInstanceBac
         return AWSInstanceBackendData()
 
 
-def _get_project_name_from_instance_tags(instance: Any) -> Optional[str]:
-    for tag in instance.tags or []:
-        if tag.get("Key") == "dstack_project":
-            return tag.get("Value")
-    return None
-
-
 def _allocate_and_associate_eip(
     ec2_client: botocore.client.BaseClient,
     instance: Any,
     project_name: Optional[str],
+    provider_ref: Optional[str],
     backend_tags: Optional[Dict[str, str]],
 ) -> Tuple[str, str]:
     """
@@ -1514,6 +1542,8 @@ def _allocate_and_associate_eip(
     }
     if project_name is not None:
         tags["dstack_project"] = project_name
+    if provider_ref is not None:
+        tags[PROVIDER_REF_TAG_KEY] = provider_ref
     if backend_tags:
         for k, v in backend_tags.items():
             tags.setdefault(k, v)
@@ -1577,6 +1607,91 @@ def _get_primary_network_interface_id(instance: Any) -> str:
     raise ProvisioningError(
         f"Instance {instance.instance_id} has no primary network interface (DeviceIndex=0)"
     )
+
+
+def _list_resource_groups(
+    ec2_client: botocore.client.BaseClient, region: str
+) -> List[ListedResourceGroup]:
+    """
+    Lists instances and Elastic IPs tagged with `provider_ref`.
+    An Elastic IP is grouped with its instance by the `dstack_instance` tag.
+    Elastic IPs whose instance is gone form groups of their own.
+    """
+    instances = aws_resources.list_instances_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
+    addresses = aws_resources.list_addresses_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
+
+    addresses_by_instance_id: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    instance_ids = {instance["InstanceId"] for instance in instances}
+    resource_groups = []
+    for address in addresses:
+        instance_id = aws_resources.get_tag_value(address.get("Tags", []), "dstack_instance")
+        if instance_id is not None and instance_id in instance_ids:
+            addresses_by_instance_id[instance_id].append(address)
+            continue
+        # EIP without an instance
+        provider_ref = _get_resource_provider_ref(address, address["AllocationId"])
+        if provider_ref is None:
+            continue
+        resource_groups.append(
+            ListedResourceGroup(
+                backend=BackendType.AWS,
+                owner_type=OwnerType.INSTANCE,
+                provider_ref=provider_ref,
+                primary_id=None,
+                region=region,
+                created_at=None,
+                description=_get_address_description(address),
+                backend_data=AWSResourceGroupBackendData(
+                    eip_allocation_ids=[address["AllocationId"]]
+                ).model_dump_json(),
+            )
+        )
+    for instance in instances:
+        provider_ref = _get_resource_provider_ref(instance, instance["InstanceId"])
+        if provider_ref is None:
+            continue
+        instance_addresses = addresses_by_instance_id[instance["InstanceId"]]
+        description = (
+            f"instance {instance['InstanceId']} ({instance['InstanceType']},"
+            f" {instance['State']['Name']})"
+        )
+        for address in instance_addresses:
+            description += f", {_get_address_description(address)}"
+        resource_groups.append(
+            ListedResourceGroup(
+                backend=BackendType.AWS,
+                owner_type=OwnerType.INSTANCE,
+                provider_ref=provider_ref,
+                primary_id=instance["InstanceId"],
+                region=region,
+                created_at=instance["LaunchTime"],
+                description=description,
+                backend_data=AWSResourceGroupBackendData(
+                    instance_id=instance["InstanceId"],
+                    eip_allocation_ids=[a["AllocationId"] for a in instance_addresses],
+                ).model_dump_json(),
+            )
+        )
+    return resource_groups
+
+
+def _get_resource_provider_ref(resource: Dict[str, Any], resource_id: str) -> Optional[str]:
+    provider_ref = aws_resources.get_tag_value(resource.get("Tags", []), PROVIDER_REF_TAG_KEY)
+    if provider_ref is None:
+        return None
+    if not is_valid_provider_ref(provider_ref):
+        logger.warning(
+            "Skipping AWS resource %s with invalid %s tag value %r",
+            resource_id,
+            PROVIDER_REF_TAG_KEY,
+            provider_ref,
+        )
+        return None
+    return provider_ref
+
+
+def _get_address_description(address: Dict[str, Any]) -> str:
+    return f"Elastic IP {address['AllocationId']} ({address.get('PublicIp')})"
 
 
 def _release_eip(ec2_client: botocore.client.BaseClient, allocation_id: str) -> None:

@@ -981,6 +981,8 @@ Random characters after `provider_ref` in names. They keep names unique across p
 attempts with the same `provider_ref`.
 """
 
+_PROVIDER_REF_REGEX = re.compile(rf"[0-9a-z]{{{PROVIDER_REF_LEN}}}")
+
 _PROVIDER_REF_NAME_SUFFIX_REGEX = re.compile(
     rf"[0-9a-z]{{{PROVIDER_REF_LEN + _PROVIDER_REF_NAME_RANDOM_SUFFIX_LEN}}}"
 )
@@ -995,6 +997,13 @@ def generate_provider_ref() -> str:
     return "".join(
         random.choice(string.ascii_lowercase + string.digits) for _ in range(PROVIDER_REF_LEN)
     )
+
+
+def is_valid_provider_ref(value: str) -> bool:
+    """
+    Checks a `provider_ref` read from a provider resource, e.g. from a tag.
+    """
+    return _PROVIDER_REF_REGEX.fullmatch(value) is not None
 
 
 def parse_provider_ref_from_name(name: str) -> Optional[str]:

@@ -33,8 +33,9 @@ class ListedResourceGroup(CoreModel):
     `None` if the group has only internal resources left.
     """
     region: Optional[str]
-    created_at: datetime
-    """Provider's creation time of the owner resource or, if it's gone, the earliest internal resource."""
+    created_at: Optional[datetime]
+    """Provider's creation time of the owner resource or, if it's gone, the earliest internal resource.
+    `None` if the provider does not report it."""
     description: str
     """Human-readable summary for events and logs"""
     backend_data: Optional[str]

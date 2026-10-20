@@ -427,6 +427,46 @@ def list_instance_device_names(
     return device_names
 
 
+def list_instances_with_tag_key(
+    ec2_client: botocore.client.BaseClient, tag_key: str
+) -> List[Dict[str, Any]]:
+    """
+    Lists instances that have the `tag_key` tag, except terminated ones.
+    """
+    instances = []
+    paginator = ec2_client.get_paginator("describe_instances")
+    for page in paginator.paginate(
+        Filters=[
+            {"Name": "tag-key", "Values": [tag_key]},
+            {
+                "Name": "instance-state-name",
+                "Values": ["pending", "running", "shutting-down", "stopping", "stopped"],
+            },
+        ]
+    ):
+        # Instances are grouped by the launch request that created them
+        for reservation in page["Reservations"]:
+            instances.extend(reservation["Instances"])
+    return instances
+
+
+def list_addresses_with_tag_key(
+    ec2_client: botocore.client.BaseClient, tag_key: str
+) -> List[Dict[str, Any]]:
+    """
+    Lists Elastic IPs that have the `tag_key` tag.
+    """
+    response = ec2_client.describe_addresses(Filters=[{"Name": "tag-key", "Values": [tag_key]}])
+    return response["Addresses"]
+
+
+def get_tag_value(tags: List[Dict[str, str]], key: str) -> Optional[str]:
+    for tag in tags:
+        if tag.get("Key") == key:
+            return tag.get("Value")
+    return None
+
+
 def make_tags(tags: Dict[str, str]) -> List[Dict[str, str]]:
     tags_list = []
     for k, v in tags.items():

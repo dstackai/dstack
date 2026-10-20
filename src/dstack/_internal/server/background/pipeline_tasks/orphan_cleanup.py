@@ -597,7 +597,10 @@ def _get_instance_group_decision(
     listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if instance_model.status == InstanceStatus.PENDING:
-        if resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD:
+        if (
+            resource_group.created_at is not None
+            and resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD
+        ):
             # Stuck pending instances are unexpected. If this changes,
             # we may treat them as orphans instead of error log and skip.
             logger.error(
@@ -642,7 +645,10 @@ def _get_job_group_decision(
     # So a submitted job may be provisioning the resources right now,
     # while resources of a job in any other status are left from failed provisioning.
     if job_model.status == JobStatus.SUBMITTED:
-        if resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD:
+        if (
+            resource_group.created_at is not None
+            and resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD
+        ):
             logger.error(
                 "Resource group %s in %s/%s was created at %s for job %s"
                 " that is still submitted. The job may be stuck in submitted.",
