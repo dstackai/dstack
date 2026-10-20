@@ -1416,7 +1416,7 @@ projects:
 
     </div>
 
-    If the GPU memory isn't specified or has no maximum (e.g., `gpu: A100` or `gpu: 24GB..`), the run gets whole GPUs only.
+    With just a GPU name (e.g., `gpu: A100`) or memory without a maximum (e.g., `gpu: 24GB..`), the run gets whole GPUs only, never slices.
     `dstack offer` and `dstack apply` show offers the same way, unless you pass `--full-offers`.
     Slices are listed separately from whole GPUs, e.g., `A100:10GB:14` and `A100:80GB:4` on the same node.
 
