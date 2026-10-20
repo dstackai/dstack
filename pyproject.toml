@@ -33,8 +33,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    # TODO: Merge/release gpuhunt#259 and pin the released version.
-    "gpuhunt @ git+https://github.com/Datura-ai/gpuhunt.git@lium-provider",
+    "gpuhunt==0.1.34",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -57,10 +56,6 @@ dstack = "dstack._internal.cli.main:main"
 
 [tool.hatch.version]
 path = "src/dstack/version.py"
-
-[tool.hatch.metadata]
-# TODO: Remove after pinning the released gpuhunt package.
-allow-direct-references = true
 
 [tool.hatch.build.targets.sdist]
 artifacts = [

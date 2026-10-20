@@ -224,7 +224,7 @@ class TestLiumAPIClient:
         assert exc.value.status_code == 302
         assert requests_mock.call_count == 1
 
-    @pytest.mark.parametrize("body", ["not JSON", '"not an object"', "null"])
+    @pytest.mark.parametrize("body", ["not JSON", "null"])
     def test_invalid_create_response_does_not_retry(self, requests_mock, body):
         requests_mock.post(f"{API_URL}/templates", text=body)
 

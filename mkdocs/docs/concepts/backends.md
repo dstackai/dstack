@@ -1525,11 +1525,6 @@ projects:
 
 </div>
 
-??? info "Disk"
-    Local disk is unencrypted and deleted with the pod. Lium allocates two thirds to `/root`
-    and one third to the container filesystem; these are separate quotas.
-    For persistent storage, use [network volumes](volumes.md#network-volumes).
-
 ### Runpod
 
 Log into your [Runpod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click

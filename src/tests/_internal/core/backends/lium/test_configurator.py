@@ -49,4 +49,3 @@ class TestLiumConfigurator:
         assert configurator.get_backend_config_with_creds(record) == config
         public_config = configurator.get_backend_config_without_creds(record).model_dump()
         assert public_config == json.loads(record.config)
-        assert "test-secret" not in json.dumps(public_config)

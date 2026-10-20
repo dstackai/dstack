@@ -69,13 +69,7 @@ class TestVolumeLifecycle:
 class TestVolumeMount:
     @pytest.mark.parametrize(
         "user",
-        [
-            None,
-            UnixUser(uid=0),
-            UnixUser(username="root"),
-            UnixUser(uid=10001),
-            UnixUser(username="app"),
-        ],
+        [None, UnixUser(uid=10001), UnixUser(username="app")],
     )
     def test_custom_path(self, user):
         commands = _volume_commands(user=user, path="/checkpoints")

@@ -468,16 +468,6 @@ class TestTerminateInstance:
         compute.api_client.delete_template.assert_not_called()
         compute.api_client.delete_pod.assert_not_called()
 
-    def test_uncertain_rental_found_by_name_is_deleted(self, compute):
-        compute.api_client.rent_executor.side_effect = LiumAPIError("timeout")
-        data = _run_job(compute)
-        compute.api_client.get_pods.return_value = [_pod()]
-
-        with pytest.raises(NotYetTerminated):
-            _terminate(compute, data)
-
-        compute.api_client.delete_pod.assert_called_once_with("pod-id")
-
     @pytest.mark.parametrize(
         "deleted_event", [{"to_status": "DELETED"}, {"sub_event_type": "pod-delete.success"}]
     )
@@ -487,6 +477,7 @@ class TestTerminateInstance:
         compute.api_client.get_pods.return_value = [_pod()]
         with pytest.raises(NotYetTerminated):
             _terminate(compute, data)
+        compute.api_client.delete_pod.assert_called_once_with("pod-id")
         # A fresh backend receives exactly the same persisted data. The deleted
         # pod is no longer listed, but its account event still identifies it.
         compute.api_client.get_pods.return_value = []
@@ -547,6 +538,8 @@ class TestBootstrapRunner:
             pkey = client.connect.call_args.kwargs["pkey"]
             assert pkey.get_name() == "ssh-rsa"
             assert pkey.get_base64() == public_key.decode().split()[1]
+            assert client.connect.call_args.kwargs["allow_agent"] is False
+            assert client.connect.call_args.kwargs["look_for_keys"] is False
 
     def test_private_bootstrap_does_not_restrict_runner_created_files(self, tmp_path):
         # Execute the generated shell so a restrictive inherited umask cannot
@@ -574,8 +567,8 @@ class TestBootstrapRunner:
         assert stat.S_IMODE((job_directory / "key").stat().st_mode) == 0o644
         assert (directory / "exit-code").read_text() == "0\n"
 
-    @pytest.mark.parametrize("output,status", [(b"running", 0), (b"exited", 0), (b"", 1)])
-    def test_checks_existing_bootstrap_status(self, output, status):
+    @pytest.mark.parametrize("output,status", [(b"exited", 0), (b"", 1)])
+    def test_rejects_failed_or_exited_bootstrap(self, output, status):
         ssh = _get_provider_ssh(_pod())
         with (
             patch(f"{COMPUTE_MODULE}.paramiko.SSHClient") as ssh_class,
@@ -586,14 +579,8 @@ class TestBootstrapRunner:
             stdout.read.return_value = output
             stdout.channel.recv_exit_status.return_value = status
             client.exec_command.return_value = (Mock(), stdout, Mock())
-            if output == b"running":
+            with pytest.raises(ProvisioningError):
                 _bootstrap_runner(ssh, "private-key", "runner")
-            else:
-                with pytest.raises(ProvisioningError):
-                    _bootstrap_runner(ssh, "private-key", "runner")
-            assert client.connect.call_args.kwargs["allow_agent"] is False
-            assert client.connect.call_args.kwargs["look_for_keys"] is False
-            assert client.connect.call_args.kwargs["pkey"] == "parsed-key"
 
     @pytest.mark.parametrize("marker,output", [("started", "running"), ("exit-code", "exited")])
     def test_repeated_bootstrap_does_not_rewrite_or_launch(self, tmp_path, marker, output):
