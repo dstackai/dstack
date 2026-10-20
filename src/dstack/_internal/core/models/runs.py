@@ -456,7 +456,9 @@ class JobSubmission(CoreModel):
     probes: list[Probe] = []
     image_pull_progress: Optional[ImagePullProgress] = None
     provider_ref: Optional[str] = None
-    """`provider_ref` is set on provider resources created for this submission to identify orphaned resources.
+    """`provider_ref` is set on provider resources created for this submission, so that the server
+    can match them back to the submission and its instance to detect orphaned resources.
+    `None` for submissions created by older servers.
     """
 
     @property

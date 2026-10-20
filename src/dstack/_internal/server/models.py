@@ -517,7 +517,9 @@ class JobModel(PipelineModelMixin, BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
 
     run_id: Mapped[uuid.UUID] = mapped_column(
@@ -607,7 +609,10 @@ class JobModel(PipelineModelMixin, BaseModel):
     """
     image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
     provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
-    """Set on provider resources for orphans matching. The job's instance inherits it.
+    """Set on provider resources created by `run_job()` for orphans matching.
+    The job's instance inherits it on successful provisioning. It's stored on the job because
+    `run_job()` may create provider resources without a successful provisioning being recorded,
+    and the job's placeholder instance is deleted when the job is terminated, so the job is the only record of such resources.
     `None` for older jobs."""
 
     service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(

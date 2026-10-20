@@ -656,9 +656,6 @@ async def _process_terminating_job(
         # Placeholder has no VM and no provisioning data, so there is nothing to terminate.
         # Skip graceful stop, container stop, and volume detach. Delete the instance right away
         # to avoid placeholders accumulating for runs retrying on no capacity.
-        # TODO: Orphan cleanup cannot match resources left by failed `run_job`/`run_jobs` calls
-        # once the placeholder and its `provider_ref` are deleted. Soft-delete placeholders
-        # instead and hard-delete never-provisioned ones after a clean orphan cleanup.
         result.instance_update_map = None
         result.delete_instance = True
         result.job_update_map["instance_id"] = None

@@ -19,6 +19,7 @@ from dstack._internal.core.models.backends.orphans import (
     OwnerType,
 )
 from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
@@ -38,6 +39,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
     InstanceModel,
+    JobModel,
     OrphanCleanupModel,
     ProjectModel,
 )
@@ -251,22 +253,37 @@ class _ResourceGroupDecision(str, Enum):
 
 
 def _eligibility_filter() -> ColumnElement[bool]:
-    has_new_activity = (
+    has_new_instance_activity = (
         select(InstanceModel.id)
         .where(
             InstanceModel.project_id == BackendModel.project_id,
             InstanceModel.provider_ref.is_not(None),
             or_(
                 InstanceModel.created_at >= OrphanCleanupModel.clean_at,
+                InstanceModel.started_at >= OrphanCleanupModel.clean_at,
                 InstanceModel.finished_at >= OrphanCleanupModel.clean_at,
             ),
+        )
+        .exists()
+    )
+    # If `run_job()` fails after creating provider resources, the job is terminated and its
+    # placeholder instance is deleted, so only the job's activity indicates possible orphans.
+    # Finished jobs are no longer processed, so `last_processed_at` is the finish time.
+    has_new_job_activity = (
+        select(JobModel.id)
+        .where(
+            JobModel.project_id == BackendModel.project_id,
+            JobModel.provider_ref.is_not(None),
+            JobModel.status.in_(JobStatus.finished_statuses()),
+            JobModel.last_processed_at >= OrphanCleanupModel.clean_at,
         )
         .exists()
     )
     return or_(
         OrphanCleanupModel.clean_at.is_(None),
         OrphanCleanupModel.clean_mode != settings.ORPHAN_CLEANUP_MODE,
-        has_new_activity,
+        has_new_instance_activity,
+        has_new_job_activity,
     )
 
 
@@ -384,6 +401,10 @@ _PROVIDER_REF_BATCH_SIZE = 100
 @dataclass
 class _OwnerRecords:
     instances: dict[str, InstanceModel]
+    jobs: dict[str, JobModel]
+    """Jobs whose `provider_ref` is not found among instances. A job's instance inherits
+    the job's `provider_ref` on successful provisioning, so a job matches only resources
+    left by failed provisioning. See `JobModel.provider_ref`."""
 
 
 async def _load_owner_records(
@@ -396,7 +417,10 @@ async def _load_owner_records(
     }
     async with get_session_ctx() as session:
         instances = await _load_instances_by_provider_ref(session, project_id, instance_refs)
-    return _OwnerRecords(instances=instances)
+        jobs = await _load_jobs_by_provider_ref(
+            session, project_id, instance_refs - instances.keys()
+        )
+    return _OwnerRecords(instances=instances, jobs=jobs)
 
 
 async def _load_instances_by_provider_ref(
@@ -428,6 +452,33 @@ async def _load_instances_by_provider_ref(
     return instances
 
 
+async def _load_jobs_by_provider_ref(
+    session: AsyncSession, project_id: uuid.UUID, provider_refs: Iterable[str]
+) -> dict[str, JobModel]:
+    jobs: dict[str, JobModel] = {}
+    for batch in batched(provider_refs, _PROVIDER_REF_BATCH_SIZE):
+        res = await session.execute(
+            select(JobModel)
+            .where(
+                JobModel.project_id == project_id,
+                JobModel.provider_ref.in_(batch),
+            )
+            .options(
+                load_only(
+                    JobModel.id,
+                    JobModel.project_id,
+                    JobModel.run_id,
+                    JobModel.job_name,
+                    JobModel.provider_ref,
+                    JobModel.status,
+                )
+            )
+        )
+        for job_model in res.scalars().all():
+            jobs[get_or_error(job_model.provider_ref)] = job_model
+    return jobs
+
+
 def _get_resource_group_decision(
     orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
@@ -435,12 +486,17 @@ def _get_resource_group_decision(
     listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if resource_group.owner_type == OwnerType.INSTANCE:
-        return _get_instance_group_decision(
-            orphan_cleanup_model,
-            resource_group,
-            owner_records.instances.get(resource_group.provider_ref),
-            listed_at,
-        )
+        instance_model = owner_records.instances.get(resource_group.provider_ref)
+        if instance_model is not None:
+            return _get_instance_group_decision(
+                orphan_cleanup_model, resource_group, instance_model, listed_at
+            )
+        job_model = owner_records.jobs.get(resource_group.provider_ref)
+        if job_model is not None:
+            return _get_job_group_decision(
+                orphan_cleanup_model, resource_group, job_model, listed_at
+            )
+        return _ResourceGroupDecision.IGNORE
     raise RuntimeError(f"Unknown resource_group.owner_type: {resource_group.owner_type}")
 
 
@@ -502,7 +558,9 @@ def _get_orphan_event(
     resource_group: ListedResourceGroup, owner_records: _OwnerRecords
 ) -> _OrphanEvent:
     assert resource_group.owner_type == OwnerType.INSTANCE
-    owner_model = owner_records.instances[resource_group.provider_ref]
+    owner_model = owner_records.instances.get(resource_group.provider_ref)
+    if owner_model is None:
+        owner_model = owner_records.jobs[resource_group.provider_ref]
     return _OrphanEvent(
         message=_get_orphan_event_message(resource_group),
         target=events.Target.from_model(owner_model),
@@ -535,11 +593,9 @@ _STUCK_PENDING_THRESHOLD = timedelta(hours=1)
 def _get_instance_group_decision(
     orphan_cleanup_model: OrphanCleanupModel,
     resource_group: ListedResourceGroup,
-    instance_model: Optional[InstanceModel],
+    instance_model: InstanceModel,
     listed_at: datetime,
 ) -> _ResourceGroupDecision:
-    if instance_model is None:
-        return _ResourceGroupDecision.IGNORE
     if instance_model.status == InstanceStatus.PENDING:
         if resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD:
             # Stuck pending instances are unexpected. If this changes,
@@ -573,6 +629,31 @@ def _get_instance_group_decision(
     ):
         return _ResourceGroupDecision.ORPHAN
     return _ResourceGroupDecision.TRACKED
+
+
+def _get_job_group_decision(
+    orphan_cleanup_model: OrphanCleanupModel,
+    resource_group: ListedResourceGroup,
+    job_model: JobModel,
+    listed_at: datetime,
+) -> _ResourceGroupDecision:
+    # Successful job provisioning moves the job out of submitted
+    # and sets its `provider_ref` on the instance in the same transaction.
+    # So a submitted job may be provisioning the resources right now,
+    # while resources of a job in any other status are left from failed provisioning.
+    if job_model.status == JobStatus.SUBMITTED:
+        if resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD:
+            logger.error(
+                "Resource group %s in %s/%s was created at %s for job %s"
+                " that is still submitted. The job may be stuck in submitted.",
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                resource_group.created_at,
+                job_model.job_name,
+            )
+        return _ResourceGroupDecision.SKIP
+    return _ResourceGroupDecision.ORPHAN
 
 
 def _get_failed_cleanup_process_result(
