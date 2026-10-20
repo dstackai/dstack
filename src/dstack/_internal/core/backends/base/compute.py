@@ -489,11 +489,7 @@ class ComputeWithResourceListingSupport(ABC):
 
         `primary_id=None` may be reported only if the owner resource type was listed
         completely. If any listing fails, raise instead of returning partial results.
-        Otherwise, resources of a tracked instance may be reported as left without
-        the instance and deleted.
-
-        Compute group resources (created by `run_jobs()`) must not be listed
-        since orphan cleanup for compute groups is not supported yet.
+        Otherwise, resources of a tracked owner may be reported as left without an owner and deleted.
         """
         pass
 
