@@ -612,7 +612,8 @@ class JobModel(PipelineModelMixin, BaseModel):
     """Set on provider resources created by `run_job()` for orphans matching.
     The job's instance inherits it on successful provisioning. It's stored on the job because
     `run_job()` may create provider resources without a successful provisioning being recorded,
-    and the job's placeholder instance is deleted when the job is terminated, so the job is the only record of such resources.
+    and the job's placeholder instance is deleted when the job is terminated,
+    so the job is the only record of such resources.
     `None` for older jobs."""
 
     service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
@@ -1472,7 +1473,8 @@ class OrphanCleanupModel(PipelineModelMixin, BaseModel):
     cleanup_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     """Consecutive failed or unclean cleanups. Determines the retry delay."""
     clean_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    """Start of the last clean cleanup. Later instance activity makes the backend eligible for cleanup."""
+    """Start of the last clean cleanup. Later instance or job activity makes the backend
+    eligible for cleanup."""
     clean_mode: Mapped[Optional[OrphanCleanupMode]] = mapped_column(
         EnumAsString(OrphanCleanupMode, 100)
     )

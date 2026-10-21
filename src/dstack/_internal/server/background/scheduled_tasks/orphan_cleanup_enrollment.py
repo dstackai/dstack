@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import false, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,7 +80,7 @@ async def _select_backend_ids_to_enroll(session: AsyncSession) -> list[uuid.UUID
         select(BackendModel.id)
         .join(ProjectModel, ProjectModel.id == BackendModel.project_id)
         .where(
-            ProjectModel.deleted == false(),
+            ProjectModel.deleted == False,
             BackendModel.type.in_(get_backends_with_resource_listing_support()),
             ~is_enrolled,
             or_(has_instances_with_provider_ref, has_jobs_with_provider_ref),

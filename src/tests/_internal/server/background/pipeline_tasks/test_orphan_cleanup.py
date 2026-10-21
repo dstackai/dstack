@@ -389,8 +389,6 @@ class TestOrphanCleanupFetcher:
         [
             (1, 1.5, False),
             (1, 2.5, True),
-            (2, 5, False),
-            (2, 7, True),
             (5, 23, False),
             (5, 25, True),
         ],

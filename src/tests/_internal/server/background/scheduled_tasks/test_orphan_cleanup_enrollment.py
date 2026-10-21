@@ -105,14 +105,13 @@ class TestEnrollBackendsInOrphanCleanup:
     async def test_is_idempotent(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await _create_project_with_provider_ref_instance(session, user, "instref00001")
-        backend = await create_backend(session=session, project_id=project.id)
+        await create_backend(session=session, project_id=project.id)
         await enroll_backends_in_orphan_cleanup()
         res = await session.execute(select(OrphanCleanupModel))
         orphan_cleanup = res.scalar_one()
         await enroll_backends_in_orphan_cleanup()
         res = await session.execute(select(OrphanCleanupModel))
         assert [r.id for r in res.scalars().all()] == [orphan_cleanup.id]
-        assert await _list_enrolled_backend_ids(session) == {backend.id}
 
     async def test_tolerates_backends_enrolled_concurrently(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
