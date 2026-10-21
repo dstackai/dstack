@@ -151,7 +151,6 @@ class OrphanCleanupFetcher(Fetcher[PipelineItem]):
                     .where(
                         ProjectModel.deleted == False,
                         BackendModel.type.in_(get_backends_with_resource_listing_support()),
-                        _eligibility_filter(),
                         _retry_delay_filter(now),
                         or_(
                             OrphanCleanupModel.last_processed_at
@@ -225,6 +224,7 @@ class OrphanCleanupWorker(Worker[PipelineItem]):
 @dataclass
 class _ProcessContext:
     orphan_cleanup_model: OrphanCleanupModel
+    needs_cleanup: bool
 
 
 class _OrphanCleanupUpdateMap(ItemUpdateMap, total=False):
@@ -250,41 +250,6 @@ class _ResourceGroupDecision(str, Enum):
     SKIP = "skip"
     ORPHAN = "orphan"
     TRACKED = "tracked"
-
-
-def _eligibility_filter() -> ColumnElement[bool]:
-    has_new_instance_activity = (
-        select(InstanceModel.id)
-        .where(
-            InstanceModel.project_id == BackendModel.project_id,
-            InstanceModel.provider_ref.is_not(None),
-            or_(
-                InstanceModel.created_at >= OrphanCleanupModel.clean_at,
-                InstanceModel.started_at >= OrphanCleanupModel.clean_at,
-                InstanceModel.finished_at >= OrphanCleanupModel.clean_at,
-            ),
-        )
-        .exists()
-    )
-    # If `run_job()` fails after creating provider resources, the job is terminated and its
-    # placeholder instance is deleted, so only the job's activity indicates possible orphans.
-    # Finished jobs are no longer processed, so `last_processed_at` is the finish time.
-    has_new_job_activity = (
-        select(JobModel.id)
-        .where(
-            JobModel.project_id == BackendModel.project_id,
-            JobModel.provider_ref.is_not(None),
-            JobModel.status.in_(JobStatus.finished_statuses()),
-            JobModel.last_processed_at >= OrphanCleanupModel.clean_at,
-        )
-        .exists()
-    )
-    return or_(
-        OrphanCleanupModel.clean_at.is_(None),
-        OrphanCleanupModel.clean_mode != settings.ORPHAN_CLEANUP_MODE,
-        has_new_instance_activity,
-        has_new_job_activity,
-    )
 
 
 _CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
@@ -328,14 +293,75 @@ async def _load_process_context(item: PipelineItem) -> Optional[_ProcessContext]
             )
         )
         orphan_cleanup_model = res.unique().scalar_one_or_none()
-    if orphan_cleanup_model is None:
-        log_lock_token_mismatch(logger, item)
-        return
-    return _ProcessContext(orphan_cleanup_model=orphan_cleanup_model)
+        if orphan_cleanup_model is None:
+            log_lock_token_mismatch(logger, item)
+            return
+        needs_cleanup = await _needs_cleanup(session, orphan_cleanup_model)
+    return _ProcessContext(orphan_cleanup_model=orphan_cleanup_model, needs_cleanup=needs_cleanup)
+
+
+async def _needs_cleanup(session: AsyncSession, orphan_cleanup_model: OrphanCleanupModel) -> bool:
+    """
+    Checks if the backend may have new orphans since the last clean cleanup.
+
+    Every enrolled backend is processed once per cleanup interval, and a backend without new
+    activity is only marked processed without listing its resources. This costs one activity
+    query and two small row updates (lock and unlock) per enrolled backend per interval,
+    but keeps the fetch query cheap regardless of project sizes and the number of
+    idle backends. If the number of enrolled backends grows large, the cost can be cut by:
+    * Deleting rows of backends that stay idle and re-enrolling backends on recent activity,
+      so that only recently active backends are processed.
+    * Cleaning up cloud accounts shared by many backends (e.g. dstack Sky base backends)
+      once instead of once per backend.
+    """
+    if orphan_cleanup_model.clean_at is None:
+        return True
+    if orphan_cleanup_model.clean_mode != settings.ORPHAN_CLEANUP_MODE:
+        return True
+    return await _has_activity_since(
+        session,
+        project_id=orphan_cleanup_model.backend.project_id,
+        since=orphan_cleanup_model.clean_at,
+    )
+
+
+async def _has_activity_since(
+    session: AsyncSession, project_id: uuid.UUID, since: datetime
+) -> bool:
+    has_instance_activity = (
+        select(InstanceModel.id)
+        .where(
+            InstanceModel.project_id == project_id,
+            InstanceModel.provider_ref.is_not(None),
+            or_(
+                InstanceModel.created_at >= since,
+                InstanceModel.started_at >= since,
+                InstanceModel.finished_at >= since,
+            ),
+        )
+        .exists()
+    )
+    # If `run_job()` fails after creating provider resources, the job is terminated and its
+    # placeholder instance is deleted, so only the job's activity indicates possible orphans.
+    # Finished jobs are no longer processed, so `last_processed_at` is the finish time.
+    has_job_activity = (
+        select(JobModel.id)
+        .where(
+            JobModel.project_id == project_id,
+            JobModel.provider_ref.is_not(None),
+            JobModel.status.in_(JobStatus.finished_statuses()),
+            JobModel.last_processed_at >= since,
+        )
+        .exists()
+    )
+    res = await session.execute(select(or_(has_instance_activity, has_job_activity)))
+    return res.scalar_one()
 
 
 async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessResult:
     orphan_cleanup_model = process_context.orphan_cleanup_model
+    if not process_context.needs_cleanup:
+        return _ProcessResult(update_map=_OrphanCleanupUpdateMap())
     backend = await backends_services.get_project_backend_by_type(
         project=orphan_cleanup_model.backend.project,
         backend_type=orphan_cleanup_model.backend.type,

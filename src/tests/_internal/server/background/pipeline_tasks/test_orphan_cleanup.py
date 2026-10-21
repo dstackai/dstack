@@ -195,9 +195,11 @@ class _ListingCompute(ComputeWithResourceListingSupport):
     ):
         self.listing = listing or ResourceListing(resource_groups=[])
         self.error = error
+        self.listed = False
         self.deleted: list[ListedResourceGroup] = []
 
     def list_resource_groups(self) -> ResourceListing:
+        self.listed = True
         if self.error is not None:
             raise self.error
         return self.listing
@@ -274,17 +276,12 @@ class TestOrphanCleanupFetcher:
         )
         assert await _fetch_ids(fetcher) == {orphan_cleanup.id}
 
-    @pytest.mark.parametrize(
-        "activity", ["instance_created", "instance_started", "instance_finished", "job_finished"]
-    )
-    async def test_fetches_rows_with_activity_after_clean_at(
-        self, test_db, session: AsyncSession, fetcher, activity: str
+    async def test_fetches_clean_rows_after_cleanup_interval(
+        self, test_db, session: AsyncSession, fetcher
     ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
         clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
-        before_clean_at = clean_at - timedelta(minutes=10)
-        after_clean_at = clean_at + timedelta(minutes=10)
         orphan_cleanup = await _create_orphan_cleanup(
             session,
             project,
@@ -292,66 +289,7 @@ class TestOrphanCleanupFetcher:
             clean_at=clean_at,
             clean_mode=settings.ORPHAN_CLEANUP_MODE,
         )
-        if activity == "job_finished":
-            repo = await create_repo(session=session, project_id=project.id)
-            run = await create_run(session=session, project=project, repo=repo, user=user)
-            await create_job(
-                session=session,
-                run=run,
-                status=JobStatus.FAILED,
-                last_processed_at=after_clean_at,
-                provider_ref=PROVIDER_REF,
-            )
-        else:
-            instance = await _create_instance_with_provider_ref(
-                session,
-                project,
-                InstanceStatus.TERMINATED,
-                created_at=after_clean_at if activity == "instance_created" else before_clean_at,
-            )
-            if activity == "instance_started":
-                instance.started_at = after_clean_at
-            if activity == "instance_finished":
-                instance.finished_at = after_clean_at
-            await session.commit()
         assert await _fetch_ids(fetcher) == {orphan_cleanup.id}
-
-    async def test_skips_rows_without_activity_after_clean_at(
-        self, test_db, session: AsyncSession, fetcher
-    ):
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
-        clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
-        await _create_orphan_cleanup(
-            session,
-            project,
-            last_processed_at=clean_at,
-            clean_at=clean_at,
-            clean_mode=settings.ORPHAN_CLEANUP_MODE,
-        )
-        await _create_instance_with_provider_ref(
-            session,
-            project,
-            InstanceStatus.IDLE,
-            created_at=clean_at - timedelta(minutes=10),
-        )
-        assert await _fetch_ids(fetcher) == set()
-
-    async def test_fetches_rows_cleaned_in_other_mode(
-        self, test_db, session: AsyncSession, fetcher
-    ):
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
-        clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
-        orphan_cleanup = await _create_orphan_cleanup(
-            session,
-            project,
-            last_processed_at=clean_at,
-            clean_at=clean_at,
-            clean_mode=OrphanCleanupMode.DELETE,
-        )
-        with patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.REPORT):
-            assert await _fetch_ids(fetcher) == {orphan_cleanup.id}
 
     async def test_skips_rows_processed_within_cleanup_interval(
         self, test_db, session: AsyncSession, fetcher
@@ -473,6 +411,108 @@ class TestOrphanCleanupWorker:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message.startswith("Orphaned resources found in aws/us-east-1")
+
+    @pytest.mark.parametrize(
+        "activity", ["instance_created", "instance_started", "instance_finished", "job_finished"]
+    )
+    async def test_cleans_up_backend_with_activity_after_clean_at(
+        self, test_db, session: AsyncSession, worker, activity: str
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
+        before_clean_at = clean_at - timedelta(minutes=10)
+        after_clean_at = clean_at + timedelta(minutes=10)
+        orphan_cleanup = await _create_orphan_cleanup(
+            session,
+            project,
+            last_processed_at=clean_at,
+            clean_at=clean_at,
+            clean_mode=settings.ORPHAN_CLEANUP_MODE,
+        )
+        if activity == "job_finished":
+            repo = await create_repo(session=session, project_id=project.id)
+            run = await create_run(session=session, project=project, repo=repo, user=user)
+            await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.FAILED,
+                last_processed_at=after_clean_at,
+                provider_ref=PROVIDER_REF,
+            )
+        else:
+            instance = await _create_instance_with_provider_ref(
+                session,
+                project,
+                InstanceStatus.TERMINATED,
+                created_at=after_clean_at if activity == "instance_created" else before_clean_at,
+            )
+            if activity == "instance_started":
+                instance.started_at = after_clean_at
+            if activity == "instance_finished":
+                instance.finished_at = after_clean_at
+            await session.commit()
+        compute = _ListingCompute()
+        item = await _lock(session, orphan_cleanup)
+        with _patch_compute(compute):
+            await worker.process(item)
+        await session.refresh(orphan_cleanup)
+        assert compute.listed
+        assert orphan_cleanup.clean_at is not None
+        assert orphan_cleanup.clean_at > clean_at
+
+    async def test_skips_listing_without_activity_after_clean_at(
+        self, test_db, session: AsyncSession, worker
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
+        orphan_cleanup = await _create_orphan_cleanup(
+            session,
+            project,
+            last_processed_at=clean_at,
+            clean_at=clean_at,
+            clean_mode=settings.ORPHAN_CLEANUP_MODE,
+        )
+        await _create_instance_with_provider_ref(
+            session,
+            project,
+            InstanceStatus.IDLE,
+            created_at=clean_at - timedelta(minutes=10),
+        )
+        compute = _ListingCompute()
+        item = await _lock(session, orphan_cleanup)
+        with _patch_compute(compute):
+            await worker.process(item)
+        await session.refresh(orphan_cleanup)
+        assert not compute.listed
+        assert orphan_cleanup.clean_at == clean_at
+        assert orphan_cleanup.last_processed_at > clean_at
+        assert orphan_cleanup.lock_token is None
+
+    async def test_cleans_up_backend_cleaned_in_other_mode(
+        self, test_db, session: AsyncSession, worker
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        clean_at = get_current_datetime() - 2 * CLEANUP_INTERVAL
+        orphan_cleanup = await _create_orphan_cleanup(
+            session,
+            project,
+            last_processed_at=clean_at,
+            clean_at=clean_at,
+            clean_mode=OrphanCleanupMode.DELETE,
+        )
+        compute = _ListingCompute()
+        item = await _lock(session, orphan_cleanup)
+        with (
+            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.REPORT),
+            _patch_compute(compute),
+        ):
+            await worker.process(item)
+        await session.refresh(orphan_cleanup)
+        assert compute.listed
+        assert orphan_cleanup.clean_mode == OrphanCleanupMode.REPORT
 
     async def test_deletes_orphans_in_delete_mode(self, test_db, session: AsyncSession, worker):
         user = await create_user(session=session)
