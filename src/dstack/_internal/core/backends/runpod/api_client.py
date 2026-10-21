@@ -1,23 +1,248 @@
-import time
-from datetime import timedelta
-from typing import Any, Dict, List, Optional
+from collections.abc import Mapping
+from http import HTTPStatus
+from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
 
 import requests
 from gpuhunt.providers.runpod import RunpodProvider
-from requests import Response
+from typing_extensions import NotRequired
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.logging import get_logger
 
-API_URL = "https://api.runpod.io/graphql"
+logger = get_logger(__name__)
+
+API_BASE_URL = "https://api.runpod.io"
+API_GRAPHQL_URL = f"{API_BASE_URL}/graphql"
+API_V2_URL = f"{API_BASE_URL}/v2"
+
+REQUEST_TIMEOUT = 120
+
+AUTH_ERROR_STATUS_CODES = (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN)
+
+# Applies to non-JSON error responses, which are not expected to contain anything useful past
+# the first few lines
+MAX_ERROR_DETAIL_LEN = 200
 
 
-class RunpodApiClientError(BackendError):
+class V2ErrorResponse(TypedDict):
+    title: str
+    status: int
+    detail: str
+    errors: NotRequired[list[str]]
+
+
+V2Cloud = Literal["SECURE", "COMMUNITY"]
+"""Cloud tier.
+`SECURE` — Runpod-owned datacenter hardware, `COMMUNITY` — community-hosted hardware"""
+
+
+class V2Pod(TypedDict):
+    id: str
+    status: Literal["PROVISIONING", "STARTING", "RUNNING", "EXITED", "ERROR", "TERMINATED"]
+    runtime: Optional["V2PodRuntime"]
+    mounts: "V2Mounts"
+    cluster: NotRequired["V2PodCluster"]
+
+
+class V2PodList(TypedDict):
+    pods: list[V2Pod]
+
+
+class V2PodCluster(TypedDict):
+    id: str
+    rank: Optional[int]
+    ip: NotRequired[str]
+
+
+class V2PodRuntime(TypedDict):
+    ports: NotRequired[list["V2PodRuntimePort"]]
+
+
+class V2PodRuntimePort(TypedDict):
+    private: NotRequired[int]
+    public: NotRequired[Optional[int]]
+    ip: NotRequired[Optional[str]]
+
+
+class V2Mounts(TypedDict):
+    network: NotRequired[list["V2NetworkMount"]]
+    """The `network` field is an array for forward compatibility with eventual multi-network-volume
+    support, but `maxItems` is 1 today"""
+
+
+class V2NetworkMount(TypedDict):
+    volumeId: str
+    path: str
+
+
+class V2CreatePodRequest(TypedDict):
+    """
+    Request body for creating a pod. Exactly one of `gpu` or `cpu` must be set.
+    """
+
+    name: str
+    cloud: NotRequired[V2Cloud]
+    """Cloud tier. Defaults to `SECURE` when omitted"""
+    dataCenterIds: NotRequired[list[str]]
+    """Preferred data centers for placement. Omit or pass an empty array to let
+    the scheduler choose."""
+    gpu: NotRequired["V2CreateGpuConfig"]
+    cpu: NotRequired["V2CreateCpuConfig"]
+    templateId: NotRequired[str]
+    """ID of a pod template to base this pod on. The template is resolved at create time into
+    the same container settings you could otherwise spread into this body."""
+    disk: NotRequired[int]
+    """Container disk in GB (ephemeral, wiped on restart)"""
+    mounts: NotRequired["V2Mounts"]
+    image: NotRequired[str]
+    """`image` is required unless `templateId` is set"""
+    registry: NotRequired[Optional[str]]
+    """Container registry credential ID (for private images)"""
+    entrypoint: NotRequired[list[str]]
+    """Container ENTRYPOINT in exec form"""
+    cmd: NotRequired[list[str]]
+    """Container CMD in exec form"""
+    ports: NotRequired[list[str]]
+    """Exposed ports, formatted as port/protocol"""
+    env: NotRequired[dict[str, str]]
+
+
+class V2UpdatePodRequest(TypedDict):
+    registry: NotRequired[Optional[str]]
+
+
+class V2CreateGpuConfig(TypedDict):
+    id: str
+    """GPU type identifier, as returned by `GET /v2/catalog/gpus`"""
+    count: NotRequired[int]
+    """Number of GPUs. Default: `1`"""
+    minCudaVersion: NotRequired[str]
+    """Lowest acceptable CUDA version for the host machine, as `major.minor`"""
+    minRamPerGpu: NotRequired[int]
+    """Minimum host system RAM in GB per requested GPU. This is a placement filter, not a resource
+    request. The actual total allocated system RAM may be higher and is returned in `gpu.memory`"""
+    minVcpuCountPerGpu: NotRequired[int]
+    """Minimum host vCPU count per requested GPU. This is a placement filter, not a resource
+    request. The actual total allocated vCPU count may be higher and is returned in `gpu.vcpuCount`
+    """
+
+
+class V2CreateCpuConfig(TypedDict):
+    id: str
+    """CPU flavor identifier, as returned by `GET /v2/catalog/cpus`"""
+    vcpuCount: int
+    """Number of vCPUs. Must be valid for the selected CPU flavor and must be a power of two."""
+
+
+class V2Cluster(TypedDict):
+    id: str
+    name: str
+    type: "V2ClusterType"
+    compute: "V2ClusterCompute"
+
+
+V2ClusterType = Literal["APPLICATION", "TRAINING", "SLURM", "RAY"]
+""""Cluster type. `TRAINING` is the generic distributed-training cluster; `SLURM` provisions
+a managed Slurm controller/compute topology; `RAY` provisions a managed Ray head/worker topology;
+`APPLICATION` is a general multi-node application cluster."""
+
+
+class V2ClusterCompute(TypedDict):
+    gpuTypeId: str
+    gpuCountPerPod: int
+    podCount: int
+
+
+class V2CreateClusterRequest(TypedDict):
+    name: str
+    type: V2ClusterType
+    compute: V2ClusterCompute
+    dataCenterIds: NotRequired[list[str]]
+    """Preferred data centers for placement. Omit or pass an empty array to let the scheduler
+    choose. A cluster is always placed within a single data center."""
+    templateId: NotRequired[str]
+    """ID of a pod template to provision every member pod from. The template supplies the container
+    settings (image, args, disk, env, ports) and the container registry credential for private
+    images — the only private-image path for clusters."""
+    disk: NotRequired[int]
+    """Container disk in GB (ephemeral, wiped on restart)"""
+    mounts: NotRequired["V2Mounts"]
+    image: NotRequired[str]
+    """`image` is required unless `templateId` is set"""
+    entrypoint: NotRequired[list[str]]
+    """Container ENTRYPOINT in exec form"""
+    cmd: NotRequired[list[str]]
+    """Container CMD in exec form"""
+    ports: NotRequired[list[str]]
+    """Exposed ports, formatted as port/protocol"""
+    env: NotRequired[dict[str, str]]
+
+
+class V2Registry(TypedDict):
+    id: str
+    name: str
+
+
+class V2CreateRegistryRequest(TypedDict):
+    name: str
+    password: str
+    username: str
+
+
+class V2ListRegistriesResponse(TypedDict):
+    registries: list[V2Registry]
+
+
+V2VolumeType = Literal["STANDARD", "HIGH_PERFORMANCE"]
+
+
+class V2NetworkVolume(TypedDict):
+    id: str
+    name: str
+    """Human-readable name (not required to be unique)"""
+    size: int
+    """Allocated storage in GB, [ 10 .. 4096 ]"""
+    dataCenter: str
+    type: V2VolumeType
+
+
+class V2CreateNetworkVolumeRequest(TypedDict):
+    name: str
+    size: int
+    """Storage to allocate in GB, [ 10 .. 4096 ]"""
+    dataCenter: str
+    type: NotRequired[V2VolumeType]
+    """ When omitted, the volume is provisioned using the requested data center's default (primary)
+    storage tier."""
+
+
+class RunpodGraphqlClientError(BackendError):
     errors: List[Dict]
 
     def __init__(self, errors: List[Dict]):
         self.errors = errors
         super().__init__(errors)
+
+
+class RunpodV2ClientError(BackendError):
+    def __init__(
+        self, *, status: int, title: str, detail: str, errors: Optional[list[str]] = None
+    ) -> None:
+        self.status = status
+        self.title = title
+        self.detail = detail
+        self.errors = errors or []
+
+    def __str__(self) -> str:
+        parts: list[str] = [str(self.status), self.title, self.detail.rstrip(".")]
+        # NOTE: Exceptions are exposed to the end user. We assume `errors` doesn't contain
+        # sensitive data
+        if self.errors:
+            parts.append(repr(self.errors))
+        return ": ".join(parts)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self})"
 
 
 class RunpodApiClient:
@@ -27,28 +252,85 @@ class RunpodApiClient:
 
     def validate_api_key(self) -> bool:
         try:
-            self.get_user_details()
+            self._make_v2_request("GET", "account", "ssh-keys")
         except BackendInvalidCredentialsError:
             return False
         return True
 
-    def get_user_details(self) -> Dict:
-        resp = self._make_request(
-            {
-                "query": """
-                query myself {
-                    myself {
-                        id
-                        authId
-                        email
-                    }
-                }
-                """
-            }
-        )
-        return resp.json()
-
     def create_pod(
+        self,
+        *,
+        name: str,
+        cloud: V2Cloud,
+        data_center_ids: Optional[list[str]] = None,
+        gpu_type_id: Optional[str] = None,
+        gpu_count: Optional[int] = None,
+        min_cpu_count_per_gpu: Optional[int] = None,
+        min_memory_in_gb_per_gpu: Optional[int] = None,
+        cpu_type_id: Optional[str] = None,
+        cpu_count: Optional[int] = None,
+        container_disk_in_gb: int,
+        network_volume_id: Optional[str] = None,
+        volume_mount_path: Optional[str] = None,
+        image_name: str,
+        container_registry_credentials_id: Optional[str] = None,
+        entrypoint: list[str],
+        cmd: list[str],
+        ports: Optional[list[str]] = None,
+        env: Optional[dict[str, str]] = None,
+    ) -> V2Pod:
+        body: V2CreatePodRequest = {
+            "name": name,
+            "cloud": cloud,
+            "image": image_name,
+            "entrypoint": entrypoint,
+            "cmd": cmd,
+            "disk": container_disk_in_gb,
+        }
+
+        if (gpu_type_id is None) == (cpu_type_id is None):
+            raise ValueError("Exactly one of CPU or GPU type must be set")
+        if gpu_type_id is not None:
+            if cpu_count is not None:
+                raise ValueError("cpu_count is not applicable for GPU pods")
+            gpu_config: V2CreateGpuConfig = {
+                "id": gpu_type_id,
+                "minCudaVersion": RunpodProvider.MIN_CUDA_VERSION,
+            }
+            if gpu_count is not None:
+                gpu_config["count"] = gpu_count
+            if min_cpu_count_per_gpu is not None:
+                gpu_config["minVcpuCountPerGpu"] = min_cpu_count_per_gpu
+            if min_memory_in_gb_per_gpu is not None:
+                gpu_config["minRamPerGpu"] = min_memory_in_gb_per_gpu
+            body["gpu"] = gpu_config
+        else:
+            if cpu_count is None:
+                raise ValueError("cpu_count is required for CPU pods")
+            assert cpu_type_id is not None
+            cpu_config: V2CreateCpuConfig = {
+                "id": cpu_type_id,
+                "vcpuCount": cpu_count,
+            }
+            body["cpu"] = cpu_config
+
+        mounts = _build_v2_mounts(network_volume_id, volume_mount_path)
+        if mounts is not None:
+            body["mounts"] = mounts
+
+        if data_center_ids is not None:
+            body["dataCenterIds"] = data_center_ids
+        if container_registry_credentials_id is not None:
+            body["registry"] = container_registry_credentials_id
+        if ports is not None:
+            body["ports"] = ports
+        if env is not None:
+            body["env"] = env
+
+        response = self._make_v2_request("POST", "pods", json=body)
+        return response.json()
+
+    def create_gpu_pod_graphql(
         self,
         name: str,
         image_name: str,
@@ -73,7 +355,7 @@ class RunpodApiClient:
         bid_per_gpu: Optional[float] = None,
         container_registry_auth_id: Optional[str] = None,
     ) -> Dict:
-        resp = self._make_request(
+        resp = self._make_graphql_request(
             {
                 "query": _generate_pod_deployment_mutation(
                     name=name,
@@ -104,327 +386,209 @@ class RunpodApiClient:
         data = resp.json()["data"]
         return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
 
-    def create_cpu_pod(
+    def get_pod(self, pod_id: str) -> Optional[V2Pod]:
+        try:
+            response = self._make_v2_request("GET", "pods", pod_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return None
+            raise
+        return response.json()
+
+    def terminate_pod(self, pod_id: str) -> bool:
+        try:
+            self._make_v2_request("DELETE", "pods", pod_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return False
+            raise
+        return True
+
+    def list_container_registry_credentials(self) -> List[V2Registry]:
+        response = self._make_v2_request("GET", "registries")
+        response_json: V2ListRegistriesResponse = response.json()
+        return response_json["registries"]
+
+    def create_container_registry_credentials(
         self,
+        *,
         name: str,
-        image_name: str,
-        instance_id: str,
-        cloud_type: str,
-        deploy_cost: float,
-        start_ssh: bool = True,
-        data_center_id: Optional[str] = None,
-        container_disk_in_gb: Optional[int] = None,
-        docker_args: Optional[str] = None,
-        ports: Optional[str] = None,
-        volume_mount_path: Optional[str] = None,
-        env: Optional[Dict[str, Any]] = None,
-        template_id: Optional[str] = None,
-        network_volume_id: Optional[str] = None,
-        container_registry_auth_id: Optional[str] = None,
-    ) -> Dict:
-        resp = self._make_request(
-            {
-                "query": _generate_cpu_pod_deployment_mutation(
-                    name=name,
-                    image_name=image_name,
-                    instance_id=instance_id,
-                    cloud_type=cloud_type,
-                    deploy_cost=deploy_cost,
-                    start_ssh=start_ssh,
-                    data_center_id=data_center_id,
-                    container_disk_in_gb=container_disk_in_gb,
-                    docker_args=docker_args,
-                    ports=ports,
-                    volume_mount_path=volume_mount_path,
-                    env=env,
-                    template_id=template_id,
-                    network_volume_id=network_volume_id,
-                    container_registry_auth_id=container_registry_auth_id,
-                )
-            }
-        )
-        return resp.json()["data"]["deployCpuPod"]
+        username: str,
+        password: str,
+    ) -> V2Registry:
+        body: V2CreateRegistryRequest = {
+            "name": name,
+            "username": username,
+            "password": password,
+        }
+        response = self._make_v2_request("POST", "registries", json=body)
+        return response.json()
 
-    def update_pod_container_registry_auth(
-        self,
-        pod_id: str,
-        container_registry_auth_id: str,
-    ) -> str:
-        resp = self._make_request(
-            {
-                "query": f"""
-                mutation {{
-                    podEditJob(input: {{
-                        podId: "{pod_id}"
-                        containerRegistryAuthId: "{container_registry_auth_id}"
-                    }}) {{
-                        id
-                    }}
-                }}
-                """
-            }
-        )
-        return resp.json()["data"]["podEditJob"]["id"]
+    def delete_container_registry_credentials(self, credentials_id: str) -> None:
+        # As of 2026-09-18, v2 API returns 400 with "detail": "Registry auth not found"
+        # instead of 404, hence we don't handle "not found" case
+        self._make_v2_request("DELETE", "registries", credentials_id)
 
-    def get_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": _generate_pod_query(pod_id)})
-        data = resp.json()
-        return data["data"]["pod"]
+    def get_network_volume(self, volume_id: str) -> Optional[V2NetworkVolume]:
+        try:
+            response = self._make_v2_request("GET", "network-volumes", volume_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return None
+            raise
+        return response.json()
 
-    def terminate_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": _generate_pod_terminate_mutation(pod_id)})
-        data = resp.json()
-        return data["data"]
+    def create_network_volume(
+        self, *, name: str, data_center_id: str, size: int
+    ) -> V2NetworkVolume:
+        body: V2CreateNetworkVolumeRequest = {
+            "name": name,
+            "dataCenter": data_center_id,
+            "size": size,
+        }
+        response = self._make_v2_request("POST", "network-volumes", json=body)
+        return response.json()
 
-    def get_container_registry_auths(self) -> List[Dict]:
-        resp = self._make_request(
-            {
-                "query": """
-                query myself {
-                    myself {
-                        containerRegistryCreds {
-                            id,
-                            name
-                        }
-                    }
-                }
-                """
-            }
-        )
-        return resp.json()["data"]["myself"]["containerRegistryCreds"]
-
-    def add_container_registry_auth(self, name: str, username: str, password: str) -> str:
-        resp = self._make_request(
-            {
-                "query": f"""
-                mutation {{
-                    saveRegistryAuth(
-                        input: {{
-                            name: "{name}",
-                            username: "{username}",
-                            password: "{password}"
-                        }}
-                    ) {{
-                        id
-                    }}
-                }}
-                """
-            }
-        )
-        return resp.json()["data"]["saveRegistryAuth"]["id"]
-
-    def delete_container_registry_auth(self, auth_id: str) -> None:
-        self._make_request(
-            {
-                "query": f"""
-                mutation {{
-                    deleteRegistryAuth(
-                        registryAuthId: "{auth_id}"
-                    )
-                }}
-                """
-            }
-        )
-
-    def get_network_volume(self, volume_id: str) -> Optional[Dict]:
-        response = self._make_request(
-            {
-                "query": """
-                query getMyVolumes {
-                    myself {
-                        networkVolumes {
-                            id,
-                            name,
-                            size,
-                            dataCenter {
-                              id
-                              name
-                            }
-                        }
-                    }
-                }
-                """
-            }
-        )
-        network_volumes = response.json()["data"]["myself"]["networkVolumes"]
-        for vol in network_volumes:
-            if vol["id"] == volume_id:
-                return vol
-        return None
-
-    def create_network_volume(self, name: str, region: str, size: int) -> str:
-        response = self._make_request(
-            {
-                "query": f"""
-                mutation {{
-                    createNetworkVolume(
-                        input: {{
-                            name: "{name}",
-                            size: {size},
-                            dataCenterId: "{region}"
-                        }}
-                    ) {{
-                       id
-                    }}
-                }}
-                """
-            }
-        )
-        return response.json()["data"]["createNetworkVolume"]["id"]
-
-    def delete_network_volume(self, volume_id: str) -> None:
-        self._make_request(
-            {
-                "query": f"""
-                mutation {{
-                    deleteNetworkVolume(
-                        input: {{
-                            id: "{volume_id}"
-                        }}
-                    )
-                }}
-                """
-            }
-        )
+    def delete_network_volume(self, volume_id: str) -> bool:
+        try:
+            self._make_v2_request("DELETE", "network-volumes", volume_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return False
+            raise
+        return True
 
     def create_cluster(
         self,
-        cluster_name: str,
+        *,
+        name: str,
+        cluster_type: V2ClusterType,
         gpu_type_id: str,
-        pod_count: int,
         gpu_count_per_pod: int,
-        image_name: str,
-        deploy_cost: str,
-        template_id: Optional[str] = None,
-        cluster_type: str = "TRAINING",
+        pod_count: int,
+        data_center_ids: Optional[list[str]] = None,
+        container_disk_in_gb: int,
         network_volume_id: Optional[str] = None,
-        volume_in_gb: Optional[int] = None,
-        throughput: Optional[int] = None,
-        allowed_cuda_versions: Optional[List[str]] = None,
-        volume_key: Optional[str] = None,
-        data_center_id: Optional[str] = None,
-        start_jupyter: bool = False,
-        start_ssh: bool = False,
-        container_disk_in_gb: Optional[int] = None,
-        docker_args: Optional[str] = None,
-        env: Optional[Dict[str, Any]] = None,
         volume_mount_path: Optional[str] = None,
-        ports: Optional[str] = None,
-    ) -> Dict:
-        resp = self._make_request(
-            {
-                "query": _generate_create_cluster_mutation(
-                    cluster_name=cluster_name,
-                    gpu_type_id=gpu_type_id,
-                    pod_count=pod_count,
-                    gpu_count_per_pod=gpu_count_per_pod,
-                    image_name=image_name,
-                    cluster_type=cluster_type,
-                    deploy_cost=deploy_cost,
-                    template_id=template_id,
-                    network_volume_id=network_volume_id,
-                    volume_in_gb=volume_in_gb,
-                    throughput=throughput,
-                    allowed_cuda_versions=allowed_cuda_versions,
-                    volume_key=volume_key,
-                    data_center_id=data_center_id,
-                    start_jupyter=start_jupyter,
-                    start_ssh=start_ssh,
-                    container_disk_in_gb=container_disk_in_gb,
-                    docker_args=docker_args,
-                    env=env,
-                    volume_mount_path=volume_mount_path,
-                    ports=ports,
-                )
-            }
-        )
-        data = resp.json()["data"]
-        return data["createCluster"]
+        image_name: str,
+        entrypoint: list[str],
+        cmd: list[str],
+        ports: Optional[list[str]] = None,
+        env: Optional[dict[str, str]] = None,
+    ) -> V2Cluster:
+        body: V2CreateClusterRequest = {
+            "name": name,
+            "type": cluster_type,
+            "compute": {
+                "gpuTypeId": gpu_type_id,
+                "gpuCountPerPod": gpu_count_per_pod,
+                "podCount": pod_count,
+            },
+            "image": image_name,
+            "entrypoint": entrypoint,
+            "cmd": cmd,
+            "disk": container_disk_in_gb,
+        }
+        mounts = _build_v2_mounts(network_volume_id, volume_mount_path)
+        if mounts is not None:
+            body["mounts"] = mounts
+        if data_center_ids is not None:
+            body["dataCenterIds"] = data_center_ids
+        if ports is not None:
+            body["ports"] = ports
+        if env is not None:
+            body["env"] = env
+        response = self._make_v2_request("POST", "clusters", json=body)
+        return response.json()
 
     def delete_cluster(self, cluster_id: str) -> bool:
-        resp = self._make_request({"query": _generate_delete_cluster_mutation(cluster_id)})
-        data = resp.json()["data"]
-        return data["deleteCluster"]
+        try:
+            self._make_v2_request("DELETE", "clusters", cluster_id)
+        except RunpodV2ClientError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                return False
+            raise
+        return True
 
-    def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
+    def list_cluster_pods(self, cluster_id: str) -> list[V2Pod]:
+        response = self._make_v2_request("GET", "clusters", cluster_id, "pods")
+        pod_list: V2PodList = response.json()
+        return pod_list["pods"]
+
+    def _make_graphql_request(self, data: Optional[Dict[str, Any]] = None) -> requests.Response:
         try:
             response = self._session.request(
                 method="POST",
-                url=API_URL,
+                url=API_GRAPHQL_URL,
                 json=data,
-                timeout=120,
+                timeout=REQUEST_TIMEOUT,
             )
             response.raise_for_status()
             response_json = response.json()
             # Runpod returns 200 on client errors
             if "errors" in response_json:
-                raise RunpodApiClientError(errors=response_json["errors"])
+                raise RunpodGraphqlClientError(errors=response_json["errors"])
             return response
         except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code in (
-                requests.codes.forbidden,
-                requests.codes.unauthorized,
-            ):
+            if e.response is not None and e.response.status_code in AUTH_ERROR_STATUS_CODES:
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 
-    def wait_for_instance(self, instance_id: str) -> Optional[Dict]:
-        start = get_current_datetime()
-        wait_for_instance_interval = 5
-        # To change the status to "running," the image must be pulled and then started.
-        # We have to wait for 20 minutes while a large image is pulled.
-        while get_current_datetime() < (start + timedelta(minutes=20)):
-            pod = self.get_pod(instance_id)
-            if pod["runtime"] is not None:
-                return pod
-            time.sleep(wait_for_instance_interval)
-        return
+    def _make_v2_request(
+        self, method: str, /, *path_parts: str, json: Optional[Mapping[str, Any]] = None
+    ) -> requests.Response:
+        url = "/".join((API_V2_URL, *path_parts))
+        response = self._session.request(
+            method=method,
+            url=url,
+            timeout=REQUEST_TIMEOUT,
+            json=json,
+        )
+        if HTTPStatus.BAD_REQUEST <= response.status_code < HTTPStatus.INTERNAL_SERVER_ERROR:
+            error = _parse_v2_error_response(response)
+            logger.debug("Runpod API v2 error: %s", error)
+            if response.status_code in AUTH_ERROR_STATUS_CODES:
+                raise BackendInvalidCredentialsError(f"{error['title']}: {error['detail']}")
+            raise RunpodV2ClientError(
+                status=response.status_code,
+                title=error["title"],
+                detail=error["detail"],
+                errors=error.get("errors"),
+            )
+        response.raise_for_status()
+        return response
 
 
-def _generate_pod_query(pod_id: str) -> str:
-    """
-    Generate a query for a specific GPU type
-    """
+def _parse_v2_error_response(response: requests.Response) -> V2ErrorResponse:
+    try:
+        error = response.json()
+    except requests.JSONDecodeError:
+        error = None
+    if isinstance(error, dict) and "title" in error and "detail" in error:
+        return cast(V2ErrorResponse, error)
+    # Not a v2 error response, e.g., an HTML page served by a proxy in front of the API
+    return {
+        "title": response.reason or "Unknown error",
+        "status": response.status_code,
+        "detail": " ".join(response.text.split())[:MAX_ERROR_DETAIL_LEN],
+    }
 
-    return f"""
-    query pod {{
-        pod(input: {{podId: "{pod_id}"}}) {{
-            id
-            clusterIp
-            containerDiskInGb
-            costPerHr
-            desiredStatus
-            dockerArgs
-            dockerId
-            env
-            gpuCount
-            imageName
-            lastStatusChange
-            machineId
-            memoryInGb
-            name
-            podType
-            port
-            ports
-            uptimeSeconds
-            vcpuCount
-            volumeInGb
-            volumeMountPath
-            runtime {{
-                ports {{
-                    ip
-                    isIpPublic
-                    privatePort
-                    publicPort
-                    type
-                }}
-            }}
-            machine {{
-                gpuDisplayName
-            }}
-        }}
-    }}
-    """
+
+def _build_v2_mounts(
+    network_volume_id: Optional[str], volume_mount_path: Optional[str]
+) -> Optional[V2Mounts]:
+    if network_volume_id is not None:
+        if volume_mount_path is None:
+            raise ValueError("volume_mount_path must be set if network_volume_id is set")
+        network_mount: V2NetworkMount = {
+            "volumeId": network_volume_id,
+            "path": volume_mount_path,
+        }
+        mounts: V2Mounts = {"network": [network_mount]}
+        return mounts
+    elif volume_mount_path is not None:
+        raise ValueError("volume_mount_path must not be set if network_volume_id is not set")
+    return None
 
 
 def _generate_pod_deployment_mutation(
@@ -522,209 +686,6 @@ def _generate_pod_deployment_mutation(
             imageName
             machine {{
               podHostId
-            }}
-          }}
-        }}
-        """
-
-
-def _generate_cpu_pod_deployment_mutation(
-    name: str,
-    image_name: str,
-    instance_id: str,
-    cloud_type: str,
-    deploy_cost: float,
-    start_ssh: bool = True,
-    data_center_id: Optional[str] = None,
-    container_disk_in_gb: Optional[int] = None,
-    docker_args: Optional[str] = None,
-    ports: Optional[str] = None,
-    volume_mount_path: Optional[str] = None,
-    env: Optional[Dict[str, Any]] = None,
-    template_id: Optional[str] = None,
-    network_volume_id: Optional[str] = None,
-    container_registry_auth_id: Optional[str] = None,
-) -> str:
-    """
-    Generates a mutation to deploy CPU pod.
-    """
-    input_fields = []
-    input_fields.append(f'name: "{name}"')
-    input_fields.append(f'imageName: "{image_name}"')
-    input_fields.append(f'instanceId: "{instance_id}"')
-    input_fields.append(f"cloudType: {cloud_type}")
-    input_fields.append(f"deployCost: {deploy_cost}")
-
-    if start_ssh:
-        input_fields.append("startSsh: true")
-    if data_center_id is not None:
-        input_fields.append(f'dataCenterId: "{data_center_id}"')
-    if container_disk_in_gb is not None:
-        input_fields.append(f"containerDiskInGb: {container_disk_in_gb}")
-    if docker_args is not None:
-        input_fields.append(f'dockerArgs: "{docker_args}"')
-    if ports is not None:
-        ports = ports.replace(" ", "")
-        input_fields.append(f'ports: "{ports}"')
-    if volume_mount_path is not None:
-        input_fields.append(f'volumeMountPath: "{volume_mount_path}"')
-    if env is not None:
-        env_string = ", ".join(
-            [f'{{ key: "{key}", value: "{value}" }}' for key, value in env.items()]
-        )
-        input_fields.append(f"env: [{env_string}]")
-    if template_id is not None:
-        input_fields.append(f'templateId: "{template_id}"')
-    if network_volume_id is not None:
-        input_fields.append(f'networkVolumeId: "{network_volume_id}"')
-    if container_registry_auth_id is not None:
-        input_fields.append(f'containerRegistryAuthId: "{container_registry_auth_id}"')
-
-    input_string = ", ".join(input_fields)
-    return f"""
-        mutation {{
-          deployCpuPod(
-            input: {{
-              {input_string}
-            }}
-          ) {{
-            id
-            lastStatusChange
-            imageName
-            machine {{
-              podHostId
-            }}
-          }}
-        }}
-        """
-
-
-def _generate_pod_terminate_mutation(pod_id: str) -> str:
-    """
-    Generates a mutation to terminate a pod.
-    """
-    return f"""
-    mutation {{
-        podTerminate(input: {{ podId: "{pod_id}" }})
-    }}
-    """
-
-
-def _generate_delete_cluster_mutation(cluster_id: str) -> str:
-    """
-    Generates a mutation to delete a cluster.
-    """
-    return f"""
-    mutation {{
-        deleteCluster(
-            input: {{
-                id: "{cluster_id}"
-            }}
-        )
-    }}
-    """
-
-
-def _generate_create_cluster_mutation(
-    cluster_name: str,
-    gpu_type_id: str,
-    pod_count: int,
-    gpu_count_per_pod: int,
-    image_name: str,
-    cluster_type: str,
-    deploy_cost: str,
-    template_id: Optional[str] = None,
-    network_volume_id: Optional[str] = None,
-    volume_in_gb: Optional[int] = None,
-    throughput: Optional[int] = None,
-    allowed_cuda_versions: Optional[List[str]] = None,
-    volume_key: Optional[str] = None,
-    data_center_id: Optional[str] = None,
-    start_jupyter: bool = False,
-    start_ssh: bool = False,
-    container_disk_in_gb: Optional[int] = None,
-    docker_args: Optional[str] = None,
-    env: Optional[Dict[str, Any]] = None,
-    volume_mount_path: Optional[str] = None,
-    ports: Optional[str] = None,
-) -> str:
-    """
-    Generates a mutation to create a cluster.
-    """
-    input_fields = []
-
-    # ------------------------------ Required Fields ----------------------------- #
-    input_fields.append(f'clusterName: "{cluster_name}"')
-    input_fields.append(f'gpuTypeId: "{gpu_type_id}"')
-    input_fields.append(f"podCount: {pod_count}")
-    input_fields.append(f'imageName: "{image_name}"')
-    input_fields.append(f"type: {cluster_type}")
-    input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
-    # If deploy_cost is not specified, Runpod returns Insufficient resources error.
-    input_fields.append(f"deployCost: {deploy_cost}")
-
-    # ------------------------------ Optional Fields ----------------------------- #
-    if template_id is not None:
-        input_fields.append(f'templateId: "{template_id}"')
-    if network_volume_id is not None:
-        input_fields.append(f'networkVolumeId: "{network_volume_id}"')
-    if volume_in_gb is not None:
-        input_fields.append(f"volumeInGb: {volume_in_gb}")
-    if throughput is not None:
-        input_fields.append(f"throughput: {throughput}")
-    if allowed_cuda_versions is not None:
-        allowed_cuda_versions_string = ", ".join(
-            [f'"{version}"' for version in allowed_cuda_versions]
-        )
-        input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
-    if volume_key is not None:
-        input_fields.append(f'volumeKey: "{volume_key}"')
-    if data_center_id is not None:
-        input_fields.append(f'dataCenterId: "{data_center_id}"')
-    if start_jupyter:
-        input_fields.append("startJupyter: true")
-    if start_ssh:
-        input_fields.append("startSsh: true")
-    if container_disk_in_gb is not None:
-        input_fields.append(f"containerDiskInGb: {container_disk_in_gb}")
-    if docker_args is not None:
-        input_fields.append(f'dockerArgs: "{docker_args}"')
-    if env is not None:
-        env_string = ", ".join(
-            [f'{{ key: "{key}", value: "{value}" }}' for key, value in env.items()]
-        )
-        input_fields.append(f"env: [{env_string}]")
-    if volume_mount_path is not None:
-        input_fields.append(f'volumeMountPath: "{volume_mount_path}"')
-    if ports is not None:
-        ports = ports.replace(" ", "")
-        input_fields.append(f'ports: "{ports}"')
-
-    # Provisioning fails if minCudaVersion is specified for createCluster.
-    # See https://github.com/dstackai/dstack/issues/3910.
-    # TODO: Uncomment when RunPod fixes minCudaVersion for createCluster.
-    #
-    # input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
-
-    # Format input fields
-    input_string = ", ".join(input_fields)
-    return f"""
-        mutation {{
-          createCluster(
-            input: {{
-              {input_string}
-            }}
-          ) {{
-            id
-            name
-            pods {{
-              id
-              clusterIp
-              lastStatusChange
-              imageName
-              machine {{
-                podHostId
-              }}
             }}
           }}
         }}
