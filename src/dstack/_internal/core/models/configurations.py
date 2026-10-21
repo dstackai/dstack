@@ -93,6 +93,7 @@ class PythonVersion(str, Enum):
     PY312 = "3.12"
     PY313 = "3.13"
     PY314 = "3.14"
+    PY315 = "3.15"
 
 
 class PortMapping(CoreModel):

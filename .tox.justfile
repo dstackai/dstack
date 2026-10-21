@@ -1,5 +1,5 @@
 # Keep in sync with pyproject.toml and .github/workflows/build-artifacts.yml
-supported_python_versions := '3.10,3.11,3.12,3.13,3.14'
+supported_python_versions := '3.10,3.11,3.12,3.13,3.14,3.15'
 
 install_tox_msg := '''
     tox is not installed; to install it using uv:
@@ -7,11 +7,11 @@ install_tox_msg := '''
 '''
 
 python_version_msg := '''
-    .python-version does not exist; to create (replace 3.14 with the desired version):
+    .python-version does not exist; to create (replace 3.15 with the desired version):
         * using uv:
-            uv python pin 3.14
+            uv python pin 3.15
         * if uv is not used:
-            echo 3.14 > .python-version
+            echo 3.15 > .python-version
 '''
 
 [doc('''
