@@ -249,10 +249,13 @@ class _ResourceGroupDecision(str, Enum):
     IGNORE = "ignore"
     """The group cannot be matched or classified. It's left as is."""
     SKIP = "skip"
-    """The owner is changing or changed during the listing, or the group's deletion
-    is in progress. The group is reconsidered by the next cleanup."""
+    """The owner is changing or changed during the listing, or the deletion of the group's
+    internal resources is in progress. The group is reconsidered by the next cleanup."""
     ORPHAN = "orphan"
     """The group is orphaned. After handling, it's been reported or deleted."""
+    DELETING = "deleting"
+    """The group is orphaned and the deletion of its owner resource is requested.
+    Its internal resources are deleted by next cleanups."""
     DELETE_FAILED = "delete_failed"
     """The group is orphaned but failed to be deleted."""
     TRACKED = "tracked"
@@ -427,13 +430,16 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             decision = await _handle_orphaned_resource_group(
                 compute, orphan_cleanup_model, resource_group
             )
-            if decision == _ResourceGroupDecision.ORPHAN:
-                orphan_events.append(_get_orphan_event(resource_group, owner_records))
+            if decision in (_ResourceGroupDecision.ORPHAN, _ResourceGroupDecision.DELETING):
+                orphan_events.append(_get_orphan_event(resource_group, owner_records, decision))
         final_decisions.append(decision)
     if any(d is _ResourceGroupDecision.DELETE_FAILED for d in final_decisions):
         result = _get_backoff_cleanup_process_result(orphan_cleanup_model)
     elif (
-        any(d is _ResourceGroupDecision.SKIP for d in final_decisions)
+        any(
+            d in (_ResourceGroupDecision.SKIP, _ResourceGroupDecision.DELETING)
+            for d in final_decisions
+        )
         or len(resource_listing.failures) > 0
     ):
         result = _get_unsettled_cleanup_process_result()
@@ -583,6 +589,17 @@ async def _handle_orphaned_resource_group(
     try:
         await run_async(compute.delete_resource_group, resource_group)
     except NotYetTerminated:
+        # Backends do not list owner resources whose deletion is in progress,
+        # so a listed owner resource has just been requested to be deleted.
+        if resource_group.primary_id is not None:
+            logger.info(
+                "Started cleaning up orphaned %s %s in %s/%s",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+            return _ResourceGroupDecision.DELETING
         logger.info(
             "Cleanup of orphaned %s %s in %s/%s is skipped because the termination is in progress",
             resource_group.owner_type.value,
@@ -621,23 +638,29 @@ async def _handle_orphaned_resource_group(
 
 
 def _get_orphan_event(
-    resource_group: ListedResourceGroup, owner_records: _OwnerRecords
+    resource_group: ListedResourceGroup,
+    owner_records: _OwnerRecords,
+    decision: _ResourceGroupDecision,
 ) -> _OrphanEvent:
     assert resource_group.owner_type == OwnerType.INSTANCE
     owner_model = owner_records.instances.get(resource_group.provider_ref)
     if owner_model is None:
         owner_model = owner_records.jobs[resource_group.provider_ref]
     return _OrphanEvent(
-        message=_get_orphan_event_message(resource_group),
+        message=_get_orphan_event_message(resource_group, decision),
         target=events.Target.from_model(owner_model),
     )
 
 
-def _get_orphan_event_message(resource_group: ListedResourceGroup) -> str:
+def _get_orphan_event_message(
+    resource_group: ListedResourceGroup, decision: _ResourceGroupDecision
+) -> str:
     # Built from the required fields so that the message is useful
     # even if the backend fills `description` poorly.
     if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
         action = "found"
+    elif decision == _ResourceGroupDecision.DELETING:
+        action = "being deleted"
     else:
         action = "deleted"
     location = resource_group.backend.value

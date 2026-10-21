@@ -486,6 +486,8 @@ class ComputeWithResourceListingSupport(ABC):
 
         Resources without `provider_ref` must be skipped. Resources whose `provider_ref`
         is present but unparsable must be skipped and logged as a warning with the resource id.
+        Owner resources whose deletion is in progress (e.g. a VM that is shutting down)
+        must be skipped, while their internal resources are listed as usual.
 
         Resources of a backend region are listed all or nothing: if any listing in a region
         fails, return no groups of the region and report it in `ResourceListing.failures`.
@@ -499,9 +501,13 @@ class ComputeWithResourceListingSupport(ABC):
     def delete_resource_group(self, group: ListedResourceGroup) -> None:
         """
         Deletes everything in the group in the order the provider requires.
-        Must be idempotent. Raises `NotYetTerminated` while waiting, for
-        example for the VM to be gone before its disk can be deleted; the
-        next cleanup re-lists and calls again.
+        Must be idempotent.
+
+        If the deletion takes several steps, request the deletion of the owner resource first
+        and raise `NotYetTerminated` instead of waiting, e.g. for the VM to be gone before
+        its disk can be deleted. The server reports the owner resource as being deleted.
+        Next cleanups list the remaining internal resources without the owner resource and
+        call the method again until it returns.
         """
         pass
 

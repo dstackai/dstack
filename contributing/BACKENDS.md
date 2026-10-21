@@ -252,9 +252,12 @@ To support it in a backend:
    (`primary_id`) together with internal resources created for it. Skip resources without `provider_ref`.
    List resources of each region all or nothing: if any listing in a region fails, return no groups
    of the region and report it in `ResourceListing.failures`. Otherwise, a tracked instance's resources
-   may be listed without the instance and deleted.
+   may be listed without the instance and deleted. Skip instances whose deletion is in progress
+   (e.g. shutting down), but list their internal resources.
 3. Implement `delete_resource_group()`. Delete everything in the group in the order the provider requires.
-   The method must be idempotent, raise `NotYetTerminated` while waiting, and never delete resources
-   that don't carry the group's `provider_ref`, such as attached volumes.
+   The method must be idempotent and never delete resources that don't carry the group's `provider_ref`,
+   such as attached volumes. If the deletion takes several steps, delete the instance first and raise
+   `NotYetTerminated` instead of waiting for the next step, e.g. for the instance to be gone before its
+   disk can be deleted. Next cleanups list the remaining internal resources and call the method again.
 
 Refer to the [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py) example.

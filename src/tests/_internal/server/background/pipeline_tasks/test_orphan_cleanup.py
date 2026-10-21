@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base.compute import ComputeWithResourceListingSupport
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import (
     ListedResourceGroup,
@@ -657,6 +657,43 @@ class TestOrphanCleanupWorker:
         assert orphan_cleanup.clean_at is None
         assert orphan_cleanup.cleanup_attempt == 2
         assert await list_events(session) == []
+
+    @pytest.mark.parametrize(
+        ("primary_id", "expected_messages"),
+        [
+            ("instance_id", ["Orphaned resources being deleted"]),
+            (None, []),
+        ],
+    )
+    async def test_retries_without_backoff_when_deletion_is_in_progress(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker,
+        primary_id: Optional[str],
+        expected_messages: list[str],
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        orphan_cleanup = await _create_orphan_cleanup(
+            session, project, last_processed_at=get_current_datetime(), cleanup_attempt=1
+        )
+        await _create_instance_with_provider_ref(session, project, InstanceStatus.TERMINATED)
+        compute = _ListingCompute(
+            ResourceListing(resource_groups=[_get_resource_group(primary_id=primary_id)]),
+            delete_error=NotYetTerminated("waiting for the instance to be gone"),
+        )
+        item = await _lock(session, orphan_cleanup)
+        with (
+            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.DELETE),
+            _patch_compute(compute),
+        ):
+            await worker.process(item)
+        await session.refresh(orphan_cleanup)
+        assert orphan_cleanup.clean_at is None
+        assert orphan_cleanup.cleanup_attempt == 0
+        events = await list_events(session)
+        assert [e.message.split(" in ")[0] for e in events] == expected_messages
 
     async def test_does_not_apply_result_if_lock_token_changes(
         self, test_db, session: AsyncSession, worker
