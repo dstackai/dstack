@@ -219,7 +219,7 @@ class OrphanCleanupWorker(Worker[PipelineItem]):
         if process_context is None:
             return
         result = await _process_orphan_cleanup(process_context)
-        await _apply_process_result(item, process_context, result)
+        await _apply_process_result(item, result)
 
 
 @dataclass
@@ -346,7 +346,7 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             orphan_cleanup_model.backend.project.name,
             orphan_cleanup_model.backend.type.value,
         )
-        return _get_failed_cleanup_process_result(orphan_cleanup_model)
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
     compute = backend.compute()
     assert isinstance(compute, ComputeWithResourceListingSupport)
     listed_at = get_current_datetime()
@@ -359,14 +359,14 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             orphan_cleanup_model.backend.type.value,
             repr(e),
         )
-        return _get_failed_cleanup_process_result(orphan_cleanup_model)
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
     except Exception:
         logger.exception(
             "Failed to list resource groups in %s/%s due to unexpected error",
             orphan_cleanup_model.backend.project.name,
             orphan_cleanup_model.backend.type.value,
         )
-        return _get_failed_cleanup_process_result(orphan_cleanup_model)
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
     for failure in resource_listing.failures:
         logger.warning(
             "Failed to list resources of %s in %s for orphan cleanup in %s/%s: %s",
@@ -398,7 +398,7 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
                 orphan_events.append(_get_orphan_event(resource_group, owner_records))
         final_decisions.append(decision)
     if any(d is _ResourceGroupDecision.SKIP for d in final_decisions):
-        result = _get_skips_cleanup_process_result(orphan_cleanup_model)
+        result = _get_backoff_cleanup_process_result(orphan_cleanup_model)
     elif len(resource_listing.failures) > 0:
         result = _get_partial_cleanup_process_result()
     else:
@@ -526,6 +526,13 @@ async def _handle_orphaned_resource_group(
     resource_group: ListedResourceGroup,
 ) -> _ResourceGroupDecision:
     if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        logger.info(
+            "Found orphaned %s %s in %s/%s",
+            resource_group.owner_type.value,
+            resource_group.provider_ref,
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
         sentry_sdk.capture_message(
             "Detected orphaned {} {} in {}/{}".format(
                 resource_group.owner_type.value,
@@ -607,7 +614,7 @@ def _get_orphan_event_message(resource_group: ListedResourceGroup) -> str:
     return message
 
 
-_STUCK_PENDING_THRESHOLD = timedelta(hours=1)
+_STUCK_THRESHOLD = timedelta(hours=1)
 
 
 def _get_instance_group_decision(
@@ -617,10 +624,7 @@ def _get_instance_group_decision(
     listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if instance_model.status == InstanceStatus.PENDING:
-        if (
-            resource_group.created_at is not None
-            and resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD
-        ):
+        if _is_stuck(resource_group, listed_at):
             # Stuck pending instances are unexpected. If this changes,
             # we may treat them as orphans instead of error log and skip.
             logger.error(
@@ -640,10 +644,12 @@ def _get_instance_group_decision(
     provisioning_data = get_instance_provisioning_data(instance_model)
     if provisioning_data is None:
         logger.error(
-            "Failed to classify resource group %s in %s/%s: provisioning_data is None for active instance",
-            instance_model.name,
+            "Failed to classify resource group %s in %s/%s:"
+            " provisioning_data is None for active instance %s",
+            resource_group.provider_ref,
             orphan_cleanup_model.backend.project.name,
             orphan_cleanup_model.backend.type.value,
+            instance_model.name,
         )
         return _ResourceGroupDecision.IGNORE
     if (
@@ -665,10 +671,7 @@ def _get_job_group_decision(
     # So a submitted job may be provisioning the resources right now,
     # while resources of a job in any other status are left from failed provisioning.
     if job_model.status == JobStatus.SUBMITTED:
-        if (
-            resource_group.created_at is not None
-            and resource_group.created_at < listed_at - _STUCK_PENDING_THRESHOLD
-        ):
+        if _is_stuck(resource_group, listed_at):
             logger.error(
                 "Resource group %s in %s/%s was created at %s for job %s"
                 " that is still submitted. The job may be stuck in submitted.",
@@ -682,17 +685,14 @@ def _get_job_group_decision(
     return _ResourceGroupDecision.ORPHAN
 
 
-def _get_failed_cleanup_process_result(
-    orphan_cleanup_model: OrphanCleanupModel,
-) -> _ProcessResult:
-    return _ProcessResult(
-        update_map=_OrphanCleanupUpdateMap(
-            cleanup_attempt=orphan_cleanup_model.cleanup_attempt + 1
-        )
+def _is_stuck(resource_group: ListedResourceGroup, listed_at: datetime) -> bool:
+    return (
+        resource_group.created_at is not None
+        and resource_group.created_at < listed_at - _STUCK_THRESHOLD
     )
 
 
-def _get_skips_cleanup_process_result(
+def _get_backoff_cleanup_process_result(
     orphan_cleanup_model: OrphanCleanupModel,
 ) -> _ProcessResult:
     return _ProcessResult(
@@ -719,9 +719,7 @@ def _get_success_cleanup_process_result(listed_at: datetime) -> _ProcessResult:
     )
 
 
-async def _apply_process_result(
-    item: PipelineItem, process_context: _ProcessContext, result: _ProcessResult
-):
+async def _apply_process_result(item: PipelineItem, result: _ProcessResult):
     update_map = _OrphanCleanupUpdateMap()
     update_map.update(result.update_map)
     set_processed_update_map_fields(update_map)
