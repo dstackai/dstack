@@ -162,7 +162,9 @@ def get_dev_env_run_plan_dict(
                 " && sudo rm -rf $DSTACK_VENV_DIR"
                 " && sudo mkdir $DSTACK_VENV_DIR"
                 " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
-                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && (if UV_PYTHON_INSTALL_DIR=/opt/uv/python uv python find 3.13 > /dev/null 2>&1;"
+                " then export UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_DOWNLOADS=never; fi;"
+                " uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR)"
                 " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'uv pip install ipykernel...'"
                 " && uv pip install -q --no-cache-dir ipykernel 2> /dev/null)"
@@ -180,7 +182,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.15-base-ubuntu24.04"
+        image_name = "dstackai/base:0.16-base-ubuntu24.04"
 
     run_spec = {
         "configuration": {
@@ -409,7 +411,9 @@ def get_dev_env_run_dict(
                 " && sudo rm -rf $DSTACK_VENV_DIR"
                 " && sudo mkdir $DSTACK_VENV_DIR"
                 " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
-                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && (if UV_PYTHON_INSTALL_DIR=/opt/uv/python uv python find 3.13 > /dev/null 2>&1;"
+                " then export UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_DOWNLOADS=never; fi;"
+                " uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR)"
                 " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'uv pip install ipykernel...'"
                 " && uv pip install -q --no-cache-dir ipykernel 2> /dev/null)"
@@ -427,7 +431,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.15-base-ubuntu24.04"
+        image_name = "dstackai/base:0.16-base-ubuntu24.04"
 
     return {
         "id": run_id,

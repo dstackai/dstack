@@ -220,7 +220,9 @@ class TestCommands:
                 " && sudo rm -rf $DSTACK_VENV_DIR"
                 " && sudo mkdir $DSTACK_VENV_DIR"
                 " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
-                " && uv venv -q --prompt dstack -p 3.12 --seed $DSTACK_VENV_DIR"
+                " && (if UV_PYTHON_INSTALL_DIR=/opt/uv/python uv python find 3.12 > /dev/null 2>&1;"
+                " then export UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_DOWNLOADS=never; fi;"
+                " uv venv -q --prompt dstack -p 3.12 --seed $DSTACK_VENV_DIR)"
                 " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && sleep inf"
             ),
