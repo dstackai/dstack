@@ -708,6 +708,18 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             session, plan
         )
 
+    if plan.register_services:
+        # Registering a service may request a TLS certificate. A reinstalled gateway has
+        # lost its global config along with its services, and certbot would fall back to
+        # its default ACME server, so resend the config first.
+        try:
+            async with connection.client() as client:
+                await client.submit_gateway_config()
+        except Exception as e:
+            logger.warning("%s: failed to submit gateway config: %r", fmt(replica_model), e)
+            await _commit_update(item, replica_model, update_map={})
+            return
+
     sync_result = await _perform_state_sync(
         connection, gateway_model, replica_model, run_models_by_id, job_models_by_id, plan
     )
