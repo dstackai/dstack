@@ -437,7 +437,7 @@ def list_instances_with_tag_key(
     ec2_client: botocore.client.BaseClient, tag_key: str
 ) -> List[Dict[str, Any]]:
     """
-    Lists instances that have the `tag_key` tag, except terminated ones.
+    Lists instances that have the `tag_key` tag, except terminated ones and ones being terminated.
     """
     instances = []
     paginator = ec2_client.get_paginator("describe_instances")
@@ -446,7 +446,7 @@ def list_instances_with_tag_key(
             {"Name": "tag-key", "Values": [tag_key]},
             {
                 "Name": "instance-state-name",
-                "Values": ["pending", "running", "shutting-down", "stopping", "stopped"],
+                "Values": ["pending", "running", "stopping", "stopped"],
             },
         ]
     ):

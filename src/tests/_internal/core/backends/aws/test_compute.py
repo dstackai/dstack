@@ -4,13 +4,13 @@ from typing import Iterator
 from unittest.mock import Mock
 
 import boto3
-import botocore.exceptions
 import pytest
 from botocore.stub import Stubber
 
 from dstack._internal.core.backends.aws.compute import AWSCompute
 from dstack._internal.core.backends.aws.models import AWSAccessKeyCreds, AWSConfig
 from dstack._internal.core.backends.aws.resources import allocate_and_associate_eip
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 
@@ -72,6 +72,11 @@ def _get_address(allocation_id: str, instance_id: str) -> dict:
 
 def _add_list_responses(ec2_client: Stubber, instances: list[dict], addresses: list[dict]):
     ec2_client.add_response(
+        "describe_addresses",
+        {"Addresses": addresses},
+        {"Filters": [PROVIDER_REF_FILTER]},
+    )
+    ec2_client.add_response(
         "describe_instances",
         {"Reservations": [{"Instances": instances}]},
         {
@@ -79,15 +84,23 @@ def _add_list_responses(ec2_client: Stubber, instances: list[dict], addresses: l
                 PROVIDER_REF_FILTER,
                 {
                     "Name": "instance-state-name",
-                    "Values": ["pending", "running", "shutting-down", "stopping", "stopped"],
+                    "Values": ["pending", "running", "stopping", "stopped"],
                 },
             ]
         },
     )
-    ec2_client.add_response(
-        "describe_addresses",
-        {"Addresses": addresses},
-        {"Filters": [PROVIDER_REF_FILTER]},
+
+
+def _get_resource_group(eip_allocation_ids: list[str]) -> ListedResourceGroup:
+    return ListedResourceGroup(
+        backend=BackendType.AWS,
+        owner_type=OwnerType.INSTANCE,
+        provider_ref=PROVIDER_REF,
+        primary_id="i-1",
+        region=REGION,
+        created_at=LAUNCH_TIME,
+        description="instance i-1",
+        backend_data=json.dumps({"instance_id": "i-1", "eip_allocation_ids": eip_allocation_ids}),
     )
 
 
@@ -141,12 +154,12 @@ class TestListResourceGroups:
     def test_lists_instances_without_elastic_ip_permissions(
         self, compute: AWSCompute, ec2_client: Stubber
     ):
+        ec2_client.add_client_error(
+            "describe_addresses", service_error_code="UnauthorizedOperation"
+        )
         ec2_client.add_response(
             "describe_instances",
             {"Reservations": [{"Instances": [_get_instance("i-1")]}]},
-        )
-        ec2_client.add_client_error(
-            "describe_addresses", service_error_code="UnauthorizedOperation"
         )
         groups = compute.list_resource_groups().resource_groups
         assert [g.primary_id for g in groups] == ["i-1"]
@@ -172,7 +185,7 @@ class TestListResourceGroups:
         _add_list_responses(ec2_client, instances=[_get_instance("i-1")], addresses=[])
         with Stubber(other_ec2_client) as other_stubber:
             other_stubber.add_client_error(
-                "describe_instances", service_error_code="RequestLimitExceeded"
+                "describe_addresses", service_error_code="RequestLimitExceeded"
             )
             listing = compute.list_resource_groups()
         assert [g.primary_id for g in listing.resource_groups] == ["i-1"]
@@ -182,9 +195,9 @@ class TestListResourceGroups:
 
     def test_raises_if_all_regions_fail(self, compute: AWSCompute, ec2_client: Stubber):
         ec2_client.add_client_error(
-            "describe_instances", service_error_code="RequestLimitExceeded"
+            "describe_addresses", service_error_code="RequestLimitExceeded"
         )
-        with pytest.raises(botocore.exceptions.ClientError):
+        with pytest.raises(ComputeError):
             compute.list_resource_groups()
 
 
@@ -192,16 +205,7 @@ class TestDeleteResourceGroup:
     def test_terminates_instance_and_releases_elastic_ip(
         self, compute: AWSCompute, ec2_client: Stubber
     ):
-        group = ListedResourceGroup(
-            backend=BackendType.AWS,
-            owner_type=OwnerType.INSTANCE,
-            provider_ref=PROVIDER_REF,
-            primary_id="i-1",
-            region=REGION,
-            created_at=LAUNCH_TIME,
-            description="instance i-1",
-            backend_data=json.dumps({"instance_id": "i-1", "eip_allocation_ids": ["eipalloc-1"]}),
-        )
+        group = _get_resource_group(eip_allocation_ids=["eipalloc-1"])
         ec2_client.add_response(
             "terminate_instances", {"TerminatingInstances": []}, {"InstanceIds": ["i-1"]}
         )
@@ -215,16 +219,7 @@ class TestDeleteResourceGroup:
         compute.delete_resource_group(group)
 
     def test_tolerates_already_terminated_instance(self, compute: AWSCompute, ec2_client: Stubber):
-        group = ListedResourceGroup(
-            backend=BackendType.AWS,
-            owner_type=OwnerType.INSTANCE,
-            provider_ref=PROVIDER_REF,
-            primary_id="i-1",
-            region=REGION,
-            created_at=LAUNCH_TIME,
-            description="instance i-1",
-            backend_data=json.dumps({"instance_id": "i-1", "eip_allocation_ids": []}),
-        )
+        group = _get_resource_group(eip_allocation_ids=[])
         ec2_client.add_client_error(
             "terminate_instances",
             service_error_code="InvalidInstanceID.NotFound",

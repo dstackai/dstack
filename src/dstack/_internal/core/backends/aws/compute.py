@@ -282,8 +282,6 @@ class AWSCompute(
             try:
                 listing.resource_groups.extend(_list_resource_groups(ec2_client, region))
             except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as e:
-                if len(regions) == 1:
-                    raise
                 listing.failures.append(
                     ResourceListingFailure(backend=BackendType.AWS, region=region, message=str(e))
                 )
@@ -1546,8 +1544,11 @@ def _list_resource_groups(
     Lists instances and Elastic IPs tagged with `provider_ref`.
     An Elastic IP is grouped with its instance by the `dstack_instance` tag.
     Elastic IPs whose instance is gone form groups of their own.
+    Instances in `shutting-down` are not listed since their termination is in progress
+    and terminating an instance releases its Elastic IPs.
     """
-    instances = aws_resources.list_instances_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
+    # Elastic IPs are listed before instances. An Elastic IP is allocated after its instance
+    # is launched, so the instance of a listed Elastic IP is listed too unless it's gone.
     try:
         addresses = aws_resources.list_addresses_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
     except botocore.exceptions.ClientError as e:
@@ -1557,6 +1558,7 @@ def _list_resource_groups(
         # with public IPs, so without them there are no Elastic IPs to clean up.
         logger.debug("Skipping Elastic IPs in %s: not authorized to list them", region)
         addresses = []
+    instances = aws_resources.list_instances_with_tag_key(ec2_client, PROVIDER_REF_TAG_KEY)
 
     addresses_by_instance_id: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     instance_ids = {instance["InstanceId"] for instance in instances}
