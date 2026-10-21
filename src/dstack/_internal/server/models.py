@@ -1473,8 +1473,8 @@ class OrphanCleanupModel(PipelineModelMixin, BaseModel):
     cleanup_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     """Consecutive failed or unclean cleanups. Determines the retry delay."""
     clean_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    """Start of the last clean cleanup. Later instance or job activity makes the backend
-    eligible for cleanup."""
+    """Start of the last clean cleanup minus a margin for timing inaccuracies.
+    Later instance or job activity makes the backend eligible for cleanup."""
     clean_mode: Mapped[Optional[OrphanCleanupMode]] = mapped_column(
         EnumAsString(OrphanCleanupMode, 100)
     )

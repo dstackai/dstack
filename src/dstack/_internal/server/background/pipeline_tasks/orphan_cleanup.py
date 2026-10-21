@@ -247,9 +247,16 @@ class _ProcessResult:
 
 class _ResourceGroupDecision(str, Enum):
     IGNORE = "ignore"
+    """The group cannot be matched or classified. It's left as is."""
     SKIP = "skip"
+    """The owner is changing or changed during the listing, or the group's deletion
+    is in progress. The group is reconsidered by the next cleanup."""
     ORPHAN = "orphan"
+    """The group is orphaned. After handling, it's been reported or deleted."""
+    DELETE_FAILED = "delete_failed"
+    """The group is orphaned but failed to be deleted."""
     TRACKED = "tracked"
+    """The group is the owner's current resources."""
 
 
 _CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
@@ -423,10 +430,13 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
             if decision == _ResourceGroupDecision.ORPHAN:
                 orphan_events.append(_get_orphan_event(resource_group, owner_records))
         final_decisions.append(decision)
-    if any(d is _ResourceGroupDecision.SKIP for d in final_decisions):
+    if any(d is _ResourceGroupDecision.DELETE_FAILED for d in final_decisions):
         result = _get_backoff_cleanup_process_result(orphan_cleanup_model)
-    elif len(resource_listing.failures) > 0:
-        result = _get_partial_cleanup_process_result()
+    elif (
+        any(d is _ResourceGroupDecision.SKIP for d in final_decisions)
+        or len(resource_listing.failures) > 0
+    ):
+        result = _get_unsettled_cleanup_process_result()
     else:
         result = _get_success_cleanup_process_result(listed_at)
     result.orphan_events = orphan_events
@@ -481,6 +491,8 @@ async def _load_instances_by_provider_ref(
                     InstanceModel.name,
                     InstanceModel.provider_ref,
                     InstanceModel.status,
+                    InstanceModel.started_at,
+                    InstanceModel.finished_at,
                     InstanceModel.job_provisioning_data,
                 )
             )
@@ -570,16 +582,17 @@ async def _handle_orphaned_resource_group(
         return _ResourceGroupDecision.ORPHAN
     try:
         await run_async(compute.delete_resource_group, resource_group)
+    except NotYetTerminated:
+        logger.info(
+            "Cleanup of orphaned %s %s in %s/%s is skipped because the termination is in progress",
+            resource_group.owner_type.value,
+            resource_group.provider_ref,
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
+        return _ResourceGroupDecision.SKIP
     except Exception as e:
-        if isinstance(e, NotYetTerminated):
-            logger.info(
-                "Cleanup of orphaned %s %s in %s/%s is skipped because the termination is in progress",
-                resource_group.owner_type.value,
-                resource_group.provider_ref,
-                orphan_cleanup_model.backend.project.name,
-                orphan_cleanup_model.backend.type.value,
-            )
-        elif isinstance(e, BackendError):
+        if isinstance(e, BackendError):
             logger.warning(
                 "Cleanup of orphaned %s %s in %s/%s is skipped due to error: %s",
                 resource_group.owner_type.value,
@@ -596,7 +609,7 @@ async def _handle_orphaned_resource_group(
                 orphan_cleanup_model.backend.project.name,
                 orphan_cleanup_model.backend.type.value,
             )
-        return _ResourceGroupDecision.SKIP
+        return _ResourceGroupDecision.DELETE_FAILED
     logger.info(
         "Cleaned up orphaned %s %s in %s/%s",
         resource_group.owner_type.value,
@@ -642,6 +655,14 @@ def _get_orphan_event_message(resource_group: ListedResourceGroup) -> str:
 
 _STUCK_THRESHOLD = timedelta(hours=1)
 
+_LISTING_MARGIN = timedelta(minutes=10)
+"""
+Owners changed later than `listed_at - _LISTING_MARGIN` are not judged by the listing,
+and `clean_at` is set to `listed_at - _LISTING_MARGIN`. The margin covers clock skew
+between replicas, the lag between setting timestamps and committing them,
+and providers listing new resources with a delay.
+"""
+
 
 def _get_instance_group_decision(
     orphan_cleanup_model: OrphanCleanupModel,
@@ -666,6 +687,9 @@ def _get_instance_group_decision(
     if instance_model.status == InstanceStatus.TERMINATING:
         return _ResourceGroupDecision.SKIP
     if instance_model.status == InstanceStatus.TERMINATED:
+        # The listing may predate the termination
+        if _changed_after(instance_model.finished_at, listed_at - _LISTING_MARGIN):
+            return _ResourceGroupDecision.SKIP
         return _ResourceGroupDecision.ORPHAN
     provisioning_data = get_instance_provisioning_data(instance_model)
     if provisioning_data is None:
@@ -682,6 +706,11 @@ def _get_instance_group_decision(
         provisioning_data.get_base_backend() != resource_group.backend
         or provisioning_data.instance_id != resource_group.primary_id
     ):
+        # The listing may predate the provisioning: the instance may be missing from it
+        # while its internal resources created earlier are listed.
+        # `started_at` is set together with the provisioning data.
+        if _changed_after(instance_model.started_at, listed_at - _LISTING_MARGIN):
+            return _ResourceGroupDecision.SKIP
         return _ResourceGroupDecision.ORPHAN
     return _ResourceGroupDecision.TRACKED
 
@@ -711,6 +740,10 @@ def _get_job_group_decision(
     return _ResourceGroupDecision.ORPHAN
 
 
+def _changed_after(changed_at: Optional[datetime], at: datetime) -> bool:
+    return changed_at is not None and changed_at >= at
+
+
 def _is_stuck(resource_group: ListedResourceGroup, listed_at: datetime) -> bool:
     return (
         resource_group.created_at is not None
@@ -728,10 +761,12 @@ def _get_backoff_cleanup_process_result(
     )
 
 
-def _get_partial_cleanup_process_result() -> _ProcessResult:
+def _get_unsettled_cleanup_process_result() -> _ProcessResult:
+    # Some groups were skipped or some parts could not be listed.
     # The backend stays eligible since `clean_at` is not updated.
     # It's retried after the cleanup interval rather than backed off,
-    # so that the listed parts are cleaned up as usual while other parts fail.
+    # since skipped groups are expected to settle and the listed parts
+    # should be cleaned up as usual while other parts fail.
     return _ProcessResult(update_map=_OrphanCleanupUpdateMap(cleanup_attempt=0))
 
 
@@ -739,7 +774,7 @@ def _get_success_cleanup_process_result(listed_at: datetime) -> _ProcessResult:
     return _ProcessResult(
         update_map=_OrphanCleanupUpdateMap(
             cleanup_attempt=0,
-            clean_at=listed_at,
+            clean_at=listed_at - _LISTING_MARGIN,
             clean_mode=settings.ORPHAN_CLEANUP_MODE,
         )
     )

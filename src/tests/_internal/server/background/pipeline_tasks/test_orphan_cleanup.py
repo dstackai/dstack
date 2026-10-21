@@ -79,7 +79,12 @@ def _get_resource_group(
     )
 
 
-def _get_instance_model(status: InstanceStatus, provisioned: bool = True) -> InstanceModel:
+def _get_instance_model(
+    status: InstanceStatus,
+    provisioned: bool = True,
+    started_at: Optional[datetime] = None,
+    finished_at: Optional[datetime] = None,
+) -> InstanceModel:
     job_provisioning_data = None
     if provisioned:
         # `instance_id` is "instance_id"
@@ -88,6 +93,8 @@ def _get_instance_model(status: InstanceStatus, provisioned: bool = True) -> Ins
         name="test-instance",
         status=status,
         provider_ref=PROVIDER_REF,
+        started_at=started_at,
+        finished_at=finished_at,
         job_provisioning_data=(
             job_provisioning_data.model_dump_json() if job_provisioning_data else None
         ),
@@ -134,6 +141,20 @@ class TestGetResourceGroupDecision:
         decision = _get_decision(_get_resource_group(), instance_model=instance_model)
         assert decision == _ResourceGroupDecision.ORPHAN
 
+    @pytest.mark.parametrize(
+        ("minutes_before_listing", "expected_decision"),
+        [(5, _ResourceGroupDecision.SKIP), (60, _ResourceGroupDecision.ORPHAN)],
+    )
+    def test_skips_group_of_instance_terminated_around_listing(
+        self, minutes_before_listing: int, expected_decision: _ResourceGroupDecision
+    ):
+        instance_model = _get_instance_model(
+            InstanceStatus.TERMINATED,
+            finished_at=LISTED_AT - timedelta(minutes=minutes_before_listing),
+        )
+        decision = _get_decision(_get_resource_group(), instance_model=instance_model)
+        assert decision == expected_decision
+
     def test_tracks_group_matching_active_instance(self):
         instance_model = _get_instance_model(InstanceStatus.BUSY)
         decision = _get_decision(_get_resource_group(), instance_model=instance_model)
@@ -150,6 +171,21 @@ class TestGetResourceGroupDecision:
         resource_group = _get_resource_group(primary_id=None)
         decision = _get_decision(resource_group, instance_model=instance_model)
         assert decision == _ResourceGroupDecision.ORPHAN
+
+    @pytest.mark.parametrize(
+        ("minutes_before_listing", "expected_decision"),
+        [(5, _ResourceGroupDecision.SKIP), (60, _ResourceGroupDecision.ORPHAN)],
+    )
+    def test_skips_other_group_of_instance_provisioned_around_listing(
+        self, minutes_before_listing: int, expected_decision: _ResourceGroupDecision
+    ):
+        instance_model = _get_instance_model(
+            InstanceStatus.PROVISIONING,
+            started_at=LISTED_AT - timedelta(minutes=minutes_before_listing),
+        )
+        resource_group = _get_resource_group(primary_id=None)
+        decision = _get_decision(resource_group, instance_model=instance_model)
+        assert decision == expected_decision
 
     def test_orphans_group_in_other_backend_of_active_instance(self):
         instance_model = _get_instance_model(InstanceStatus.BUSY)
@@ -192,9 +228,11 @@ class _ListingCompute(ComputeWithResourceListingSupport):
         self,
         listing: Optional[ResourceListing] = None,
         error: Optional[Exception] = None,
+        delete_error: Optional[Exception] = None,
     ):
         self.listing = listing or ResourceListing(resource_groups=[])
         self.error = error
+        self.delete_error = delete_error
         self.listed = False
         self.deleted: list[ListedResourceGroup] = []
 
@@ -205,6 +243,8 @@ class _ListingCompute(ComputeWithResourceListingSupport):
         return self.listing
 
     def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        if self.delete_error is not None:
+            raise self.delete_error
         self.deleted.append(group)
 
 
@@ -404,6 +444,10 @@ class TestOrphanCleanupWorker:
             await worker.process(item)
         await session.refresh(orphan_cleanup)
         assert orphan_cleanup.clean_at is not None
+        assert (
+            orphan_cleanup.clean_at
+            <= get_current_datetime() - orphan_cleanup_pipeline._LISTING_MARGIN
+        )
         assert orphan_cleanup.clean_mode == OrphanCleanupMode.REPORT
         assert orphan_cleanup.cleanup_attempt == 0
         assert orphan_cleanup.lock_token is None
@@ -574,11 +618,13 @@ class TestOrphanCleanupWorker:
         assert orphan_cleanup.clean_at is None
         assert orphan_cleanup.cleanup_attempt == 2
 
-    async def test_backs_off_when_owner_is_in_flight(self, test_db, session: AsyncSession, worker):
+    async def test_retries_without_backoff_when_owner_is_in_flight(
+        self, test_db, session: AsyncSession, worker
+    ):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
         orphan_cleanup = await _create_orphan_cleanup(
-            session, project, last_processed_at=get_current_datetime()
+            session, project, last_processed_at=get_current_datetime(), cleanup_attempt=2
         )
         await _create_instance_with_provider_ref(session, project, InstanceStatus.PENDING)
         compute = _ListingCompute(ResourceListing(resource_groups=[_get_resource_group()]))
@@ -587,8 +633,30 @@ class TestOrphanCleanupWorker:
             await worker.process(item)
         await session.refresh(orphan_cleanup)
         assert orphan_cleanup.clean_at is None
-        assert orphan_cleanup.cleanup_attempt == 1
+        assert orphan_cleanup.cleanup_attempt == 0
         assert compute.deleted == []
+
+    async def test_backs_off_after_delete_error(self, test_db, session: AsyncSession, worker):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        orphan_cleanup = await _create_orphan_cleanup(
+            session, project, last_processed_at=get_current_datetime(), cleanup_attempt=1
+        )
+        await _create_instance_with_provider_ref(session, project, InstanceStatus.TERMINATED)
+        compute = _ListingCompute(
+            ResourceListing(resource_groups=[_get_resource_group()]),
+            delete_error=BackendError("rate limited"),
+        )
+        item = await _lock(session, orphan_cleanup)
+        with (
+            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.DELETE),
+            _patch_compute(compute),
+        ):
+            await worker.process(item)
+        await session.refresh(orphan_cleanup)
+        assert orphan_cleanup.clean_at is None
+        assert orphan_cleanup.cleanup_attempt == 2
+        assert await list_events(session) == []
 
     async def test_does_not_apply_result_if_lock_token_changes(
         self, test_db, session: AsyncSession, worker
