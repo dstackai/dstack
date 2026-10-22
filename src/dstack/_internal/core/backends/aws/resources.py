@@ -561,7 +561,7 @@ def get_primary_network_interface_id(instance: Any) -> str:
 def release_eip(ec2_client: botocore.client.BaseClient, allocation_id: str) -> None:
     """
     Releases an Elastic IP by allocation ID. Disassociates first if the EIP is still
-    bound to an instance — `TerminateInstances` only initiates shutdown, and AWS
+    bound to an instance – `TerminateInstances` only initiates shutdown, and AWS
     auto-disassociates only once the instance reaches `terminated`. Releasing
     explicitly avoids the `InvalidIPAddress.InUse` race and the retry loop.
     """
