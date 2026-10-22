@@ -14,6 +14,7 @@ from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, R
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import get_job_spec, get_jobs_from_run_spec
+from dstack._internal.server.services.orphan_cleanup import get_cleaned_up_after_filter
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
 from dstack._internal.server.services.runs.replicas import build_replica_lists
 from dstack._internal.server.services.services.autoscalers import get_service_scaler
@@ -132,6 +133,14 @@ async def delete_superseded_no_capacity_job_submissions(
     on no capacity and carry no information beyond the events.
     The direct predecessor of each new submission is kept so that the run's
     `status_message` can still show `retrying` while the new submission is in flight.
+
+    A submission is also kept until orphan cleanup has had a clean run after it finished.
+    `run_job()` may have failed after creating provider resources, and the submission's
+    `provider_ref` is then the only way to match them as orphans.
+
+    Trade-off: deletion only happens when a new submission is created, so submissions
+    still waiting for orphan cleanup when the run stops retrying are never deleted.
+    Runs retrying for days still don't pile them up.
     """
     for job_model in new_job_models:
         if job_model.submission_num < 2:
@@ -146,5 +155,6 @@ async def delete_superseded_no_capacity_job_submissions(
                 JobModel.termination_reason
                 == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 JobModel.job_provisioning_data.is_(None),
+                get_cleaned_up_after_filter(JobModel.project_id, JobModel.last_processed_at),
             )
         )
