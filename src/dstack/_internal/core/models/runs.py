@@ -455,6 +455,11 @@ class JobSubmission(CoreModel):
     error: Optional[str] = None
     probes: list[Probe] = []
     image_pull_progress: Optional[ImagePullProgress] = None
+    provider_ref: Optional[str] = None
+    """`provider_ref` to set on provider resources created by `run_job()` for this submission.
+    The server sets it from the submission's placeholder instance before calling `run_job()`.
+    It's not stored with the submission.
+    """
 
     @property
     def age(self) -> timedelta:

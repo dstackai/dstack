@@ -1,12 +1,18 @@
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import botocore.client
 import botocore.exceptions
 
 from dstack._internal import settings
 from dstack._internal.core.backends.aws.models import AWSOSImageConfig
-from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
+from dstack._internal.core.backends.base.compute import PROVIDER_REF_TAG_KEY
+from dstack._internal.core.errors import (
+    BackendError,
+    ComputeError,
+    ComputeResourceNotFoundError,
+    ProvisioningError,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -439,6 +445,168 @@ def list_instance_device_names(
     for mapping in block_device_mappings:
         device_names.append(mapping["DeviceName"])
     return device_names
+
+
+def list_instances_with_tag_key(
+    ec2_client: botocore.client.BaseClient, tag_key: str
+) -> List[Dict[str, Any]]:
+    """
+    Lists instances that have the `tag_key` tag, except terminated ones and ones being terminated.
+    """
+    instances = []
+    paginator = ec2_client.get_paginator("describe_instances")
+    for page in paginator.paginate(
+        Filters=[
+            {"Name": "tag-key", "Values": [tag_key]},
+            {
+                "Name": "instance-state-name",
+                "Values": ["pending", "running", "stopping", "stopped"],
+            },
+        ]
+    ):
+        # Instances are grouped by the launch request that created them
+        for reservation in page["Reservations"]:
+            instances.extend(reservation["Instances"])
+    return instances
+
+
+def list_addresses_with_tag_key(
+    ec2_client: botocore.client.BaseClient, tag_key: str
+) -> List[Dict[str, Any]]:
+    """
+    Lists Elastic IPs that have the `tag_key` tag.
+    """
+    response = ec2_client.describe_addresses(Filters=[{"Name": "tag-key", "Values": [tag_key]}])
+    return response["Addresses"]
+
+
+def get_tag_value(tags: List[Dict[str, str]], key: str) -> Optional[str]:
+    for tag in tags:
+        if tag.get("Key") == key:
+            return tag.get("Value")
+    return None
+
+
+def allocate_and_associate_eip(
+    ec2_client: botocore.client.BaseClient,
+    instance: Any,
+    project_name: Optional[str],
+    provider_ref: Optional[str],
+    backend_tags: Optional[Dict[str, str]],
+) -> Tuple[str, str]:
+    """
+    Allocates an Elastic IP and associates it with the primary ENI of `instance`.
+    Returns `(public_ip, allocation_id)`.
+    """
+    primary_nic_id = get_primary_network_interface_id(instance)
+    tags = {
+        "owner": "dstack",
+        "dstack_instance": instance.instance_id,
+    }
+    if project_name is not None:
+        tags["dstack_project"] = project_name
+    if provider_ref is not None:
+        tags[PROVIDER_REF_TAG_KEY] = provider_ref
+    if backend_tags:
+        for k, v in backend_tags.items():
+            tags.setdefault(k, v)
+    tags = filter_invalid_tags(tags)
+
+    try:
+        allocate_response = ec2_client.allocate_address(
+            Domain="vpc",
+            TagSpecifications=[
+                {
+                    "ResourceType": "elastic-ip",
+                    "Tags": make_tags(tags),
+                }
+            ],
+        )
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        region = ec2_client.meta.region_name
+        if code == "AddressLimitExceeded":
+            raise ProvisioningError(
+                f"Elastic IP quota exceeded in {region}. "
+                "Raise the EC2 'EC2-VPC Elastic IPs' quota in Service Quotas, "
+                "or reduce concurrent multi-EFA instances."
+            )
+        raise ProvisioningError(f"Failed to allocate Elastic IP in {region}: {e}")
+
+    allocation_id = allocate_response["AllocationId"]
+    public_ip = allocate_response["PublicIp"]
+    try:
+        ec2_client.associate_address(
+            AllocationId=allocation_id,
+            NetworkInterfaceId=primary_nic_id,
+            AllowReassociation=False,
+        )
+    except botocore.exceptions.ClientError as e:
+        # Best-effort release; on failure the EIP leaks until manually released.
+        logger.warning(
+            "Failed to associate EIP %s to instance %s; releasing.",
+            allocation_id,
+            instance.instance_id,
+        )
+        try:
+            ec2_client.release_address(AllocationId=allocation_id)
+        except botocore.exceptions.ClientError:
+            logger.exception(
+                "Failed to release just-allocated EIP %s; release it manually.",
+                allocation_id,
+            )
+        raise ProvisioningError(
+            f"Failed to associate Elastic IP {allocation_id} to instance "
+            f"{instance.instance_id}: {e}"
+        )
+    return public_ip, allocation_id
+
+
+def get_primary_network_interface_id(instance: Any) -> str:
+    for nic in instance.network_interfaces_attribute or []:
+        attachment = nic.get("Attachment") or {}
+        if attachment.get("DeviceIndex") == 0:
+            return nic["NetworkInterfaceId"]
+    raise ProvisioningError(
+        f"Instance {instance.instance_id} has no primary network interface (DeviceIndex=0)"
+    )
+
+
+def release_eip(ec2_client: botocore.client.BaseClient, allocation_id: str) -> None:
+    """
+    Releases an Elastic IP by allocation ID. Disassociates first if the EIP is still
+    bound to an instance – `TerminateInstances` only initiates shutdown, and AWS
+    auto-disassociates only once the instance reaches `terminated`. Releasing
+    explicitly avoids the `InvalidIPAddress.InUse` race and the retry loop.
+    """
+    try:
+        response = ec2_client.describe_addresses(AllocationIds=[allocation_id])
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
+            logger.debug("Skipping EIP %s release. Already released.", allocation_id)
+            return
+        raise
+    addresses = response.get("Addresses", [])
+    if not addresses:
+        return
+    association_id = addresses[0].get("AssociationId")
+    if association_id is not None:
+        try:
+            ec2_client.disassociate_address(AssociationId=association_id)
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            # AWS may have auto-disassociated between our Describe and Disassociate
+            # if the instance just reached `terminated`. Tolerated.
+            if code != "InvalidAssociationID.NotFound":
+                raise
+    try:
+        ec2_client.release_address(AllocationId=allocation_id)
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
+            return
+        raise
 
 
 def make_tags(tags: Dict[str, str]) -> List[Dict[str, str]]:

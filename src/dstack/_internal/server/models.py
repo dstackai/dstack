@@ -25,6 +25,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode, OwnerType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.events import EventTargetType
@@ -516,7 +517,9 @@ class JobModel(PipelineModelMixin, BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship()
 
     run_id: Mapped[uuid.UUID] = mapped_column(
@@ -935,7 +938,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
     # TODO: drop `pool_id` after the release without pools.
@@ -1037,6 +1042,11 @@ class InstanceModel(PipelineModelMixin, BaseModel):
         back_populates="instance",
         cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
+
+    provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
+    """Set on provider resources for orphans matching. Recorded in `ProviderRefModel`.
+    Placeholder instances get it on creation and keep it when promoted, so `run_job()`
+    resources carry it too. `None` for older instances and compute group instances."""
 
     __table_args__ = (
         Index(
@@ -1439,3 +1449,56 @@ class UserPublicKeyModel(BaseModel):
     """`fingerprint` stores a key digest in the format used by OpenSSH: `SHA256:<base64>`."""
     key: Mapped[str] = mapped_column(Text)
     """`key` stores a public key in the OpenSSH disk (ASCII-armored) format."""
+
+
+class OrphanCleanupModel(PipelineModelMixin, BaseModel):
+    __tablename__ = "orphan_cleanups"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    backend_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("backends.id", ondelete="CASCADE"), unique=True
+    )
+    backend: Mapped["BackendModel"] = relationship()
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    cleanup_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    """Consecutive failed cleanups. Determines the retry delay."""
+    clean_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """Start of the last clean cleanup minus a margin for timing inaccuracies.
+    Later instance or job activity makes the backend eligible for cleanup."""
+    clean_mode: Mapped[Optional[OrphanCleanupMode]] = mapped_column(
+        EnumAsString(OrphanCleanupMode, 100)
+    )
+    """Mode `clean_at` was reached in. The backend is eligible for cleanup again if the current mode differs."""
+
+    __table_args__ = (Index("ix_orphan_cleanups_pipeline_fetch_q", last_processed_at.asc()),)
+
+
+class ProviderRefModel(BaseModel):
+    """
+    A `provider_ref` issued by the server, committed with its owner record before any provider
+    call that uses it. Rows are not deleted together with owners, so that resources of deleted
+    owners (e.g. placeholder instances of failed `run_job()` calls) are still matched as orphans.
+    Resources with a `provider_ref` that has no row are not owned by the project.
+    """
+
+    # TODO: Delete rows of deleted or terminated owners after a retention period.
+    # A row is added per fleet instance and per placeholder instance, i.e. per job submission
+    # that provisions new capacity, including no-capacity retries.
+
+    __tablename__ = "provider_refs"
+
+    provider_ref: Mapped[str] = mapped_column(String(12), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    owner_type: Mapped[OwnerType] = mapped_column(EnumAsString(OwnerType, 100))
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False))
+    """Not a foreign key, since owners may be deleted. Kept to report orphans of deleted owners
+    in the owner's events."""
+    owner_name: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    __table_args__ = (Index("ix_provider_refs_project_id_created_at", project_id, created_at),)

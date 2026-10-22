@@ -1,6 +1,10 @@
+from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
     ProcessResult,
@@ -71,11 +75,13 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
                             exc_info=not isinstance(exc, BackendError),
                         )
                     return result
+                next_step = "Please terminate the instance manually to avoid unexpected charges."
+                if _is_to_be_deleted_by_orphan_cleanup(instance_model, job_provisioning_data):
+                    next_step = "Orphan cleanup will retry deleting the instance."
                 logger.error(
-                    "Failed all attempts to terminate instance %s."
-                    " Please terminate the instance manually to avoid unexpected charges."
-                    " Error: %r",
+                    "Failed all attempts to terminate instance %s. %s Error: %r",
                     instance_model.name,
+                    next_step,
                     exc,
                     exc_info=not isinstance(exc, BackendError),
                 )
@@ -92,3 +98,13 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
         new_status=InstanceStatus.TERMINATED,
     )
     return result
+
+
+def _is_to_be_deleted_by_orphan_cleanup(
+    instance_model: InstanceModel, job_provisioning_data: JobProvisioningData
+) -> bool:
+    return (
+        settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.DELETE
+        and instance_model.provider_ref is not None
+        and job_provisioning_data.backend in get_backends_with_resource_listing_support()
+    )

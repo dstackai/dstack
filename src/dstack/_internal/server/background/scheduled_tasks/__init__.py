@@ -2,6 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.server import settings
 from dstack._internal.server.background.scheduled_tasks.events import delete_events
 from dstack._internal.server.background.scheduled_tasks.gateways import (
@@ -20,6 +21,9 @@ from dstack._internal.server.background.scheduled_tasks.metrics import (
 )
 from dstack._internal.server.background.scheduled_tasks.offers_catalog import (
     preload_offers_catalog,
+)
+from dstack._internal.server.background.scheduled_tasks.orphan_cleanup_enrollment import (
+    enroll_backends_in_orphan_cleanup,
 )
 from dstack._internal.server.background.scheduled_tasks.probes import process_probes
 from dstack._internal.server.background.scheduled_tasks.prometheus_metrics import (
@@ -53,6 +57,10 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
     _scheduler.add_job(delete_instance_healthchecks, IntervalTrigger(minutes=5), max_instances=1)
+    if settings.ORPHAN_CLEANUP_MODE != OrphanCleanupMode.OFF:
+        _scheduler.add_job(
+            enroll_backends_in_orphan_cleanup, IntervalTrigger(minutes=10), max_instances=1
+        )
     if settings.ENABLE_PROMETHEUS_METRICS:
         _scheduler.add_job(
             collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1

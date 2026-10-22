@@ -61,6 +61,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     PlacementGroupModel,
+    ProviderRefModel,
     VolumeAttachmentModel,
 )
 from dstack._internal.server.services.docker import ImageConfig
@@ -446,6 +447,10 @@ class TestJobSubmittedWorker:
             placeholder_id = job.instance.id
             assert job.used_instance_id == placeholder_id
             assert job.instance.status == InstanceStatus.PENDING
+            provider_ref = job.instance.provider_ref
+            assert provider_ref is not None
+            res = await session.execute(select(ProviderRefModel.provider_ref))
+            assert res.scalars().all() == [provider_ref]
 
             await _process_job(session=session, worker=worker, job_model=job)
 
@@ -458,6 +463,9 @@ class TestJobSubmittedWorker:
         assert job.instance.fleet_id == fleet.id
         assert job.instance.offer is not None
         assert job.instance.provisioning_job_id == job.id  # never cleared
+        assert job.instance.provider_ref == provider_ref
+        run_job_job = backend_mock.compute.return_value.run_job.call_args[0][1]
+        assert run_job_job.job_submissions[-1].provider_ref == provider_ref
         res = await session.execute(
             select(InstanceModel).where(
                 InstanceModel.fleet_id == fleet.id,
@@ -2124,7 +2132,11 @@ class TestJobSubmittedWorker:
         assert job1.status == JobStatus.PROVISIONING
         assert job2.status == JobStatus.PROVISIONING
         res = await session.execute(select(ComputeGroupModel))
-        assert res.scalar_one_or_none() is not None
+        compute_group = res.scalar_one()
+        res = await session.execute(
+            select(InstanceModel).where(InstanceModel.compute_group_id == compute_group.id)
+        )
+        assert [i.provider_ref for i in res.scalars().all()] == [None, None]
 
     async def test_provisions_one_job_node_group_via_run_job(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

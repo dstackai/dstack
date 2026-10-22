@@ -30,6 +30,7 @@ from dstack._internal.core.consts import (
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup, ResourceListing
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayLoadBalancerConfiguration,
@@ -444,6 +445,7 @@ class ComputeWithCreateInstanceSupport(ABC):
             volumes=volumes,
             reservation=requirements.reservation,
             tags=run.run_spec.merged_profile.tags,
+            provider_ref=get_job_provider_ref(job),
         )
         instance_offer = instance_offer.model_copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
@@ -470,6 +472,44 @@ class ComputeWithCreateInstanceSupport(ABC):
                 for z in instance_offer.availability_zones
                 if z == volume.provisioning_data.availability_zone
             ]
+
+
+class ComputeWithResourceListingSupport(ABC):
+    """
+    Implement this mixin for automatic cleanup of orphaned resources.
+    """
+
+    @abstractmethod
+    def list_resource_groups(self) -> ResourceListing:
+        """
+        Lists all groups carrying a dstack `provider_ref` across the configured backend regions.
+
+        Resources without `provider_ref` must be skipped. Resources whose `provider_ref`
+        is present but unparsable must be skipped and logged as a warning with the resource id.
+        Owner resources whose deletion is in progress (e.g. a VM that is shutting down)
+        must be skipped, while their internal resources are listed as usual.
+
+        Resources of a backend region are listed all or nothing: if any listing in a region
+        fails, return no groups of the region and report it in `ResourceListing.failures`.
+        Otherwise, `primary_id=None` may be reported for resources of a tracked owner
+        whose owner resource was not listed, and they would be deleted.
+        Raise if nothing could be listed.
+        """
+        pass
+
+    @abstractmethod
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        """
+        Deletes everything in the group in the order the provider requires.
+        Must be idempotent.
+
+        If the deletion takes several steps, request the deletion of the owner resource first
+        and raise `NotYetTerminated` instead of waiting, e.g. for the VM to be gone before
+        its disk can be deleted. The server reports the owner resource as being deleted.
+        Next cleanups list the remaining internal resources without the owner resource and
+        call the method again until it returns.
+        """
+        pass
 
 
 class ComputeWithGroupProvisioningSupport(ABC):
@@ -779,14 +819,19 @@ _CLOUD_RESOURCE_SUFFIX_LEN = 8
 def generate_unique_instance_name(
     instance_configuration: InstanceConfiguration,
     max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+    with_provider_ref: bool = False,
 ) -> str:
     """
     Generates a unique instance name valid across all backends.
+
+    Backends that cannot set `PROVIDER_REF_TAG_KEY` on resources pass `with_provider_ref=True`
+    to encode `provider_ref` in the name. See `generate_unique_backend_name()`.
     """
     return generate_unique_backend_name(
         resource_name=instance_configuration.instance_name,
         project_name=instance_configuration.project_name,
         max_length=max_length,
+        provider_ref=instance_configuration.provider_ref if with_provider_ref else None,
     )
 
 
@@ -794,14 +839,19 @@ def generate_unique_instance_name_for_job(
     run: Run,
     job: Job,
     max_length: int = _DEFAULT_MAX_RESOURCE_NAME_LEN,
+    with_provider_ref: bool = False,
 ) -> str:
     """
     Generates a unique instance name for a job valid across all backends.
+
+    Backends that cannot set `PROVIDER_REF_TAG_KEY` on resources pass `with_provider_ref=True`
+    to encode `provider_ref` in the name. See `generate_unique_backend_name()`.
     """
     return generate_unique_backend_name(
         resource_name=get_job_instance_name(run, job),
         project_name=run.project_name,
         max_length=max_length,
+        provider_ref=get_job_provider_ref(job) if with_provider_ref else None,
     )
 
 
@@ -852,12 +902,17 @@ def generate_unique_backend_name(
     resource_name: str,
     project_name: Optional[str],
     max_length: int,
+    provider_ref: Optional[str] = None,
 ) -> str:
     """
     Generates a unique resource name valid across all backends.
     Backend resource names must be unique on every provisioning so that
     resource re-submission/re-creation doesn't lead to conflicts
     on backends that require unique names (e.g. Azure, GCP).
+
+    If `provider_ref` is set, the name ends with `provider_ref` followed by fewer random
+    characters, so that `parse_provider_ref_from_name()` can get it back. Only the prefix
+    is truncated to fit `max_length`.
     """
     # resource_name is guaranteed to be valid in all backends
     prefix = f"dstack-{resource_name}"
@@ -865,8 +920,15 @@ def generate_unique_backend_name(
         # project_name is not guaranteed to be valid in all backends,
         # so we add it only if it passes the validation
         prefix = f"dstack-{project_name}-{resource_name}"
+    if provider_ref is None:
+        return generate_unique_name(
+            prefix=prefix,
+            max_length=max_length,
+        )
     return generate_unique_name(
         prefix=prefix,
+        fixed_suffix=provider_ref,
+        random_suffix_length=_PROVIDER_REF_NAME_RANDOM_SUFFIX_LEN,
         max_length=max_length,
     )
 
@@ -882,23 +944,95 @@ def generate_unique_short_backend_name() -> str:
 def generate_unique_name(
     *,
     prefix: Optional[str] = None,
-    suffix_length: Optional[int] = None,
+    fixed_suffix: str = "",
+    random_suffix_length: Optional[int] = None,
     max_length: Optional[int] = None,
 ) -> str:
-    if suffix_length is None:
-        suffix_length = _CLOUD_RESOURCE_SUFFIX_LEN
+    """
+    Generates a name of the form `{prefix}-{fixed_suffix}{random_suffix}`,
+    where `random_suffix` has `random_suffix_length` characters.
+    Only the prefix is truncated to fit `max_length`.
+    """
+    if random_suffix_length is None:
+        random_suffix_length = _CLOUD_RESOURCE_SUFFIX_LEN
+    full_suffix_length = len(fixed_suffix) + random_suffix_length
     if max_length is not None:
-        assert max_length >= suffix_length
+        assert max_length >= full_suffix_length
         if prefix is not None:
-            prefix_len = max_length - suffix_length - 1
+            prefix_len = max_length - full_suffix_length - 1
             assert prefix_len > 0
-            prefix = prefix[:prefix_len]
-    suffix = "".join(
-        random.choice(string.ascii_lowercase + string.digits) for _ in range(suffix_length)
+            # Avoid a double hyphen if the prefix is cut right after a hyphen
+            prefix = prefix[:prefix_len].rstrip("-")
+    suffix = fixed_suffix + "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(random_suffix_length)
     )
     if prefix is None:
         return suffix
     return f"{prefix}-{suffix}"
+
+
+PROVIDER_REF_LEN = 12
+
+PROVIDER_REF_TAG_KEY = "dstack_provider_ref"
+"""
+The tag (label) key for `provider_ref` on backends that support tags.
+Backends whose tag keys cannot contain `_` define their own key.
+"""
+
+_PROVIDER_REF_NAME_RANDOM_SUFFIX_LEN = 4
+"""
+Random characters after `provider_ref` in names. They keep names unique across provisioning
+attempts with the same `provider_ref`.
+"""
+
+_PROVIDER_REF_REGEX = re.compile(rf"[0-9a-z]{{{PROVIDER_REF_LEN}}}")
+
+_PROVIDER_REF_NAME_SUFFIX_REGEX = re.compile(
+    rf"[0-9a-z]{{{PROVIDER_REF_LEN + _PROVIDER_REF_NAME_RANDOM_SUFFIX_LEN}}}"
+)
+
+
+def generate_provider_ref() -> str:
+    """
+    Generates a `provider_ref` that is set on provider resources for orphan cleanup.
+    Uses lowercase letters and digits only, so it's valid in resource names and tags
+    on all backends.
+    """
+    return "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(PROVIDER_REF_LEN)
+    )
+
+
+def is_valid_provider_ref(value: str) -> bool:
+    """
+    Checks a `provider_ref` read from a provider resource, e.g. from a tag.
+    """
+    return _PROVIDER_REF_REGEX.fullmatch(value) is not None
+
+
+def parse_provider_ref_from_name(name: str) -> Optional[str]:
+    """
+    Parses `provider_ref` from a name generated by `generate_unique_backend_name()`
+    with `provider_ref`. Returns `None` if the name does not contain `provider_ref`.
+
+    Backends that derive names of internal resources from the instance name
+    (e.g. by appending `-data`) must strip such suffixes before calling it.
+    """
+    if not name.startswith("dstack-"):
+        return None
+    suffix = name.rsplit("-", 1)[-1]
+    if _PROVIDER_REF_NAME_SUFFIX_REGEX.fullmatch(suffix) is None:
+        return None
+    return suffix[:PROVIDER_REF_LEN]
+
+
+def get_job_provider_ref(job: Job) -> Optional[str]:
+    """
+    Returns the `provider_ref` of the job's latest submission.
+    """
+    if len(job.job_submissions) == 0:
+        return None
+    return job.job_submissions[-1].provider_ref
 
 
 def get_cloud_config(**config) -> str:

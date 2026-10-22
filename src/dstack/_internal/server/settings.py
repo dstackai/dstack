@@ -7,6 +7,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.server.utils.settings import parse_hostname_port
 from dstack._internal.utils.env import environ
 from dstack._internal.utils.logging import get_logger
@@ -234,4 +235,14 @@ JOB_NETWORK_MODE = environ.get_enum(
     JobNetworkMode,
     value_type=int,
     default=DEFAULT_JOB_NETWORK_MODE,
+)
+
+ORPHAN_CLEANUP_INTERVAL_SECONDS = environ.get_int(
+    "DSTACK_SERVER_ORPHAN_CLEANUP_INTERVAL_SECONDS", default=3600
+)
+
+
+DEFAULT_ORPHAN_CLEANUP_MODE = OrphanCleanupMode.REPORT
+ORPHAN_CLEANUP_MODE = environ.get_enum(
+    "DSTACK_SERVER_ORPHAN_CLEANUP_MODE", OrphanCleanupMode, default=DEFAULT_ORPHAN_CLEANUP_MODE
 )

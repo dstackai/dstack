@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import OwnerType
 from dstack._internal.core.models.common import EntityReference, validate_json_extra_ignore
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
@@ -60,6 +61,7 @@ from dstack._internal.server.schemas.runner import InstanceHealthResponse, TaskS
 from dstack._internal.server.services import events
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import generate_shared_offer
+from dstack._internal.server.services.orphan_cleanup import issue_provider_ref
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.utils import common as common_utils
@@ -902,6 +904,13 @@ def create_instance_model(
     )
     if instance_id is None:
         instance_id = uuid.uuid4()
+    provider_ref = issue_provider_ref(
+        session=session,
+        project=project,
+        owner_type=OwnerType.INSTANCE,
+        owner_id=instance_id,
+        owner_name=instance_name,
+    )
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
@@ -914,6 +923,7 @@ def create_instance_model(
         instance_id=str(instance_id),
         reservation=reservation,
         tags=tags,
+        provider_ref=provider_ref,
     )
     now = common_utils.get_current_datetime()
     instance = InstanceModel(
@@ -932,6 +942,7 @@ def create_instance_model(
         termination_idle_time=termination_idle_time,
         total_blocks=None if blocks == "auto" else blocks,
         busy_blocks=0,
+        provider_ref=provider_ref,
     )
     session.add(instance)
     return instance

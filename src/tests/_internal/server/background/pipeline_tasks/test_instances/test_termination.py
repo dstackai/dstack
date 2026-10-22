@@ -9,12 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.instances import InstanceWorker
 from dstack._internal.server.background.pipeline_tasks.instances import (
     termination as instances_termination,
 )
-from dstack._internal.server.testing.common import create_instance, create_project
+from dstack._internal.server.models import InstanceModel
+from dstack._internal.server.testing.common import (
+    create_instance,
+    create_project,
+    get_job_provisioning_data,
+)
 from tests._internal.server.background.pipeline_tasks.test_instances.helpers import (
     instance_to_pipeline_item,
     lock_instance,
@@ -217,3 +224,32 @@ class TestTermination:
             mock.assert_called_once()
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
+
+
+class TestIsDeletedByOrphanCleanup:
+    @pytest.mark.parametrize(
+        ("mode", "provider_ref", "backend", "expected"),
+        [
+            (OrphanCleanupMode.DELETE, "abc123def456", BackendType.AWS, True),
+            (OrphanCleanupMode.REPORT, "abc123def456", BackendType.AWS, False),
+            (OrphanCleanupMode.OFF, "abc123def456", BackendType.AWS, False),
+            (OrphanCleanupMode.DELETE, None, BackendType.AWS, False),
+            (OrphanCleanupMode.DELETE, "abc123def456", BackendType.LAMBDA, False),
+        ],
+    )
+    def test_is_deleted_by_orphan_cleanup(
+        self,
+        mode: OrphanCleanupMode,
+        provider_ref: Optional[str],
+        backend: BackendType,
+        expected: bool,
+    ):
+        instance = InstanceModel(provider_ref=provider_ref)
+        job_provisioning_data = get_job_provisioning_data(backend=backend)
+        with patch.object(settings, "ORPHAN_CLEANUP_MODE", mode):
+            assert (
+                instances_termination._is_to_be_deleted_by_orphan_cleanup(
+                    instance, job_provisioning_data
+                )
+                == expected
+            )

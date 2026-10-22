@@ -1,0 +1,800 @@
+import asyncio
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Optional, Sequence
+
+import sentry_sdk
+from sqlalchemy import ColumnElement, and_, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, load_only
+
+from dstack._internal.core.backends.base.compute import ComputeWithResourceListingSupport
+from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
+from dstack._internal.core.errors import BackendError, NotYetTerminated
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    OrphanCleanupMode,
+    OwnerType,
+)
+from dstack._internal.core.models.events import EventTargetType
+from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.server import settings
+from dstack._internal.server.background.pipeline_tasks.base import (
+    Fetcher,
+    Heartbeater,
+    ItemUpdateMap,
+    Pipeline,
+    PipelineItem,
+    UpdateMapDateTime,
+    Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_mismatch,
+    resolve_now_placeholders,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
+)
+from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.models import (
+    BackendModel,
+    InstanceModel,
+    JobModel,
+    OrphanCleanupModel,
+    ProjectModel,
+    ProviderRefModel,
+)
+from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
+from dstack._internal.server.services.instances import get_instance_provisioning_data
+from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
+from dstack._internal.server.utils import tracing
+from dstack._internal.utils.common import batched, get_current_datetime, run_async
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+class OrphanCleanupPipeline(Pipeline[PipelineItem]):
+    def __init__(
+        self,
+        workers_num: int = 5,
+        queue_lower_limit_factor: float = 0.5,
+        queue_upper_limit_factor: float = 2.0,
+        min_processing_interval: Optional[timedelta] = None,
+        lock_timeout: timedelta = timedelta(seconds=60),
+        heartbeat_trigger: timedelta = timedelta(seconds=20),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
+    ) -> None:
+        if min_processing_interval is None:
+            if settings.ORPHAN_CLEANUP_INTERVAL_SECONDS <= 0:
+                raise ValueError("DSTACK_SERVER_ORPHAN_CLEANUP_INTERVAL_SECONDS must be positive")
+            min_processing_interval = timedelta(seconds=settings.ORPHAN_CLEANUP_INTERVAL_SECONDS)
+        super().__init__(
+            workers_num=workers_num,
+            queue_lower_limit_factor=queue_lower_limit_factor,
+            queue_upper_limit_factor=queue_upper_limit_factor,
+            min_processing_interval=min_processing_interval,
+            lock_timeout=lock_timeout,
+            heartbeat_trigger=heartbeat_trigger,
+        )
+        self.__heartbeater = Heartbeater[PipelineItem](
+            model_type=OrphanCleanupModel,
+            lock_timeout=self._lock_timeout,
+            heartbeat_trigger=self._heartbeat_trigger,
+        )
+        self.__fetcher = OrphanCleanupFetcher(
+            queue=self._queue,
+            queue_desired_minsize=self._queue_desired_minsize,
+            min_processing_interval=self._min_processing_interval,
+            lock_timeout=self._lock_timeout,
+            heartbeater=self._heartbeater,
+        )
+        self.__workers = [
+            OrphanCleanupWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
+            for _ in range(self._workers_num)
+        ]
+
+    @property
+    def hint_fetch_model_name(self) -> str:
+        return OrphanCleanupModel.__name__
+
+    @property
+    def _heartbeater(self) -> Heartbeater[PipelineItem]:
+        return self.__heartbeater
+
+    @property
+    def _fetcher(self) -> Fetcher[PipelineItem]:
+        return self.__fetcher
+
+    @property
+    def _workers(self) -> Sequence["OrphanCleanupWorker"]:
+        return self.__workers
+
+
+class OrphanCleanupFetcher(Fetcher[PipelineItem]):
+    def __init__(
+        self,
+        queue: asyncio.Queue[PipelineItem],
+        queue_desired_minsize: int,
+        min_processing_interval: timedelta,
+        lock_timeout: timedelta,
+        heartbeater: Heartbeater[PipelineItem],
+        queue_check_delay: float = 1.0,
+    ) -> None:
+        super().__init__(
+            queue=queue,
+            queue_desired_minsize=queue_desired_minsize,
+            min_processing_interval=min_processing_interval,
+            lock_timeout=lock_timeout,
+            heartbeater=heartbeater,
+            queue_check_delay=queue_check_delay,
+        )
+
+    @tracing.instrument_pipeline_task("OrphanCleanupFetcher.fetch")
+    async def fetch(self, limit: int) -> list[PipelineItem]:
+        orphan_cleanup_lock, _ = get_locker(get_db().dialect_name).get_lockset(
+            OrphanCleanupModel.__tablename__
+        )
+        async with orphan_cleanup_lock:
+            async with get_session_ctx() as session:
+                now = get_current_datetime()
+                res = await session.execute(
+                    select(OrphanCleanupModel)
+                    .join(BackendModel, BackendModel.id == OrphanCleanupModel.backend_id)
+                    .join(ProjectModel, ProjectModel.id == BackendModel.project_id)
+                    .where(
+                        ProjectModel.deleted == False,
+                        BackendModel.type.in_(get_backends_with_resource_listing_support()),
+                        _retry_delay_filter(now),
+                        or_(
+                            OrphanCleanupModel.last_processed_at
+                            <= now - self._min_processing_interval,
+                            OrphanCleanupModel.last_processed_at == OrphanCleanupModel.created_at,
+                        ),
+                        or_(
+                            OrphanCleanupModel.lock_expires_at.is_(None),
+                            OrphanCleanupModel.lock_expires_at < now,
+                        ),
+                        or_(
+                            OrphanCleanupModel.lock_owner.is_(None),
+                            OrphanCleanupModel.lock_owner == OrphanCleanupPipeline.__name__,
+                        ),
+                    )
+                    .order_by(OrphanCleanupModel.last_processed_at.asc())
+                    .limit(limit)
+                    .with_for_update(skip_locked=True, key_share=True, of=OrphanCleanupModel)
+                    .options(
+                        load_only(
+                            OrphanCleanupModel.id,
+                            OrphanCleanupModel.lock_token,
+                            OrphanCleanupModel.lock_expires_at,
+                        )
+                    )
+                )
+                orphan_cleanup_models = list(res.scalars().all())
+                lock_expires_at = get_current_datetime() + self._lock_timeout
+                lock_token = uuid.uuid4()
+                items = []
+                for orphan_cleanup_model in orphan_cleanup_models:
+                    prev_lock_expired = orphan_cleanup_model.lock_expires_at is not None
+                    orphan_cleanup_model.lock_expires_at = lock_expires_at
+                    orphan_cleanup_model.lock_token = lock_token
+                    orphan_cleanup_model.lock_owner = OrphanCleanupPipeline.__name__
+                    items.append(
+                        PipelineItem(
+                            __tablename__=OrphanCleanupModel.__tablename__,
+                            id=orphan_cleanup_model.id,
+                            lock_expires_at=lock_expires_at,
+                            lock_token=lock_token,
+                            prev_lock_expired=prev_lock_expired,
+                        )
+                    )
+                await session.commit()
+        return items
+
+
+class OrphanCleanupWorker(Worker[PipelineItem]):
+    def __init__(
+        self,
+        queue: asyncio.Queue[PipelineItem],
+        heartbeater: Heartbeater[PipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
+    ) -> None:
+        super().__init__(
+            queue=queue,
+            heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
+        )
+
+    @tracing.instrument_pipeline_task("OrphanCleanupWorker.process")
+    async def process(self, item: PipelineItem):
+        process_context = await _load_process_context(item)
+        if process_context is None:
+            return
+        result = await _process_orphan_cleanup(process_context)
+        await _apply_process_result(item, result)
+
+
+@dataclass
+class _ProcessContext:
+    orphan_cleanup_model: OrphanCleanupModel
+    needs_cleanup: bool
+
+
+class _OrphanCleanupUpdateMap(ItemUpdateMap, total=False):
+    cleanup_attempt: int
+    clean_at: UpdateMapDateTime
+    clean_mode: OrphanCleanupMode
+
+
+@dataclass
+class _OrphanEvent:
+    message: str
+    target: events.Target
+
+
+@dataclass
+class _ProcessResult:
+    update_map: _OrphanCleanupUpdateMap
+    orphan_events: list[_OrphanEvent] = field(default_factory=list)
+
+
+class _ResourceGroupDecision(str, Enum):
+    IGNORE = "ignore"
+    """The group cannot be matched or classified. It's left as is."""
+    SKIP = "skip"
+    """The owner is changing or changed during the listing, or the deletion of the group's
+    internal resources is in progress. The group is reconsidered by the next cleanup."""
+    ORPHAN = "orphan"
+    """The group is orphaned. After handling, it's been reported or deleted."""
+    DELETING = "deleting"
+    """The group is orphaned and the deletion of its owner resource is requested.
+    Its internal resources are deleted by next cleanups."""
+    DELETE_FAILED = "delete_failed"
+    """The group is orphaned but failed to be deleted."""
+    TRACKED = "tracked"
+    """The group is the owner's current resources."""
+
+
+_CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
+"""Retry delays after failed cleanups, as multiples of the cleanup interval."""
+
+
+def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
+    """
+    SQL-portable way to filter by retry delay depending on `cleanup_attempt`.
+    """
+    interval = timedelta(seconds=settings.ORPHAN_CLEANUP_INTERVAL_SECONDS)
+    filters = [
+        and_(
+            OrphanCleanupModel.cleanup_attempt == i,
+            OrphanCleanupModel.last_processed_at < now - interval * multiplier,
+        )
+        for i, multiplier in enumerate(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
+    ]
+    filters.append(
+        and_(
+            OrphanCleanupModel.cleanup_attempt >= len(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
+            OrphanCleanupModel.last_processed_at
+            < now - interval * _CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
+        )
+    )
+    return or_(OrphanCleanupModel.cleanup_attempt == 0, *filters)
+
+
+async def _load_process_context(item: PipelineItem) -> Optional[_ProcessContext]:
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(OrphanCleanupModel)
+            .where(
+                OrphanCleanupModel.id == item.id,
+                OrphanCleanupModel.lock_token == item.lock_token,
+            )
+            .options(
+                joinedload(OrphanCleanupModel.backend)
+                .joinedload(BackendModel.project)
+                .joinedload(ProjectModel.backends)
+            )
+        )
+        orphan_cleanup_model = res.unique().scalar_one_or_none()
+        if orphan_cleanup_model is None:
+            log_lock_token_mismatch(logger, item)
+            return
+        needs_cleanup = await _needs_cleanup(session, orphan_cleanup_model)
+    return _ProcessContext(orphan_cleanup_model=orphan_cleanup_model, needs_cleanup=needs_cleanup)
+
+
+async def _needs_cleanup(session: AsyncSession, orphan_cleanup_model: OrphanCleanupModel) -> bool:
+    """
+    Checks if the backend may have new orphans since the last clean cleanup.
+
+    Every enrolled backend is processed once per cleanup interval, and a backend without new
+    activity is only marked processed without listing its resources. This costs one activity
+    query and two small row updates (lock and unlock) per enrolled backend per interval,
+    but keeps the fetch query cheap regardless of project sizes and the number of
+    idle backends. If the number of enrolled backends grows large, the cost can be cut by:
+    * Deleting rows of backends that stay idle and re-enrolling backends on recent activity,
+      so that only recently active backends are processed.
+    * Cleaning up cloud accounts shared by many backends (e.g. dstack Sky base backends)
+      once instead of once per backend.
+    """
+    if orphan_cleanup_model.clean_at is None:
+        return True
+    if orphan_cleanup_model.clean_mode != settings.ORPHAN_CLEANUP_MODE:
+        return True
+    return await _has_activity_since(
+        session,
+        project_id=orphan_cleanup_model.backend.project_id,
+        since=orphan_cleanup_model.clean_at,
+    )
+
+
+async def _has_activity_since(
+    session: AsyncSession, project_id: uuid.UUID, since: datetime
+) -> bool:
+    has_issued_provider_refs = (
+        select(ProviderRefModel.provider_ref)
+        .where(
+            ProviderRefModel.project_id == project_id,
+            ProviderRefModel.created_at >= since,
+        )
+        .exists()
+    )
+    has_instance_activity = (
+        select(InstanceModel.id)
+        .where(
+            InstanceModel.project_id == project_id,
+            InstanceModel.provider_ref.is_not(None),
+            or_(
+                InstanceModel.started_at >= since,
+                InstanceModel.finished_at >= since,
+            ),
+        )
+        .exists()
+    )
+    # If `run_job()` fails after creating provider resources, the job is terminated and its
+    # placeholder instance is deleted, so only the job's activity indicates possible orphans.
+    # Finished jobs are no longer processed, so `last_processed_at` is the finish time.
+    has_job_activity = (
+        select(JobModel.id)
+        .where(
+            JobModel.project_id == project_id,
+            JobModel.status.in_(JobStatus.finished_statuses()),
+            JobModel.last_processed_at >= since,
+        )
+        .exists()
+    )
+    res = await session.execute(
+        select(or_(has_issued_provider_refs, has_instance_activity, has_job_activity))
+    )
+    return res.scalar_one()
+
+
+async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessResult:
+    orphan_cleanup_model = process_context.orphan_cleanup_model
+    if not process_context.needs_cleanup:
+        return _ProcessResult(update_map=_OrphanCleanupUpdateMap())
+    backend = await backends_services.get_project_backend_by_type(
+        project=orphan_cleanup_model.backend.project,
+        backend_type=orphan_cleanup_model.backend.type,
+    )
+    if backend is None:
+        logger.warning(
+            "Failed to clean up orphaned resources in %s/%s: backend is not available",
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithResourceListingSupport)
+    listed_at = get_current_datetime()
+    try:
+        resource_listing = await run_async(compute.list_resource_groups)
+    except BackendError as e:
+        logger.warning(
+            "Failed to list resource groups in %s/%s due to backend error: %s",
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+            repr(e),
+        )
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+    except Exception:
+        logger.exception(
+            "Failed to list resource groups in %s/%s due to unexpected error",
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
+        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+    for failure in resource_listing.failures:
+        logger.warning(
+            "Failed to list resources of %s in %s for orphan cleanup in %s/%s: %s",
+            failure.backend.value,
+            failure.region if failure.region is not None else "all regions",
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+            failure.message,
+        )
+    resource_groups = resource_listing.resource_groups
+    owner_records = await _load_owner_records(
+        project_id=orphan_cleanup_model.backend.project_id,
+        resource_groups=resource_groups,
+    )
+    decisions = [
+        _get_resource_group_decision(
+            orphan_cleanup_model, resource_group, owner_records, listed_at
+        )
+        for resource_group in resource_groups
+    ]
+    final_decisions: list[_ResourceGroupDecision] = []
+    orphan_events: list[_OrphanEvent] = []
+    for resource_group, decision in zip(resource_groups, decisions):
+        if decision == _ResourceGroupDecision.ORPHAN:
+            decision = await _handle_orphaned_resource_group(
+                compute, orphan_cleanup_model, resource_group
+            )
+            if decision in (_ResourceGroupDecision.ORPHAN, _ResourceGroupDecision.DELETING):
+                orphan_events.append(_get_orphan_event(resource_group, owner_records, decision))
+        final_decisions.append(decision)
+    if any(d is _ResourceGroupDecision.DELETE_FAILED for d in final_decisions):
+        result = _get_backoff_cleanup_process_result(orphan_cleanup_model)
+    elif (
+        any(
+            d in (_ResourceGroupDecision.SKIP, _ResourceGroupDecision.DELETING)
+            for d in final_decisions
+        )
+        or len(resource_listing.failures) > 0
+    ):
+        result = _get_unsettled_cleanup_process_result()
+    else:
+        result = _get_success_cleanup_process_result(listed_at)
+    result.orphan_events = orphan_events
+    return result
+
+
+_PROVIDER_REF_BATCH_SIZE = 100
+
+
+@dataclass
+class _OwnerRecord:
+    provider_ref_model: ProviderRefModel
+    instance_model: Optional[InstanceModel]
+    """Including soft-deleted instances. `None` if the instance was deleted,
+    e.g. a placeholder instance of a failed `run_job()`."""
+
+
+_OwnerRecords = dict[str, _OwnerRecord]
+"""Owner records by `provider_ref`. `provider_ref`s missing from the dict were not issued."""
+
+
+async def _load_owner_records(
+    project_id: uuid.UUID, resource_groups: list[ListedResourceGroup]
+) -> _OwnerRecords:
+    instance_refs = {
+        resource_group.provider_ref
+        for resource_group in resource_groups
+        if resource_group.owner_type == OwnerType.INSTANCE
+    }
+    owner_records: _OwnerRecords = {}
+    async with get_session_ctx() as session:
+        for batch in batched(instance_refs, _PROVIDER_REF_BATCH_SIZE):
+            # `provider_ref`s and instances are read in one statement, so that an instance
+            # committed with its `provider_ref` record is never missed while the record is seen.
+            res = await session.execute(
+                select(ProviderRefModel, InstanceModel)
+                .outerjoin(
+                    InstanceModel, InstanceModel.provider_ref == ProviderRefModel.provider_ref
+                )
+                .where(
+                    ProviderRefModel.project_id == project_id,
+                    ProviderRefModel.owner_type == OwnerType.INSTANCE,
+                    ProviderRefModel.provider_ref.in_(batch),
+                )
+                .options(
+                    load_only(
+                        InstanceModel.id,
+                        InstanceModel.project_id,
+                        InstanceModel.fleet_id,
+                        InstanceModel.name,
+                        InstanceModel.provider_ref,
+                        InstanceModel.status,
+                        InstanceModel.started_at,
+                        InstanceModel.finished_at,
+                        InstanceModel.job_provisioning_data,
+                    )
+                )
+            )
+            for provider_ref_model, instance_model in res.all():
+                owner_records[provider_ref_model.provider_ref] = _OwnerRecord(
+                    provider_ref_model=provider_ref_model, instance_model=instance_model
+                )
+    return owner_records
+
+
+def _get_resource_group_decision(
+    orphan_cleanup_model: OrphanCleanupModel,
+    resource_group: ListedResourceGroup,
+    owner_records: _OwnerRecords,
+    listed_at: datetime,
+) -> _ResourceGroupDecision:
+    if resource_group.owner_type == OwnerType.INSTANCE:
+        if resource_group.provider_ref not in owner_records:
+            return _ResourceGroupDecision.IGNORE
+        instance_model = owner_records[resource_group.provider_ref].instance_model
+        if instance_model is None:
+            # Placeholder instances are deleted when their jobs are terminated,
+            # so `run_job()` can no longer be creating resources for them.
+            return _ResourceGroupDecision.ORPHAN
+        return _get_instance_group_decision(
+            orphan_cleanup_model, resource_group, instance_model, listed_at
+        )
+    # Backends may list owner types that orphan cleanup does not support yet
+    logger.warning(
+        "Ignoring resource group %s in %s/%s with unsupported owner type %s",
+        resource_group.provider_ref,
+        orphan_cleanup_model.backend.project.name,
+        orphan_cleanup_model.backend.type.value,
+        resource_group.owner_type.value,
+    )
+    return _ResourceGroupDecision.IGNORE
+
+
+async def _handle_orphaned_resource_group(
+    compute: ComputeWithResourceListingSupport,
+    orphan_cleanup_model: OrphanCleanupModel,
+    resource_group: ListedResourceGroup,
+) -> _ResourceGroupDecision:
+    if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        logger.info(
+            "Found orphaned %s %s in %s/%s",
+            resource_group.owner_type.value,
+            resource_group.provider_ref,
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
+        sentry_sdk.capture_message(
+            "Detected orphaned {} {} in {}/{}".format(
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+        )
+        return _ResourceGroupDecision.ORPHAN
+    try:
+        await run_async(compute.delete_resource_group, resource_group)
+    except NotYetTerminated:
+        # Backends do not list owner resources whose deletion is in progress,
+        # so a listed owner resource has just been requested to be deleted.
+        if resource_group.primary_id is not None:
+            logger.info(
+                "Started cleaning up orphaned %s %s in %s/%s",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+            return _ResourceGroupDecision.DELETING
+        logger.info(
+            "Cleanup of orphaned %s %s in %s/%s is skipped because the termination is in progress",
+            resource_group.owner_type.value,
+            resource_group.provider_ref,
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+        )
+        return _ResourceGroupDecision.SKIP
+    except Exception as e:
+        if isinstance(e, BackendError):
+            logger.warning(
+                "Cleanup of orphaned %s %s in %s/%s is skipped due to error: %s",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                repr(e),
+            )
+        else:
+            logger.exception(
+                "Cleanup of orphaned %s %s in %s/%s is skipped because of unexpected exception",
+                resource_group.owner_type.value,
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+        return _ResourceGroupDecision.DELETE_FAILED
+    logger.info(
+        "Cleaned up orphaned %s %s in %s/%s",
+        resource_group.owner_type.value,
+        resource_group.provider_ref,
+        orphan_cleanup_model.backend.project.name,
+        orphan_cleanup_model.backend.type.value,
+    )
+    return _ResourceGroupDecision.ORPHAN
+
+
+def _get_orphan_event(
+    resource_group: ListedResourceGroup,
+    owner_records: _OwnerRecords,
+    decision: _ResourceGroupDecision,
+) -> _OrphanEvent:
+    assert resource_group.owner_type == OwnerType.INSTANCE
+    owner_record = owner_records[resource_group.provider_ref]
+    if owner_record.instance_model is not None:
+        target = events.Target.from_model(owner_record.instance_model)
+    else:
+        # Targeting the deleted instance puts the event next to the instance's earlier events,
+        # e.g. the job it was created for.
+        provider_ref_model = owner_record.provider_ref_model
+        target = events.Target(
+            type=EventTargetType.INSTANCE,
+            project_id=provider_ref_model.project_id,
+            id=provider_ref_model.owner_id,
+            name=provider_ref_model.owner_name,
+        )
+    return _OrphanEvent(
+        message=_get_orphan_event_message(resource_group, decision),
+        target=target,
+    )
+
+
+def _get_orphan_event_message(
+    resource_group: ListedResourceGroup, decision: _ResourceGroupDecision
+) -> str:
+    # Built from the required fields so that the message is useful
+    # even if the backend fills `description` poorly.
+    if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        action = "found"
+    elif decision == _ResourceGroupDecision.DELETING:
+        action = "being deleted"
+    else:
+        action = "deleted"
+    location = resource_group.backend.value
+    if resource_group.region is not None:
+        location += f"/{resource_group.region}"
+    message = (
+        f"Orphaned resources {action} in {location}, provider_ref {resource_group.provider_ref}"
+    )
+    if resource_group.primary_id is not None:
+        message += f", {resource_group.owner_type.value} id {resource_group.primary_id}"
+    if resource_group.description:
+        message += f": {resource_group.description}"
+    return message
+
+
+_STUCK_THRESHOLD = timedelta(hours=1)
+
+_LISTING_MARGIN = timedelta(minutes=10)
+"""
+Owners changed later than `listed_at - _LISTING_MARGIN` are not judged by the listing,
+and `clean_at` is set to `listed_at - _LISTING_MARGIN`. The margin covers clock skew
+between replicas, the lag between setting timestamps and committing them,
+and providers listing new resources with a delay.
+"""
+
+
+def _get_instance_group_decision(
+    orphan_cleanup_model: OrphanCleanupModel,
+    resource_group: ListedResourceGroup,
+    instance_model: InstanceModel,
+    listed_at: datetime,
+) -> _ResourceGroupDecision:
+    if instance_model.status == InstanceStatus.PENDING:
+        if _is_stuck(resource_group, listed_at):
+            # Stuck pending instances are unexpected. If this changes,
+            # we may treat them as orphans instead of error log and skip.
+            logger.error(
+                "Resource group %s in %s/%s was created at %s for instance %s"
+                " that is still pending. The instance may be stuck in pending.",
+                resource_group.provider_ref,
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                resource_group.created_at,
+                instance_model.name,
+            )
+        return _ResourceGroupDecision.SKIP
+    if instance_model.status == InstanceStatus.TERMINATING:
+        return _ResourceGroupDecision.SKIP
+    if instance_model.status == InstanceStatus.TERMINATED:
+        # The listing may predate the termination
+        if _changed_after(instance_model.finished_at, listed_at - _LISTING_MARGIN):
+            return _ResourceGroupDecision.SKIP
+        return _ResourceGroupDecision.ORPHAN
+    provisioning_data = get_instance_provisioning_data(instance_model)
+    if provisioning_data is None:
+        logger.error(
+            "Failed to classify resource group %s in %s/%s:"
+            " provisioning_data is None for active instance %s",
+            resource_group.provider_ref,
+            orphan_cleanup_model.backend.project.name,
+            orphan_cleanup_model.backend.type.value,
+            instance_model.name,
+        )
+        return _ResourceGroupDecision.IGNORE
+    if (
+        provisioning_data.get_base_backend() != resource_group.backend
+        or provisioning_data.instance_id != resource_group.primary_id
+    ):
+        # The listing may predate the provisioning: the instance may be missing from it
+        # while its internal resources created earlier are listed.
+        # `started_at` is set together with the provisioning data.
+        if _changed_after(instance_model.started_at, listed_at - _LISTING_MARGIN):
+            return _ResourceGroupDecision.SKIP
+        return _ResourceGroupDecision.ORPHAN
+    return _ResourceGroupDecision.TRACKED
+
+
+def _changed_after(changed_at: Optional[datetime], at: datetime) -> bool:
+    return changed_at is not None and changed_at >= at
+
+
+def _is_stuck(resource_group: ListedResourceGroup, listed_at: datetime) -> bool:
+    return (
+        resource_group.created_at is not None
+        and resource_group.created_at < listed_at - _STUCK_THRESHOLD
+    )
+
+
+def _get_backoff_cleanup_process_result(
+    orphan_cleanup_model: OrphanCleanupModel,
+) -> _ProcessResult:
+    return _ProcessResult(
+        update_map=_OrphanCleanupUpdateMap(
+            cleanup_attempt=orphan_cleanup_model.cleanup_attempt + 1
+        )
+    )
+
+
+def _get_unsettled_cleanup_process_result() -> _ProcessResult:
+    # Some groups were skipped or some parts could not be listed.
+    # The backend stays eligible since `clean_at` is not updated.
+    # It's retried after the cleanup interval rather than backed off,
+    # since skipped groups are expected to settle and the listed parts
+    # should be cleaned up as usual while other parts fail.
+    return _ProcessResult(update_map=_OrphanCleanupUpdateMap(cleanup_attempt=0))
+
+
+def _get_success_cleanup_process_result(listed_at: datetime) -> _ProcessResult:
+    return _ProcessResult(
+        update_map=_OrphanCleanupUpdateMap(
+            cleanup_attempt=0,
+            clean_at=listed_at - _LISTING_MARGIN,
+            clean_mode=settings.ORPHAN_CLEANUP_MODE,
+        )
+    )
+
+
+async def _apply_process_result(item: PipelineItem, result: _ProcessResult):
+    update_map = _OrphanCleanupUpdateMap()
+    update_map.update(result.update_map)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(update_map, now=now)
+        res = await session.execute(
+            update(OrphanCleanupModel)
+            .where(
+                OrphanCleanupModel.id == item.id,
+                OrphanCleanupModel.lock_token == item.lock_token,
+            )
+            .values(**update_map)
+            .returning(OrphanCleanupModel.id)
+        )
+        updated_ids = list(res.scalars().all())
+        if len(updated_ids) == 0:
+            log_lock_token_changed_after_processing(logger, item)
+            return
+        for orphan_event in result.orphan_events:
+            events.emit(
+                session,
+                orphan_event.message,
+                actor=events.SystemActor(),
+                targets=[orphan_event.target],
+            )
