@@ -12,7 +12,7 @@ This example shows how to deploy `zai-org/GLM-4.5-Air-FP8` using
 ## Apply a configuration
 
 Here's an example of a service that deploys `zai-org/GLM-4.5-Air-FP8` using
-Dynamo with PD disaggregation.
+Dynamo with PD disaggregation and vLLM workers.
 
 <div editor-title="service.dstack.yml">
 
@@ -25,95 +25,96 @@ env:
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
 groups:
-  - replicas: 1
-    docker: true
+  # The frontend and the workers discover each other via etcd
+  - name: etcd
+    replicas: 1
     commands:
-      - apt-get update
-      - apt-get install -y python3-dev python3-venv
-      - python3 -m venv ~/dyn-venv
-      - source ~/dyn-venv/bin/activate
-      - pip install -U pip
-      - pip install "ai-dynamo[sglang]==1.1.1"
-      - git clone https://github.com/ai-dynamo/dynamo.git
-      # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
-      - docker compose -f dynamo/dev/docker-compose.yml up -d
+      - |
+        curl -fsSL https://github.com/etcd-io/etcd/releases/download/v3.5.33/etcd-v3.5.33-linux-amd64.tar.gz \
+          | tar -xz -C /usr/local/bin --strip-components=1 etcd-v3.5.33-linux-amd64/etcd
+      - |
+        etcd \
+          --data-dir /tmp/etcd \
+          --listen-client-urls http://0.0.0.0:2379 \
+          --advertise-client-urls http://$DSTACK_MASTER_NODE_IP:2379
+    resources:
+      cpu: 2
+
+  - name: frontend
+    replicas: 1
+    # The vLLM image provides vLLM's GLM tool call and reasoning parsers
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
+    commands:
+      - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
       - |
         python3 -m dynamo.frontend \
-          --http-host 0.0.0.0 --http-port 8000 \
-          --discovery-backend etcd --router-mode kv \
-          --kv-cache-block-size 64
-    resources:
-      cpu: 4
+          --http-port 8000 \
+          --router-mode kv \
+          --dyn-chat-processor vllm \
+          --enable-auto-tool-choice \
+          --tool-call-parser glm45 \
+          --reasoning-parser glm45
     router:
       type: dynamo
+    resources:
+      cpu: 4
 
-  - replicas: 1..4
+  # Only prefill workers publish KV events, as Dynamo's decode routing ignores prefix overlap
+  - name: prefill-worker
+    replicas: 1..4
     scaling:
       metric: rps
       target: 3
-    python: "3.12"
-    nvcc: true
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
     commands:
-      # dstack injects DSTACK_ROUTER_INTERNAL_IP after the router replica
-      # is provisioned. Compose the etcd/NATS endpoints from it.
-      - export ETCD_ENDPOINTS="http://$DSTACK_ROUTER_INTERNAL_IP:2379"
-      - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
-      # Set to enable /health endpoint required by dstack probes.
-      - export DYN_SYSTEM_PORT="8000"
-      # Wait until the router's etcd and NATS are healthy.
+      - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
+      - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
+      # vLLM binds the KV events endpoint only if it's a wildcard address, otherwise it connects
       - |
-        until curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:2379/health" \
-           && curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:8222/healthz"; do
-          echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
-        done
-      - pip install "ai-dynamo[sglang]==1.1.1"
-      - |
-        python3 -m dynamo.sglang \
-          --model-path $MODEL_ID --served-model-name $MODEL_ID \
-          --discovery-backend etcd --host 0.0.0.0 \
-          --page-size 64 \
-          --disaggregation-mode prefill --disaggregation-transfer-backend nixl
+        python3 -m dynamo.vllm \
+          --model $MODEL_ID \
+          --max-model-len 65536 \
+          --disaggregation-mode prefill \
+          --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_producer"}' \
+          --kv-events-config '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
     resources:
       gpu: H200
+      disk: 200GB..
 
-  - replicas: 1..8
+  - name: decode-worker
+    replicas: 1..8
     scaling:
       metric: rps
       target: 2
-    python: "3.12"
-    nvcc: true
+    image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.5.1
     commands:
-      - export ETCD_ENDPOINTS="http://$DSTACK_ROUTER_INTERNAL_IP:2379"
-      - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
-      - export DYN_SYSTEM_PORT="8000"
+      - export ETCD_ENDPOINTS=http://${{ groups[0].replicas[0].IP_ADDRESS }}:2379
+      - export VLLM_NIXL_SIDE_CHANNEL_HOST=$DSTACK_MASTER_NODE_IP
       - |
-        until curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:2379/health" \
-           && curl -fsS "http://$DSTACK_ROUTER_INTERNAL_IP:8222/healthz"; do
-          echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
-        done
-      - pip install "ai-dynamo[sglang]==1.1.1"
-      - |
-        python3 -m dynamo.sglang \
-          --model-path $MODEL_ID --served-model-name $MODEL_ID \
-          --discovery-backend etcd --host 0.0.0.0 \
-          --page-size 64 \
-          --disaggregation-mode decode --disaggregation-transfer-backend nixl
+        python3 -m dynamo.vllm \
+          --model $MODEL_ID \
+          --max-model-len 65536 \
+          --disaggregation-mode decode \
+          --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_consumer"}'
     resources:
       gpu: H200
+      disk: 200GB..
 
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
-
-# Custom probe is required for PD disaggregation.
-probes:
-  - type: http
-    url: /health
-    interval: 15s
 ```
 
 </div>
 
-> With the the `dynamo` router, you can use SGLang, vLLM, and TensorRT-LLM prefill and decode workers.
+The service consists of four replica groups:
+
+- `etcd` runs [etcd](https://etcd.io/), which Dynamo uses for service discovery. Other groups reach it via
+  [`${{ groups[0].replicas[0].IP_ADDRESS }}`](../../concepts/services.md#replica-groups).
+- `frontend` runs the Dynamo frontend, which serves the OpenAI-compatible API and routes requests to the workers
+  based on KV cache overlap. Because the group sets `router`, `dstack` sends the service traffic to it.
+- `prefill-worker` and `decode-worker` run vLLM. The prefill workers pass the KV cache to the decode workers over NIXL.
+
+> With the `dynamo` router, you can use SGLang, vLLM, and TensorRT-LLM prefill and decode workers.
 
 Save the configuration as `service.dstack.yml`, then use the
 [`dstack apply`](../../reference/cli/dstack/apply.md) command.
@@ -158,9 +159,11 @@ Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics 
 !!! info "Cluster"
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
 
-    While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
+    While the prefill and decode replicas run on GPUs, the `etcd` and `frontend` replicas require CPU instances in the same cluster.
+
+    For production, use instances with RDMA (InfiniBand or RoCE). Without RDMA, NIXL transfers the KV cache over TCP, which works but may be slower than recomputing the prompt on the decode worker.
 
 ## What's next?
 
 1. Read about [services](../../concepts/services.md) and [gateways](../../concepts/gateways.md)
-2. Browse the [NVIDIA Dynamo GitHub repository](https://github.com/ai-dynamo/dynamo) and the [SGLang](./sglang.md) example
+2. Browse the [NVIDIA Dynamo GitHub repository](https://github.com/ai-dynamo/dynamo) and the [vLLM](./vllm.md) example
