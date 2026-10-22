@@ -2,8 +2,8 @@
 
 Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHITECTURE.md`,
 `PIPELINES.md`, `LOCKING.md`, `DATABASE.md`, `MIGRATIONS.md`, `RUNS-AND-JOBS.md`, `AUTOSCALING.md`,
-`BACKENDS.md`, `GPUHUNT.md`, `PROXY.md`, `RUNNER-AND-SHIM.md`, `FRONTEND.md`, `DOCS.md`,
-`DEVELOPMENT.md`, `RELEASE.md`.
+`BACKENDS.md`, `ORPHAN-CLEANUP.md`, `GPUHUNT.md`, `PROXY.md`, `RUNNER-AND-SHIM.md`, `FRONTEND.md`,
+`DOCS.md`, `DEVELOPMENT.md`, `RELEASE.md`.
 
 ## Project Structure & Module Organization
 - Core Python package lives in `src/dstack`; internal modules (including server) sit under `_internal`, API surfaces under `api`, and plugin integrations under `plugins`.
