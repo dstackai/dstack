@@ -21,6 +21,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.errors import BackendError, ServerClientError, SkipOffer
+from dstack._internal.core.models.backends.orphans import OwnerType
 from dstack._internal.core.models.common import NetworkMode, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
@@ -120,6 +121,7 @@ from dstack._internal.server.services.offers import (
     get_instance_offer_with_restricted_az,
     get_offers_by_requirements,
 )
+from dstack._internal.server.services.orphan_cleanup import issue_provider_ref
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
     can_use_placement_groups,
@@ -670,6 +672,7 @@ async def _apply_assignment_result(
                     )
                     return
                 instance_model = _create_placeholder_instance(
+                    session=session,
                     fleet_model=fleet_model,
                     project=context.project,
                     job_model=job_model,
@@ -1179,21 +1182,34 @@ async def _lock_fleet_for_placeholder(
 
 
 def _create_placeholder_instance(
+    session: AsyncSession,
     fleet_model: FleetModel,
     project: ProjectModel,
     job_model: JobModel,
 ) -> InstanceModel:
     taken_instance_nums = {i.instance_num for i in fleet_model.instances}
     instance_num = get_next_instance_num(taken_instance_nums)
+    instance_id = uuid.uuid4()
+    instance_name = f"{fleet_model.name}-{instance_num}"
     return InstanceModel(
-        id=uuid.uuid4(),
-        name=f"{fleet_model.name}-{instance_num}",
+        id=instance_id,
+        name=instance_name,
         instance_num=instance_num,
         project=project,
         fleet=fleet_model,
         status=InstanceStatus.PENDING,
         unreachable=False,
         provisioning_job_id=job_model.id,
+        # Set on resources created by `run_job()` for this placeholder. The placeholder
+        # keeps it when promoted, and the `ProviderRefModel` record outlives the placeholder
+        # if it's deleted after a failed `run_job()`.
+        provider_ref=issue_provider_ref(
+            session=session,
+            project=project,
+            owner_type=OwnerType.INSTANCE,
+            owner_id=instance_id,
+            owner_name=instance_name,
+        ),
     )
 
 
@@ -1719,7 +1735,6 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
             _promote_placeholder_instance(
                 instance_model=instance_model,
                 compute_group_model=compute_group_model,
-                job_model=provisioned_job_model,
                 job_provisioning_data=job_provisioning_data,
                 offer=offer,
                 profile=effective_profile,
@@ -1822,14 +1837,12 @@ def _create_instance_model_for_job(
         volume_attachments=[],
         total_blocks=1,
         busy_blocks=1,
-        provider_ref=_get_job_instance_provider_ref(job_model, compute_group_model),
     )
 
 
 def _promote_placeholder_instance(
     instance_model: InstanceModel,
     compute_group_model: Optional[ComputeGroupModel],
-    job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
     profile: Profile,
@@ -1855,19 +1868,12 @@ def _promote_placeholder_instance(
     instance_model.termination_idle_time = termination_idle_time
     instance_model.total_blocks = 1
     instance_model.busy_blocks = 1
-    instance_model.provider_ref = _get_job_instance_provider_ref(job_model, compute_group_model)
-
-
-def _get_job_instance_provider_ref(
-    job_model: JobModel, compute_group_model: Optional[ComputeGroupModel]
-) -> Optional[str]:
-    # Compute group instances must not be cleaned up individually.
-    # TODO: Orphan cleanup for compute groups is not implemented, and backends must not set
-    # `provider_ref` on compute group resources. Store a `provider_ref` on the compute group,
-    # set it on all its resources, and clean them up as one unit.
     if compute_group_model is not None:
-        return None
-    return job_model.provider_ref
+        # Compute group instances must not be cleaned up individually.
+        # TODO: Orphan cleanup for compute groups is not implemented, and backends must not set
+        # `provider_ref` on compute group resources. Store a `provider_ref` on the compute group,
+        # set it on all its resources, and clean them up as one unit.
+        instance_model.provider_ref = None
 
 
 async def _process_volume_attachments(
@@ -2527,6 +2533,14 @@ async def _provision_new_capacity(
                         new_placement_group_models=new_placement_group_models,
                     ),
                 )
+            placeholder_instance = job_model.instance
+            if (
+                placeholder_instance is not None
+                and is_placeholder_instance(placeholder_instance)
+                and len(job.job_submissions) > 0
+            ):
+                # `run_job()` sets the placeholder's `provider_ref` on the resources it creates
+                job.job_submissions[-1].provider_ref = placeholder_instance.provider_ref
             job_provisioning_data = await run_async(
                 compute.run_job,
                 run,

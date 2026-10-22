@@ -446,7 +446,6 @@ async def create_job(
     registered: bool = False,
     ready: bool = False,
     waiting_master_job: Optional[bool] = None,
-    provider_ref: Optional[str] = None,
     replica_group_name: Optional[str] = None,
 ) -> JobModel:
     assert not (registered and not ready), "registered=True with ready=False is invalid"
@@ -494,7 +493,6 @@ async def create_job(
         registered=registered,
         ready=ready,
         waiting_master_job=waiting_master_job,
-        provider_ref=provider_ref,
     )
     session.add(job)
     await session.commit()

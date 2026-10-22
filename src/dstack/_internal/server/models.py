@@ -25,7 +25,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
+from dstack._internal.core.models.backends.orphans import OrphanCleanupMode, OwnerType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.events import EventTargetType
@@ -608,13 +608,6 @@ class JobModel(PipelineModelMixin, BaseModel):
     should be processed only one-by-one.
     """
     image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
-    provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
-    """Set on provider resources created by `run_job()` for orphans matching.
-    The job's instance inherits it on successful provisioning. It's stored on the job because
-    `run_job()` may create provider resources without a successful provisioning being recorded,
-    and the job's placeholder instance is deleted when the job is terminated,
-    so the job is the only record of such resources.
-    `None` for older jobs."""
 
     service_replica_registrations: Mapped[List["ServiceReplicaRegistrationModel"]] = relationship(
         back_populates="job"
@@ -1051,7 +1044,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     )
 
     provider_ref: Mapped[Optional[str]] = mapped_column(String(12), unique=True, index=True)
-    """Set on provider resources for orphans matching. `None` for older instances."""
+    """Set on provider resources for orphans matching. Recorded in `ProviderRefModel`.
+    Placeholder instances get it on creation and keep it when promoted, so `run_job()`
+    resources carry it too. `None` for older instances and compute group instances."""
 
     __table_args__ = (
         Index(
@@ -1471,7 +1466,7 @@ class OrphanCleanupModel(PipelineModelMixin, BaseModel):
         NaiveDateTime, default=get_current_datetime
     )
     cleanup_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
-    """Consecutive failed or unclean cleanups. Determines the retry delay."""
+    """Consecutive failed cleanups. Determines the retry delay."""
     clean_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     """Start of the last clean cleanup minus a margin for timing inaccuracies.
     Later instance or job activity makes the backend eligible for cleanup."""
@@ -1481,3 +1476,29 @@ class OrphanCleanupModel(PipelineModelMixin, BaseModel):
     """Mode `clean_at` was reached in. The backend is eligible for cleanup again if the current mode differs."""
 
     __table_args__ = (Index("ix_orphan_cleanups_pipeline_fetch_q", last_processed_at.asc()),)
+
+
+class ProviderRefModel(BaseModel):
+    """
+    A `provider_ref` issued by the server, committed with its owner record before any provider
+    call that uses it. Rows are not deleted together with owners, so that resources of deleted
+    owners (e.g. placeholder instances of failed `run_job()` calls) are still matched as orphans.
+    Resources with a `provider_ref` that has no row are not owned by the project.
+    """
+
+    # TODO: Delete rows of deleted or terminated owners after a retention period.
+    # A row is added per fleet instance and per placeholder instance, i.e. per job submission
+    # that provisions new capacity, including no-capacity retries.
+
+    __tablename__ = "provider_refs"
+
+    provider_ref: Mapped[str] = mapped_column(String(12), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    owner_type: Mapped[OwnerType] = mapped_column(EnumAsString(OwnerType, 100))
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False))
+    """Not a foreign key, since owners may be deleted. Kept to report orphans of deleted owners
+    in the owner's events."""
+    owner_name: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    __table_args__ = (Index("ix_provider_refs_project_id_created_at", project_id, created_at),)

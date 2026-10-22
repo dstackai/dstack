@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload, raiseload, selectinload
 
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.backends.base.compute import generate_provider_ref
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
     ResourceNotExistsError,
@@ -902,7 +901,6 @@ def create_job_model_for_new_submission(
         job_provisioning_data=None,
         probes=[],
         waiting_master_job=job.job_spec.job_num != 0,
-        provider_ref=generate_provider_ref(),
     )
 
 

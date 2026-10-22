@@ -7,7 +7,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.backends.orphans import OrphanCleanupMode
 from dstack._internal.core.models.configurations import ScalingSpec, ServiceConfiguration
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.resources import Range
@@ -17,13 +16,8 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
-from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
-from dstack._internal.server.models import (
-    JobModel,
-    OrphanCleanupModel,
-    ServiceRegistrationModel,
-)
+from dstack._internal.server.models import JobModel, ServiceRegistrationModel
 from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
@@ -230,74 +224,6 @@ class TestRunPendingWorker:
         assert other_reason_job.id in [j.id for j in jobs]
         assert predecessor_job.id in [j.id for j in jobs]
         assert jobs[-1].status == JobStatus.SUBMITTED
-
-    @pytest.mark.parametrize(
-        ("orphan_cleanup_state", "finished_hours_ago", "deleted"),
-        [
-            ("not_enrolled", 0.5, False),
-            ("not_enrolled", 200, True),
-            ("cleaned_before_finish", 0.5, False),
-            ("cleaned_after_finish", 0.5, True),
-            ("off", 0.5, True),
-        ],
-    )
-    async def test_keeps_superseded_submissions_until_orphan_cleanup(
-        self,
-        test_db,
-        session: AsyncSession,
-        worker: RunWorker,
-        orphan_cleanup_state: str,
-        finished_hours_ago: float,
-        deleted: bool,
-    ) -> None:
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        backend = await create_backend(session=session, project_id=project.id)
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            status=RunStatus.PENDING,
-            resubmission_attempt=4,
-        )
-        finished_at = get_current_datetime() - timedelta(hours=finished_hours_ago)
-        superseded_job = await create_job(
-            session=session,
-            run=run,
-            status=JobStatus.FAILED,
-            last_processed_at=finished_at,
-            submission_num=0,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-        )
-        await create_job(
-            session=session,
-            run=run,
-            status=JobStatus.FAILED,
-            last_processed_at=finished_at,
-            submission_num=1,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-        )
-        if orphan_cleanup_state in ("cleaned_before_finish", "cleaned_after_finish"):
-            clean_at = finished_at + timedelta(
-                minutes=10 if orphan_cleanup_state == "cleaned_after_finish" else -10
-            )
-            session.add(
-                OrphanCleanupModel(
-                    backend_id=backend.id, clean_at=clean_at, clean_mode=OrphanCleanupMode.REPORT
-                )
-            )
-        lock_run(run)
-        await session.commit()
-
-        mode = OrphanCleanupMode.OFF if orphan_cleanup_state == "off" else OrphanCleanupMode.REPORT
-        with patch.object(settings, "ORPHAN_CLEANUP_MODE", mode):
-            await worker.process(run_to_pipeline_item(run))
-
-        res = await session.execute(select(JobModel.id).where(JobModel.run_id == run.id))
-        job_ids = set(res.scalars().all())
-        assert (superseded_job.id not in job_ids) == deleted
 
     async def test_noops_when_run_lock_changes_after_processing(
         self, test_db, session: AsyncSession, worker: RunWorker

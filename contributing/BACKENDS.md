@@ -235,7 +235,7 @@ Examples of container-based backends include: `kubernetes`, `vastai`, `runpod`.
 `dstack` can find and delete cloud resources it created but no longer tracks, e.g. if the server
 crashed after the provider created an instance but before it was recorded, or if instance
 termination failed. The `OrphanCleanupPipeline` lists resources of backends that extend
-`ComputeWithResourceListingSupport` and matches them with instances and jobs by `provider_ref`.
+`ComputeWithResourceListingSupport` and matches them with instances by `provider_ref`.
 See [ORPHAN-CLEANUP.md](ORPHAN-CLEANUP.md) for the server side.
 
 To support it in a backend:

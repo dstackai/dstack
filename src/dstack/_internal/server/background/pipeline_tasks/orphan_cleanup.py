@@ -3,7 +3,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Iterable, Optional, Sequence
+from typing import Optional, Sequence
 
 import sentry_sdk
 from sqlalchemy import ColumnElement, and_, or_, select, update
@@ -18,6 +18,7 @@ from dstack._internal.core.models.backends.orphans import (
     OrphanCleanupMode,
     OwnerType,
 )
+from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server import settings
@@ -42,15 +43,15 @@ from dstack._internal.server.models import (
     JobModel,
     OrphanCleanupModel,
     ProjectModel,
+    ProviderRefModel,
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.orphan_cleanup import CLEANUP_RETRY_INTERVAL_MULTIPLIERS
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import tracing
-from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
+from dstack._internal.utils.common import batched, get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -263,6 +264,10 @@ class _ResourceGroupDecision(str, Enum):
     """The group is the owner's current resources."""
 
 
+_CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
+"""Retry delays after failed cleanups, as multiples of the cleanup interval."""
+
+
 def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
     """
     SQL-portable way to filter by retry delay depending on `cleanup_attempt`.
@@ -273,13 +278,13 @@ def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
             OrphanCleanupModel.cleanup_attempt == i,
             OrphanCleanupModel.last_processed_at < now - interval * multiplier,
         )
-        for i, multiplier in enumerate(CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
+        for i, multiplier in enumerate(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
     ]
     filters.append(
         and_(
-            OrphanCleanupModel.cleanup_attempt >= len(CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
+            OrphanCleanupModel.cleanup_attempt >= len(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
             OrphanCleanupModel.last_processed_at
-            < now - interval * CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
+            < now - interval * _CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
         )
     )
     return or_(OrphanCleanupModel.cleanup_attempt == 0, *filters)
@@ -335,13 +340,20 @@ async def _needs_cleanup(session: AsyncSession, orphan_cleanup_model: OrphanClea
 async def _has_activity_since(
     session: AsyncSession, project_id: uuid.UUID, since: datetime
 ) -> bool:
+    has_issued_provider_refs = (
+        select(ProviderRefModel.provider_ref)
+        .where(
+            ProviderRefModel.project_id == project_id,
+            ProviderRefModel.created_at >= since,
+        )
+        .exists()
+    )
     has_instance_activity = (
         select(InstanceModel.id)
         .where(
             InstanceModel.project_id == project_id,
             InstanceModel.provider_ref.is_not(None),
             or_(
-                InstanceModel.created_at >= since,
                 InstanceModel.started_at >= since,
                 InstanceModel.finished_at >= since,
             ),
@@ -355,13 +367,14 @@ async def _has_activity_since(
         select(JobModel.id)
         .where(
             JobModel.project_id == project_id,
-            JobModel.provider_ref.is_not(None),
             JobModel.status.in_(JobStatus.finished_statuses()),
             JobModel.last_processed_at >= since,
         )
         .exists()
     )
-    res = await session.execute(select(or_(has_instance_activity, has_job_activity)))
+    res = await session.execute(
+        select(or_(has_issued_provider_refs, has_instance_activity, has_job_activity))
+    )
     return res.scalar_one()
 
 
@@ -450,12 +463,15 @@ _PROVIDER_REF_BATCH_SIZE = 100
 
 
 @dataclass
-class _OwnerRecords:
-    instances: dict[str, InstanceModel]
-    jobs: dict[str, JobModel]
-    """A job's instance inherits the job's `provider_ref` on successful provisioning,
-    so a job is consulted only if no instance has its `provider_ref`. Then it matches
-    only resources left by failed provisioning. See `JobModel.provider_ref`."""
+class _OwnerRecord:
+    provider_ref_model: ProviderRefModel
+    instance_model: Optional[InstanceModel]
+    """Including soft-deleted instances. `None` if the instance was deleted,
+    e.g. a placeholder instance of a failed `run_job()`."""
+
+
+_OwnerRecords = dict[str, _OwnerRecord]
+"""Owner records by `provider_ref`. `provider_ref`s missing from the dict were not issued."""
 
 
 async def _load_owner_records(
@@ -466,73 +482,40 @@ async def _load_owner_records(
         for resource_group in resource_groups
         if resource_group.owner_type == OwnerType.INSTANCE
     }
+    owner_records: _OwnerRecords = {}
     async with get_session_ctx() as session:
-        # Jobs are loaded before instances since each query may see later commits
-        # (e.g. on Postgres with Read Committed). Successful provisioning moves the job
-        # out of submitted and sets its `provider_ref` on the instance in one transaction.
-        # So if the job query sees the job provisioned, the instance query sees its instance.
-        # In the reverse order, the instance could be missed and its resources orphaned.
-        jobs = await _load_jobs_by_provider_ref(session, project_id, instance_refs)
-        instances = await _load_instances_by_provider_ref(session, project_id, instance_refs)
-    return _OwnerRecords(instances=instances, jobs=jobs)
-
-
-async def _load_instances_by_provider_ref(
-    session: AsyncSession, project_id: uuid.UUID, provider_refs: Iterable[str]
-) -> dict[str, InstanceModel]:
-    # Soft-deleted instances are included since termination sets `deleted`.
-    instances: dict[str, InstanceModel] = {}
-    for batch in batched(provider_refs, _PROVIDER_REF_BATCH_SIZE):
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.project_id == project_id,
-                InstanceModel.provider_ref.in_(batch),
-            )
-            .options(
-                load_only(
-                    InstanceModel.id,
-                    InstanceModel.project_id,
-                    InstanceModel.fleet_id,
-                    InstanceModel.name,
-                    InstanceModel.provider_ref,
-                    InstanceModel.status,
-                    InstanceModel.started_at,
-                    InstanceModel.finished_at,
-                    InstanceModel.job_provisioning_data,
+        for batch in batched(instance_refs, _PROVIDER_REF_BATCH_SIZE):
+            # `provider_ref`s and instances are read in one statement, so that an instance
+            # committed with its `provider_ref` record is never missed while the record is seen.
+            res = await session.execute(
+                select(ProviderRefModel, InstanceModel)
+                .outerjoin(
+                    InstanceModel, InstanceModel.provider_ref == ProviderRefModel.provider_ref
+                )
+                .where(
+                    ProviderRefModel.project_id == project_id,
+                    ProviderRefModel.owner_type == OwnerType.INSTANCE,
+                    ProviderRefModel.provider_ref.in_(batch),
+                )
+                .options(
+                    load_only(
+                        InstanceModel.id,
+                        InstanceModel.project_id,
+                        InstanceModel.fleet_id,
+                        InstanceModel.name,
+                        InstanceModel.provider_ref,
+                        InstanceModel.status,
+                        InstanceModel.started_at,
+                        InstanceModel.finished_at,
+                        InstanceModel.job_provisioning_data,
+                    )
                 )
             )
-        )
-        for instance_model in res.scalars().all():
-            instances[get_or_error(instance_model.provider_ref)] = instance_model
-    return instances
-
-
-async def _load_jobs_by_provider_ref(
-    session: AsyncSession, project_id: uuid.UUID, provider_refs: Iterable[str]
-) -> dict[str, JobModel]:
-    jobs: dict[str, JobModel] = {}
-    for batch in batched(provider_refs, _PROVIDER_REF_BATCH_SIZE):
-        res = await session.execute(
-            select(JobModel)
-            .where(
-                JobModel.project_id == project_id,
-                JobModel.provider_ref.in_(batch),
-            )
-            .options(
-                load_only(
-                    JobModel.id,
-                    JobModel.project_id,
-                    JobModel.run_id,
-                    JobModel.job_name,
-                    JobModel.provider_ref,
-                    JobModel.status,
+            for provider_ref_model, instance_model in res.all():
+                owner_records[provider_ref_model.provider_ref] = _OwnerRecord(
+                    provider_ref_model=provider_ref_model, instance_model=instance_model
                 )
-            )
-        )
-        for job_model in res.scalars().all():
-            jobs[get_or_error(job_model.provider_ref)] = job_model
-    return jobs
+    return owner_records
 
 
 def _get_resource_group_decision(
@@ -542,17 +525,16 @@ def _get_resource_group_decision(
     listed_at: datetime,
 ) -> _ResourceGroupDecision:
     if resource_group.owner_type == OwnerType.INSTANCE:
-        instance_model = owner_records.instances.get(resource_group.provider_ref)
-        if instance_model is not None:
-            return _get_instance_group_decision(
-                orphan_cleanup_model, resource_group, instance_model, listed_at
-            )
-        job_model = owner_records.jobs.get(resource_group.provider_ref)
-        if job_model is not None:
-            return _get_job_group_decision(
-                orphan_cleanup_model, resource_group, job_model, listed_at
-            )
-        return _ResourceGroupDecision.IGNORE
+        if resource_group.provider_ref not in owner_records:
+            return _ResourceGroupDecision.IGNORE
+        instance_model = owner_records[resource_group.provider_ref].instance_model
+        if instance_model is None:
+            # Placeholder instances are deleted when their jobs are terminated,
+            # so `run_job()` can no longer be creating resources for them.
+            return _ResourceGroupDecision.ORPHAN
+        return _get_instance_group_decision(
+            orphan_cleanup_model, resource_group, instance_model, listed_at
+        )
     # Backends may list owner types that orphan cleanup does not support yet
     logger.warning(
         "Ignoring resource group %s in %s/%s with unsupported owner type %s",
@@ -643,12 +625,22 @@ def _get_orphan_event(
     decision: _ResourceGroupDecision,
 ) -> _OrphanEvent:
     assert resource_group.owner_type == OwnerType.INSTANCE
-    owner_model = owner_records.instances.get(resource_group.provider_ref)
-    if owner_model is None:
-        owner_model = owner_records.jobs[resource_group.provider_ref]
+    owner_record = owner_records[resource_group.provider_ref]
+    if owner_record.instance_model is not None:
+        target = events.Target.from_model(owner_record.instance_model)
+    else:
+        # Targeting the deleted instance puts the event next to the instance's earlier events,
+        # e.g. the job it was created for.
+        provider_ref_model = owner_record.provider_ref_model
+        target = events.Target(
+            type=EventTargetType.INSTANCE,
+            project_id=provider_ref_model.project_id,
+            id=provider_ref_model.owner_id,
+            name=provider_ref_model.owner_name,
+        )
     return _OrphanEvent(
         message=_get_orphan_event_message(resource_group, decision),
-        target=events.Target.from_model(owner_model),
+        target=target,
     )
 
 
@@ -736,31 +728,6 @@ def _get_instance_group_decision(
             return _ResourceGroupDecision.SKIP
         return _ResourceGroupDecision.ORPHAN
     return _ResourceGroupDecision.TRACKED
-
-
-def _get_job_group_decision(
-    orphan_cleanup_model: OrphanCleanupModel,
-    resource_group: ListedResourceGroup,
-    job_model: JobModel,
-    listed_at: datetime,
-) -> _ResourceGroupDecision:
-    # Successful job provisioning moves the job out of submitted
-    # and sets its `provider_ref` on the instance in the same transaction.
-    # So a submitted job may be provisioning the resources right now,
-    # while resources of a job in any other status are left from failed provisioning.
-    if job_model.status == JobStatus.SUBMITTED:
-        if _is_stuck(resource_group, listed_at):
-            logger.error(
-                "Resource group %s in %s/%s was created at %s for job %s"
-                " that is still submitted. The job may be stuck in submitted.",
-                resource_group.provider_ref,
-                orphan_cleanup_model.backend.project.name,
-                orphan_cleanup_model.backend.type.value,
-                resource_group.created_at,
-                job_model.job_name,
-            )
-        return _ResourceGroupDecision.SKIP
-    return _ResourceGroupDecision.ORPHAN
 
 
 def _changed_after(changed_at: Optional[datetime], at: datetime) -> bool:

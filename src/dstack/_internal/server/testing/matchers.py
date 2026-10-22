@@ -1,8 +1,6 @@
 import re
 import uuid
 
-from dstack._internal.core.backends.base.compute import is_valid_provider_ref
-
 
 class SomeUUID4Str:
     """
@@ -31,15 +29,3 @@ class SomeUUID4Str:
 
     def __repr__(self):
         return "SomeUUID4Str()"
-
-
-class SomeProviderRef:
-    """
-    A matcher that compares equal to any valid `provider_ref`
-    """
-
-    def __eq__(self, other):
-        return isinstance(other, str) and is_valid_provider_ref(other)
-
-    def __repr__(self):
-        return "SomeProviderRef()"

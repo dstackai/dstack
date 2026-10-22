@@ -61,6 +61,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     PlacementGroupModel,
+    ProviderRefModel,
     VolumeAttachmentModel,
 )
 from dstack._internal.server.services.docker import ImageConfig
@@ -424,7 +425,7 @@ class TestJobSubmittedWorker:
         fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run, provider_ref="jobref000001")
+        job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -446,6 +447,10 @@ class TestJobSubmittedWorker:
             placeholder_id = job.instance.id
             assert job.used_instance_id == placeholder_id
             assert job.instance.status == InstanceStatus.PENDING
+            provider_ref = job.instance.provider_ref
+            assert provider_ref is not None
+            res = await session.execute(select(ProviderRefModel.provider_ref))
+            assert res.scalars().all() == [provider_ref]
 
             await _process_job(session=session, worker=worker, job_model=job)
 
@@ -458,9 +463,9 @@ class TestJobSubmittedWorker:
         assert job.instance.fleet_id == fleet.id
         assert job.instance.offer is not None
         assert job.instance.provisioning_job_id == job.id  # never cleared
-        assert job.instance.provider_ref == "jobref000001"
+        assert job.instance.provider_ref == provider_ref
         run_job_job = backend_mock.compute.return_value.run_job.call_args[0][1]
-        assert run_job_job.job_submissions[-1].provider_ref == "jobref000001"
+        assert run_job_job.job_submissions[-1].provider_ref == provider_ref
         res = await session.execute(
             select(InstanceModel).where(
                 InstanceModel.fleet_id == fleet.id,
@@ -2096,7 +2101,6 @@ class TestJobSubmittedWorker:
             instance_assigned=True,
             job_num=0,
             waiting_master_job=False,
-            provider_ref="jobref000001",
         )
         job2 = await create_job(
             session=session,
@@ -2104,7 +2108,6 @@ class TestJobSubmittedWorker:
             instance_assigned=False,
             job_num=1,
             waiting_master_job=True,
-            provider_ref="jobref000002",
         )
 
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)

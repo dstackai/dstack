@@ -29,15 +29,16 @@ from dstack._internal.server.background.pipeline_tasks.orphan_cleanup import (
     OrphanCleanupPipeline,
     OrphanCleanupWorker,
     _get_resource_group_decision,
+    _OwnerRecord,
     _OwnerRecords,
     _ResourceGroupDecision,
 )
 from dstack._internal.server.models import (
     BackendModel,
     InstanceModel,
-    JobModel,
     OrphanCleanupModel,
     ProjectModel,
+    ProviderRefModel,
 )
 from dstack._internal.server.testing.common import (
     create_backend,
@@ -101,27 +102,28 @@ def _get_instance_model(
     )
 
 
-def _get_job_model(status: JobStatus) -> JobModel:
-    return JobModel(job_name="test-job", status=status, provider_ref=PROVIDER_REF)
-
-
 def _get_decision(
     resource_group: ListedResourceGroup,
     instance_model: Optional[InstanceModel] = None,
-    job_model: Optional[JobModel] = None,
+    issued: bool = True,
 ) -> _ResourceGroupDecision:
-    owner_records = _OwnerRecords(
-        instances={PROVIDER_REF: instance_model} if instance_model is not None else {},
-        jobs={PROVIDER_REF: job_model} if job_model is not None else {},
-    )
+    owner_records: _OwnerRecords = {}
+    if issued:
+        owner_records[PROVIDER_REF] = _OwnerRecord(
+            provider_ref_model=ProviderRefModel(provider_ref=PROVIDER_REF),
+            instance_model=instance_model,
+        )
     return _get_resource_group_decision(
         _get_orphan_cleanup_model(), resource_group, owner_records, LISTED_AT
     )
 
 
 class TestGetResourceGroupDecision:
-    def test_ignores_group_without_owner_record(self):
-        assert _get_decision(_get_resource_group()) == _ResourceGroupDecision.IGNORE
+    def test_ignores_group_with_unknown_provider_ref(self):
+        assert _get_decision(_get_resource_group(), issued=False) == _ResourceGroupDecision.IGNORE
+
+    def test_orphans_group_of_deleted_instance(self):
+        assert _get_decision(_get_resource_group()) == _ResourceGroupDecision.ORPHAN
 
     @pytest.mark.parametrize("status", [InstanceStatus.PENDING, InstanceStatus.TERMINATING])
     def test_skips_group_of_transitional_instance(self, status: InstanceStatus):
@@ -198,27 +200,6 @@ class TestGetResourceGroupDecision:
         decision = _get_decision(_get_resource_group(), instance_model=instance_model)
         assert decision == _ResourceGroupDecision.IGNORE
 
-    def test_skips_group_of_submitted_job_without_instance(self):
-        job_model = _get_job_model(JobStatus.SUBMITTED)
-        decision = _get_decision(_get_resource_group(), job_model=job_model)
-        assert decision == _ResourceGroupDecision.SKIP
-
-    @pytest.mark.parametrize(
-        "status", [JobStatus.RUNNING, JobStatus.TERMINATING, JobStatus.FAILED]
-    )
-    def test_orphans_group_of_not_submitted_job_without_instance(self, status: JobStatus):
-        job_model = _get_job_model(status)
-        decision = _get_decision(_get_resource_group(), job_model=job_model)
-        assert decision == _ResourceGroupDecision.ORPHAN
-
-    def test_prefers_instance_over_job(self):
-        instance_model = _get_instance_model(InstanceStatus.BUSY)
-        job_model = _get_job_model(JobStatus.RUNNING)
-        decision = _get_decision(
-            _get_resource_group(), instance_model=instance_model, job_model=job_model
-        )
-        assert decision == _ResourceGroupDecision.TRACKED
-
 
 CLEANUP_INTERVAL = timedelta(seconds=settings.ORPHAN_CLEANUP_INTERVAL_SECONDS)
 
@@ -285,6 +266,16 @@ async def _create_instance_with_provider_ref(
         session=session, project=project, status=status, created_at=created_at
     )
     instance.provider_ref = PROVIDER_REF
+    session.add(
+        ProviderRefModel(
+            provider_ref=PROVIDER_REF,
+            project_id=project.id,
+            owner_type=OwnerType.INSTANCE,
+            owner_id=instance.id,
+            owner_name=instance.name,
+            created_at=created_at,
+        )
+    )
     await session.commit()
     return instance
 
@@ -457,7 +448,8 @@ class TestOrphanCleanupWorker:
         assert events[0].message.startswith("Orphaned resources found in aws/us-east-1")
 
     @pytest.mark.parametrize(
-        "activity", ["instance_created", "instance_started", "instance_finished", "job_finished"]
+        "activity",
+        ["provider_ref_issued", "instance_started", "instance_finished", "job_finished"],
     )
     async def test_cleans_up_backend_with_activity_after_clean_at(
         self, test_db, session: AsyncSession, worker, activity: str
@@ -482,14 +474,15 @@ class TestOrphanCleanupWorker:
                 run=run,
                 status=JobStatus.FAILED,
                 last_processed_at=after_clean_at,
-                provider_ref=PROVIDER_REF,
             )
         else:
             instance = await _create_instance_with_provider_ref(
                 session,
                 project,
                 InstanceStatus.TERMINATED,
-                created_at=after_clean_at if activity == "instance_created" else before_clean_at,
+                created_at=after_clean_at
+                if activity == "provider_ref_issued"
+                else before_clean_at,
             )
             if activity == "instance_started":
                 instance.started_at = after_clean_at
@@ -695,7 +688,7 @@ class TestOrphanCleanupWorker:
         events = await list_events(session)
         assert [e.message.split(" in ")[0] for e in events] == expected_messages
 
-    async def test_tracks_resources_of_job_provisioned_while_loading_owners(
+    async def test_reports_orphans_of_deleted_instance_to_the_instance(
         self, test_db, session: AsyncSession, worker
     ):
         user = await create_user(session=session)
@@ -703,37 +696,31 @@ class TestOrphanCleanupWorker:
         orphan_cleanup = await _create_orphan_cleanup(
             session, project, last_processed_at=get_current_datetime()
         )
-        repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(
-            session=session, run=run, status=JobStatus.SUBMITTED, provider_ref=PROVIDER_REF
+        # A placeholder instance deleted after a failed `run_job()` leaves only the record
+        deleted_instance_id = uuid.uuid4()
+        session.add(
+            ProviderRefModel(
+                provider_ref=PROVIDER_REF,
+                project_id=project.id,
+                owner_type=OwnerType.INSTANCE,
+                owner_id=deleted_instance_id,
+                owner_name="fleet-0",
+            )
         )
+        await session.commit()
         compute = _ListingCompute(ResourceListing(resource_groups=[_get_resource_group()]))
         item = await _lock(session, orphan_cleanup)
-        load_jobs_by_provider_ref = orphan_cleanup_pipeline._load_jobs_by_provider_ref
-
-        async def load_jobs_after_provisioning(*args, **kwargs):
-            # The job's provisioning commits while owner records are being loaded
-            instance = await create_instance(
-                session=session, project=project, backend=BackendType.AWS
-            )
-            instance.provider_ref = PROVIDER_REF
-            job.status = JobStatus.PROVISIONING
-            await session.commit()
-            return await load_jobs_by_provider_ref(*args, **kwargs)
-
         with (
-            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.DELETE),
+            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.REPORT),
             _patch_compute(compute),
-            patch.object(
-                orphan_cleanup_pipeline,
-                "_load_jobs_by_provider_ref",
-                side_effect=load_jobs_after_provisioning,
-            ),
         ):
             await worker.process(item)
-        assert compute.deleted == []
-        assert await list_events(session) == []
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message.startswith("Orphaned resources found")
+        assert [(t.entity_id, t.entity_name) for t in events[0].targets] == [
+            (deleted_instance_id, "fleet-0")
+        ]
 
     async def test_does_not_apply_result_if_lock_token_changes(
         self, test_db, session: AsyncSession, worker

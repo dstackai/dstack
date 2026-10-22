@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,10 +8,9 @@ from dstack._internal.core.backends.features import get_backends_with_resource_l
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     BackendModel,
-    InstanceModel,
-    JobModel,
     OrphanCleanupModel,
     ProjectModel,
+    ProviderRefModel,
 )
 from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import get_current_datetime
@@ -25,7 +24,7 @@ async def enroll_backends_in_orphan_cleanup():
     Creates `OrphanCleanupModel` rows for backends that support resource listing,
     so that `OrphanCleanupPipeline` starts processing them.
 
-    Only backends of projects with instances or jobs that have `provider_ref` are enrolled,
+    Only backends of projects that have issued `provider_ref`s are enrolled,
     since other backends cannot have orphaned resources that can be matched.
 
     At most `_ENROLLMENT_BATCH_SIZE` backends are enrolled per run. This spreads out
@@ -55,20 +54,9 @@ async def enroll_backends_in_orphan_cleanup():
 
 
 async def _select_backend_ids_to_enroll(session: AsyncSession) -> list[uuid.UUID]:
-    has_instances_with_provider_ref = (
-        select(InstanceModel.id)
-        .where(
-            InstanceModel.project_id == BackendModel.project_id,
-            InstanceModel.provider_ref.is_not(None),
-        )
-        .exists()
-    )
-    has_jobs_with_provider_ref = (
-        select(JobModel.id)
-        .where(
-            JobModel.project_id == BackendModel.project_id,
-            JobModel.provider_ref.is_not(None),
-        )
+    has_provider_refs = (
+        select(ProviderRefModel.provider_ref)
+        .where(ProviderRefModel.project_id == BackendModel.project_id)
         .exists()
     )
     is_enrolled = (
@@ -83,7 +71,7 @@ async def _select_backend_ids_to_enroll(session: AsyncSession) -> list[uuid.UUID
             ProjectModel.deleted == False,
             BackendModel.type.in_(get_backends_with_resource_listing_support()),
             ~is_enrolled,
-            or_(has_instances_with_provider_ref, has_jobs_with_provider_ref),
+            has_provider_refs,
         )
         .limit(_ENROLLMENT_BATCH_SIZE)
     )
