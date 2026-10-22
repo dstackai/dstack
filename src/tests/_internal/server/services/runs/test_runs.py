@@ -27,11 +27,20 @@ class TestListUserRuns:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("include_jobs", [True, False])
+    @pytest.mark.parametrize(
+        "termination_reason",
+        [
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+        ],
+    )
     async def test_limited_list_materializes_only_latest_and_status_jobs(
         self,
         test_db,
         session: AsyncSession,
         include_jobs: bool,
+        termination_reason: JobTerminationReason,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -60,7 +69,7 @@ class TestListUserRuns:
             run=run,
             submission_num=0,
             status=JobStatus.TERMINATED,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            termination_reason=termination_reason,
         )
         for submission_num in range(1, 12):
             await create_job(

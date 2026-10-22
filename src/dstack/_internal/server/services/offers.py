@@ -13,8 +13,10 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PRIVILEGED_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
 )
+from dstack._internal.core.consts import NO_BALANCE_MESSAGE, NO_QUOTA_MESSAGE
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
@@ -127,6 +129,17 @@ async def get_offers_by_requirements(
     # Sorting consumes the lazy offers chain, which is CPU-bound,
     # so it must not run on the event loop.
     return await run_async(_sort_offers_by_availability, offers)
+
+
+def get_offers_termination_reason_message(
+    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
+) -> Optional[str]:
+    availabilities = {offer.availability for _, offer in offers}
+    if availabilities == {InstanceAvailability.NO_QUOTA}:
+        return NO_QUOTA_MESSAGE
+    if availabilities == {InstanceAvailability.NO_BALANCE}:
+        return NO_BALANCE_MESSAGE
+    return None
 
 
 def _sort_offers_by_availability(

@@ -83,6 +83,8 @@ def test_get_error_returns_expected_messages():
     # already handled and shown in status_message
     no_error_reasons = [
         JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
         JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
         JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
         JobTerminationReason.TERMINATED_BY_USER,

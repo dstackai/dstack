@@ -154,8 +154,16 @@ class TestRunPendingWorker:
         assert new_job.replica_num == old_job.replica_num
         assert new_job.submission_num == old_job.submission_num + 1
 
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+        ],
+    )
     async def test_resubmission_deletes_superseded_no_capacity_submissions(
-        self, test_db, session: AsyncSession, worker: RunWorker
+        self, test_db, session: AsyncSession, worker: RunWorker, reason: JobTerminationReason
     ) -> None:
         """
         On resubmission, older submissions that failed to start due to no capacity
@@ -180,7 +188,7 @@ class TestRunPendingWorker:
             status=JobStatus.FAILED,
             last_processed_at=old_time,
             submission_num=0,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            termination_reason=reason,
         )
         provisioned_job = await create_job(
             session=session,
@@ -188,7 +196,7 @@ class TestRunPendingWorker:
             status=JobStatus.FAILED,
             last_processed_at=old_time,
             submission_num=1,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            termination_reason=reason,
             job_provisioning_data=get_job_provisioning_data(),
         )
         other_reason_job = await create_job(
@@ -205,7 +213,7 @@ class TestRunPendingWorker:
             status=JobStatus.FAILED,
             last_processed_at=old_time,
             submission_num=3,
-            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            termination_reason=reason,
         )
         lock_run(run)
         await session.commit()

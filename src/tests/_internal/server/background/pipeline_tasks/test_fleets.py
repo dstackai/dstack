@@ -693,8 +693,20 @@ class TestFleetWorker:
             for instance in non_deleted_instances
         )
 
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            InstanceTerminationReason.NO_OFFERS,
+            InstanceTerminationReason.NO_QUOTA,
+            InstanceTerminationReason.NO_BALANCE,
+        ],
+    )
     async def test_min_zero_failed_master_terminates_unprovisioned_siblings(
-        self, test_db, session: AsyncSession, worker: FleetWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: FleetWorker,
+        reason: InstanceTerminationReason,
     ):
         project = await create_project(session)
         fleet = await create_fleet(
@@ -716,7 +728,7 @@ class TestFleetWorker:
             offer=None,
             instance_num=0,
         )
-        failed_master.termination_reason = InstanceTerminationReason.NO_OFFERS
+        failed_master.termination_reason = reason
         sibling1 = await create_instance(
             session=session,
             project=project,

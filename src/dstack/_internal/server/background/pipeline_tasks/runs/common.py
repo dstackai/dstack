@@ -127,7 +127,7 @@ async def delete_superseded_no_capacity_job_submissions(
     new_job_models: list[JobModel],
 ) -> None:
     """
-    Delete previous job submissions that failed to start due to no capacity without
+    Delete previous job submissions that failed to start due to capacity, quota, or balance without
     ever provisioning. Such submissions are created each time a run is retrying
     on no capacity and carry no information beyond the events.
     The direct predecessor of each new submission is kept so that the run's
@@ -143,8 +143,13 @@ async def delete_superseded_no_capacity_job_submissions(
                 JobModel.job_num == job_model.job_num,
                 JobModel.submission_num < job_model.submission_num - 1,
                 JobModel.status.in_(JobStatus.finished_statuses()),
-                JobModel.termination_reason
-                == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                JobModel.termination_reason.in_(
+                    [
+                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+                    ]
+                ),
                 JobModel.job_provisioning_data.is_(None),
             )
         )

@@ -260,6 +260,22 @@ class TestGetRunsTable:
             ),
             (
                 JobStatus.FAILED,
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
+                None,
+                "All matching offers are blocked by quota",
+                "no quota",
+                "indian_red1",
+            ),
+            (
+                JobStatus.FAILED,
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
+                None,
+                "All matching offers are blocked by insufficient balance",
+                "no balance",
+                "indian_red1",
+            ),
+            (
+                JobStatus.FAILED,
                 JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 None,
                 "No matching fleet found. Possible reasons: https://dstack.ai/docs/guides/troubleshooting/#no-fleets",
