@@ -17,8 +17,12 @@ def get_cleaned_up_after_filter(
     Returns a filter that is true if orphan cleanup has had a clean run started after `at`
     for every backend of the project that supports resource listing, i.e. orphaned resources
     of records that finished before `at` have been reported or deleted.
-    Backends not enrolled in orphan cleanup yet are not cleaned up.
+    Backends not enrolled in orphan cleanup yet count as not cleaned up.
     Always true if orphan cleanup is off.
+
+    A clean run in report mode counts too, although its orphans were only reported.
+    So after switching to delete mode, orphans of records deleted based on this filter
+    are not matched and stay.
     """
     if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.OFF:
         return true()
