@@ -294,11 +294,14 @@ class AWSCompute(
             AWSResourceGroupBackendData, get_or_error(group.backend_data)
         )
         region = get_or_error(group.region)
-        if backend_data.instance_id is not None:
-            self.terminate_instance(instance_id=backend_data.instance_id, region=region)
-        ec2_client = self.session.client("ec2", region_name=region)
-        for allocation_id in backend_data.eip_allocation_ids:
-            aws_resources.release_eip(ec2_client=ec2_client, allocation_id=allocation_id)
+        try:
+            if backend_data.instance_id is not None:
+                self.terminate_instance(instance_id=backend_data.instance_id, region=region)
+            ec2_client = self.session.client("ec2", region_name=region)
+            for allocation_id in backend_data.eip_allocation_ids:
+                aws_resources.release_eip(ec2_client=ec2_client, allocation_id=allocation_id)
+        except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as e:
+            raise ComputeError(f"Failed to delete resource group {group.provider_ref}: {e}") from e
 
     def create_instance(
         self,

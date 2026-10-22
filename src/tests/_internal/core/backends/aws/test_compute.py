@@ -227,6 +227,13 @@ class TestDeleteResourceGroup:
         )
         compute.delete_resource_group(group)
 
+    def test_raises_compute_error_on_api_error(self, compute: AWSCompute, ec2_client: Stubber):
+        ec2_client.add_client_error(
+            "terminate_instances", service_error_code="UnauthorizedOperation"
+        )
+        with pytest.raises(ComputeError):
+            compute.delete_resource_group(_get_resource_group(eip_allocation_ids=[]))
+
 
 class TestAllocateAndAssociateEip:
     def test_tags_elastic_ip_with_provider_ref(self, ec2_client: Stubber):
