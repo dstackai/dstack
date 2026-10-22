@@ -67,7 +67,9 @@ def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExclude
     Excludes new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    get_plan_excludes: IncludeExcludeDictType = {}
+    get_plan_excludes: IncludeExcludeDictType = (
+        {} if request.reverse_offers else {"reverse_offers": True}
+    )
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
     if run_spec_excludes is not None:
         get_plan_excludes["run_spec"] = run_spec_excludes

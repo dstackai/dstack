@@ -381,6 +381,73 @@ class TestListProjects:
             ],
         }
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_owner_or_member_before_pagination(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(session=session, name="admin")
+        user = await create_user(session=session, name="member")
+        await create_project(session=session, owner=user, name="owned")
+        joined = await create_project(
+            session=session,
+            owner=admin,
+            name="joined",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        for member in (user, admin):
+            await add_project_member(
+                session=session, project=joined, user=member, project_role=ProjectRole.MANAGER
+            )
+        await create_project(
+            session=session,
+            owner=admin,
+            name="unrelated",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+        )
+
+        params = {"username": user.name, "return_total_count": True, "limit": 1}
+        for expected_name in ("joined", "owned"):
+            response = await client.post(
+                "/api/projects/list", headers=get_auth_headers(admin.token), json=params
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["total_count"] == 2
+            assert len(data["projects"]) == 1
+            project_data = data["projects"][0]
+            assert project_data["project_name"] == expected_name
+            if expected_name == "joined":
+                members = project_data["members"]
+                assert len(members) == 1
+                assert members[0]["user"]["username"] == user.name
+                assert members[0]["project_role"] == "manager"
+            params.update(
+                prev_created_at=project_data["created_at"], prev_id=project_data["project_id"]
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_username_filter_preserves_visibility(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        viewer = await create_user(session=session, name="viewer", global_role=GlobalRole.USER)
+        owner = await create_user(session=session, name="owner")
+        await create_project(session=session, owner=owner, name="private")
+        public = await create_project(session=session, owner=owner, name="public", is_public=True)
+        shared = await create_project(session=session, owner=owner, name="shared")
+        await add_project_member(
+            session=session, project=shared, user=viewer, project_role=ProjectRole.USER
+        )
+
+        response = await client.post(
+            "/api/projects/list",
+            headers=get_auth_headers(viewer.token),
+            json={"username": owner.name},
+        )
+        assert response.status_code == 200
+        assert {p["project_name"] for p in response.json()} == {public.name, shared.name}
+
 
 class TestListOnlyNoFleets:
     @pytest.mark.asyncio

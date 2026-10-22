@@ -30,16 +30,16 @@ import { useGetProjectQuery } from 'services/project';
 import { useGetAllTemplatesQuery } from 'services/templates';
 
 import { getRequestParams } from 'pages/Offers/List';
-import { getOfferFilters, useFilters } from 'pages/Offers/List/hooks/useFilters';
+import { getOfferFilters, toRangeTokens, useFilters } from 'pages/Offers/List/hooks/useFilters';
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
 
 import { AGENTS_INFO, CLI_INFO, getTemplatesInfo } from './constants';
+import { getApplyCommand } from './helpers';
 
 import styles from './styles.module.scss';
 
 const INSTALL_COMMAND = 'uv tool install dstack -U';
-const APPLY_COMMAND = 'dstack apply -f .dstack.yml';
 const SKILLS_COMMAND = 'npx skills add dstackai/dstack';
 // The page layout's padding below the content.
 const PAGE_BOTTOM_PADDING = 40;
@@ -63,8 +63,11 @@ export const LaunchOptions: FC = () => {
         },
     ]);
 
-    // The same filter as on Offers; GPU names and backends load only when their list is opened.
-    const [initialFilters] = useState(() => getOfferFilters(searchParams));
+    // The same filter as on Offers; GPU names, vendors and backends load only when their list is opened.
+    const [initialFilters] = useState(() => {
+        const filters = getOfferFilters(searchParams);
+        return product.hasTemplates ? filters : filters?.project_name ? { project_name: filters.project_name } : {};
+    });
 
     const loadGpus = async (projectName: string) => {
         const data = await getGpus(getRequestParams({ project_name: projectName, group_by: ['gpu'] })).unwrap();
@@ -73,6 +76,7 @@ export const LaunchOptions: FC = () => {
 
     const {
         filteringRequestParams,
+        clearFilter,
         propertyFilterRef,
         propertyFilterQuery,
         onChangePropertyFilter,
@@ -86,7 +90,7 @@ export const LaunchOptions: FC = () => {
     useEffect(() => {
         setSearchParams(
             (params) => {
-                const next = tokensToSearchParams(propertyFilterQuery.tokens);
+                const next = tokensToSearchParams(toRangeTokens(propertyFilterQuery.tokens));
                 const template = params.get('template');
 
                 if (template) {
@@ -133,6 +137,11 @@ export const LaunchOptions: FC = () => {
                         ref={propertyFilterRef}
                         query={propertyFilterQuery}
                         onChange={onChangePropertyFilter}
+                        customFilterActions={
+                            <Button variant="link" formAction="none" onClick={clearFilter}>
+                                {t('common.clearFilter')}
+                            </Button>
+                        }
                         expandToViewport
                         hideOperations
                         i18nStrings={{
@@ -140,8 +149,16 @@ export const LaunchOptions: FC = () => {
                             filteringAriaLabel: t('offer.filter_property_placeholder'),
                             filteringPlaceholder: t('offer.filter_property_placeholder'),
                         }}
-                        filteringOptions={filteringOptions}
-                        filteringProperties={filteringProperties}
+                        filteringOptions={
+                            product.hasTemplates
+                                ? filteringOptions
+                                : filteringOptions.filter(({ propertyKey }) => propertyKey === 'project_name')
+                        }
+                        filteringProperties={
+                            product.hasTemplates
+                                ? filteringProperties
+                                : filteringProperties.filter(({ key }) => key === 'project_name')
+                        }
                         filteringStatusType={filteringStatusType}
                         onLoadItems={handleLoadItems}
                     />
@@ -183,6 +200,7 @@ const CliColumn: FC<{ projectName: string }> = ({ projectName }) => (
 
 const CliPanel: FC<{ projectName: string }> = ({ projectName }) => {
     const { t } = useTranslation();
+    const [searchParams] = useSearchParams();
     const [openHelpPanel] = useHelpPanel();
     const [configCliCommand] = useConfigProjectCliCommand({ projectName });
 
@@ -222,7 +240,7 @@ const CliPanel: FC<{ projectName: string }> = ({ projectName }) => {
                 </FormField>
 
                 <FormField label={t('runs.launch_page.cli_apply')}>
-                    <CopyableCode command={APPLY_COMMAND} />
+                    <CopyableCode command={getApplyCommand(searchParams)} />
                 </FormField>
             </SpaceBetween>
         </Container>

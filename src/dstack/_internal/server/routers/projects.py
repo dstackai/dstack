@@ -48,7 +48,12 @@ async def list_projects(
     Returns all accessible projects (member projects for regular users, all non-deleted
     projects for global admins, plus public projects if `include_not_joined` is `True`).
 
-    `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
+    If `username` is specified, restrict results to projects that user owns or belongs to,
+    and include only that user's membership in `members`.
+    Only projects accessible to the authenticated user are returned.
+
+    Without `username`, `members` are empty. `backends` are always empty -
+    call `/api/projects/{project_name}/get` to retrieve them.
     """
     if body is None:
         # For backward compatibility
@@ -64,6 +69,7 @@ async def list_projects(
             prev_id=body.prev_id,
             limit=body.limit,
             ascending=body.ascending,
+            username=body.username,
         )
     )
 

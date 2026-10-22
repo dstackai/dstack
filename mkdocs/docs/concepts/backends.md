@@ -627,6 +627,30 @@ gcloud projects list --format="json(projectId)"
     gcloud services enable compute.googleapis.com
     ```
 
+??? info "TPUs"
+    TPU support is experimental and disabled by default. To enable it, set `tpu: true` in the backend settings:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+          tpu: true
+    ```
+
+    </div>
+
+    Enable the Cloud TPU API in your GCP project:
+
+    ```shell
+    gcloud services enable tpu.googleapis.com --project=gcp-project-id
+    ```
+
 ??? info "VPC"
 
     === "VPC"
@@ -1505,6 +1529,25 @@ projects:
     * Private images: `write:registries` and `delete:registries`
     * Creating volumes: `read:volumes`, `write:volumes`, and `delete:volumes`
     * Registering existing volumes: `read:volumes`
+
+### Lium
+
+Create an API key under **Access → API Keys** in the
+[Lium dashboard](https://lium.io/ssh-keys), then configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: lium
+        creds:
+          type: api_key
+          api_key: YOUR_LIUM_API_KEY
+```
+
+</div>
 
 ### Runpod
 

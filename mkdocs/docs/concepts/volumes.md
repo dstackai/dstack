@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, and `daytona` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, `kubernetes`, `daytona`, and `lium` backends.
 
 ### Apply a configuration
 
@@ -51,6 +51,18 @@ If you use this configuration, `dstack` will create a new volume based on the sp
     backend: daytona
     name: my-volume
     ```
+
+??? info "Lium"
+    Lium volumes use S3-backed storage, grow with usage, and can be mounted in any Lium region.
+    Omit `size` and `region`. Each run can mount one volume.
+
+    ```yaml
+    type: volume
+    backend: lium
+    name: my-volume
+    ```
+
+    > Files on Lium volumes are owned by root and accessible to all users in the container.
 
 ??? info "Kubernetes"
     Set `region` to a kubeconfig context name enabled in the [backend configuration](backends.md#kubernetes).
@@ -143,7 +155,7 @@ For all volume configuration options, refer to the [reference](../reference/dsta
 
 ### Attach a volume { #attach-network-volume }
 
-Dev environments, tasks, and services let you attach any number of network volumes.
+Dev environments, tasks, and services let you attach network volumes.
 To attach a network volume, simply specify its name using the `volumes` property
 and specify where to mount its contents:
 
@@ -276,7 +288,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
     If you don't want to limit a run to one particular region, you can create different volumes for different regions
     and specify them for the same mount point as [documented above](#attach-network-volume).
 
-    Daytona volumes can be mounted in any Daytona region.
+    Daytona and Lium volumes can be mounted in any region of their respective backend.
 
 ??? info "Can I attach network volumes to multiple runs or instances?"
     The `runpod` and `daytona` backends support mounting the same volume in multiple runs at the same time.
@@ -287,7 +299,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-> Instance volumes are currently supported for all backends except `daytona`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+> Instance volumes are currently supported for all backends except `daytona`, `lium`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ### Attach a volume
 

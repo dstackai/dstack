@@ -161,6 +161,11 @@ export const ROUTES = {
                 FORMAT: (projectName: string, fleetId: string) =>
                     buildRoute(ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE, { projectName, fleetId }),
             },
+            OFFERS: {
+                TEMPLATE: `/projects/:projectName/fleets/:fleetId/offers`,
+                FORMAT: (projectName: string, fleetId: string) =>
+                    buildRoute(ROUTES.FLEETS.DETAILS.OFFERS.TEMPLATE, { projectName, fleetId }),
+            },
             INSPECT: {
                 TEMPLATE: `/projects/:projectName/fleets/:fleetId/inspect`,
                 FORMAT: (projectName: string, fleetId: string) =>

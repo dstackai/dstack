@@ -73,6 +73,9 @@ logger = get_logger(__name__)
 DSTACK_DIR = "/dstack"
 DSTACK_PROFILE_PATH = f"{DSTACK_DIR}/profile"
 
+# A directory with preinstalled Python builds in dstackai/base image
+UV_PYTHON_INSTALL_DIR = "/opt/uv/python"
+
 # A non-existent image name used to signal that the image registry must never be requested
 # and some dummy defaults should be used instead.
 # As a job with such an image cannot be started, this special value only makes sense
@@ -290,6 +293,7 @@ class JobConfigurator(ABC):
             or self.run_spec.configuration.entrypoint is not None
         ):
             return []
+        python = self._python()
         return [
             f"eval $(echo 'export DSTACK_VENV_DIR={DSTACK_DIR}/venv' | sudo tee -a {DSTACK_PROFILE_PATH})",
             # Make sure /dstack/venv is owned by the current user.
@@ -310,7 +314,13 @@ class JobConfigurator(ABC):
             # used for legacy `pip`-based configurations). `--no-active` suppresses the warning.
             # Alternatively, the user can call `deactivate` once before using `uv`.
             # If the user really wants to reuse dstack's venv, they must spefify `--active`.
-            f"uv venv -q --prompt dstack -p {self._python()} --seed $DSTACK_VENV_DIR",
+            # Use the preinstalled Python build if available, otherwise let `uv` download it.
+            # The subshell keeps the `UV_*` variables out of the user's commands.
+            (
+                f"(if UV_PYTHON_INSTALL_DIR={UV_PYTHON_INSTALL_DIR} uv python find {python} > /dev/null 2>&1;"
+                f" then export UV_PYTHON_INSTALL_DIR={UV_PYTHON_INSTALL_DIR} UV_PYTHON_DOWNLOADS=never; fi;"
+                f" uv venv -q --prompt dstack -p {python} --seed $DSTACK_VENV_DIR)"
+            ),
             f"eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a {DSTACK_PROFILE_PATH})",
         ]
 

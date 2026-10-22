@@ -95,6 +95,7 @@ class TestListBackendTypes:
             "jarvislabs",
             "kubernetes",
             "lambda",
+            "lium",
             "nebius",
             "oci",
             "runpod",

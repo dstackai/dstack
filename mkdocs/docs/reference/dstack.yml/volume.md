@@ -34,6 +34,14 @@ The `volume` configuration type allows creating, registering, and updating [volu
             backend:
                 required: true
 
+=== "Lium"
+
+    #SCHEMA# dstack._internal.core.models.volumes.LiumVolumeConfiguration
+        overrides:
+            show_root_heading: false
+            backend:
+                required: true
+
 === "Kubernetes"
 
     Kubernetes backend volumes are mapped to [`PersistentVolumeClaim`](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) objects.

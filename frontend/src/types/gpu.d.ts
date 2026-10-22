@@ -1,7 +1,7 @@
 declare type TAvailability = 'unknown' | 'available' | 'not_available' | 'no_quota' | 'no_balance' | 'idle' | 'busy';
 
 declare type TSpot = 'spot' | 'on-demand' | 'auto';
-declare type TGpuGroupBy = 'gpu' | 'backend' | 'region' | 'count';
+declare type TGpuGroupBy = 'gpu' | 'cpu' | 'backend' | 'region' | 'count';
 
 declare type TRange = {
     min: number;
@@ -36,6 +36,7 @@ declare interface IResourcesSpecRequest {
 }
 
 declare interface ITaskConfigurationQueryParams {
+    image?: string;
     nodes?: number;
     ports?: Array<number | string | IPortMappingRequest>;
     commands?: string[];
@@ -72,6 +73,7 @@ declare interface IGpu {
         min: number;
         max: number;
     };
+    offer_price?: { min: number; max: number };
     backends?: TBackendType[];
     backend?: TBackendType;
     regions?: string[];
@@ -98,4 +100,23 @@ declare type TGpusListQueryParams = {
 
 declare type TGpusListQueryResponse = {
     gpus: IGpu[];
+    cpus?: ICpuGroup[];
+};
+
+declare interface ICpuGroup extends Omit<IGpu, 'name' | 'vendor' | 'memory_mib'> {
+    cpu_arch: NonNullable<IResources['cpu_arch']>[];
+    memory_mib: { min: number; max: number };
+}
+
+declare interface IInstanceOffer {
+    backend: TBackendType;
+    region: string;
+    instance: NonNullable<IInstance['instance_type']>;
+    price: number;
+    availability: TAvailability;
+}
+
+declare type TOffersQueryResponse = {
+    offers: IInstanceOffer[];
+    total_offers: number;
 };

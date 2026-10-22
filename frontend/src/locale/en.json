@@ -576,6 +576,10 @@
         "availability_not_available": "Not available",
         "availability_no_quota": "No quota",
         "availability_no_balance": "No balance",
+        "availability_busy": "Busy",
+        "availability_idle": "Idle",
+        "truncated": "Showing {{shown}} of {{total}} offers. Use filters to narrow the results.",
+        "terminated_fleet": "Offers are unavailable for a terminated fleet.",
         "groupBy": "Group by properties",
         "region": "Region",
         "count": "Count",
@@ -587,7 +591,8 @@
         "empty_message_title_select_groupBy": "Select a group by",
         "empty_message_text_select_groupBy": "Use the field above to select a group by",
         "empty_message_title": "No offers",
-        "empty_message_text": "A backend may not be configured for this project.",
+        "empty_message_text": "No offers matching backends or SSH fleets. Check configured backends.",
+        "empty_message_text_fleet": "No offers matching fleet requirements. Check configured backends.",
         "nomatch_message_title": "No matches",
         "nomatch_message_text": "We can't find a match. Try to clear filter."
     },
@@ -763,6 +768,11 @@
         "account_settings": "User settings",
         "settings": "Settings",
         "projects": "Projects",
+        "projects_table": {
+            "project": "Project",
+            "role": "Role",
+            "empty_message": "This user doesn't own or belong to any projects."
+        },
         "events": "Events",
         "public_keys": {
             "title": "SSH keys",

@@ -1,7 +1,7 @@
 import datetime as dt
 import logging
 from typing import ClassVar, Optional
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import pytest_asyncio
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal import settings
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.health import HealthStatus
@@ -92,20 +93,32 @@ class TestCheckInstance:
         assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is None
 
-    async def test_check_shim_transitions_provisioning_on_terminating(
+    @pytest.mark.parametrize(
+        ("backend", "age_minutes", "expected_status"),
+        [
+            (BackendType.VERDA, 20, InstanceStatus.TERMINATING),
+            (BackendType.CLOUDRIFT, 20, InstanceStatus.PROVISIONING),
+            (BackendType.CLOUDRIFT, 31, InstanceStatus.TERMINATING),
+        ],
+    )
+    async def test_check_shim_respects_backend_provisioning_timeout(
         self,
         test_db,
         session: AsyncSession,
         worker: InstanceWorker,
         monkeypatch: pytest.MonkeyPatch,
+        backend: BackendType,
+        age_minutes: int,
+        expected_status: InstanceStatus,
     ):
         project = await create_project(session=session)
         instance = await create_instance(
             session=session,
             project=project,
             status=InstanceStatus.PROVISIONING,
+            backend=backend,
         )
-        instance.started_at = get_current_datetime() + dt.timedelta(minutes=-20)
+        instance.started_at = get_current_datetime() - dt.timedelta(minutes=age_minutes)
         await session.commit()
 
         monkeypatch.setattr(
@@ -117,8 +130,55 @@ class TestCheckInstance:
 
         await session.refresh(instance)
 
-        assert instance.status == InstanceStatus.TERMINATING
+        assert instance.status == expected_status
         assert instance.termination_deadline is not None
+        if expected_status == InstanceStatus.PROVISIONING:
+            assert instance.termination_deadline > get_current_datetime()
+
+    @pytest.mark.parametrize(
+        ("age_minutes", "expected_status"),
+        [(20, InstanceStatus.PROVISIONING), (31, InstanceStatus.TERMINATING)],
+    )
+    async def test_cloudrift_waits_for_backend_within_timeout(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        monkeypatch: pytest.MonkeyPatch,
+        age_minutes: int,
+        expected_status: InstanceStatus,
+    ):
+        project = await create_project(session=session)
+        provisioning_data = get_job_provisioning_data(
+            dockerized=True, backend=BackendType.CLOUDRIFT
+        )
+        provisioning_data.hostname = None
+        provisioning_data.ssh_port = None
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PROVISIONING,
+            backend=BackendType.CLOUDRIFT,
+            job_provisioning_data=provisioning_data,
+        )
+        instance.started_at = get_current_datetime() - dt.timedelta(minutes=age_minutes)
+        await session.commit()
+        backend = Mock()
+        monkeypatch.setattr(
+            instances_check,
+            "_get_backend_for_provisioning_wait",
+            AsyncMock(return_value=backend),
+        )
+
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+
+        assert instance.status == expected_status
+        if expected_status == InstanceStatus.TERMINATING:
+            assert instance.termination_reason == InstanceTerminationReason.PROVISIONING_TIMEOUT
+            backend.compute.assert_not_called()
+        else:
+            backend.compute().update_provisioning_data.assert_called_once()
 
     async def test_check_shim_transitions_provisioning_on_busy(
         self,

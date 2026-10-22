@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from datetime import timedelta
 from typing import Callable, List, Optional
@@ -18,10 +19,10 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, RunpodApiClientError
+from dstack._internal.core.backends.runpod.api_client import RunpodApiClient, V2Pod
 from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
@@ -50,6 +51,13 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 # Runpod does not seem to have any limits on the disk size.
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
+
+# gpuhunt, as of 0.1.30, builds CPU instance type names as
+# {CPU flavor (aka type) identifier}-{vCPU count}-{memory in GB}, e.g., cpu3c-2-4
+# The deprecated GraphQL API (used by old dstack servers) accepts the whole string as
+# `instanceId` field; REST API v2, which we currently use, accepts separate `id` and `vcpuCount`
+# fields (memory is inferred)
+CPU_INSTANCE_ID_REGEX = re.compile(r"(?P<flavor_id>.+)-(?P<vcpu>\d+)-(?P<memory>\d+)")
 
 
 class RunpodOfferBackendData(CoreModel):
@@ -130,8 +138,6 @@ class RunpodCompute(
 
         pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
         authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
-        memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
-        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
         network_volume_id = None
         volume_mount_path = None
@@ -141,71 +147,104 @@ class RunpodCompute(
             network_volume_id = volumes[0].volume_id
             volume_mount_path = run.run_spec.configuration.volumes[0].path
 
-        container_registry_auth_id = self._generate_container_registry_auth_id(
+        if instance_offer.instance.resources.spot:
+            raise ComputeError("Runpod spot offers are not supported")
+
+        offer_gpu_count = len(instance_offer.instance.resources.gpus)
+        offer_cpu_count = instance_offer.instance.resources.cpus
+        offer_memory_gib = round(instance_offer.instance.resources.memory_mib / 1024)
+        offer_disk_gib = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        is_gpu_offer = offer_gpu_count > 0
+        is_secure_cloud = _is_secure_cloud(instance_offer.region)
+        if not is_gpu_offer and not is_secure_cloud:
+            raise ComputeError("Runpod CPU offers are only supported in secure cloud regions")
+
+        gpu_type_id: Optional[str] = None
+        gpu_count: Optional[int] = None
+        min_cpu_count_per_gpu: Optional[int] = None
+        min_memory_in_gb_per_gpu: Optional[int] = None
+        cpu_type_id: Optional[str] = None
+        cpu_count: Optional[int] = None
+        if is_gpu_offer:
+            gpu_type_id = instance_offer.instance.name
+            gpu_count = offer_gpu_count
+            # Offer resources are host totals. Round down, since these are lower bounds, and
+            # rounding up may exclude the host the offer is based on
+            min_cpu_count_per_gpu = offer_cpu_count // gpu_count
+            min_memory_in_gb_per_gpu = offer_memory_gib // gpu_count
+        else:
+            cpu_type_id = _get_cpu_type_id(instance_offer)
+            cpu_count = offer_cpu_count
+
+        container_registry_credentials_id = self._generate_container_registry_credentials_id(
             job.job_spec.registry_auth
         )
-        gpu_count = len(instance_offer.instance.resources.gpus)
-        if gpu_count == 0:
-            if not _is_secure_cloud(instance_offer.region):
-                raise ComputeError("Runpod CPU offers are only supported in secure cloud regions")
-            resp = self.api_client.create_cpu_pod(
-                name=pod_name,
-                image_name=job.job_spec.image_name,
-                container_registry_auth_id=container_registry_auth_id,
-                instance_id=instance_offer.instance.name,
-                cloud_type="SECURE",
-                deploy_cost=instance_offer.price,
-                data_center_id=instance_offer.region,
-                container_disk_in_gb=disk_size,
-                start_ssh=True,
-                docker_args=_get_docker_args(authorized_keys),
-                ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
-                network_volume_id=network_volume_id,
-                volume_mount_path=volume_mount_path,
-                env={"RUNPOD_POD_USER": "0"},
-            )
-        else:
-            bid_per_gpu = None
-            if instance_offer.instance.resources.spot:
-                bid_per_gpu = instance_offer.price / gpu_count
-            if _is_secure_cloud(instance_offer.region):
-                cloud_type = "SECURE"
-                data_center_id = instance_offer.region
-                country_code = None
-            else:
-                cloud_type = "COMMUNITY"
-                data_center_id = None
-                country_code = instance_offer.region
 
-            resp = self.api_client.create_pod(
+        if is_secure_cloud:
+            # API v2 is used by default; its unified method supports both CPU and GPU pods
+            pod = self.api_client.create_pod(
                 name=pod_name,
-                image_name=job.job_spec.image_name,
-                container_registry_auth_id=container_registry_auth_id,
-                gpu_type_id=instance_offer.instance.name,
-                cloud_type=cloud_type,
-                data_center_id=data_center_id,
-                country_code=country_code,
+                cloud="SECURE",
+                data_center_ids=[instance_offer.region],
+                gpu_type_id=gpu_type_id,
                 gpu_count=gpu_count,
-                container_disk_in_gb=disk_size,
-                min_vcpu_count=instance_offer.instance.resources.cpus,
-                min_memory_in_gb=memory_size,
-                support_public_ip=True,
-                docker_args=_get_docker_args(authorized_keys),
-                ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
-                bid_per_gpu=bid_per_gpu,
+                min_cpu_count_per_gpu=min_cpu_count_per_gpu,
+                min_memory_in_gb_per_gpu=min_memory_in_gb_per_gpu,
+                cpu_type_id=cpu_type_id,
+                cpu_count=cpu_count,
+                container_disk_in_gb=offer_disk_gib,
                 network_volume_id=network_volume_id,
                 volume_mount_path=volume_mount_path,
+                image_name=job.job_spec.image_name,
+                container_registry_credentials_id=container_registry_credentials_id,
+                entrypoint=["/bin/sh"],
+                cmd=["-c", " && ".join(get_docker_commands(authorized_keys))],
+                ports=[f"{DSTACK_RUNNER_SSH_PORT}/tcp"],
                 env={"RUNPOD_POD_USER": "0"},
             )
-
-        instance_id = resp["id"]
+            instance_id = pod["id"]
+        else:
+            # Deprecated GraphQL API is used for Community Cloud, as API v2 does not support
+            # country codes
+            assert gpu_type_id is not None
+            assert gpu_count is not None
+            resp = self.api_client.create_gpu_pod_graphql(
+                name=pod_name,
+                cloud_type="COMMUNITY",
+                data_center_id=None,
+                country_code=instance_offer.region,
+                bid_per_gpu=None,
+                support_public_ip=True,
+                gpu_type_id=gpu_type_id,
+                gpu_count=gpu_count,
+                min_vcpu_count=offer_cpu_count,
+                min_memory_in_gb=offer_memory_gib,
+                container_disk_in_gb=offer_disk_gib,
+                network_volume_id=network_volume_id,
+                volume_mount_path=volume_mount_path,
+                image_name=job.job_spec.image_name,
+                container_registry_auth_id=container_registry_credentials_id,
+                docker_args=_get_docker_args(authorized_keys),
+                ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
+                env={"RUNPOD_POD_USER": "0"},
+            )
+            instance_id = resp["id"]
 
         if (
             self._last_cleanup_time is None
             or self._last_cleanup_time
             < get_current_datetime() - timedelta(seconds=CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL)
         ):
-            self._clean_stale_container_registry_auths()
+            # The pod is already created, a failed cleanup must not fail provisioning
+            try:
+                self._clean_stale_container_registry_credentials()
+            except Exception as e:
+                logger.warning(
+                    "Failed to clean up stale container registry credentials: %r",
+                    e,
+                    exc_info=not isinstance(e, BackendError),
+                )
             self._last_cleanup_time = get_current_datetime()
 
         return JobProvisioningData(
@@ -236,6 +275,8 @@ class RunpodCompute(
     ) -> ComputeGroupProvisioningData:
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job
+        if master_job.job_spec.registry_auth is not None:
+            raise ComputeError("Runpod clusters with private registries are not supported")
         master_job_volumes = master_job_configuration.volumes
         all_volumes_names = set(v.name for jc in job_configurations for v in jc.volumes)
         instance_config = InstanceConfiguration(
@@ -245,7 +286,9 @@ class RunpodCompute(
             user=run.user,
         )
 
-        pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
+        cluster_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_RESOURCE_NAME_LEN
+        )
         authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
@@ -271,37 +314,32 @@ class RunpodCompute(
                 f"Failed to provision {pod_count} pods. Available pod counts: {offer_pod_counts}"
             )
 
-        container_registry_auth_id = self._generate_container_registry_auth_id(
-            master_job.job_spec.registry_auth
-        )
-        resp = self.api_client.create_cluster(
-            cluster_name=pod_name,
-            gpu_type_id=instance_offer.instance.name,
-            pod_count=pod_count,
-            gpu_count_per_pod=gpu_count,
-            deploy_cost=f"{instance_offer.price * pod_count:.2f}",
-            image_name=master_job.job_spec.image_name,
+        cluster = self.api_client.create_cluster(
+            name=cluster_name,
             cluster_type="TRAINING",
-            data_center_id=data_center_id,
+            gpu_type_id=instance_offer.instance.name,
+            gpu_count_per_pod=gpu_count,
+            pod_count=pod_count,
+            data_center_ids=[data_center_id],
             container_disk_in_gb=disk_size,
-            docker_args=_get_docker_args(authorized_keys),
-            ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
             network_volume_id=network_volume_id,
             volume_mount_path=volume_mount_path,
+            image_name=master_job.job_spec.image_name,
+            entrypoint=["/bin/sh"],
+            cmd=["-c", " && ".join(get_docker_commands(authorized_keys))],
+            ports=[f"{DSTACK_RUNNER_SSH_PORT}/tcp"],
             env={"RUNPOD_POD_USER": "0"},
         )
-
-        # Unlike create mutations for individual pods, createCluster mutation doesn't accept
-        # containerRegistryAuthId.
-        # The workaround is to inject containerRegistryAuthId into already created pods.
-        # Expect a long time (~5m) for the pods to pick up the creds.
-        # TODO: remove once createCluster supports containerRegistryAuthId
-        if container_registry_auth_id is not None:
-            for pod in resp["pods"]:
-                self.api_client.update_pod_container_registry_auth(
-                    pod_id=pod["id"],
-                    container_registry_auth_id=container_registry_auth_id,
+        try:
+            pods = self.api_client.list_cluster_pods(cluster["id"])
+            if len(pods) != pod_count:
+                raise ComputeError(
+                    f"Expected {pod_count} pods in cluster {cluster['id']}, got {len(pods)}"
                 )
+        except Exception:
+            # dstack does not track the cluster until run_jobs() returns
+            self._delete_cluster_after_failed_provisioning(cluster["id"])
+            raise
 
         jpds = [
             JobProvisioningData(
@@ -309,17 +347,18 @@ class RunpodCompute(
                 instance_type=instance_offer.instance,
                 instance_id=pod["id"],
                 hostname=None,
-                internal_ip=pod["clusterIp"],
+                # May not be assigned yet, see update_provisioning_data()
+                internal_ip=_get_pod_cluster_ip(pod),
                 region=instance_offer.region,
                 price=instance_offer.price,
                 username="root",
                 dockerized=False,
             )
-            for pod in resp["pods"]
+            for pod in pods
         ]
         return ComputeGroupProvisioningData(
-            compute_group_id=resp["id"],
-            compute_group_name=resp["name"],
+            compute_group_id=cluster["id"],
+            compute_group_name=cluster["name"],
             backend=BackendType.RUNPOD,
             region=instance_offer.region,
             job_provisioning_datas=jpds,
@@ -328,26 +367,15 @@ class RunpodCompute(
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
-        try:
-            self.api_client.terminate_pod(instance_id)
-        except RunpodApiClientError as e:
-            if len(e.errors) > 0 and e.errors[0]["message"] == "pod not found to terminate":
-                logger.debug("The instance %s not found. Skipping deletion.", instance_id)
-                return
-            raise
+        terminated = self.api_client.terminate_pod(instance_id)
+        if not terminated:
+            logger.debug("The instance %s not found. Skipping deletion.", instance_id)
 
     def terminate_compute_group(self, compute_group: ComputeGroup):
-        provisioning_data = compute_group.provisioning_data
-        try:
-            self.api_client.delete_cluster(provisioning_data.compute_group_id)
-        except RunpodApiClientError as e:
-            if len(e.errors) > 0 and e.errors[0]["extensions"]["code"] == "Cluster not found":
-                logger.debug(
-                    "The cluster %s not found. Skipping deletion.",
-                    provisioning_data.compute_group_id,
-                )
-                return
-            raise
+        cluster_id = compute_group.provisioning_data.compute_group_id
+        deleted = self.api_client.delete_cluster(cluster_id)
+        if not deleted:
+            logger.debug("The cluster %s not found. Skipping deletion.", cluster_id)
 
     def update_provisioning_data(
         self,
@@ -362,22 +390,28 @@ class RunpodCompute(
         ports = pod["runtime"].get("ports")
         if ports is None:
             return
-        for port in pod["runtime"]["ports"]:
-            if port["privatePort"] == DSTACK_RUNNER_SSH_PORT:
-                provisioning_data.hostname = port["ip"]
-                provisioning_data.ssh_port = port["publicPort"]
+        if "cluster" in pod:
+            # The job copies the instance's provisioning data only until the hostname is set,
+            # so the internal IP must be set no later than the hostname
+            internal_ip = _get_pod_cluster_ip(pod)
+            if internal_ip is None:
+                return
+            provisioning_data.internal_ip = internal_ip
+        for port in ports:
+            if port.get("private") == DSTACK_RUNNER_SSH_PORT:
+                provisioning_data.hostname = port.get("ip")
+                provisioning_data.ssh_port = port.get("public")
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, RunpodVolumeConfiguration)
-        volume_data = self.api_client.get_network_volume(
-            volume_id=get_or_error(volume.configuration.volume_id)
-        )
-        if volume_data is None:
-            raise ComputeError(f"Volume {volume.configuration.volume_id} not found")
-        size_gb = volume_data["size"]
+        volume_id = get_or_error(volume.configuration.volume_id)
+        network_volume = self.api_client.get_network_volume(volume_id)
+        if network_volume is None:
+            raise ComputeError(f"Volume {volume_id} not found")
+        size_gb = network_volume["size"]
         return VolumeProvisioningData(
             backend=BackendType.RUNPOD,
-            volume_id=volume_data["id"],
+            volume_id=network_volume["id"],
             size_gb=size_gb,
             price=_get_volume_price(size_gb),
             attachable=False,
@@ -390,15 +424,15 @@ class RunpodCompute(
         size_gb = volume.configuration.size_gb
         # Runpod regions must be uppercase.
         # Lowercase regions are accepted in the API but they break Runpod in several ways.
-        region = volume.configuration.region.upper()
-        volume_id = self.api_client.create_network_volume(
+        data_center_id = volume.configuration.region.upper()
+        network_volume = self.api_client.create_network_volume(
             name=volume_name,
-            region=region,
+            data_center_id=data_center_id,
             size=size_gb,
         )
         return VolumeProvisioningData(
             backend=BackendType.RUNPOD,
-            volume_id=volume_id,
+            volume_id=network_volume["id"],
             size_gb=size_gb,
             price=_get_volume_price(size_gb),
             attachable=False,
@@ -406,39 +440,48 @@ class RunpodCompute(
         )
 
     def delete_volume(self, volume: Volume):
-        if volume.volume_id is not None:
-            try:
-                self.api_client.delete_network_volume(volume_id=volume.volume_id)
-            except RunpodApiClientError as e:
-                if (
-                    len(e.errors) > 0
-                    and "Tried to delete nonexistent network volume" in e.errors[0]["message"]
-                ):
-                    logger.debug(
-                        "The volume %s not found. Skipping deletion.",
-                        volume.volume_id,
-                    )
-                    return
-                raise
+        if volume.volume_id is None:
+            return
+        deleted = self.api_client.delete_network_volume(volume.volume_id)
+        if not deleted:
+            logger.debug("The volume %s not found. Skipping deletion.", volume.volume_id)
 
-    def _generate_container_registry_auth_id(
+    def _generate_container_registry_credentials_id(
         self, registry_auth: Optional[RegistryAuth]
     ) -> Optional[str]:
         if registry_auth is None:
             return None
-        return self.api_client.add_container_registry_auth(
-            uuid.uuid4().hex, registry_auth.username, registry_auth.password
+        creds = self.api_client.create_container_registry_credentials(
+            name=uuid.uuid4().hex,
+            username=registry_auth.username,
+            password=registry_auth.password,
         )
+        return creds["id"]
 
-    def _clean_stale_container_registry_auths(self) -> None:
-        container_registry_auths = self.api_client.get_container_registry_auths()
-        # Container_registry_auths sorted by creation time so try to delete the oldest first
-        # when we reach container_registry_auths that is still in use, we stop
-        for container_registry_auth in container_registry_auths:
+    def _clean_stale_container_registry_credentials(self) -> None:
+        # XXX: Credentials are sorted by creation time so try to delete the oldest first.
+        # When we reach credentials that is still in use, we stop.
+        # > Permanently deletes a container registry credential by ID. Rejected if any pod
+        # > currently uses this credential to pull its image. Templates that reference it are not
+        # > part of that check — they silently lose the reference (registry becomes null) instead
+        # > of blocking the delete.
+        for creds in self.api_client.list_container_registry_credentials():
             try:
-                self.api_client.delete_container_registry_auth(container_registry_auth["id"])
+                self.api_client.delete_container_registry_credentials(creds["id"])
             except Exception:
                 break
+
+    def _delete_cluster_after_failed_provisioning(self, cluster_id: str) -> None:
+        try:
+            self.api_client.delete_cluster(cluster_id)
+        except Exception as e:
+            logger.error(
+                "Failed to delete cluster %s after failed provisioning."
+                " Please delete it manually to avoid unexpected charges. Error: %r",
+                cluster_id,
+                e,
+                exc_info=not isinstance(e, BackendError),
+            )
 
 
 def _get_docker_args(authorized_keys: List[str]) -> str:
@@ -467,3 +510,17 @@ def _get_offer_pod_counts(offer: InstanceOfferWithAvailability) -> list[int]:
     backend_data = validate_extra_ignore(RunpodOfferBackendData, offer.backend_data)
     pod_counts = backend_data.pod_counts or []
     return pod_counts
+
+
+def _get_cpu_type_id(offer: InstanceOfferWithAvailability) -> str:
+    match = CPU_INSTANCE_ID_REGEX.fullmatch(offer.instance.name)
+    if match is None:
+        raise ComputeError(f"Failed to parse CPU instance type: {offer.instance.name!r}")
+    return match.group("flavor_id")
+
+
+def _get_pod_cluster_ip(pod: V2Pod) -> Optional[str]:
+    cluster = pod.get("cluster")
+    if cluster is None:
+        return None
+    return cluster.get("ip")

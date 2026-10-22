@@ -85,14 +85,31 @@ async def list_user_accessible_projects(
     prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
+    username: Optional[str] = None,
 ) -> ProjectsInfoListOrProjectsList:
     """
-    Returns all projects accessible to the user:
+    Returns all projects accessible to the authenticated `user`:
     - All projects for global admins
     - Projects where user is a member (public or private)
     - if `include_not_joined`: Public projects where user is NOT a member
+
+    `username` optionally filters to projects owned or joined by the profile user and
+    includes only their membership. Access is still checked for `user`.
     """
     filters = [ProjectModel.deleted == False]
+    user_id = None
+    if username is not None:
+        user_id = select(UserModel.id).where(UserModel.name == username).scalar_subquery()
+        # TODO: Add a members.user_id index for this filter and global run/event lists;
+        # these lookups can scan the membership table as it grows.
+        filters.append(
+            or_(
+                ProjectModel.owner_id == user_id,
+                ProjectModel.id.in_(
+                    select(MemberModel.project_id).where(MemberModel.user_id == user_id)
+                ),
+            )
+        )
     if name_pattern:
         name_pattern = name_pattern.replace("_", "/_")
         filters.append(ProjectModel.name.ilike(f"%{name_pattern}%", escape="/"))
@@ -147,15 +164,15 @@ async def list_user_accessible_projects(
     if return_total_count:
         res = await session.execute(stmt.with_only_columns(safunc.count(literal_column("1"))))
         total_count = res.scalar_one()
+    options = [joinedload(ProjectModel.owner)]
+    if user_id is not None:
+        options.append(joinedload(ProjectModel.members.and_(MemberModel.user_id == user_id)))
     res = await session.execute(
-        stmt.where(*pagination_filters)
-        .order_by(*order_by)
-        .limit(limit)
-        .options(joinedload(ProjectModel.owner))
+        stmt.where(*pagination_filters).order_by(*order_by).limit(limit).options(*options)
     )
     project_models = res.unique().scalars().all()
     projects = [
-        project_model_to_project(p, include_backends=False, include_members=False)
+        project_model_to_project(p, include_backends=False, include_members=user_id is not None)
         for p in project_models
     ]
     if total_count is None:

@@ -176,7 +176,9 @@ class GCPCompute(
     ) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
         zones_by_key: Dict[Tuple, List[str]] = {}
-        catalog_item_filter = _make_catalog_item_filter(regions, zones_by_key)
+        catalog_item_filter = _make_catalog_item_filter(
+            regions, zones_by_key, allow_tpu=self.config.allow_tpu
+        )
         offers = get_catalog_offers(
             backend=BackendType.GCP,
             catalog_item_filter=catalog_item_filter,
@@ -1488,9 +1490,11 @@ def _offer_dedup_key(
 def _make_catalog_item_filter(
     regions: List[str],
     zones_by_key: Dict[Tuple, List[str]],
+    *,
+    allow_tpu: bool,
 ) -> Callable[[gpuhunt.CatalogItem], bool]:
     """
-    Returns a filter that checks region, instance support, and deduplicates
+    Returns a filter that checks region, TPU opt-in, instance support, and deduplicates
     per-zone items into per-region offers. Zones are collected in `zones_by_key`
     so the caller can attach them to offers later.
     """
@@ -1499,6 +1503,8 @@ def _make_catalog_item_filter(
     def _filter(item: gpuhunt.CatalogItem) -> bool:
         region = item.location[:-2]
         if region not in regions:
+            return False
+        if not allow_tpu and item.gpu_vendor == gpuhunt.AcceleratorVendor.GOOGLE:
             return False
         if not _is_supported_gcp_instance(item.instance_name, item.gpu_name):
             return False

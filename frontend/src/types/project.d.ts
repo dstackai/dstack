@@ -9,6 +9,7 @@ declare type TCreateWizardProjectParams = {
 
 declare type TGetProjectListParams = TBaseRequestListParams & {
     include_not_joined?: boolean;
+    username?: string;
     return_total_count?: boolean;
     name_pattern?: string;
 };

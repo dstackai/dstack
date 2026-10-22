@@ -878,6 +878,9 @@ class TestGatewayReplicaWorkerRunningStateSync:
             ssh_head_proxy_private_key=None,
         )
         assert client_mock.register_replica.call_args.kwargs["job_submission"].id == job.id
+        # The config (ACME settings) is resent before registration requests a certificate
+        called = [c[0] for c in client_mock.method_calls]
+        assert called.index("submit_gateway_config") < called.index("register_service")
         client_mock.unregister_service.assert_not_called()
         client_mock.unregister_replica.assert_not_called()
 
@@ -908,6 +911,49 @@ class TestGatewayReplicaWorkerRunningStateSync:
             "Service registered",
             "Service replica registered",
         }
+
+    async def test_skips_registration_if_gateway_config_not_submitted(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        mock_gateway_connection: AsyncMock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        replica = await create_gateway_replica(
+            session=session,
+            gateway_id=gateway.id,
+            backend=backend,
+            status=GatewayReplicaStatus.RUNNING,
+        )
+        await self._create_service_run_and_job(
+            session, project, repo, user, gateway, run_name="test-service"
+        )
+        _lock_replica(replica)
+        await session.commit()
+
+        client_mock = _get_client_mock(mock_gateway_connection)
+        client_mock.list_services.return_value = []
+        client_mock.submit_gateway_config.side_effect = RuntimeError("gateway unavailable")
+
+        await worker.process(_replica_to_pipeline_item(replica))
+
+        # Registering now could issue a certificate from the wrong ACME server,
+        # so the sync waits for the next tick
+        client_mock.register_service.assert_not_called()
+        client_mock.register_replica.assert_not_called()
+        await session.refresh(replica)
+        assert replica.status == GatewayReplicaStatus.RUNNING
+        assert replica.lock_token is None
 
     async def test_unregisters_dangling_service_and_stale_replica(
         self,
@@ -1304,6 +1350,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         client_mock.unregister_service.assert_not_called()
         client_mock.unregister_replica.assert_not_called()
         client_mock.set_service_id.assert_not_called()
+        client_mock.submit_gateway_config.assert_not_called()
 
         # Registration records are still (re)created to reflect the confirmed state,
         # even though no gateway calls were needed this tick.

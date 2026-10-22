@@ -162,7 +162,9 @@ def get_dev_env_run_plan_dict(
                 " && sudo rm -rf $DSTACK_VENV_DIR"
                 " && sudo mkdir $DSTACK_VENV_DIR"
                 " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
-                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && (if UV_PYTHON_INSTALL_DIR=/opt/uv/python uv python find 3.13 > /dev/null 2>&1;"
+                " then export UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_DOWNLOADS=never; fi;"
+                " uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR)"
                 " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'uv pip install ipykernel...'"
                 " && uv pip install -q --no-cache-dir ipykernel 2> /dev/null)"
@@ -180,7 +182,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.15-base-ubuntu24.04"
+        image_name = "dstackai/base:0.16-base-ubuntu24.04"
 
     run_spec = {
         "configuration": {
@@ -409,7 +411,9 @@ def get_dev_env_run_dict(
                 " && sudo rm -rf $DSTACK_VENV_DIR"
                 " && sudo mkdir $DSTACK_VENV_DIR"
                 " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
-                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && (if UV_PYTHON_INSTALL_DIR=/opt/uv/python uv python find 3.13 > /dev/null 2>&1;"
+                " then export UV_PYTHON_INSTALL_DIR=/opt/uv/python UV_PYTHON_DOWNLOADS=never; fi;"
+                " uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR)"
                 " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'uv pip install ipykernel...'"
                 " && uv pip install -q --no-cache-dir ipykernel 2> /dev/null)"
@@ -427,7 +431,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.15-base-ubuntu24.04"
+        image_name = "dstackai/base:0.16-base-ubuntu24.04"
 
     return {
         "id": run_id,
@@ -1537,6 +1541,63 @@ class TestGetRun:
 
 
 class TestGetRunPlan:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("reverse_offers", [None, False, True])
+    @pytest.mark.parametrize("for_offers_only", [False, True])
+    @pytest.mark.parametrize("gpu_count", [0, 2])
+    async def test_sorts_offers_before_limit(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        reverse_offers,
+        for_offers_only,
+        gpu_count,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(session=session, project=project, spec=get_fleet_spec())
+        run_spec = get_run_spec(repo_id=repo.name)
+        offers = [
+            get_instance_offer_with_availability(
+                price=price, gpu_count=gpu_count, instance_type=f"instance-{price}"
+            )
+            for price in range(1, 61)
+        ]
+        offers.append(
+            get_instance_offer_with_availability(
+                price=100, gpu_count=gpu_count, availability=InstanceAvailability.NO_BALANCE
+            )
+        )
+        backend = Mock()
+        backend.TYPE = BackendType.AWS
+        backend.compute.return_value.get_offers.return_value = offers
+        body = {
+            "run_spec": run_spec.model_dump(),
+            "for_offers_only": for_offers_only,
+            "max_offers": 3,
+        }
+        if reverse_offers is not None:
+            body["reverse_offers"] = reverse_offers
+        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
+            mock.return_value = [backend]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        plan = response.json()["job_plans"][0]
+        assert [offer["price"] for offer in plan["offers"]] == (
+            [60, 59, 58] if reverse_offers else [1, 2, 3]
+        )
+        assert plan["total_offers"] == 61
+        assert plan["max_price"] == 100
+        assert [offer.price for offer in offers] == [*range(1, 61), 100]
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(

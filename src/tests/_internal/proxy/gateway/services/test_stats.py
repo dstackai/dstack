@@ -93,6 +93,22 @@ from dstack._internal.proxy.gateway.services.stats import StatsCollector
             id="ignores-replica-not-hit",
         ),
         pytest.param(
+            # Nginx rejected the 400 requests before setting $dstack_replica_hit,
+            # so the flag is empty and the lines end with a space
+            "2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.100 1\n"
+            "2024-12-06T12:08:02+00:00 srv.gtw.test 400 0.001 \n"
+            "2024-12-06T12:08:02+00:00 srv.gtw.test 400 0.002 \n"
+            "2024-12-06T12:08:03+00:00 srv.gtw.test 200 0.300 1\n",
+            {
+                "srv.gtw.test": {
+                    30: Stat(requests=0, request_time=0.0),
+                    60: Stat(requests=0, request_time=0.0),
+                    300: Stat(requests=2, request_time=0.2),
+                },
+            },
+            id="ignores-requests-rejected-before-routing",
+        ),
+        pytest.param(
             dedent(
                 """
                 2024-12-06T12:08:01+00:00 srv.gtw.test 200 0.100
