@@ -235,7 +235,7 @@ class TestRunPendingWorker:
         ("orphan_cleanup_state", "finished_hours_ago", "deleted"),
         [
             ("not_enrolled", 0.5, False),
-            ("not_enrolled", 100, True),
+            ("not_enrolled", 200, True),
             ("cleaned_before_finish", 0.5, False),
             ("cleaned_after_finish", 0.5, True),
             ("off", 0.5, True),

@@ -47,6 +47,7 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.orphan_cleanup import CLEANUP_RETRY_INTERVAL_MULTIPLIERS
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import tracing
 from dstack._internal.utils.common import batched, get_current_datetime, get_or_error, run_async
@@ -262,10 +263,6 @@ class _ResourceGroupDecision(str, Enum):
     """The group is the owner's current resources."""
 
 
-_CLEANUP_RETRY_INTERVAL_MULTIPLIERS = [2, 6, 24]
-"""Retry delays after failed or unclean cleanups, as multiples of the cleanup interval."""
-
-
 def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
     """
     SQL-portable way to filter by retry delay depending on `cleanup_attempt`.
@@ -276,13 +273,13 @@ def _retry_delay_filter(now: datetime) -> ColumnElement[bool]:
             OrphanCleanupModel.cleanup_attempt == i,
             OrphanCleanupModel.last_processed_at < now - interval * multiplier,
         )
-        for i, multiplier in enumerate(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
+        for i, multiplier in enumerate(CLEANUP_RETRY_INTERVAL_MULTIPLIERS[:-1], start=1)
     ]
     filters.append(
         and_(
-            OrphanCleanupModel.cleanup_attempt >= len(_CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
+            OrphanCleanupModel.cleanup_attempt >= len(CLEANUP_RETRY_INTERVAL_MULTIPLIERS),
             OrphanCleanupModel.last_processed_at
-            < now - interval * _CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
+            < now - interval * CLEANUP_RETRY_INTERVAL_MULTIPLIERS[-1],
         )
     )
     return or_(OrphanCleanupModel.cleanup_attempt == 0, *filters)
