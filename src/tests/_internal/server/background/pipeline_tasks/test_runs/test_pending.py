@@ -232,12 +232,13 @@ class TestRunPendingWorker:
         assert jobs[-1].status == JobStatus.SUBMITTED
 
     @pytest.mark.parametrize(
-        ("orphan_cleanup_state", "deleted"),
+        ("orphan_cleanup_state", "finished_hours_ago", "deleted"),
         [
-            ("not_enrolled", False),
-            ("cleaned_before_finish", False),
-            ("cleaned_after_finish", True),
-            ("off", True),
+            ("not_enrolled", 0.5, False),
+            ("not_enrolled", 100, True),
+            ("cleaned_before_finish", 0.5, False),
+            ("cleaned_after_finish", 0.5, True),
+            ("off", 0.5, True),
         ],
     )
     async def test_keeps_superseded_submissions_until_orphan_cleanup(
@@ -246,6 +247,7 @@ class TestRunPendingWorker:
         session: AsyncSession,
         worker: RunWorker,
         orphan_cleanup_state: str,
+        finished_hours_ago: float,
         deleted: bool,
     ) -> None:
         project = await create_project(session=session)
@@ -260,7 +262,7 @@ class TestRunPendingWorker:
             status=RunStatus.PENDING,
             resubmission_attempt=4,
         )
-        finished_at = get_current_datetime() - timedelta(minutes=30)
+        finished_at = get_current_datetime() - timedelta(hours=finished_hours_ago)
         superseded_job = await create_job(
             session=session,
             run=run,

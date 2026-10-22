@@ -1,9 +1,9 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import delete
+from sqlalchemy import delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import (
@@ -18,6 +18,7 @@ from dstack._internal.server.services.orphan_cleanup import get_cleaned_up_after
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
 from dstack._internal.server.services.runs.replicas import build_replica_lists
 from dstack._internal.server.services.services.autoscalers import get_service_scaler
+from dstack._internal.utils.common import get_current_datetime
 
 PerGroupDesiredCounts = dict[str, int]
 """Maps group_name → desired replica count"""
@@ -141,6 +142,10 @@ async def delete_superseded_no_capacity_job_submissions(
     Trade-off: deletion only happens when a new submission is created, so submissions
     still waiting for orphan cleanup when the run stops retrying are never deleted.
     Runs retrying for days still don't pile them up.
+
+    Submissions are not kept longer than `_ORPHAN_CLEANUP_MAX_WAIT`, so that a backend
+    that is never cleaned up (e.g. a region that always fails to list) does not keep them
+    forever.
     """
     for job_model in new_job_models:
         if job_model.submission_num < 2:
@@ -155,6 +160,16 @@ async def delete_superseded_no_capacity_job_submissions(
                 JobModel.termination_reason
                 == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 JobModel.job_provisioning_data.is_(None),
-                get_cleaned_up_after_filter(JobModel.project_id, JobModel.last_processed_at),
+                or_(
+                    get_cleaned_up_after_filter(JobModel.project_id, JobModel.last_processed_at),
+                    JobModel.last_processed_at < get_current_datetime() - _ORPHAN_CLEANUP_MAX_WAIT,
+                ),
             )
         )
+
+
+_ORPHAN_CLEANUP_MAX_WAIT = timedelta(hours=96)
+"""
+Exceeds the longest orphan cleanup retry delay (24 cleanup intervals, 24 hours by default),
+so that backends whose cleanups fail get a few more attempts.
+"""
