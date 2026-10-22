@@ -1862,9 +1862,9 @@ def _get_job_instance_provider_ref(
     job_model: JobModel, compute_group_model: Optional[ComputeGroupModel]
 ) -> Optional[str]:
     # Compute group instances must not be cleaned up individually.
-    # TODO: Orphan cleanup for compute groups is not implemented. Backends set the provider_ref
-    # of the first job on all compute group resources. Store it on the compute group and
-    # clean up compute group resources as one unit.
+    # TODO: Orphan cleanup for compute groups is not implemented, and backends must not set
+    # `provider_ref` on compute group resources. Store a `provider_ref` on the compute group,
+    # set it on all its resources, and clean them up as one unit.
     if compute_group_model is not None:
         return None
     return job_model.provider_ref
