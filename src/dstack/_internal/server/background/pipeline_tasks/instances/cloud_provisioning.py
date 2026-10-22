@@ -23,13 +23,13 @@ from dstack._internal.core.errors import (
     SkipOffer,
 )
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceTerminationReason,
 )
 from dstack._internal.core.models.placement import PlacementGroupConfiguration, PlacementStrategy
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
@@ -46,7 +46,10 @@ from dstack._internal.server.services.instances import (
     get_instance_requirements,
 )
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import get_instance_offer_with_restricted_az
+from dstack._internal.server.services.offers import (
+    get_instance_offer_with_restricted_az,
+    get_offers_termination_reason_message,
+)
 from dstack._internal.server.services.placement import (
     can_use_placement_groups,
     get_fleet_placement_group_models,
@@ -117,24 +120,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         include_only_create_instance_supported_backends=True,
     )
 
-    available_offers = offers.offers
-    for availability, message in (
-        (InstanceAvailability.NO_QUOTA, "No quota"),
-        (InstanceAvailability.NO_BALANCE, "No balance"),
-    ):
-        if offers.unavailable_reason == availability:
-            set_status_update(
-                update_map=result.instance_update_map,
-                instance_model=instance_model,
-                new_status=InstanceStatus.TERMINATED,
-                termination_reason=InstanceTerminationReason.NO_OFFERS,
-                # TODO: Store NO_QUOTA/NO_BALANCE once the minimum supported rolling-upgrade
-                # source version handles them on every replica.
-                termination_reason_message=message,
-            )
-            return result
-
-    offers_iter = iter(available_offers)
+    offers_iter = iter(offers)
     offers_tried = 0
     # Limit number of offers tried to prevent long-running processing in case all offers fail.
     while offers_tried < server_settings.MAX_OFFERS_TRIED:
@@ -254,14 +240,70 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
                 result.schedule_pg_deletion_except_id = placement_group_model.id
         return result
 
+    termination_reason_message = "All offers failed" if offers else "No offers found"
+    if not offers:
+        termination_reason_message = (
+            await _get_no_offers_termination_reason_message(
+                instance_model=instance_model,
+                profile=profile,
+                requirements=requirements,
+                placement_group_model=placement_group_model,
+                master_job_provisioning_data=master_job_provisioning_data,
+            )
+            or termination_reason_message
+        )
+
     set_status_update(
         update_map=result.instance_update_map,
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATED,
         termination_reason=InstanceTerminationReason.NO_OFFERS,
-        termination_reason_message="All offers failed" if available_offers else "No offers found",
+        termination_reason_message=termination_reason_message,
     )
     return result
+
+
+async def _get_no_offers_termination_reason_message(
+    instance_model: InstanceModel,
+    profile: Profile,
+    requirements: Requirements,
+    placement_group_model: Optional[PlacementGroupModel],
+    master_job_provisioning_data: Optional[JobProvisioningData],
+) -> Optional[str]:
+    """Explain why no offers are available by refetching with unavailable offers included.
+
+    Return "No quota" or "No balance" only if all matching offers have that reason.
+    Return None otherwise or if the lookup fails.
+
+    Adds one offer lookup only when no available offers were found. Backend loading and
+    quota/balance checks may repeat DB reads; provider cache misses may repeat
+    provider calls.
+    """
+    # TODO: Return InstanceTerminationReason values and persist NO_QUOTA/NO_BALANCE
+    # once all supported rolling-upgrade source versions recognize them. Until then,
+    # use messages so older replicas can read the shared DB.
+    # Refetching will still be needed: the initial lookup excludes unavailable offers.
+    try:
+        offers = await get_fleet_offers(
+            project=instance_model.project,
+            profile=profile,
+            requirements=requirements,
+            exclude_not_available=False,
+            fleet_model=instance_model.fleet,
+            placement_group=placement_group_model_to_placement_group_optional(
+                placement_group_model
+            ),
+            blocks="auto" if instance_model.total_blocks is None else instance_model.total_blocks,
+            master_job_provisioning_data=master_job_provisioning_data,
+            infer_master_job_provisioning_data_from_fleet_instances=False,
+            include_only_create_instance_supported_backends=True,
+        )
+        return await run_async(get_offers_termination_reason_message, offers)
+    except Exception:
+        logger.warning(
+            "%s: failed to check unavailable offers", fmt(instance_model), exc_info=True
+        )
+        return None
 
 
 async def _get_cluster_master_context(

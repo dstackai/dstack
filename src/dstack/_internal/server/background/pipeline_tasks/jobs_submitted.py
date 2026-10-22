@@ -31,7 +31,6 @@ from dstack._internal.core.models.fleets import (
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
 )
@@ -120,6 +119,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import (
     get_instance_offer_with_restricted_az,
     get_offers_by_requirements,
+    get_offers_termination_reason_message,
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
@@ -2421,21 +2421,8 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
-    available_offers = offers.offers
-    for availability, message in (
-        (InstanceAvailability.NO_QUOTA, "No quota"),
-        (InstanceAvailability.NO_BALANCE, "No balance"),
-    ):
-        if offers.unavailable_reason == availability:
-            return _FailedNewCapacityProvisioning(
-                placement_group_cleanup=None,
-                # TODO: Store FAILED_TO_START_DUE_TO_NO_QUOTA/NO_BALANCE once the minimum
-                # supported rolling-upgrade source version handles them on every replica.
-                message=message,
-            )
-
     extra_authorized_keys = get_extra_authorized_keys(run.run_spec)
-    offers_iter = iter(available_offers)
+    offers_iter = iter(offers)
     offers_tried = 0
     offers_taken = 0
     skip_reasons: list[str] = []
@@ -2583,18 +2570,34 @@ async def _provision_new_capacity(
                 offer.region,
             )
             continue
-    return _FailedNewCapacityProvisioning(
-        message=_get_new_capacity_failure_message(
-            fleet_name=fleet_model.name,
-            attempts=_NewCapacityAttempts(
-                total=len(available_offers),
-                tried=offers_tried,
-                skip_reasons=skip_reasons,
-                errors=offer_errors,
-                # Offers are left only if the attempt limit, not the offer list, ended the loop.
-                limit_reached=offers_taken < len(available_offers),
-            ),
+    termination_reason_message = _get_new_capacity_failure_message(
+        fleet_name=fleet_model.name,
+        attempts=_NewCapacityAttempts(
+            total=len(offers),
+            tried=offers_tried,
+            skip_reasons=skip_reasons,
+            errors=offer_errors,
+            # Offers are left only if the attempt limit, not the offer list, ended the loop.
+            limit_reached=offers_taken < len(offers),
         ),
+    )
+    if not offers:
+        termination_reason_message = (
+            await _get_no_offers_termination_reason_message(
+                project=project,
+                job_model=job_model,
+                run=run,
+                job=job,
+                profile=profile,
+                requirements=requirements,
+                volumes=volumes,
+                placement_group_model=placement_group_model,
+                master_job_provisioning_data=master_job_provisioning_data,
+            )
+            or termination_reason_message
+        )
+    return _FailedNewCapacityProvisioning(
+        message=termination_reason_message,
         placement_group_cleanup=_build_placement_group_cleanup(
             fleet_model=fleet_model,
             offers_tried=offers_tried,
@@ -2602,6 +2605,52 @@ async def _provision_new_capacity(
             new_placement_group_models=new_placement_group_models,
         ),
     )
+
+
+async def _get_no_offers_termination_reason_message(
+    project: ProjectModel,
+    job_model: JobModel,
+    run: Run,
+    job: Job,
+    profile: Profile,
+    requirements: Requirements,
+    volumes: list[list[Volume]],
+    placement_group_model: Optional[PlacementGroupModel],
+    master_job_provisioning_data: Optional[JobProvisioningData],
+) -> Optional[str]:
+    """Explain why no offers are available by refetching with unavailable offers included.
+
+    Return "No quota" or "No balance" only if all matching offers have that reason.
+    Return None otherwise or if the lookup fails.
+
+    Adds one offer lookup only when no available offers were found. Backend loading and
+    quota/balance checks may repeat DB reads; provider cache misses may repeat
+    provider calls.
+    """
+    # TODO: Return JobTerminationReason values and persist
+    # FAILED_TO_START_DUE_TO_NO_QUOTA/NO_BALANCE once all supported rolling-upgrade
+    # source versions recognize them. Until then, use messages so older replicas
+    # can read the shared DB.
+    # Refetching will still be needed: the initial lookup excludes unavailable offers.
+    try:
+        offers = await get_offers_by_requirements(
+            project=project,
+            profile=profile,
+            requirements=requirements,
+            exclude_not_available=False,
+            multinode=requirements.multinode or is_multinode_job(job),
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+            privileged=job.job_spec.privileged,
+            instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
+            placement_group=placement_group_model_to_placement_group_optional(
+                placement_group_model
+            ),
+        )
+        return await run_async(get_offers_termination_reason_message, offers)
+    except Exception:
+        logger.warning("%s: failed to check unavailable offers", fmt(job_model), exc_info=True)
+        return None
 
 
 _MAX_OFFER_ERROR_LEN = 200

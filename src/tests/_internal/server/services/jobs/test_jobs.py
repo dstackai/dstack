@@ -30,20 +30,6 @@ from dstack._internal.server.testing.common import (
 
 class TestGetJobStatusMessage:
     @pytest.mark.parametrize(
-        ("reason", "message"),
-        [
-            (JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA, "no quota"),
-            (JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE, "no balance"),
-        ],
-    )
-    def test_reports_blocked_offers(self, reason, message):
-        job = JobModel(
-            status=JobStatus.FAILED,
-            termination_reason=reason,
-        )
-        assert _get_job_status_message(job) == message
-
-    @pytest.mark.parametrize(
         ("message", "expected"),
         [("No quota", "no quota"), ("No balance", "no balance"), ("Other error", "no capacity")],
     )

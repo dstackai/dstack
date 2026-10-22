@@ -8,6 +8,7 @@ from dstack._internal.cli.utils.common import (
     format_backend,
     format_entity_reference,
 )
+from dstack._internal.core.consts import NO_BALANCE_MESSAGE, NO_QUOTA_MESSAGE
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet, FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.health import HealthStatus
@@ -172,7 +173,8 @@ def get_fleets_table(
                 instance_row["ERROR"] = instance.termination_reason
                 if (
                     instance.termination_reason == InstanceTerminationReason.NO_OFFERS
-                    and instance.termination_reason_message in ("No quota", "No balance")
+                    and instance.termination_reason_message
+                    in (NO_QUOTA_MESSAGE, NO_BALANCE_MESSAGE)
                 ):
                     instance_row["ERROR"] = instance.termination_reason_message.lower()
 

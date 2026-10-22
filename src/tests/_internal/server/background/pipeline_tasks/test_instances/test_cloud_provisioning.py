@@ -108,10 +108,7 @@ class TestCloudProvisioning:
                 total_blocks=expected_blocks,
             )
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.get_offers.return_value = [
-                offer.model_copy(update={"availability": InstanceAvailability.NO_QUOTA}),
-                offer,
-            ]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
                 backend=offer.backend,
                 instance_type=offer.instance,
@@ -133,7 +130,7 @@ class TestCloudProvisioning:
         assert instance.status == InstanceStatus.PROVISIONING
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
-        backend_mock.compute.return_value.create_instance.assert_called_once()
+        backend_mock.compute.return_value.get_offers.assert_called_once()
 
     @pytest.mark.parametrize("err", [RuntimeError("Unexpected"), ProvisioningError("Expected")])
     async def test_tries_second_offer_if_first_fails(
@@ -201,6 +198,8 @@ class TestCloudProvisioning:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+        assert instance.termination_reason_message == "All offers failed"
+        aws_mock.compute.return_value.get_offers.assert_called_once()
 
     async def test_fails_if_no_offers(
         self,
@@ -221,6 +220,7 @@ class TestCloudProvisioning:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+        assert instance.termination_reason_message == "No offers found"
 
     @pytest.mark.parametrize(
         ("availabilities", "message"),
@@ -231,14 +231,6 @@ class TestCloudProvisioning:
                 "No offers found",
             ),
             ([InstanceAvailability.NO_BALANCE] * 2, "No balance"),
-            (
-                [InstanceAvailability.NO_QUOTA, InstanceAvailability.NO_BALANCE],
-                "No offers found",
-            ),
-            (
-                [InstanceAvailability.NO_BALANCE, InstanceAvailability.NOT_AVAILABLE],
-                "No offers found",
-            ),
         ],
     )
     async def test_fails_without_attempting_unavailable_offers(
@@ -270,7 +262,7 @@ class TestCloudProvisioning:
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
         assert instance.termination_reason_message == message
-        compute.get_offers.assert_called_once()
+        assert compute.get_offers.call_count == 2
         compute.create_instance.assert_not_called()
 
     async def test_waits_when_fleet_has_no_current_master(

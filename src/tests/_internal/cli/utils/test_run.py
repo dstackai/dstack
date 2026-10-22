@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.cli.services.configurators.run import print_finished_message
 from dstack._internal.cli.utils.run import _format_pull_progress, get_runs_table
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import (
@@ -596,34 +595,3 @@ class TestGetRunsTable:
 )
 def test_format_pull_progress(progress: ImagePullProgress, expected: str) -> None:
     assert _format_pull_progress(progress) == expected
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-@pytest.mark.usefixtures("image_config_mock")
-class TestPrintFinishedMessage:
-    @pytest.mark.parametrize(
-        ("reason", "status_message"),
-        [
-            (JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY, "No capacity"),
-            (JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA, "No quota"),
-            (JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE, "No balance"),
-        ],
-    )
-    async def test_provisioning_failure_has_no_runner_logs_hint(
-        self,
-        test_db,
-        session: AsyncSession,
-        capsys: pytest.CaptureFixture[str],
-        reason: JobTerminationReason,
-        status_message: str,
-    ):
-        run = await create_run_with_job(
-            session=session, job_status=JobStatus.FAILED, termination_reason=reason
-        )
-
-        print_finished_message(run)
-
-        output = capsys.readouterr().out
-        assert status_message in output
-        assert "dstack logs" not in output

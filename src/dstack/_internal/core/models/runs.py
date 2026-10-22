@@ -138,7 +138,7 @@ class RunTerminationReason(str, Enum):
 class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
-    # Add read support before emission so server replicas can be upgraded gradually.
+    # Recognize new reasons before storing them to support rolling upgrades.
     FAILED_TO_START_DUE_TO_NO_QUOTA = "failed_to_start_due_to_no_quota"
     FAILED_TO_START_DUE_TO_NO_BALANCE = "failed_to_start_due_to_no_balance"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"

@@ -558,16 +558,8 @@ class TestRunActiveWorker:
         assert retried_job.status == JobStatus.SUBMITTED
         assert len(jobs) == 3
 
-    @pytest.mark.parametrize(
-        "reason",
-        [
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
-        ],
-    )
     async def test_replica_retry_deletes_superseded_no_capacity_submissions(
-        self, test_db, session: AsyncSession, worker: RunWorker, reason: JobTerminationReason
+        self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -605,7 +597,7 @@ class TestRunActiveWorker:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            termination_reason=reason,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             submitted_at=run.submitted_at,
             last_processed_at=run.last_processed_at,
             replica_num=0,
@@ -646,16 +638,8 @@ class TestRunActiveWorker:
         assert interrupted_job.id in [j.id for j in jobs]
         assert jobs[-1].status == JobStatus.SUBMITTED
 
-    @pytest.mark.parametrize(
-        "reason",
-        [
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA,
-            JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE,
-        ],
-    )
     async def test_retries_scheduled_run_no_capacity_from_trigger_time(
-        self, test_db, session: AsyncSession, worker: RunWorker, reason: JobTerminationReason
+        self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -687,7 +671,7 @@ class TestRunActiveWorker:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            termination_reason=reason,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
         )
         lock_run(run)
         await session.commit()

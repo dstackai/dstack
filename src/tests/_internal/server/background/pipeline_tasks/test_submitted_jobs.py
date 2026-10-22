@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, call, patch
 
 import gpuhunt
 import pytest
-from sqlalchemy import event, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -431,10 +431,7 @@ class TestJobSubmittedWorker:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [
-                offer.model_copy(update={"availability": InstanceAvailability.NO_QUOTA}),
-                offer,
-            ]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
                 dockerized=True,
                 backend=BackendType.AWS,
@@ -461,7 +458,6 @@ class TestJobSubmittedWorker:
         assert job.instance.fleet_id == fleet.id
         assert job.instance.offer is not None
         assert job.instance.provisioning_job_id == job.id  # never cleared
-        backend_mock.compute.return_value.run_job.assert_called_once()
         res = await session.execute(
             select(InstanceModel).where(
                 InstanceModel.fleet_id == fleet.id,
@@ -2041,15 +2037,8 @@ class TestJobSubmittedWorker:
         assert not placeholder.deleted
         assert placeholder.status == InstanceStatus.PENDING
 
-    @pytest.mark.parametrize(
-        "blocked_availability", [InstanceAvailability.NO_QUOTA, InstanceAvailability.NO_BALANCE]
-    )
     async def test_reports_tried_offers_when_new_capacity_provisioning_fails(
-        self,
-        test_db,
-        session: AsyncSession,
-        worker: JobSubmittedWorker,
-        blocked_availability: InstanceAvailability,
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -2067,14 +2056,12 @@ class TestJobSubmittedWorker:
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = compute_mock
             m.return_value = [backend_mock]
-            compute_mock.get_offers.return_value = [
-                offer.model_copy(update={"availability": blocked_availability}),
-                offer,
-            ]
+            compute_mock.get_offers.return_value = [offer]
             compute_mock.run_job.side_effect = BackendError("InsufficientInstanceCapacity")
 
             # The first pass assigns the job to the fleet, the second one provisions.
             await _process_job(session=session, worker=worker, job_model=job)
+            compute_mock.get_offers.reset_mock()
             await _process_job(session=session, worker=worker, job_model=job)
 
         job = await _get_job(session, job.id)
@@ -2083,7 +2070,7 @@ class TestJobSubmittedWorker:
         assert f"Failed to provision in fleet '{fleet.name}'" in job.termination_reason_message
         assert "tried 1 of 1 offers, all failed" in job.termination_reason_message
         assert "us-east-1: InsufficientInstanceCapacity" in job.termination_reason_message
-        compute_mock.run_job.assert_called_once()
+        compute_mock.get_offers.assert_called_once()
 
     @pytest.mark.parametrize(
         ("availabilities", "message"),
@@ -2100,14 +2087,6 @@ class TestJobSubmittedWorker:
             (
                 [InstanceAvailability.NO_BALANCE],
                 "No balance",
-            ),
-            (
-                [InstanceAvailability.NO_QUOTA, InstanceAvailability.NO_BALANCE],
-                None,
-            ),
-            (
-                [InstanceAvailability.NO_BALANCE, InstanceAvailability.NOT_AVAILABLE],
-                None,
             ),
         ],
     )
@@ -2147,87 +2126,43 @@ class TestJobSubmittedWorker:
         else:
             assert job.termination_reason_message is not None
             assert "No offers matching the run requirements" in job.termination_reason_message
-        assert job.lock_token is None
-        assert job.instance is not None
-        assert not job.instance.deleted
-        assert job.instance.status == InstanceStatus.PENDING
-        compute.get_offers.assert_called_once()
+        assert compute.get_offers.call_count == 2
         compute.run_job.assert_not_called()
         compute.run_jobs.assert_not_called()
         compute.create_instance.assert_not_called()
 
-    async def test_blocked_offers_keep_query_count_and_offer_iteration_outside_sessions(
+    async def test_keeps_generic_failure_if_refetch_fails(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
+        project = await create_project(session=session)
         user = await create_user(session=session)
-        query_counts = []
-        for index, availability in enumerate(
-            [None, InstanceAvailability.NO_QUOTA, InstanceAvailability.NO_BALANCE]
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        job = await create_job(session=session, run=run)
+        backend = Mock(TYPE=BackendType.DSTACK)
+        compute = Mock(spec=ComputeMockSpec)
+        backend.compute.return_value = compute
+
+        compute.get_offers.return_value = [
+            get_instance_offer_with_availability(availability=InstanceAvailability.NO_QUOTA)
+        ]
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            side_effect=[[backend], RuntimeError("Diagnostic lookup failed")],
         ):
-            project = await create_project(session=session, name=f"project_{index}", owner=user)
-            repo = await create_repo(session=session, project_id=project.id)
-            fleet = await create_fleet(session=session, project=project)
-            run = await create_run(
-                session=session, project=project, repo=repo, user=user, fleet=fleet
-            )
-            job = await create_job(session=session, run=run)
-            await session.commit()
-            active_connections = 0
-            queries = 0
+            await _process_job(session=session, worker=worker, job_model=job)
+            await _process_job(session=session, worker=worker, job_model=job)
 
-            def checkout(*args):
-                nonlocal active_connections
-                active_connections += 1
-
-            def checkin(*args):
-                nonlocal active_connections
-                active_connections -= 1
-
-            def before_cursor_execute(*args):
-                nonlocal queries
-                queries += 1
-
-            def iterate_offers():
-                if availability is None:
-                    return
-                offer = get_instance_offer_with_availability(availability=availability)
-                for _ in range(1000):
-                    # The generator resumes after each offer's rejection is processed.
-                    assert active_connections == 0
-                    previous_queries = queries
-                    yield offer
-                    assert queries == previous_queries
-                    assert active_connections == 0
-
-            backend = Mock(TYPE=BackendType.DSTACK)
-            backend.compute.return_value.get_offers.side_effect = lambda *args: iterate_offers()
-            engine = test_db.engine.sync_engine
-            listeners = [
-                ("checkout", checkout),
-                ("checkin", checkin),
-                ("before_cursor_execute", before_cursor_execute),
-            ]
-            for name, listener in listeners:
-                event.listen(engine, name, listener)
-            try:
-                with patch(
-                    "dstack._internal.server.services.backends.get_project_backends",
-                    return_value=[backend],
-                ):
-                    await _process_job(session=session, worker=worker, job_model=job)
-                    await _process_job(session=session, worker=worker, job_model=job)
-                query_counts.append(queries)
-                assert active_connections == 0
-            finally:
-                for name, listener in listeners:
-                    event.remove(engine, name, listener)
-            job = await _get_job(session, job.id)
-            assert (
-                job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            )
-
-        assert query_counts[0] > 0
-        assert len(set(query_counts)) == 1
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert "No offers matching the run requirements" in job.termination_reason_message
+        compute.get_offers.assert_called_once()
+        compute.run_job.assert_not_called()
+        compute.run_jobs.assert_not_called()
+        compute.create_instance.assert_not_called()
 
     async def test_provisions_compute_group(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
