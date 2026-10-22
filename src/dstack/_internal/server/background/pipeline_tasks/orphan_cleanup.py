@@ -456,9 +456,9 @@ _PROVIDER_REF_BATCH_SIZE = 100
 class _OwnerRecords:
     instances: dict[str, InstanceModel]
     jobs: dict[str, JobModel]
-    """Jobs whose `provider_ref` is not found among instances. A job's instance inherits
-    the job's `provider_ref` on successful provisioning, so a job matches only resources
-    left by failed provisioning. See `JobModel.provider_ref`."""
+    """A job's instance inherits the job's `provider_ref` on successful provisioning,
+    so a job is consulted only if no instance has its `provider_ref`. Then it matches
+    only resources left by failed provisioning. See `JobModel.provider_ref`."""
 
 
 async def _load_owner_records(
@@ -470,10 +470,13 @@ async def _load_owner_records(
         if resource_group.owner_type == OwnerType.INSTANCE
     }
     async with get_session_ctx() as session:
+        # Jobs are loaded before instances since each query may see later commits
+        # (e.g. on Postgres with Read Committed). Successful provisioning moves the job
+        # out of submitted and sets its `provider_ref` on the instance in one transaction.
+        # So if the job query sees the job provisioned, the instance query sees its instance.
+        # In the reverse order, the instance could be missed and its resources orphaned.
+        jobs = await _load_jobs_by_provider_ref(session, project_id, instance_refs)
         instances = await _load_instances_by_provider_ref(session, project_id, instance_refs)
-        jobs = await _load_jobs_by_provider_ref(
-            session, project_id, instance_refs - instances.keys()
-        )
     return _OwnerRecords(instances=instances, jobs=jobs)
 
 

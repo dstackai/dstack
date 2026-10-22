@@ -695,6 +695,46 @@ class TestOrphanCleanupWorker:
         events = await list_events(session)
         assert [e.message.split(" in ")[0] for e in events] == expected_messages
 
+    async def test_tracks_resources_of_job_provisioned_while_loading_owners(
+        self, test_db, session: AsyncSession, worker
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        orphan_cleanup = await _create_orphan_cleanup(
+            session, project, last_processed_at=get_current_datetime()
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session, run=run, status=JobStatus.SUBMITTED, provider_ref=PROVIDER_REF
+        )
+        compute = _ListingCompute(ResourceListing(resource_groups=[_get_resource_group()]))
+        item = await _lock(session, orphan_cleanup)
+        load_jobs_by_provider_ref = orphan_cleanup_pipeline._load_jobs_by_provider_ref
+
+        async def load_jobs_after_provisioning(*args, **kwargs):
+            # The job's provisioning commits while owner records are being loaded
+            instance = await create_instance(
+                session=session, project=project, backend=BackendType.AWS
+            )
+            instance.provider_ref = PROVIDER_REF
+            job.status = JobStatus.PROVISIONING
+            await session.commit()
+            return await load_jobs_by_provider_ref(*args, **kwargs)
+
+        with (
+            patch.object(settings, "ORPHAN_CLEANUP_MODE", OrphanCleanupMode.DELETE),
+            _patch_compute(compute),
+            patch.object(
+                orphan_cleanup_pipeline,
+                "_load_jobs_by_provider_ref",
+                side_effect=load_jobs_after_provisioning,
+            ),
+        ):
+            await worker.process(item)
+        assert compute.deleted == []
+        assert await list_events(session) == []
+
     async def test_does_not_apply_result_if_lock_token_changes(
         self, test_db, session: AsyncSession, worker
     ):
