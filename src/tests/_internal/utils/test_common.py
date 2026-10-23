@@ -14,6 +14,7 @@ from dstack._internal.utils.common import (
     make_proxy_url,
     parse_datetime,
     parse_memory,
+    parse_since,
     pretty_date,
     pretty_resources,
     render_datetime_as_api,
@@ -180,6 +181,26 @@ class TestParseDatetime:
     def test_raises_value_error(self, value: str) -> None:
         with pytest.raises(ValueError):
             parse_datetime(value)
+
+
+class TestParseSince:
+    @pytest.mark.time_machine(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc), tick=False)
+    def test_duration(self) -> None:
+        assert parse_since("5m") == datetime(2023, 10, 4, 11, 55, tzinfo=timezone.utc)
+
+    @pytest.mark.parametrize(
+        "value", ["2023-09-24T15:30:00Z", "2023-09-24T15:30:00+00:00", "2023-09-24T17:30:00+02:00"]
+    )
+    def test_datetime(self, value: str) -> None:
+        assert parse_since(value) == datetime(2023, 9, 24, 15, 30, tzinfo=timezone.utc)
+
+    def test_naive_datetime(self) -> None:
+        with pytest.raises(ValueError):
+            parse_since("2023-09-24T15:30:00")
+
+    def test_invalid(self) -> None:
+        with pytest.raises(ValueError, match="Invalid datetime format"):
+            parse_since("invalid")
 
 
 class TestParseMemory:

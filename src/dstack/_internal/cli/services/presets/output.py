@@ -1,5 +1,4 @@
 from collections import defaultdict
-from datetime import datetime
 from typing import Any, Optional, Sequence
 
 from rich.table import Table
@@ -8,7 +7,7 @@ from dstack._internal.cli.models.presets import AnyStoredPreset, VerifiedPreset
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.configurations import PresetConfiguration
 from dstack._internal.core.models.presets import PresetWorkload
-from dstack._internal.utils.common import pretty_date, pretty_resources
+from dstack._internal.utils.common import parse_datetime, pretty_date, pretty_resources
 
 _STATUS_DISPLAY = {
     "verified": ("verified", "secondary"),
@@ -161,9 +160,7 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
     created_at = session.get("created_at")
     if isinstance(created_at, str):
         try:
-            # `Z` is what pydantic v2 emits for UTC, and `datetime.fromisoformat` only
-            # accepts it from Python 3.11; dstack supports 3.10.
-            created = pretty_date(datetime.fromisoformat(created_at.replace("Z", "+00:00")))
+            created = pretty_date(parse_datetime(created_at))
         except ValueError:
             created = created_at
     benchmark = ""

@@ -212,7 +212,7 @@ def parse_since(value: str) -> datetime:
     except ValueError:
         pass
     try:
-        res = datetime.fromisoformat(value)
+        res = parse_datetime(value)
     except ValueError:
         raise ValueError("Invalid datetime format")
     else:

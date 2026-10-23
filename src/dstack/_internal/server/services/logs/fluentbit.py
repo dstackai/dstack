@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import List, Optional, Protocol
 from uuid import UUID
 
@@ -19,7 +18,7 @@ from dstack._internal.server.services.logs.base import (
     LogStorageError,
     unix_time_ms_to_datetime,
 )
-from dstack._internal.utils.common import batched
+from dstack._internal.utils.common import batched, parse_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -113,7 +112,7 @@ else:
 
                 if timestamp_str:
                     try:
-                        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        timestamp = parse_datetime(timestamp_str)
                     except ValueError:
                         continue
                 else:
