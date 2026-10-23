@@ -59,7 +59,9 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(delete_instance_healthchecks, IntervalTrigger(minutes=5), max_instances=1)
     if settings.ORPHAN_CLEANUP_MODE != OrphanCleanupMode.OFF:
         _scheduler.add_job(
-            enroll_backends_in_orphan_cleanup, IntervalTrigger(minutes=10), max_instances=1
+            enroll_backends_in_orphan_cleanup,
+            IntervalTrigger(seconds=settings.ORPHAN_CLEANUP_ENROLLMENT_INTERVAL_SECONDS),
+            max_instances=1,
         )
     if settings.ENABLE_PROMETHEUS_METRICS:
         _scheduler.add_job(
