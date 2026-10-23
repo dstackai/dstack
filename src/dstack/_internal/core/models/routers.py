@@ -24,7 +24,7 @@ class ReplicaGroupRouterConfig(CoreModel):
                 "The router implementation for this replica group."
                 " `smg` runs the Shepherd Model Gateway (SMG) and dstack syncs worker URLs to it."
                 " `dynamo` runs the NVIDIA Dynamo frontend, which discovers workers"
-                " itself via etcd/NATS"
+                " itself via etcd"
             ),
         ),
     ] = RouterType.SMG
