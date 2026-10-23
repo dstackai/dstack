@@ -35,7 +35,7 @@ Processing a row:
     - No record: ignored. Resources of other servers and projects are never touched.
 - STEP 5: Owners that were provisioned or terminated around the listing are skipped instead of classified as orphans, since the listing may predate the change. The margin covers clock skew between replicas, the lag between setting timestamps and committing them, and providers listing new resources with a delay.
 - STEP 6: Handle orphans according to `DSTACK_SERVER_ORPHAN_CLEANUP_MODE`:
-    - `report` (default): log, send to Sentry, and emit an event targeting the owner instance. If the instance was deleted, the event still targets it by the id and name kept in `ProviderRefModel`, so it shows next to the instance's earlier events.
+    - `report` (default): log, send to Sentry, and emit an event targeting the owner instance. If the instance was deleted, the event still targets it by the id and name kept in `ProviderRefModel`, so it shows next to the instance's earlier events. Reports are not deduplicated: an orphan that stays is reported again on every cleanup of the backend, at most once per cleanup interval. This is expected and accepted.
     - `delete`: call `delete_resource_group()` and emit an event. If the backend raises `NotYetTerminated` for a group with an owner resource, the owner's deletion was requested and the event says the resources are being deleted. The remaining internal resources are listed and deleted by next cleanups.
     - `off`: the pipeline and enrollment are disabled.
 - STEP 7: Set the outcome:
