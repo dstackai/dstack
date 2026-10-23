@@ -646,7 +646,7 @@ class TestAgentSession:
         session.append_log("first")
         session.append_log("second")
 
-        assert capsys.readouterr().out.count("Could not write agent log") == 1
+        assert capsys.readouterr().err.count("Could not write agent log") == 1
 
 
 class TestRedaction:

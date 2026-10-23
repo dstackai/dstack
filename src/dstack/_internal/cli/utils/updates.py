@@ -7,7 +7,7 @@ import requests
 from packaging import version as pkg_version
 
 from dstack import version
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import error_console
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -73,7 +73,9 @@ def _check_version():
     latest_version = get_latest_version()
     if latest_version is not None:
         if is_update_available(version.__version__, latest_version):
-            console.print(f"A new version of dstack is available: [code]{latest_version}[/]\n")
+            error_console.print(
+                f"A new version of dstack is available: [code]{latest_version}[/]\n"
+            )
 
 
 def _update_last_check_time():

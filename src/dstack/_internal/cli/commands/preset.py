@@ -267,7 +267,7 @@ class PresetCommand(BaseCommand):
             )
             return
         # The store warns about unreadable presets on stderr once per read;
-        # inside Live that would tear the render on every refresh. The first
+        # inside Live that would repeat them on every refresh. The first
         # read happens before Live starts so warnings print once, above the
         # table; refreshes read with stderr suppressed.
         presets, sessions = self._list_presets_and_sessions(base=base, repo=repo)
@@ -303,10 +303,7 @@ class PresetCommand(BaseCommand):
         return presets, sessions
 
     def _create(self, args: argparse.Namespace) -> None:
-        warn(
-            "`dstack preset create` is deprecated; use `dstack apply -f <configuration>`",
-            stderr=True,
-        )
+        warn("`dstack preset create` is deprecated; use `dstack apply -f <configuration>`")
         _check_stdin_configuration_confirmable(args)
         _, configuration = _read_configuration_arg(args.configuration_file)
         # A thin adapter over the configurator, the same path `dstack apply` takes.
@@ -399,7 +396,7 @@ class PresetCommand(BaseCommand):
                 preset = store.find_by_id_or_name(args.preset)
             except CLIError as e:
                 # A corrupt preset file must still be removable by ID.
-                warn(str(e), stderr=True)
+                warn(str(e))
                 preset_ids = [args.preset]
                 description = f"preset [code]{args.preset}[/]"
             else:

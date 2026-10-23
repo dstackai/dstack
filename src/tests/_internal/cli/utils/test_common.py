@@ -1,12 +1,24 @@
+import io
+import logging
 import os
+from contextlib import redirect_stderr
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from typing import Generator
 from unittest.mock import patch
 
 import pytest
+from rich.console import Console
+from rich.live import Live
 
-from dstack._internal.cli.utils.common import _get_cli_log_file
+from dstack._internal import settings
+from dstack._internal.cli.utils.common import (
+    _get_cli_log_file,
+    configure_logging,
+    error_console,
+    warn,
+)
 
 
 @pytest.fixture
@@ -101,3 +113,64 @@ class TestGetCliLogFile:
         assert expected_rotated_log.exists(), (
             "The log should have rotated to the next available counter"
         )
+
+
+class TestConfigureLogging:
+    @pytest.fixture(autouse=True)
+    def restore_dstack_logger(self) -> Generator[None, None, None]:
+        dstack_logger = logging.getLogger("dstack")
+        handlers = dstack_logger.handlers[:]
+        level = dstack_logger.level
+        yield
+        dstack_logger.handlers[:] = handlers
+        dstack_logger.setLevel(level)
+
+    def test_logs_to_stderr(self, mock_dstack_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys):
+        monkeypatch.setattr(settings, "CLI_LOG_LEVEL", "INFO")
+        configure_logging()
+
+        logging.getLogger("dstack.test").info("Something happened")
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Something happened" in captured.err
+
+
+class TestWarn:
+    def test_writes_to_stderr(self, capsys):
+        warn("Something is off")
+
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Something is off" in captured.err
+
+    def test_respects_stderr_redirect(self, capsys):
+        # `dstack preset list -w` relies on this to suppress repeated warnings
+        buffer = StringIO()
+        with redirect_stderr(buffer):
+            warn("Something is off")
+
+        assert "Something is off" in buffer.getvalue()
+        assert capsys.readouterr().err == ""
+
+
+class TestErrorConsole:
+    def test_prints_through_active_live_display(self, capsys):
+        # A plain `Console(stderr=True)` would bypass the `sys.stderr` proxy that `Live`
+        # installs and garble the live render.
+        live_output = StringIO()
+        live_console = Console(file=live_output, force_terminal=True, width=80)
+        with Live("Working...", console=live_console, auto_refresh=False):
+            error_console.print("Something is off")
+
+        assert "Something is off" in live_output.getvalue()
+        assert capsys.readouterr().err == ""
+
+    def test_has_no_fileno_during_live_display(self):
+        # Given a std stream fileno, rich on legacy Windows consoles writes and flushes each
+        # styled segment separately, and `Live`'s `sys.stderr` proxy would print each one
+        # on a separate line.
+        live_console = Console(file=StringIO(), force_terminal=True)
+        with Live("Working...", console=live_console, auto_refresh=False):
+            with pytest.raises(io.UnsupportedOperation):
+                error_console.file.fileno()

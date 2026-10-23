@@ -303,7 +303,7 @@ class TestCreatePreset:
         }
         assert json.loads((paths[0] / "session.json").read_text())["status"] == "running"
         assert "hf-secret" not in (paths[0] / "preset.dstack.yml").read_text()
-        assert "Files remain at" in capsys.readouterr().out
+        assert "Files remain at" in capsys.readouterr().err
 
     def test_finalization_does_not_mask_creation_error(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -509,7 +509,7 @@ class TestResolvePreviousSessions:
 
         resolve_previous_sessions(["e5f6a7b8", "a1b2c3d4"])
 
-        output = capsys.readouterr().out
+        output = capsys.readouterr().err
         assert "e5f6a7b8 was created with --previous 00000000" in output
         # The included parent must not be warned about.
         assert output.count("was created with") == 1
@@ -1122,7 +1122,7 @@ class TestInterruptAndResume:
         # The session keeps its original prompt; the new one is ignored with a warning.
         assert "Optimize for RAG traffic." in captured["prompt"]
         assert "A different prompt." not in captured["prompt"]
-        assert "keepsitsoriginalprompt" in "".join(capsys.readouterr().out.split())
+        assert "keepsitsoriginalprompt" in "".join(capsys.readouterr().err.split())
         remove_agent_workspace(session)
 
 

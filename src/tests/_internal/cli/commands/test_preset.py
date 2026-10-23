@@ -129,7 +129,7 @@ class TestPresetLocalCommands:
 
         assert exit_code == 1
         create.assert_not_called()
-        assert "already created; nothing to resume" in capsys.readouterr().out
+        assert "already created; nothing to resume" in capsys.readouterr().err
 
     def test_get_returns_the_requested_configuration_for_an_unfinished_preset(
         self, tmp_path, capsys
@@ -272,7 +272,7 @@ class TestPresetLocalCommands:
             exit_code = run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path)
 
         assert exit_code != 0
-        assert "Preset creation is in use" in capsys.readouterr().out
+        assert "Preset creation is in use" in capsys.readouterr().err
         assert session_dir.exists()
 
     def test_refuses_to_delete_an_orphaned_creation_that_recorded_runs(self, tmp_path, capsys):
@@ -284,7 +284,7 @@ class TestPresetLocalCommands:
         exit_code = run_dstack_cli(["preset", "delete", "ab12cd34", "-y"], home_dir=tmp_path)
 
         assert exit_code != 0
-        assert "Preset creation was interrupted" in capsys.readouterr().out
+        assert "Preset creation was interrupted" in capsys.readouterr().err
         assert session_dir.exists()
 
     def test_deletes_an_orphaned_creation_without_runs(self, tmp_path):
@@ -609,7 +609,7 @@ env:
         # A qualified ref never names a creation session, so the session
         # fallback must not turn this into a confusing error.
         assert exit_code != 0
-        assert "does not exist" in capsys.readouterr().out
+        assert "does not exist" in capsys.readouterr().err
         assert store.list() != []
 
     def test_create_always_asks_even_without_a_name_conflict(self, tmp_path):
@@ -674,7 +674,7 @@ class TestPresetRegistryCommands:
         exit_code = run_dstack_cli(args, home_dir=tmp_path)
 
         assert exit_code != 0
-        assert "Invalid registry reference" in capsys.readouterr().out
+        assert "Invalid registry reference" in capsys.readouterr().err
 
 
 class TestApplyPresetConfiguration:

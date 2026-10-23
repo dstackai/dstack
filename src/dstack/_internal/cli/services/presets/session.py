@@ -26,7 +26,7 @@ from dstack._internal.cli.models.preset_agent import (
     PresetSessionStatus,
     PresetSessionWorkspace,
 )
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import console, error_console
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
@@ -142,7 +142,7 @@ class PresetSession:
         except OSError as e:
             self._log_enabled = False
             if self.echo:
-                console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
+                error_console.print(f"[warning]Could not write agent log {self.log_path}: {e}[/]")
 
     def read_state(self) -> Optional[PresetSessionState]:
         """None marks a session with no readable state: never created, or corrupt."""

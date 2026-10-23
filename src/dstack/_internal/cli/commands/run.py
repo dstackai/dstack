@@ -3,7 +3,7 @@ from uuid import UUID
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import RunNameCompleter
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import error_console
 from dstack._internal.core.errors import CLIError, ResourceNotExistsError
 
 
@@ -62,7 +62,7 @@ class RunCommand(APIBaseCommand):
             else:
                 run = self.api.client.runs.get(project_name=self.api.project, run_name=args.name)
         except ResourceNotExistsError:
-            console.print(f"Run [code]{args.name or args.id}[/] not found")
+            error_console.print(f"Run [code]{args.name or args.id}[/] not found")
             exit(1)
 
         print(run.model_dump_json(indent=2))

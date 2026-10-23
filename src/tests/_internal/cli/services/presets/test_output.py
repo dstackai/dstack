@@ -561,18 +561,3 @@ class TestFailedTrialSpark:
         assert spark.count("gold1") == 1
         assert spark.count("indian_red1") == 2
         assert "sea_green3" not in spark
-
-
-def test_warn_respects_stderr_redirect():
-    """`preset -w` suppresses store warnings during refreshes via
-    redirect_stderr; that only works while `error_console` resolves
-    `sys.stderr` at write time."""
-    import io
-    from contextlib import redirect_stderr
-
-    from dstack._internal.cli.utils.common import warn
-
-    buffer = io.StringIO()
-    with redirect_stderr(buffer):
-        warn("torn render", stderr=True)
-    assert "torn render" in buffer.getvalue()

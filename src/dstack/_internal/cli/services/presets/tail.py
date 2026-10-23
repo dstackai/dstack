@@ -14,7 +14,7 @@ from dstack._internal.cli.services.presets.session import (
     _write_private_text,
     print_preset_progress,
 )
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import error_console
 
 
 class FileLineReader:
@@ -193,7 +193,7 @@ class RecordMirror:
         except OSError as e:
             self._enabled = False
             if self._echo:
-                console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
+                error_console.print(f"[warning]Could not mirror {self._target.name}: {e}[/]")
 
 
 class DirectoryMirror:
@@ -237,7 +237,7 @@ class DirectoryMirror:
             if stat.st_size > self._MAX_FILE_BYTES:
                 if self._echo and relative not in self._warned:
                     self._warned.add(relative)
-                    console.print(
+                    error_console.print(
                         f"[warning]Not mirroring {relative}: "
                         f"larger than {self._MAX_FILE_BYTES // (1024 * 1024)} MiB[/]"
                     )
@@ -253,7 +253,7 @@ class DirectoryMirror:
             except OSError as e:
                 if self._echo and relative not in self._warned:
                     self._warned.add(relative)
-                    console.print(f"[warning]Could not mirror {relative}: {e}[/]")
+                    error_console.print(f"[warning]Could not mirror {relative}: {e}[/]")
                 continue
             self._copied[relative] = signature
 

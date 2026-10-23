@@ -10,6 +10,7 @@ from dstack._internal.cli.utils.common import (
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
+    error_console,
 )
 from dstack._internal.cli.utils.volume import get_volumes_table, print_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
@@ -110,7 +111,7 @@ class VolumeCommand(APIBaseCommand):
         try:
             volume = self.api.client.volumes.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
-            console.print("Volume not found")
+            error_console.print("Volume not found")
             exit(1)
 
         print(volume.model_dump_json(indent=2))

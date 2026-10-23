@@ -48,21 +48,19 @@ class PresetStore:
                 earlier_version_ids.append(path.parent.name)
             except CLIError as e:
                 # One corrupt file must not take down every read; the preset
-                # stays deletable by ID. stderr keeps `--json` output parseable.
-                warn(str(e), stderr=True)
+                # stays deletable by ID.
+                warn(str(e))
         if len(earlier_version_ids) == 1:
             warn(
                 f"Preset {earlier_version_ids[0]} was created before dstack 0.21 and cannot"
                 f" be read. Delete it with"
-                f" [code]dstack preset delete {earlier_version_ids[0]}[/], or recreate.",
-                stderr=True,
+                f" [code]dstack preset delete {earlier_version_ids[0]}[/], or recreate."
             )
         elif earlier_version_ids:
             warn(
                 f"{len(earlier_version_ids)} presets created before dstack 0.21 cannot be"
                 f" read: {', '.join(sorted(earlier_version_ids))}."
-                f" Delete them with [code]dstack preset delete <id>[/], or recreate.",
-                stderr=True,
+                f" Delete them with [code]dstack preset delete <id>[/], or recreate."
             )
         return sorted(presets, key=lambda preset: (preset.base.lower(), preset.id))
 

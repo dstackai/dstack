@@ -79,5 +79,5 @@ class TestInstallPreviousRecords:
 
         install_previous_records(workspace, [session])
 
-        assert "empty000 has no records" in capsys.readouterr().out
+        assert "empty000 has no records" in capsys.readouterr().err
         assert not (workspace.path / "previous" / "empty000").exists()

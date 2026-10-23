@@ -202,7 +202,7 @@ The following environment variables are supported by the CLI.
   dstack ps
   ```
 
-- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stdout. Defaults to `INFO`.
+- `DSTACK_CLI_LOG_LEVEL`{ #DSTACK_CLI_LOG_LEVEL } – Sets the logging level for CLI output to stderr. Defaults to `INFO`.
 
 Example:
 
