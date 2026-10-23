@@ -12,9 +12,11 @@ from dstack._internal.utils.common import (
     has_duplicates,
     local_time,
     make_proxy_url,
+    parse_datetime,
     parse_memory,
     pretty_date,
     pretty_resources,
+    render_datetime_as_api,
     sizeof_fmt,
 )
 
@@ -149,6 +151,35 @@ class TestFormatDurationMultiunit:
 )
 def test_has_duplicates(iterable, expected):
     assert has_duplicates(iterable) == expected
+
+
+class TestParseDatetime:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("2026-10-23T10:00:00Z", datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc)),
+            (
+                "2026-10-23T10:00:00.12345Z",
+                datetime(2026, 10, 23, 10, 0, 0, 123450, tzinfo=timezone.utc),
+            ),
+            (
+                "2026-10-23T12:00:00+02:00",
+                datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc),
+            ),
+            ("2026-10-23T10:00:00", datetime(2026, 10, 23, 10, 0)),
+        ],
+    )
+    def test_parses(self, value: str, expected: datetime) -> None:
+        assert parse_datetime(value) == expected
+
+    def test_roundtrips_render_datetime_as_api(self) -> None:
+        dt = datetime(2026, 10, 23, 10, 0, 0, 123456, tzinfo=timezone.utc)
+        assert parse_datetime(render_datetime_as_api(dt)) == dt
+
+    @pytest.mark.parametrize("value", ["invalid", "", "2026-13-01T00:00:00Z"])
+    def test_raises_value_error(self, value: str) -> None:
+        with pytest.raises(ValueError):
+            parse_datetime(value)
 
 
 class TestParseMemory:

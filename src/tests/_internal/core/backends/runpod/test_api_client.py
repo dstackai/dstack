@@ -2,6 +2,7 @@ import pytest
 
 from dstack._internal.core.backends.runpod.api_client import (
     API_V2_URL,
+    PAGINATION_MAX_PAGES,
     RunpodApiClient,
     RunpodV2ClientError,
 )
@@ -193,3 +194,36 @@ class TestRunpodApiClientNotFound:
 
         with pytest.raises(RunpodV2ClientError):
             _client().terminate_pod("pod-1")
+
+
+class TestRunpodApiClientListPods:
+    def _page(self, pod_ids: list[str], next_cursor: str | None) -> dict:
+        return {
+            "pods": [{"id": pod_id} for pod_id in pod_ids],
+            "pagination": {"nextCursor": next_cursor, "hasNextPage": next_cursor is not None},
+        }
+
+    def test_follows_cursor(self, requests_mock):
+        requests_mock.get(
+            f"{API_V2_URL}/pods",
+            [
+                {"json": self._page(["pod-1", "pod-2"], "cursor-1")},
+                {"json": self._page(["pod-3"], None)},
+            ],
+        )
+
+        pods = _client().list_pods()
+
+        assert [pod["id"] for pod in pods] == ["pod-1", "pod-2", "pod-3"]
+        assert [r.qs for r in requests_mock.request_history] == [
+            {"limit": ["1000"]},
+            {"limit": ["1000"], "cursor": ["cursor-1"]},
+        ]
+
+    def test_stops_at_max_pages(self, requests_mock):
+        requests_mock.get(f"{API_V2_URL}/pods", json=self._page(["pod-1"], "cursor-1"))
+
+        pods = _client().list_pods()
+
+        assert len(pods) == PAGINATION_MAX_PAGES
+        assert requests_mock.call_count == PAGINATION_MAX_PAGES

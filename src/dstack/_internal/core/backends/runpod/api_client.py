@@ -19,6 +19,11 @@ REQUEST_TIMEOUT = 120
 
 AUTH_ERROR_STATUS_CODES = (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN)
 
+PAGINATION_PAGE_LIMIT = 1000
+"""The maximum page size of paginated v2 endpoints."""
+
+PAGINATION_MAX_PAGES = 20
+
 # Applies to non-JSON error responses, which are not expected to contain anything useful past
 # the first few lines
 MAX_ERROR_DETAIL_LEN = 200
@@ -44,11 +49,16 @@ class V2Pod(TypedDict):
     mounts: "V2Mounts"
     cluster: NotRequired["V2PodCluster"]
     createdAt: str
-    dataCenterId: str
+    dataCenterId: Optional[str]
 
 
 class V2PodList(TypedDict):
     pods: list[V2Pod]
+
+
+class V2Pagination(TypedDict):
+    nextCursor: Optional[str]
+    hasNextPage: bool
 
 
 class V2PodCluster(TypedDict):
@@ -399,7 +409,10 @@ class RunpodApiClient:
         return response.json()
 
     def list_pods(self) -> list[V2Pod]:
-        return self._paginate_v2("GET", "pods", response_key="pods")
+        """
+        Lists pods except cluster member pods. Deleted pods are not listed.
+        """
+        return self._paginate_v2("pods", response_key="pods")
 
     def terminate_pod(self, pod_id: str) -> bool:
         try:
@@ -540,35 +553,35 @@ class RunpodApiClient:
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 
-    def _paginate_v2(
+    def _paginate_v2(self, *path_parts: str, response_key: str) -> list[Any]:
+        """
+        Follows `pagination.nextCursor` of a cursor-paginated GET endpoint and returns
+        the items of all pages, or of the first `PAGINATION_MAX_PAGES` pages.
+        """
+        result = []
+        params: dict[str, Any] = {"limit": PAGINATION_PAGE_LIMIT}
+        for _ in range(PAGINATION_MAX_PAGES):
+            response_json = self._make_v2_request("GET", *path_parts, params=params).json()
+            result.extend(response_json[response_key])
+            pagination: V2Pagination = response_json["pagination"]
+            if not pagination["hasNextPage"] or pagination["nextCursor"] is None:
+                break
+            params["cursor"] = pagination["nextCursor"]
+        else:
+            logger.error(
+                "Listing %s exceeded the limit of %s pages, the rest is skipped",
+                "/".join(path_parts),
+                PAGINATION_MAX_PAGES,
+            )
+        return result
+
+    def _make_v2_request(
         self,
         method: str,
         /,
         *path_parts: str,
-        response_key: str,
         json: Optional[Mapping[str, Any]] = None,
-    ) -> list[Any]:
-        per_page_limit = 1000
-        pagination_pages_hardlimit = 20
-        result = []
-        for p in range(pagination_pages_hardlimit):
-            resp = self._make_v2_request(
-                method, *path_parts, f"?limit={per_page_limit}", json=json
-            ).json()
-            batch = resp[response_key]
-            result.extend(batch)
-            next_cursor = resp["pagination"]["nextCursor"]
-            has_next_page = resp["pagination"]["hasNextPage"]
-            if next_cursor is None or not has_next_page:
-                break
-            if p == pagination_pages_hardlimit:
-                logger.error(
-                    "Pagination exceeded hard limit of %s pages", pagination_pages_hardlimit
-                )
-        return result
-
-    def _make_v2_request(
-        self, method: str, /, *path_parts: str, json: Optional[Mapping[str, Any]] = None
+        params: Optional[Mapping[str, Any]] = None,
     ) -> requests.Response:
         url = "/".join((API_V2_URL, *path_parts))
         response = self._session.request(
@@ -576,6 +589,7 @@ class RunpodApiClient:
             url=url,
             timeout=REQUEST_TIMEOUT,
             json=json,
+            params=params,
         )
         if HTTPStatus.BAD_REQUEST <= response.status_code < HTTPStatus.INTERNAL_SERVER_ERROR:
             error = _parse_v2_error_response(response)

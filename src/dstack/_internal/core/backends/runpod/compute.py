@@ -1,7 +1,7 @@
 import json
 import re
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Callable, List, Optional
 
 from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
@@ -10,6 +10,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithGroupProvisioningSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
@@ -75,6 +76,7 @@ class RunpodCompute(
     ComputeWithVolumeSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGroupProvisioningSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     _last_cleanup_time = None
@@ -414,6 +416,8 @@ class RunpodCompute(
         resource_groups = []
         pods = self.api_client.list_pods()
         for pod in pods:
+            if pod["status"] == "TERMINATED":
+                continue
             provider_ref = parse_provider_ref_from_name(pod["name"])
             if provider_ref is None:
                 continue
@@ -423,7 +427,7 @@ class RunpodCompute(
                 provider_ref=provider_ref,
                 primary_id=pod["id"],
                 region=pod["dataCenterId"],
-                created_at=parse_datetime(pod["createdAt"]),
+                created_at=_parse_pod_created_at(pod),
                 description=f"pod {pod['id']}",
                 backend_data=None,
             )
@@ -560,3 +564,11 @@ def _get_pod_cluster_ip(pod: V2Pod) -> Optional[str]:
     if cluster is None:
         return None
     return cluster.get("ip")
+
+
+def _parse_pod_created_at(pod: V2Pod) -> Optional[datetime]:
+    try:
+        return parse_datetime(pod["createdAt"])
+    except ValueError:
+        logger.warning("Failed to parse createdAt %r of pod %s", pod["createdAt"], pod["id"])
+        return None

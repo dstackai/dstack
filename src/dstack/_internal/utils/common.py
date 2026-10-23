@@ -68,17 +68,6 @@ def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
 
 
-def parse_datetime_or_error(d: str) -> datetime:
-    return datetime.fromisoformat(d.replace("Z", "+00:00"))
-
-
-def parse_datetime(d: str) -> Optional[datetime]:
-    try:
-        return parse_datetime_or_error(d)
-    except ValueError:
-        return None
-
-
 _DATETIME_ADAPTER = TypeAdapter(datetime)
 
 
@@ -94,6 +83,16 @@ def render_datetime_as_api(value: datetime) -> str:
     `pydantic_core.to_json` is already rendered this way.
     """
     return _DATETIME_ADAPTER.dump_python(value, mode="json")
+
+
+def parse_datetime(value: str) -> datetime:
+    """
+    Parse a datetime the way the API parses one: an ISO 8601 string or a Unix timestamp.
+
+    Unlike `datetime.fromisoformat()` on Python 3.10, accepts the `Z` suffix and fractional
+    seconds of any precision. Raises `ValueError` if `value` is not a datetime.
+    """
+    return _DATETIME_ADAPTER.validate_strings(value)
 
 
 DateFormatter = Callable[[datetime], str]
