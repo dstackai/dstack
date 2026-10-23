@@ -38,10 +38,13 @@ V2Cloud = Literal["SECURE", "COMMUNITY"]
 
 class V2Pod(TypedDict):
     id: str
+    name: str
     status: Literal["PROVISIONING", "STARTING", "RUNNING", "EXITED", "ERROR", "TERMINATED"]
     runtime: Optional["V2PodRuntime"]
     mounts: "V2Mounts"
     cluster: NotRequired["V2PodCluster"]
+    createdAt: str
+    dataCenterId: str
 
 
 class V2PodList(TypedDict):
@@ -395,6 +398,9 @@ class RunpodApiClient:
             raise
         return response.json()
 
+    def list_pods(self) -> list[V2Pod]:
+        return self._paginate_v2("GET", "pods", response_key="pods")
+
     def terminate_pod(self, pod_id: str) -> bool:
         try:
             self._make_v2_request("DELETE", "pods", pod_id)
@@ -533,6 +539,33 @@ class RunpodApiClient:
             if e.response is not None and e.response.status_code in AUTH_ERROR_STATUS_CODES:
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
+
+    def _paginate_v2(
+        self,
+        method: str,
+        /,
+        *path_parts: str,
+        response_key: str,
+        json: Optional[Mapping[str, Any]] = None,
+    ) -> list[Any]:
+        per_page_limit = 1000
+        pagination_pages_hardlimit = 20
+        result = []
+        for p in range(pagination_pages_hardlimit):
+            resp = self._make_v2_request(
+                method, *path_parts, f"?limit={per_page_limit}", json=json
+            ).json()
+            batch = resp[response_key]
+            result.extend(batch)
+            next_cursor = resp["pagination"]["nextCursor"]
+            has_next_page = resp["pagination"]["hasNextPage"]
+            if next_cursor is None or not has_next_page:
+                break
+            if p == pagination_pages_hardlimit:
+                logger.error(
+                    "Pagination exceeded hard limit of %s pages", pagination_pages_hardlimit
+                )
+        return result
 
     def _make_v2_request(
         self, method: str, /, *path_parts: str, json: Optional[Mapping[str, Any]] = None

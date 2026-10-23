@@ -68,6 +68,17 @@ def get_milliseconds_since_epoch() -> int:
     return int(round(time.time() * 1000))
 
 
+def parse_datetime_or_error(d: str) -> datetime:
+    return datetime.fromisoformat(d.replace("Z", "+00:00"))
+
+
+def parse_datetime(d: str) -> Optional[datetime]:
+    try:
+        return parse_datetime_or_error(d)
+    except ValueError:
+        return None
+
+
 _DATETIME_ADAPTER = TypeAdapter(datetime)
 
 
