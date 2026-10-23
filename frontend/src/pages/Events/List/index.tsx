@@ -11,6 +11,7 @@ import { ROUTES } from 'routes';
 import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
+import { useEventsOrder } from './hooks/useEventsOrder';
 import { useFilters } from './hooks/useFilters';
 
 import styles from 'pages/Runs/List/styles.module.scss';
@@ -18,6 +19,7 @@ import styles from 'pages/Runs/List/styles.module.scss';
 type RenderHeaderArgs = {
     refreshAction?: () => void;
     disabledRefresh?: boolean;
+    ascending: boolean;
 };
 
 type EventListProps = Pick<TableProps, 'variant'> & {
@@ -53,9 +55,11 @@ export const EventList: React.FC<EventListProps> = ({
         handleLoadItems,
     } = useFilters({ permanentFilters, withSearchParams });
 
+    const { ascending, sortingProps } = useEventsOrder({ withSearchParams });
+
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, ascending, limit: DEFAULT_TABLE_PAGE_SIZE },
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -79,12 +83,13 @@ export const EventList: React.FC<EventListProps> = ({
         <Table
             {...props}
             {...collectionProps}
+            {...sortingProps}
             columnDefinitions={columns}
             items={items}
             loading={loading}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading })}
+            header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading, ascending })}
             filter={
                 showFilters && (
                     <div className={styles.selectFilters}>
