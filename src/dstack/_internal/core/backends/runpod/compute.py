@@ -440,7 +440,7 @@ class RunpodCompute(
     def delete_resource_group(self, group: ListedResourceGroup) -> None:
         if group.primary_id is None:
             return
-        self.terminate_instance(group.primary_id, group.region or "")
+        self.api_client.terminate_pod(group.primary_id)
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, RunpodVolumeConfiguration)
