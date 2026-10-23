@@ -11,6 +11,7 @@ from dstack._internal.cli.utils.common import (
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
+    error_console,
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table, print_fleets_table
 from dstack._internal.core.errors import CLIError, ResourceNotExistsError
@@ -172,7 +173,7 @@ class FleetCommand(APIBaseCommand):
                     name=args.name.name,
                 )
         except ResourceNotExistsError:
-            console.print(f"Fleet [code]{args.name or args.id}[/] not found")
+            error_console.print(f"Fleet [code]{args.name or args.id}[/] not found")
             exit(1)
 
         print(fleet.model_dump_json(indent=2))

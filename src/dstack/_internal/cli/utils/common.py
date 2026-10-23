@@ -1,10 +1,13 @@
+import io
 import logging
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 import requests
 from rich.console import Console
+from rich.file_proxy import FileProxy
 from rich.prompt import Confirm
 from rich.table import Table
 from rich.theme import Theme
@@ -26,7 +29,38 @@ _colors = {
 
 console = Console(theme=Theme(_colors))
 
-error_console = Console(theme=Theme(_colors), stderr=True)
+
+class _LiveAwareStderr:
+    """
+    Resolves `sys.stderr` on each call. `Console(stderr=True)` unwraps the proxy that
+    `rich.live.Live` installs on `sys.stderr`, so its output would bypass an active
+    `console.status()` or live table and break the render.
+    """
+
+    @property
+    def encoding(self) -> str:
+        return getattr(sys.stderr, "encoding", None) or "utf-8"
+
+    def write(self, text: str) -> int:
+        return sys.stderr.write(text)
+
+    def flush(self) -> None:
+        sys.stderr.flush()
+
+    def isatty(self) -> bool:
+        return sys.stderr.isatty()
+
+    def fileno(self) -> int:
+        if isinstance(sys.stderr, FileProxy):
+            # Without a std stream fileno, rich on legacy Windows consoles renders ANSI
+            # in one write instead of a write and flush per styled segment, each of
+            # which `FileProxy` would print on a separate line.
+            raise io.UnsupportedOperation("fileno")
+        return sys.stderr.fileno()
+
+
+error_console = Console(theme=Theme(_colors), file=_LiveAwareStderr())  # type: ignore[arg-type]
+"""Logs, errors, and warnings. Keeps stdout for command output, e.g., `--json`."""
 
 
 LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
@@ -77,10 +111,10 @@ def configure_logging():
     dstack_logger = logging.getLogger("dstack")
     dstack_logger.handlers.clear()
 
-    stdout_handler = DstackRichHandler(console=console)
-    stdout_handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
-    stdout_handler.setLevel(settings.CLI_LOG_LEVEL)
-    dstack_logger.addHandler(stdout_handler)
+    stderr_handler = DstackRichHandler(console=error_console)
+    stderr_handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
+    stderr_handler.setLevel(settings.CLI_LOG_LEVEL)
+    dstack_logger.addHandler(stderr_handler)
 
     log_file = get_dstack_dir() / "logs" / "cli" / "latest.log"
     try:
@@ -95,7 +129,9 @@ def configure_logging():
         file_handler.setLevel(settings.CLI_FILE_LOG_LEVEL)
         dstack_logger.addHandler(file_handler)
     except PermissionError:
-        console.print(f"[warning]Couldn't write to {log_file} due to a permissions problem.[/]")
+        error_console.print(
+            f"[warning]Couldn't write to {log_file} due to a permissions problem.[/]"
+        )
 
     # the logger allows all messages, filtering is done by the handlers
     dstack_logger.setLevel(logging.DEBUG)
@@ -118,12 +154,11 @@ def add_row_from_dict(table: Table, data: dict[str, Any], **kwargs):
     table.add_row(*row, **kwargs)
 
 
-def warn(message: str, stderr: bool = False):
-    """`stderr=True` keeps the warning off stdout, so `--json` output stays parseable."""
+def warn(message: str):
     if not message.endswith("\n"):
         # Additional blank line for better visibility if there are more than one warning
         message = f"{message}\n"
-    (error_console if stderr else console).print(f"[warning][bold]{message}[/]")
+    error_console.print(f"[warning][bold]{message}[/]")
 
 
 def get_start_time(since: Optional[str]) -> Optional[datetime]:

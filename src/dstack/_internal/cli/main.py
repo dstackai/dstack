@@ -26,7 +26,7 @@ from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
-from dstack._internal.cli.utils.common import _colors, console
+from dstack._internal.cli.utils.common import _colors, error_console
 from dstack._internal.cli.utils.updates import check_for_updates
 from dstack._internal.core.errors import ClientError, CLIError, ConfigurationError, SSHError
 from dstack._internal.core.services.ssh.client import get_ssh_client_info
@@ -98,7 +98,7 @@ def main():
         get_ssh_client_info()
         args.func(args)
     except (ClientError, CLIError, ConfigurationError, SSHError) as e:
-        console.print(f"[error]{escape(str(e))}[/]")
+        error_console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
         exit(1)
 
