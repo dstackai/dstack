@@ -552,6 +552,9 @@ async def _handle_orphaned_resource_group(
     resource_group: ListedResourceGroup,
 ) -> _ResourceGroupDecision:
     if settings.ORPHAN_CLEANUP_MODE == OrphanCleanupMode.REPORT:
+        # Expected and accepted: reports are not deduplicated, so an orphan that stays
+        # is reported (logged, sent to Sentry, emitted as an event) on every cleanup
+        # of the backend, i.e. at most once per cleanup interval while the backend is eligible.
         logger.info(
             "Found orphaned %s %s in %s/%s",
             resource_group.owner_type.value,

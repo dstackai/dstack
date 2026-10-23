@@ -1,7 +1,7 @@
 import json
 import re
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Callable, List, Optional
 
 from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
@@ -10,12 +10,14 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithGroupProvisioningSupport,
     ComputeWithMultinodeSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_instance_name,
     generate_unique_volume_name,
     get_docker_commands,
     get_job_instance_name,
     get_job_provider_ref,
+    parse_provider_ref_from_name,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -24,6 +26,11 @@ from dstack._internal.core.backends.runpod.models import RunpodConfig
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    OwnerType,
+    ResourceListing,
+)
 from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_extra_ignore
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.instances import (
@@ -39,7 +46,7 @@ from dstack._internal.core.models.volumes import (
     Volume,
     VolumeProvisioningData,
 )
-from dstack._internal.utils.common import get_current_datetime, get_or_error
+from dstack._internal.utils.common import get_current_datetime, get_or_error, parse_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -69,6 +76,7 @@ class RunpodCompute(
     ComputeWithVolumeSupport,
     ComputeWithMultinodeSupport,
     ComputeWithGroupProvisioningSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     _last_cleanup_time = None
@@ -136,7 +144,9 @@ class RunpodCompute(
             provider_ref=get_job_provider_ref(job),
         )
 
-        pod_name = generate_unique_instance_name(instance_config, max_length=MAX_RESOURCE_NAME_LEN)
+        pod_name = generate_unique_instance_name(
+            instance_config, max_length=MAX_RESOURCE_NAME_LEN, with_provider_ref=True
+        )
         authorized_keys = build_authorized_keys(project_ssh_public_key, extra_authorized_keys)
 
         network_volume_id = None
@@ -402,6 +412,36 @@ class RunpodCompute(
                 provisioning_data.hostname = port.get("ip")
                 provisioning_data.ssh_port = port.get("public")
 
+    def list_resource_groups(self) -> ResourceListing:
+        resource_groups = []
+        pods = self.api_client.list_pods()
+        for pod in pods:
+            if pod["status"] == "TERMINATED":
+                continue
+            provider_ref = parse_provider_ref_from_name(pod["name"])
+            if provider_ref is None:
+                continue
+            resource_group = ListedResourceGroup(
+                backend=BackendType.RUNPOD,
+                owner_type=OwnerType.INSTANCE,
+                provider_ref=provider_ref,
+                primary_id=pod["id"],
+                region=pod["dataCenterId"],
+                created_at=_parse_pod_created_at(pod),
+                description=f"pod {pod['id']}",
+                backend_data=None,
+            )
+            resource_groups.append(resource_group)
+        return ResourceListing(
+            resource_groups=resource_groups,
+            failures=[],
+        )
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        if group.primary_id is None:
+            return
+        self.api_client.terminate_pod(group.primary_id)
+
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         volume_id = get_or_error(volume.configuration.volume_id)
@@ -524,3 +564,11 @@ def _get_pod_cluster_ip(pod: V2Pod) -> Optional[str]:
     if cluster is None:
         return None
     return cluster.get("ip")
+
+
+def _parse_pod_created_at(pod: V2Pod) -> Optional[datetime]:
+    try:
+        return parse_datetime(pod["createdAt"])
+    except ValueError:
+        logger.warning("Failed to parse createdAt %r of pod %s", pod["createdAt"], pod["id"])
+        return None

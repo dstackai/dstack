@@ -85,6 +85,16 @@ def render_datetime_as_api(value: datetime) -> str:
     return _DATETIME_ADAPTER.dump_python(value, mode="json")
 
 
+def parse_datetime(value: str) -> datetime:
+    """
+    Parse a datetime the way the API parses one: an ISO 8601 string or a Unix timestamp.
+
+    Unlike `datetime.fromisoformat()` on Python 3.10, accepts the `Z` suffix and fractional
+    seconds of any precision. Raises `ValueError` if `value` is not a datetime.
+    """
+    return _DATETIME_ADAPTER.validate_strings(value)
+
+
 DateFormatter = Callable[[datetime], str]
 
 
@@ -202,7 +212,7 @@ def parse_since(value: str) -> datetime:
     except ValueError:
         pass
     try:
-        res = datetime.fromisoformat(value)
+        res = parse_datetime(value)
     except ValueError:
         raise ValueError("Invalid datetime format")
     else:

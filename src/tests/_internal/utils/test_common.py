@@ -12,9 +12,12 @@ from dstack._internal.utils.common import (
     has_duplicates,
     local_time,
     make_proxy_url,
+    parse_datetime,
     parse_memory,
+    parse_since,
     pretty_date,
     pretty_resources,
+    render_datetime_as_api,
     sizeof_fmt,
 )
 
@@ -149,6 +152,55 @@ class TestFormatDurationMultiunit:
 )
 def test_has_duplicates(iterable, expected):
     assert has_duplicates(iterable) == expected
+
+
+class TestParseDatetime:
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("2026-10-23T10:00:00Z", datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc)),
+            (
+                "2026-10-23T10:00:00.12345Z",
+                datetime(2026, 10, 23, 10, 0, 0, 123450, tzinfo=timezone.utc),
+            ),
+            (
+                "2026-10-23T12:00:00+02:00",
+                datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc),
+            ),
+            ("2026-10-23T10:00:00", datetime(2026, 10, 23, 10, 0)),
+        ],
+    )
+    def test_parses(self, value: str, expected: datetime) -> None:
+        assert parse_datetime(value) == expected
+
+    def test_roundtrips_render_datetime_as_api(self) -> None:
+        dt = datetime(2026, 10, 23, 10, 0, 0, 123456, tzinfo=timezone.utc)
+        assert parse_datetime(render_datetime_as_api(dt)) == dt
+
+    @pytest.mark.parametrize("value", ["invalid", "", "2026-13-01T00:00:00Z"])
+    def test_raises_value_error(self, value: str) -> None:
+        with pytest.raises(ValueError):
+            parse_datetime(value)
+
+
+class TestParseSince:
+    @pytest.mark.time_machine(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc), tick=False)
+    def test_duration(self) -> None:
+        assert parse_since("5m") == datetime(2023, 10, 4, 11, 55, tzinfo=timezone.utc)
+
+    @pytest.mark.parametrize(
+        "value", ["2023-09-24T15:30:00Z", "2023-09-24T15:30:00+00:00", "2023-09-24T17:30:00+02:00"]
+    )
+    def test_datetime(self, value: str) -> None:
+        assert parse_since(value) == datetime(2023, 9, 24, 15, 30, tzinfo=timezone.utc)
+
+    def test_naive_datetime(self) -> None:
+        with pytest.raises(ValueError):
+            parse_since("2023-09-24T15:30:00")
+
+    def test_invalid(self) -> None:
+        with pytest.raises(ValueError, match="Invalid datetime format"):
+            parse_since("invalid")
 
 
 class TestParseMemory:

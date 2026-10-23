@@ -1,13 +1,16 @@
+from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from dstack._internal.core.backends.base.compute import parse_provider_ref_from_name
 from dstack._internal.core.backends.runpod.api_client import RunpodV2ClientError
 from dstack._internal.core.backends.runpod.compute import RunpodCompute
 from dstack._internal.core.backends.runpod.models import RunpodAPIKeyCreds, RunpodConfig
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
@@ -63,14 +66,18 @@ def _run() -> MagicMock:
     return run
 
 
-def _run_job(compute: RunpodCompute, offer: InstanceOfferWithAvailability) -> JobProvisioningData:
+def _run_job(
+    compute: RunpodCompute,
+    offer: InstanceOfferWithAvailability,
+    job: Optional[MagicMock] = None,
+) -> JobProvisioningData:
     with patch(
         "dstack._internal.core.backends.runpod.compute.get_docker_commands",
         return_value=["echo hi"],
     ):
         return compute.run_job(
             run=_run(),
-            job=_job(),
+            job=job if job is not None else _job(),
             instance_offer=offer,
             project_ssh_public_key=PROJECT_SSH_PUBLIC_KEY,
             project_ssh_private_key="private-key",
@@ -157,6 +164,17 @@ class TestRunpodComputeRunJob:
 
         assert jpd.instance_id == "pod-1"
         compute.api_client.terminate_pod.assert_not_called()
+
+    def test_encodes_provider_ref_in_pod_name(self):
+        compute = _compute()
+        compute.api_client.create_pod.return_value = {"id": "pod-1"}
+        job = _job()
+        job.job_submissions = [MagicMock(provider_ref="abcdef123456")]
+
+        _run_job(compute, _gpu_offer(), job=job)
+
+        pod_name = compute.api_client.create_pod.call_args.kwargs["name"]
+        assert parse_provider_ref_from_name(pod_name) == "abcdef123456"
 
 
 class TestRunpodComputeRunJobs:
@@ -256,3 +274,103 @@ class TestRunpodComputeUpdateProvisioningData:
         assert jpd.hostname == "203.0.113.10"
         assert jpd.ssh_port == 40022
         assert jpd.internal_ip == "10.65.0.3"
+
+
+def _listed_pod(
+    pod_id: str,
+    *,
+    name: str,
+    status: str = "RUNNING",
+    data_center_id: Optional[str] = "EU-RO-1",
+    created_at: str = "2026-10-23T10:00:00Z",
+) -> dict:
+    pod = _pod(pod_id)
+    pod["status"] = status
+    pod["name"] = name
+    pod["dataCenterId"] = data_center_id
+    pod["createdAt"] = created_at
+    return pod
+
+
+class TestRunpodComputeListResourceGroups:
+    def test_lists_pods_with_provider_ref(self):
+        compute = _compute()
+        compute.api_client.list_pods.return_value = [
+            _listed_pod("pod-1", name="dstack-main-test-job-0-abcdef123456wxyz"),
+        ]
+
+        listing = compute.list_resource_groups()
+
+        assert listing.failures == []
+        assert listing.resource_groups == [
+            ListedResourceGroup(
+                backend=BackendType.RUNPOD,
+                owner_type=OwnerType.INSTANCE,
+                provider_ref="abcdef123456",
+                primary_id="pod-1",
+                region="EU-RO-1",
+                created_at=datetime(2026, 10, 23, 10, 0, tzinfo=timezone.utc),
+                description="pod pod-1",
+                backend_data=None,
+            )
+        ]
+
+    def test_skips_pods_without_provider_ref(self):
+        compute = _compute()
+        compute.api_client.list_pods.return_value = [
+            _listed_pod("pod-1", name="dstack-main-test-job-0-abcdefgh"),
+            _listed_pod("pod-2", name="my-pod"),
+        ]
+
+        assert compute.list_resource_groups().resource_groups == []
+
+    def test_skips_terminated_pods(self):
+        compute = _compute()
+        compute.api_client.list_pods.return_value = [
+            _listed_pod(
+                "pod-1", name="dstack-main-test-job-0-abcdef123456wxyz", status="TERMINATED"
+            ),
+        ]
+
+        assert compute.list_resource_groups().resource_groups == []
+
+    def test_unparsable_created_at(self):
+        compute = _compute()
+        compute.api_client.list_pods.return_value = [
+            _listed_pod(
+                "pod-1", name="dstack-main-test-job-0-abcdef123456wxyz", created_at="invalid"
+            ),
+        ]
+
+        [group] = compute.list_resource_groups().resource_groups
+
+        assert group.created_at is None
+
+
+class TestRunpodComputeDeleteResourceGroup:
+    def _group(self, primary_id: Optional[str]) -> ListedResourceGroup:
+        return ListedResourceGroup(
+            backend=BackendType.RUNPOD,
+            owner_type=OwnerType.INSTANCE,
+            provider_ref="abcdef123456",
+            primary_id=primary_id,
+            region="EU-RO-1",
+            created_at=None,
+            description="pod pod-1",
+            backend_data=None,
+        )
+
+    def test_terminates_pod(self):
+        compute = _compute()
+
+        compute.delete_resource_group(self._group("pod-1"))
+
+        compute.api_client.terminate_pod.assert_called_once_with("pod-1")
+
+    def test_pod_already_deleted(self):
+        compute = _compute()
+        compute.api_client.terminate_pod.return_value = False
+
+        compute.delete_resource_group(self._group("pod-1"))
+
+        compute.api_client.terminate_pod.assert_called_once_with("pod-1")
