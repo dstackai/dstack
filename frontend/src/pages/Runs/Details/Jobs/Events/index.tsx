@@ -11,6 +11,7 @@ import { useCollection, useInfiniteScroll } from 'hooks';
 import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from 'pages/Events/List/hooks/useColumnDefinitions';
+import { useEventsOrder } from 'pages/Events/List/hooks/useEventsOrder';
 
 import { ROUTES } from '../../../../../routes';
 import { useGetRunQuery } from '../../../../../services/run';
@@ -34,9 +35,11 @@ export const EventsList = () => {
         return runData.jobs.find((job) => job.job_spec.job_name === paramJobName)?.job_submissions?.[0]?.id;
     }, [runData]);
 
+    const { ascending, sortingProps } = useEventsOrder();
+
     const { data, isLoading, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { limit: DEFAULT_TABLE_PAGE_SIZE, target_jobs: jobId ? [jobId] : undefined },
+        args: { limit: DEFAULT_TABLE_PAGE_SIZE, target_jobs: jobId ? [jobId] : undefined, ascending },
         skip: !jobId,
 
         getPaginationParams: (lastEvent) => ({
@@ -58,6 +61,7 @@ export const EventsList = () => {
     return (
         <Table
             {...collectionProps}
+            {...sortingProps}
             columnDefinitions={columns}
             items={items}
             loading={isLoading || isLoadingRun}

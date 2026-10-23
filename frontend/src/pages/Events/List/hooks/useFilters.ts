@@ -226,9 +226,19 @@ export const useFilters = ({
     }, [dynamicFilteringOptions]);
 
     const setSearchParamsHandle = ({ tokens }: { tokens: PropertyFilterProps.Query['tokens'] }) => {
-        const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
+        setSearchParams((prevSearchParams) => {
+            const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
+            const filterKeysValues: string[] = Object.values(filterKeys);
 
-        setSearchParams(searchParams);
+            // Keep search params that are not managed by the property filter, e.g. the sort order
+            prevSearchParams.forEach((value, key) => {
+                if (!filterKeysValues.includes(key)) {
+                    searchParams.append(key, value);
+                }
+            });
+
+            return searchParams;
+        });
     };
 
     const onChangePropertyFilterHandle = ({ tokens, operation }: PropertyFilterProps.Query) => {

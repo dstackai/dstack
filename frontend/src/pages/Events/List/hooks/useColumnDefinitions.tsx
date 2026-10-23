@@ -15,6 +15,7 @@ export const useColumnsDefinitions = () => {
             id: 'recorded_at',
             header: t('events.recorded_at'),
             cell: (item) => format(new Date(item.recorded_at), DATE_TIME_FORMAT),
+            sortingField: 'recorded_at',
         },
         {
             id: 'actor',
