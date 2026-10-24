@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Callable, Literal, Optional, Union, cast, get_args
 
 import gpuhunt
-from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
+from gpuhunt import KNOWN_AMD_GPUS, AcceleratorVendor
 from kubernetes.client import CoreV1Api, V1Node, V1Taint
 from kubernetes.utils.quantity import parse_quantity as _parse_quantity
 from typing_extensions import Self
@@ -27,6 +27,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.utils import docker as docker_utils
 from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.gpu import convert_nvidia_gpu_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -47,6 +48,7 @@ LABEL_VALUE_REGEX = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?)
 NVIDIA_GPU_RESOURCE = "nvidia.com/gpu"
 NVIDIA_GPU_NODE_TAINT = NVIDIA_GPU_RESOURCE
 NVIDIA_GPU_PRODUCT_LABEL = f"{NVIDIA_GPU_RESOURCE}.product"
+NVIDIA_GPU_MEMORY_LABEL = f"{NVIDIA_GPU_RESOURCE}.memory"
 
 AMD_GPU_RESOURCE = "amd.com/gpu"
 AMD_GPU_NODE_TAINT = AMD_GPU_RESOURCE
@@ -56,9 +58,6 @@ AMD_GPU_NODE_TAINT = AMD_GPU_RESOURCE
 # We cannot rely on the beta.amd.com/gpu.product-name.* label, as it may be missing, see the issue:
 # https://github.com/ROCm/k8s-device-plugin/issues/112
 AMD_GPU_DEVICE_ID_LABEL_PREFIX = f"beta.{AMD_GPU_RESOURCE}.device-id."
-
-NVIDIA_GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_NVIDIA_GPUS}
-NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 AMD_GPU_DEVICE_ID_TO_GPU_INFO = {
     device_id: gpu_info for gpu_info in KNOWN_AMD_GPUS for device_id in gpu_info.device_ids
@@ -417,26 +416,40 @@ def get_instance_offer_from_node(
     )
 
 
-def get_nvidia_gpu_from_node_labels(labels: dict[str, str]) -> Optional[Gpu]:
-    # We rely on https://github.com/NVIDIA/k8s-device-plugin/tree/main/docs/gpu-feature-discovery
-    # to detect gpus. Note that "nvidia.com/gpu.product" is not a short gpu name like "T4" or
-    # "A100" but a product name like "Tesla-T4" or "A100-SXM4-40GB".
-    # Thus, we convert the product name to a known gpu name.
+def get_nvidia_gpu_from_node_labels(
+    labels: dict[str, str], *, node_name: Optional[str] = None
+) -> Optional[Gpu]:
+    """Read the NVIDIA GFD product and per-device MiB; normalize whole-GPU VRAM.
+
+    Missing or invalid memory warns and returns None. Unknown models and unmatched
+    capacities retain measured VRAM, with a warning from gpuhunt.
+    """
+    # https://github.com/NVIDIA/k8s-device-plugin/tree/main/docs/gpu-feature-discovery
     gpu_product = labels.get(NVIDIA_GPU_PRODUCT_LABEL)
-    if gpu_product is None:
+    if not gpu_product:
         return None
-    gpu_product = gpu_product.replace("RTX-", "RTX")
-    for gpu_name in NVIDIA_GPU_NAMES:
-        if gpu_name.lower() in gpu_product.lower().split("-"):
-            break
-    else:
+    context = f"provider=kubernetes, node={node_name}" if node_name else "provider=kubernetes"
+    try:
+        gpu_memory_mib = int(labels.get(NVIDIA_GPU_MEMORY_LABEL, "0"))
+    except ValueError:
+        gpu_memory_mib = 0
+    if gpu_memory_mib <= 0:
+        logger.warning(
+            "Missing or invalid %s for NVIDIA GPU %r (%s): %r",
+            NVIDIA_GPU_MEMORY_LABEL,
+            gpu_product,
+            context,
+            labels.get(NVIDIA_GPU_MEMORY_LABEL),
+        )
         return None
-    gpu_info = NVIDIA_GPU_NAME_TO_GPU_INFO[gpu_name]
-    gpu_memory = gpu_info.memory * 1024
-    # A100 may come in two variants
-    if "40GB" in gpu_product:
-        gpu_memory = 40 * 1024
-    return Gpu(vendor=AcceleratorVendor.NVIDIA, name=gpu_name, memory_mib=gpu_memory)
+    gpu_product = gpu_product.removesuffix("-SHARED")
+    gpu_name = convert_nvidia_gpu_name(gpu_product.replace("-", " "))
+    gpu_memory_gib = gpuhunt.get_gpu_memory_gib(gpu_name, gpu_memory_mib / 1024, context=context)
+    return Gpu(
+        vendor=AcceleratorVendor.NVIDIA,
+        name=gpu_name,
+        memory_mib=int(gpu_memory_gib * 1024),
+    )
 
 
 def get_amd_gpu_from_node_labels(labels: dict[str, str]) -> Optional[Gpu]:
@@ -514,17 +527,17 @@ def _get_gpus_from_node(
     node: V1Node, node_name: str, node_resources: KubernetesResources
 ) -> list[Gpu]:
     labels = get_node_labels(node)
-    for gpu_resource, gpu_getter in (
-        (NVIDIA_GPU_RESOURCE, get_nvidia_gpu_from_node_labels),
-        (AMD_GPU_RESOURCE, get_amd_gpu_from_node_labels),
-    ):
+    for gpu_resource in (NVIDIA_GPU_RESOURCE, AMD_GPU_RESOURCE):
         gpu_count = int(node_resources[gpu_resource])
         if gpu_count < 1:
             continue
-        gpu = gpu_getter(labels)
+        if gpu_resource == NVIDIA_GPU_RESOURCE:
+            gpu = get_nvidia_gpu_from_node_labels(labels, node_name=node_name)
+        else:
+            gpu = get_amd_gpu_from_node_labels(labels)
         if gpu is None:
             logger.warning(
-                "Node %s: GPU resource found, but failed to detect its model: %s=%d",
+                "Node %s: GPU resource found, but failed to detect its model or memory: %s=%d",
                 node_name,
                 gpu_resource,
                 gpu_count,

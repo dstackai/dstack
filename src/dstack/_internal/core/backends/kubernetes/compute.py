@@ -47,6 +47,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_NAME_TO_DEVICE_IDS,
     AMD_GPU_NODE_TAINT,
     LABEL_VALUE_MAX_LENGTH,
+    NVIDIA_GPU_MEMORY_LABEL,
     NVIDIA_GPU_NODE_TAINT,
     NVIDIA_GPU_PRODUCT_LABEL,
     OBJECT_NAME_MAX_LENGTH,
@@ -790,19 +791,19 @@ def _get_pod_spec_parameters_for_gpu(
 def _get_nvidia_gpu_node_affinity(
     gpu_spec: GPUSpec, nodes: list[client.V1Node]
 ) -> client.V1NodeAffinity:
-    matching_gpu_label_values: set[str] = set()
+    matching_gpu_labels: set[tuple[str, str]] = set()
     for node in nodes:
         labels = get_node_labels(node)
-        gpu = get_nvidia_gpu_from_node_labels(labels)
+        gpu = get_nvidia_gpu_from_node_labels(labels, node_name=get_node_name(node))
         if gpu is not None and gpu_matches_gpu_spec(gpu, gpu_spec):
-            matching_gpu_label_values.add(labels[NVIDIA_GPU_PRODUCT_LABEL])
-    if not matching_gpu_label_values:
+            matching_gpu_labels.add(
+                (labels[NVIDIA_GPU_PRODUCT_LABEL], labels[NVIDIA_GPU_MEMORY_LABEL])
+            )
+    if not matching_gpu_labels:
         raise ComputeError(
             f"NVIDIA GPU is requested but no matching GPU labels found: {gpu_spec=}"
         )
-    logger.debug(
-        "Selecting nodes by labels %s for NVIDIA %s", matching_gpu_label_values, gpu_spec.name
-    )
+    logger.debug("Selecting nodes by labels %s for NVIDIA %s", matching_gpu_labels, gpu_spec.name)
     return client.V1NodeAffinity(
         required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
             node_selector_terms=[
@@ -811,10 +812,16 @@ def _get_nvidia_gpu_node_affinity(
                         client.V1NodeSelectorRequirement(
                             key=NVIDIA_GPU_PRODUCT_LABEL,
                             operator=Operator.IN,
-                            values=list(matching_gpu_label_values),
+                            values=[product],
+                        ),
+                        client.V1NodeSelectorRequirement(
+                            key=NVIDIA_GPU_MEMORY_LABEL,
+                            operator=Operator.IN,
+                            values=[memory],
                         ),
                     ],
-                ),
+                )
+                for product, memory in sorted(matching_gpu_labels)
             ],
         ),
     )

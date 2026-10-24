@@ -28,14 +28,54 @@ class TestGetNvidiaGPUFromNodeLabels:
     def test_returns_none_if_no_labels(self):
         assert get_nvidia_gpu_from_node_labels({}) is None
 
-    def test_returns_correct_memory_for_different_A100(self):
+    @pytest.mark.parametrize(
+        "product,memory_mib,name,expected_gib",
+        [
+            ("A100-SXM4-40GB", 39538, "A100", 40),
+            ("A100-SXM4-80GB", 79 * 1024, "A100", 80),
+            ("Tesla-P100-PCIE-12GB", 12 * 1024, "P100", 12),
+            ("Tesla-P100-PCIE-16GB", 16 * 1024, "P100", 16),
+            ("NVIDIA-RTX-A2000", 6 * 1024, "A2000", 6),
+            ("NVIDIA-RTX-A2000", 12 * 1024, "A2000", 12),
+            ("Quadro-RTX-4000", 8 * 1024, "RTX4000", 8),
+            ("NVIDIA-RTX-4000-Ada-Generation", 20 * 1024, "RTX4000Ada", 20),
+            ("Quadro-RTX-5000", 16 * 1024, "RTX5000", 16),
+            ("NVIDIA-RTX-5000-Ada-Generation", 32 * 1024, "RTX5000Ada", 32),
+            ("NVIDIA-L4-SHARED", 22888, "L4", 24),
+        ],
+    )
+    def test_uses_measured_memory_and_preserves_model_generation(
+        self, product, memory_mib, name, expected_gib
+    ):
         assert get_nvidia_gpu_from_node_labels(
-            {"nvidia.com/gpu.product": "A100-SXM4-40GB"}
-        ) == Gpu(vendor=AcceleratorVendor.NVIDIA, name="A100", memory_mib=40 * 1024)
+            {"nvidia.com/gpu.product": product, "nvidia.com/gpu.memory": str(memory_mib)}
+        ) == Gpu(vendor=AcceleratorVendor.NVIDIA, name=name, memory_mib=expected_gib * 1024)
 
-        assert get_nvidia_gpu_from_node_labels(
-            {"nvidia.com/gpu.product": "A100-SXM4-80GB"}
-        ) == Gpu(vendor=AcceleratorVendor.NVIDIA, name="A100", memory_mib=80 * 1024)
+    @pytest.mark.parametrize("memory", [None, "", "invalid", "0", "-1"])
+    def test_warns_and_returns_none_if_memory_is_missing_or_invalid(self, memory, caplog):
+        labels = {"nvidia.com/gpu.product": "NVIDIA-A100"}
+        if memory is not None:
+            labels["nvidia.com/gpu.memory"] = memory
+        assert get_nvidia_gpu_from_node_labels(labels) is None
+        assert "Missing or invalid nvidia.com/gpu.memory" in caplog.text
+
+    @pytest.mark.parametrize(
+        "product,name,memory_mib,warning",
+        [
+            ("NVIDIA-Future-GPU", "FutureGPU", 12345, "Unknown GPU FutureGPU"),
+            ("NVIDIA-GeForce-RTX-4090", "RTX4090", 49140, "no registered capacity matches"),
+        ],
+    )
+    def test_warns_and_preserves_unresolved_measured_memory(
+        self, product, name, memory_mib, warning, caplog
+    ):
+        gpu = get_nvidia_gpu_from_node_labels(
+            {"nvidia.com/gpu.product": product, "nvidia.com/gpu.memory": str(memory_mib)},
+            node_name="gpu-node",
+        )
+        assert gpu == Gpu(vendor=AcceleratorVendor.NVIDIA, name=name, memory_mib=memory_mib)
+        assert warning in caplog.text
+        assert "provider=kubernetes, node=gpu-node" in caplog.text
 
 
 class TestGetAMDGPUFromNodeLabels:

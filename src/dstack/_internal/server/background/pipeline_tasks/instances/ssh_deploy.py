@@ -135,7 +135,9 @@ async def add_ssh_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         return result
 
-    instance_type = host_info_to_instance_type(host_info, arch)
+    instance_type = host_info_to_instance_type(
+        host_info, arch, context=f"provider=ssh, instance={fmt(instance_model)}"
+    )
     try:
         instance_network, internal_ip = _resolve_ssh_instance_network(instance_model, host_info)
     except _SSHInstanceNetworkResolutionError as exc:

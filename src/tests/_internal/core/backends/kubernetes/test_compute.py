@@ -1,7 +1,15 @@
 from unittest.mock import MagicMock, patch
 
-from dstack._internal.core.backends.kubernetes.compute import KubernetesCompute
+import pytest
+from kubernetes.client import V1Node, V1NodeSpec, V1NodeStatus, V1ObjectMeta
+
+from dstack._internal.core.backends.kubernetes.compute import (
+    KubernetesCompute,
+    _get_nvidia_gpu_node_affinity,
+)
 from dstack._internal.core.backends.kubernetes.models import KubeconfigConfig, KubernetesConfig
+from dstack._internal.core.backends.kubernetes.resources import get_instance_offer_from_node
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -13,6 +21,63 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
+
+
+class TestGetNvidiaGpuNodeAffinity:
+    def test_memory_requirement_is_preserved_from_offer_to_node_selection(self):
+        nodes = [
+            _gpu_node("NVIDIA-RTX-A2000", "6144"),
+            _gpu_node("NVIDIA-RTX-A2000", "12288"),
+        ]
+        offers = [get_instance_offer_from_node(node, "ctx") for node in nodes]
+        assert [offer.instance.resources.gpus[0].memory_mib for offer in offers] == [6144, 12288]
+        assert all(len(offer.instance.resources.gpus) == 2 for offer in offers)
+
+        affinity = _get_nvidia_gpu_node_affinity(ResourcesSpec(gpu="A2000:12GB").gpu, nodes)
+        terms = affinity.required_during_scheduling_ignored_during_execution.node_selector_terms
+        assert len(terms) == 1
+        assert {rule.key: rule.values for rule in terms[0].match_expressions} == {
+            "nvidia.com/gpu.product": ["NVIDIA-RTX-A2000"],
+            "nvidia.com/gpu.memory": ["12288"],
+        }
+
+    def test_product_and_memory_pairs_cannot_be_combined_across_nodes(self):
+        nodes = [_gpu_node("A100-SXM4-40GB", "39538"), _gpu_node("A100-SXM4-80GB", "80896")]
+        affinity = _get_nvidia_gpu_node_affinity(ResourcesSpec(gpu="A100").gpu, nodes)
+        terms = affinity.required_during_scheduling_ignored_during_execution.node_selector_terms
+        assert [{rule.key: rule.values for rule in term.match_expressions} for term in terms] == [
+            {
+                "nvidia.com/gpu.product": ["A100-SXM4-40GB"],
+                "nvidia.com/gpu.memory": ["39538"],
+            },
+            {
+                "nvidia.com/gpu.product": ["A100-SXM4-80GB"],
+                "nvidia.com/gpu.memory": ["80896"],
+            },
+        ]
+
+    def test_does_not_select_a_smaller_capacity(self):
+        with pytest.raises(ComputeError, match="no matching GPU labels"):
+            _get_nvidia_gpu_node_affinity(
+                ResourcesSpec(gpu="A2000:12GB").gpu, [_gpu_node("NVIDIA-RTX-A2000", "6144")]
+            )
+
+    def test_missing_product_warns_when_a_node_has_gpu_resources(self, caplog):
+        node = _gpu_node("", "6144")
+        offer = get_instance_offer_from_node(node, "ctx")
+        assert offer.instance.resources.gpus == []
+        assert "GPU resource found, but failed to detect its model or memory" in caplog.text
+
+
+def _gpu_node(product: str, memory_mib: str) -> V1Node:
+    return V1Node(
+        metadata=V1ObjectMeta(
+            name="gpu-node",
+            labels={"nvidia.com/gpu.product": product, "nvidia.com/gpu.memory": memory_mib},
+        ),
+        spec=V1NodeSpec(),
+        status=V1NodeStatus(allocatable={"cpu": "8", "memory": "64Gi", "nvidia.com/gpu": "2"}),
+    )
 
 
 def _compute() -> KubernetesCompute:

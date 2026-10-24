@@ -36,6 +36,12 @@ class TestGPUModelFromString:
             vendor=NVIDIA, name="H100", memory_mib=80 * 1024
         )
 
+    @pytest.mark.parametrize("spec", ["P100", "nvidia:P100"])
+    def test_p100_without_memory_keeps_existing_capacity(self, spec):
+        assert GPUModel.from_string(spec) == GPUModel(
+            vendor=NVIDIA, name="P100", memory_mib=16 * 1024
+        )
+
     def test_name_only_looks_up_amd(self):
         assert GPUModel.from_string("MI300X") == GPUModel(
             vendor=AMD, name="MI300X", memory_mib=192 * 1024

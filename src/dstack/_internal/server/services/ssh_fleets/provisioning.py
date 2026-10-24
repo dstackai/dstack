@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import Any, Dict, Generator, List, Optional
 
 import paramiko
-from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
+from gpuhunt import AcceleratorVendor, get_gpu_memory_gib
 
 from dstack._internal.core.backends.base.authorized_keys import (
     get_add_authorized_keys_script,
@@ -265,7 +265,9 @@ def _get_shim_healthcheck(client: paramiko.SSHClient) -> Optional[str]:
     return out
 
 
-def host_info_to_instance_type(host_info: Dict[str, Any], arch: GoArchType) -> InstanceType:
+def host_info_to_instance_type(
+    host_info: Dict[str, Any], arch: GoArchType, *, context: Optional[str] = None
+) -> InstanceType:
     gpu_count = host_info.get("gpu_count", 0)
     if gpu_count > 0:
         gpu_vendor = AcceleratorVendor.cast(host_info.get("gpu_vendor", "nvidia"))
@@ -283,7 +285,10 @@ def host_info_to_instance_type(host_info: Dict[str, Any], arch: GoArchType) -> I
         else:
             # newer shim versions report gpu_memory as an integer
             gpu_memory_mib = float(gpu_memory_mib)
-        gpu_memory_mib = correct_gpu_memory_gib(gpu_name, gpu_memory_mib) * 1024
+        gpu_memory_mib = int(
+            get_gpu_memory_gib(gpu_name, gpu_memory_mib / 1024, context=context or "provider=ssh")
+            * 1024
+        )
         gpus = [Gpu(vendor=gpu_vendor, name=gpu_name, memory_mib=gpu_memory_mib)] * gpu_count
     else:
         gpus = []
