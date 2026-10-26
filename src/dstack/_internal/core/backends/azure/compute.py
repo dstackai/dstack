@@ -246,9 +246,12 @@ class AzureCompute(
 
     def list_resource_groups(self) -> ResourceListing:
         """
-        Lists VMs tagged with `provider_ref` across all locations of the resource group.
-        Groups contain only VMs since Azure deletes the OS disk, NIC, and public IP created
-        with a VM together with the VM.
+        Lists dstack resource groups (`ListedResourceGroup`) for orphan cleanup.
+        Not related to Azure resource groups.
+
+        Each group is a VM tagged with `provider_ref`, listed across all locations of the
+        configured Azure resource group. Groups contain only VMs since Azure deletes the OS disk,
+        NIC, and public IP created with a VM together with the VM.
         """
         try:
             vms = list(
@@ -280,6 +283,10 @@ class AzureCompute(
         return ResourceListing(resource_groups=resource_groups)
 
     def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        """
+        Deletes the VM of a dstack resource group (`ListedResourceGroup`).
+        Not related to Azure resource groups.
+        """
         try:
             _terminate_instance(
                 compute_client=self._compute_client,
