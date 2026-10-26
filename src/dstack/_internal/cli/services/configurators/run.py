@@ -333,6 +333,7 @@ class BaseRunConfigurator(
                 console.print("Stopped")
             except KeyboardInterrupt:
                 abort_at_exit = True
+                raise
         finally:
             run.detach()
             if abort_at_exit:

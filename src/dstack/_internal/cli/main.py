@@ -102,6 +102,20 @@ def main():
         error_console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
         sys.exit(1)
+    except KeyboardInterrupt:
+        error_console.print("\nInterrupted")
+        logger.debug("Interrupted", exc_info=True)
+        # Re-raise instead of exiting with an error code: on an uncaught KeyboardInterrupt,
+        # Python shuts down normally (incl. atexit) and then kills itself with SIGINT,
+        # so that a parent shell sees the interrupt and stops, e.g., a script loop.
+        sys.excepthook = _excepthook_without_keyboard_interrupt
+        raise
+
+
+def _excepthook_without_keyboard_interrupt(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        return
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
 
 if __name__ == "__main__":

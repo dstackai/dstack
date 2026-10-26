@@ -3,9 +3,11 @@ import json
 import os
 import uuid
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from pydantic import ValidationError
+from rich.prompt import Confirm
 
 from dstack._internal.cli.models.preset_agent import (
     PresetAgentInfo,
@@ -30,6 +32,7 @@ from dstack._internal.cli.services.presets.create import (
     _print_fleet_offers,
     _save_final_report_copy,
     _stop_active_session_runs,
+    _stop_or_detach_agent_session,
     _suspend_agent_session,
     create_preset,
     follow_preset,
@@ -964,6 +967,35 @@ class TestInterruptAndResume:
         output = capsys.readouterr().out
         assert "dstack preset resume" in output
         assert sessions[0].name in output
+
+    def test_interrupt_at_stop_prompt_stops_agent(self, tmp_path, monkeypatch):
+        session_dir = tmp_path / "ab12cd34"
+        session_dir.mkdir()
+        session = PresetSession(path=session_dir, preset_id="ab12cd34")
+        # A live agent: this very process.
+        session.write_state(
+            get_session_state(
+                run=get_session_run(
+                    session_process=PresetSessionProcess(pid=os.getpid(), started_at=None)
+                )
+            )
+        )
+        stopped = []
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create.terminate_agent_process",
+            lambda process: stopped.append("terminate"),
+        )
+        monkeypatch.setattr(
+            "dstack._internal.cli.services.presets.create._stop_active_session_runs",
+            lambda api, session: stopped.append("stop_runs"),
+        )
+        monkeypatch.setattr(Confirm, "ask", Mock(side_effect=KeyboardInterrupt))
+
+        _stop_or_detach_agent_session(session, SimpleNamespace())
+
+        assert stopped == ["terminate", "stop_runs"]
+        state = json.loads((session_dir / "session.json").read_text())
+        assert state["status"] == "interrupted"
 
     def test_suspend_scrubs_workspace_token(self, tmp_path, capsys):
         session_dir = tmp_path / "ab12cd34"

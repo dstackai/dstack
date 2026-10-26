@@ -33,10 +33,11 @@ def select_default_project(
         default_project: Currently default project, if any.
 
     Returns:
-        Selected project configuration, or None if cancelled.
+        Selected project configuration.
 
     Raises:
         CLIError: If `is_project_menu_supported` is False or `project_configs` is empty.
+        KeyboardInterrupt: If the selection is cancelled.
     """
     if not is_project_menu_supported:
         raise CLIError("Interactive menu is not supported on this platform")
@@ -61,7 +62,7 @@ def select_default_project(
         default=default_value,  # pyright: ignore[reportArgumentType]
         qmark="",
         instruction="(↑↓ Enter)",
-    ).ask()
+    ).unsafe_ask()
 
     if selected_index is not None and isinstance(selected_index, int):
         return project_configs[selected_index]

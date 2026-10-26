@@ -1,7 +1,6 @@
 import io
 import re
 import subprocess
-import sys
 import time
 from dataclasses import dataclass
 from typing import Annotated, BinaryIO, Callable, Dict, Optional, Union, cast
@@ -374,15 +373,11 @@ def _interactive_git_proc(
 
 def _repo_diff_verbose(repo: git.Repo, repo_hash: str, warning_time: float = 5) -> bytes:
     collector = _DiffCollector(warning_time)
-    try:
-        _interactive_git_proc(repo.git.diff(repo_hash, binary=True, as_process=True), collector)
-        for filename in repo.untracked_files:
-            _interactive_git_proc(
-                repo.git.diff("/dev/null", filename, no_index=True, binary=True, as_process=True),
-                collector,
-                ignore_status=True,
-            )
-        return collector.get()
-    except KeyboardInterrupt:
-        print("\nAborted")
-        sys.exit(1)
+    _interactive_git_proc(repo.git.diff(repo_hash, binary=True, as_process=True), collector)
+    for filename in repo.untracked_files:
+        _interactive_git_proc(
+            repo.git.diff("/dev/null", filename, no_index=True, binary=True, as_process=True),
+            collector,
+            ignore_status=True,
+        )
+    return collector.get()

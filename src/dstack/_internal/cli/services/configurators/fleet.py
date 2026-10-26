@@ -264,7 +264,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     fleet = self.api.client.fleets.get(self.api.project, fleet.name)
         except KeyboardInterrupt:
-            if confirm_ask("Delete the fleet before exiting?"):
+            if not command_args.yes and confirm_ask("Delete the fleet before exiting?"):
                 with console.status("Deleting fleet..."):
                     self.api.client.fleets.delete(
                         project_name=self.api.project, names=[fleet.name]
