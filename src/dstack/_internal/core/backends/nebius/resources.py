@@ -2,11 +2,11 @@ import logging
 import re
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
 from collections.abc import Container as ContainerT
-from collections.abc import Generator, Iterable, Sequence
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -16,8 +16,11 @@ from nebius.api.nebius.billing.v1 import (
     ComputeInstanceSpecV1,
     CreatePricingPolicyRequest,
     DeletePricingPolicyRequest,
+    GetPricingPolicyRequest,
+    ListPricingPoliciesRequest,
     MaxPriceV1,
     PricingMethod,
+    PricingPolicy,
     PricingPolicyServiceClient,
     PricingPolicySpec,
 )
@@ -30,6 +33,7 @@ from nebius.api.nebius.compute.v1 import (
     DeleteDiskRequest,
     DeleteGpuClusterRequest,
     DeleteInstanceRequest,
+    Disk,
     DiskServiceClient,
     DiskSpec,
     ExistingDisk,
@@ -43,6 +47,8 @@ from nebius.api.nebius.compute.v1 import (
     InstanceServiceClient,
     InstanceSpec,
     IPAddress,
+    ListDisksRequest,
+    ListInstancesRequest,
     NetworkInterfaceSpec,
     PreemptibleSpec,
     PublicIPAddress,
@@ -87,6 +93,7 @@ REQUEST_AUTH_OPTIONS = {
     OPTION_RENEW_SYNCHRONOUS: "true",
     OPTION_RENEW_REQUEST_TIMEOUT: "5",
 }
+LIST_PAGE_SIZE = 100
 
 # disables log messages about errors such as invalid creds or expired timeouts
 logging.getLogger("nebius").setLevel(logging.CRITICAL)
@@ -311,6 +318,19 @@ def delete_disk(sdk: SDK, disk_id: str) -> None:
     )
 
 
+def list_disks(sdk: SDK, project_id: str) -> list[Disk]:
+    client = DiskServiceClient(sdk)
+    return _list_all_pages(
+        lambda page_token: client.list(
+            ListDisksRequest(
+                parent_id=project_id, page_size=LIST_PAGE_SIZE, page_token=page_token
+            ),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
+
+
 def create_pricing_policy(
     sdk: SDK, name: str, project_id: str, platform: str, max_price: str
 ) -> SDKOperation[Operation]:
@@ -329,10 +349,33 @@ def create_pricing_policy(
     )
 
 
+def get_pricing_policy(sdk: SDK, pricing_policy_id: str) -> PricingPolicy:
+    return LOOP.await_(
+        PricingPolicyServiceClient(sdk).get(
+            GetPricingPolicyRequest(id=pricing_policy_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
+
+
 def delete_pricing_policy(sdk: SDK, pricing_policy_id: str) -> None:
     LOOP.await_(
         PricingPolicyServiceClient(sdk).delete(
             DeletePricingPolicyRequest(id=pricing_policy_id),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
+
+
+def list_pricing_policies(sdk: SDK, project_id: str) -> list[PricingPolicy]:
+    client = PricingPolicyServiceClient(sdk)
+    return _list_all_pages(
+        lambda page_token: client.list(
+            ListPricingPoliciesRequest(
+                parent_id=project_id, page_size=LIST_PAGE_SIZE, page_token=page_token
+            ),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
@@ -420,6 +463,19 @@ def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
     )
 
 
+def list_instances(sdk: SDK, project_id: str) -> list[Instance]:
+    client = InstanceServiceClient(sdk)
+    return _list_all_pages(
+        lambda page_token: client.list(
+            ListInstancesRequest(
+                parent_id=project_id, page_size=LIST_PAGE_SIZE, page_token=page_token
+            ),
+            per_retry_timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
+
+
 def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOperation[Operation]:
     with wrap_capacity_errors():
         return LOOP.await_(
@@ -481,3 +537,17 @@ def is_valid_resource_name(name: str) -> bool:
 def is_valid_label_value(value: str) -> bool:
     match = re.match(LABEL_VALUE_PATTERN, value)
     return match is not None
+
+
+def _list_all_pages(list_page: Callable[[str], Awaitable[Any]]) -> list:
+    """
+    Calls `list_page` with the next page token until all pages are fetched.
+    """
+    items = []
+    page_token = ""
+    while True:
+        response = LOOP.await_(list_page(page_token))
+        items.extend(response.items)
+        page_token = response.next_page_token
+        if not page_token:
+            return items
