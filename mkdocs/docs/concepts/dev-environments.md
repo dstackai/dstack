@@ -298,6 +298,9 @@ ide: vscode
 
 </div>
 
+??? info "Registry rate limits"
+    The `dstack` server queries the Docker registry for details about your custom image, such as its default user and entrypoint. If you are submitting many jobs and hitting the registry’s rate limit, try setting [`registry_auth`](../reference/dstack.yml/dev-environment.md#registry_auth), as many registries offer higher rate limits for authenticated users.
+
 ### Environment variables
 
 <div editor-title=".dstack.yml"> 
