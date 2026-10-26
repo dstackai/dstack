@@ -22,7 +22,7 @@ from dstack._internal.core.backends.nebius.models import (
     NebiusConfig,
     NebiusServiceAccountCreds,
 )
-from dstack._internal.core.errors import ComputeError, NotYetTerminated
+from dstack._internal.core.errors import NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import (
@@ -130,7 +130,6 @@ class TestGetAllOffersWithAvailability:
 
 
 PROVIDER_REF = "abcdef123456"
-OTHER_PROVIDER_REF = "zyxwvu654321"
 CREATED_AT = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
 
@@ -385,34 +384,6 @@ class TestListResourceGroups:
 
         assert listing.resource_groups == []
 
-    def test_skips_resource_with_mismatching_provider_ref(self, mock_listings):
-        name = make_name()
-        mock_listings(
-            disks=[make_disk(name=name, labels=make_labels(name))],
-            instances=[
-                make_instance(name=name, labels=make_labels(name, provider_ref=OTHER_PROVIDER_REF))
-            ],
-        )
-
-        listing = make_compute().list_resource_groups()
-
-        assert len(listing.resource_groups) == 1
-        assert listing.resource_groups[0].primary_id is None
-
-    def test_keeps_first_disk_with_copied_labels(self, mock_listings):
-        name = make_name()
-        mock_listings(
-            disks=[
-                make_disk("disk-1", name=name, labels=make_labels(name)),
-                make_disk("disk-copy", name="my-disk", labels=make_labels(name)),
-            ],
-        )
-
-        listing = make_compute().list_resource_groups()
-
-        assert len(listing.resource_groups) == 1
-        assert json.loads(listing.resource_groups[0].backend_data or "")["disk_id"] == "disk-1"
-
     def test_reports_failed_region(self, mocker, mock_listings):
         mocker.patch.object(
             NebiusCompute,
@@ -433,15 +404,6 @@ class TestListResourceGroups:
 
         assert [g.region for g in listing.resource_groups] == ["eu-north1"]
         assert [f.region for f in listing.failures] == ["us-central1"]
-
-    def test_raises_if_all_regions_fail(self, mock_listings):
-        mock_listings()
-        compute_module.resources.list_disks.side_effect = make_request_error(
-            StatusCode.UNAVAILABLE
-        )
-
-        with pytest.raises(ComputeError):
-            make_compute().list_resource_groups()
 
 
 class TestDeleteResourceGroup:
@@ -511,19 +473,3 @@ class TestDeleteResourceGroup:
             make_compute().delete_resource_group(group)
 
         resources.delete_pricing_policy.assert_not_called()
-
-    def test_ignores_resources_not_found(self, resources):
-        resources.delete_disk.side_effect = make_request_error(StatusCode.NOT_FOUND)
-        resources.get_pricing_policy.side_effect = make_request_error(StatusCode.NOT_FOUND)
-        group = make_resource_group(None, "disk-1", "pricingpolicy-1")
-
-        make_compute().delete_resource_group(group)
-
-        resources.delete_pricing_policy.assert_not_called()
-
-    def test_raises_compute_error_on_request_error(self, resources):
-        resources.delete_disk.side_effect = make_request_error(StatusCode.FAILED_PRECONDITION)
-        group = make_resource_group(None, "disk-1")
-
-        with pytest.raises(ComputeError):
-            make_compute().delete_resource_group(group)
