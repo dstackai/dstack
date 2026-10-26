@@ -1,6 +1,5 @@
 import argparse
 import shlex
-import sys
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
@@ -71,37 +70,33 @@ class ApplyCommand(APIBaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
-        try:
-            if args.help is not NOTSET:
-                if args.help is not None:
-                    configurator_class = get_apply_configurator_class(
-                        ApplyConfigurationType(args.help)
-                    )
-                    configurator_class.register_args(self._parser)
-                    self._parser.print_help()
-                    return
-                self._parser.print_help()
-                console.print(
-                    "\nType `dstack apply -h CONFIGURATION_TYPE` to see configuration-specific options.\n"
+        if args.help is not NOTSET:
+            if args.help is not None:
+                configurator_class = get_apply_configurator_class(
+                    ApplyConfigurationType(args.help)
                 )
+                configurator_class.register_args(self._parser)
+                self._parser.print_help()
                 return
-
-            super()._command(args)
-            if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
-                raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
-            configuration_path, configuration = load_apply_configuration(args.configuration_file)
-            configurator_class = get_apply_configurator_class(configuration.type)
-            configurator = configurator_class(api_client=self.api)
-            configurator_parser = configurator.get_parser()
-            configurator_args, unknown_args = configurator_parser.parse_known_args(args.extra_args)
-            if unknown_args:
-                raise CLIError(f"Unrecognized arguments: {shlex.join(unknown_args)}")
-            configurator.apply_configuration(
-                conf=configuration,
-                configuration_path=configuration_path,
-                command_args=args,
-                configurator_args=configurator_args,
+            self._parser.print_help()
+            console.print(
+                "\nType `dstack apply -h CONFIGURATION_TYPE` to see configuration-specific options.\n"
             )
-        except KeyboardInterrupt:
-            console.print("\nOperation interrupted by user. Exiting...")
-            sys.exit(0)
+            return
+
+        super()._command(args)
+        if not args.yes and args.configuration_file == APPLY_STDIN_NAME:
+            raise CLIError("Cannot read configuration from stdin if -y/--yes is not specified")
+        configuration_path, configuration = load_apply_configuration(args.configuration_file)
+        configurator_class = get_apply_configurator_class(configuration.type)
+        configurator = configurator_class(api_client=self.api)
+        configurator_parser = configurator.get_parser()
+        configurator_args, unknown_args = configurator_parser.parse_known_args(args.extra_args)
+        if unknown_args:
+            raise CLIError(f"Unrecognized arguments: {shlex.join(unknown_args)}")
+        configurator.apply_configuration(
+            conf=configuration,
+            configuration_path=configuration_path,
+            command_args=args,
+            configurator_args=configurator_args,
+        )

@@ -113,15 +113,11 @@ class LoginCommand(BaseCommand):
         return provider
 
     def _prompt_url(self) -> str:
-        try:
-            url = UrlPrompt.ask(
-                "Enter the server URL",
-                default="https://sky.dstack.ai",
-                console=console,
-            )
-        except KeyboardInterrupt:
-            console.print("\nCancelled by user")
-            sys.exit(1)
+        url = UrlPrompt.ask(
+            "Enter the server URL",
+            default="https://sky.dstack.ai",
+            console=console,
+        )
         if url is None:
             raise CLIError("URL is required")
         return url
@@ -135,9 +131,7 @@ class LoginCommand(BaseCommand):
             choices=choices,
             qmark="",
             instruction="(↑↓ Enter)",
-        ).ask()
-        if selected_provider is None:
-            sys.exit(1)
+        ).unsafe_ask()
         return selected_provider
 
     def _configure_projects(
