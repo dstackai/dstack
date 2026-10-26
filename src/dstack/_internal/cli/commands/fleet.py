@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 from uuid import UUID
 
@@ -120,14 +121,14 @@ class FleetCommand(APIBaseCommand):
                 "The [code]<project>/<fleet>[/] format is not supported for fleet names."
                 " Can only delete fleets or instances owned by the current project"
             )
-            exit(1)
+            sys.exit(1)
         name = args.name.name
 
         try:
             self.api.client.fleets.get(project_name=self.api.project, name=name)
         except ResourceNotExistsError:
             console.print(f"Fleet [code]{name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
 
         if not args.instances:
             if not args.yes and not confirm_ask(f"Delete the fleet [code]{name}[/]?"):
@@ -174,6 +175,6 @@ class FleetCommand(APIBaseCommand):
                 )
         except ResourceNotExistsError:
             error_console.print(f"Fleet [code]{args.name or args.id}[/] not found")
-            exit(1)
+            sys.exit(1)
 
         print(fleet.model_dump_json(indent=2))

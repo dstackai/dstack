@@ -121,7 +121,7 @@ class LoginCommand(BaseCommand):
             )
         except KeyboardInterrupt:
             console.print("\nCancelled by user")
-            raise SystemExit(1)
+            sys.exit(1)
         if url is None:
             raise CLIError("URL is required")
         return url
@@ -137,7 +137,7 @@ class LoginCommand(BaseCommand):
             instruction="(↑↓ Enter)",
         ).ask()
         if selected_provider is None:
-            raise SystemExit(1)
+            sys.exit(1)
         return selected_provider
 
     def _configure_projects(

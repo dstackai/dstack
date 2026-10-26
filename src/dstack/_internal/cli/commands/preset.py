@@ -238,7 +238,7 @@ class PresetCommand(BaseCommand):
             args.subfunc(args)
         except KeyboardInterrupt:
             console.print("\nOperation interrupted by user. Exiting...")
-            exit(0)
+            sys.exit(0)
 
     def _reconcile(self) -> None:
         """Finalize any detached/orphaned session whose agent already completed,

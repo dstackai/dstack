@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 
 from rich.table import Table
@@ -160,7 +161,7 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             console.print(
                 f"\n[error]Provisioning failed. Error: {gateway.status_message or 'unknown'}[/]"
             )
-            exit(1)
+            sys.exit(1)
 
     def delete_configuration(
         self,
@@ -170,13 +171,13 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no gateway to delete[/]")
-            exit(1)
+            sys.exit(1)
 
         try:
             self.api.client.gateways.get(project_name=self.api.project, gateway_name=conf.name)
         except ResourceNotExistsError:
             console.print(f"Gateway [code]{conf.name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
 
         if not command_args.yes and not confirm_ask(f"Delete the gateway [code]{conf.name}[/]?"):
             console.print("\nExiting...")

@@ -10,6 +10,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 from fnmatch import fnmatch
 from functools import cache
 
@@ -58,7 +59,7 @@ def process_file(file: File):
 def main():
     if os.environ.get(DISABLE_ENV):
         logger.warning("CLI reference generation is disabled")
-        exit()
+        sys.exit()
 
     logger.info("Generating CLI reference...")
     # Sequential processing take > 10s

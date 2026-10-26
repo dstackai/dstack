@@ -229,7 +229,7 @@ class BaseRunConfigurator(
                 f" Use [code]-p[/code] in [code]dstack apply[/code] to override the local"
                 f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
             )
-            exit(1)
+            sys.exit(1)
 
         if command_args.detach:
             detach_message = f"Run [code]{run.name}[/] submitted, detaching..."
@@ -286,14 +286,14 @@ class BaseRunConfigurator(
                                 f" Use [code]-p[/code] in [code]dstack attach[/code] to override the local"
                                 f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
                             )
-                            exit(1)
+                            sys.exit(1)
                         if attached:
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
                         else:
                             console.print("[error]Failed to attach, exiting...[/]")
-                            exit(1)
+                            sys.exit(1)
                     finally:
                         run.detach()
 
@@ -308,14 +308,14 @@ class BaseRunConfigurator(
                         break
                     if run.status.is_finished():
                         print_finished_message(run)
-                        exit(get_run_exit_code(run))
+                        sys.exit(get_run_exit_code(run))
                     time.sleep(1)
                 if not reattach:
                     console.print(
                         "[error]Lost run connection. Timed out waiting for run final status."
                         " Check `dstack ps` to see if it's done or failed."
                     )
-                    exit(1)
+                    sys.exit(1)
         except KeyboardInterrupt:
             try:
                 if command_args.yes or not confirm_ask(
@@ -348,7 +348,7 @@ class BaseRunConfigurator(
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no run to delete[/]")
-            exit(1)
+            sys.exit(1)
         try:
             self.api.client.runs.get(
                 project_name=self.api.project,
@@ -356,7 +356,7 @@ class BaseRunConfigurator(
             )
         except ResourceNotExistsError:
             console.print(f"Run [code]{conf.name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
         if not command_args.yes and not confirm_ask(f"Delete the run [code]{conf.name}[/]?"):
             console.print("\nExiting...")
             return

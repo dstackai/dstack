@@ -1,6 +1,7 @@
 import io
 import re
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from typing import Annotated, BinaryIO, Callable, Dict, Optional, Union, cast
@@ -384,4 +385,4 @@ def _repo_diff_verbose(repo: git.Repo, repo_hash: str, warning_time: float = 5) 
         return collector.get()
     except KeyboardInterrupt:
         print("\nAborted")
-        exit(1)
+        sys.exit(1)

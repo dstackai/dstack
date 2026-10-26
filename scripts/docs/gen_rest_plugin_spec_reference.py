@@ -5,6 +5,7 @@ Generates OpenAPI schema from an example REST plugin.
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 
 from dstack._internal.settings import DSTACK_VERSION
@@ -13,7 +14,7 @@ logger = logging.getLogger("mkdocs.plugins.dstack.rest_plugin_schema")
 disable_env = "DSTACK_DOCS_DISABLE_REST_PLUGIN_SPEC_REFERENCE"
 if os.environ.get(disable_env):
     logger.warning("REST plugin spec reference generation is disabled")
-    exit(0)
+    sys.exit(0)
 
 try:
     from example_plugin_server.main import app
@@ -23,7 +24,7 @@ except ImportError:
         " The REST Plugin API won't be generated."
         " Run 'uv pip install examples/plugins/example_plugin_server' to install 'example_plugin_server'."
     )
-    exit(0)
+    sys.exit(0)
 
 app.title = "REST Plugin OpenAPI Spec"
 app.servers = [

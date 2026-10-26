@@ -1,4 +1,5 @@
 import argparse
+import sys
 from uuid import UUID
 
 from dstack._internal.cli.commands import APIBaseCommand
@@ -63,6 +64,6 @@ class RunCommand(APIBaseCommand):
                 run = self.api.client.runs.get(project_name=self.api.project, run_name=args.name)
         except ResourceNotExistsError:
             error_console.print(f"Run [code]{args.name or args.id}[/] not found")
-            exit(1)
+            sys.exit(1)
 
         print(run.model_dump_json(indent=2))

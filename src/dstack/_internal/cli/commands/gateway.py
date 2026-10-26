@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 
 from rich.live import Live
@@ -139,7 +140,7 @@ class GatewayCommand(APIBaseCommand):
                 "The [code]<project>/<gateway>[/] format is not supported for gateway names."
                 " Can only delete gateways owned by the current project"
             )
-            exit(1)
+            sys.exit(1)
         name = args.name.name
         gateway = self.api.client.gateways.get(self.api.project, name)
         print_gateways_table([gateway], current_project=self.api.project)
@@ -164,7 +165,7 @@ class GatewayCommand(APIBaseCommand):
                         " when [code]--domain[/] is passed."
                         " Can only update gateways owned by the current project"
                     )
-                    exit(1)
+                    sys.exit(1)
                 self.api.client.gateways.set_wildcard_domain(
                     self.api.project, args.name.name, args.domain
                 )

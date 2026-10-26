@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 
 from rich.live import Live
@@ -95,7 +96,7 @@ class VolumeCommand(APIBaseCommand):
             self.api.client.volumes.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
             console.print(f"Volume [code]{args.name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
 
         if not args.yes and not confirm_ask(f"Delete the volume [code]{args.name}[/]?"):
             console.print("\nExiting...")
@@ -112,6 +113,6 @@ class VolumeCommand(APIBaseCommand):
             volume = self.api.client.volumes.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
             error_console.print("Volume not found")
-            exit(1)
+            sys.exit(1)
 
         print(volume.model_dump_json(indent=2))
