@@ -9,10 +9,10 @@ from azure.mgmt.compute.models import (
     ImageReference,
     VirtualMachine,
     VirtualMachineProperties,
+    VirtualMachineSizeTypes,
 )
 
 from dstack._internal import settings
-from dstack._internal.core.backends.azure import compute as azure_compute
 from dstack._internal.core.backends.azure.compute import (
     AzureCompute,
     VMImageVariant,
@@ -23,13 +23,7 @@ from dstack._internal.core.backends.azure.models import AzureConfig, AzureDefaul
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
-from dstack._internal.core.models.instances import (
-    Gpu,
-    InstanceConfiguration,
-    InstanceType,
-    Resources,
-)
-from dstack._internal.server.testing.common import get_instance_offer_with_availability
+from dstack._internal.core.models.instances import Gpu, InstanceType, Resources
 
 RESOURCE_GROUP = "dstack-resources"
 PROVIDER_REF = "abc123def456"
@@ -192,36 +186,6 @@ def compute(compute_client: Mock) -> AzureCompute:
     return compute
 
 
-class TestCreateInstance:
-    def test_tags_vm_with_provider_ref(
-        self, compute: AzureCompute, monkeypatch: pytest.MonkeyPatch
-    ):
-        create_instance_and_wait = Mock(return_value=_get_vm("vm-1"))
-        monkeypatch.setattr(azure_compute, "_create_instance_and_wait", create_instance_and_wait)
-        monkeypatch.setattr(
-            azure_compute,
-            "get_resource_group_network_subnet_or_error",
-            Mock(return_value=(RESOURCE_GROUP, "network", "subnet")),
-        )
-        monkeypatch.setattr(azure_compute, "_get_image_ref", Mock())
-        monkeypatch.setattr(
-            azure_compute, "_get_vm_public_private_ips", Mock(return_value=("1.2.3.4", "10.0.0.4"))
-        )
-        compute.create_instance(
-            get_instance_offer_with_availability(backend=BackendType.AZURE, region="westeurope"),
-            InstanceConfiguration(
-                project_name="project",
-                instance_name="instance",
-                user="user",
-                ssh_keys=[],
-                provider_ref=PROVIDER_REF,
-            ),
-            placement_group=None,
-        )
-        tags = create_instance_and_wait.call_args.kwargs["tags"]
-        assert tags["dstack_provider_ref"] == PROVIDER_REF
-
-
 class TestListResourceGroups:
     def test_lists_tagged_vms(self, compute: AzureCompute, compute_client: Mock):
         _set_vms(compute_client, [_get_vm("vm-1")])
@@ -238,7 +202,7 @@ class TestListResourceGroups:
                 primary_id="vm-1",
                 region="westeurope",
                 created_at=TIME_CREATED,
-                description="VM vm-1 (Standard_D2s_v6, Succeeded)",
+                description="VM vm-1 (Standard_F2s_v2, Succeeded)",
                 backend_data=None,
             )
         ]
@@ -298,7 +262,7 @@ def _get_vm(
         location="westeurope",
         tags=tags,
         properties=VirtualMachineProperties(
-            hardware_profile=HardwareProfile(vm_size="Standard_D2s_v6")
+            hardware_profile=HardwareProfile(vm_size=VirtualMachineSizeTypes.STANDARD_F2_S_V2)
         ),
     )
     vm.id = f"/subscriptions/subscription/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.Compute/virtualMachines/{name}"

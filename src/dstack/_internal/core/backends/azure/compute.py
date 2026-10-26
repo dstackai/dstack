@@ -876,7 +876,11 @@ def _get_vm_provider_ref(vm: VirtualMachine) -> Optional[str]:
 def _get_vm_size(vm: VirtualMachine) -> Optional[str]:
     if vm.hardware_profile is None:
         return None
-    return vm.hardware_profile.vm_size
+    vm_size = vm.hardware_profile.vm_size
+    # Sizes known to the SDK are `VirtualMachineSizeTypes`, which format as enum names
+    if isinstance(vm_size, enum.Enum):
+        return vm_size.value
+    return vm_size
 
 
 def _terminate_instance(
