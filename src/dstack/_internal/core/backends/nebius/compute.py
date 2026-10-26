@@ -2,26 +2,33 @@ import json
 import random
 import shlex
 import time
+from dataclasses import dataclass
 from decimal import ROUND_CEILING, Decimal
 from functools import cached_property
 from typing import List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
-from nebius.api.nebius.common.v1 import Operation
+from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
+from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
+from nebius.api.nebius.compute.v1 import Disk, DiskStatus, Instance, InstanceStatus
 from nebius.sdk import SDK
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    PROVIDER_REF_TAG_KEY,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithResourceListingSupport,
     generate_unique_instance_name,
     get_user_data,
+    is_valid_provider_ref,
     merge_tags,
+    parse_provider_ref_from_name,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius import resources
@@ -32,10 +39,17 @@ from dstack._internal.core.backends.nebius.models import (
 )
 from dstack._internal.core.errors import (
     BackendError,
+    ComputeError,
     NotYetTerminated,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    OwnerType,
+    ResourceListing,
+    ResourceListingFailure,
+)
 from dstack._internal.core.models.common import (
     CoreModel,
     validate_extra_ignore,
@@ -54,6 +68,7 @@ from dstack._internal.core.models.placement import (
 )
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -88,6 +103,13 @@ SUPPORTED_PLATFORMS = [
     "cpu-d3",
     "cpu-e2",
 ]
+PROVIDER_NAME_LABEL_KEY = "dstack_provider_name"
+"""
+The label that groups resources created by one `create_instance()` call for orphan cleanup.
+Its value is the provider resource name that dstack generated for the call and that
+the disk, the pricing policy, and the instance share. Unlike the name itself, it survives
+renaming the resource.
+"""
 
 
 class NebiusCompute(
@@ -97,6 +119,7 @@ class NebiusCompute(
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     def __init__(self, config: NebiusConfig):
@@ -155,7 +178,9 @@ class NebiusCompute(
         # and the instance to enter the STARTING state. This has to be done in create_instance so
         # that we can handle quota and availability errors that may occur even after creating an
         # instance.
-        instance_name = generate_unique_instance_name(instance_config)
+        # The disk, the pricing policy, and the instance share this name. Pricing policies
+        # don't keep labels, so orphan cleanup finds them by `provider_ref` in the name.
+        instance_name = generate_unique_instance_name(instance_config, with_provider_ref=True)
         platform, preset = instance_offer.instance.name.split()
         offer_backend_data = validate_extra_ignore(
             NebiusOfferBackendData, instance_offer.backend_data
@@ -181,6 +206,9 @@ class NebiusCompute(
             resource_tags=instance_config.tags,
         )
         labels = resources.filter_invalid_labels(labels)
+        if instance_config.provider_ref is not None:
+            labels[PROVIDER_REF_TAG_KEY] = instance_config.provider_ref
+            labels[PROVIDER_NAME_LABEL_KEY] = instance_name
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
             name=instance_name,
@@ -244,15 +272,18 @@ class NebiusCompute(
             )
             _wait_for_instance(self._sdk, create_instance_op)
         except BaseException:
+            # Best-effort rollback. It may leave resources behind, e.g. the boot disk if
+            # the instance is not deleted within DELETE_INSTANCE_TIMEOUT. This is accepted:
+            # leftovers carry provider_ref in labels or names and are handled by orphan cleanup.
             if create_instance_op is not None:
                 try:
                     with resources.ignore_errors([StatusCode.NOT_FOUND]):
                         delete_instance_op = resources.delete_instance(
                             self._sdk, create_instance_op.resource_id
                         )
-                    resources.wait_for_operation(
-                        delete_instance_op, timeout=DELETE_INSTANCE_TIMEOUT
-                    )
+                        resources.wait_for_operation(
+                            delete_instance_op, timeout=DELETE_INSTANCE_TIMEOUT
+                        )
                 except Exception as e:
                     logger.exception(
                         "Could not delete instance %s: %s", create_instance_op.resource_id, e
@@ -311,30 +342,43 @@ class NebiusCompute(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         backend_data_parsed = NebiusInstanceBackendData.load(backend_data)
+        _delete_resources(
+            self._sdk,
+            instance_id=instance_id,
+            disk_id=backend_data_parsed.boot_disk_id,
+            pricing_policy_id=backend_data_parsed.pricing_policy_id,
+        )
+
+    def list_resource_groups(self) -> ResourceListing:
+        listing = ResourceListing(resource_groups=[])
+        for region, project_id in self._region_to_project_id.items():
+            try:
+                listing.resource_groups.extend(
+                    _list_resource_groups(self._sdk, region=region, project_id=project_id)
+                )
+            except RequestError as e:
+                listing.failures.append(
+                    ResourceListingFailure(
+                        backend=BackendType.NEBIUS, region=region, message=str(e)
+                    )
+                )
+        if len(listing.failures) == len(self._region_to_project_id):
+            raise ComputeError(f"Failed to list resources in all regions: {listing.failures}")
+        return listing
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        backend_data = validate_json_extra_ignore(
+            NebiusResourceGroupBackendData, get_or_error(group.backend_data)
+        )
         try:
-            instance = resources.get_instance(self._sdk, instance_id)
+            _delete_resources(
+                self._sdk,
+                instance_id=backend_data.instance_id,
+                disk_id=backend_data.disk_id,
+                pricing_policy_id=backend_data.pricing_policy_id,
+            )
         except RequestError as e:
-            if e.status.code != StatusCode.NOT_FOUND:
-                raise
-            instance = None
-        if instance is not None:
-            if instance.status.state != instance.status.InstanceState.DELETING:
-                resources.delete_instance(self._sdk, instance_id)
-                raise NotYetTerminated(
-                    "Requested instance deletion."
-                    " Will wait for deletion before deleting the boot disk."
-                    f" Instance state was: {instance.status.state.name}"
-                )
-            else:
-                raise NotYetTerminated(
-                    "Waiting for instance deletion before deleting the boot disk."
-                    f" Instance state: {instance.status.state.name}"
-                )
-        with resources.ignore_errors([StatusCode.NOT_FOUND]):
-            resources.delete_disk(self._sdk, backend_data_parsed.boot_disk_id)
-        if backend_data_parsed.pricing_policy_id is not None:
-            with resources.ignore_errors([StatusCode.NOT_FOUND]):
-                resources.delete_pricing_policy(self._sdk, backend_data_parsed.pricing_policy_id)
+            raise ComputeError(f"Failed to delete resource group {group.provider_ref}: {e}") from e
 
     def create_placement_group(
         self,
@@ -407,6 +451,14 @@ class NebiusInstanceBackendData(CoreModel):
         return validate_json_extra_ignore(cls, raw)
 
 
+class NebiusResourceGroupBackendData(CoreModel):
+    instance_id: Optional[str] = None
+    """The group's instance. It's set without `ListedResourceGroup.primary_id`
+    if the instance is being deleted."""
+    disk_id: Optional[str] = None
+    pricing_policy_id: Optional[str] = None
+
+
 class NebiusClusterBackendData(CoreModel):
     id: str
     fabric: str
@@ -453,6 +505,258 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
                 auth_options=resources.REQUEST_AUTH_OPTIONS,
             )
         )
+
+
+def _delete_resources(
+    sdk: SDK,
+    instance_id: Optional[str],
+    disk_id: Optional[str],
+    pricing_policy_id: Optional[str],
+) -> None:
+    """
+    Deletes the instance, then its boot disk and pricing policy.
+    Raises `NotYetTerminated` while the instance exists, since an attached disk can't be deleted,
+    and while a pricing policy is being created, since Nebius rejects its deletion.
+    """
+    if instance_id is not None:
+        try:
+            instance = resources.get_instance(sdk, instance_id)
+        except RequestError as e:
+            if e.status.code != StatusCode.NOT_FOUND:
+                raise
+            instance = None
+        if instance is not None:
+            if instance.status.state != InstanceStatus.InstanceState.DELETING:
+                resources.delete_instance(sdk, instance_id)
+                raise NotYetTerminated(
+                    "Requested instance deletion."
+                    " Will wait for deletion before deleting the boot disk."
+                    f" Instance state was: {instance.status.state.name}"
+                )
+            raise NotYetTerminated(
+                "Waiting for instance deletion before deleting the boot disk."
+                f" Instance state: {instance.status.state.name}"
+            )
+    if disk_id is not None:
+        with resources.ignore_errors([StatusCode.NOT_FOUND]):
+            resources.delete_disk(sdk, disk_id)
+    if pricing_policy_id is not None:
+        _delete_pricing_policy(sdk, pricing_policy_id)
+
+
+def _delete_pricing_policy(sdk: SDK, pricing_policy_id: str) -> None:
+    try:
+        pricing_policy = resources.get_pricing_policy(sdk, pricing_policy_id)
+    except RequestError as e:
+        if e.status.code == StatusCode.NOT_FOUND:
+            return
+        raise
+    if pricing_policy.status.state == PricingPolicyStatus.State.STATE_DELETING:
+        return
+    if pricing_policy.status.state == PricingPolicyStatus.State.STATE_CREATING:
+        raise NotYetTerminated(
+            f"Waiting for pricing policy {pricing_policy_id} to be created before deleting it"
+        )
+    with resources.ignore_errors([StatusCode.NOT_FOUND]):
+        resources.delete_pricing_policy(sdk, pricing_policy_id)
+
+
+def _list_resource_groups(sdk: SDK, region: str, project_id: str) -> list[ListedResourceGroup]:
+    """
+    Lists the resources of `create_instance()` calls, grouped by the name they share.
+    Instances being deleted are not listed, but their ids are kept in the groups
+    of their disks and pricing policies, so that these are deleted after the instances.
+    """
+    # Disks and pricing policies are created before their instance and deleted after it,
+    # so listing them first ensures the instance of a listed disk or pricing policy
+    # is listed too unless it's gone or created after the instances are listed.
+    # The latter is a provisioning in progress, which the server skips.
+    disks = resources.list_disks(sdk, project_id)
+    pricing_policies = resources.list_pricing_policies(sdk, project_id)
+    instances = resources.list_instances(sdk, project_id)
+
+    collector = _ProvisioningAttemptCollector()
+    for disk in disks:
+        if disk.status.state != DiskStatus.State.DELETING:
+            collector.add_disk(disk)
+    for pricing_policy in pricing_policies:
+        if pricing_policy.status.state != PricingPolicyStatus.State.STATE_DELETING:
+            collector.add_pricing_policy(pricing_policy)
+    for instance in instances:
+        collector.add_instance(instance)
+
+    resource_groups = []
+    for attempt in collector.attempts():
+        resource_group = _get_resource_group(attempt, region)
+        if resource_group is not None:
+            resource_groups.append(resource_group)
+    return resource_groups
+
+
+@dataclass
+class _ProvisioningAttempt:
+    """
+    Resources created by one `create_instance()` call.
+    """
+
+    provider_ref: str
+    instance: Optional[Instance] = None
+    disk: Optional[Disk] = None
+    pricing_policy: Optional[PricingPolicy] = None
+
+
+class _ProvisioningAttemptCollector:
+    """
+    Groups resources into `create_instance()` calls by the name these resources share.
+    Resources without a valid `provider_ref` are ignored. If labels were copied to another
+    disk or instance, only the first one listed is kept in the attempt.
+    """
+
+    def __init__(self) -> None:
+        self._attempts: dict[str, _ProvisioningAttempt] = {}
+
+    def attempts(self) -> list[_ProvisioningAttempt]:
+        return list(self._attempts.values())
+
+    def add_disk(self, disk: Disk) -> None:
+        attempt = self._get_or_add(disk.metadata, _get_attempt_key_from_labels(disk.metadata))
+        if attempt is None:
+            return
+        if attempt.disk is not None:
+            _log_duplicate_resource(disk.metadata, attempt.disk.metadata)
+            return
+        attempt.disk = disk
+
+    def add_pricing_policy(self, pricing_policy: PricingPolicy) -> None:
+        # Pricing policies don't keep labels. Their names are unique within the project,
+        # so there are no duplicates.
+        attempt = self._get_or_add(
+            pricing_policy.metadata, _get_attempt_key_from_name(pricing_policy.metadata)
+        )
+        if attempt is not None:
+            attempt.pricing_policy = pricing_policy
+
+    def add_instance(self, instance: Instance) -> None:
+        attempt = self._get_or_add(
+            instance.metadata, _get_attempt_key_from_labels(instance.metadata)
+        )
+        if attempt is None:
+            return
+        if attempt.instance is not None:
+            _log_duplicate_resource(instance.metadata, attempt.instance.metadata)
+            return
+        attempt.instance = instance
+
+    def _get_or_add(
+        self, metadata: ResourceMetadata, key: Optional[tuple[str, str]]
+    ) -> Optional[_ProvisioningAttempt]:
+        if key is None:
+            return None
+        name, provider_ref = key
+        attempt = self._attempts.setdefault(name, _ProvisioningAttempt(provider_ref=provider_ref))
+        if attempt.provider_ref != provider_ref:
+            logger.warning(
+                "Skipping Nebius resource %s of %s with provider_ref %s, expected %s",
+                metadata.id,
+                name,
+                provider_ref,
+                attempt.provider_ref,
+            )
+            return None
+        return attempt
+
+
+def _log_duplicate_resource(metadata: ResourceMetadata, kept_metadata: ResourceMetadata) -> None:
+    logger.warning(
+        "Skipping Nebius resource %s labeled with the same %s as %s",
+        metadata.id,
+        PROVIDER_NAME_LABEL_KEY,
+        kept_metadata.id,
+    )
+
+
+def _get_attempt_key_from_labels(metadata: ResourceMetadata) -> Optional[tuple[str, str]]:
+    """
+    Returns the attempt's name and `provider_ref` from the resource's labels,
+    or `None` if the resource has no valid `provider_ref` label.
+    """
+    provider_ref = metadata.labels.get(PROVIDER_REF_TAG_KEY)
+    if provider_ref is None:
+        return None
+    if not is_valid_provider_ref(provider_ref):
+        logger.warning(
+            "Skipping Nebius resource %s with invalid %s label value %r",
+            metadata.id,
+            PROVIDER_REF_TAG_KEY,
+            provider_ref,
+        )
+        return None
+    name = metadata.labels.get(PROVIDER_NAME_LABEL_KEY)
+    if name is None:
+        logger.warning(
+            "Skipping Nebius resource %s with %s label but without %s label",
+            metadata.id,
+            PROVIDER_REF_TAG_KEY,
+            PROVIDER_NAME_LABEL_KEY,
+        )
+        return None
+    return name, provider_ref
+
+
+def _get_attempt_key_from_name(metadata: ResourceMetadata) -> Optional[tuple[str, str]]:
+    """
+    Returns the attempt's name and `provider_ref` from the resource's name,
+    or `None` if the name has no `provider_ref`.
+    """
+    provider_ref = parse_provider_ref_from_name(metadata.name)
+    if provider_ref is None:
+        return None
+    return metadata.name, provider_ref
+
+
+def _get_resource_group(
+    attempt: _ProvisioningAttempt, region: str
+) -> Optional[ListedResourceGroup]:
+    instance = attempt.instance
+    owner = None
+    if instance is not None and instance.status.state != InstanceStatus.InstanceState.DELETING:
+        owner = instance
+    internal_resources = [r for r in (attempt.disk, attempt.pricing_policy) if r is not None]
+    if owner is None and not internal_resources:
+        return None
+    descriptions = []
+    if owner is not None:
+        descriptions.append(
+            f"instance {owner.metadata.id} ({owner.spec.resources.platform}"
+            f" {owner.spec.resources.preset}, {owner.status.state.name})"
+        )
+    if attempt.disk is not None:
+        descriptions.append(f"boot disk {attempt.disk.metadata.id}")
+    if attempt.pricing_policy is not None:
+        descriptions.append(f"pricing policy {attempt.pricing_policy.metadata.id}")
+    if owner is not None:
+        created_at = owner.metadata.created_at
+    else:
+        created_at = min(
+            (r.metadata.created_at for r in internal_resources if r.metadata.created_at),
+            default=None,
+        )
+    return ListedResourceGroup(
+        backend=BackendType.NEBIUS,
+        owner_type=OwnerType.INSTANCE,
+        provider_ref=attempt.provider_ref,
+        primary_id=owner.metadata.id if owner is not None else None,
+        region=region,
+        created_at=created_at,
+        description=", ".join(descriptions),
+        backend_data=NebiusResourceGroupBackendData(
+            instance_id=instance.metadata.id if instance is not None else None,
+            disk_id=attempt.disk.metadata.id if attempt.disk is not None else None,
+            pricing_policy_id=(
+                attempt.pricing_policy.metadata.id if attempt.pricing_policy is not None else None
+            ),
+        ).model_dump_json(),
+    )
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
