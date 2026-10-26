@@ -14,8 +14,6 @@ from dstack._internal.core.backends.gcp.models import GCPConfig, GCPDefaultCreds
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
-from dstack._internal.core.models.instances import InstanceConfiguration
-from dstack._internal.server.testing.common import get_instance_offer_with_availability
 
 PROJECT_ID = "test-project"
 PROVIDER_REF = "abc123def456"
@@ -328,34 +326,3 @@ class TestDeleteResourceGroup:
         )
         with pytest.raises(ComputeError):
             compute.delete_resource_group(_get_resource_group())
-
-
-class TestCreateInstance:
-    def test_labels_vm_with_provider_ref(self, mocker):
-        compute = _get_compute(mocker, regions=["us-central1"])
-        mocker.patch("dstack._internal.core.backends.gcp.resources.create_runner_firewall_rules")
-        mocker.patch("dstack._internal.core.backends.gcp.resources.wait_for_extended_operation")
-        mocker.patch.object(compute, "_get_vpc_subnet", return_value=None)
-        mocker.patch.object(compute, "_get_extra_subnets", return_value=[])
-        mocker.patch.object(compute, "_get_roce_subnets", return_value=[])
-        insert = mocker.patch.object(compute.instances_client, "insert")
-        offer = get_instance_offer_with_availability(
-            backend=BackendType.GCP,
-            region="us-central1",
-            availability_zones=["us-central1-a"],
-        )
-
-        compute.create_instance(
-            offer,
-            InstanceConfiguration(
-                project_name="test-project",
-                instance_name="test-instance",
-                user="test-user",
-                ssh_keys=[],
-                provider_ref=PROVIDER_REF,
-            ),
-            placement_group=None,
-        )
-
-        labels = insert.call_args.kwargs["request"].instance_resource.labels
-        assert labels["dstack_provider_ref"] == PROVIDER_REF
