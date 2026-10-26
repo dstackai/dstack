@@ -545,6 +545,7 @@ gcloud projects list --format="json(projectId)"
     compute.instances.delete
     compute.instances.detachDisk
     compute.instances.get
+    compute.instances.list
     compute.instances.setLabels
     compute.instances.setMetadata
     compute.instances.setServiceAccount
@@ -605,6 +606,7 @@ gcloud projects list --format="json(projectId)"
     ```
     tpu.nodes.create
     tpu.nodes.get
+    tpu.nodes.list
     tpu.nodes.update
     tpu.nodes.delete
     tpu.operations.get
