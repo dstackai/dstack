@@ -1,17 +1,33 @@
+from datetime import datetime, timezone
+from typing import Optional
 from unittest.mock import Mock
 
 import pytest
-from azure.core.exceptions import ODataV4Format, ResourceNotFoundError
-from azure.mgmt.compute.models import ImageReference
+from azure.core.exceptions import HttpResponseError, ODataV4Format, ResourceNotFoundError
+from azure.mgmt.compute.models import (
+    HardwareProfile,
+    ImageReference,
+    VirtualMachine,
+    VirtualMachineProperties,
+    VirtualMachineSizeTypes,
+)
 
 from dstack._internal import settings
 from dstack._internal.core.backends.azure.compute import (
+    AzureCompute,
     VMImageVariant,
     _begin_create_instance,
     _get_image_ref,
 )
+from dstack._internal.core.backends.azure.models import AzureConfig, AzureDefaultCreds
 from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import Gpu, InstanceType, Resources
+
+RESOURCE_GROUP = "dstack-resources"
+PROVIDER_REF = "abc123def456"
+TIME_CREATED = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
 
 
 class TestVMImageVariant:
@@ -146,4 +162,128 @@ def _create_instance_kwargs(compute_client: Mock, image_reference: ImageReferenc
         spot=True,
         disk_size=100,
         computer_name="runnervm",
+    )
+
+
+@pytest.fixture
+def compute_client() -> Mock:
+    return Mock()
+
+
+@pytest.fixture
+def compute(compute_client: Mock) -> AzureCompute:
+    compute = AzureCompute(
+        AzureConfig(
+            tenant_id="tenant",
+            subscription_id="subscription",
+            resource_group=RESOURCE_GROUP,
+            regions=["westeurope"],
+            creds=AzureDefaultCreds(),
+        ),
+        credential=Mock(),
+    )
+    compute._compute_client = compute_client
+    return compute
+
+
+class TestListResourceGroups:
+    def test_lists_tagged_vms(self, compute: AzureCompute, compute_client: Mock):
+        _set_vms(compute_client, [_get_vm("vm-1")])
+        listing = compute.list_resource_groups()
+        compute_client.virtual_machines.list.assert_called_once_with(
+            resource_group_name=RESOURCE_GROUP
+        )
+        assert listing.failures == []
+        assert listing.resource_groups == [
+            ListedResourceGroup(
+                backend=BackendType.AZURE,
+                owner_type=OwnerType.INSTANCE,
+                provider_ref=PROVIDER_REF,
+                primary_id="vm-1",
+                region="westeurope",
+                created_at=TIME_CREATED,
+                description="VM vm-1 (Standard_F2s_v2, Succeeded)",
+                backend_data=None,
+            )
+        ]
+
+    def test_skips_vms_without_provider_ref(self, compute: AzureCompute, compute_client: Mock):
+        _set_vms(compute_client, [_get_vm("vm-1", provider_ref=None)])
+        assert compute.list_resource_groups().resource_groups == []
+
+    def test_skips_vms_with_invalid_provider_ref(
+        self, compute: AzureCompute, compute_client: Mock
+    ):
+        _set_vms(compute_client, [_get_vm("vm-1", provider_ref="Invalid-Ref")])
+        assert compute.list_resource_groups().resource_groups == []
+
+    def test_skips_vms_being_deleted(self, compute: AzureCompute, compute_client: Mock):
+        _set_vms(
+            compute_client,
+            [_get_vm("vm-1", provisioning_state="Deleting"), _get_vm("vm-2")],
+        )
+        groups = compute.list_resource_groups().resource_groups
+        assert [g.primary_id for g in groups] == ["vm-2"]
+
+    def test_raises_compute_error_on_api_error(self, compute: AzureCompute, compute_client: Mock):
+        compute_client.virtual_machines.list.side_effect = HttpResponseError("error")
+        with pytest.raises(ComputeError):
+            compute.list_resource_groups()
+
+
+class TestDeleteResourceGroup:
+    def test_deletes_vm(self, compute: AzureCompute, compute_client: Mock):
+        compute.delete_resource_group(_get_resource_group())
+        compute_client.virtual_machines.begin_delete.assert_called_once_with(
+            resource_group_name=RESOURCE_GROUP, vm_name="vm-1"
+        )
+
+    def test_tolerates_deleted_vm(self, compute: AzureCompute, compute_client: Mock):
+        compute_client.virtual_machines.begin_delete.side_effect = _not_found_error(
+            "ResourceNotFound"
+        )
+        compute.delete_resource_group(_get_resource_group())
+
+    def test_raises_compute_error_on_api_error(self, compute: AzureCompute, compute_client: Mock):
+        compute_client.virtual_machines.begin_delete.side_effect = HttpResponseError("error")
+        with pytest.raises(ComputeError):
+            compute.delete_resource_group(_get_resource_group())
+
+
+def _get_vm(
+    name: str,
+    provider_ref: Optional[str] = PROVIDER_REF,
+    provisioning_state: str = "Succeeded",
+) -> VirtualMachine:
+    tags = {"owner": "dstack"}
+    if provider_ref is not None:
+        tags["dstack_provider_ref"] = provider_ref
+    vm = VirtualMachine(
+        location="westeurope",
+        tags=tags,
+        properties=VirtualMachineProperties(
+            hardware_profile=HardwareProfile(vm_size=VirtualMachineSizeTypes.STANDARD_F2_S_V2)
+        ),
+    )
+    vm.id = f"/subscriptions/subscription/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.Compute/virtualMachines/{name}"
+    vm.name = name
+    vm.provisioning_state = provisioning_state
+    vm.time_created = TIME_CREATED
+    return vm
+
+
+def _set_vms(compute_client: Mock, vms: list[VirtualMachine]):
+    compute_client.virtual_machines.list.return_value = iter(vms)
+
+
+def _get_resource_group() -> ListedResourceGroup:
+    return ListedResourceGroup(
+        backend=BackendType.AZURE,
+        owner_type=OwnerType.INSTANCE,
+        provider_ref=PROVIDER_REF,
+        primary_id="vm-1",
+        region="westeurope",
+        created_at=TIME_CREATED,
+        description="VM vm-1",
+        backend_data=None,
     )
