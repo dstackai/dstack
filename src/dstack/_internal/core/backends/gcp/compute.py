@@ -2,8 +2,9 @@ import concurrent.futures
 import json
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
@@ -19,6 +20,7 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
+    PROVIDER_REF_TAG_KEY,
     Compute,
     ComputeTTLCache,
     ComputeWithAllOffersCached,
@@ -31,6 +33,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
     ComputeWithReservationSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
@@ -39,6 +42,7 @@ from dstack._internal.core.backends.base.compute import (
     get_gateway_user_data,
     get_shim_commands,
     get_user_data,
+    is_valid_provider_ref,
     merge_tags,
     requires_nvidia_proprietary_kernel_modules,
 )
@@ -57,6 +61,12 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    OwnerType,
+    ResourceListing,
+    ResourceListingFailure,
+)
 from dstack._internal.core.models.common import (
     CoreModel,
     validate_extra_ignore,
@@ -84,7 +94,7 @@ from dstack._internal.core.models.volumes import (
     VolumeAttachmentData,
     VolumeProvisioningData,
 )
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_or_error, parse_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -121,6 +131,11 @@ class GCPGatewayBackendData(CoreModel):
     forwarding_rule_name: str
 
 
+class GCPResourceGroupBackendData(CoreModel):
+    zone: str
+    is_tpu: bool = False
+
+
 class GCPCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
@@ -133,6 +148,7 @@ class GCPCompute(
     ComputeWithPrivateGatewaySupport,
     ComputeWithGatewayLoadBalancerSupport,
     ComputeWithVolumeSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     def __init__(self, config: GCPConfig):
@@ -278,19 +294,51 @@ class GCPCompute(
             backend_data_dict = json.loads(backend_data)
             zone = backend_data_dict["zone"]
             is_tpu = backend_data_dict.get("is_tpu", False)
-        try:
-            if is_tpu:
-                name = f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}"
-                delete_request = tpu_v2.DeleteNodeRequest(name=name)
-                self.tpu_client.delete_node(request=delete_request)
-            else:
-                self.instances_client.delete(
-                    project=self.config.project_id,
-                    zone=zone,
-                    instance=instance_id,
+        self._delete_instance(instance_id=instance_id, zone=zone, is_tpu=is_tpu)
+
+    def list_resource_groups(self) -> ResourceListing:
+        regions = get_or_error(self.config.regions)
+        resource_groups, unreachable_zones = self._list_vm_resource_groups()
+        # TPUs are not listed if disabled so that the TPU API and permissions stay optional.
+        if self.config.allow_tpu:
+            tpu_resource_groups, tpu_unreachable_zones = self._list_tpu_resource_groups()
+            resource_groups.extend(tpu_resource_groups)
+            unreachable_zones.extend(tpu_unreachable_zones)
+        unreachable_zones_by_region: Dict[str, List[str]] = defaultdict(list)
+        for zone in unreachable_zones:
+            unreachable_zones_by_region[_get_zone_region(zone)].append(zone)
+        listing = ResourceListing(
+            resource_groups=[
+                g
+                for g in resource_groups
+                if g.region in regions and g.region not in unreachable_zones_by_region
+            ],
+            failures=[
+                ResourceListingFailure(
+                    backend=BackendType.GCP,
+                    region=region,
+                    message=f"Zones unreachable: {', '.join(sorted(set(zones)))}",
                 )
-        except google.api_core.exceptions.NotFound:
-            pass
+                for region, zones in unreachable_zones_by_region.items()
+                if region in regions
+            ],
+        )
+        if len(listing.failures) == len(regions):
+            raise ComputeError(f"Failed to list resources in all regions: {listing.failures}")
+        return listing
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        backend_data = validate_json_extra_ignore(
+            GCPResourceGroupBackendData, get_or_error(group.backend_data)
+        )
+        try:
+            self._delete_instance(
+                instance_id=get_or_error(group.primary_id),
+                zone=backend_data.zone,
+                is_tpu=backend_data.is_tpu,
+            )
+        except google.api_core.exceptions.GoogleAPICallError as e:
+            raise ComputeError(f"Failed to delete resource group {group.provider_ref}: {e}") from e
 
     def create_instance(
         self,
@@ -340,6 +388,8 @@ class GCPCompute(
             "dstack_name": instance_config.instance_name,
             "dstack_user": instance_config.user.lower(),
         }
+        if instance_config.provider_ref is not None:
+            labels[PROVIDER_REF_TAG_KEY] = instance_config.provider_ref
         labels = merge_tags(
             base_tags=labels,
             backend_tags=self.config.tags,
@@ -1452,6 +1502,155 @@ class GCPCompute(
             project_id=project_id,
             name=name,
         )
+
+    def _delete_instance(self, instance_id: str, zone: str, is_tpu: bool) -> None:
+        try:
+            if is_tpu:
+                name = f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}"
+                delete_request = tpu_v2.DeleteNodeRequest(name=name)
+                self.tpu_client.delete_node(request=delete_request)
+            else:
+                self.instances_client.delete(
+                    project=self.config.project_id,
+                    zone=zone,
+                    instance=instance_id,
+                )
+        except google.api_core.exceptions.NotFound:
+            pass
+
+    def _list_vm_resource_groups(self) -> Tuple[List[ListedResourceGroup], List[str]]:
+        """
+        Lists VMs labeled with `provider_ref` in all zones.
+        Returns the resource groups and the unreachable zones.
+        """
+        resource_groups = []
+        unreachable_zones = []
+        request = compute_v1.AggregatedListInstancesRequest(
+            project=self.config.project_id,
+            filter=f"labels.{PROVIDER_REF_TAG_KEY}:*",
+        )
+        try:
+            for page in self.instances_client.aggregated_list(request=request).pages:
+                unreachable_zones.extend(_get_last_path_segment(s) for s in page.unreachables)
+                for scope, scoped_list in page.items.items():
+                    zone = _get_last_path_segment(scope)
+                    if scoped_list.warning.code == "UNREACHABLE":
+                        unreachable_zones.append(zone)
+                    for instance in scoped_list.instances:
+                        resource_group = _get_vm_resource_group(instance, zone)
+                        if resource_group is not None:
+                            resource_groups.append(resource_group)
+        except google.api_core.exceptions.Forbidden as e:
+            raise ComputeError(
+                f"Failed to list instances. Grant the compute.instances.list permission: {e}"
+            ) from e
+        except google.api_core.exceptions.GoogleAPICallError as e:
+            raise ComputeError(f"Failed to list instances: {e}") from e
+        return resource_groups, unreachable_zones
+
+    def _list_tpu_resource_groups(self) -> Tuple[List[ListedResourceGroup], List[str]]:
+        """
+        Lists TPU nodes labeled with `provider_ref` in all zones.
+        Returns the resource groups and the unreachable zones.
+        """
+        resource_groups = []
+        unreachable_zones = []
+        request = tpu_v2.ListNodesRequest(parent=f"projects/{self.config.project_id}/locations/-")
+        try:
+            for page in self.tpu_client.list_nodes(request=request).pages:
+                unreachable_zones.extend(_get_last_path_segment(loc) for loc in page.unreachable)
+                for node in page.nodes:
+                    resource_group = _get_tpu_resource_group(node)
+                    if resource_group is not None:
+                        resource_groups.append(resource_group)
+        except google.api_core.exceptions.Forbidden as e:
+            raise ComputeError(
+                "Failed to list TPU nodes. Enable the TPU API and grant"
+                f" the tpu.nodes.list permission: {e}"
+            ) from e
+        except google.api_core.exceptions.GoogleAPICallError as e:
+            raise ComputeError(f"Failed to list TPU nodes: {e}") from e
+        return resource_groups, unreachable_zones
+
+
+def _get_vm_resource_group(instance: Instance, zone: str) -> Optional[ListedResourceGroup]:
+    # dstack never stops VMs, so a stopping VM is being deleted or preempted.
+    # A preempted VM ends up TERMINATED and is listed by next cleanups.
+    if instance.status == "STOPPING":
+        return None
+    provider_ref = _get_resource_provider_ref(instance.labels, instance.name)
+    if provider_ref is None:
+        return None
+    machine_type = _get_last_path_segment(instance.machine_type)
+    return ListedResourceGroup(
+        backend=BackendType.GCP,
+        owner_type=OwnerType.INSTANCE,
+        provider_ref=provider_ref,
+        primary_id=instance.name,
+        region=_get_zone_region(zone),
+        created_at=_parse_instance_creation_timestamp(instance),
+        description=f"instance {instance.name} ({machine_type}, {instance.status})",
+        backend_data=GCPResourceGroupBackendData(zone=zone).model_dump_json(),
+    )
+
+
+def _get_tpu_resource_group(node: tpu_v2.Node) -> Optional[ListedResourceGroup]:
+    if node.state == tpu_v2.Node.State.DELETING:
+        return None
+    # projects/{project}/locations/{zone}/nodes/{node_id}
+    _, _, _, zone, _, node_id = node.name.split("/")
+    provider_ref = _get_resource_provider_ref(node.labels, node_id)
+    if provider_ref is None:
+        return None
+    return ListedResourceGroup(
+        backend=BackendType.GCP,
+        owner_type=OwnerType.INSTANCE,
+        provider_ref=provider_ref,
+        primary_id=node_id,
+        region=_get_zone_region(zone),
+        created_at=node.create_time,  # pyright: ignore[reportArgumentType]
+        description=f"TPU node {node_id} ({node.accelerator_type}, {node.state.name})",
+        backend_data=GCPResourceGroupBackendData(zone=zone, is_tpu=True).model_dump_json(),
+    )
+
+
+def _get_resource_provider_ref(labels: Mapping[str, str], resource_name: str) -> Optional[str]:
+    provider_ref = labels.get(PROVIDER_REF_TAG_KEY)
+    if provider_ref is None:
+        return None
+    if not is_valid_provider_ref(provider_ref):
+        logger.warning(
+            "Skipping GCP resource %s with invalid %s label value %r",
+            resource_name,
+            PROVIDER_REF_TAG_KEY,
+            provider_ref,
+        )
+        return None
+    return provider_ref
+
+
+def _parse_instance_creation_timestamp(instance: Instance) -> Optional[datetime]:
+    try:
+        return parse_datetime(instance.creation_timestamp)
+    except ValueError:
+        logger.warning(
+            "Failed to parse creation timestamp %r of instance %s",
+            instance.creation_timestamp,
+            instance.name,
+        )
+        return None
+
+
+def _get_last_path_segment(path: str) -> str:
+    """
+    Returns the last segment of a scope, location, or resource path,
+    e.g. `us-central1-a` for `zones/us-central1-a`.
+    """
+    return path.rsplit("/", 1)[-1]
+
+
+def _get_zone_region(zone: str) -> str:
+    return zone.rsplit("-", 1)[0]
 
 
 def _is_supported_gcp_instance(instance_name: str, gpu_name: Optional[str]) -> bool:
