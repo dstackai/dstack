@@ -1,5 +1,6 @@
 import argparse
 import shlex
+import sys
 
 from argcomplete import FilesCompleter  # type: ignore[attr-defined]
 
@@ -103,4 +104,4 @@ class ApplyCommand(APIBaseCommand):
             )
         except KeyboardInterrupt:
             console.print("\nOperation interrupted by user. Exiting...")
-            exit(0)
+            sys.exit(0)

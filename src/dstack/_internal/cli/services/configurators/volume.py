@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 
 from rich.table import Table
@@ -127,7 +128,7 @@ class VolumeConfigurator(BaseApplyConfigurator[AnyVolumeConfiguration]):
             console.print(
                 f"\n[error]Provisioning failed. Error: {volume.status_message or 'unknown'}[/]"
             )
-            exit(1)
+            sys.exit(1)
 
     def delete_configuration(
         self,
@@ -137,7 +138,7 @@ class VolumeConfigurator(BaseApplyConfigurator[AnyVolumeConfiguration]):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no volume to delete[/]")
-            exit(1)
+            sys.exit(1)
 
         try:
             self.api.client.volumes.get(
@@ -146,7 +147,7 @@ class VolumeConfigurator(BaseApplyConfigurator[AnyVolumeConfiguration]):
             )
         except ResourceNotExistsError:
             console.print(f"Volume [code]{conf.name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
 
         if not command_args.yes and not confirm_ask(f"Delete the volume [code]{conf.name}[/]?"):
             console.print("\nExiting...")

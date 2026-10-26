@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 import argcomplete
 from rich.markup import escape
@@ -100,7 +101,7 @@ def main():
     except (ClientError, CLIError, ConfigurationError, SSHError) as e:
         error_console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ OPENAPI_VERSION = "3.1.0"
 
 if os.environ.get(disable_env):
     logger.warning("OpenAPI reference generation is disabled")
-    exit(0)
+    sys.exit(0)
 
 
 def _write_tag_references(tags: list[str]) -> None:

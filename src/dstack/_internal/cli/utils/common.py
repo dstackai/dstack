@@ -143,7 +143,7 @@ def confirm_ask(prompt, **kwargs) -> bool:
         return Confirm.ask(prompt=prompt, **kwargs)
     except KeyboardInterrupt:
         console.print("\nCancelled by user")
-        raise SystemExit(1)
+        sys.exit(1)
 
 
 def add_row_from_dict(table: Table, data: dict[str, Any], **kwargs):

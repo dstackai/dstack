@@ -112,7 +112,7 @@ class AttachCommand(APIBaseCommand):
                     f" Use [code]-p[/code] in [code]dstack attach[/code] to override the local"
                     f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
                 )
-                exit(1)
+                sys.exit(1)
             if not attached:
                 raise CLIError(f"Failed to attach to run {args.run_name}")
             _print_attached_message(
@@ -141,7 +141,7 @@ class AttachCommand(APIBaseCommand):
         finally:
             run.detach()
         # TODO: Handle run resubmissions similar to dstack apply
-        exit(exit_code)
+        sys.exit(exit_code)
 
 
 def _print_finished_message_when_available(run: Run) -> None:

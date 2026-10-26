@@ -1,4 +1,5 @@
 import argparse
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -186,7 +187,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                 console.print(
                     "\n[error]Some instances failed. Check the table above for errors.[/]"
                 )
-            exit(1)
+            sys.exit(1)
 
     def _apply_plan_on_old_server(self, plan: FleetPlan, command_args: argparse.Namespace):
         action_message = ""
@@ -281,7 +282,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
         )
         if _fleet_has_failed_instances(fleet):
             console.print("\n[error]Some instances failed. Check the table above for errors.[/]")
-            exit(1)
+            sys.exit(1)
 
     def delete_configuration(
         self,
@@ -291,7 +292,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no fleet to delete[/]")
-            exit(1)
+            sys.exit(1)
 
         try:
             self.api.client.fleets.get(
@@ -300,7 +301,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
             )
         except ResourceNotExistsError:
             console.print(f"Fleet [code]{conf.name}[/] does not exist")
-            exit(1)
+            sys.exit(1)
 
         if not command_args.yes and not confirm_ask(f"Delete the fleet [code]{conf.name}[/]?"):
             console.print("\nExiting...")
