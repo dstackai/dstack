@@ -109,24 +109,16 @@ include = [
     "src/dstack/plugins",
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
-    "src/dstack/_internal/core/backends/aws",
-    "src/dstack/_internal/core/backends/azure",
-    "src/dstack/_internal/core/backends/cloudrift",
-    "src/dstack/_internal/core/backends/daytona",
-    "src/dstack/_internal/core/backends/gcp",
-    "src/dstack/_internal/core/backends/kubernetes",
-    "src/dstack/_internal/core/backends/lambdalabs",
-    "src/dstack/_internal/core/backends/lium",
-    "src/dstack/_internal/core/backends/nebius",
-    "src/dstack/_internal/core/backends/runpod",
-    "src/dstack/_internal/core/backends/slurm",
-    "src/dstack/_internal/core/backends/vultr",
+    "src/dstack/_internal/core/backends",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",
+    "src/dstack/_internal/core/backends/oci",
+    # Until the gpuhunt release with float `QueryFilter` disk size bounds
+    "src/dstack/_internal/core/backends/base/offers.py",
 ]
 
 [tool.pytest.ini_options]
