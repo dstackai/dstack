@@ -116,6 +116,7 @@ include = [
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/lambdalabs",
     "src/dstack/_internal/core/backends/lium",
+    "src/dstack/_internal/core/backends/nebius",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
     "src/dstack/_internal/core/backends/vultr",

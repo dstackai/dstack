@@ -8,9 +8,10 @@ from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, Optional
 
+from grpc import StatusCode
 from nebius.aio.operation import Operation as SDKOperation
-from nebius.aio.service_error import RequestError, StatusCode
-from nebius.aio.token.renewable import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENEW_SYNCHRONOUS
+from nebius.aio.service_error import RequestError
+from nebius.aio.token.options import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENEW_SYNCHRONOUS
 from nebius.api.nebius.billing.v1 import (
     ComputeInstanceSpec,
     ComputeInstanceSpecV1,
@@ -76,6 +77,7 @@ from dstack._internal.core.backends.nebius.models import (
 from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__
@@ -94,6 +96,9 @@ REQUEST_AUTH_OPTIONS = {
     OPTION_RENEW_REQUEST_TIMEOUT: "5",
 }
 LIST_PAGE_SIZE = 100
+# The SDK's own `Operation` does not satisfy the `OperationMessage` bound of `SDKOperation`:
+# the protocol declares a mutable `id: str`, while the `Operation` setter accepts `str | None`
+NebiusOperation = SDKOperation[Operation]  # pyright: ignore[reportInvalidTypeArguments]
 
 # disables log messages about errors such as invalid creds or expired timeouts
 logging.getLogger("nebius").setLevel(logging.CRITICAL)
@@ -132,7 +137,7 @@ def make_sdk(creds: NebiusServiceAccountCreds) -> SDK:
 
 
 def wait_for_operation(
-    op: SDKOperation[Operation],
+    op: NebiusOperation,
     timeout: float,
     interval: float = 1,
 ) -> None:
@@ -145,6 +150,11 @@ def wait_for_operation(
         LOOP.await_(
             op.update(per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS)
         )
+
+
+def get_operation_error(op: NebiusOperation) -> str:
+    status = get_or_error(op.raw().status)
+    return f"Message: {status.message}. Details: {status.details}"
 
 
 def get_region_to_project_id_map(
@@ -216,7 +226,7 @@ def _get_region_to_default_project_id_map(
             ]
             if len(region_projects) != 1:
                 raise_invalid_credentials_error(
-                    ["regions"],
+                    [["regions"]],
                     (
                         f"Could not find the default project in region {region}."
                         " Consider setting the `projects` property in backend settings"
@@ -237,13 +247,13 @@ def _get_region_to_configured_project_id_map(
         project = project_id_to_project.get(project_id)
         if project is None:
             raise_invalid_credentials_error(
-                ["projects"],
+                [["projects"]],
                 f"Configured project ID {project_id!r} not found in this Nebius tenancy",
             )
         duplicate_project_id = region_to_project_id.get(project.status.region)
         if duplicate_project_id:
             raise_invalid_credentials_error(
-                ["projects"],
+                [["projects"]],
                 (
                     f"Configured projects {project_id} and {duplicate_project_id}"
                     f" both belong to the same region {project.status.region}."
@@ -286,7 +296,7 @@ def get_all_infiniband_fabrics() -> set[str]:
 
 def create_disk(
     sdk: SDK, name: str, project_id: str, size_mib: int, image_family: str, labels: Dict[str, str]
-) -> SDKOperation[Operation]:
+) -> NebiusOperation:
     client = DiskServiceClient(sdk)
     request = CreateDiskRequest(
         metadata=ResourceMetadata(
@@ -333,7 +343,7 @@ def list_disks(sdk: SDK, project_id: str) -> list[Disk]:
 
 def create_pricing_policy(
     sdk: SDK, name: str, project_id: str, platform: str, max_price: str
-) -> SDKOperation[Operation]:
+) -> NebiusOperation:
     client = PricingPolicyServiceClient(sdk)
     request = CreatePricingPolicyRequest(
         metadata=ResourceMetadata(name=name, parent_id=project_id),
@@ -395,7 +405,7 @@ def create_instance(
     preemptible: bool,
     pricing_policy_id: Optional[str],
     labels: Dict[str, str],
-) -> SDKOperation[Operation]:
+) -> NebiusOperation:
     client = InstanceServiceClient(sdk)
     request = CreateInstanceRequest(
         metadata=ResourceMetadata(
@@ -453,7 +463,7 @@ def get_instance(sdk: SDK, instance_id: str) -> Instance:
     )
 
 
-def delete_instance(sdk: SDK, instance_id: str) -> SDKOperation[Operation]:
+def delete_instance(sdk: SDK, instance_id: str) -> NebiusOperation:
     return LOOP.await_(
         InstanceServiceClient(sdk).delete(
             DeleteInstanceRequest(id=instance_id),
@@ -476,7 +486,7 @@ def list_instances(sdk: SDK, project_id: str) -> list[Instance]:
     )
 
 
-def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> SDKOperation[Operation]:
+def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> NebiusOperation:
     with wrap_capacity_errors():
         return LOOP.await_(
             GpuClusterServiceClient(sdk).create(
