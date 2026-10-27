@@ -510,6 +510,9 @@ resources:
 !!! info "No commands"
     If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
 
+??? info "Registry rate limits"
+    The `dstack` server queries the Docker registry for details about your custom image, such as its default user and entrypoint. If you are submitting many jobs and hitting the registry’s rate limit, try setting [`registry_auth`](../reference/dstack.yml/task.md#registry_auth), as many registries offer higher rate limits for authenticated users.
+
 #### Docker in Docker
 
 Set `docker` to `true` to enable the `docker` CLI in your task, e.g., to run or build Docker images, or use Docker Compose.

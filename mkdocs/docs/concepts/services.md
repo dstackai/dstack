@@ -993,6 +993,9 @@ resources:
   gpu: H100:1
 ```
 
+??? info "Registry rate limits"
+    The `dstack` server queries the Docker registry for details about your custom image, such as its default user and entrypoint. If you are submitting many jobs and hitting the registry’s rate limit, try setting [`registry_auth`](../reference/dstack.yml/service.md#registry_auth), as many registries offer higher rate limits for authenticated users.
+
 ### Working directory
 
 If `working_dir` is not specified, it defaults to the working directory set in the Docker image. For example, the [default image](#default-image) uses `/dstack/run` as its working directory.
