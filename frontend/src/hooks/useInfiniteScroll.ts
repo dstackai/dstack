@@ -37,25 +37,36 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     const lastRequestParams = useRef<Args | undefined>(undefined);
     const { limit, ...argsProp } = args;
     const lastArgsProps = useRef<Partial<Args> | null>(null);
+    // Incremented on every list reset, so that responses to outdated requests can be ignored
+    const requestGenerationRef = useRef<number>(0);
 
     const [getItems, { isLoading, isFetching, error }] = useLazyQuery({ ...args } as Args);
 
-    const getDataRequest = async (params: Args) => {
+    const getDataRequest = async (params: Args, requestGeneration: number) => {
         const result = await getItems({
             limit,
             ...params,
         } as Args).unwrap();
-        lastRequestParams.current = { ...params };
+
+        if (requestGeneration === requestGenerationRef.current) {
+            lastRequestParams.current = { ...params };
+        }
+
         return result;
     };
 
     const getEmptyList = () => {
+        const requestGeneration = ++requestGenerationRef.current;
         isLoadingRef.current = true;
 
         setData([]);
 
-        getDataRequest(argsProp as Args)
+        getDataRequest(argsProp as Args, requestGeneration)
             .then((result: LazyQueryResponse<DataItem>) => {
+                if (requestGeneration !== requestGenerationRef.current) {
+                    return;
+                }
+
                 isDisabledMoreRef.current = false;
 
                 if ('data' in result) {
@@ -67,9 +78,17 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
                 }
             })
             .catch(() => {
+                if (requestGeneration !== requestGenerationRef.current) {
+                    return;
+                }
+
                 isDisabledMoreRef.current = true;
             })
             .finally(() => {
+                if (requestGeneration !== requestGenerationRef.current) {
+                    return;
+                }
+
                 isLoadingRef.current = false;
             });
     };
@@ -92,10 +111,16 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
         };
 
         if (!isEqual(requestParams, lastRequestParams.current)) {
+            const requestGeneration = requestGenerationRef.current;
+
             try {
                 isLoadingRef.current = true;
 
-                const result = await getDataRequest(requestParams as Args);
+                const result = await getDataRequest(requestParams as Args, requestGeneration);
+
+                if (requestGeneration !== requestGenerationRef.current) {
+                    return;
+                }
 
                 let listResponse: ListResponse<DataItem>;
 
@@ -113,11 +138,17 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
                     isDisabledMoreRef.current = true;
                 }
             } catch (e) {
+                if (requestGeneration !== requestGenerationRef.current) {
+                    return;
+                }
+
                 console.log(e);
             }
 
             setTimeout(() => {
-                isLoadingRef.current = false;
+                if (requestGeneration === requestGenerationRef.current) {
+                    isLoadingRef.current = false;
+                }
             }, 50);
         }
     };
