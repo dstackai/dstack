@@ -164,14 +164,14 @@ def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
 
     offers_250gb = list(
         compute.get_offers(
-            Requirements(resources=ResourcesSpec(disk="250GB")),
+            Requirements(resources=ResourcesSpec.model_validate({"disk": "250GB"})),
             full_offers=False,
             unallocated_resources=False,
         )
     )
     offers_300gb = list(
         compute.get_offers(
-            Requirements(resources=ResourcesSpec(disk="300GB")),
+            Requirements(resources=ResourcesSpec.model_validate({"disk": "300GB"})),
             full_offers=False,
             unallocated_resources=False,
         )

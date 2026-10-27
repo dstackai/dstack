@@ -48,11 +48,15 @@ class TestProfileInstances:
             ({"hostname": "worker-1"}, InstanceHostnameSelector(hostname="worker-1")),
             (
                 {"fleet": "my-fleet", "instance": 3},
-                FleetInstanceSelector(fleet="my-fleet", instance=3),
+                FleetInstanceSelector(
+                    fleet=EntityReference(project=None, name="my-fleet"), instance=3
+                ),
             ),
             (
                 {"fleet": "other-project/my-fleet", "instance": 3},
-                FleetInstanceSelector(fleet="other-project/my-fleet", instance=3),
+                FleetInstanceSelector(
+                    fleet=EntityReference(project="other-project", name="my-fleet"), instance=3
+                ),
             ),
         ],
     )

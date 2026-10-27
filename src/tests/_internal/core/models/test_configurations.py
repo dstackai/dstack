@@ -1215,7 +1215,7 @@ class TestPresetConfiguration:
         ]["anyOf"]
 
     def test_parses_string_as_exact_repo(self):
-        configuration = PresetConfiguration(model="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelRepo)
         assert configuration.model.exact_repo == "Qwen/Qwen3.5-27B"
@@ -1223,7 +1223,7 @@ class TestPresetConfiguration:
         assert not configuration.model.allows_variant_selection
 
     def test_parses_base_model(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.exact_repo is None
@@ -1231,24 +1231,26 @@ class TestPresetConfiguration:
         assert configuration.model.allows_variant_selection
 
     def test_agent_is_optional_and_carries_provider_model_and_effort(self):
-        assert PresetConfiguration(model="Qwen/Qwen3.5-27B").agent is None
+        assert PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B"}).agent is None
 
-        configuration = PresetConfiguration(
-            model="Qwen/Qwen3.5-27B",
-            agent={"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+        configuration = PresetConfiguration.model_validate(
+            {
+                "model": "Qwen/Qwen3.5-27B",
+                "agent": {"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+            }
         )
 
         assert configuration.agent == PresetAgentConfig(
             provider="codex", model="gpt-6-astra", effort="xhigh"
         )
-        assert PresetConfiguration(
-            model="Qwen/Qwen3.5-27B", agent={"provider": "claude"}
+        assert PresetConfiguration.model_validate(
+            {"model": "Qwen/Qwen3.5-27B", "agent": {"provider": "claude"}}
         ).agent == (PresetAgentConfig(provider="claude", model=None, effort=None))
 
     @pytest.mark.parametrize("agent", [{}, {"model": "gpt-6-astra"}, {"provider": "gemini"}])
     def test_agent_requires_a_known_provider(self, agent):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+            PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B", "agent": agent})
 
     @pytest.mark.parametrize(
         "agent",
@@ -1256,13 +1258,15 @@ class TestPresetConfiguration:
     )
     def test_agent_effort_must_exist_for_the_provider(self, agent):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+            PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B", "agent": agent})
 
     def test_parses_exact_repo_with_client_facing_name(self):
-        configuration = PresetConfiguration(
-            model={
-                "repo": "community/Qwen3.5-27B-GPTQ-Int4",
-                "name": "Qwen/Qwen3.5-27B",
+        configuration = PresetConfiguration.model_validate(
+            {
+                "model": {
+                    "repo": "community/Qwen3.5-27B-GPTQ-Int4",
+                    "name": "Qwen/Qwen3.5-27B",
+                }
             }
         )
 
@@ -1271,24 +1275,28 @@ class TestPresetConfiguration:
 
     def test_rejects_ambiguous_model_object(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model={"base": "Qwen/base", "repo": "Qwen/repo"})
+            PresetConfiguration.model_validate(
+                {"model": {"base": "Qwen/base", "repo": "Qwen/repo"}}
+            )
 
     def test_parses_top_level_base_shorthand(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
         assert configuration.base is None
 
     def test_parses_top_level_repo_shorthand(self):
-        configuration = PresetConfiguration(repo="community/Qwen3.5-27B-GPTQ-Int4")
+        configuration = PresetConfiguration.model_validate(
+            {"repo": "community/Qwen3.5-27B-GPTQ-Int4"}
+        )
 
         assert isinstance(configuration.model, PresetModelRepo)
         assert configuration.model.exact_repo == "community/Qwen3.5-27B-GPTQ-Int4"
         assert configuration.repo is None
 
     def test_shorthand_round_trips_through_dict(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         round_tripped = PresetConfiguration.model_validate(configuration.model_dump())
 
@@ -1296,24 +1304,28 @@ class TestPresetConfiguration:
 
     def test_rejects_combined_base_and_repo_shorthand(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration(base="Qwen/base", repo="Qwen/repo")
+            PresetConfiguration.model_validate({"base": "Qwen/base", "repo": "Qwen/repo"})
 
     def test_rejects_shorthand_combined_with_model(self):
         with pytest.raises(ValidationError, match="cannot be combined"):
-            PresetConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
+            PresetConfiguration.model_validate(
+                {"base": "Qwen/base", "model": {"repo": "Qwen/repo"}}
+            )
 
     def test_requires_model(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration()
+            PresetConfiguration.model_validate({})
 
     @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
     def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
         with pytest.raises(ValidationError, match="cannot be set together with `dataset`"):
-            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
+            PresetConfiguration.model_validate(
+                {"base": "Qwen/Qwen3.5-27B", "dataset": "spec_bench", field: 512}
+            )
 
     def test_allows_request_shape_fields_without_a_dataset(self):
-        configuration = PresetConfiguration(
-            base="Qwen/Qwen3.5-27B", input_tokens=1024, output_tokens=256
+        configuration = PresetConfiguration.model_validate(
+            {"base": "Qwen/Qwen3.5-27B", "input_tokens": 1024, "output_tokens": 256}
         )
 
         assert configuration.input_tokens == 1024
@@ -1323,10 +1335,10 @@ class TestPresetConfiguration:
         # `random` used to be the explicit way to ask for synthetic prompts;
         # now a set dataset always means a real one.
         with pytest.raises(ValidationError, match="omit `dataset` for synthetic prompts"):
-            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="random")
+            PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B", "dataset": "random"})
 
     def test_defaults_to_a_synthetic_workload(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert configuration.dataset is None
 

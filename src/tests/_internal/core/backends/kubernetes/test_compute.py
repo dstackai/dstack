@@ -49,7 +49,9 @@ def _node_offer() -> InstanceOfferWithAvailability:
 
 def test_get_offers_modifiers_are_skipped_with_full_offers():
     compute = _compute()
-    requirements = Requirements(resources=ResourcesSpec(cpu="2", memory="8GB", gpu="1"))
+    requirements = Requirements(
+        resources=ResourcesSpec.model_validate({"cpu": "2", "memory": "8GB", "gpu": "1"})
+    )
 
     assert compute.get_offers_modifiers(requirements, full_offers=True) == []
     assert compute.get_offers_modifiers(requirements, full_offers=False) != []
@@ -60,7 +62,9 @@ def test_get_offers_with_full_offers_keeps_full_node_resources():
     compute.get_all_offers_with_availability = MagicMock(return_value=[_node_offer()])
     # Open-ended requirements so the full node satisfies them without an upper bound.
     requirements = Requirements(
-        resources=ResourcesSpec(cpu="2..", memory="8GB..", gpu="1..", disk="100GB..")
+        resources=ResourcesSpec.model_validate(
+            {"cpu": "2..", "memory": "8GB..", "gpu": "1..", "disk": "100GB.."}
+        )
     )
 
     full_offers = list(
@@ -79,7 +83,9 @@ def test_get_offers_without_full_offers_adjusts_to_requested_slice():
     compute = _compute()
     compute.get_all_offers_with_availability = MagicMock(return_value=[_node_offer()])
     requirements = Requirements(
-        resources=ResourcesSpec(cpu="2..", memory="8GB..", gpu="1..", disk="100GB..")
+        resources=ResourcesSpec.model_validate(
+            {"cpu": "2..", "memory": "8GB..", "gpu": "1..", "disk": "100GB.."}
+        )
     )
 
     adjusted_offers = list(

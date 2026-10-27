@@ -57,7 +57,9 @@ def test_unset_service_groups_are_excluded_for_compatibility():
 
 
 def test_set_service_groups_are_not_excluded():
-    configuration = ServiceConfiguration(port=8000, groups=[{"replicas": 1, "commands": ["true"]}])
+    configuration = ServiceConfiguration.model_validate(
+        {"port": 8000, "groups": [{"replicas": 1, "commands": ["true"]}]}
+    )
 
     configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
         "configuration"

@@ -2,7 +2,7 @@ import shlex
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gpuhunt import CatalogItem
+from gpuhunt import AcceleratorVendor, CatalogItem
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
@@ -53,7 +53,7 @@ def _raw(name: str, gpu: str, location: str = "it-fr2") -> CatalogItem:
         gpu_count=1,
         gpu_name=gpu,
         gpu_memory=24.0,
-        gpu_vendor="nvidia",
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         spot=False,
         disk_size=100.0,
     )
