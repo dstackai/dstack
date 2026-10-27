@@ -4,6 +4,9 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 import google.api_core.exceptions
+
+# Pyright infers compute_v1 enum members as ints in the huge generated types module,
+# so accessing `.name` on them needs a pyright ignore.
 import google.cloud.compute_v1 as compute_v1
 from google.api_core.extended_operation import ExtendedOperation
 from google.api_core.operation import Operation
@@ -218,7 +221,7 @@ def create_instance_struct(
 
     if spot:
         instance.scheduling = compute_v1.Scheduling()
-        instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name
+        instance.scheduling.provisioning_model = compute_v1.Scheduling.ProvisioningModel.SPOT.name  # pyright: ignore[reportAttributeAccessIssue]
         instance.scheduling.instance_termination_action = "STOP"  # TODO?
 
     metadata_items = [
@@ -244,7 +247,7 @@ def create_instance_struct(
         reservation_project = get_resource_project(reservation.self_link)
         instance.reservation_affinity = compute_v1.ReservationAffinity()
         instance.reservation_affinity.consume_reservation_type = (
-            compute_v1.ReservationAffinity.ConsumeReservationType.SPECIFIC_RESERVATION.name
+            compute_v1.ReservationAffinity.ConsumeReservationType.SPECIFIC_RESERVATION.name  # pyright: ignore[reportAttributeAccessIssue]
         )
         instance.reservation_affinity.key = "compute.googleapis.com/reservation-name"
         instance.reservation_affinity.values = [
@@ -267,16 +270,16 @@ def _get_network_interfaces(
         network_interface.subnetwork = subnetwork
     if allocate_public_ip:
         access = compute_v1.AccessConfig()
-        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
+        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name  # pyright: ignore[reportAttributeAccessIssue]
         access.name = "External NAT"
-        access.network_tier = access.NetworkTier.PREMIUM.name
+        access.network_tier = access.NetworkTier.PREMIUM.name  # pyright: ignore[reportAttributeAccessIssue]
         network_interface.access_configs = [access]
     else:
         network_interface.access_configs = []
 
     if extra_subnetworks:
         # Multiple interfaces are set only for GPU VM that require gVNIC for best performance
-        network_interface.nic_type = compute_v1.NetworkInterface.NicType.GVNIC.name
+        network_interface.nic_type = compute_v1.NetworkInterface.NicType.GVNIC.name  # pyright: ignore[reportAttributeAccessIssue]
 
     network_interfaces = [network_interface]
     for network, subnetwork in extra_subnetworks or []:
@@ -284,7 +287,7 @@ def _get_network_interfaces(
             compute_v1.NetworkInterface(
                 network=network,
                 subnetwork=subnetwork,
-                nic_type=compute_v1.NetworkInterface.NicType.GVNIC.name,
+                nic_type=compute_v1.NetworkInterface.NicType.GVNIC.name,  # pyright: ignore[reportAttributeAccessIssue]
             )
         )
     for network, subnetwork in roce_subnetworks or []:
@@ -292,7 +295,7 @@ def _get_network_interfaces(
             compute_v1.NetworkInterface(
                 network=network,
                 subnetwork=subnetwork,
-                nic_type=compute_v1.NetworkInterface.NicType.MRDMA.name,
+                nic_type=compute_v1.NetworkInterface.NicType.MRDMA.name,  # pyright: ignore[reportAttributeAccessIssue]
             )
         )
     return network_interfaces
@@ -499,8 +502,8 @@ def get_proxy_only_subnet_cidr_or_error(
     network_name = network.split("/")[-1]
     for subnet in subnetworks_client.list(project=project_id, region=region):
         if (
-            subnet.purpose == compute_v1.Subnetwork.Purpose.REGIONAL_MANAGED_PROXY.name
-            and subnet.role == compute_v1.Subnetwork.Role.ACTIVE.name
+            subnet.purpose == compute_v1.Subnetwork.Purpose.REGIONAL_MANAGED_PROXY.name  # pyright: ignore[reportAttributeAccessIssue]
+            and subnet.role == compute_v1.Subnetwork.Role.ACTIVE.name  # pyright: ignore[reportAttributeAccessIssue]
             and subnet.network.split("/")[-1] == network_name
         ):
             return subnet.ip_cidr_range

@@ -112,6 +112,7 @@ include = [
     "src/dstack/_internal/core/backends/aws",
     "src/dstack/_internal/core/backends/cloudrift",
     "src/dstack/_internal/core/backends/daytona",
+    "src/dstack/_internal/core/backends/gcp",
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/lambdalabs",
     "src/dstack/_internal/core/backends/lium",
