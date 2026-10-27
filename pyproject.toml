@@ -114,11 +114,11 @@ include = [
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
+exclude = [
+    "src/dstack/_internal/core/backends/oci",
+]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",
-    "src/dstack/_internal/core/backends/oci",
-    # Until the gpuhunt release with float `QueryFilter` disk size bounds
-    "src/dstack/_internal/core/backends/base/offers.py",
 ]
 
 [tool.pytest.ini_options]
