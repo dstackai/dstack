@@ -8,10 +8,15 @@ from dstack._internal.cli.utils.common import (
     format_backend,
     format_entity_reference,
 )
+from dstack._internal.core.consts import NO_BALANCE_MESSAGE, NO_QUOTA_MESSAGE
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet, FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.health import HealthStatus
-from dstack._internal.core.models.instances import Instance, InstanceStatus
+from dstack._internal.core.models.instances import (
+    Instance,
+    InstanceStatus,
+    InstanceTerminationReason,
+)
 from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.utils.common import DateFormatter, pretty_date
 
@@ -166,6 +171,12 @@ def get_fleets_table(
 
             if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
                 instance_row["ERROR"] = instance.termination_reason
+                if (
+                    instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+                    and instance.termination_reason_message
+                    in (NO_QUOTA_MESSAGE, NO_BALANCE_MESSAGE)
+                ):
+                    instance_row["ERROR"] = instance.termination_reason_message.lower()
 
             # No row-level dimming: only the columns styled above are dimmed on instance rows
             add_row_from_dict(table, instance_row)

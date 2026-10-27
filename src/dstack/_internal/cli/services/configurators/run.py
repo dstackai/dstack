@@ -895,7 +895,12 @@ def print_finished_message(run: Run):
         if (
             termination_reason
             # A run that never started has no runner logs to read.
-            and termination_reason != JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY.value
+            and termination_reason
+            not in (
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY.value,
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_QUOTA.value,
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_BALANCE.value,
+            )
         ):
             console.print(f"Check [code]dstack logs -d {run.name}[/code] for more details.")
 

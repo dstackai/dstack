@@ -12,5 +12,9 @@ DSTACK_RUN_SERVER_URL = f"http+unix://{quote(DSTACK_RUN_SERVER_SOCKET_PATH, safe
 DSTACK_PROJECT_ENV = "DSTACK_PROJECT"
 DSTACK_SERVER_URL_ENV = "DSTACK_SERVER_URL"
 DSTACK_TOKEN_ENV = "DSTACK_TOKEN"
+# Keep these messages stable while existing termination reasons carry quota/balance failures
+# during rolling upgrades. Status formatting recognizes their exact values.
+NO_QUOTA_MESSAGE = "No quota"
+NO_BALANCE_MESSAGE = "No balance"
 # legacy AWS, Azure, GCP, and OCI image for older GPUs
 DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES = "0.10"

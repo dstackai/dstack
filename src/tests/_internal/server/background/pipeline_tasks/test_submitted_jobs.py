@@ -25,7 +25,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -2069,6 +2069,7 @@ class TestJobSubmittedWorker:
 
             # The first pass assigns the job to the fleet, the second one provisions.
             await _process_job(session=session, worker=worker, job_model=job)
+            compute_mock.get_offers.reset_mock()
             await _process_job(session=session, worker=worker, job_model=job)
 
         job = await _get_job(session, job.id)
@@ -2077,6 +2078,99 @@ class TestJobSubmittedWorker:
         assert f"Failed to provision in fleet '{fleet.name}'" in job.termination_reason_message
         assert "tried 1 of 1 offers, all failed" in job.termination_reason_message
         assert "us-east-1: InsufficientInstanceCapacity" in job.termination_reason_message
+        compute_mock.get_offers.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("availabilities", "message"),
+        [
+            ([], None),
+            (
+                [InstanceAvailability.NO_QUOTA] * 2,
+                "No quota",
+            ),
+            (
+                [InstanceAvailability.NO_QUOTA, InstanceAvailability.NOT_AVAILABLE],
+                None,
+            ),
+            (
+                [InstanceAvailability.NO_BALANCE],
+                "No balance",
+            ),
+        ],
+    )
+    async def test_fails_without_attempting_unavailable_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        availabilities: list[InstanceAvailability],
+        message: str | None,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        job = await create_job(session=session, run=run)
+        backend = Mock(TYPE=BackendType.DSTACK)
+        compute = Mock(spec=ComputeMockSpec)
+        backend.compute.return_value = compute
+        compute.get_offers.return_value = [
+            get_instance_offer_with_availability(availability=availability)
+            for availability in availabilities
+        ]
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            return_value=[backend],
+        ):
+            await _process_job(session=session, worker=worker, job_model=job)
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        if message is not None:
+            assert job.termination_reason_message == message
+        else:
+            assert job.termination_reason_message is not None
+            assert "No offers matching the run requirements" in job.termination_reason_message
+        assert compute.get_offers.call_count == 2
+        compute.run_job.assert_not_called()
+        compute.run_jobs.assert_not_called()
+        compute.create_instance.assert_not_called()
+
+    async def test_keeps_generic_failure_if_refetch_fails(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        job = await create_job(session=session, run=run)
+        backend = Mock(TYPE=BackendType.DSTACK)
+        compute = Mock(spec=ComputeMockSpec)
+        backend.compute.return_value = compute
+
+        compute.get_offers.return_value = [
+            get_instance_offer_with_availability(availability=InstanceAvailability.NO_QUOTA)
+        ]
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            side_effect=[[backend], RuntimeError("Diagnostic lookup failed")],
+        ):
+            await _process_job(session=session, worker=worker, job_model=job)
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert "No offers matching the run requirements" in job.termination_reason_message
+        compute.get_offers.assert_called_once()
+        compute.run_job.assert_not_called()
+        compute.run_jobs.assert_not_called()
+        compute.create_instance.assert_not_called()
 
     async def test_provisions_compute_group(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

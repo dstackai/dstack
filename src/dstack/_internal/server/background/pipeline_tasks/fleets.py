@@ -841,7 +841,12 @@ def _set_fail_instances_on_master_bootstrap_failure(
 
     if (
         current_master_instance_model.status != InstanceStatus.TERMINATED
-        or current_master_instance_model.termination_reason != InstanceTerminationReason.NO_OFFERS
+        or current_master_instance_model.termination_reason
+        not in (
+            InstanceTerminationReason.NO_OFFERS,
+            InstanceTerminationReason.NO_QUOTA,
+            InstanceTerminationReason.NO_BALANCE,
+        )
     ):
         return
 

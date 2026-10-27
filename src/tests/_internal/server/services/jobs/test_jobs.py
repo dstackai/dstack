@@ -10,11 +10,13 @@ from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, RunSpec
+from dstack._internal.core.models.runs import JobSpec, JobStatus, JobTerminationReason, RunSpec
 from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
+from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs import (
     _get_job_mount_point_attached_volume,
+    _get_job_status_message,
     get_job_specs_from_run_spec,
     job_spec_updatable_in_place,
 )
@@ -24,6 +26,20 @@ from dstack._internal.server.testing.common import (
     get_volume_configuration,
     get_volume_provisioning_data,
 )
+
+
+class TestGetJobStatusMessage:
+    @pytest.mark.parametrize(
+        ("message", "expected"),
+        [("No quota", "no quota"), ("No balance", "no balance"), ("Other error", "no capacity")],
+    )
+    def test_reports_blocked_offers_with_legacy_reason(self, message, expected):
+        job = JobModel(
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            termination_reason_message=message,
+        )
+        assert _get_job_status_message(job) == expected
 
 
 @pytest.mark.parametrize(
