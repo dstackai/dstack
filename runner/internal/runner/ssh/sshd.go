@@ -45,7 +45,8 @@ type Sshd struct {
 
 	akMu sync.Mutex
 
-	cmd *exec.Cmd
+	cmd    *exec.Cmd
+	cancel context.CancelFunc
 }
 
 func NewSshd(binPath string) *Sshd {
@@ -129,27 +130,36 @@ func (d *Sshd) Start(ctx context.Context) error {
 	if d.confPath == "" {
 		return errors.New("not configured")
 	}
+	// The server pulls the job's final state through sshd, so sshd must outlive the shutdown
+	// signal that cancels the caller's context. Only Stop ends it.
+	ctx, d.cancel = context.WithCancel(context.WithoutCancel(ctx))
 	cmd := exec.CommandContext(ctx, d.binPath, "-D", "-f", d.confPath, "-E", d.logPath)
 	cmd.Cancel = func() error {
-		return d.sendSigterm()
+		return cmd.Process.Signal(syscall.SIGTERM)
 	}
 	cmd.WaitDelay = time.Second * 10
 	d.cmd = cmd
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		d.cancel()
+		return err
+	}
+	return nil
 }
 
 func (d *Sshd) Stop(ctx context.Context) error {
 	if d.cmd == nil {
 		return errors.New("not started")
 	}
-	if err := d.sendSigterm(); err != nil {
+	d.cancel()
+	if err := d.cmd.Wait(); !errors.Is(err, context.Canceled) {
 		return err
 	}
-	return d.cmd.Wait()
-}
-
-func (d *Sshd) sendSigterm() error {
-	return d.cmd.Process.Signal(syscall.SIGTERM)
+	// Wait reports the cancellation in place of the exit status. sshd exits with 0 on SIGTERM,
+	// so any other status means it had already failed by the time it was stopped.
+	if state := d.cmd.ProcessState; !state.Success() {
+		return &exec.ExitError{ProcessState: state}
+	}
+	return nil
 }
 
 func generateHostKeys(ctx context.Context, confDir string) error {
