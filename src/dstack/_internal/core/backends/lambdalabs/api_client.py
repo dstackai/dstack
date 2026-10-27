@@ -18,11 +18,10 @@ class LambdaAPIClient:
             raise e
         return True
 
-    def list_instance_types(self):
+    def list_instance_types(self) -> Dict[str, Any]:
         resp = self._make_request("GET", "/instance-types")
-        if resp.ok:
-            return resp.json()["data"]
         resp.raise_for_status()
+        return resp.json()["data"]
 
     def list_instances(self) -> List[dict]:
         resp = self._make_request("GET", "/instances")

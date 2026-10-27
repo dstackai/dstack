@@ -113,6 +113,7 @@ include = [
     "src/dstack/_internal/core/backends/cloudrift",
     "src/dstack/_internal/core/backends/daytona",
     "src/dstack/_internal/core/backends/kubernetes",
+    "src/dstack/_internal/core/backends/lambdalabs",
     "src/dstack/_internal/core/backends/lium",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
