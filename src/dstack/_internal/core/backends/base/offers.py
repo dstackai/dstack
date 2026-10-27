@@ -53,6 +53,10 @@ def get_catalog_offers(
 ) -> List[InstanceOffer]:
     """
     Args:
+        configurable_disk_size: disk sizes the backend can provision. Used for catalog items
+        without a fixed disk size: the offer's disk is set to the smallest size within both
+        this range and the required range (`DEFAULT_DISK` if `requirements` don't specify disk).
+        `min` must be set, since it is the lower bound when the required range has none.
         catalog_item_filter: applied to raw catalog items before the conversion to
         `InstanceOffer` models. Use it for filtering that can be done on raw catalog fields
         to avoid expensive model construction for items that will be discarded.
@@ -93,6 +97,8 @@ def catalog_item_to_offer(
     # The rest use construct() to skip redundant validation — data comes from already validated CatalogItem.
     gpus = []
     if item.gpu_count > 0:
+        # gpuhunt requires GPU name and memory for items with GPUs
+        assert item.gpu_name is not None and item.gpu_memory is not None
         gpu = Gpu(
             vendor=item.gpu_vendor, name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024)
         )
@@ -229,7 +235,7 @@ def choose_disk_size_mib(
         disk_size_range = disk_size_range.intersect(configurable_disk_size)
         if disk_size_range is None:
             return None
-        disk_size_gib = disk_size_range.min
+        disk_size_gib = get_or_error(disk_size_range.min)
 
     return round(disk_size_gib * 1024)
 
