@@ -154,14 +154,14 @@ class AzureCompute(
         allocate_public_ip = self.config.allocate_public_ips
         network_resource_group, network, subnet = get_resource_group_network_subnet_or_error(
             network_client=self._network_client,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             vpc_ids=self.config.vpc_ids,
             subnet_ids=self.config.subnet_ids,
             location=location,
             allocate_public_ip=allocate_public_ip,
         )
         network_security_group = azure_utils.get_default_network_security_group_name(
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             location=location,
         )
 
@@ -190,7 +190,7 @@ class AzureCompute(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
             location=location,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             network_security_group=network_security_group,
             network=network,
             subnet=subnet,
@@ -214,7 +214,7 @@ class AzureCompute(
         logger.info("Request succeeded")
         public_ip, private_ip = _get_vm_public_private_ips(
             network_client=self._network_client,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             vm=vm,
         )
         hostname = public_ip
@@ -223,7 +223,7 @@ class AzureCompute(
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
-            instance_id=vm.name,
+            instance_id=get_or_error(vm.name),
             hostname=hostname,
             internal_ip=private_ip,
             region=location,
@@ -240,7 +240,7 @@ class AzureCompute(
     ):
         _terminate_instance(
             compute_client=self._compute_client,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             instance_name=instance_id,
         )
 
@@ -256,7 +256,7 @@ class AzureCompute(
         try:
             vms = list(
                 self._compute_client.virtual_machines.list(
-                    resource_group_name=self.config.resource_group
+                    resource_group_name=self.config.get_resource_group()
                 )
             )
         except AzureError as e:
@@ -290,7 +290,7 @@ class AzureCompute(
         try:
             _terminate_instance(
                 compute_client=self._compute_client,
-                resource_group=self.config.resource_group,
+                resource_group=self.config.get_resource_group(),
                 instance_name=get_or_error(group.primary_id),
             )
         except ResourceNotFoundError:
@@ -320,14 +320,14 @@ class AzureCompute(
         )
         network_resource_group, network, subnet = get_resource_group_network_subnet_or_error(
             network_client=self._network_client,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             vpc_ids=self.config.vpc_ids,
             subnet_ids=self.config.subnet_ids,
             location=configuration.region,
             allocate_public_ip=True,
         )
         network_security_group = azure_utils.get_default_network_security_group_name(
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             location=configuration.region,
         )
 
@@ -349,7 +349,7 @@ class AzureCompute(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
             location=configuration.region,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             network_security_group=network_security_group,
             network=network,
             subnet=subnet,
@@ -369,12 +369,12 @@ class AzureCompute(
         logger.info("Request succeeded")
         public_ip, _ = _get_vm_public_private_ips(
             network_client=self._network_client,
-            resource_group=self.config.resource_group,
+            resource_group=self.config.get_resource_group(),
             vm=vm,
         )
         return GatewayReplicaProvisioningData(
-            instance_id=vm.name,
-            ip_address=public_ip,
+            instance_id=get_or_error(vm.name),
+            ip_address=get_or_error(public_ip),
             region=configuration.region,
         )
 
@@ -549,10 +549,11 @@ def _supported_instances(offer: InstanceOffer) -> bool:
 
 def _get_offers_with_availability(
     compute_client: compute_mgmt.ComputeManagementClient,
-    config_locations: List[str],
+    config_locations: Optional[List[str]],
     offers: List[InstanceOffer],
 ) -> List[InstanceOfferWithAvailability]:
-    offers = [offer for offer in offers if offer.region in config_locations]
+    if config_locations is not None:
+        offers = [offer for offer in offers if offer.region in config_locations]
     locations = set(offer.region for offer in offers)
 
     def get_location_quotas(location: str) -> List[str]:
@@ -583,11 +584,12 @@ def _get_offers_with_availability(
 
 
 def _vm_type_available(vm_resource: ResourceSku) -> bool:
-    if len(vm_resource.restrictions) == 0:
+    restrictions = vm_resource.restrictions
+    if not restrictions:
         return True
     # If a VM type is restricted in "Zone", it is still available in other zone.
     # Otherwise the restriction type is "Location"
-    if vm_resource.restrictions[0].type == "Zone":
+    if restrictions[0].type == "Zone":
         return True
     return False
 
@@ -671,10 +673,13 @@ def _begin_create_instance(
             },
         )
     try:
+        # The typed overloads of the TypeSpec-generated models (azure-mgmt-compute 38+) only
+        # accept nested `properties`. The flattened kwargs used here are supported at runtime
+        # and are the only form accepted by older SDK versions.
         poller = compute_client.virtual_machines.begin_create_or_update(
             resource_group,
             instance_name,
-            VirtualMachine(
+            VirtualMachine(  # pyright: ignore[reportCallIssue]
                 location=location,
                 hardware_profile=HardwareProfile(vm_size=vm_size),
                 storage_profile=StorageProfile(
@@ -708,7 +713,7 @@ def _begin_create_instance(
                     # Azure deletes the NIC and public IP created from these configurations
                     # together with the VM.
                     network_interface_configurations=[
-                        VirtualMachineNetworkInterfaceConfiguration(
+                        VirtualMachineNetworkInterfaceConfiguration(  # pyright: ignore[reportCallIssue]
                             name="nic_config",
                             network_security_group=SubResource(
                                 id=azure_utils.get_network_security_group_id(
@@ -718,7 +723,7 @@ def _begin_create_instance(
                                 )
                             ),
                             ip_configurations=[
-                                VirtualMachineNetworkInterfaceIPConfiguration(
+                                VirtualMachineNetworkInterfaceIPConfiguration(  # pyright: ignore[reportCallIssue]
                                     name="ip_config",
                                     subnet=SubResource(
                                         id=azure_utils.get_subnet_id(
@@ -855,11 +860,12 @@ def _get_vm_public_private_ips(
         network_interface_name=nic_name,
     )
 
-    private_ip = nic.ip_configurations[0].private_ip_address
-    if nic.ip_configurations[0].public_ip_address is None:
+    ip_configuration = get_or_error(nic.ip_configurations)[0]
+    private_ip = get_or_error(ip_configuration.private_ip_address)
+    if ip_configuration.public_ip_address is None:
         return None, private_ip
 
-    public_ip_id = nic.ip_configurations[0].public_ip_address.id
+    public_ip_id = get_or_error(ip_configuration.public_ip_address.id)
     public_ip_name = azure_utils.get_resource_name_from_resource_id(public_ip_id)
     public_ip = network_client.public_ip_addresses.get(resource_group, public_ip_name)
     return public_ip.ip_address, private_ip

@@ -1,8 +1,10 @@
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import Field, RootModel
+from pydantic import Field, RootModel, model_validator
+from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.common import get_or_error
 
 
 class AzureClientCreds(CoreModel):
@@ -95,7 +97,11 @@ AnyAzureBackendConfig = Union[AzureBackendConfig, AzureBackendConfigWithCreds]
 
 
 class AzureStoredConfig(AzureBackendConfig):
-    resource_group: str = ""
+    @model_validator(mode="after")
+    def validate_resource_group(self) -> Self:
+        if self.resource_group is None:
+            raise ValueError("resource_group must be set in the stored config")
+        return self
 
 
 class AzureConfig(AzureStoredConfig):
@@ -106,3 +112,7 @@ class AzureConfig(AzureStoredConfig):
         if self.public_ips is not None:
             return self.public_ips
         return True
+
+    def get_resource_group(self) -> str:
+        # Guaranteed by `AzureStoredConfig.validate_resource_group()`
+        return get_or_error(self.resource_group)

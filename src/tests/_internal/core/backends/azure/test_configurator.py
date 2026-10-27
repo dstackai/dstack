@@ -30,7 +30,7 @@ class TestAzureConfigurator:
             patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
             patch("azure.mgmt.subscription.SubscriptionClient") as SubscriptionClientMock,
         ):
-            authenticate_mock.return_value = Mock(), Mock()
+            authenticate_mock.return_value = Mock()
             subcription_client_mock = SubscriptionClientMock.return_value
             subcription_client_mock.tenants.list.return_value = [Mock(tenant_id="ten1")]
             subcription_client_mock.subscriptions.list.return_value = [

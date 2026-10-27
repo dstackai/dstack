@@ -47,6 +47,7 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 from dstack._internal.core.models.common import validate_extra_ignore, validate_json_extra_ignore
+from dstack._internal.utils.common import get_or_error
 
 LOCATIONS = [
     ("(US) Central US", "centralus"),
@@ -86,7 +87,7 @@ class AzureConfigurator(
         if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
-            credential, _ = auth.authenticate(config.creds)
+            credential = auth.authenticate(config.creds)
         except BackendAuthError:
             if isinstance(config.creds, AzureClientCreds):
                 raise_invalid_credentials_error(
@@ -113,7 +114,7 @@ class AzureConfigurator(
             config.regions = DEFAULT_LOCATIONS
         if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
-        credential, _ = auth.authenticate(config.creds)
+        credential = auth.authenticate(config.creds)
         if config.resource_group is None:
             config.resource_group = self._create_resource_group(
                 credential=credential,
@@ -393,7 +394,7 @@ class ResourceManager:
                 location=location,
             ),
         )
-        return resource_group.name
+        return get_or_error(resource_group.name)
 
     def resource_group_exists(
         self,
@@ -435,7 +436,7 @@ class NetworkManager:
                 ],
             ),
         ).result()
-        return network.name, subnet_name
+        return get_or_error(network.name), subnet_name
 
     def create_network_security_group(
         self,
