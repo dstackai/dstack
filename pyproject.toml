@@ -115,6 +115,8 @@ include = [
     "src/tests/_internal/server/background/pipeline_tasks",
 ]
 exclude = [
+    # OCI has pyright errors. Excluded rather than ignored because checking it makes pyright analyze
+    # the large OCI SDK, which is slow and takes a lot of memory. Editors still show its errors
     "src/dstack/_internal/core/backends/oci",
 ]
 ignore = [
