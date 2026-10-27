@@ -398,7 +398,7 @@ class TestListResourceGroups:
                 raise make_request_error(StatusCode.UNAVAILABLE)
             return []
 
-        compute_module.resources.list_instances.side_effect = list_instances
+        mocker.patch.object(compute_module.resources, "list_instances", side_effect=list_instances)
 
         listing = make_compute().list_resource_groups()
 
@@ -414,16 +414,18 @@ class TestDeleteResourceGroup:
     @pytest.fixture
     def resources(self, mocker):
         resources = compute_module.resources
-        for name in [
-            "get_instance",
-            "delete_instance",
-            "delete_disk",
-            "get_pricing_policy",
-            "delete_pricing_policy",
-        ]:
-            mocker.patch.object(resources, name)
-        resources.get_instance.side_effect = make_request_error(StatusCode.NOT_FOUND)
-        resources.get_pricing_policy.return_value = make_pricing_policy()
+        mocks = {
+            name: mocker.patch.object(resources, name)
+            for name in [
+                "get_instance",
+                "delete_instance",
+                "delete_disk",
+                "get_pricing_policy",
+                "delete_pricing_policy",
+            ]
+        }
+        mocks["get_instance"].side_effect = make_request_error(StatusCode.NOT_FOUND)
+        mocks["get_pricing_policy"].return_value = make_pricing_policy()
         return resources
 
     def test_deletes_instance_first(self, resources):

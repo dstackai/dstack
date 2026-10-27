@@ -15,10 +15,11 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import JobProvisioningData
 
 
-def _compute() -> CloudRiftCompute:
+def _compute_with_mocked_api_client() -> tuple[CloudRiftCompute, MagicMock]:
     compute = CloudRiftCompute(CloudRiftConfig(creds=CloudRiftCreds(api_key="test")))
-    compute.client = MagicMock()
-    return compute
+    client = MagicMock()
+    compute.client = client
+    return compute, client
 
 
 def _provisioning_data(ssh_port: int | None = None) -> JobProvisioningData:
@@ -75,8 +76,8 @@ def _offer() -> InstanceOfferWithAvailability:
 
 class TestCloudRiftComputeCreateInstance:
     def test_waits_for_ssh_endpoint_from_cloudrift(self):
-        compute = _compute()
-        compute.client.deploy_instance.return_value = ["instance-id"]
+        compute, client = _compute_with_mocked_api_client()
+        client.deploy_instance.return_value = ["instance-id"]
         instance_config = InstanceConfiguration(
             project_name="main",
             instance_name="test-instance",
@@ -97,9 +98,9 @@ class TestCloudRiftComputeCreateInstance:
 
 class TestCloudRiftComputeUpdateProvisioningData:
     def test_sets_hostname_and_mapped_ssh_port(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info()
+        client.get_instance_by_id.return_value = _vm_instance_info()
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -111,11 +112,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 57001
 
     def test_accepts_string_port_mapping_values(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
-            port_mappings=[["22", "57001"]]
-        )
+        client.get_instance_by_id.return_value = _vm_instance_info(port_mappings=[["22", "57001"]])
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -127,9 +126,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 57001
 
     def test_uses_ssh_port_from_instructions_when_port_mappings_are_missing(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
+        client.get_instance_by_id.return_value = _vm_instance_info(
             port_mappings=None,
             instructions={"placeholder_values": [["SSH_PORT", "-p 57001"]]},
         )
@@ -144,9 +143,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 57001
 
     def test_uses_ssh_port_from_instructions_when_port_mappings_are_empty(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
+        client.get_instance_by_id.return_value = _vm_instance_info(
             port_mappings=[],
             instructions={"placeholder_values": [["SSH_PORT", "-p 57001"]]},
         )
@@ -161,9 +160,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 57001
 
     def test_uses_default_ssh_port_from_empty_ssh_port_instruction(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
+        client.get_instance_by_id.return_value = _vm_instance_info(
             port_mappings=None,
             instructions={"placeholder_values": [["SSH_PORT", ""]]},
         )
@@ -178,11 +177,11 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 22
 
     def test_uses_default_ssh_port_when_cloudrift_does_not_return_port_mapping_data(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
         instance_info = _vm_instance_info()
         instance_info.pop("port_mappings")
-        compute.client.get_instance_by_id.return_value = instance_info
+        client.get_instance_by_id.return_value = instance_info
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -194,13 +193,13 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 22
 
     def test_uses_default_ssh_port_when_instructions_do_not_include_ssh_port(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
         instance_info = _vm_instance_info(
             instructions={"placeholder_values": [["USERNAME", "riftuser"]]}
         )
         instance_info.pop("port_mappings")
-        compute.client.get_instance_by_id.return_value = instance_info
+        client.get_instance_by_id.return_value = instance_info
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -212,9 +211,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port == 22
 
     def test_waits_for_ssh_port_when_port_mappings_are_temporarily_missing(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(port_mappings=[])
+        client.get_instance_by_id.return_value = _vm_instance_info(port_mappings=[])
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -226,9 +225,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port is None
 
     def test_waits_for_ssh_port_when_port_mappings_are_invalid(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
+        client.get_instance_by_id.return_value = _vm_instance_info(
             port_mappings=[
                 [22],
                 [22, "not-a-port"],
@@ -248,13 +247,13 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port is None
 
     def test_waits_for_ssh_port_when_ssh_port_instruction_is_invalid(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
         instance_info = _vm_instance_info(
             instructions={"placeholder_values": [["SSH_PORT", "-p not-a-port"]]}
         )
         instance_info.pop("port_mappings")
-        compute.client.get_instance_by_id.return_value = instance_info
+        client.get_instance_by_id.return_value = instance_info
 
         compute.update_provisioning_data(
             provisioning_data=provisioning_data,
@@ -266,9 +265,9 @@ class TestCloudRiftComputeUpdateProvisioningData:
         assert provisioning_data.ssh_port is None
 
     def test_does_not_update_before_vm_is_ready(self):
-        compute = _compute()
+        compute, client = _compute_with_mocked_api_client()
         provisioning_data = _provisioning_data()
-        compute.client.get_instance_by_id.return_value = _vm_instance_info(
+        client.get_instance_by_id.return_value = _vm_instance_info(
             virtual_machines=[{"ready": False}]
         )
 
