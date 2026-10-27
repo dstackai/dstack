@@ -2,8 +2,8 @@ from typing import Optional
 
 from dstack._internal.core.compatibility.common import get_profile_excludes
 from dstack._internal.core.models.common import (
-    IncludeExcludeDictType,
     IncludeExcludeSetType,
+    IncludeExcludeStrDictType,
 )
 from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
@@ -24,19 +24,19 @@ def get_list_runs_excludes(list_runs_request: ListRunsRequest) -> IncludeExclude
     return excludes
 
 
-def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeDictType]:
+def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeStrDictType]:
     """
     Returns `plan` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    apply_plan_excludes: IncludeExcludeDictType = {}
+    apply_plan_excludes: IncludeExcludeStrDictType = {}
     run_spec_excludes = get_run_spec_excludes(plan.run_spec)
     if run_spec_excludes is not None:
         apply_plan_excludes["run_spec"] = run_spec_excludes
     current_resource = plan.current_resource
     if current_resource is not None:
-        current_resource_excludes: IncludeExcludeDictType = {}
+        current_resource_excludes: IncludeExcludeStrDictType = {}
         apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
         current_resource_excludes["jobs"] = {
@@ -62,12 +62,12 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
     return {"plan": apply_plan_excludes}
 
 
-def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExcludeDictType]:
+def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExcludeStrDictType]:
     """
     Excludes new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    get_plan_excludes: IncludeExcludeDictType = (
+    get_plan_excludes: IncludeExcludeStrDictType = (
         {} if request.reverse_offers else {"reverse_offers": True}
     )
     run_spec_excludes = get_run_spec_excludes(request.run_spec)
@@ -76,14 +76,14 @@ def get_get_plan_excludes(request: GetRunPlanRequest) -> Optional[IncludeExclude
     return get_plan_excludes
 
 
-def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
+def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeStrDictType:
     """
     Returns `run_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: IncludeExcludeDictType = {}
-    configuration_excludes: IncludeExcludeDictType = {}
+    spec_excludes: IncludeExcludeStrDictType = {}
+    configuration_excludes: IncludeExcludeStrDictType = {}
     profile_excludes = get_profile_excludes(run_spec.profile)
     for field in get_profile_excludes(run_spec.configuration):
         configuration_excludes[field] = True
@@ -106,13 +106,13 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     return spec_excludes
 
 
-def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
+def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeStrDictType:
     """
     Returns `job_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: IncludeExcludeDictType = {}
+    spec_excludes: IncludeExcludeStrDictType = {}
     if all(s.node_group_index == 0 for s in job_specs):
         spec_excludes["node_group_index"] = True
     if all(s.node_group_name == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
@@ -122,8 +122,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     return spec_excludes
 
 
-def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> IncludeExcludeDictType:
-    submission_excludes: IncludeExcludeDictType = {}
+def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> IncludeExcludeStrDictType:
+    submission_excludes: IncludeExcludeStrDictType = {}
     # `Resources.description` is deprecated and never set since 0.21. Not sending it lets 0.22
     # drop the field without breaking 0.21 clients.
     submission_excludes["job_provisioning_data"] = {
