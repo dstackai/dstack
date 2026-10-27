@@ -122,6 +122,7 @@ class VultrCompute(
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
+        assert backend_data is not None
         plan_type = json.loads(backend_data)["plan_type"]
         try:
             self.api_client.terminate_instance(instance_id=instance_id, plan_type=plan_type)
@@ -134,6 +135,7 @@ class VultrCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
+        assert provisioning_data.backend_data is not None
         plan_type = json.loads(provisioning_data.backend_data)["plan_type"]
         instance_data = self.api_client.get_instance(provisioning_data.instance_id, plan_type)
         # Access specific fields

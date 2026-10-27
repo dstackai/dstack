@@ -117,6 +117,7 @@ include = [
     "src/dstack/_internal/core/backends/lium",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
+    "src/dstack/_internal/core/backends/vultr",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
