@@ -75,6 +75,9 @@ jobs:
         run: uv sync --all-extras
       - name: Run pyright
         uses: jakebailey/pyright-action@v3
+        env:
+          # The default Node heap on the macOS runners (~2 GB) is not enough for pyright
+          NODE_OPTIONS: --max-old-space-size=4096
         with:
           pylance-version: latest-release
       - name: Download frontend build
