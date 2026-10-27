@@ -75,6 +75,7 @@ class TestRiftClient:
         with pytest.raises(requests.HTTPError) as exc_info:
             RiftClient("test-key").list_recipes()
 
+        assert exc_info.value.response is not None
         assert exc_info.value.response.text == "unsupported version"
 
 

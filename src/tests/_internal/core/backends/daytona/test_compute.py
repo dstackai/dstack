@@ -368,6 +368,7 @@ class TestRegistryAuth:
         data = _run_job(compute, registry_auth=RegistryAuth(username="user", password="password"))
         _update(compute, data)
         data = JobProvisioningData.model_validate_json(data.model_dump_json())
+        assert data.backend_data is not None
         assert json.loads(data.backend_data) == {
             "startup_command": None,
             "registry_id": "registry-id",

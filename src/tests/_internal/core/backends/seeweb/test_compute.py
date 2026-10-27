@@ -28,7 +28,8 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHKey,
 )
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 
 def _config(regions=None) -> SeewebConfig:
@@ -124,7 +125,9 @@ def test_get_offers_marks_only_creatable_as_available():
         ),
     ):
         offers = SeewebCompute(_config()).get_offers_by_requirements(
-            requirements=None, full_offers=False, unallocated_resources=False
+            requirements=Requirements(resources=ResourcesSpec()),
+            full_offers=False,
+            unallocated_resources=False,
         )
 
     by_name = {offer.instance.name: offer for offer in offers}
@@ -150,7 +153,9 @@ def test_get_offers_filters_configured_regions():
         ),
     ):
         offers = SeewebCompute(_config(["it-mi2"])).get_offers_by_requirements(
-            requirements=None, full_offers=False, unallocated_resources=False
+            requirements=Requirements(resources=ResourcesSpec()),
+            full_offers=False,
+            unallocated_resources=False,
         )
 
     assert [offer.region for offer in offers] == ["it-mi2"]

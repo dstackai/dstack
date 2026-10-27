@@ -4,7 +4,8 @@ from typing import Optional
 from unittest.mock import Mock
 
 import pytest
-from nebius.aio.service_error import RequestError, RequestStatusExtended, StatusCode
+from grpc import StatusCode
+from nebius.aio.service_error import RequestError, RequestStatusExtended
 from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
 from nebius.api.nebius.common.v1 import ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
