@@ -74,8 +74,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
       - name: Run pyright
-        # Type checking does not depend on the OS, so run it once per Python version
-        if: matrix.os == 'ubuntu-latest'
         uses: jakebailey/pyright-action@v3
         with:
           pylance-version: latest-release
