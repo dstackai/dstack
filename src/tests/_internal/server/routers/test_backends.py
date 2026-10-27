@@ -505,7 +505,7 @@ class TestCreateBackend:
                 "dstack._internal.core.backends.azure.configurator.network_mgmt.NetworkManagementClient"
             ) as NetworkManagementClientMock,
         ):
-            authenticate_mock.return_value = None, "test_tenant"
+            authenticate_mock.return_value = None
             subscription_client_mock = SubscriptionClientMock.return_value
             tenant_mock = Mock()
             tenant_mock.tenant_id = "test_tenant"

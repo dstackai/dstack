@@ -109,15 +109,15 @@ include = [
     "src/dstack/plugins",
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
-    "src/dstack/_internal/core/backends/aws",
-    "src/dstack/_internal/core/backends/daytona",
-    "src/dstack/_internal/core/backends/kubernetes",
-    "src/dstack/_internal/core/backends/lium",
-    "src/dstack/_internal/core/backends/runpod",
-    "src/dstack/_internal/core/backends/slurm",
+    "src/dstack/_internal/core/backends",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
     "src/tests/_internal/server/background/pipeline_tasks",
+]
+exclude = [
+    # OCI has pyright errors. Excluded rather than ignored because checking it makes pyright analyze
+    # the large OCI SDK, which is slow and takes a lot of memory. Editors still show its errors
+    "src/dstack/_internal/core/backends/oci",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",

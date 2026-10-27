@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Union
 
 from azure.core.exceptions import ClientAuthenticationError
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
@@ -9,26 +9,26 @@ from dstack._internal.core.backends.azure.models import (
     AzureClientCreds,
 )
 from dstack._internal.core.errors import BackendAuthError
+from dstack._internal.utils.common import get_or_error
 
 AzureCredential = Union[ClientSecretCredential, DefaultAzureCredential]
 
 
-def authenticate(creds: AnyAzureCreds) -> Tuple[AzureCredential, str]:
-    credential, tenant_id = get_credential(creds)
+def authenticate(creds: AnyAzureCreds) -> AzureCredential:
+    credential = get_credential(creds)
     check_credential(credential)
-    return credential, tenant_id
+    return credential
 
 
-def get_credential(creds: AnyAzureCreds) -> Tuple[AzureCredential, str]:
+def get_credential(creds: AnyAzureCreds) -> AzureCredential:
     if isinstance(creds, AzureClientCreds):
-        credential = ClientSecretCredential(
-            tenant_id=creds.tenant_id,
+        return ClientSecretCredential(
+            # The configurator populates `tenant_id` from the backend config if it's missing
+            tenant_id=get_or_error(creds.tenant_id),
             client_id=creds.client_id,
             client_secret=creds.client_secret,
         )
-        return credential, creds.tenant_id
-
-    return DefaultAzureCredential(), None
+    return DefaultAzureCredential()
 
 
 def check_credential(credential: AzureCredential):

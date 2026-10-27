@@ -8,6 +8,9 @@ from datetime import datetime
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import google.api_core.exceptions
+
+# Pyright infers compute_v1 enum members as ints in the huge generated types module,
+# so accessing `.name` on them needs a pyright ignore.
 import google.cloud.compute_v1 as compute_v1
 import gpuhunt
 from cachetools import TTLCache, cachedmethod
@@ -834,7 +837,7 @@ class GCPCompute(
         logger.debug("Creating health check for gateway %s...", configuration.gateway_name)
         health_check = compute_v1.HealthCheck()
         health_check.name = health_check_name
-        health_check.type_ = compute_v1.HealthCheck.Type.HTTP.name
+        health_check.type_ = compute_v1.HealthCheck.Type.HTTP.name  # pyright: ignore[reportAttributeAccessIssue]
         health_check.http_health_check = compute_v1.HTTPHealthCheck(port=80)
         operation = self.region_health_checks_client.insert(
             project=self.config.project_id,
@@ -846,20 +849,20 @@ class GCPCompute(
 
         logger.debug("Creating backend service for gateway %s...", configuration.gateway_name)
         load_balancing_scheme = (
-            compute_v1.BackendService.LoadBalancingScheme.EXTERNAL_MANAGED.name
+            compute_v1.BackendService.LoadBalancingScheme.EXTERNAL_MANAGED.name  # pyright: ignore[reportAttributeAccessIssue]
             if configuration.public_ip
-            else compute_v1.BackendService.LoadBalancingScheme.INTERNAL_MANAGED.name
+            else compute_v1.BackendService.LoadBalancingScheme.INTERNAL_MANAGED.name  # pyright: ignore[reportAttributeAccessIssue]
         )
         backend_service = compute_v1.BackendService()
         backend_service.name = backend_service_name
         backend_service.load_balancing_scheme = load_balancing_scheme
-        backend_service.protocol = compute_v1.BackendService.Protocol.HTTP.name
+        backend_service.protocol = compute_v1.BackendService.Protocol.HTTP.name  # pyright: ignore[reportAttributeAccessIssue]
         backend_service.port_name = "http"
         backend_service.health_checks = [health_check_resource_name]
         backend_service.backends = [
             compute_v1.Backend(
                 group=instance_group_resource_name,
-                balancing_mode=compute_v1.Backend.BalancingMode.UTILIZATION.name,
+                balancing_mode=compute_v1.Backend.BalancingMode.UTILIZATION.name,  # pyright: ignore[reportAttributeAccessIssue]
                 capacity_scaler=1.0,
             )
         ]
@@ -922,7 +925,7 @@ class GCPCompute(
         forwarding_rule = compute_v1.ForwardingRule()
         forwarding_rule.name = forwarding_rule_name
         forwarding_rule.load_balancing_scheme = load_balancing_scheme
-        forwarding_rule.I_p_protocol = compute_v1.ForwardingRule.IPProtocolEnum.TCP.name
+        forwarding_rule.I_p_protocol = compute_v1.ForwardingRule.IPProtocolEnum.TCP.name  # pyright: ignore[reportAttributeAccessIssue]
         forwarding_rule.port_range = "80" if configuration.certificate is None else "443"
         forwarding_rule.target = target_proxy_resource_name
         forwarding_rule.network = self.config.vpc_resource_name

@@ -7,10 +7,10 @@ from decimal import ROUND_CEILING, Decimal
 from functools import cached_property
 from typing import List, Optional
 
-from nebius.aio.operation import Operation as SDKOperation
-from nebius.aio.service_error import RequestError, StatusCode
+from grpc import StatusCode
+from nebius.aio.service_error import RequestError
 from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
-from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
+from nebius.api.nebius.common.v1 import ResourceMetadata
 from nebius.api.nebius.compute.v1 import Disk, DiskStatus, Instance, InstanceStatus
 from nebius.sdk import SDK
 
@@ -223,10 +223,9 @@ class NebiusCompute(
             logger.debug("Blocking until disk %s is created", create_disk_op.resource_id)
             resources.wait_for_operation(create_disk_op, timeout=WAIT_FOR_DISK_TIMEOUT)
             if not create_disk_op.successful():
-                raw_op = create_disk_op.raw()
                 raise ProvisioningError(
-                    f"Create disk operation failed. Message: {raw_op.status.message}."
-                    f" Details: {raw_op.status.details}"
+                    "Create disk operation failed."
+                    f" {resources.get_operation_error(create_disk_op)}"
                 )
             if (
                 instance_offer.instance.resources.spot
@@ -244,10 +243,9 @@ class NebiusCompute(
                     create_pricing_policy_op, timeout=WAIT_FOR_PRICING_POLICY_TIMEOUT
                 )
                 if not create_pricing_policy_op.successful():
-                    raw_op = create_pricing_policy_op.raw()
                     raise ProvisioningError(
-                        f"Create pricing policy operation failed. Message: {raw_op.status.message}."
-                        f" Details: {raw_op.status.details}"
+                        "Create pricing policy operation failed."
+                        f" {resources.get_operation_error(create_pricing_policy_op)}"
                     )
             create_instance_op = resources.create_instance(
                 sdk=self._sdk,
@@ -473,13 +471,12 @@ class NebiusPlacementGroupBackendData(CoreModel):
         return validate_json_extra_ignore(cls, raw)
 
 
-def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
+def _wait_for_instance(sdk: SDK, op: resources.NebiusOperation) -> None:
     start = time.monotonic()
     while True:
         if op.done() and not op.successful():
             raise ProvisioningError(
-                f"Create instance operation failed. Message: {op.raw().status.message}."
-                f" Details: {op.raw().status.details}"
+                f"Create instance operation failed. {resources.get_operation_error(op)}"
             )
         instance = resources.get_instance(sdk, op.resource_id)
         if instance.status.state in [

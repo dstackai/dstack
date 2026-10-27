@@ -94,7 +94,9 @@ class CloudRiftCompute(
 
         gpu_vendor = None
         if instance_offer.instance.resources.gpus:
-            gpu_vendor = instance_offer.instance.resources.gpus[0].vendor.value
+            vendor = instance_offer.instance.resources.gpus[0].vendor
+            assert vendor is not None
+            gpu_vendor = vendor.value
 
         instance_ids = self.client.deploy_instance(
             instance_type=instance_offer.instance.name,
