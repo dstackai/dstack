@@ -14,9 +14,12 @@ from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
+    InstanceOfferWithAvailability,
     InstanceType,
     Resources,
+    SSHKey,
 )
 
 
@@ -29,6 +32,28 @@ def _offer(spot: bool, name: str = "SOME.INSTANCE", region: str = "FIN-01") -> I
         ),
         region=region,
         price=1.0,
+    )
+
+
+def _instance_offer() -> InstanceOfferWithAvailability:
+    return InstanceOfferWithAvailability(
+        backend=BackendType.VERDA,
+        instance=InstanceType(
+            name="CPU.4V.16G",
+            resources=Resources(cpus=4, memory_mib=16384, gpus=[], spot=False),
+        ),
+        region="FIN-01",
+        price=0.0279,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+
+
+def _instance_config(public_keys: list[str]) -> InstanceConfiguration:
+    return InstanceConfiguration(
+        project_name="main",
+        instance_name="verda-one-node-0",
+        user="admin",
+        ssh_keys=[SSHKey(public=key) for key in public_keys],
     )
 
 
@@ -101,23 +126,8 @@ class TestCreateInstance:
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
 
-        instance_offer = SimpleNamespace(
-            backend="verda",
-            instance=SimpleNamespace(
-                name="CPU.4V.16G",
-                resources=SimpleNamespace(
-                    disk=SimpleNamespace(size_mib=102400),
-                    gpus=[],
-                    spot=False,
-                ),
-            ),
-            region="FIN-01",
-            price=0.0279,
-        )
-        instance_config = SimpleNamespace(
-            instance_name="verda-one-node-0",
-            get_public_keys=lambda: ["ssh-rsa test-1", "ssh-rsa test-2"],
-        )
+        instance_offer = _instance_offer()
+        instance_config = _instance_config(["ssh-rsa test-1", "ssh-rsa test-2"])
 
         with (
             patch(
@@ -149,23 +159,8 @@ class TestCreateInstance:
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
 
-        instance_offer = SimpleNamespace(
-            backend="verda",
-            instance=SimpleNamespace(
-                name="CPU.4V.16G",
-                resources=SimpleNamespace(
-                    disk=SimpleNamespace(size_mib=102400),
-                    gpus=[],
-                    spot=False,
-                ),
-            ),
-            region="FIN-01",
-            price=0.0279,
-        )
-        instance_config = SimpleNamespace(
-            instance_name="verda-one-node-0",
-            get_public_keys=lambda: ["ssh-rsa test-1", "ssh-rsa test-2"],
-        )
+        instance_offer = _instance_offer()
+        instance_config = _instance_config(["ssh-rsa test-1", "ssh-rsa test-2"])
 
         with (
             patch(
@@ -197,23 +192,8 @@ class TestCreateInstance:
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
 
-        instance_offer = SimpleNamespace(
-            backend="verda",
-            instance=SimpleNamespace(
-                name="CPU.4V.16G",
-                resources=SimpleNamespace(
-                    disk=SimpleNamespace(size_mib=102400),
-                    gpus=[],
-                    spot=False,
-                ),
-            ),
-            region="FIN-01",
-            price=0.0279,
-        )
-        instance_config = SimpleNamespace(
-            instance_name="verda-one-node-0",
-            get_public_keys=lambda: ["ssh-rsa test"],
-        )
+        instance_offer = _instance_offer()
+        instance_config = _instance_config(["ssh-rsa test"])
 
         with (
             patch(
@@ -253,23 +233,8 @@ class TestCreateInstance:
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
 
-        instance_offer = SimpleNamespace(
-            backend="verda",
-            instance=SimpleNamespace(
-                name="CPU.4V.16G",
-                resources=SimpleNamespace(
-                    disk=SimpleNamespace(size_mib=102400),
-                    gpus=[],
-                    spot=False,
-                ),
-            ),
-            region="FIN-01",
-            price=0.0279,
-        )
-        instance_config = SimpleNamespace(
-            instance_name="verda-one-node-0",
-            get_public_keys=lambda: ["ssh-rsa test-1", "ssh-rsa test-2"],
-        )
+        instance_offer = _instance_offer()
+        instance_config = _instance_config(["ssh-rsa test-1", "ssh-rsa test-2"])
         provider_instance = SimpleNamespace(id="provider-instance-id", location="FIN-01")
 
         with (

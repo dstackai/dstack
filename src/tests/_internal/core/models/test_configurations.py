@@ -15,6 +15,7 @@ from dstack._internal.core.models.configurations import (
     PythonVersion,
     RepoSpec,
     ServiceConfiguration,
+    TaskConfiguration,
     parse_run_configuration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -113,15 +114,20 @@ class TestParseConfiguration:
                 conf["scaling"] = scaling
             return conf
 
-        assert parse_run_configuration(test_conf(1)).replicas == Range(min=1, max=1)
-        assert parse_run_configuration(test_conf("2")).replicas == Range(min=2, max=2)
-        assert parse_run_configuration(test_conf("3..3")).replicas == Range(min=3, max=3)
+        def parse_service(conf: dict) -> ServiceConfiguration:
+            parsed = parse_run_configuration(conf)
+            assert isinstance(parsed, ServiceConfiguration)
+            return parsed
+
+        assert parse_service(test_conf(1)).replicas == Range(min=1, max=1)
+        assert parse_service(test_conf("2")).replicas == Range(min=2, max=2)
+        assert parse_service(test_conf("3..3")).replicas == Range(min=3, max=3)
         with pytest.raises(
             ConfigurationError,
             match="When you set `replicas` to a range, ensure to specify `scaling`",
         ):
             parse_run_configuration(test_conf("0..10"))
-        assert parse_run_configuration(
+        assert parse_service(
             test_conf(
                 "0..10",
                 {
@@ -957,6 +963,7 @@ class TestNodeGroups:
 
     def test_omitted_nodes_defaults_to_one_node_group(self):
         parsed = parse_run_configuration({"type": "task", "commands": ["true"]})
+        assert isinstance(parsed, TaskConfiguration)
         assert parsed.nodes is None
         assert parsed.nodes_num == 1
         assert parsed.node_groups[0].nodes == 1
@@ -1090,6 +1097,7 @@ class TestNodeGroups:
                 "groups": [{"nodes": 1, "commands": ["true"]}],
             }
         )
+        assert isinstance(parsed, TaskConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].resources == ResourcesSpec()
         assert parsed.resources.gpu is not None

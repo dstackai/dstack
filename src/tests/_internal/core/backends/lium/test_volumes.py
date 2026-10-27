@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Union, cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -7,8 +8,10 @@ from dstack._internal.core.backends.lium.api_client import LiumAPIError
 from dstack._internal.core.backends.lium.compute import LiumCompute, _get_volume_commands
 from dstack._internal.core.backends.lium.models import LiumConfig, LiumCreds
 from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.models.runs import Job
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import LiumVolumeConfiguration, VolumeMountPoint
+from dstack._internal.server.testing.common import get_volume
 
 COMPUTE_MODULE = "dstack._internal.core.backends.lium.compute"
 
@@ -94,19 +97,18 @@ class TestVolumeMount:
             _get_volume_commands(Mock(), Mock(), [Mock(), Mock()])
 
     def test_selects_volume_from_alternatives(self):
-        job = SimpleNamespace(
-            job_spec=SimpleNamespace(
-                user=None,
-                volumes=[VolumeMountPoint(name=["elsewhere", "cache"], path="/data")],
-            )
-        )
-        assert _get_volume_commands(Mock(), job, [SimpleNamespace(name="cache")])[-1] == (
+        assert _volume_commands(name=["elsewhere", "cache"], path="/data")[-1] == (
             "mount --bind /mnt /data"
         )
 
 
-def _volume_commands(user=None, path="/checkpoints"):
-    job = SimpleNamespace(
-        job_spec=SimpleNamespace(user=user, volumes=[VolumeMountPoint(name="cache", path=path)])
+def _volume_commands(user=None, path="/checkpoints", name: Union[str, list[str]] = "cache"):
+    # A real `Job` needs a full `JobSpec`, while `_get_volume_commands()` only reads the user and
+    # the mount points
+    job = cast(
+        Job,
+        SimpleNamespace(
+            job_spec=SimpleNamespace(user=user, volumes=[VolumeMountPoint(name=name, path=path)])
+        ),
     )
-    return _get_volume_commands(Mock(), job, [SimpleNamespace(name="cache")])
+    return _get_volume_commands(Mock(), job, [get_volume(name="cache")])
