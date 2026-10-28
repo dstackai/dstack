@@ -112,13 +112,14 @@ include = [
     "src/dstack/_internal/core/backends",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
-    "src/tests/_internal/core",
-    "src/tests/_internal/server/background/pipeline_tasks",
+    "src/tests/_internal",
 ]
 exclude = [
     # OCI has pyright errors. Excluded rather than ignored because checking it makes pyright analyze
     # the large OCI SDK, which is slow and takes a lot of memory. Editors still show its errors
     "src/dstack/_internal/core/backends/oci",
+    # CLI tests have pyright errors that are not fixed yet
+    "src/tests/_internal/cli",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",
