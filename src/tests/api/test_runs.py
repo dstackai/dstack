@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,53 +24,25 @@ from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack.api import Client
 from dstack.api._public.runs import Run, RunCollection
-from dstack.api.server import APIClient
 from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_NO_COMMENT
 
 
-class _RunsAPI:
-    def __init__(self):
-        self.calls = []
-
-    def list(self, **kwargs):
-        self.calls.append(kwargs)
-        if len(self.calls) == 1:
-            return []
-        return ["finished-run"]
-
-
-class _APIClient:
-    def __init__(self):
-        self.runs = _RunsAPI()
-        self.logs: Optional[_LogsAPI] = None
-
-
-class _PlansAPI:
-    def __init__(self):
-        self.run_specs: list[RunSpec] = []
-
-    def get_plan(self, project_name: str, run_spec: RunSpec, **kwargs) -> str:
-        self.run_specs.append(run_spec)
-        return "run-plan"
-
-
-class _PlansAPIClient:
-    def __init__(self):
-        self.runs = _PlansAPI()
+def _get_run_collection(api_client: MagicMock) -> RunCollection:
+    # `list()` and `get_run_plan()` don't use the client
+    return RunCollection(api_client=api_client, project="main", client=cast(Client, None))
 
 
 class TestRunCollectionList:
-    def test_default_list_fallback_limits_job_submissions(self, monkeypatch):
-        api_client = _APIClient()
-        runs = RunCollection(
-            api_client=cast(APIClient, api_client), project="main", client=cast(Client, None)
-        )
-        monkeypatch.setattr(runs, "_model_to_run", lambda run: run)
+    def test_default_list_fallback_limits_job_submissions(self):
+        api_client = MagicMock()
+        api_client.runs.list.side_effect = [[], [_get_run_model(RunStatus.DONE, jobs=[])]]
 
-        assert runs.list() == ["finished-run"]
+        runs = _get_run_collection(api_client).list()
 
-        assert api_client.runs.calls[0]["job_submissions_limit"] == 1
-        assert api_client.runs.calls[1]["job_submissions_limit"] == 1
+        assert [run.name for run in runs] == ["test-run"]
+        assert [
+            call.kwargs["job_submissions_limit"] for call in api_client.runs.list.call_args_list
+        ] == [1, 1]
 
 
 class _LogsAPI:
@@ -132,9 +105,9 @@ def _get_run_model(status: RunStatus, jobs: list[Job]) -> RunModel:
 
 
 def _get_run(run_model: RunModel, logs_api: _LogsAPI) -> Run:
-    api_client = _APIClient()
+    api_client = MagicMock()
     api_client.logs = logs_api
-    return Run(api_client=cast(APIClient, api_client), project="main", run=run_model)
+    return Run(api_client=api_client, project="main", run=run_model)
 
 
 class TestRunLogs:
@@ -197,21 +170,17 @@ class TestRunCollectionGetRunPlan:
     def _get_run_plan(
         self, ssh_identity_file: Optional[Path] = None, ssh_key_pub: Optional[str] = None
     ) -> RunSpec:
-        api_client = _PlansAPIClient()
-        runs = RunCollection(
-            api_client=cast(APIClient, api_client), project="main", client=cast(Client, None)
+        api_client = MagicMock()
+        api_client.runs.get_plan.return_value = "run-plan"
+
+        plan = _get_run_collection(api_client).get_run_plan(
+            configuration=TaskConfiguration(commands=["echo hello"], image="ubuntu:latest"),
+            ssh_identity_file=ssh_identity_file,
+            ssh_key_pub=ssh_key_pub,
         )
 
-        assert (
-            runs.get_run_plan(
-                configuration=TaskConfiguration(commands=["echo hello"], image="ubuntu:latest"),
-                ssh_identity_file=ssh_identity_file,
-                ssh_key_pub=ssh_key_pub,
-            )
-            == "run-plan"
-        )
-
-        return api_client.runs.run_specs[0]
+        assert plan == "run-plan"
+        return api_client.runs.get_plan.call_args.kwargs["run_spec"]
 
     def test_uses_public_key_file(self, tmp_path: Path):
         private_key_path = tmp_path / "id_ed25519"
