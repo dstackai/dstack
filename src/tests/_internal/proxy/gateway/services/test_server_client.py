@@ -117,7 +117,7 @@ class TestHTTPMultiClient:
         # A short path is needed for macOS's Unix-socket pathname limit.
         with TemporaryDirectory() as directory:
             socket = Path(directory) / "server.sock"
-            server = await asyncio.start_unix_server(handle, path=socket)
+            server = await asyncio.start_unix_server(handle, path=socket)  # pyright: ignore[reportAttributeAccessIssue]
             client = HTTPMultiClient(Path(directory))
             try:
                 response = await client.post(

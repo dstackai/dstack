@@ -158,7 +158,7 @@ class TestJobServerConnection:
     async def test_stale_probe_socket_is_not_reachable(self, tunnel_mock):
         job = Mock(id=uuid.uuid4())
         connection = JobServerConnection(job, job_runtime_data=None)
-        stale_socket = socket.socket(socket.AF_UNIX)
+        stale_socket = socket.socket(socket.AF_UNIX)  # pyright: ignore[reportAttributeAccessIssue]
         stale_socket.bind(str(connection._probe_socket_path))
         stale_socket.close()
 
@@ -175,7 +175,7 @@ class TestJobServerConnection:
             await writer.drain()
             writer.close()
 
-        server = await asyncio.start_unix_server(handle, path=connection._probe_socket_path)
+        server = await asyncio.start_unix_server(handle, path=connection._probe_socket_path)  # pyright: ignore[reportAttributeAccessIssue]
         try:
             assert await connection._server_is_reachable()
         finally:
