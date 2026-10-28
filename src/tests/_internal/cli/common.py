@@ -19,6 +19,7 @@ from dstack._internal.cli.models.preset_agent import (
 )
 from dstack._internal.cli.models.presets import VerifiedPreset
 from dstack._internal.cli.services.presets.agents.base import PresetAgentSpec
+from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
@@ -50,20 +51,26 @@ def run_dstack_cli(
     repo_dir: Optional[Path] = None,
 ) -> int:
     exit_code = 0
+    cwd = os.getcwd()
+    prev_home_dir = os.environ.get("HOME")
+    prev_userprofile = os.environ.get("USERPROFILE")
     if repo_dir is not None:
-        cwd = os.getcwd()
         os.chdir(repo_dir)
     if home_dir is not None:
-        prev_home_dir = os.environ.get("HOME")
         os.environ["HOME"] = str(home_dir)
         if IS_WINDOWS:
-            prev_userprofile = os.environ.get("USERPROFILE")
             os.environ["USERPROFILE"] = str(home_dir)
     with patch("sys.argv", ["dstack"] + cli_args):
         try:
             main()
         except SystemExit as e:
-            exit_code = e.code
+            # Same as the process exit status: no code is success, a non-int code is an error
+            if e.code is None:
+                exit_code = 0
+            elif isinstance(e.code, int):
+                exit_code = e.code
+            else:
+                exit_code = 1
         finally:
             if home_dir is not None:
                 if prev_home_dir is None:
@@ -95,28 +102,30 @@ SHARED_PREFIX_WORKLOAD = {
 
 
 def get_preset_benchmark() -> PresetBenchmark:
-    benchmark = PresetBenchmark(
-        tool="vllm bench serve",
-        tool_version="0.11.0",
-        command="vllm bench serve --base-url $SERVICE_URL",
-        workload={
-            "api": "chat_completions",
-            "num_requests": 16,
-            "input_tokens": 1024,
-            "output_tokens": 128,
-            "concurrency": 1,
-        },
-        metrics={
-            "successful_requests": 16,
-            "failed_requests": 0,
-            "duration_seconds": 48.64,
-            "total_input_tokens": 16384,
-            "total_output_tokens": 2048,
-            "output_tok_per_s": 42.1,
-            "per_user_tok_per_s": 42.1,
-            "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
-            "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1},
-        },
+    benchmark = PresetBenchmark.model_validate(
+        {
+            "tool": "vllm bench serve",
+            "tool_version": "0.11.0",
+            "command": "vllm bench serve --base-url $SERVICE_URL",
+            "workload": {
+                "api": "chat_completions",
+                "num_requests": 16,
+                "input_tokens": 1024,
+                "output_tokens": 128,
+                "concurrency": 1,
+            },
+            "metrics": {
+                "successful_requests": 16,
+                "failed_requests": 0,
+                "duration_seconds": 48.64,
+                "total_input_tokens": 16384,
+                "total_output_tokens": 2048,
+                "output_tok_per_s": 42.1,
+                "per_user_tok_per_s": 42.1,
+                "ttft_ms": {"mean": 110.9, "p50": 108.2, "p99": 121.6},
+                "tpot_ms": {"mean": 7.5, "p50": 7.4, "p99": 8.1},
+            },
+        }
     )
     return benchmark
 
@@ -258,14 +267,22 @@ def get_session_run(**overrides: Any) -> PresetSessionRun:
 
 
 def get_successful_preset_report(run: Run) -> PresetAgentSuccess:
-    return PresetAgentSuccess(
-        success=True,
-        run_id=run.id,
-        run_name=run.run_spec.run_name,
-        service_yaml="type: service",
-        trial=1,
-        base="Qwen/Qwen3.5-27B",
-        model="community/Qwen3.5-27B-GPTQ-Int4",
-        context_length=32768,
-        benchmark=get_preset_benchmark(),
+    return PresetAgentSuccess.model_validate(
+        {
+            "success": True,
+            "run_id": run.id,
+            "run_name": run.run_spec.run_name,
+            "service_yaml": "type: service",
+            "trial": 1,
+            "base": "Qwen/Qwen3.5-27B",
+            "model": "community/Qwen3.5-27B-GPTQ-Int4",
+            "context_length": 32768,
+            "benchmark": get_preset_benchmark(),
+        }
     )
+
+
+def get_verified_preset(store: PresetStore, preset_id: str) -> VerifiedPreset:
+    preset = store.get(preset_id)
+    assert isinstance(preset, VerifiedPreset)
+    return preset

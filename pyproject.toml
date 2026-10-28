@@ -118,8 +118,6 @@ exclude = [
     # OCI has pyright errors. Excluded rather than ignored because checking it makes pyright analyze
     # the large OCI SDK, which is slow and takes a lot of memory. Editors still show its errors
     "src/dstack/_internal/core/backends/oci",
-    # CLI tests have pyright errors that are not fixed yet
-    "src/tests/_internal/cli",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",

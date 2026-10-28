@@ -76,7 +76,7 @@ class TestApplyArgs:
         assert modified.model_dump() == conf.model_dump()
 
     def test_ports_override(self):
-        conf = TaskConfiguration(commands=["whoami"], ports=["80"])
+        conf = TaskConfiguration.model_validate({"commands": ["whoami"], "ports": ["80"]})
         modified, args = self.apply_args(conf, ["-p", "8000:80", "--port", "8001:8000"])
         conf.ports = [
             PortMapping(local_port=8000, container_port=80),
@@ -85,12 +85,12 @@ class TestApplyArgs:
         assert modified.model_dump() == conf.model_dump()
 
     def test_local_ports_conflict(self):
-        conf = TaskConfiguration(commands=["whoami"], ports=["3000"])
+        conf = TaskConfiguration.model_validate({"commands": ["whoami"], "ports": ["3000"]})
         with pytest.raises(ConfigurationError):
             self.apply_args(conf, ["-p", "3000:4000"])
 
     def test_any_port(self):
-        conf = TaskConfiguration(commands=["whoami"], ports=["8000"])
+        conf = TaskConfiguration.model_validate({"commands": ["whoami"], "ports": ["8000"]})
         modified, args = self.apply_args(conf, ["-p", "*:8000"])
         conf.ports = [PortMapping(local_port=None, container_port=8000)]
         assert modified.model_dump() == conf.model_dump()
@@ -132,6 +132,7 @@ class TestApplyArgs:
             }
         )
         modified, _ = self.apply_args(conf, ["hello"])
+        assert isinstance(modified, ServiceConfiguration)
         assert modified.groups is not None
         assert modified.groups[0].commands == [
             "echo hello ${{ groups[0].replicas[0].IP_ADDRESS }}"
@@ -164,6 +165,7 @@ class TestApplyArgs:
             }
         )
         modified, _ = self.apply_args(conf, [])
+        assert isinstance(modified, ServiceConfiguration)
         assert modified.commands == ["echo ${{ env.FOO }}"]
 
 

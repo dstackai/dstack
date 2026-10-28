@@ -5,7 +5,7 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
+from typing import Optional, cast
 from uuid import uuid4
 
 import pytest
@@ -42,7 +42,9 @@ from dstack._internal.server.schemas.presets import (
     PushPresetRequest,
     PushPresetResponse,
 )
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.files import create_file_archive
+from dstack.api.server._group import APIRequest
 from dstack.api.server._presets import PresetsAPIClient
 from tests._internal.cli.common import get_preset
 
@@ -176,7 +178,7 @@ def _symlink_member(name: str, linkname: str) -> tarfile.TarInfo:
 def _archive_member_texts(blob: bytes) -> dict[str, str]:
     with tarfile.open(fileobj=io.BytesIO(blob)) as archive:
         return {
-            member.name: archive.extractfile(member).read().decode("utf-8")
+            member.name: get_or_error(archive.extractfile(member)).read().decode("utf-8")
             for member in archive.getmembers()
             if member.isfile()
         }
@@ -278,7 +280,7 @@ class TestPresetsAPIClient:
             calls.append(SimpleNamespace(path=path, body=body, kwargs=kwargs))
             return response
 
-        return PresetsAPIClient(request, logging.getLogger(__name__)), calls
+        return PresetsAPIClient(cast(APIRequest, request), logging.getLogger(__name__)), calls
 
     def test_push_sends_the_name_and_the_typed_spec(self):
         info = _registry_preset_info(name="qwen")
@@ -515,7 +517,7 @@ class TestPullPresetFromRegistry:
         pull_preset_from_registry(store, "dstack/qwen38")
 
         assert len(requests_sent) == 2
-        pulled = store.get(str(remote.id))
+        pulled = get_or_error(store.get(str(remote.id)))
         assert pulled.name == "dstack/qwen38"
         assert Path(pulled.service.files[0].local_path).read_text() == "public preset file"
 
@@ -557,8 +559,8 @@ class TestPullPresetFromRegistry:
 
         pull_preset_from_registry(store, "main/qwen38")
 
-        assert store.get(local.id).name == "qwen38"
-        assert store.get(str(stub_client.remote.id)).name == "main/qwen38"
+        assert get_or_error(store.get(local.id)).name == "qwen38"
+        assert get_or_error(store.get(str(stub_client.remote.id))).name == "main/qwen38"
 
     def test_repointing_a_name_releases_it_from_the_earlier_pull(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
@@ -572,9 +574,9 @@ class TestPullPresetFromRegistry:
         second_id = str(stub_client.remote.id)
         pull_preset_from_registry(store, "main/qwen38")
 
-        assert store.get(first_id).name is None
-        assert store.get(second_id).name == "main/qwen38"
-        assert store.find_by_name("main/qwen38").id == second_id
+        assert get_or_error(store.get(first_id)).name is None
+        assert get_or_error(store.get(second_id)).name == "main/qwen38"
+        assert get_or_error(store.find_by_name("main/qwen38")).id == second_id
 
     def test_a_non_current_version_pulled_by_id_does_not_take_the_name(
         self, tmp_path, stub_client
@@ -590,9 +592,9 @@ class TestPullPresetFromRegistry:
         old_id = str(stub_client.remote.id)
         pull_preset_from_registry(store, f"main/{old_id}")
 
-        assert store.get(old_id).name is None
-        assert store.get(current_id).name == "main/qwen38"
-        assert store.find_by_name("main/qwen38").id == current_id
+        assert get_or_error(store.get(old_id)).name is None
+        assert get_or_error(store.get(current_id)).name == "main/qwen38"
+        assert get_or_error(store.find_by_name("main/qwen38")).id == current_id
 
     def test_repulling_a_copy_by_id_keeps_the_name_it_already_holds(self, tmp_path, stub_client):
         # This copy took the qualified name when it was current. Re-pulling it by
@@ -608,8 +610,8 @@ class TestPullPresetFromRegistry:
         )
         pull_preset_from_registry(store, f"main/{preset_id}")
 
-        assert store.get(preset_id).name == "main/qwen38"
-        assert store.find_by_name("main/qwen38").id == preset_id
+        assert get_or_error(store.get(preset_id)).name == "main/qwen38"
+        assert get_or_error(store.find_by_name("main/qwen38")).id == preset_id
 
     def test_repulling_the_same_version_overwrites_in_place(self, tmp_path, stub_client):
         store = PresetStore(tmp_path / "presets")
@@ -624,7 +626,7 @@ class TestPullPresetFromRegistry:
         stub_client.file_blobs["/app/a.txt"] = _file_archive_blob(tmp_path, "a.txt", "fresh")
         pull_preset_from_registry(store, "main/qwen38")
 
-        assert store.get(preset_id).name == "main/qwen38"
+        assert get_or_error(store.get(preset_id)).name == "main/qwen38"
         assert [path.parent.name for path in store.root.glob("*/preset.yml")] == [preset_id]
         assert (store.root / preset_id / "patch" / "a.txt").read_text() == "fresh"
 

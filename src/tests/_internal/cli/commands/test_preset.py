@@ -13,7 +13,7 @@ from dstack._internal.cli.services.presets import output as presets_utils
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
-from dstack._internal.utils.common import render_datetime_as_api
+from dstack._internal.utils.common import get_or_error, render_datetime_as_api
 from tests._internal.cli.common import (
     get_preset,
     get_session_run,
@@ -543,7 +543,7 @@ env:
 
         assert exit_code == 0
         create.assert_called_once()
-        assert store.get(preset.id).name is None
+        assert get_or_error(store.get(preset.id)).name is None
 
     def test_create_without_confirmation_exits_before_creating(self, tmp_path):
         preset = get_preset().model_copy(update={"name": "qwen"})
@@ -569,7 +569,7 @@ env:
 
         assert exit_code == 0
         create.assert_not_called()
-        assert store.get(preset.id).name == "qwen"
+        assert get_or_error(store.get(preset.id)).name == "qwen"
 
     def test_get_and_delete_resolve_names(self, tmp_path, capsys):
         preset = get_preset().model_copy(update={"name": "qwen"})

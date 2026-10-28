@@ -75,7 +75,7 @@ class TestProfileArgs:
     def test_retry_duration(self):
         profile = Profile(name="test")
         modified, _ = apply_args(profile, ["--retry-duration", "1h"])
-        profile.retry = ProfileRetry(on_events=None, duration="1h")
+        profile.retry = ProfileRetry.model_validate({"on_events": None, "duration": "1h"})
         assert profile.model_dump() == modified.model_dump()
 
 

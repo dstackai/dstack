@@ -8,6 +8,7 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import psutil
 import pytest
@@ -60,6 +61,8 @@ from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import PresetAgentConfig, PresetConfiguration
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.utils.common import get_or_error
+from dstack.api import Client
 from tests._internal.cli.common import get_agent_spec, get_session_run, get_session_state
 
 
@@ -477,7 +480,7 @@ class TestAgentIsolation:
         monkeypatch.setenv("PATH", "/usr/bin")
         monkeypatch.setenv("HOME", "/home/test")
         monkeypatch.setenv("UNRELATED_SECRET", "must-not-be-inherited")
-        api = SimpleNamespace(
+        api = _api(
             project="main",
             client=SimpleNamespace(base_url="http://127.0.0.1:3000"),
         )
@@ -547,11 +550,13 @@ def _session_workspace(tmp_path):
 
 class TestAgentSession:
     def _configuration(self) -> PresetConfiguration:
-        return PresetConfiguration(
-            name="qwen",
-            base="Qwen/Qwen3.5-27B",
-            max_price=0.5,
-            env=["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
+        return PresetConfiguration.model_validate(
+            {
+                "name": "qwen",
+                "base": "Qwen/Qwen3.5-27B",
+                "max_price": 0.5,
+                "env": ["HF_TOKEN", "TOKENIZERS_PARALLELISM=false"],
+            }
         )
 
     def _home(self, tmp_path, monkeypatch) -> None:
@@ -630,7 +635,8 @@ class TestAgentSession:
 
         with pytest.raises(CLIError, match="Could not create agent output"):
             create_preset_session(
-                PresetConfiguration(name="qwen", base="Qwen/Qwen3.5-27B"), previous=()
+                PresetConfiguration.model_validate({"name": "qwen", "base": "Qwen/Qwen3.5-27B"}),
+                previous=(),
             )
 
     def test_log_write_failure_warns_once(self, tmp_path, capsys):
@@ -1325,7 +1331,7 @@ sys.exit(1)
         workspace, session = _agent_setup(tmp_path)
         # Another CLI recorded a stop: the death must read as a decision, not an
         # outage to retry.
-        state = session.read_state()
+        state = get_or_error(session.read_state())
         state.status = "interrupted"
         session.write_state(state)
 
@@ -1622,6 +1628,7 @@ class TestSummarizeSessionTrials:
         trials_dir = _write_trials(tmp_path, [record, rerun, record, nameless])
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         # 4 records = 4 trials: one long-lived task commonly hosts several
         # trials, so identical records must not collapse the count.
@@ -1649,6 +1656,7 @@ class TestSummarizeSessionTrials:
         trials_dir = _write_trials(tmp_path, records)
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["series"] == [float(i * 100) for i in range(1, 13)]
 
@@ -1666,6 +1674,7 @@ class TestSummarizeSessionTrials:
         (trials_dir / "2" / "task.dstack.yml").write_text("type: task\n")
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["count"] == 1
         assert summary["series"] == [2000.0]
@@ -1676,6 +1685,7 @@ class TestSummarizeSessionTrials:
         (trials_dir / "1" / "trial.json").write_text('{"benchmark": {"met')
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["count"] == 0
 
@@ -1780,18 +1790,18 @@ class TestStopOrDetach:
             session.write_state(state)
 
             monkeypatch.setattr(create_module, "confirm_ask", lambda *_: False)
-            _stop_or_detach_agent_session(session, None)
+            _stop_or_detach_agent_session(session, cast(Client, None))
             assert agent.poll() is None
-            assert session.read_state().status == "running"
+            assert get_or_error(session.read_state()).status == "running"
             assert "Detached" in capsys.readouterr().out
 
             monkeypatch.setattr(create_module, "confirm_ask", lambda *_: True)
-            _stop_or_detach_agent_session(session, None)
+            _stop_or_detach_agent_session(session, cast(Client, None))
             psutil.Process(agent.pid).wait(timeout=10)
-            assert session.read_state().status == "interrupted"
+            assert get_or_error(session.read_state()).status == "interrupted"
         finally:
             with suppress(OSError):
-                os.killpg(agent.pid, signal.SIGKILL)
+                os.killpg(agent.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class TestOffsetStoreSharing:
@@ -1821,3 +1831,8 @@ class TestOffsetStoreSharing:
         reloaded = OffsetStore(state)
         for key in ("agent_stdout", "agent_stderr", "runs", "trials"):
             assert reloaded.get(key) == 50
+
+
+def _api(**attrs: Any) -> Client:
+    # Only the attributes that the code under test reads
+    return cast(Client, SimpleNamespace(**attrs))
