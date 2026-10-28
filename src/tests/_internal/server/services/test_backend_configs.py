@@ -1,11 +1,16 @@
 import json
 from pathlib import Path
 from textwrap import dedent
+from typing import cast
 from unittest.mock import patch
 
 import yaml
 
 from dstack._internal.core.backends.kubernetes.backend import KubernetesBackend
+from dstack._internal.core.backends.kubernetes.models import (
+    KubernetesBackendConfigWithCreds,
+    KubernetesConfig,
+)
 from dstack._internal.server import settings
 from dstack._internal.server.services.config import (
     ServerConfigManager,
@@ -181,10 +186,12 @@ class TestKubernetesBackendConfig:
         )
 
         backend_config = config_yaml_to_backend_config(config_yaml)
-        backend = KubernetesBackend(backend_config)
+        assert isinstance(backend_config, KubernetesBackendConfigWithCreds)
+        # `KubernetesConfig` adds no fields to the parsed config
+        backend = KubernetesBackend(cast(KubernetesConfig, backend_config))
 
         cluster = backend.compute().region_cluster_map[""]
-        assert cluster.api_client.configuration.host == (
+        assert cluster.api_client.configuration.host == (  # pyright: ignore[reportAttributeAccessIssue]
             "https://gpu-cluster.internal.example.com:6443"
         )
         assert cluster.proxy_jump.hostname == "204.12.171.137"
@@ -225,7 +232,9 @@ class TestKubernetesBackendConfig:
         )
 
         backend_config = config_yaml_to_backend_config(config_yaml)
-        backend = KubernetesBackend(backend_config)
+        assert isinstance(backend_config, KubernetesBackendConfigWithCreds)
+        # `KubernetesConfig` adds no fields to the parsed config
+        backend = KubernetesBackend(cast(KubernetesConfig, backend_config))
 
         cluster = backend.compute().region_cluster_map[""]
         assert cluster.namespace == "default"

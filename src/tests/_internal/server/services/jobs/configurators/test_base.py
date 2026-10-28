@@ -1,5 +1,3 @@
-from typing import Union
-
 import pytest
 
 from dstack._internal.core.errors import ServerClientError
@@ -37,7 +35,7 @@ class TestInterpolateJobVolumes:
     )
     def test_interpolates_volumes(
         self,
-        run_volumes: list[Union[MountPoint, str]],
+        run_volumes: list[MountPoint],
         job_num: int,
         job_volumes: list[MountPoint],
     ):
@@ -65,7 +63,7 @@ class TestInterpolateJobVolumes:
     )
     def test_raises_server_client_error(
         self,
-        run_volumes: list[Union[MountPoint, str]],
+        run_volumes: list[MountPoint],
         job_num: int,
     ):
         with pytest.raises(ServerClientError):

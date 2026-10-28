@@ -17,6 +17,7 @@ from dstack._internal.cli.utils.metrics import (
 )
 from dstack._internal.cli.utils.sparkline import SPARKS
 from dstack._internal.core.models.metrics import JobMetrics, Metric
+from dstack._internal.utils.common import get_or_error
 
 GIB = 1024**3
 CAPACITY_GB = 80
@@ -197,7 +198,7 @@ class TestWindow:
     @pytest.mark.parametrize("state,emphasised", [("running", True), ("terminated", False)])
     def test_only_a_live_edge_is_emphasised(self, state: str, emphasised: bool):
         job, metrics = make_run("saturated", state=state)
-        axis = _time_axis(60, *_job_window(metrics))
+        axis = _time_axis(60, *get_or_error(_job_window(metrics)))
         styles = {str(span.style) for span in axis.spans}
         assert ("bold grey58" in styles) == emphasised
 

@@ -32,7 +32,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, Schedule
+from dstack._internal.core.models.profiles import FleetReferenceOrShorthand, Profile, Schedule
 from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -1308,7 +1308,7 @@ class TestGetRun:
         run_spec = get_run_spec(
             repo_id=repo.name,
             run_name="dev-env",
-            configuration=DevEnvironmentConfiguration(ide=ide),
+            configuration=DevEnvironmentConfiguration.model_validate({"ide": ide}),
         )
         run = await create_run(
             session=session,
@@ -1936,16 +1936,16 @@ class TestGetRunPlan:
             configuration=ServiceConfiguration(
                 port=8080,
                 gateway=False,
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="gpu-group",
-                        count=Range[int](min=2, max=2),
+                        replicas=Range[int](min=2, max=2),
                         resources=ResourcesSpec(gpu=GPUSpec()),
                         commands=["python server.py"],
                     ),
                     ReplicaGroup(
                         name="cpu-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         resources=ResourcesSpec(gpu=None),
                         commands=["python router.py"],
                     ),
@@ -2000,14 +2000,14 @@ class TestGetRunPlan:
                 port=8080,
                 gateway=False,
                 image="nginx",
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="reserved-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         reservation="my-reservation-id",
                     ),
                     ReplicaGroup(
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         name="unreserved-group",
                     ),
                 ],
@@ -2927,7 +2927,7 @@ class TestGetRunPlan:
             project_role=ProjectRole.USER,
         )
         repo = await create_repo(session=session, project_id=project.id)
-        selected_fleets = ["fleet-a", "fleet-b"]
+        selected_fleets: list[FleetReferenceOrShorthand] = ["fleet-a", "fleet-b"]
         run_spec = get_run_spec(
             repo_id=repo.name,
             profile=Profile(name="default", fleets=selected_fleets),
@@ -3175,7 +3175,9 @@ class TestGetRunPlan:
             ),
             pytest.param(
                 DevEnvironmentConfiguration(ide="vscode", inactivity_duration=False),
-                DevEnvironmentConfiguration(ide="vscode", inactivity_duration="30m"),
+                DevEnvironmentConfiguration.model_validate(
+                    {"ide": "vscode", "inactivity_duration": "30m"}
+                ),
                 "update",
                 id="update-dev-env",
             ),
@@ -3592,6 +3594,7 @@ class TestApplyPlan:
         )
         run = run_model_to_run(run_model)
         run_spec.configuration_path = "new.dstack.yml"
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.replicas = Range[int](min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
@@ -3614,7 +3617,9 @@ class TestApplyPlan:
         assert updated_run.deployment_num == 1
         assert run.run_spec.configuration_path == "old.dstack.yml"
         assert updated_run.run_spec.configuration_path == "new.dstack.yml"
+        assert isinstance(run.run_spec.configuration, ServiceConfiguration)
         assert run.run_spec.configuration.replicas == Range(min=1, max=1)
+        assert isinstance(updated_run.run_spec.configuration, ServiceConfiguration)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
         events = await list_events(session)
         assert len(events) == 1
@@ -3817,6 +3822,7 @@ class TestApplyPlanServiceGatewayUpdate:
         await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "my-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3860,6 +3866,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=old_gateway, gateway_field="old-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "new-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3892,6 +3899,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = False
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3930,6 +3938,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway_field=False
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3974,6 +3983,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4041,6 +4051,7 @@ class TestApplyPlanServiceGatewayUpdate:
         repo = await create_repo(session=session, project_id=project.id)
 
         run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "nonexistent-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4062,6 +4073,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway_field=False
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4087,6 +4099,7 @@ class TestApplyPlanServiceGatewayUpdate:
             session, project, repo, user, gateway_field=None
         )
         assert run_model.service_spec is None
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = False
 
         response = await self._apply(client, project, user, run_model, run_spec)

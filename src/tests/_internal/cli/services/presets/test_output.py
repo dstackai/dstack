@@ -393,6 +393,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["count"] == 3
         # Still charted: the trial happened and its number is real.
@@ -411,6 +412,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["best"] is None
         assert summary["best_failed"] is None
@@ -425,6 +427,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["gpu"] == "MI300X:192GB:1"
 
@@ -439,6 +442,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["gpu"] == "H200:141GB:8 x3"
 
@@ -459,6 +463,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         # Group order, not sorted: the roles read in the order they ran.
         assert summary["gpu"] == "H200:141GB:8 + H100:80GB:8 x2"
@@ -486,6 +491,7 @@ class TestFailedTrials:
         )
 
         summary = _summarize_session_trials(trials_dir)
+        assert summary is not None
 
         assert summary["best"] is None
         assert summary["best_failed"]["tok_s"] == 300.0

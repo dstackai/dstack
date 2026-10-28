@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 import httpx2 as httpx
 import pytest
 import pytest_asyncio
+from aiocache.base import BaseCache
 
 from dstack._internal.proxy.gateway.auth import GatewayProxyAuthProvider
 from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClient
@@ -11,7 +12,7 @@ from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 @pytest_asyncio.fixture(autouse=True)
 async def clear_auth_cache():
-    cache = GatewayProxyAuthProvider.is_project_member.cache
+    cache = _get_auth_cache()
     await cache.clear()
     yield
     await cache.clear()
@@ -27,7 +28,7 @@ class TestGatewayProxyAuthProvider:
             requests.append(request)
             return httpx.Response(status)
 
-        cache = GatewayProxyAuthProvider.is_project_member.cache
+        cache = _get_auth_cache()
         set_value = AsyncMock(wraps=cache.set)
         monkeypatch.setattr(cache, "set", set_value)
         async with httpx.AsyncClient(
@@ -77,3 +78,8 @@ class TestGatewayProxyAuthProvider:
                 await provider.is_project_member("test", "token")
             assert isinstance(exc.value.__cause__, httpx.RequestError)
             assert exc.value.__cause__.request.url.path == "/api/projects/test/get"
+
+
+def _get_auth_cache() -> BaseCache:
+    # `aiocache.cached` sets `cache` on the wrapper at runtime, but its type doesn't declare it
+    return GatewayProxyAuthProvider.is_project_member.cache  # pyright: ignore[reportAttributeAccessIssue]

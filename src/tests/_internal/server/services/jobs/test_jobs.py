@@ -10,7 +10,7 @@ from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, RunSpec
+from dstack._internal.core.models.runs import JobSpec, Requirements, RunSpec
 from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
 from dstack._internal.server.services.docker import ImageConfig
 from dstack._internal.server.services.jobs import (
@@ -138,7 +138,7 @@ class TestJobSpecUpdatableInPlace:
             commands=["sleep infinity"],
             env={},
             image_name="ubuntu",
-            requirements={"resources": resources},
+            requirements=Requirements.model_validate({"resources": resources}),
         )
 
     def test_identical_specs(self):

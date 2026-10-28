@@ -1,6 +1,7 @@
 import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 
 import httpcore2 as httpcore
 import httpx2 as httpx
@@ -19,7 +20,7 @@ class TestHTTPMultiClient:
         (tmp_path / "server.sock").touch()
         client = HTTPMultiClient(tmp_path)
         cached = next(client._iter_clients_rand())
-        pool = cached.client._transport._pool
+        pool = cast(httpx.AsyncHTTPTransport, cached.client._transport)._pool
         assert isinstance(pool, httpcore.AsyncConnectionPool)
         pool._max_connections = 1
         # Closing the first response assigns a fresh connection to the queued request.
@@ -117,7 +118,7 @@ class TestHTTPMultiClient:
         # A short path is needed for macOS's Unix-socket pathname limit.
         with TemporaryDirectory() as directory:
             socket = Path(directory) / "server.sock"
-            server = await asyncio.start_unix_server(handle, path=socket)
+            server = await asyncio.start_unix_server(handle, path=socket)  # pyright: ignore[reportAttributeAccessIssue]
             client = HTTPMultiClient(Path(directory))
             try:
                 response = await client.post(

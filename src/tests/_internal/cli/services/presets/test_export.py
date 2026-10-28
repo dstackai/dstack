@@ -8,6 +8,7 @@ from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.files import FilePathMapping
+from dstack._internal.utils.common import get_or_error
 from tests._internal.cli.common import get_preset
 
 pytestmark = pytest.mark.windows
@@ -27,7 +28,10 @@ class TestExportPreset:
         destination = tmp_path / "deploy" / "qwen.dstack.yml"
 
         export_preset(
-            store.get(preset.id), preset_dir=preset_dir, destination=destination, force=False
+            get_or_error(store.get(preset.id)),
+            preset_dir=preset_dir,
+            destination=destination,
+            force=False,
         )
 
         exported = destination.parent / "service" / "1" / "patches"
@@ -46,7 +50,7 @@ class TestExportPreset:
         destination = tmp_path / "deploy" / "qwen.dstack.yml"
 
         written = export_preset(
-            store.get(preset.id),
+            get_or_error(store.get(preset.id)),
             preset_dir=preset_dir,
             destination=destination,
             force=False,
@@ -157,7 +161,7 @@ class TestExportPreset:
 
         with pytest.raises(CLIError, match="already exists"):
             export_preset(
-                store.get(get_preset().id),
+                get_or_error(store.get(get_preset().id)),
                 preset_dir=preset_dir,
                 destination=destination,
                 force=False,
@@ -165,7 +169,7 @@ class TestExportPreset:
         assert destination.read_text() == "existing"
 
         export_preset(
-            store.get(get_preset().id),
+            get_or_error(store.get(get_preset().id)),
             preset_dir=preset_dir,
             destination=destination,
             force=True,

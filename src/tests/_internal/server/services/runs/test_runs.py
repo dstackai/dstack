@@ -8,6 +8,7 @@ from dstack._internal.core.models.duration import Duration
 from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services import runs as runs_services
 from dstack._internal.server.services.jobs import check_can_attach_job_volumes
@@ -20,6 +21,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_run_spec,
     get_volume,
+    get_volume_configuration,
 )
 
 
@@ -328,38 +330,30 @@ class TestListUserRuns:
 class TestCanAttachRunVolumes:
     @pytest.mark.asyncio
     async def test_can_attach(self):
-        vol11 = get_volume(name="vol11")
-        vol11.configuration.backend = BackendType.AWS
-        vol11.configuration.region = "eu-west-1"
-        vol12 = get_volume(name="vol12")
-        vol12.configuration.backend = BackendType.AWS
-        vol12.configuration.region = "eu-west-2"
-        vol21 = get_volume(name="vol21")
-        vol21.configuration.backend = BackendType.AWS
-        vol21.configuration.region = "eu-west-1"
-        vol22 = get_volume(name="vol22")
-        vol22.configuration.backend = BackendType.AWS
-        vol22.configuration.region = "eu-west-2"
+        vol11 = _get_aws_volume("vol11", "eu-west-1")
+        vol12 = _get_aws_volume("vol12", "eu-west-2")
+        vol21 = _get_aws_volume("vol21", "eu-west-1")
+        vol22 = _get_aws_volume("vol22", "eu-west-2")
         volumes = [[vol11, vol12], [vol21, vol22]]
         check_can_attach_job_volumes(volumes)
 
     @pytest.mark.asyncio
     async def test_cannot_attach_different_mount_points_with_different_backends_regions(self):
-        vol1 = get_volume(name="vol11")
-        vol1.configuration.backend = BackendType.AWS
-        vol1.configuration.region = "eu-west-1"
-        vol2 = get_volume(name="vol12")
-        vol2.configuration.backend = BackendType.AWS
-        vol2.configuration.region = "eu-west-2"
+        vol1 = _get_aws_volume("vol11", "eu-west-1")
+        vol2 = _get_aws_volume("vol12", "eu-west-2")
         volumes = [[vol1], [vol2]]
         with pytest.raises(ServerClientError):
             check_can_attach_job_volumes(volumes)
 
     @pytest.mark.asyncio
     async def test_cannot_attach_same_volume_at_different_mount_points(self):
-        vol1 = get_volume(name="vol11")
-        vol1.configuration.backend = BackendType.AWS
-        vol1.configuration.region = "eu-west-1"
+        vol1 = _get_aws_volume("vol11", "eu-west-1")
         volumes = [[vol1], [vol1]]
         with pytest.raises(ServerClientError):
             check_can_attach_job_volumes(volumes)
+
+
+def _get_aws_volume(name: str, region: str) -> Volume:
+    return get_volume(
+        name=name, configuration=get_volume_configuration(backend=BackendType.AWS, region=region)
+    )

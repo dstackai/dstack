@@ -55,6 +55,8 @@ class TestInstrumentNamedTask:
         task_span, outer_span = span_exporter.get_finished_spans()
         assert task_span.name == "task"
         assert task_span.parent is None
+        assert task_span.context is not None
+        assert outer_span.context is not None
         assert task_span.context.trace_id != outer_span.context.trace_id
 
 
@@ -63,7 +65,7 @@ class TestRecordTaskRun:
     async def test_counts_runs_by_status(self):
         from opentelemetry import metrics
         from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+        from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
 
         reader = InMemoryMetricReader()
         # The global meter provider can only be set once per process
@@ -85,16 +87,16 @@ class TestRecordTaskRun:
         with pytest.raises(ValueError):
             await failing_task()
 
-        points = (
-            reader.get_metrics_data()
-            .resource_metrics[0]
-            .scope_metrics[0]
-            .metrics[0]
-            .data.data_points
-        )
-        counts = {p.attributes["status"]: p.value for p in points}
+        metrics_data = reader.get_metrics_data()
+        assert metrics_data is not None
+        points = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0].data.data_points
+        counts = {}
+        for point in points:
+            assert isinstance(point, NumberDataPoint)
+            assert point.attributes is not None
+            assert point.attributes["task"] == "task"
+            counts[point.attributes["status"]] = point.value
         assert counts == {"success": 2, "error": 1}
-        assert all(p.attributes["task"] == "task" for p in points)
 
 
 class TestBuildLogHandler:

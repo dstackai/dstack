@@ -112,8 +112,8 @@ class TestProcessProbes:
                     port=80,
                     image="nginx",
                     probes=[
-                        ProbeConfig(type="http", url="/1", timeout="1m"),
-                        ProbeConfig(type="http", url="/2", timeout="2m"),
+                        ProbeConfig.model_validate({"type": "http", "url": "/1", "timeout": "1m"}),
+                        ProbeConfig.model_validate({"type": "http", "url": "/2", "timeout": "2m"}),
                     ],
                 ),
             ),

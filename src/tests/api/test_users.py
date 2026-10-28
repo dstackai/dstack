@@ -3,7 +3,8 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from dstack._internal.utils.common import render_datetime_as_api
+from dstack._internal.core.models.users import UsersInfoList
+from dstack._internal.utils.common import get_or_error, render_datetime_as_api
 from dstack.api.server._users import UsersAPIClient
 from tests.api.common import RequestRecorder
 
@@ -35,7 +36,7 @@ class TestUsersAPIClientList:
             ascending=True,
         )
 
-        payload = json.loads(recorder.last_body)
+        payload = json.loads(get_or_error(recorder.last_body))
         assert recorder.last_path == "/api/users/list"
         assert payload["return_total_count"] is True
         assert payload["name_pattern"] == "user"
@@ -43,6 +44,7 @@ class TestUsersAPIClientList:
         assert payload["prev_id"] == str(uid)
         assert payload["limit"] == 1
         assert payload["ascending"] is True
+        assert isinstance(result, UsersInfoList)
         assert result.total_count == 1
         assert result.users[0].username == "user"
 

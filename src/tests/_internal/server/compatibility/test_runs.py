@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union, cast
 
 import pytest
 from packaging.version import Version
@@ -61,8 +61,11 @@ class TestPatchRunSpecReplicaGroups:
         patch_run_spec(run_spec, client_version)
 
         configuration = run_spec.configuration
+        assert isinstance(configuration, ServiceConfiguration)
         assert configuration.groups is None
-        assert [group["count"] for group in configuration.replicas] == [
+        # Old clients get `replicas` as a list of groups, which the model doesn't type
+        legacy_groups = cast(list[dict[str, Any]], configuration.replicas)
+        assert [group["count"] for group in legacy_groups] == [
             {"min": 1, "max": 1},
             {"min": 2, "max": 2},
         ]
@@ -76,7 +79,9 @@ class TestPatchRunSpecReplicaGroups:
 
         patch_run_spec(run_spec, client_version)
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         assert run_spec.configuration.replicas is None
+        assert run_spec.configuration.groups is not None
         assert [group.replicas for group in run_spec.configuration.groups] == [
             Range[int](min=1, max=1),
             Range[int](min=2, max=2),
@@ -90,6 +95,7 @@ class TestPatchRunSpecReplicaGroups:
 
         patch_run_spec(run_spec, Version("0.21.0"))
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         assert run_spec.configuration.groups is None
         assert run_spec.configuration.replicas == Range[int](min=2, max=2)
 

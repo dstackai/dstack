@@ -217,7 +217,7 @@ class TestGetJobPlansNodeGroups:
                         nodes=2,
                         commands=["echo prefill"],
                         resources=ResourcesSpec(
-                            gpu=GPUSpec(name=["L40S"], count=1),
+                            gpu=GPUSpec.model_validate({"name": ["L40S"], "count": 1}),
                         ),
                     ),
                 ],
@@ -286,16 +286,18 @@ class TestGetJobPlansReplicaGroups:
             configuration=ServiceConfiguration(
                 port=8080,
                 gateway=False,
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="gpu-group",
-                        count=Range[int](min=1, max=1),
-                        resources=ResourcesSpec(gpu=GPUSpec(name=["L40S"], count=1)),
+                        replicas=Range[int](min=1, max=1),
+                        resources=ResourcesSpec(
+                            gpu=GPUSpec.model_validate({"name": ["L40S"], "count": 1})
+                        ),
                         commands=["python server.py"],
                     ),
                     ReplicaGroup(
                         name="cpu-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         resources=ResourcesSpec(cpu=CPUSpec(count=Range[int](min=4, max=4))),
                         commands=["python router.py"],
                     ),
@@ -849,7 +851,6 @@ class TestGetBackendOffersInFleet:
 
         assert offers == [(backend, offer)]
         get_offers_by_requirements_mock.assert_awaited_once()
-        assert (
-            get_offers_by_requirements_mock.await_args.kwargs["master_job_provisioning_data"]
-            is None
-        )
+        await_args = get_offers_by_requirements_mock.await_args
+        assert await_args is not None
+        assert await_args.kwargs["master_job_provisioning_data"] is None

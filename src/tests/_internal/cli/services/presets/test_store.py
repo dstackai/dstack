@@ -11,11 +11,16 @@ from dstack._internal.cli.services.presets import store as store_module
 from dstack._internal.cli.services.presets.store import PresetStore
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.configurations import PresetConfiguration, ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    PresetConfiguration,
+    PresetModelBase,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.presets import PortablePreset
-from tests._internal.cli.common import get_preset
+from dstack._internal.utils.common import get_or_error
+from tests._internal.cli.common import get_preset, get_verified_preset
 
 pytestmark = pytest.mark.windows
 
@@ -113,9 +118,8 @@ class TestPresetStore:
         data["benchmark"]["workload"]["shared_prefix_tokens"] = 0
         path.write_text(yaml.safe_dump(data, sort_keys=False))
 
-        loaded = store.get(preset.id)
+        loaded = get_verified_preset(store, preset.id)
 
-        assert loaded is not None
         assert loaded.configuration.dataset is None
         assert loaded.benchmark.workload.dataset is None
 
@@ -366,11 +370,11 @@ class TestPresetStore:
             """
         )
 
-        preset = store.get("523096d6")
+        preset = get_verified_preset(store, "523096d6")
 
-        assert preset is not None
         assert preset.name == "dsv4-flash"
         assert preset.best_trial == 2
+        assert isinstance(preset.configuration.model, PresetModelBase)
         assert preset.configuration.model.base == "deepseek-ai/DeepSeek-V4-Flash"
         assert preset.configuration.min_context_length == 1048576
         assert preset.configuration.max_ttft == 675
@@ -385,7 +389,7 @@ class TestPresetStore:
         assert [group.name for group in preset.verified_on] == [
             group.name for group in preset.service.replica_groups
         ]
-        assert preset.verified_on[0].replicas[0].gpu.name == ["MI300X"]
+        assert get_or_error(preset.verified_on[0].replicas[0].gpu).name == ["MI300X"]
         # The old format never recorded a dataset name for a synthetic workload.
         assert preset.benchmark.workload.dataset is None
         assert store.list() == [preset]
@@ -456,15 +460,14 @@ class TestPresetStore:
             """
         )
 
-        preset = store.get("aa11bb22")
+        preset = get_verified_preset(store, "aa11bb22")
 
-        assert preset is not None
         assert [(group.name, len(group.replicas)) for group in preset.verified_on] == [
             ("small", 1),
             ("large", 2),
         ]
-        assert preset.verified_on[0].replicas[0].gpu.name == ["H100"]
-        assert preset.verified_on[1].replicas[0].gpu.name == ["H200"]
+        assert get_or_error(preset.verified_on[0].replicas[0].gpu).name == ["H100"]
+        assert get_or_error(preset.verified_on[1].replicas[0].gpu).name == ["H200"]
 
     def test_reports_pre_0_21_presets_as_one_summary_line(self, tmp_path: Path, capsys):
         store = PresetStore(tmp_path / "presets")
@@ -494,7 +497,7 @@ class TestPresetStore:
         preset.service.files = [FilePathMapping(local_path="service/1/patches", path="/patches")]
         store.save(preset)
 
-        loaded = store.get(preset.id)
+        loaded = get_or_error(store.get(preset.id))
 
         assert loaded.service.files[0].local_path == str(
             tmp_path / "presets" / preset.id / "service" / "1" / "patches"
@@ -507,7 +510,7 @@ class TestPresetStore:
         preset.service.files = [FilePathMapping(local_path=absolute, path="/patches")]
         store.save(preset)
 
-        assert store.get(preset.id).service.files[0].local_path == absolute
+        assert get_or_error(store.get(preset.id)).service.files[0].local_path == absolute
 
     def test_release_name_keeps_file_paths_relative(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
@@ -535,7 +538,7 @@ class TestPresetStore:
         )
 
         store.save(preset)
-        env = store.get(preset.id).service.env
+        env = get_or_error(store.get(preset.id)).service.env
 
         assert env["TOKENIZERS_PARALLELISM"] == "false"
         assert env["MODEL_LABEL"] == "monkey"
@@ -584,13 +587,19 @@ class TestResolvePresetPrompt:
     def test_resolves_inline_and_file_relative_to_configuration(self, tmp_path: Path):
         (tmp_path / "notes.md").write_text("From a file.\n")
         base = tmp_path
-        inline = PresetConfiguration(name="q", base="Q/M", prompt="Inline text.")
-        from_file = PresetConfiguration(name="q", base="Q/M", prompt={"path": "notes.md"})
+        inline = PresetConfiguration.model_validate(
+            {"name": "q", "base": "Q/M", "prompt": "Inline text."}
+        )
+        from_file = PresetConfiguration.model_validate(
+            {"name": "q", "base": "Q/M", "prompt": {"path": "notes.md"}}
+        )
 
         assert store_module.resolve_preset_prompt(inline, base) == "Inline text."
         assert store_module.resolve_preset_prompt(from_file, base) == "From a file."
         assert (
-            store_module.resolve_preset_prompt(PresetConfiguration(name="q", base="Q/M"), base)
+            store_module.resolve_preset_prompt(
+                PresetConfiguration.model_validate({"name": "q", "base": "Q/M"}), base
+            )
             is None
         )
 
@@ -600,12 +609,16 @@ class TestResolvePresetPrompt:
 
         with pytest.raises(ConfigurationError, match="Failed to read"):
             store_module.resolve_preset_prompt(
-                PresetConfiguration(name="q", base="Q/M", prompt={"path": "missing.md"}),
+                PresetConfiguration.model_validate(
+                    {"name": "q", "base": "Q/M", "prompt": {"path": "missing.md"}}
+                ),
                 base,
             )
         with pytest.raises(ConfigurationError, match="is empty"):
             store_module.resolve_preset_prompt(
-                PresetConfiguration(name="q", base="Q/M", prompt={"path": "empty.md"}),
+                PresetConfiguration.model_validate(
+                    {"name": "q", "base": "Q/M", "prompt": {"path": "empty.md"}}
+                ),
                 base,
             )
 
@@ -617,14 +630,14 @@ class TestPresetNames:
         store.save(named)
         store.save(get_preset().model_copy(update={"id": "01234567"}))
 
-        assert store.find_by_name("qwen").id == named.id
+        assert get_or_error(store.find_by_name("qwen")).id == named.id
         assert store.find_by_name("other") is None
 
-        released = store.release_name("qwen")
+        released = get_or_error(store.release_name("qwen"))
 
         assert released.id == named.id
         assert store.find_by_name("qwen") is None
-        assert store.get(named.id).name is None
+        assert get_or_error(store.get(named.id)).name is None
 
     def test_find_by_id_or_name_resolves_a_pulled_qualified_name(self, tmp_path: Path):
         store = PresetStore(tmp_path / "presets")
@@ -636,7 +649,7 @@ class TestPresetNames:
 
         # A qualified name is never id-shaped, so the id lookup must not
         # reject it before the name lookup runs.
-        assert store.find_by_id_or_name("main/qwen").id == pulled.id
+        assert get_or_error(store.find_by_id_or_name("main/qwen")).id == pulled.id
         assert store.find_by_id_or_name(pulled.id) == store.get(pulled.id)
 
     def test_find_by_id_or_name_returns_none_for_an_unknown_qualified_ref(self, tmp_path: Path):

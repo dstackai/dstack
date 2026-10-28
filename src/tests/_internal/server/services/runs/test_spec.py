@@ -1,7 +1,7 @@
 import re
 import uuid
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import gpuhunt
 import pytest
@@ -12,10 +12,13 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
     check_can_update_run_spec,
@@ -145,25 +148,23 @@ def _service_run_spec(
 
 
 def _validate(run_spec: RunSpec) -> None:
-    validate_run_spec_and_set_defaults(SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec)
+    validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestValidateRunSpecRetryDuration:
     def test_model_accepts_negative_retry_duration_for_backward_compatibility(self):
-        retry = ProfileRetry(duration=-1)
+        retry = ProfileRetry.model_validate({"duration": -1})
 
         assert retry.duration == -1
 
     def test_rejects_negative_retry_duration_for_new_run_specs(self):
         run_spec = get_run_spec(
             repo_id="test-repo",
-            profile=Profile(name="default", retry=ProfileRetry(duration=-1)),
+            profile=Profile(name="default", retry=ProfileRetry.model_validate({"duration": -1})),
         )
 
         with pytest.raises(ServerClientError, match="retry.duration cannot be negative"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestValidateRunSpecGroupsIpRefs:
@@ -183,9 +184,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_valid_groups_ref(self):
         run_spec = get_run_spec(
@@ -202,9 +201,7 @@ class TestValidateRunSpecGroupsIpRefs:
             ),
         )
 
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_groups_ref_in_env(self):
         run_spec = get_run_spec(
@@ -212,14 +209,14 @@ class TestValidateRunSpecGroupsIpRefs:
             configuration=TaskConfiguration(
                 image="debian",
                 commands=["echo ok"],
-                env={"PREFILL_URL": "http://${{ groups[1].nodes[0].IP_ADDRESS }}"},
+                env=Env.model_validate(
+                    {"PREFILL_URL": "http://${{ groups[1].nodes[0].IP_ADDRESS }}"}
+                ),
             ),
         )
 
         with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_out_of_range_group_index(self):
         run_spec = get_run_spec(
@@ -237,9 +234,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_out_of_range_node_index(self):
         run_spec = get_run_spec(
@@ -257,9 +252,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_replicas_member_in_task_commands(self):
         run_spec = get_run_spec(
@@ -277,9 +270,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_nodes_member_in_service_commands(self):
         run_spec = get_run_spec(
@@ -300,9 +291,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_replicas_ref_on_fixed_and_min_slot(self):
         for replicas in (1, "1..4"):
@@ -316,9 +305,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 repo_id="test-repo",
                 configuration=_service_with_groups([group]),
             )
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_replicas_indexes_for_fixed_count(self):
         run_spec = get_run_spec(
@@ -335,9 +322,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 ]
             ),
         )
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_index_above_min(self):
         run_spec = get_run_spec(
@@ -354,9 +339,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_ref_into_scale_to_zero_group(self):
         run_spec = get_run_spec(
@@ -373,9 +356,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="scales to zero"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_group_out_of_range(self):
         run_spec = get_run_spec(
@@ -391,9 +372,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_ref_to_another_group_min_slot(self):
         run_spec = get_run_spec(
@@ -413,9 +392,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 ]
             ),
         )
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_groups_ref_in_env(self):
         run_spec = get_run_spec(
@@ -434,9 +411,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestRunSpecHasReplicaIpRefs:
@@ -679,7 +654,7 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == expected_vendor
+        assert _gpu_vendor(run_spec.configuration.resources) == expected_vendor
 
     @pytest.mark.parametrize(
         "gpu_spec",
@@ -694,7 +669,7 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_does_not_override_vendor_set_by_the_user(self):
         run_spec = _task_run_spec(
@@ -703,14 +678,14 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.AMD
+        assert _gpu_vendor(run_spec.configuration.resources) == gpuhunt.AcceleratorVendor.AMD
 
     def test_sets_nvidia_if_the_default_image_is_used(self):
         run_spec = _task_run_spec(resources={"gpu": "1"})
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(run_spec.configuration.resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
     @pytest.mark.parametrize(
         ["image", "docker"],
@@ -726,14 +701,14 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_does_not_set_vendor_if_no_gpu_requested(self):
         run_spec = _task_run_spec(resources={"gpu": "0"})
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_sets_default_gpu_spec_if_gpu_is_null(self):
         run_spec = _task_run_spec(resources={"gpu": None})
@@ -760,9 +735,10 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         groups = run_spec.configuration.groups
         assert groups is not None
-        assert [g.resources.gpu.vendor for g in groups] == [
+        assert [_gpu_vendor(g.resources) for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
             gpuhunt.AcceleratorVendor.NVIDIA,
             gpuhunt.AcceleratorVendor.NVIDIA,
@@ -789,8 +765,9 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         assert run_spec.configuration.groups is not None
-        assert run_spec.configuration.groups[0].resources.gpu.vendor == expected_vendor
+        assert _gpu_vendor(run_spec.configuration.groups[0].resources) == expected_vendor
 
     def test_sets_defaults_for_top_level_resources(self):
         # The top-level resources are ignored when replica groups are set, but they are still
@@ -803,7 +780,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
         set_run_spec_resources_defaults(run_spec)
 
         resources = run_spec.configuration.resources
-        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
 
 class TestSetRunSpecResourcesDefaultsNodeGroups:
@@ -818,8 +795,9 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, TaskConfiguration)
         groups = run_spec.configuration.node_groups
-        assert [g.resources.gpu.vendor for g in groups] == [
+        assert [_gpu_vendor(g.resources) for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
             gpuhunt.AcceleratorVendor.NVIDIA,
             gpuhunt.AcceleratorVendor.NVIDIA,
@@ -836,7 +814,7 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
         set_run_spec_resources_defaults(run_spec)
 
         resources = run_spec.configuration.resources
-        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
 
 class TestValidateRunSpecGpuVendorAndImage:
@@ -976,3 +954,13 @@ class TestValidateRunSpecCpuArchAndImage:
         )
 
         _validate(run_spec)
+
+
+def _gpu_vendor(resources: ResourcesSpec) -> Optional[gpuhunt.AcceleratorVendor]:
+    assert resources.gpu is not None
+    return resources.gpu.vendor
+
+
+def _user() -> UserModel:
+    # Only the attribute that `validate_run_spec_and_set_defaults()` reads
+    return cast(UserModel, SimpleNamespace(ssh_public_key="ssh-rsa test"))

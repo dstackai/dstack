@@ -45,11 +45,13 @@ class TestValidateVolumeConfiguration:
 
     def test_external_volume_with_auto_cleanup_duration_raises_error(self):
         """External volumes (with volume_id) should not allow auto_cleanup_duration"""
-        config = AWSVolumeConfiguration(
-            backend=BackendType.AWS,
-            region="us-east-1",
-            volume_id="vol-123456",
-            auto_cleanup_duration="1h",
+        config = AWSVolumeConfiguration.model_validate(
+            {
+                "backend": BackendType.AWS,
+                "region": "us-east-1",
+                "volume_id": "vol-123456",
+                "auto_cleanup_duration": "1h",
+            }
         )
         with pytest.raises(
             ServerClientError, match="External volumes.*do not support auto_cleanup_duration"
@@ -71,11 +73,13 @@ class TestValidateVolumeConfiguration:
 
     def test_external_volume_with_auto_cleanup_disabled_succeeds(self):
         """External volumes with auto_cleanup_duration='off' or -1 should be allowed"""
-        config1 = AWSVolumeConfiguration(
-            backend=BackendType.AWS,
-            region="us-east-1",
-            volume_id="vol-123456",
-            auto_cleanup_duration="off",
+        config1 = AWSVolumeConfiguration.model_validate(
+            {
+                "backend": BackendType.AWS,
+                "region": "us-east-1",
+                "volume_id": "vol-123456",
+                "auto_cleanup_duration": "off",
+            }
         )
         config2 = AWSVolumeConfiguration(
             backend=BackendType.AWS,
@@ -97,8 +101,13 @@ class TestValidateVolumeConfiguration:
 
     def test_new_volume_with_auto_cleanup_duration_succeeds(self):
         """New volumes (without volume_id) with auto_cleanup_duration should be allowed"""
-        config = AWSVolumeConfiguration(
-            backend=BackendType.AWS, region="us-east-1", size=100, auto_cleanup_duration="1h"
+        config = AWSVolumeConfiguration.model_validate(
+            {
+                "backend": BackendType.AWS,
+                "region": "us-east-1",
+                "size": 100,
+                "auto_cleanup_duration": "1h",
+            }
         )
         # Should not raise any errors
         _validate_volume_configuration(config)

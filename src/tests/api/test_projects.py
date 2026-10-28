@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from dstack._internal.utils.common import render_datetime_as_api
+from dstack._internal.utils.common import get_or_error, render_datetime_as_api
 from dstack.api.server._projects import ProjectsAPIClient
 from tests.api.common import RequestRecorder
 
@@ -43,7 +43,7 @@ class TestProjectsAPIClientList:
             ascending=True,
         )
 
-        payload = json.loads(request.last_body)
+        payload = json.loads(get_or_error(request.last_body))
         assert request.last_path == "/api/projects/list"
         assert payload["include_not_joined"] is True
         assert payload["return_total_count"] is True

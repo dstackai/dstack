@@ -112,8 +112,7 @@ include = [
     "src/dstack/_internal/core/backends",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
-    "src/tests/_internal/core",
-    "src/tests/_internal/server/background/pipeline_tasks",
+    "src/tests",
 ]
 exclude = [
     # OCI has pyright errors. Excluded rather than ignored because checking it makes pyright analyze

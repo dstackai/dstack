@@ -188,7 +188,7 @@ class TestSystemPrompt:
         ]
         for content, expected in cases:
             doc.write_text(content)
-            previous = "x" if "previous" in content else None
+            previous = ["x"] if "previous" in content else []
             rendered = get_preset_agent_system_prompt(
                 user_prompt=None, baseline=True, previous=previous, custom_dataset=False
             )

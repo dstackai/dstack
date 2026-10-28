@@ -24,6 +24,7 @@ from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.presets import PresetWorkload
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.runs import Run
+from dstack._internal.utils.common import get_or_error
 from tests._internal.cli.common import (
     SHARED_PREFIX_WORKLOAD,
     get_preset,
@@ -89,12 +90,14 @@ class TestBuildVerifiedPreset:
 
         preset = build_verified_preset(
             run=run,
-            preset_configuration=PresetConfiguration(
-                name="qwen-build",
-                base="Qwen/Qwen3.5-27B",
-                min_context_length=8192,
-                gateway="benchmark-gateway",
-                env=["LICENSE", "TOKENIZERS_PARALLELISM=false"],
+            preset_configuration=PresetConfiguration.model_validate(
+                {
+                    "name": "qwen-build",
+                    "base": "Qwen/Qwen3.5-27B",
+                    "min_context_length": 8192,
+                    "gateway": "benchmark-gateway",
+                    "env": ["LICENSE", "TOKENIZERS_PARALLELISM=false"],
+                }
             ),
             report=get_successful_preset_report(run),
             workspace_path=tmp_path,
@@ -113,8 +116,10 @@ class TestBuildVerifiedPreset:
         assert all(getattr(preset.service, field) is None for field in ProfileParams.model_fields)
         assert isinstance(preset.service.env["LICENSE"], EnvSentinel)
         assert preset.service.env["TOKENIZERS_PARALLELISM"] == "false"
-        assert preset.service.resources.gpu.vendor.value == "nvidia"
-        assert preset.verified_on[0].replicas[0].gpu.name == ["A6000"]
+        gpu = get_or_error(preset.service.resources.gpu)
+        assert gpu.vendor is not None
+        assert gpu.vendor.value == "nvidia"
+        assert get_or_error(preset.verified_on[0].replicas[0].gpu).name == ["A6000"]
 
     def test_rewrites_file_paths_onto_the_mirrored_session_copies(self, tmp_path):
         # `files` local paths resolve into the agent workspace at submission, and
@@ -136,7 +141,9 @@ class TestBuildVerifiedPreset:
 
         preset = build_verified_preset(
             run=run,
-            preset_configuration=PresetConfiguration(name="qwen-build", base="Qwen/Qwen3.5-27B"),
+            preset_configuration=PresetConfiguration.model_validate(
+                {"name": "qwen-build", "base": "Qwen/Qwen3.5-27B"}
+            ),
             report=get_successful_preset_report(run),
             workspace_path=workspace,
             session_path=session,
@@ -163,8 +170,8 @@ class TestBuildVerifiedPreset:
         with pytest.raises(CLIError, match="no mirrored copy"):
             build_verified_preset(
                 run=run,
-                preset_configuration=PresetConfiguration(
-                    name="qwen-build", base="Qwen/Qwen3.5-27B"
+                preset_configuration=PresetConfiguration.model_validate(
+                    {"name": "qwen-build", "base": "Qwen/Qwen3.5-27B"}
                 ),
                 report=get_successful_preset_report(run),
                 workspace_path=workspace,
@@ -238,10 +245,8 @@ class TestBuildVerifiedPreset:
 
         preset = build_verified_preset(
             run=run,
-            preset_configuration=PresetConfiguration(
-                name="qwen-build",
-                base="Qwen/Qwen3.5-27B",
-                dataset="spec_bench",
+            preset_configuration=PresetConfiguration.model_validate(
+                {"name": "qwen-build", "base": "Qwen/Qwen3.5-27B", "dataset": "spec_bench"}
             ),
             report=report,
             workspace_path=tmp_path,
@@ -260,12 +265,14 @@ class TestBuildVerifiedPreset:
 
         preset = build_verified_preset(
             run=run,
-            preset_configuration=PresetConfiguration(
-                name="qwen-build",
-                base="Qwen/Qwen3.5-27B",
-                min_context_length=8192,
-                gateway="benchmark-gateway",
-                dataset="spec_bench",
+            preset_configuration=PresetConfiguration.model_validate(
+                {
+                    "name": "qwen-build",
+                    "base": "Qwen/Qwen3.5-27B",
+                    "min_context_length": 8192,
+                    "gateway": "benchmark-gateway",
+                    "dataset": "spec_bench",
+                }
             ),
             report=_dataset_report(run, dataset="spec_bench", shared_prefix_tokens=768),
             workspace_path=tmp_path,
@@ -291,10 +298,8 @@ class TestBuildVerifiedPreset:
         ):
             build_verified_preset(
                 run=run,
-                preset_configuration=PresetConfiguration(
-                    name="qwen-build",
-                    base="Qwen/Qwen3.5-27B",
-                    dataset="spec_bench",
+                preset_configuration=PresetConfiguration.model_validate(
+                    {"name": "qwen-build", "base": "Qwen/Qwen3.5-27B", "dataset": "spec_bench"}
                 ),
                 report=_dataset_report(run, dataset=reported),
                 workspace_path=tmp_path,
@@ -311,12 +316,14 @@ class TestBuildVerifiedPreset:
         with pytest.raises(CLIError, match="changed an exact model request"):
             build_verified_preset(
                 run=run,
-                preset_configuration=PresetConfiguration(
-                    name="qwen-build",
-                    model={
-                        "repo": "community/Qwen3.5-27B-GPTQ-Int4",
-                        "name": "Qwen/Qwen3.5-27B",
-                    },
+                preset_configuration=PresetConfiguration.model_validate(
+                    {
+                        "name": "qwen-build",
+                        "model": {
+                            "repo": "community/Qwen3.5-27B-GPTQ-Int4",
+                            "name": "Qwen/Qwen3.5-27B",
+                        },
+                    }
                 ),
                 report=report,
                 workspace_path=tmp_path,
@@ -345,6 +352,7 @@ class TestLoadPresetAgentReport:
 
         report = self._load(tmp_path, data, redacted_values=("sk-live-0123456789abcdef",))
 
+        assert isinstance(report, PresetAgentSuccess)
         assert report.benchmark is not None
         assert report.benchmark.command.endswith("Bearer [redacted]'")
         assert "sk-live" not in report.benchmark.command
@@ -373,6 +381,7 @@ class TestLoadPresetAgentReport:
 
         report = self._load(tmp_path, data, redacted_values=())
 
+        assert isinstance(report, PresetAgentSuccess)
         assert report.benchmark is not None
         assert "bearer header" in report.benchmark.command
 

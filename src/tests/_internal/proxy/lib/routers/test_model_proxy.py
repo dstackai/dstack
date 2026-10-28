@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import AsyncIterator, Generator
 from unittest.mock import patch
 
-import httpx
+import httpx2 as httpx
 import openai
 import pytest
 from fastapi import FastAPI
@@ -194,7 +194,9 @@ async def test_chat_completions_stream(mock_chat_client) -> None:
     )
     completion = ""
     async for chunk in response:
-        completion += chunk.choices[0].delta.content
+        content = chunk.choices[0].delta.content
+        assert content is not None
+        completion += content
     assert completion == SAMPLE_RESPONSE
 
 
