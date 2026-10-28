@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Loader, PropertyFilter, Table } from 'components';
+import { DateRangePicker, Loader, PropertyFilter, Table } from 'components';
 import { TableProps } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
@@ -13,8 +13,9 @@ import { useLazyGetAllEventsQuery } from 'services/events';
 import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
 import { useEventsOrder } from './hooks/useEventsOrder';
 import { useFilters } from './hooks/useFilters';
+import { relativeOptions, useTimeRange } from './hooks/useTimeRange';
 
-import styles from 'pages/Runs/List/styles.module.scss';
+import styles from './styles.module.scss';
 
 type RenderHeaderArgs = {
     refreshAction?: () => void;
@@ -57,9 +58,19 @@ export const EventList: React.FC<EventListProps> = ({
 
     const { ascending, sortingProps } = useEventsOrder({ withSearchParams });
 
+    const {
+        timeRange,
+        onChangeTimeRange,
+        isValidRange,
+        refreshRelativeTimeRange,
+        requestParams: timeRangeRequestParams,
+        isPastEnd,
+    } = useTimeRange({ withSearchParams, ascending });
+
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { ...filteringRequestParams, ascending, limit: DEFAULT_TABLE_PAGE_SIZE },
+        args: { ...filteringRequestParams, ...timeRangeRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+        isPastEnd,
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -77,6 +88,12 @@ export const EventList: React.FC<EventListProps> = ({
 
     const { columns } = useColumnsDefinitions();
 
+    const refreshAction = () => {
+        if (!refreshRelativeTimeRange()) {
+            refreshList();
+        }
+    };
+
     const loading = isLoading;
 
     return (
@@ -89,7 +106,7 @@ export const EventList: React.FC<EventListProps> = ({
             loading={loading}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading, ascending })}
+            header={renderHeader?.({ refreshAction, disabledRefresh: loading, ascending })}
             filter={
                 showFilters && (
                     <div className={styles.selectFilters}>
@@ -112,6 +129,15 @@ export const EventList: React.FC<EventListProps> = ({
                                 onLoadItems={handleLoadItems}
                             />
                         </div>
+
+                        <DateRangePicker
+                            value={timeRange}
+                            onChange={onChangeTimeRange}
+                            relativeOptions={relativeOptions}
+                            isValidRange={isValidRange}
+                            placeholder={t('events.time_range_placeholder')}
+                            expandToViewport
+                        />
                     </div>
                 )
             }
