@@ -125,6 +125,16 @@ class Operator(str, Enum):
     IN = "In"
 
 
+class RestartPolicy(str, Enum):
+    """
+    This policy determines how Kubernetes reacts to containers exiting due to errors
+    or other reasons. The default value is `Always`.
+    """
+    ALWAYS = "Always"
+    ON_FAILURE = "OnFailure"
+    NEVER = "Never"
+
+
 class KubernetesBackendData(CoreModel):
     jump_pod_name: str
     jump_pod_service_name: str
@@ -557,7 +567,8 @@ class KubernetesCompute(
                             run_as_group=0,
                         ),
                     )
-                ]
+                ],
+                restart_policy=RestartPolicy.ALWAYS,
             ),
         )
         api.create_namespaced_pod(
@@ -958,6 +969,7 @@ def _create_jump_pod_service_if_not_exists(
                     ],
                 )
             ],
+            restart_policy=RestartPolicy.ALWAYS,
             tolerations=tolerations,
         ),
     )
@@ -1299,6 +1311,7 @@ def _create_job_pod(
                     env=env_vars,
                 )
             ],
+            restart_policy=RestartPolicy.NEVER,
             image_pull_secrets=(
                 [client.V1LocalObjectReference(name=registry_auth_secret_name)]
                 if registry_auth_secret_name is not None
