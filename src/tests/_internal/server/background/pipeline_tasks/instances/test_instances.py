@@ -21,7 +21,7 @@ from dstack._internal.server.testing.common import (
     create_project,
 )
 from dstack._internal.utils.common import get_current_datetime
-from tests._internal.server.background.pipeline_tasks.test_instances.helpers import (
+from tests._internal.server.background.pipeline_tasks.instances.helpers import (
     instance_to_pipeline_item,
     lock_instance,
     process_instance,

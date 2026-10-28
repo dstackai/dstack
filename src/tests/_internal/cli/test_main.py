@@ -1,10 +1,12 @@
 import signal
 import subprocess
 import sys
+from pathlib import Path
 from textwrap import dedent
 from unittest.mock import Mock
 
 import pytest
+from pytest import CaptureFixture
 
 import dstack._internal.cli.main as main_module
 from dstack._internal.compat import IS_WINDOWS
@@ -12,6 +14,18 @@ from tests._internal.cli.common import run_dstack_cli
 
 
 class TestMain:
+    def test_prints_help_and_exists_with_0_exit_code(self, capsys: CaptureFixture):
+        exit_code = run_dstack_cli([])
+        assert exit_code == 0
+        assert capsys.readouterr().out.startswith("Usage: dstack [-h] [-v] COMMAND ...")
+
+    def test_prints_errors_to_stderr(self, tmp_path: Path, capsys: CaptureFixture):
+        exit_code = run_dstack_cli(["ps", "--nonsense"], home_dir=tmp_path)
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "Unrecognized arguments: --nonsense" in captured.err
+
     def test_reraises_keyboard_interrupt(self, monkeypatch: pytest.MonkeyPatch, capsys):
         monkeypatch.setattr(sys, "excepthook", sys.excepthook)
         monkeypatch.setattr(main_module, "check_for_updates", Mock(side_effect=KeyboardInterrupt))

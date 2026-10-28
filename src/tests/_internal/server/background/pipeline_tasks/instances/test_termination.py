@@ -22,7 +22,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     get_job_provisioning_data,
 )
-from tests._internal.server.background.pipeline_tasks.test_instances.helpers import (
+from tests._internal.server.background.pipeline_tasks.instances.helpers import (
     instance_to_pipeline_item,
     lock_instance,
     process_instance,
