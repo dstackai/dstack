@@ -52,7 +52,7 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
 )
 from dstack._internal.utils.common import get_current_datetime
-from tests._internal.server.background.pipeline_tasks.test_runs.helpers import (
+from tests._internal.server.background.pipeline_tasks.runs.helpers import (
     lock_run,
     run_to_pipeline_item,
 )

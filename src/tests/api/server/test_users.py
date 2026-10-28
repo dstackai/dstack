@@ -6,7 +6,7 @@ from uuid import UUID
 from dstack._internal.core.models.users import UsersInfoList
 from dstack._internal.utils.common import get_or_error, render_datetime_as_api
 from dstack.api.server._users import UsersAPIClient
-from tests.api.common import RequestRecorder
+from tests.api.server.common import RequestRecorder
 
 USER_PAYLOAD = {
     "id": "11111111-1111-4111-8111-111111111111",

@@ -56,7 +56,7 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
-from tests._internal.server.background.pipeline_tasks.test_instances.helpers import (
+from tests._internal.server.background.pipeline_tasks.instances.helpers import (
     process_instance,
 )
 
