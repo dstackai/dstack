@@ -32,7 +32,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, Schedule
+from dstack._internal.core.models.profiles import FleetReferenceOrShorthand, Profile, Schedule
 from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -1308,7 +1308,7 @@ class TestGetRun:
         run_spec = get_run_spec(
             repo_id=repo.name,
             run_name="dev-env",
-            configuration=DevEnvironmentConfiguration(ide=ide),
+            configuration=DevEnvironmentConfiguration.model_validate({"ide": ide}),
         )
         run = await create_run(
             session=session,
@@ -1936,7 +1936,7 @@ class TestGetRunPlan:
             configuration=ServiceConfiguration(
                 port=8080,
                 gateway=False,
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="gpu-group",
                         replicas=Range[int](min=2, max=2),
@@ -2000,7 +2000,7 @@ class TestGetRunPlan:
                 port=8080,
                 gateway=False,
                 image="nginx",
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="reserved-group",
                         replicas=Range[int](min=1, max=1),
@@ -2927,7 +2927,7 @@ class TestGetRunPlan:
             project_role=ProjectRole.USER,
         )
         repo = await create_repo(session=session, project_id=project.id)
-        selected_fleets = ["fleet-a", "fleet-b"]
+        selected_fleets: list[FleetReferenceOrShorthand] = ["fleet-a", "fleet-b"]
         run_spec = get_run_spec(
             repo_id=repo.name,
             profile=Profile(name="default", fleets=selected_fleets),
@@ -3175,7 +3175,9 @@ class TestGetRunPlan:
             ),
             pytest.param(
                 DevEnvironmentConfiguration(ide="vscode", inactivity_duration=False),
-                DevEnvironmentConfiguration(ide="vscode", inactivity_duration="30m"),
+                DevEnvironmentConfiguration.model_validate(
+                    {"ide": "vscode", "inactivity_duration": "30m"}
+                ),
                 "update",
                 id="update-dev-env",
             ),

@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from pydantic import AnyHttpUrl
 
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig, ModelEntrypoint
@@ -280,7 +281,7 @@ async def test_migrate_from_state_v1(tmp_path: Path) -> None:
     repo = GatewayProxyRepo.load(v2_file)
     assert await repo.get_config() == GlobalProxyConfig(
         acme_settings=ACMESettings(
-            server="https://acme.test/",
+            server=AnyHttpUrl("https://acme.test/"),
             eab_kid="test_eab_kid",
             eab_hmac_key="test_eab_hmac_key",
         )

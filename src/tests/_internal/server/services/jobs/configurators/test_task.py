@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from dstack._internal.core.models.configurations import NodeGroup, TaskConfiguration
+from dstack._internal.core.models.configurations import NodeGroup, PythonVersion, TaskConfiguration
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.core.models.runs import JobSSHKey
 from dstack._internal.server.services.docker import ImageConfig
@@ -74,13 +75,17 @@ class TestNodeGroups:
                     name="head",
                     nodes=1,
                     commands=["echo head"],
-                    resources=ResourcesSpec(gpu=GPUSpec(name=["H100"], count=1)),
+                    resources=ResourcesSpec(
+                        gpu=GPUSpec.model_validate({"name": ["H100"], "count": 1})
+                    ),
                 ),
                 NodeGroup(
                     name="workers",
                     nodes=1,
                     commands=["echo worker"],
-                    resources=ResourcesSpec(gpu=GPUSpec(name=["A100"], count=2)),
+                    resources=ResourcesSpec(
+                        gpu=GPUSpec.model_validate({"name": ["A100"], "count": 2})
+                    ),
                 ),
             ],
         )
@@ -104,7 +109,7 @@ class TestNodeGroups:
         """Same as replica groups: omitted group resources → ResourcesSpec(), not top-level."""
         configuration = TaskConfiguration(
             image="debian",
-            resources=ResourcesSpec(gpu=GPUSpec(name=["H100"], count=1)),
+            resources=ResourcesSpec(gpu=GPUSpec.model_validate({"name": ["H100"], "count": 1})),
             groups=[
                 NodeGroup(name="head", nodes=1, commands=["echo head"]),
             ],
@@ -148,9 +153,7 @@ class TestServerAccess:
             image="debian",
             commands=["true"],
             dstack=True,
-            env={
-                "DSTACK_SERVER_URL": "https://server.example.com",
-            },
+            env=Env.model_validate({"DSTACK_SERVER_URL": "https://server.example.com"}),
         )
         run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
         configurator = TaskJobConfigurator(run_spec)
@@ -211,7 +214,9 @@ class TestCommands:
         ],
     )
     async def test_with_commands_no_image(self, shell: Optional[str], expected_shell: str):
-        configuration = TaskConfiguration(python="3.12", commands=["sleep inf"], shell=shell)
+        configuration = TaskConfiguration(
+            python=PythonVersion.PY312, commands=["sleep inf"], shell=shell
+        )
         run_spec = get_run_spec(run_name="run", repo_id="id", configuration=configuration)
         configurator = TaskJobConfigurator(run_spec)
 

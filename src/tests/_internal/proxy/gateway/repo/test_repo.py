@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import AnyHttpUrl
 
 from dstack._internal.proxy.gateway.models import ACMESettings, GlobalProxyConfig, ModelEntrypoint
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
@@ -16,7 +17,7 @@ async def test_persist_repo(tmp_path: Path) -> None:
     srv_2 = make_service("proj-2", "run-2", domain="run-2.gtw.test")
     model_1 = make_model("proj-1", "model-1", run_name="run-1")
     entrypoint_1 = ModelEntrypoint(project_name="proj-1", domain="gateway.gtw.test", https=True)
-    config = GlobalProxyConfig(acme_settings=ACMESettings(server="https://acme.test"))
+    config = GlobalProxyConfig(acme_settings=ACMESettings(server=AnyHttpUrl("https://acme.test")))
     file = tmp_path / "state-v2.json"
 
     repo = GatewayProxyRepo.load(file)

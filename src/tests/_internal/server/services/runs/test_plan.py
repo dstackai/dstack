@@ -217,7 +217,7 @@ class TestGetJobPlansNodeGroups:
                         nodes=2,
                         commands=["echo prefill"],
                         resources=ResourcesSpec(
-                            gpu=GPUSpec(name=["L40S"], count=1),
+                            gpu=GPUSpec.model_validate({"name": ["L40S"], "count": 1}),
                         ),
                     ),
                 ],
@@ -286,11 +286,13 @@ class TestGetJobPlansReplicaGroups:
             configuration=ServiceConfiguration(
                 port=8080,
                 gateway=False,
-                replicas=[
+                groups=[
                     ReplicaGroup(
                         name="gpu-group",
                         replicas=Range[int](min=1, max=1),
-                        resources=ResourcesSpec(gpu=GPUSpec(name=["L40S"], count=1)),
+                        resources=ResourcesSpec(
+                            gpu=GPUSpec.model_validate({"name": ["L40S"], "count": 1})
+                        ),
                         commands=["python server.py"],
                     ),
                     ReplicaGroup(

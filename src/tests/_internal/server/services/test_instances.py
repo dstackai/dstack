@@ -454,7 +454,7 @@ class TestSelectInstancesBySelectors:
         res = await instances_services.select_instances_by_selectors(
             session=session,
             project=project,
-            selectors=[FleetInstanceSelector(fleet=selector, instance=1)],
+            selectors=[FleetInstanceSelector.model_validate({"fleet": selector, "instance": 1})],
         )
 
         assert [instance.name for instance in res] == [expected_name]

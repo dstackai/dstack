@@ -34,11 +34,11 @@ class TestProcessIdleVolumes:
 
         config1 = get_volume_configuration(
             name="test-volume",
-            auto_cleanup_duration="1h",
+            auto_cleanup_duration=3600,
         )
         config2 = get_volume_configuration(
             name="test-volume",
-            auto_cleanup_duration="3h",
+            auto_cleanup_duration=10800,
         )
         volume1 = await create_volume(
             session=session,
@@ -101,7 +101,7 @@ class TestProcessIdleVolumes:
             backend=BackendType.AWS,
             configuration=get_volume_configuration(
                 name="test-volume",
-                auto_cleanup_duration="1h",
+                auto_cleanup_duration=3600,
             ),
             volume_provisioning_data=get_volume_provisioning_data(),
             last_job_processed_at=datetime.datetime.now(datetime.timezone.utc)

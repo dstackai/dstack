@@ -553,7 +553,9 @@ class TestListGpus:
         run_spec = get_run_spec(
             run_name="test-run",
             repo_id=repo.name,
-            profile=Profile(name="default", instances=["targeted-instance"]),
+            profile=Profile.model_validate(
+                {"name": "default", "instances": ["targeted-instance"]}
+            ),
         )
 
         offers_by_backend = {

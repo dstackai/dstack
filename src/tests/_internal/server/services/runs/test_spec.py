@@ -12,6 +12,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -151,14 +152,14 @@ def _validate(run_spec: RunSpec) -> None:
 
 class TestValidateRunSpecRetryDuration:
     def test_model_accepts_negative_retry_duration_for_backward_compatibility(self):
-        retry = ProfileRetry(duration=-1)
+        retry = ProfileRetry.model_validate({"duration": -1})
 
         assert retry.duration == -1
 
     def test_rejects_negative_retry_duration_for_new_run_specs(self):
         run_spec = get_run_spec(
             repo_id="test-repo",
-            profile=Profile(name="default", retry=ProfileRetry(duration=-1)),
+            profile=Profile(name="default", retry=ProfileRetry.model_validate({"duration": -1})),
         )
 
         with pytest.raises(ServerClientError, match="retry.duration cannot be negative"):
@@ -213,7 +214,9 @@ class TestValidateRunSpecGroupsIpRefs:
             configuration=TaskConfiguration(
                 image="debian",
                 commands=["echo ok"],
-                env={"PREFILL_URL": "http://${{ groups[1].nodes[0].IP_ADDRESS }}"},
+                env=Env.model_validate(
+                    {"PREFILL_URL": "http://${{ groups[1].nodes[0].IP_ADDRESS }}"}
+                ),
             ),
         )
 
