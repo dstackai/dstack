@@ -168,7 +168,10 @@ def get_region_to_project_id_map(
     configured_project_ids: Optional[list[str]],
     tenant_id: Optional[str] = None,
 ) -> dict[str, str]:
-    """Resolve projects for backend validation and compute; reuse tenant_id when supplied."""
+    """Select one project per region for NebiusConfigurator and NebiusCompute.
+
+    Use configured projects when supplied, otherwise per-region defaults.
+    """
 
     projects = list_tenant_projects(sdk, tenant_id=tenant_id)
     if configured_regions:
@@ -196,7 +199,7 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
 
 
 def get_tenant_id(sdk: SDK) -> str:
-    """Resolve the sole tenant for project discovery and Capacity Advisor."""
+    """Require one visible tenant; used by project selection and Capacity Advisor."""
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
             ListTenantsRequest(),
@@ -210,7 +213,10 @@ def get_tenant_id(sdk: SDK) -> str:
 
 
 def list_tenant_projects(sdk: SDK, tenant_id: Optional[str] = None) -> Sequence[Container]:
-    """List projects for backend discovery, resolving the tenant only if its ID is not supplied."""
+    """Return projects for get_region_to_project_id_map() to validate and select.
+
+    Without tenant_id, require exactly one visible tenant.
+    """
     if tenant_id is None:
         tenant_id = get_tenant_id(sdk)
     projects = LOOP.await_(
@@ -224,7 +230,7 @@ def list_tenant_projects(sdk: SDK, tenant_id: Optional[str] = None) -> Sequence[
 
 
 def list_resource_advice(sdk: SDK, tenant_id: str) -> list[ResourceAdvice]:
-    """Fetch all advice for NebiusCompute offer collection; propagate failures for UNKNOWN fallback."""
+    """Fetch every advice page for NebiusCompute's cache; raise if any page fails."""
     client = ResourceAdviceServiceClient(sdk)
     return _list_all_pages(
         lambda page_token: client.list(

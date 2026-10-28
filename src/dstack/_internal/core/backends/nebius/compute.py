@@ -83,7 +83,7 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](
     max=Memory.parse("8192GB"),  # max for the NETWORK_SSD disk type
 )
 RESOURCE_ADVICE_CACHE_TTL = 600
-"""Reuse capacity advice across offer-cache refreshes, like AWS's quota cache."""
+"""Seconds to cache tenant advice across offer refreshes; matches AWS's quota cache."""
 WAIT_FOR_DISK_TIMEOUT = 20
 WAIT_FOR_PRICING_POLICY_TIMEOUT = 10
 WAIT_FOR_INSTANCE_TIMEOUT = 30
@@ -208,7 +208,7 @@ class NebiusCompute(
         lock=lambda self: self._resource_advice_cache.lock,
     )
     def _get_resource_advice(self) -> list[ResourceAdvice]:
-        """Supply cached advice to offer collection; propagate failures for UNKNOWN fallback."""
+        """Return advice for offer collection; fetch on cache miss and propagate API errors."""
         return resources.list_resource_advice(self._sdk, self._tenant_id)
 
     def get_offer_disk_size_range(
@@ -488,7 +488,7 @@ class NebiusCompute(
         )
 
     def _get_eligible_fabrics(self, data: NebiusOfferBackendData) -> set[str]:
-        """Constrain cluster creation/reuse by catalog compatibility, config, and cached advice."""
+        """Cluster fabrics that are compatible, allowed, and AVAILABLE or UNKNOWN."""
         return {
             fabric
             for fabric in data.fabrics
@@ -532,7 +532,7 @@ class NebiusPlacementGroupBackendData(CoreModel):
 def _get_capacity_availability(
     status: ResourceAdviceStatus.Availability,
 ) -> InstanceAvailability:
-    """Map advice for offer collection; stale or unsupported advice remains UNKNOWN."""
+    """Convert fresh Nebius advice to offer status; stale or unknown data returns UNKNOWN."""
     if status.data_state != ResourceAdviceStatus.Availability.DataState.DATA_STATE_FRESH:
         return InstanceAvailability.UNKNOWN
     level = status.availability_level
@@ -557,7 +557,7 @@ def _apply_resource_advice(
     offer: InstanceOffer,
     advice_by_fabric: dict[str, InstanceAvailability],
 ) -> InstanceOfferWithAvailability:
-    """Annotate catalog offers, retaining per-fabric advice for cluster creation and reuse."""
+    """Set offer status across compatible fabrics; keep per-fabric advice for cluster placement."""
     availability = InstanceAvailability.UNKNOWN
     backend_data = offer.backend_data
     if offer.instance.resources.gpus:
@@ -585,7 +585,7 @@ def _apply_resource_advice(
 
 
 def _get_best_availability(availabilities: Iterable[InstanceAvailability]) -> InstanceAvailability:
-    """Combine fabric statuses for _apply_resource_advice(); UNKNOWN keeps an offer eligible."""
+    """Prefer AVAILABLE, UNKNOWN, NOT_AVAILABLE, then NO_QUOTA; no advice means UNKNOWN."""
     statuses = set(availabilities)
     # Report NO_QUOTA only when every compatible fabric explicitly reports a quota limit.
     for availability in (

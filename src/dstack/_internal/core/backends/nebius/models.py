@@ -184,7 +184,7 @@ class NebiusConfig(NebiusStoredConfig):
 class NebiusOfferBackendData(CoreModel):
     fabrics: set[str] = set()
     fabric_availability: dict[str, InstanceAvailability] = {}
-    """Cached capacity advice for cluster creation and placement-group suitability checks."""
+    """Per-fabric offer status for cluster placement; missing entries mean UNKNOWN."""
     is_preemptible_flat_rate: bool = False
     """
     True if the price of this spot instance does not change and pricing policies are not supported.
