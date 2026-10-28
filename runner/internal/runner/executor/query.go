@@ -23,6 +23,10 @@ func (ex *RunExecutor) GetRunnerState() string {
 	return ex.state
 }
 
+func (ex *RunExecutor) GetJobSubmissionId() string {
+	return ex.jobSubmission.Id
+}
+
 type OrderedEvent interface {
 	GetTimestamp() int64
 }

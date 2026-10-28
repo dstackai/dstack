@@ -170,6 +170,14 @@ class RunnerResponseBodyError(_ResponseBodyError, RunnerResponseError):
     pass
 
 
+class RunnerJobSubmissionMismatchError(RunnerResponseStatusError):
+    """
+    The runner refused a request meant for another job submission than its own, or it has none.
+    The backend may have restarted the container, starting the runner anew, or given the job's
+    address to another container. Either way, the runner the job was submitted to is gone.
+    """
+
+
 class ShimError(DstackError):
     pass
 
@@ -246,11 +254,15 @@ class RunnerClient:
             self._negotiate(healthcheck_response)
         return healthcheck_response
 
-    def get_metrics(self) -> Optional[MetricsResponse]:
-        resp = self._session.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
+    def get_metrics(self, job_submission_id: uuid.UUID) -> Optional[MetricsResponse]:
+        resp = self._session.get(
+            self._url("/api/metrics"),
+            params={"job_submission_id": str(job_submission_id)},
+            timeout=REQUEST_TIMEOUT,
+        )
         if resp.status_code == 404:
             return None
-        self._raise_for_status(resp)
+        self._raise_for_job_submission_status(resp)
         return self._response(MetricsResponse, resp)
 
     def submit_job(
@@ -324,16 +336,22 @@ class RunnerClient:
             return None
         return self._response(JobInfoResponse, resp)
 
-    def pull(self, timestamp: int) -> PullResponse:
+    def pull(self, job_submission_id: uuid.UUID, timestamp: int) -> PullResponse:
         resp = self._session.get(
-            self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
+            self._url("/api/pull"),
+            params={"job_submission_id": str(job_submission_id), "timestamp": timestamp},
+            timeout=REQUEST_TIMEOUT,
         )
-        self._raise_for_status(resp)
+        self._raise_for_job_submission_status(resp)
         return self._response(PullResponse, resp)
 
-    def stop(self):
-        resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
-        self._raise_for_status(resp)
+    def stop(self, job_submission_id: uuid.UUID):
+        resp = self._session.post(
+            self._url("/api/stop"),
+            params={"job_submission_id": str(job_submission_id)},
+            timeout=REQUEST_TIMEOUT,
+        )
+        self._raise_for_job_submission_status(resp)
 
     def _url(self, path: str) -> str:
         return f"{self._base_url}/{path.lstrip('/')}"
@@ -347,6 +365,12 @@ class RunnerClient:
     def _raise_for_status(self, response: requests.Response) -> None:
         if response.status_code >= HTTPStatus.BAD_REQUEST:
             raise RunnerResponseStatusError(response)
+
+    def _raise_for_job_submission_status(self, response: requests.Response) -> None:
+        """`_raise_for_status` for the endpoints that take `job_submission_id`."""
+        if response.status_code == HTTPStatus.CONFLICT:
+            raise RunnerJobSubmissionMismatchError(response)
+        self._raise_for_status(response)
 
     def _healthcheck(self) -> HealthcheckResponse:
         resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)

@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -33,6 +33,7 @@ from dstack._internal.server.schemas.runner import (
 )
 from dstack._internal.server.services.runner.client import (
     RunnerClient,
+    RunnerJobSubmissionMismatchError,
     RunnerResponseBodyError,
     RunnerResponseStatusError,
     ShimClient,
@@ -147,38 +148,38 @@ class TestRunnerClientSubmitJob(BaseShimClientTest):
 class TestRunnerClientResponseErrors(BaseShimClientTest):
     def test_status_error_reports_endpoint_status_and_body(self, adapter: requests_mock.Adapter):
         adapter.register_uri(
-            "POST", "/api/stop", status_code=502, reason="Bad Gateway", text="upstream is down"
+            "POST", "/api/run", status_code=502, reason="Bad Gateway", text="upstream is down"
         )
         client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
 
         with pytest.raises(RunnerResponseStatusError) as excinfo:
-            client.stop()
+            client.run_job()
 
         exc = excinfo.value
         assert exc.status_code == 502
         assert exc.response.status_code == 502
         # The status line reason is dropped: Go derives it from the status code alone,
         # while the body carries the message the handler actually wrote.
-        assert str(exc) == "POST /api/stop: 502: upstream is down"
+        assert str(exc) == "POST /api/run: 502: upstream is down"
         assert repr(exc) == "RunnerResponseStatusError(502)"
         # API errors must not be confused with connection errors
         assert not isinstance(exc, requests.RequestException)
 
     def test_status_error_without_body(self, adapter: requests_mock.Adapter):
-        adapter.register_uri("POST", "/api/stop", status_code=500, text="")
+        adapter.register_uri("POST", "/api/run", status_code=500, text="")
         client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
 
         with pytest.raises(RunnerResponseStatusError) as excinfo:
-            client.stop()
+            client.run_job()
 
-        assert str(excinfo.value) == "POST /api/stop: 500: <empty>"
+        assert str(excinfo.value) == "POST /api/run: 500: <empty>"
 
     def test_status_error_truncates_long_body(self, adapter: requests_mock.Adapter):
-        adapter.register_uri("POST", "/api/stop", status_code=500, text="x" * 4096)
+        adapter.register_uri("POST", "/api/run", status_code=500, text="x" * 4096)
         client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
 
         with pytest.raises(RunnerResponseStatusError) as excinfo:
-            client.stop()
+            client.run_job()
 
         message = str(excinfo.value)
         assert message.endswith("x" * 512 + "...")
@@ -223,6 +224,34 @@ class TestRunnerClientResponseErrors(BaseShimClientTest):
 
         with pytest.raises(RunnerResponseStatusError):
             client.healthcheck()
+
+
+class TestRunnerClientJobSubmissionScoped(BaseShimClientTest):
+    @pytest.mark.parametrize(
+        ("method", "path", "call"),
+        [
+            pytest.param("GET", "/api/pull", lambda c, id_: c.pull(id_, 0), id="pull"),
+            pytest.param("GET", "/api/metrics", lambda c, id_: c.get_metrics(id_), id="metrics"),
+            pytest.param("POST", "/api/stop", lambda c, id_: c.stop(id_), id="stop"),
+        ],
+    )
+    def test_raises_mismatch_error_on_conflict(
+        self,
+        adapter: requests_mock.Adapter,
+        method: str,
+        path: str,
+        call: Callable[[RunnerClient, uuid.UUID], object],
+    ):
+        adapter.register_uri(method, path, status_code=409, text="no job submitted")
+        client = RunnerClient(port=DSTACK_RUNNER_HTTP_PORT)
+        job_submission_id = uuid.uuid4()
+
+        with pytest.raises(RunnerJobSubmissionMismatchError) as excinfo:
+            call(client, job_submission_id)
+
+        assert adapter.last_request is not None
+        assert adapter.last_request.qs["job_submission_id"] == [str(job_submission_id)]
+        assert str(excinfo.value).endswith(": 409: no job submitted")
 
 
 class TestShimClientNegotiate(BaseShimClientTest):

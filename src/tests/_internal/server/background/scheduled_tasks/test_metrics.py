@@ -26,6 +26,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_job_provisioning_data,
+    get_runner_job_submission_mismatch_error,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -84,10 +85,46 @@ class TestCollectMetrics:
             )
             await collect_metrics()
             SSHTunnelMock.assert_called_once()
-            runner_client_mock.get_metrics.assert_called_once()
+            runner_client_mock.get_metrics.assert_called_once_with(job.id)
         res = await session.execute(select(JobMetricsPoint))
         metrics_point = res.scalar_one()
         assert metrics_point.job_id == job.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_skips_metrics_if_runner_no_longer_runs_job(
+        self, test_db, session: AsyncSession
+    ):
+        """The metrics would be of another container, e.g., one restarted in place of the job's."""
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance_assigned=True,
+            instance=instance,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as RunnerClientMock,
+        ):
+            RunnerClientMock.return_value.get_metrics.side_effect = (
+                get_runner_job_submission_mismatch_error(path="/api/metrics")
+            )
+            await collect_metrics()
+        res = await session.execute(select(JobMetricsPoint))
+        assert res.scalars().all() == []
 
 
 class TestDeleteMetrics:

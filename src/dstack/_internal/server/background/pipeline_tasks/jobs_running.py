@@ -1769,7 +1769,22 @@ def _process_running(
 ) -> _ProcessRunningResult:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
-    resp = runner_client.pull(timestamp)
+    try:
+        resp = runner_client.pull(job_model.id, timestamp)
+    except client.RunnerJobSubmissionMismatchError as e:
+        # The runner the job was submitted to is gone, and nothing will ever give the job to
+        # this one. Unlike an unreachable instance, this is not expected to resolve on its own.
+        logger.warning("%s: runner no longer runs the job: %s", fmt(job_model), e)
+        result = _ProcessRunningResult()
+        _terminate_job(
+            job_model=job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.INSTANCE_UNREACHABLE,
+            termination_reason_message=(
+                "Runner no longer runs the job, the container may have been restarted"
+            ),
+        )
+        return result
     try:
         logs_services.write_logs(
             project=run_model.project,

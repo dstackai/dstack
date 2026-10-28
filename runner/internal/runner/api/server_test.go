@@ -20,8 +20,9 @@ import (
 
 // fakeExecutor implements executor.Executor with the minimum needed to drive the handlers.
 type fakeExecutor struct {
-	mu    sync.RWMutex
-	state string
+	mu              sync.RWMutex
+	state           string
+	jobSubmissionId string
 }
 
 func (e *fakeExecutor) SetJob(schemas.SubmitBody)                {}
@@ -37,6 +38,7 @@ func (e *fakeExecutor) GetJobWsLogsHistory() []schemas.LogEvent { return nil }
 
 func (e *fakeExecutor) GetRunnerState() string      { return e.state }
 func (e *fakeExecutor) SetRunnerState(state string) { e.state = state }
+func (e *fakeExecutor) GetJobSubmissionId() string  { return e.jobSubmissionId }
 
 func (e *fakeExecutor) SetJobState(context.Context, schemas.JobState) {}
 func (e *fakeExecutor) SetJobStateWithTerminationReason(
@@ -197,5 +199,53 @@ func TestStop_DoesNotMarkLogsFinished(t *testing.T) {
 	case <-s.pullDoneCh:
 	default:
 		t.Fatal("the first pull after the executor finished must be the final one")
+	}
+}
+
+// /api/stop has a side effect, so the runner itself must refuse a request meant for another job:
+// the backend may have restarted the container, or given the job's address to another one.
+func TestStop_JobSubmissionScoped(t *testing.T) {
+	cases := []struct {
+		name    string
+		query   string
+		status  int
+		stopped bool
+	}{
+		{"same job", "?job_submission_id=job-1", http.StatusOK, true},
+		{"another job", "?job_submission_id=job-2", http.StatusConflict, false},
+		// Old servers do not send the ID
+		{"not sent", "", http.StatusOK, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestServer(t, executor.ServeLogs)
+			s.executor.(*fakeExecutor).jobSubmissionId = "job-1"
+			stopped := false
+			s.cancelRun = func() { stopped = true }
+
+			rec := httptest.NewRecorder()
+			s.srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/stop"+tc.query, nil))
+
+			require.Equal(t, tc.status, rec.Code)
+			require.Equal(t, tc.stopped, stopped)
+		})
+	}
+}
+
+// A runner restarted along with its container has no job, and must not pass for the runner the
+// job was submitted to.
+func TestJobSubmissionScoped_NoJobSubmitted(t *testing.T) {
+	s := newTestServer(t, executor.WaitSubmit)
+	for _, endpoint := range []struct{ method, path string }{
+		{http.MethodGet, "/api/pull"},
+		{http.MethodGet, "/api/metrics"},
+		{http.MethodPost, "/api/stop"},
+	} {
+		rec := httptest.NewRecorder()
+		s.srv.Handler.ServeHTTP(
+			rec, httptest.NewRequest(endpoint.method, endpoint.path+"?job_submission_id=job-1", nil),
+		)
+		require.Equal(t, http.StatusConflict, rec.Code, endpoint.path)
+		require.Equal(t, "no job submitted\n", rec.Body.String(), endpoint.path)
 	}
 }

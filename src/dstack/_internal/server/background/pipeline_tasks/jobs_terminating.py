@@ -799,7 +799,12 @@ def _pull_job_logs(
     job_update_map: _JobUpdateMap,
 ) -> bool:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    resp = runner_client.pull(job_model.runner_timestamp or 0)
+    try:
+        resp = runner_client.pull(job_model.id, job_model.runner_timestamp or 0)
+    except client.RunnerJobSubmissionMismatchError:
+        # Not a failure to report: the job's logs went away with the runner it was submitted to
+        logger.debug("%s: runner no longer runs the job, no logs to collect", fmt(job_model))
+        return True
     try:
         logs_services.write_logs(
             project=run_model.project,
