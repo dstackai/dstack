@@ -33,79 +33,108 @@ class TestGpuMatchesGpuSpec:
         assert gpu_matches_gpu_spec(make_gpu(vendor=AMD), GPUSpec())
 
     def test_vendor_matches(self):
-        assert gpu_matches_gpu_spec(make_gpu(vendor=NVIDIA), GPUSpec(vendor="nvidia"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(vendor=NVIDIA), GPUSpec.model_validate({"vendor": "nvidia"})
+        )
 
     def test_vendor_mismatch(self):
-        assert not gpu_matches_gpu_spec(make_gpu(vendor=AMD), GPUSpec(vendor="nvidia"))
+        assert not gpu_matches_gpu_spec(
+            make_gpu(vendor=AMD), GPUSpec.model_validate({"vendor": "nvidia"})
+        )
 
     def test_name_matches(self):
-        assert gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(name="A100"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(name="A100"), GPUSpec.model_validate({"name": "A100"})
+        )
 
     @pytest.mark.parametrize(
         ("gpu_name", "spec_name"),
         [("A100", "a100"), ("a100", "A100"), ("H100", "h100")],
     )
     def test_name_match_is_case_insensitive(self, gpu_name: str, spec_name: str):
-        assert gpu_matches_gpu_spec(make_gpu(name=gpu_name), GPUSpec(name=spec_name))
+        assert gpu_matches_gpu_spec(
+            make_gpu(name=gpu_name), GPUSpec.model_validate({"name": spec_name})
+        )
 
     def test_name_matches_any_in_list(self):
         assert gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(name=["V100", "A100"]))
 
     def test_name_mismatch(self):
-        assert not gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(name="V100"))
+        assert not gpu_matches_gpu_spec(
+            make_gpu(name="A100"), GPUSpec.model_validate({"name": "V100"})
+        )
 
     def test_name_not_in_list(self):
         assert not gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(name=["V100", "H100"]))
 
     def test_memory_within_range(self):
-        assert gpu_matches_gpu_spec(make_gpu(memory_gib=40), GPUSpec(memory="16GB..80GB"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(memory_gib=40), GPUSpec.model_validate({"memory": "16GB..80GB"})
+        )
 
     def test_memory_equal_to_min(self):
-        assert gpu_matches_gpu_spec(make_gpu(memory_gib=16), GPUSpec(memory="16GB.."))
+        assert gpu_matches_gpu_spec(
+            make_gpu(memory_gib=16), GPUSpec.model_validate({"memory": "16GB.."})
+        )
 
     def test_memory_equal_to_max(self):
-        assert gpu_matches_gpu_spec(make_gpu(memory_gib=80), GPUSpec(memory="..80GB"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(memory_gib=80), GPUSpec.model_validate({"memory": "..80GB"})
+        )
 
     def test_memory_below_min(self):
-        assert not gpu_matches_gpu_spec(make_gpu(memory_gib=15), GPUSpec(memory="16GB.."))
+        assert not gpu_matches_gpu_spec(
+            make_gpu(memory_gib=15), GPUSpec.model_validate({"memory": "16GB.."})
+        )
 
     def test_memory_above_max(self):
-        assert not gpu_matches_gpu_spec(make_gpu(memory_gib=100), GPUSpec(memory="..80GB"))
+        assert not gpu_matches_gpu_spec(
+            make_gpu(memory_gib=100), GPUSpec.model_validate({"memory": "..80GB"})
+        )
 
     def test_compute_capability_equal(self):
         # A100 has compute capability 8.0
-        assert gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(compute_capability="8.0"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(name="A100"), GPUSpec.model_validate({"compute_capability": "8.0"})
+        )
 
     def test_compute_capability_gpu_higher_than_required(self):
         # A100 (8.0) satisfies the 7.0 minimum
-        assert gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(compute_capability="7.0"))
+        assert gpu_matches_gpu_spec(
+            make_gpu(name="A100"), GPUSpec.model_validate({"compute_capability": "7.0"})
+        )
 
     def test_compute_capability_gpu_lower_than_required(self):
         # A100 (8.0) does not satisfy the 9.0 minimum
-        assert not gpu_matches_gpu_spec(make_gpu(name="A100"), GPUSpec(compute_capability="9.0"))
+        assert not gpu_matches_gpu_spec(
+            make_gpu(name="A100"), GPUSpec.model_validate({"compute_capability": "9.0"})
+        )
 
     def test_compute_capability_non_nvidia_never_matches(self):
         assert not gpu_matches_gpu_spec(
-            make_gpu(name="MI300X", vendor=AMD), GPUSpec(compute_capability="8.0")
+            make_gpu(name="MI300X", vendor=AMD),
+            GPUSpec.model_validate({"compute_capability": "8.0"}),
         )
 
     def test_compute_capability_unknown_gpu_name_never_matches(self):
         assert not gpu_matches_gpu_spec(
-            make_gpu(name="UnknownGPU"), GPUSpec(compute_capability="8.0")
+            make_gpu(name="UnknownGPU"), GPUSpec.model_validate({"compute_capability": "8.0"})
         )
 
     def test_all_constraints_match(self):
-        spec = GPUSpec(
-            vendor="nvidia",
-            name="A100",
-            memory="40GB..80GB",
-            compute_capability="8.0",
+        spec = GPUSpec.model_validate(
+            {
+                "vendor": "nvidia",
+                "name": "A100",
+                "memory": "40GB..80GB",
+                "compute_capability": "8.0",
+            }
         )
         assert gpu_matches_gpu_spec(make_gpu(name="A100", memory_gib=80), spec)
 
     def test_single_failing_constraint_rejects_gpu(self):
         # Everything matches except memory, which is below the minimum.
-        spec = GPUSpec(vendor="nvidia", name="A100", memory="40GB..80GB")
+        spec = GPUSpec.model_validate({"vendor": "nvidia", "name": "A100", "memory": "40GB..80GB"})
         assert not gpu_matches_gpu_spec(make_gpu(name="A100", memory_gib=24), spec)
 
 
@@ -140,26 +169,30 @@ class TestFilterOffersByRequirementsDiskSize:
         # An offer with a real 0 GB disk would satisfy neither the min nor the max
         # bound, so a match here proves the disk requirement is ignored entirely.
         offer = self.make_offer(disk_size_mib=0)
-        requirements = Requirements(resources=ResourcesSpec(disk="100GB..200GB"))
+        requirements = Requirements(
+            resources=ResourcesSpec.model_validate({"disk": "100GB..200GB"})
+        )
 
         assert list(filter_offers_by_requirements([offer], requirements)) == [offer]
 
     def test_known_disk_size_below_min_is_filtered_out(self):
         # A non-zero disk size is still checked, so the requirement stays effective.
         offer = self.make_offer(disk_size_mib=50 * 1024)
-        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "100GB.."}))
 
         assert list(filter_offers_by_requirements([offer], requirements)) == []
 
     def test_known_disk_size_within_range_matches(self):
         offer = self.make_offer(disk_size_mib=150 * 1024)
-        requirements = Requirements(resources=ResourcesSpec(disk="100GB..200GB"))
+        requirements = Requirements(
+            resources=ResourcesSpec.model_validate({"disk": "100GB..200GB"})
+        )
 
         assert list(filter_offers_by_requirements([offer], requirements)) == [offer]
 
     def test_ignore_disk_skips_disk_requirement(self):
         offer = self.make_offer(disk_size_mib=50 * 1024)
-        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "100GB.."}))
 
         assert list(filter_offers_by_requirements([offer], requirements, ignore_disk=True)) == [
             offer
@@ -169,7 +202,7 @@ class TestFilterOffersByRequirementsDiskSize:
 class TestOfferDiskFitter:
     def test_sets_min_disk_size_within_configurable_and_required_ranges(self):
         offer = get_instance_offer_with_availability(gpu_count=1, disk_gib=100)
-        requirements = Requirements(resources=ResourcesSpec(disk="200GB.."))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "200GB.."}))
         fitter = OfferDiskFitter(requirements)
 
         fitted_a = fitter.fit(offer, Range[Memory](min=Memory.parse("10GB"), max=None))
@@ -195,14 +228,14 @@ class TestOfferDiskFitter:
 
     def test_returns_none_if_configurable_range_does_not_fit(self):
         offer = get_instance_offer_with_availability()
-        requirements = Requirements(resources=ResourcesSpec(disk="..50GB"))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "..50GB"}))
         configurable = Range[Memory](min=Memory.parse("100GB"), max=None)
 
         assert OfferDiskFitter(requirements).fit(offer, configurable) is None
 
     def test_returns_same_offer_if_disk_size_unchanged(self):
         offer = get_instance_offer_with_availability(disk_gib=100)
-        requirements = Requirements(resources=ResourcesSpec(disk="100GB.."))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "100GB.."}))
         configurable = Range[Memory](min=Memory.parse("10GB"), max=None)
 
         assert OfferDiskFitter(requirements).fit(offer, configurable) is offer
@@ -219,7 +252,9 @@ class TestOfferDiskFitter:
     )
     def test_checks_fixed_disk(self, disk_gib: int, required_disk: Optional[str], fits: bool):
         offer = get_instance_offer_with_availability(disk_gib=disk_gib)
-        requirements = Requirements(resources=ResourcesSpec(disk=required_disk))
+        requirements = Requirements(
+            resources=ResourcesSpec.model_validate({"disk": required_disk})
+        )
 
         fitted = OfferDiskFitter(requirements).fit(offer, None)
 

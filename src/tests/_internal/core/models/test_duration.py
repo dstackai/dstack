@@ -101,4 +101,6 @@ class TestOptionalIdleDuration:
         `-1` is how older clients and existing stored rows spell "off", so negatives have to keep
         parsing rather than being rejected the way `OptionalOffableDuration` rejects them.
         """
-        assert TypeAdapter(OptionalIdleDuration).validate_python(raw) < 0
+        duration = TypeAdapter(OptionalIdleDuration).validate_python(raw)
+        assert duration is not None
+        assert duration < 0

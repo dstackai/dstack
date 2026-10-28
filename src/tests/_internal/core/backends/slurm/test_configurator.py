@@ -15,16 +15,18 @@ USER = "alice"
 
 
 def _make_backend_record() -> BackendRecord:
-    config = SlurmBackendConfigWithCreds(
-        clusters=[
-            {
-                "name": "c1",
-                "hostname": HOSTNAME,
-                "port": PORT,
-                "user": USER,
-                "private_key": {"content": PRIVATE_KEY},
-            }
-        ]
+    config = SlurmBackendConfigWithCreds.model_validate(
+        {
+            "clusters": [
+                {
+                    "name": "c1",
+                    "hostname": HOSTNAME,
+                    "port": PORT,
+                    "user": USER,
+                    "private_key": {"content": PRIVATE_KEY},
+                }
+            ]
+        }
     )
     return SlurmConfigurator().create_backend("proj", config)
 

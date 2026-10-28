@@ -29,10 +29,13 @@ def drop_merged_profile(schema: dict[str, Any]) -> None:
 IncludeExcludeFieldType = Union[int, str]
 IncludeExcludeSetType = Union[set[int], set[str]]
 # `dict` rather than `Mapping`, so these stay assignable both *to* pydantic's `IncEx` and to the
-# plain `Dict` parameters the plugin API declares. Keyed by int or str but not both, like `IncEx`.
+# plain `Dict` parameters the plugin API declares.
+# Keyed by field names, as include/exclude mappings for models are.
+IncludeExcludeStrDictType = dict[str, Union["IncludeExcludeType", bool]]
+# Keyed by int or str but not both, like `IncEx`.
 IncludeExcludeDictType = Union[
     dict[int, Union["IncludeExcludeType", bool]],
-    dict[str, Union["IncludeExcludeType", bool]],
+    IncludeExcludeStrDictType,
 ]
 IncludeExcludeType = Union[IncludeExcludeSetType, IncludeExcludeDictType]
 

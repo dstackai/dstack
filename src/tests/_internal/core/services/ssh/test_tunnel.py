@@ -370,7 +370,7 @@ class TestSSHTunnel:
             ssh_process.kill.assert_called_once_with()
             kill_process_group.assert_not_called()
         else:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
             ssh_process.kill.assert_not_called()
         assert ssh_process.wait.await_count == 2
         assert not Path(foreground_tunnel.control_sock_path).exists()
@@ -436,7 +436,7 @@ class TestSSHTunnel:
         if IS_WINDOWS:
             ssh_process.kill.assert_called_once_with()
         else:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
         ssh_process.wait.assert_awaited_once_with()
         assert not Path(foreground_tunnel.control_sock_path).exists()
         with pytest.raises(SSHError, match="No foreground SSH process"):
@@ -484,7 +484,7 @@ class TestSSHTunnel:
         if IS_WINDOWS:
             ssh_process.kill.assert_called_once_with()
         else:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
         ssh_process.wait.assert_awaited_once_with()
         assert foreground_tunnel._process is None
 
@@ -506,7 +506,7 @@ class TestSSHTunnel:
             await foreground_tunnel.aopen()
 
         if not IS_WINDOWS:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
             ssh_process.kill.assert_not_called()
         else:
             ssh_process.kill.assert_called_once_with()
@@ -546,7 +546,7 @@ class TestSSHTunnel:
             ssh_process.kill.assert_called_once_with()
             kill_process_group.assert_not_called()
         else:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
             ssh_process.kill.assert_not_called()
         ssh_process.wait.assert_awaited_once_with()
         ssh_process.communicate.assert_not_called()
@@ -616,7 +616,7 @@ class TestSSHTunnel:
         if IS_WINDOWS:
             ssh_process.kill.assert_called_once_with()
         else:
-            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)
+            kill_process_group.assert_called_once_with(ssh_process.pid, signal.SIGKILL)  # pyright: ignore[reportAttributeAccessIssue]
 
 
 class TestSSHTunnelControlTimeouts:

@@ -2,7 +2,7 @@ import shlex
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gpuhunt import CatalogItem
+from gpuhunt import AcceleratorVendor, CatalogItem
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
@@ -28,17 +28,19 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHKey,
 )
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 
 def _config(regions=None) -> SeewebConfig:
     return SeewebConfig(regions=regions, creds=SeewebAPITokenCreds(api_token="tok"))
 
 
-def _compute(regions=None) -> SeewebCompute:
+def _compute_with_mocked_api_client(regions=None) -> tuple[SeewebCompute, MagicMock]:
     compute = SeewebCompute(_config(regions))
-    compute.api_client = MagicMock()
-    return compute
+    api_client = MagicMock()
+    compute.api_client = api_client
+    return compute, api_client
 
 
 def _raw(name: str, gpu: str, location: str = "it-fr2") -> CatalogItem:
@@ -52,7 +54,7 @@ def _raw(name: str, gpu: str, location: str = "it-fr2") -> CatalogItem:
         gpu_count=1,
         gpu_name=gpu,
         gpu_memory=24.0,
-        gpu_vendor="nvidia",
+        gpu_vendor=AcceleratorVendor.NVIDIA,
         spot=False,
         disk_size=100.0,
     )
@@ -123,7 +125,9 @@ def test_get_offers_marks_only_creatable_as_available():
         ),
     ):
         offers = SeewebCompute(_config()).get_offers_by_requirements(
-            requirements=None, full_offers=False, unallocated_resources=False
+            requirements=Requirements(resources=ResourcesSpec()),
+            full_offers=False,
+            unallocated_resources=False,
         )
 
     by_name = {offer.instance.name: offer for offer in offers}
@@ -149,7 +153,9 @@ def test_get_offers_filters_configured_regions():
         ),
     ):
         offers = SeewebCompute(_config(["it-mi2"])).get_offers_by_requirements(
-            requirements=None, full_offers=False, unallocated_resources=False
+            requirements=Requirements(resources=ResourcesSpec()),
+            full_offers=False,
+            unallocated_resources=False,
         )
 
     assert [offer.region for offer in offers] == ["it-mi2"]
@@ -201,16 +207,16 @@ def test_select_image_rejects_unsupported_images():
 
 
 def test_create_instance_uses_allowed_image_and_quotes_ssh_key():
-    compute = _compute()
+    compute, api_client = _compute_with_mocked_api_client()
     public_key = "ssh-ed25519 AAAATEST comment with ' quote"
-    compute.api_client.get_available_plans.return_value = {
+    api_client.get_available_plans.return_value = {
         "ECS1GPU7": SeewebPlanAvailability(
             regions=frozenset({"it-fr2"}),
             images=("ubuntu-2204-uefi-nvidia-driver",),
         )
     }
-    compute.api_client.get_or_create_ssh_key.return_value = "dstack-key"
-    compute.api_client.create_server.return_value = ({"name": "ec-test"}, 35)
+    api_client.get_or_create_ssh_key.return_value = "dstack-key"
+    api_client.create_server.return_value = ({"name": "ec-test"}, 35)
 
     with (
         patch(
@@ -230,7 +236,7 @@ def test_create_instance_uses_allowed_image_and_quotes_ssh_key():
             _gpu_offer(), _instance_config(public_key), placement_group=None
         )
 
-    body = compute.api_client.create_server.call_args.args[0]
+    body = api_client.create_server.call_args.args[0]
     assert body["plan"] == "ECS1GPU7"
     assert body["location"] == "it-fr2"
     assert body["image"] == "ubuntu-2204-uefi-nvidia-driver"
@@ -251,20 +257,20 @@ def test_create_instance_uses_allowed_image_and_quotes_ssh_key():
 
 
 def test_update_provisioning_data_waits_for_action():
-    compute = _compute()
-    compute.api_client.get_action.return_value = {"status": "in-progress"}
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_action.return_value = {"status": "in-progress"}
     provisioning_data = _provisioning_data()
 
     compute.update_provisioning_data(provisioning_data, "public", "private")
 
     assert provisioning_data.hostname is None
-    compute.api_client.get_server.assert_not_called()
+    api_client.get_server.assert_not_called()
 
 
 def test_update_provisioning_data_sets_hostname_after_completed_action():
-    compute = _compute()
-    compute.api_client.get_action.return_value = {"status": "completed"}
-    compute.api_client.get_server.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_action.return_value = {"status": "completed"}
+    api_client.get_server.return_value = {
         "name": "ec-test",
         "status": "Booted",
         "ipv4": "192.0.2.1",
@@ -277,16 +283,16 @@ def test_update_provisioning_data_sets_hostname_after_completed_action():
 
 
 def test_update_provisioning_data_raises_for_failed_action():
-    compute = _compute()
-    compute.api_client.get_action.return_value = {"status": "failed"}
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_action.return_value = {"status": "failed"}
 
     with pytest.raises(ProvisioningError, match="entered status 'failed'"):
         compute.update_provisioning_data(_provisioning_data(), "public", "private")
 
 
 def test_update_provisioning_data_raises_for_failed_server():
-    compute = _compute()
-    compute.api_client.get_server.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_server.return_value = {
         "name": "ec-test",
         "status": "Fail",
     }
@@ -296,8 +302,8 @@ def test_update_provisioning_data_raises_for_failed_server():
 
 
 def test_terminate_instance_delegates_to_idempotent_api():
-    compute = _compute()
+    compute, api_client = _compute_with_mocked_api_client()
 
     compute.terminate_instance("ec-test", "it-fr2")
 
-    compute.api_client.delete_server.assert_called_once_with("ec-test")
+    api_client.delete_server.assert_called_once_with("ec-test")

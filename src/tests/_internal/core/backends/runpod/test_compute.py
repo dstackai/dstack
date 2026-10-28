@@ -25,10 +25,11 @@ PROJECT_SSH_PUBLIC_KEY = (
 )
 
 
-def _compute() -> RunpodCompute:
+def _compute_with_mocked_api_client() -> tuple[RunpodCompute, MagicMock]:
     compute = RunpodCompute(RunpodConfig(creds=RunpodAPIKeyCreds(api_key="test")))
-    compute.api_client = MagicMock()
-    return compute
+    api_client = MagicMock()
+    compute.api_client = api_client
+    return compute, api_client
 
 
 def _gpu_offer(
@@ -139,13 +140,13 @@ SSH_PORTS = [
 
 class TestRunpodComputeRunJob:
     def test_requests_per_gpu_minimums_rounded_down(self):
-        compute = _compute()
-        compute.api_client.create_pod.return_value = {"id": "pod-1"}
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {"id": "pod-1"}
 
         jpd = _run_job(compute, _gpu_offer(gpu_count=2, cpu_count=15, memory_gib=251))
 
         assert jpd.instance_id == "pod-1"
-        kwargs = compute.api_client.create_pod.call_args.kwargs
+        kwargs = api_client.create_pod.call_args.kwargs
         assert kwargs["cloud"] == "SECURE"
         assert kwargs["data_center_ids"] == ["EU-RO-1"]
         assert kwargs["gpu_type_id"] == "NVIDIA H100 80GB HBM3"
@@ -154,34 +155,34 @@ class TestRunpodComputeRunJob:
         assert kwargs["min_memory_in_gb_per_gpu"] == 125
 
     def test_failed_registry_credentials_cleanup_does_not_fail_provisioning(self):
-        compute = _compute()
-        compute.api_client.create_pod.return_value = {"id": "pod-1"}
-        compute.api_client.list_container_registry_credentials.side_effect = RunpodV2ClientError(
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {"id": "pod-1"}
+        api_client.list_container_registry_credentials.side_effect = RunpodV2ClientError(
             status=429, title="Too Many Requests", detail="Rate limit exceeded"
         )
 
         jpd = _run_job(compute, _gpu_offer())
 
         assert jpd.instance_id == "pod-1"
-        compute.api_client.terminate_pod.assert_not_called()
+        api_client.terminate_pod.assert_not_called()
 
     def test_encodes_provider_ref_in_pod_name(self):
-        compute = _compute()
-        compute.api_client.create_pod.return_value = {"id": "pod-1"}
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_pod.return_value = {"id": "pod-1"}
         job = _job()
         job.job_submissions = [MagicMock(provider_ref="abcdef123456")]
 
         _run_job(compute, _gpu_offer(), job=job)
 
-        pod_name = compute.api_client.create_pod.call_args.kwargs["name"]
+        pod_name = api_client.create_pod.call_args.kwargs["name"]
         assert parse_provider_ref_from_name(pod_name) == "abcdef123456"
 
 
 class TestRunpodComputeRunJobs:
     def test_sets_internal_ip_from_cluster_ip(self):
-        compute = _compute()
-        compute.api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        compute.api_client.list_cluster_pods.return_value = [
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
+        api_client.list_cluster_pods.return_value = [
             _pod("pod-1", cluster_ip="10.65.0.2"),
             _pod("pod-2", is_cluster_pod=True),
         ]
@@ -193,31 +194,31 @@ class TestRunpodComputeRunJobs:
         assert [jpd.internal_ip for jpd in cgpd.job_provisioning_datas] == ["10.65.0.2", None]
 
     def test_deletes_cluster_if_pod_count_mismatch(self):
-        compute = _compute()
-        compute.api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        compute.api_client.list_cluster_pods.return_value = [_pod("pod-1", is_cluster_pod=True)]
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
+        api_client.list_cluster_pods.return_value = [_pod("pod-1", is_cluster_pod=True)]
 
         with pytest.raises(ComputeError, match="Expected 2 pods"):
             _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
 
-        compute.api_client.delete_cluster.assert_called_once_with("cluster-1")
+        api_client.delete_cluster.assert_called_once_with("cluster-1")
 
     def test_deletes_cluster_if_listing_pods_fails(self):
-        compute = _compute()
-        compute.api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
         error = RunpodV2ClientError(status=429, title="Too Many Requests", detail="-")
-        compute.api_client.list_cluster_pods.side_effect = error
+        api_client.list_cluster_pods.side_effect = error
 
         with pytest.raises(RunpodV2ClientError):
             _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
 
-        compute.api_client.delete_cluster.assert_called_once_with("cluster-1")
+        api_client.delete_cluster.assert_called_once_with("cluster-1")
 
     def test_raises_original_error_if_cluster_deletion_fails(self):
-        compute = _compute()
-        compute.api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
-        compute.api_client.list_cluster_pods.return_value = []
-        compute.api_client.delete_cluster.side_effect = RuntimeError("delete failed")
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_cluster.return_value = {"id": "cluster-1", "name": "test"}
+        api_client.list_cluster_pods.return_value = []
+        api_client.delete_cluster.side_effect = RuntimeError("delete failed")
 
         with pytest.raises(ComputeError, match="Expected 2 pods"):
             _run_jobs(compute, _cluster_offer([2, 4]), job_count=2)
@@ -232,8 +233,8 @@ class TestRunpodComputeUpdateProvisioningData:
         )
 
     def test_sets_hostname_and_ssh_port(self):
-        compute = _compute()
-        compute.api_client.get_pod.return_value = _pod(ports=SSH_PORTS)
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_pod.return_value = _pod(ports=SSH_PORTS)
         jpd = get_job_provisioning_data(backend=BackendType.RUNPOD, hostname=None)
 
         self._update(compute, jpd)
@@ -242,8 +243,8 @@ class TestRunpodComputeUpdateProvisioningData:
         assert jpd.ssh_port == 40022
 
     def test_waits_for_runtime(self):
-        compute = _compute()
-        compute.api_client.get_pod.return_value = _pod(ports=None)
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_pod.return_value = _pod(ports=None)
         jpd = get_job_provisioning_data(backend=BackendType.RUNPOD, hostname=None)
 
         self._update(compute, jpd)
@@ -251,8 +252,8 @@ class TestRunpodComputeUpdateProvisioningData:
         assert jpd.hostname is None
 
     def test_cluster_pod_waits_for_cluster_ip(self):
-        compute = _compute()
-        compute.api_client.get_pod.return_value = _pod(ports=SSH_PORTS, is_cluster_pod=True)
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_pod.return_value = _pod(ports=SSH_PORTS, is_cluster_pod=True)
         jpd = get_job_provisioning_data(
             backend=BackendType.RUNPOD, hostname=None, internal_ip=None
         )
@@ -263,8 +264,8 @@ class TestRunpodComputeUpdateProvisioningData:
         assert jpd.internal_ip is None
 
     def test_cluster_pod_sets_internal_ip(self):
-        compute = _compute()
-        compute.api_client.get_pod.return_value = _pod(ports=SSH_PORTS, cluster_ip="10.65.0.3")
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_pod.return_value = _pod(ports=SSH_PORTS, cluster_ip="10.65.0.3")
         jpd = get_job_provisioning_data(
             backend=BackendType.RUNPOD, hostname=None, internal_ip=None
         )
@@ -294,8 +295,8 @@ def _listed_pod(
 
 class TestRunpodComputeListResourceGroups:
     def test_lists_pods_with_provider_ref(self):
-        compute = _compute()
-        compute.api_client.list_pods.return_value = [
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.list_pods.return_value = [
             _listed_pod("pod-1", name="dstack-main-test-job-0-abcdef123456wxyz"),
         ]
 
@@ -316,8 +317,8 @@ class TestRunpodComputeListResourceGroups:
         ]
 
     def test_skips_pods_without_provider_ref(self):
-        compute = _compute()
-        compute.api_client.list_pods.return_value = [
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.list_pods.return_value = [
             _listed_pod("pod-1", name="dstack-main-test-job-0-abcdefgh"),
             _listed_pod("pod-2", name="my-pod"),
         ]
@@ -325,8 +326,8 @@ class TestRunpodComputeListResourceGroups:
         assert compute.list_resource_groups().resource_groups == []
 
     def test_skips_terminated_pods(self):
-        compute = _compute()
-        compute.api_client.list_pods.return_value = [
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.list_pods.return_value = [
             _listed_pod(
                 "pod-1", name="dstack-main-test-job-0-abcdef123456wxyz", status="TERMINATED"
             ),
@@ -335,8 +336,8 @@ class TestRunpodComputeListResourceGroups:
         assert compute.list_resource_groups().resource_groups == []
 
     def test_unparsable_created_at(self):
-        compute = _compute()
-        compute.api_client.list_pods.return_value = [
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.list_pods.return_value = [
             _listed_pod(
                 "pod-1", name="dstack-main-test-job-0-abcdef123456wxyz", created_at="invalid"
             ),
@@ -361,16 +362,16 @@ class TestRunpodComputeDeleteResourceGroup:
         )
 
     def test_terminates_pod(self):
-        compute = _compute()
+        compute, api_client = _compute_with_mocked_api_client()
 
         compute.delete_resource_group(self._group("pod-1"))
 
-        compute.api_client.terminate_pod.assert_called_once_with("pod-1")
+        api_client.terminate_pod.assert_called_once_with("pod-1")
 
     def test_pod_already_deleted(self):
-        compute = _compute()
-        compute.api_client.terminate_pod.return_value = False
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.terminate_pod.return_value = False
 
         compute.delete_resource_group(self._group("pod-1"))
 
-        compute.api_client.terminate_pod.assert_called_once_with("pod-1")
+        api_client.terminate_pod.assert_called_once_with("pod-1")

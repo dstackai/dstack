@@ -60,7 +60,9 @@ class TestComputeWithAllOffersCachedGetOffers:
         compute = _ComputeWithCachedOffers(
             [gpu_offer, cpu_offer], {"gpu": configurable, "cpu": configurable}
         )
-        requirements = Requirements(resources=ResourcesSpec(gpu=1, disk="200GB.."))
+        requirements = Requirements(
+            resources=ResourcesSpec.model_validate({"gpu": 1, "disk": "200GB.."})
+        )
 
         offers = list(compute.get_offers(requirements, False, False))
 
@@ -77,7 +79,7 @@ class TestComputeWithAllOffersCachedGetOffers:
             [configurable_offer, fixed_offer],
             {"configurable": Range[Memory](min=Memory.parse("50GB"), max=None), "fixed": None},
         )
-        requirements = Requirements(resources=ResourcesSpec(disk="200GB.."))
+        requirements = Requirements(resources=ResourcesSpec.model_validate({"disk": "200GB.."}))
 
         offers = list(compute.get_offers(requirements, False, False))
 

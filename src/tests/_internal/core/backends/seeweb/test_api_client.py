@@ -167,8 +167,12 @@ def test_get_action_and_server(requests_mock):
     )
     client = SeewebApiClient("token")
 
-    assert client.get_action(35)["status"] == "completed"
-    assert client.get_server("ec-test")["ipv4"] == "192.0.2.1"
+    action = client.get_action(35)
+    assert action is not None
+    assert action["status"] == "completed"
+    server = client.get_server("ec-test")
+    assert server is not None
+    assert server["ipv4"] == "192.0.2.1"
 
 
 def test_delete_server_is_idempotent(requests_mock):

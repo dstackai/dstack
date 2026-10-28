@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 
 import pytest
 from pydantic import ValidationError
@@ -15,6 +15,7 @@ from dstack._internal.core.models.configurations import (
     PythonVersion,
     RepoSpec,
     ServiceConfiguration,
+    TaskConfiguration,
     parse_run_configuration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -70,8 +71,7 @@ class TestParseConfiguration:
             "port": 8000,
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is None
 
     def test_service_model_does_not_override_explicit_probes(self):
@@ -82,8 +82,7 @@ class TestParseConfiguration:
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
             "probes": [{"type": "http", "url": "/health"}],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is not None
         assert len(parsed.probes) == 1
         assert parsed.probes[0].url == "/health"
@@ -96,8 +95,7 @@ class TestParseConfiguration:
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
             "probes": [],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is not None
         assert len(parsed.probes) == 0
 
@@ -113,23 +111,28 @@ class TestParseConfiguration:
                 conf["scaling"] = scaling
             return conf
 
-        assert parse_run_configuration(test_conf(1)).replicas == Range(min=1, max=1)
-        assert parse_run_configuration(test_conf("2")).replicas == Range(min=2, max=2)
-        assert parse_run_configuration(test_conf("3..3")).replicas == Range(min=3, max=3)
+        parsed = _parse_run_configuration_as(test_conf(1), ServiceConfiguration)
+        assert parsed.replicas == Range(min=1, max=1)
+        parsed = _parse_run_configuration_as(test_conf("2"), ServiceConfiguration)
+        assert parsed.replicas == Range(min=2, max=2)
+        parsed = _parse_run_configuration_as(test_conf("3..3"), ServiceConfiguration)
+        assert parsed.replicas == Range(min=3, max=3)
         with pytest.raises(
             ConfigurationError,
             match="When you set `replicas` to a range, ensure to specify `scaling`",
         ):
             parse_run_configuration(test_conf("0..10"))
-        assert parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             test_conf(
                 "0..10",
                 {
                     "metric": "rps",
                     "target": 10,
                 },
-            )
-        ).replicas == Range(min=0, max=10)
+            ),
+            ServiceConfiguration,
+        )
+        assert parsed.replicas == Range(min=0, max=10)
         # `metric: rpc` is a typo, so `scaling` itself fails to validate. The config stays
         # rejected, but the message is no longer the `scaling`-is-missing one: pydantic v1 ran a
         # bare `root_validator` even after a field had failed, handing it a partial `values` dict
@@ -160,8 +163,7 @@ class TestParseConfiguration:
                 {"name": "worker", "count": 2, "commands": ["worker"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         router_g = next(g for g in parsed.groups if g.name == "router")
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
@@ -245,8 +247,7 @@ class TestReplicaGroupContainerFields:
                 {"name": "d", "count": 1, "docker": True, "commands": ["x"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         groups = {g.name: g for g in parsed.groups}
         assert groups["a"].image == "nginx:latest"
@@ -268,8 +269,7 @@ class TestReplicaGroupContainerFields:
                 },
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].privileged is True
 
@@ -289,8 +289,7 @@ class TestReplicaGroupContainerFields:
             "port": 8000,
             "replicas": [{"count": 1, "python": yaml_value, "commands": ["x"]}],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].python == expected
 
@@ -363,8 +362,7 @@ class TestReplicaGroupContainerFields:
                 {"count": 1, "python": "3.12", "nvcc": True, "commands": ["x"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].python == PythonVersion.PY312
         assert parsed.groups[0].nvcc is True
@@ -956,7 +954,9 @@ class TestNodeGroups:
             )
 
     def test_omitted_nodes_defaults_to_one_node_group(self):
-        parsed = parse_run_configuration({"type": "task", "commands": ["true"]})
+        parsed = _parse_run_configuration_as(
+            {"type": "task", "commands": ["true"]}, TaskConfiguration
+        )
         assert parsed.nodes is None
         assert parsed.nodes_num == 1
         assert parsed.node_groups[0].nodes == 1
@@ -1082,13 +1082,14 @@ class TestNodeGroups:
 
     def test_accepts_top_level_resources_with_groups(self):
         """Top-level resources is allowed (not rejected) but not used for group jobs."""
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "task",
                 "image": "debian",
                 "resources": {"gpu": "H100"},
                 "groups": [{"nodes": 1, "commands": ["true"]}],
-            }
+            },
+            TaskConfiguration,
         )
         assert parsed.groups is not None
         assert parsed.groups[0].resources == ResourcesSpec()
@@ -1098,14 +1099,14 @@ class TestNodeGroups:
 
 class TestServiceGroupsPhase1:
     def test_legacy_replicas_list_parses_to_groups(self):
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "service",
                 "port": 8000,
                 "replicas": [{"count": 1, "commands": ["x"]}],
-            }
+            },
+            ServiceConfiguration,
         )
-        assert isinstance(parsed, ServiceConfiguration)
         assert parsed.replicas is None
         assert parsed.groups is not None
         assert parsed.groups[0].replicas == Range(min=1, max=1)
@@ -1151,14 +1152,14 @@ class TestServiceGroupsPhase1:
         assert "replicas" in dumped_json["groups"][0]
 
     def test_dump_validate_is_fixed_point(self):
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "service",
                 "port": 8000,
                 "groups": [{"replicas": 1, "commands": ["x"]}],
-            }
+            },
+            ServiceConfiguration,
         )
-        assert isinstance(parsed, ServiceConfiguration)
         once = ServiceConfiguration.model_validate(parsed.model_dump())
         twice = ServiceConfiguration.model_validate(once.model_dump())
         assert once.model_dump() == twice.model_dump() == parsed.model_dump()
@@ -1215,7 +1216,7 @@ class TestPresetConfiguration:
         ]["anyOf"]
 
     def test_parses_string_as_exact_repo(self):
-        configuration = PresetConfiguration(model="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelRepo)
         assert configuration.model.exact_repo == "Qwen/Qwen3.5-27B"
@@ -1223,7 +1224,7 @@ class TestPresetConfiguration:
         assert not configuration.model.allows_variant_selection
 
     def test_parses_base_model(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.exact_repo is None
@@ -1231,24 +1232,26 @@ class TestPresetConfiguration:
         assert configuration.model.allows_variant_selection
 
     def test_agent_is_optional_and_carries_provider_model_and_effort(self):
-        assert PresetConfiguration(model="Qwen/Qwen3.5-27B").agent is None
+        assert PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B"}).agent is None
 
-        configuration = PresetConfiguration(
-            model="Qwen/Qwen3.5-27B",
-            agent={"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+        configuration = PresetConfiguration.model_validate(
+            {
+                "model": "Qwen/Qwen3.5-27B",
+                "agent": {"provider": "codex", "model": "gpt-6-astra", "effort": "xhigh"},
+            }
         )
 
         assert configuration.agent == PresetAgentConfig(
             provider="codex", model="gpt-6-astra", effort="xhigh"
         )
-        assert PresetConfiguration(
-            model="Qwen/Qwen3.5-27B", agent={"provider": "claude"}
+        assert PresetConfiguration.model_validate(
+            {"model": "Qwen/Qwen3.5-27B", "agent": {"provider": "claude"}}
         ).agent == (PresetAgentConfig(provider="claude", model=None, effort=None))
 
     @pytest.mark.parametrize("agent", [{}, {"model": "gpt-6-astra"}, {"provider": "gemini"}])
     def test_agent_requires_a_known_provider(self, agent):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+            PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B", "agent": agent})
 
     @pytest.mark.parametrize(
         "agent",
@@ -1256,13 +1259,15 @@ class TestPresetConfiguration:
     )
     def test_agent_effort_must_exist_for_the_provider(self, agent):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model="Qwen/Qwen3.5-27B", agent=agent)
+            PresetConfiguration.model_validate({"model": "Qwen/Qwen3.5-27B", "agent": agent})
 
     def test_parses_exact_repo_with_client_facing_name(self):
-        configuration = PresetConfiguration(
-            model={
-                "repo": "community/Qwen3.5-27B-GPTQ-Int4",
-                "name": "Qwen/Qwen3.5-27B",
+        configuration = PresetConfiguration.model_validate(
+            {
+                "model": {
+                    "repo": "community/Qwen3.5-27B-GPTQ-Int4",
+                    "name": "Qwen/Qwen3.5-27B",
+                }
             }
         )
 
@@ -1271,24 +1276,28 @@ class TestPresetConfiguration:
 
     def test_rejects_ambiguous_model_object(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration(model={"base": "Qwen/base", "repo": "Qwen/repo"})
+            PresetConfiguration.model_validate(
+                {"model": {"base": "Qwen/base", "repo": "Qwen/repo"}}
+            )
 
     def test_parses_top_level_base_shorthand(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert isinstance(configuration.model, PresetModelBase)
         assert configuration.model.api_model_name == "Qwen/Qwen3.5-27B"
         assert configuration.base is None
 
     def test_parses_top_level_repo_shorthand(self):
-        configuration = PresetConfiguration(repo="community/Qwen3.5-27B-GPTQ-Int4")
+        configuration = PresetConfiguration.model_validate(
+            {"repo": "community/Qwen3.5-27B-GPTQ-Int4"}
+        )
 
         assert isinstance(configuration.model, PresetModelRepo)
         assert configuration.model.exact_repo == "community/Qwen3.5-27B-GPTQ-Int4"
         assert configuration.repo is None
 
     def test_shorthand_round_trips_through_dict(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         round_tripped = PresetConfiguration.model_validate(configuration.model_dump())
 
@@ -1296,24 +1305,28 @@ class TestPresetConfiguration:
 
     def test_rejects_combined_base_and_repo_shorthand(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration(base="Qwen/base", repo="Qwen/repo")
+            PresetConfiguration.model_validate({"base": "Qwen/base", "repo": "Qwen/repo"})
 
     def test_rejects_shorthand_combined_with_model(self):
         with pytest.raises(ValidationError, match="cannot be combined"):
-            PresetConfiguration(base="Qwen/base", model={"repo": "Qwen/repo"})
+            PresetConfiguration.model_validate(
+                {"base": "Qwen/base", "model": {"repo": "Qwen/repo"}}
+            )
 
     def test_requires_model(self):
         with pytest.raises(ValidationError):
-            PresetConfiguration()
+            PresetConfiguration.model_validate({})
 
     @pytest.mark.parametrize("field", ["input_tokens", "output_tokens", "shared_prefix_tokens"])
     def test_rejects_request_shape_fields_with_a_custom_dataset(self, field):
         with pytest.raises(ValidationError, match="cannot be set together with `dataset`"):
-            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="spec_bench", **{field: 512})
+            PresetConfiguration.model_validate(
+                {"base": "Qwen/Qwen3.5-27B", "dataset": "spec_bench", field: 512}
+            )
 
     def test_allows_request_shape_fields_without_a_dataset(self):
-        configuration = PresetConfiguration(
-            base="Qwen/Qwen3.5-27B", input_tokens=1024, output_tokens=256
+        configuration = PresetConfiguration.model_validate(
+            {"base": "Qwen/Qwen3.5-27B", "input_tokens": 1024, "output_tokens": 256}
         )
 
         assert configuration.input_tokens == 1024
@@ -1323,10 +1336,10 @@ class TestPresetConfiguration:
         # `random` used to be the explicit way to ask for synthetic prompts;
         # now a set dataset always means a real one.
         with pytest.raises(ValidationError, match="omit `dataset` for synthetic prompts"):
-            PresetConfiguration(base="Qwen/Qwen3.5-27B", dataset="random")
+            PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B", "dataset": "random"})
 
     def test_defaults_to_a_synthetic_workload(self):
-        configuration = PresetConfiguration(base="Qwen/Qwen3.5-27B")
+        configuration = PresetConfiguration.model_validate({"base": "Qwen/Qwen3.5-27B"})
 
         assert configuration.dataset is None
 
@@ -1339,3 +1352,14 @@ class TestPresetConfigurationSchema:
         assert "model" not in schema.get("required", [])
         for field in ("model", "base", "repo"):
             assert field in schema["properties"]
+
+
+RunConfigurationT = TypeVar("RunConfigurationT")
+
+
+def _parse_run_configuration_as(
+    data: dict, configuration_type: type[RunConfigurationT]
+) -> RunConfigurationT:
+    configuration = parse_run_configuration(data)
+    assert isinstance(configuration, configuration_type)
+    return configuration

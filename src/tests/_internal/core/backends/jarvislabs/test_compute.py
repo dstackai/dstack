@@ -28,14 +28,15 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 
-def _compute() -> JarvisLabsCompute:
+def _compute_with_mocked_api_client() -> tuple[JarvisLabsCompute, MagicMock]:
     compute = JarvisLabsCompute(
         JarvisLabsConfig(creds=JarvisLabsCreds(api_key="test"), regions=["india-noida-01"])
     )
-    compute.api_client = MagicMock()
-    compute.api_client.create_ssh_key.return_value = "ssh-key-id"
-    compute.api_client.get_instance_status.return_value = {"status": "Running"}
-    return compute
+    api_client = MagicMock()
+    compute.api_client = api_client
+    api_client.create_ssh_key.return_value = "ssh-key-id"
+    api_client.get_instance_status.return_value = {"status": "Running"}
+    return compute, api_client
 
 
 def _instance_config(ssh_keys: list[SSHKey] | None = None) -> InstanceConfiguration:
@@ -137,7 +138,7 @@ def test_get_disk_size_gb_clamps_to_jarvislabs_vm_minimum():
 
 
 def test_get_all_offers_uses_configurable_disk_size():
-    compute = _compute()
+    compute, _ = _compute_with_mocked_api_client()
 
     with patch(
         "dstack._internal.core.backends.jarvislabs.compute.get_catalog_offers",
@@ -156,21 +157,21 @@ def test_get_all_offers_uses_configurable_disk_size():
 
 
 def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
-    compute = _compute()
+    compute, _ = _compute_with_mocked_api_client()
     compute.get_all_offers_with_availability = MagicMock(
         return_value=[_cpu_offer(disk_size_mib=100 * 1024)]
     )
 
     offers_250gb = list(
         compute.get_offers(
-            Requirements(resources=ResourcesSpec(disk="250GB")),
+            Requirements(resources=ResourcesSpec.model_validate({"disk": "250GB"})),
             full_offers=False,
             unallocated_resources=False,
         )
     )
     offers_300gb = list(
         compute.get_offers(
-            Requirements(resources=ResourcesSpec(disk="300GB")),
+            Requirements(resources=ResourcesSpec.model_validate({"disk": "300GB"})),
             full_offers=False,
             unallocated_resources=False,
         )
@@ -184,8 +185,8 @@ def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
 
 
 def test_create_gpu_instance_creates_ssh_key_and_gpu_vm():
-    compute = _compute()
-    compute.api_client.create_gpu_vm.return_value = "123"
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_gpu_vm.return_value = "123"
 
     with patch(
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
@@ -195,11 +196,11 @@ def test_create_gpu_instance_creates_ssh_key_and_gpu_vm():
             _gpu_offer(backend_data={"gpu_type": "A100-80GB"}), _instance_config(), None
         )
 
-    compute.api_client.create_ssh_key.assert_called_once_with(
+    api_client.create_ssh_key.assert_called_once_with(
         public_key="ssh-rsa AAAA test",
         key_name="dstack-test-0.key",
     )
-    compute.api_client.create_gpu_vm.assert_called_once_with(
+    api_client.create_gpu_vm.assert_called_once_with(
         gpu_type="A100-80GB",
         num_gpus=1,
         is_spot=False,
@@ -212,12 +213,12 @@ def test_create_gpu_instance_creates_ssh_key_and_gpu_vm():
     assert provisioning_data.dockerized is True
     backend_data = JarvisLabsInstanceBackendData.load(provisioning_data.backend_data)
     assert backend_data.ssh_key_ids == ["ssh-key-id"]
-    compute.api_client.get_instance_status.assert_not_called()
+    api_client.get_instance_status.assert_not_called()
 
 
 def test_create_gpu_instance_passes_spot_flag():
-    compute = _compute()
-    compute.api_client.create_gpu_vm.return_value = "123"
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_gpu_vm.return_value = "123"
 
     with patch(
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
@@ -229,7 +230,7 @@ def test_create_gpu_instance_passes_spot_flag():
             None,
         )
 
-    compute.api_client.create_gpu_vm.assert_called_once_with(
+    api_client.create_gpu_vm.assert_called_once_with(
         gpu_type="A100-80GB",
         num_gpus=1,
         is_spot=True,
@@ -240,8 +241,8 @@ def test_create_gpu_instance_passes_spot_flag():
 
 
 def test_create_rtx_pro_6000_instance_uses_jarvislabs_gpu_type_from_backend_data():
-    compute = _compute()
-    compute.api_client.create_gpu_vm.return_value = "123"
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_gpu_vm.return_value = "123"
     offer = _gpu_offer(
         gpu_name="RTXPRO6000",
         gpu_memory_mib=96 * 1024,
@@ -254,7 +255,7 @@ def test_create_rtx_pro_6000_instance_uses_jarvislabs_gpu_type_from_backend_data
     ):
         compute.create_instance(offer, _instance_config(), None)
 
-    compute.api_client.create_gpu_vm.assert_called_once_with(
+    api_client.create_gpu_vm.assert_called_once_with(
         gpu_type="RTX-PRO6000",
         num_gpus=1,
         is_spot=False,
@@ -265,8 +266,8 @@ def test_create_rtx_pro_6000_instance_uses_jarvislabs_gpu_type_from_backend_data
 
 
 def test_create_cpu_instance_creates_ssh_key_and_cpu_vm():
-    compute = _compute()
-    compute.api_client.create_cpu_vm.return_value = "456"
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_cpu_vm.return_value = "456"
 
     with patch(
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
@@ -274,11 +275,11 @@ def test_create_cpu_instance_creates_ssh_key_and_cpu_vm():
     ):
         provisioning_data = compute.create_instance(_cpu_offer(), _instance_config(), None)
 
-    compute.api_client.create_ssh_key.assert_called_once_with(
+    api_client.create_ssh_key.assert_called_once_with(
         public_key="ssh-rsa AAAA test",
         key_name="dstack-cpu-0.key",
     )
-    compute.api_client.create_cpu_vm.assert_called_once_with(
+    api_client.create_cpu_vm.assert_called_once_with(
         vcpus=4,
         ram_gb=16,
         storage=100,
@@ -291,8 +292,8 @@ def test_create_cpu_instance_creates_ssh_key_and_cpu_vm():
 
 
 def test_update_provisioning_data_sets_hostname_and_starts_runner():
-    compute = _compute()
-    compute.api_client.get_instance.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_instance.return_value = {
         "machine_id": 123,
         "status": "Running",
         "public_ip": "203.0.113.10",
@@ -329,8 +330,8 @@ def test_update_provisioning_data_sets_hostname_and_starts_runner():
 
 
 def test_update_provisioning_data_does_not_set_hostname_until_runner_starts():
-    compute = _compute()
-    compute.api_client.get_instance.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_instance.return_value = {
         "machine_id": 123,
         "status": "Running",
         "public_ip": "203.0.113.10",
@@ -369,38 +370,38 @@ def test_get_ssh_username_parses_jarvislabs_ssh_command():
 
 
 def test_terminate_instance_delegates_to_api_client_without_backend_data():
-    compute = _compute()
+    compute, api_client = _compute_with_mocked_api_client()
 
     compute.terminate_instance("123", "india-noida-01")
 
-    compute.api_client.destroy_instance.assert_called_once_with(
+    api_client.destroy_instance.assert_called_once_with(
         machine_id="123",
         region="india-noida-01",
     )
-    compute.api_client.delete_ssh_key.assert_not_called()
+    api_client.delete_ssh_key.assert_not_called()
 
 
 def test_terminate_instance_deletes_created_ssh_keys():
-    compute = _compute()
+    compute, api_client = _compute_with_mocked_api_client()
     backend_data = JarvisLabsInstanceBackendData(
         ssh_key_ids=["ssh-key-id-1", "ssh-key-id-2"]
     ).model_dump_json()
 
     compute.terminate_instance("123", "india-noida-01", backend_data)
 
-    compute.api_client.destroy_instance.assert_called_once_with(
+    api_client.destroy_instance.assert_called_once_with(
         machine_id="123",
         region="india-noida-01",
     )
-    assert compute.api_client.delete_ssh_key.call_args_list == [
+    assert api_client.delete_ssh_key.call_args_list == [
         call("ssh-key-id-1"),
         call("ssh-key-id-2"),
     ]
 
 
 def test_create_instance_cleans_up_ssh_key_on_create_failure():
-    compute = _compute()
-    compute.api_client.create_gpu_vm.side_effect = NoCapacityError(
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_gpu_vm.side_effect = NoCapacityError(
         "L4 not available at this moment, please try again later"
     )
 
@@ -411,13 +412,13 @@ def test_create_instance_cleans_up_ssh_key_on_create_failure():
         with pytest.raises(NoCapacityError):
             compute.create_instance(_gpu_offer(spot=True), _instance_config(), None)
 
-    compute.api_client.destroy_instance.assert_not_called()
-    compute.api_client.delete_ssh_key.assert_called_once_with("ssh-key-id")
+    api_client.destroy_instance.assert_not_called()
+    api_client.delete_ssh_key.assert_called_once_with("ssh-key-id")
 
 
 def test_create_instance_cleans_up_created_ssh_key_if_later_ssh_key_create_fails():
-    compute = _compute()
-    compute.api_client.create_ssh_key.side_effect = [
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.create_ssh_key.side_effect = [
         "ssh-key-id-1",
         BackendError("ssh create failed"),
     ]
@@ -435,14 +436,14 @@ def test_create_instance_cleans_up_created_ssh_key_if_later_ssh_key_create_fails
         with pytest.raises(BackendError, match="ssh create failed"):
             compute.create_instance(_gpu_offer(), instance_config, None)
 
-    compute.api_client.create_gpu_vm.assert_not_called()
-    compute.api_client.delete_ssh_key.assert_called_once_with("ssh-key-id-1")
+    api_client.create_gpu_vm.assert_not_called()
+    api_client.delete_ssh_key.assert_called_once_with("ssh-key-id-1")
 
 
 def test_update_provisioning_data_raises_provisioning_error_from_failed_capacity_status():
-    compute = _compute()
-    compute.api_client.get_instance.return_value = None
-    compute.api_client.get_instance_status.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_instance.return_value = None
+    api_client.get_instance_status.return_value = {
         "status": "Failed",
         "error": "L4 not available at this moment, please try again later",
         "code": 404,
@@ -467,9 +468,9 @@ def test_update_provisioning_data_raises_provisioning_error_from_failed_capacity
 
 
 def test_update_provisioning_data_raises_provisioning_error_from_failed_status():
-    compute = _compute()
-    compute.api_client.get_instance.return_value = None
-    compute.api_client.get_instance_status.return_value = {
+    compute, api_client = _compute_with_mocked_api_client()
+    api_client.get_instance.return_value = None
+    api_client.get_instance_status.return_value = {
         "status": "Failed",
         "error": "image setup failed",
         "code": 500,

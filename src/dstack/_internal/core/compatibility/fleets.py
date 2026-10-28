@@ -1,26 +1,26 @@
 from typing import Optional
 
 from dstack._internal.core.compatibility.common import get_profile_excludes
-from dstack._internal.core.models.common import IncludeExcludeDictType
+from dstack._internal.core.models.common import IncludeExcludeStrDictType
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
 
-def get_get_plan_excludes(fleet_spec: FleetSpec) -> IncludeExcludeDictType:
-    get_plan_excludes: IncludeExcludeDictType = {}
+def get_get_plan_excludes(fleet_spec: FleetSpec) -> IncludeExcludeStrDictType:
+    get_plan_excludes: IncludeExcludeStrDictType = {}
     spec_excludes = get_fleet_spec_excludes(fleet_spec)
     if spec_excludes:
         get_plan_excludes["spec"] = spec_excludes
     return get_plan_excludes
 
 
-def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDictType:
-    apply_plan_excludes: IncludeExcludeDictType = {}
+def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeStrDictType:
+    apply_plan_excludes: IncludeExcludeStrDictType = {}
     spec_excludes = get_fleet_spec_excludes(plan_input.spec)
     if spec_excludes:
         apply_plan_excludes["spec"] = spec_excludes
     current_resource = plan_input.current_resource
     if current_resource is not None:
-        current_resource_excludes: IncludeExcludeDictType = {}
+        current_resource_excludes: IncludeExcludeStrDictType = {}
         current_resource_spec_excludes = get_fleet_spec_excludes(current_resource.spec)
         if current_resource_spec_excludes:
             current_resource_excludes["spec"] = current_resource_spec_excludes
@@ -33,13 +33,13 @@ def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDi
     return {"plan": apply_plan_excludes}
 
 
-def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDictType]:
+def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeStrDictType]:
     """
     Returns `fleet_spec` exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    spec_excludes: IncludeExcludeDictType = {}
+    spec_excludes: IncludeExcludeStrDictType = {}
     profile_excludes = get_profile_excludes(fleet_spec.profile)
 
     spec_excludes["autocreated"] = True

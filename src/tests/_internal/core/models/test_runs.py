@@ -1,8 +1,10 @@
+from typing import cast
+
 import pytest
 from pydantic import ValidationError
 
 from dstack._internal.core.compatibility.runs import get_run_spec_excludes
-from dstack._internal.core.models.common import validate_extra_ignore
+from dstack._internal.core.models.common import IncludeExcludeStrDictType, validate_extra_ignore
 from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
@@ -42,7 +44,7 @@ def test_unset_task_nodes_are_excluded_for_compatibility():
     )
 
     assert isinstance(configuration_excludes, dict)
-    assert configuration_excludes["nodes"] is True
+    assert cast(IncludeExcludeStrDictType, configuration_excludes)["nodes"] is True
 
 
 def test_unset_service_groups_are_excluded_for_compatibility():
@@ -53,11 +55,13 @@ def test_unset_service_groups_are_excluded_for_compatibility():
     )
 
     assert isinstance(configuration_excludes, dict)
-    assert configuration_excludes["groups"] is True
+    assert cast(IncludeExcludeStrDictType, configuration_excludes)["groups"] is True
 
 
 def test_set_service_groups_are_not_excluded():
-    configuration = ServiceConfiguration(port=8000, groups=[{"replicas": 1, "commands": ["true"]}])
+    configuration = ServiceConfiguration.model_validate(
+        {"port": 8000, "groups": [{"replicas": 1, "commands": ["true"]}]}
+    )
 
     configuration_excludes = get_run_spec_excludes(RunSpec(configuration=configuration)).get(
         "configuration"

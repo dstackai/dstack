@@ -1,14 +1,14 @@
 from typing import Optional
 
-from dstack._internal.core.models.common import IncludeExcludeDictType
+from dstack._internal.core.models.common import IncludeExcludeStrDictType
 from dstack._internal.server.schemas.logs import PollLogsRequest
 
 
-def get_poll_logs_excludes(request: PollLogsRequest) -> Optional[IncludeExcludeDictType]:
+def get_poll_logs_excludes(request: PollLogsRequest) -> Optional[IncludeExcludeStrDictType]:
     """
     Returns exclude mapping to exclude certain fields from the request.
     Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    excludes: IncludeExcludeDictType = {}
+    excludes: IncludeExcludeStrDictType = {}
     return excludes if excludes else None

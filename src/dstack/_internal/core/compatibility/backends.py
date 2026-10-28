@@ -1,16 +1,16 @@
 from dstack._internal.core.backends.gcp.models import GCPBackendConfigWithCreds
 from dstack._internal.core.backends.hotaisle.models import HotAisleBackendConfigWithCreds
 from dstack._internal.core.backends.models import AnyBackendConfigWithCreds
-from dstack._internal.core.models.common import IncludeExcludeDictType
+from dstack._internal.core.models.common import IncludeExcludeStrDictType
 
 
-def get_backend_config_excludes(config: AnyBackendConfigWithCreds) -> IncludeExcludeDictType:
+def get_backend_config_excludes(config: AnyBackendConfigWithCreds) -> IncludeExcludeStrDictType:
     """
     Returns `config` exclude mapping to exclude certain fields from the create/update backend
     request. Use this method to exclude new fields when they are not set to keep
     clients backward-compatibility with older servers.
     """
-    excludes: IncludeExcludeDictType = {}
+    excludes: IncludeExcludeStrDictType = {}
     if isinstance(config, GCPBackendConfigWithCreds) and config.tpu is None:
         excludes["tpu"] = True
     if isinstance(config, HotAisleBackendConfigWithCreds) and config.bare_metal is None:

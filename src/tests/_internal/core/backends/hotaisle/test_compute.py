@@ -56,10 +56,11 @@ def _compute(bare_metal: Optional[bool] = None) -> HotAisleCompute:
     )
 
 
-def _compute_with_mocked_api_client() -> HotAisleCompute:
+def _compute_with_mocked_api_client() -> tuple[HotAisleCompute, MagicMock]:
     compute = _compute()
-    compute.api_client = MagicMock()
-    return compute
+    api_client = MagicMock()
+    compute.api_client = api_client
+    return compute, api_client
 
 
 def _instance_type(name: str) -> InstanceType:
@@ -164,8 +165,8 @@ class TestGetAllOffersWithAvailability:
 
 class TestCreateInstance:
     def test_creates_vm(self):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.create_virtual_machine.return_value = {
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.create_virtual_machine.return_value = {
             "name": "vm-name",
             "ip_address": "10.0.0.1",
         }
@@ -174,17 +175,17 @@ class TestCreateInstance:
             _offer("vm-mi300x-1", {"vm_specs": VM_SPECS}), _instance_config(), None
         )
 
-        compute.api_client.upload_ssh_key.assert_called_once_with("ssh-rsa AAAA test")
-        compute.api_client.create_virtual_machine.assert_called_once_with(VM_SPECS)
-        compute.api_client.reserve_bare_metal_server.assert_not_called()
+        api_client.upload_ssh_key.assert_called_once_with("ssh-rsa AAAA test")
+        api_client.create_virtual_machine.assert_called_once_with(VM_SPECS)
+        api_client.reserve_bare_metal_server.assert_not_called()
         assert provisioning_data.instance_id == "vm-name"
         assert HotAisleInstanceBackendData.load(
             provisioning_data.backend_data
         ) == HotAisleInstanceBackendData(ip_address="10.0.0.1", bare_metal=False)
 
     def test_reserves_bare_metal_server(self):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.reserve_bare_metal_server.return_value = {
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.reserve_bare_metal_server.return_value = {
             "deployment_id": "deployment-id",
             "name": "server-01",
             "ip_address": "10.0.0.2",
@@ -197,7 +198,7 @@ class TestCreateInstance:
         )
 
         # The key must be uploaded before reserving, so the server accepts it.
-        assert compute.api_client.mock_calls == [
+        assert api_client.mock_calls == [
             call.upload_ssh_key("ssh-rsa AAAA test"),
             call.reserve_bare_metal_server(specs=BARE_METAL_SPECS, description="test-instance"),
         ]
@@ -211,13 +212,13 @@ class TestCreateInstance:
 @patch("dstack._internal.core.backends.hotaisle.compute._run_ssh_command", return_value=True)
 class TestUpdateProvisioningData:
     def test_starts_shim_on_running_vm(self, ssh_mock):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_vm_state.return_value = "running"
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_vm_state.return_value = "running"
         provisioning_data = _provisioning_data(HotAisleInstanceBackendData(ip_address="10.0.0.1"))
 
         compute.update_provisioning_data(provisioning_data, "public-key", "private-key")
 
-        compute.api_client.get_vm_state.assert_called_once_with("instance-id")
+        api_client.get_vm_state.assert_called_once_with("instance-id")
         assert provisioning_data.hostname == "10.0.0.1"
         assert provisioning_data.ssh_port == 22
         ssh_mock.assert_called_once()
@@ -225,8 +226,8 @@ class TestUpdateProvisioningData:
 
     def test_retries_if_shim_fails_to_start(self, ssh_mock):
         ssh_mock.return_value = False
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_vm_state.return_value = "running"
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_vm_state.return_value = "running"
         provisioning_data = _provisioning_data(HotAisleInstanceBackendData(ip_address="10.0.0.1"))
 
         compute.update_provisioning_data(provisioning_data, "public-key", "private-key")
@@ -235,8 +236,8 @@ class TestUpdateProvisioningData:
         assert provisioning_data.hostname is None
 
     def test_waits_for_vm_to_run(self, ssh_mock):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_vm_state.return_value = "shut off"
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_vm_state.return_value = "shut off"
         provisioning_data = _provisioning_data(HotAisleInstanceBackendData(ip_address="10.0.0.1"))
 
         compute.update_provisioning_data(provisioning_data, "public-key", "private-key")
@@ -255,8 +256,8 @@ class TestUpdateProvisioningData:
     def test_starts_shim_on_installed_bare_metal_server(
         self, ssh_mock, ssh_access, hostname, port
     ):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_bare_metal_server.return_value = {
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_bare_metal_server.return_value = {
             "ip_address": "10.0.0.2",
             "ssh_access": ssh_access,
             "os_status": {"os_install_status": "installed"},
@@ -267,8 +268,8 @@ class TestUpdateProvisioningData:
 
         compute.update_provisioning_data(provisioning_data, "public-key", "private-key")
 
-        compute.api_client.get_bare_metal_server.assert_called_once_with("instance-id")
-        compute.api_client.get_vm_state.assert_not_called()
+        api_client.get_bare_metal_server.assert_called_once_with("instance-id")
+        api_client.get_vm_state.assert_not_called()
         assert provisioning_data.hostname == hostname
         assert provisioning_data.ssh_port == port
         ssh_mock.assert_called_once()
@@ -285,8 +286,8 @@ class TestUpdateProvisioningData:
         ],
     )
     def test_waits_for_bare_metal_os_installation(self, ssh_mock, server_data):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_bare_metal_server.return_value = server_data
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_bare_metal_server.return_value = server_data
         provisioning_data = _provisioning_data(
             HotAisleInstanceBackendData(ip_address="10.0.0.2", bare_metal=True)
         )
@@ -297,8 +298,8 @@ class TestUpdateProvisioningData:
         ssh_mock.assert_not_called()
 
     def test_raises_on_failed_bare_metal_os_installation(self, ssh_mock):
-        compute = _compute_with_mocked_api_client()
-        compute.api_client.get_bare_metal_server.return_value = {
+        compute, api_client = _compute_with_mocked_api_client()
+        api_client.get_bare_metal_server.return_value = {
             "os_status": {"os_install_status": "failed"}
         }
         provisioning_data = _provisioning_data(
@@ -312,7 +313,7 @@ class TestUpdateProvisioningData:
 
 class TestTerminateInstance:
     def test_terminates_vm(self):
-        compute = _compute_with_mocked_api_client()
+        compute, api_client = _compute_with_mocked_api_client()
 
         compute.terminate_instance(
             "vm-name",
@@ -320,15 +321,15 @@ class TestTerminateInstance:
             HotAisleInstanceBackendData(ip_address="10.0.0.1").model_dump_json(),
         )
 
-        compute.api_client.terminate_virtual_machine.assert_called_once_with("vm-name")
-        compute.api_client.release_bare_metal_server.assert_not_called()
+        api_client.terminate_virtual_machine.assert_called_once_with("vm-name")
+        api_client.release_bare_metal_server.assert_not_called()
 
     def test_terminates_vm_without_backend_data(self):
-        compute = _compute_with_mocked_api_client()
+        compute, api_client = _compute_with_mocked_api_client()
 
         compute.terminate_instance("vm-name", "us-michigan-1", None)
 
-        compute.api_client.terminate_virtual_machine.assert_called_once_with("vm-name")
+        api_client.terminate_virtual_machine.assert_called_once_with("vm-name")
 
     @pytest.mark.parametrize(
         ("no_force_release", "force"),
@@ -336,7 +337,7 @@ class TestTerminateInstance:
         ids=["force", "no-force-flag"],
     )
     def test_releases_bare_metal_server(self, no_force_release, force):
-        compute = _compute_with_mocked_api_client()
+        compute, api_client = _compute_with_mocked_api_client()
 
         with patch.object(FeatureFlags, "HOTAISLE_BARE_METAL_NO_FORCE_RELEASE", no_force_release):
             compute.terminate_instance(
@@ -347,10 +348,8 @@ class TestTerminateInstance:
                 ).model_dump_json(),
             )
 
-        compute.api_client.release_bare_metal_server.assert_called_once_with(
-            "deployment-id", force=force
-        )
-        compute.api_client.terminate_virtual_machine.assert_not_called()
+        api_client.release_bare_metal_server.assert_called_once_with("deployment-id", force=force)
+        api_client.terminate_virtual_machine.assert_not_called()
 
 
 class TestLaunchRunner:

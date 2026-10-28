@@ -116,8 +116,8 @@ def _get_tpu_node(
         accelerator_type="v5litepod-8",
         state=state,
         labels={"owner": "dstack", "dstack_provider_ref": PROVIDER_REF},
+        create_time=CREATED_AT,
     )
-    node.create_time = CREATED_AT
     return node
 
 
