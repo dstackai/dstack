@@ -43,8 +43,6 @@ export const getPropertyFilterOptions = (gpus: (IGpu | ICpuGroup)[]) => {
     };
 };
 
-const AVAILABLE_STATUSES = new Set<TAvailability>(['unknown', 'available']);
-
 export const formatGpuVendor = (vendor: string) => (vendor === 'google' ? 'TPU' : vendor.toUpperCase());
 
 export type OfferCard = IGpu & {
@@ -133,12 +131,7 @@ export const getOfferSearchParams = (searchParams: URLSearchParams, offer?: Offe
     return params;
 };
 
-export const getOfferAvailability = (availability: TAvailability[]) =>
-    availability.some((status) => AVAILABLE_STATUSES.has(status))
-        ? undefined
-        : (['idle', 'not_available', 'no_balance', 'no_quota', 'busy'] as const).find((status) =>
-              availability.includes(status),
-          );
+export const getOfferAvailability = (availability: TAvailability[]) => Array.from(new Set(availability)).sort();
 
 export const getFleetFilterValue = (fleet: IFleet, selectedProjectName?: string) => {
     if (selectedProjectName && fleet.project_name === selectedProjectName) {

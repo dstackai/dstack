@@ -574,6 +574,8 @@
         "backend": "Backend",
         "backend_plural": "Backends",
         "availability_not_available": "Not available",
+        "availability_available": "Available",
+        "availability_unknown": "Unknown",
         "availability_no_quota": "No quota",
         "availability_no_balance": "No balance",
         "availability_busy": "Busy",

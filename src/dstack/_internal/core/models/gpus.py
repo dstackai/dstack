@@ -14,7 +14,7 @@ class BackendGpu(CoreModel):
     name: str
     memory_mib: int
     vendor: gpuhunt.AcceleratorVendor
-    availability: InstanceAvailability
+    availability: List[InstanceAvailability]
     spot: bool
     count: int
     price: float
