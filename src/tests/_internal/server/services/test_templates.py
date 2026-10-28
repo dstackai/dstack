@@ -1,5 +1,7 @@
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -10,6 +12,7 @@ from dstack._internal.core.models.templates import (
     EnvUITemplateParameter,
     NameUITemplateParameter,
 )
+from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import templates as templates_service
 
 
@@ -39,7 +42,7 @@ class TestListTemplates:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_repo_configured(self):
         with patch.object(templates_service.settings, "SERVER_TEMPLATES_REPO", None):
-            project = type("Project", (), {"templates_repo": None, "id": "project-id"})()
+            project = cast(ProjectModel, SimpleNamespace(templates_repo=None, id="project-id"))
             result = await templates_service.list_templates(project)
         assert result == []
 

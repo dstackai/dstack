@@ -1,7 +1,7 @@
 import re
 import uuid
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import gpuhunt
 import pytest
@@ -18,6 +18,7 @@ from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
     check_can_update_run_spec,
@@ -147,7 +148,7 @@ def _service_run_spec(
 
 
 def _validate(run_spec: RunSpec) -> None:
-    validate_run_spec_and_set_defaults(SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec)
+    validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestValidateRunSpecRetryDuration:
@@ -163,9 +164,7 @@ class TestValidateRunSpecRetryDuration:
         )
 
         with pytest.raises(ServerClientError, match="retry.duration cannot be negative"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestValidateRunSpecGroupsIpRefs:
@@ -185,9 +184,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_valid_groups_ref(self):
         run_spec = get_run_spec(
@@ -204,9 +201,7 @@ class TestValidateRunSpecGroupsIpRefs:
             ),
         )
 
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_groups_ref_in_env(self):
         run_spec = get_run_spec(
@@ -221,9 +216,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_out_of_range_group_index(self):
         run_spec = get_run_spec(
@@ -241,9 +234,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_out_of_range_node_index(self):
         run_spec = get_run_spec(
@@ -261,9 +252,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_replicas_member_in_task_commands(self):
         run_spec = get_run_spec(
@@ -281,9 +270,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_nodes_member_in_service_commands(self):
         run_spec = get_run_spec(
@@ -304,9 +291,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="Illegal reference name"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_replicas_ref_on_fixed_and_min_slot(self):
         for replicas in (1, "1..4"):
@@ -320,9 +305,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 repo_id="test-repo",
                 configuration=_service_with_groups([group]),
             )
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_replicas_indexes_for_fixed_count(self):
         run_spec = get_run_spec(
@@ -339,9 +322,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 ]
             ),
         )
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_index_above_min(self):
         run_spec = get_run_spec(
@@ -358,9 +339,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_ref_into_scale_to_zero_group(self):
         run_spec = get_run_spec(
@@ -377,9 +356,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="scales to zero"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_replicas_group_out_of_range(self):
         run_spec = get_run_spec(
@@ -395,9 +372,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="out of range"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_accepts_service_ref_to_another_group_min_slot(self):
         run_spec = get_run_spec(
@@ -417,9 +392,7 @@ class TestValidateRunSpecGroupsIpRefs:
                 ]
             ),
         )
-        validate_run_spec_and_set_defaults(
-            SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-        )
+        validate_run_spec_and_set_defaults(_user(), run_spec)
 
     def test_rejects_service_groups_ref_in_env(self):
         run_spec = get_run_spec(
@@ -438,9 +411,7 @@ class TestValidateRunSpecGroupsIpRefs:
         )
 
         with pytest.raises(ServerClientError, match="only supported in commands, not in `env`"):
-            validate_run_spec_and_set_defaults(
-                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
-            )
+            validate_run_spec_and_set_defaults(_user(), run_spec)
 
 
 class TestRunSpecHasReplicaIpRefs:
@@ -988,3 +959,8 @@ class TestValidateRunSpecCpuArchAndImage:
 def _gpu_vendor(resources: ResourcesSpec) -> Optional[gpuhunt.AcceleratorVendor]:
     assert resources.gpu is not None
     return resources.gpu.vendor
+
+
+def _user() -> UserModel:
+    # Only the attribute that `validate_run_spec_and_set_defaults()` reads
+    return cast(UserModel, SimpleNamespace(ssh_public_key="ssh-rsa test"))
