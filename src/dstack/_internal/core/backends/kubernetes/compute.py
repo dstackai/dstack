@@ -130,6 +130,7 @@ class RestartPolicy(str, Enum):
     This policy determines how Kubernetes reacts to containers exiting due to errors
     or other reasons. The default value is `Always`.
     """
+
     ALWAYS = "Always"
     ON_FAILURE = "OnFailure"
     NEVER = "Never"
