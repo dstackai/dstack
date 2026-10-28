@@ -10,6 +10,7 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
+from dstack._internal.server.services.logs import fluentbit
 from dstack._internal.server.services.logs.base import LogStorageError
 from dstack._internal.server.services.logs.fluentbit import (
     ELASTICSEARCH_AVAILABLE,
@@ -19,24 +20,12 @@ from dstack._internal.server.testing.common import create_project
 
 pytestmark = pytest.mark.skipif(not FLUENTBIT_AVAILABLE, reason="fluent-logger not installed")
 
-# Conditionally import classes that are only defined when FLUENTBIT_AVAILABLE is True
-if FLUENTBIT_AVAILABLE:
-    from dstack._internal.server.services.logs.fluentbit import (
-        FluentBitLogStorage,
-        ForwardFluentBitWriter,
-        HTTPFluentBitWriter,
-        NullLogReader,
-    )
-
-    if ELASTICSEARCH_AVAILABLE:
-        from dstack._internal.server.services.logs.fluentbit import ElasticsearchReader
-
 
 class TestNullLogReader:
-    """Tests for the NullLogReader (ship-only mode)."""
+    """Tests for the fluentbit.NullLogReader (ship-only mode)."""
 
     def test_read_returns_empty_logs(self):
-        reader = NullLogReader()
+        reader = fluentbit.NullLogReader()
         request = PollLogsRequest(
             run_name="test-run",
             job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
@@ -48,12 +37,12 @@ class TestNullLogReader:
         assert result.next_token is None
 
     def test_close_does_nothing(self):
-        reader = NullLogReader()
+        reader = fluentbit.NullLogReader()
         reader.close()  # Should not raise
 
 
 class TestHTTPFluentBitWriter:
-    """Tests for the HTTPFluentBitWriter."""
+    """Tests for the fluentbit.HTTPFluentBitWriter."""
 
     @pytest.fixture
     def mock_httpx_client(self):
@@ -61,12 +50,12 @@ class TestHTTPFluentBitWriter:
             yield mock.return_value
 
     def test_init_creates_client(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         assert writer._endpoint == "http://localhost:8080"
         assert writer._tag_prefix == "dstack"
 
     def test_write_posts_records(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         records = [
             {"message": "Hello", "@timestamp": "2023-10-06T10:00:00Z"},
             {"message": "World", "@timestamp": "2023-10-06T10:00:01Z"},
@@ -89,7 +78,7 @@ class TestHTTPFluentBitWriter:
         """Test that response.raise_for_status() is called to detect non-2xx responses."""
         mock_response = Mock()
         mock_httpx_client.post.return_value = mock_response
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         writer.write(tag="test-tag", records=[{"message": "test"}])
 
@@ -106,7 +95,7 @@ class TestHTTPFluentBitWriter:
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Server Error", request=Mock(), response=mock_response
         )
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         with pytest.raises(LogStorageError, match="Fluent-bit HTTP error: status 500"):
             writer.write(tag="test-tag", records=[{"message": "test"}])
@@ -115,19 +104,19 @@ class TestHTTPFluentBitWriter:
         import httpx
 
         mock_httpx_client.post.side_effect = httpx.HTTPError("Connection failed")
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         with pytest.raises(LogStorageError, match="Fluent-bit HTTP error"):
             writer.write(tag="test-tag", records=[{"message": "test"}])
 
     def test_close_closes_client(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         writer.close()
         mock_httpx_client.close.assert_called_once()
 
     def test_write_applies_tag_prefix(self, mock_httpx_client):
         """Test that tag prefix is applied to tags in HTTP requests."""
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         records = [{"message": "test"}]
         writer.write(tag="project/run/job", records=records)
 
@@ -139,7 +128,7 @@ class TestHTTPFluentBitWriter:
 
     def test_write_with_empty_tag_prefix(self, mock_httpx_client):
         """Test that empty tag prefix doesn't break the tag."""
-        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="")
+        writer = fluentbit.HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="")
         records = [{"message": "test"}]
         writer.write(tag="test-tag", records=records)
 
@@ -151,7 +140,7 @@ class TestHTTPFluentBitWriter:
 
 
 class TestForwardFluentBitWriter:
-    """Tests for the ForwardFluentBitWriter."""
+    """Tests for the fluentbit.ForwardFluentBitWriter."""
 
     @pytest.fixture
     def mock_fluent_sender(self):
@@ -168,7 +157,7 @@ class TestForwardFluentBitWriter:
             "dstack._internal.server.services.logs.fluentbit.fluent_sender.FluentSender"
         ) as mock:
             mock.return_value = mock_fluent_sender
-            ForwardFluentBitWriter(host="localhost", port=24224, tag_prefix="dstack")
+            fluentbit.ForwardFluentBitWriter(host="localhost", port=24224, tag_prefix="dstack")
             mock.assert_called_once_with("dstack", host="localhost", port=24224)
 
     def test_write_emits_records(self, mock_fluent_sender):
@@ -176,7 +165,9 @@ class TestForwardFluentBitWriter:
             "dstack._internal.server.services.logs.fluentbit.fluent_sender.FluentSender"
         ) as mock:
             mock.return_value = mock_fluent_sender
-            writer = ForwardFluentBitWriter(host="localhost", port=24224, tag_prefix="dstack")
+            writer = fluentbit.ForwardFluentBitWriter(
+                host="localhost", port=24224, tag_prefix="dstack"
+            )
 
             records = [
                 {"message": "Hello"},
@@ -194,7 +185,9 @@ class TestForwardFluentBitWriter:
             "dstack._internal.server.services.logs.fluentbit.fluent_sender.FluentSender"
         ) as mock:
             mock.return_value = mock_fluent_sender
-            writer = ForwardFluentBitWriter(host="localhost", port=24224, tag_prefix="dstack")
+            writer = fluentbit.ForwardFluentBitWriter(
+                host="localhost", port=24224, tag_prefix="dstack"
+            )
 
             with pytest.raises(LogStorageError, match="Fluent-bit Forward error"):
                 writer.write(tag="test-tag", records=[{"message": "test"}])
@@ -206,13 +199,15 @@ class TestForwardFluentBitWriter:
             "dstack._internal.server.services.logs.fluentbit.fluent_sender.FluentSender"
         ) as mock:
             mock.return_value = mock_fluent_sender
-            writer = ForwardFluentBitWriter(host="localhost", port=24224, tag_prefix="dstack")
+            writer = fluentbit.ForwardFluentBitWriter(
+                host="localhost", port=24224, tag_prefix="dstack"
+            )
             writer.close()
             mock_fluent_sender.close.assert_called_once()
 
 
 class TestFluentBitLogStorage:
-    """Tests for the FluentBitLogStorage."""
+    """Tests for the fluentbit.FluentBitLogStorage."""
 
     @pytest_asyncio.fixture
     async def project(self, test_db, session: AsyncSession) -> ProjectModel:
@@ -247,19 +242,19 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
                 tag_prefix="dstack",
             )
             mock.assert_called_once_with(host="localhost", port=24224, tag_prefix="dstack")
-            assert isinstance(storage._reader, NullLogReader)
+            assert isinstance(storage._reader, fluentbit.NullLogReader)
 
     def test_init_with_http_protocol(self, mock_http_writer):
         with patch("dstack._internal.server.services.logs.fluentbit.HTTPFluentBitWriter") as mock:
             mock.return_value = mock_http_writer
-            FluentBitLogStorage(
+            fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=8080,
                 protocol="http",
@@ -269,7 +264,7 @@ class TestFluentBitLogStorage:
 
     def test_init_with_unsupported_protocol_raises(self):
         with pytest.raises(LogStorageError, match="Unsupported Fluent-bit protocol"):
-            FluentBitLogStorage(
+            fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="grpc",
@@ -282,14 +277,14 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
                 tag_prefix="dstack",
                 es_host=None,
             )
-            assert isinstance(storage._reader, NullLogReader)
+            assert isinstance(storage._reader, fluentbit.NullLogReader)
 
     @pytest.mark.skipif(not ELASTICSEARCH_AVAILABLE, reason="elasticsearch not installed")
     def test_init_with_elasticsearch(self, mock_forward_writer, mock_es_reader):
@@ -305,7 +300,7 @@ class TestFluentBitLogStorage:
             writer_mock.return_value = mock_forward_writer
             reader_mock.return_value = mock_es_reader
 
-            FluentBitLogStorage(
+            fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -328,7 +323,7 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -359,7 +354,7 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -381,7 +376,7 @@ class TestFluentBitLogStorage:
     async def test_poll_logs_ship_only_mode(self, test_db, project: ProjectModel):
         """Test that ship-only mode returns empty logs."""
         with patch("dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"):
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -404,7 +399,7 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -422,7 +417,7 @@ class TestFluentBitLogStorage:
         ) as mock:
             mock_forward_writer.close.side_effect = Exception("Writer close failed")
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -444,7 +439,7 @@ class TestFluentBitLogStorage:
             "dstack._internal.server.services.logs.fluentbit.ForwardFluentBitWriter"
         ) as mock:
             mock.return_value = mock_forward_writer
-            storage = FluentBitLogStorage(
+            storage = fluentbit.FluentBitLogStorage(
                 host="localhost",
                 port=24224,
                 protocol="forward",
@@ -466,7 +461,7 @@ class TestFluentBitLogStorage:
     reason="fluent-logger or elasticsearch not installed",
 )
 class TestElasticsearchReader:
-    """Tests for the ElasticsearchReader."""
+    """Tests for the fluentbit.ElasticsearchReader."""
 
     @pytest.fixture
     def mock_es_client(self):
@@ -480,7 +475,7 @@ class TestElasticsearchReader:
     def test_init_verifies_connection(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            ElasticsearchReader(
+            fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -489,7 +484,7 @@ class TestElasticsearchReader:
     def test_init_with_api_key(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            ElasticsearchReader(
+            fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
                 api_key="test-api-key",
@@ -505,7 +500,7 @@ class TestElasticsearchReader:
             mock.return_value = mock_instance
 
             with pytest.raises(LogStorageError, match="Failed to connect"):
-                ElasticsearchReader(
+                fluentbit.ElasticsearchReader(
                     host="http://localhost:9200",
                     index="dstack-logs",
                 )
@@ -536,7 +531,7 @@ class TestElasticsearchReader:
 
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -556,7 +551,7 @@ class TestElasticsearchReader:
     def test_read_with_time_filtering(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -578,7 +573,7 @@ class TestElasticsearchReader:
     def test_read_descending_order(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -600,7 +595,7 @@ class TestElasticsearchReader:
     def test_read_with_next_token(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -620,7 +615,7 @@ class TestElasticsearchReader:
         """Test that malformed next_token raises ServerClientError (400) instead of IndexError (500)."""
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
@@ -651,7 +646,7 @@ class TestElasticsearchReader:
     def test_close_closes_client(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
             mock.return_value = mock_es_client
-            reader = ElasticsearchReader(
+            reader = fluentbit.ElasticsearchReader(
                 host="http://localhost:9200",
                 index="dstack-logs",
             )
