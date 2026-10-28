@@ -88,7 +88,7 @@ export const getRequestParams = ({
                         ...(gpuMemoryMinMax ? { memory: gpuMemoryMinMax as unknown as TRange } : {}),
                     },
                 },
-                spot_policy,
+                spot_policy: spot_policy ?? 'auto',
                 volumes: [],
                 files: [],
                 setup: [],

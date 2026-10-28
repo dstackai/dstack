@@ -162,15 +162,15 @@ export const renderRangeJSX = (range: { min?: number; max?: number }) => {
     if (typeof range.min === 'number' && typeof range.max === 'number' && range.max != range.min) {
         return (
             <>
-                {Number(range.min.toFixed(4))}
+                {Number(range.min.toFixed(2))}
                 <span className={styles.greyText}>{rangeSeparator}</span>
-                {Number(range.max.toFixed(4))}
+                {Number(range.max.toFixed(2))}
             </>
         );
     }
 
     const value = range.min ?? range.max;
-    return value === undefined ? undefined : Number(value.toFixed(4));
+    return value === undefined ? undefined : Number(value.toFixed(2));
 };
 
 export const rangeToObject = (
