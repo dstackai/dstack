@@ -13,6 +13,7 @@ import { ROUTES } from 'routes';
 import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from 'pages/Events/List/hooks/useColumnDefinitions';
+import { getEventsOrderSearchParams, useEventsOrder } from 'pages/Events/List/hooks/useEventsOrder';
 
 import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../../constants';
 
@@ -22,9 +23,11 @@ export const EventsList = () => {
     const paramRunId = params.runId ?? '';
     const navigate = useNavigate();
 
+    const { ascending, sortingProps } = useEventsOrder();
+
     const { data, isLoading, isLoadingMore, refreshList } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { limit: DEFAULT_TABLE_PAGE_SIZE, within_runs: [paramRunId] },
+        args: { limit: DEFAULT_TABLE_PAGE_SIZE, within_runs: [paramRunId], ascending },
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -39,7 +42,8 @@ export const EventsList = () => {
     });
 
     const goToFullView = () => {
-        navigate(ROUTES.EVENTS.LIST + `?within_runs=${paramRunId}`);
+        const searchParams = new URLSearchParams({ within_runs: paramRunId, ...getEventsOrderSearchParams(ascending) });
+        navigate(`${ROUTES.EVENTS.LIST}?${searchParams}`);
     };
 
     const { columns } = useColumnsDefinitions();
@@ -47,6 +51,7 @@ export const EventsList = () => {
     return (
         <Table
             {...collectionProps}
+            {...sortingProps}
             columnDefinitions={columns}
             items={items}
             loading={isLoading}
