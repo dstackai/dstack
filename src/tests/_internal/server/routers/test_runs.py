@@ -3594,6 +3594,7 @@ class TestApplyPlan:
         )
         run = run_model_to_run(run_model)
         run_spec.configuration_path = "new.dstack.yml"
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.replicas = Range[int](min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
@@ -3616,7 +3617,9 @@ class TestApplyPlan:
         assert updated_run.deployment_num == 1
         assert run.run_spec.configuration_path == "old.dstack.yml"
         assert updated_run.run_spec.configuration_path == "new.dstack.yml"
+        assert isinstance(run.run_spec.configuration, ServiceConfiguration)
         assert run.run_spec.configuration.replicas == Range(min=1, max=1)
+        assert isinstance(updated_run.run_spec.configuration, ServiceConfiguration)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
         events = await list_events(session)
         assert len(events) == 1
@@ -3819,6 +3822,7 @@ class TestApplyPlanServiceGatewayUpdate:
         await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
 
         run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "my-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3862,6 +3866,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=old_gateway, gateway_field="old-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "new-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3894,6 +3899,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = False
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3932,6 +3938,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway_field=False
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -3976,6 +3983,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway=gateway, gateway_field="my-gateway"
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4043,6 +4051,7 @@ class TestApplyPlanServiceGatewayUpdate:
         repo = await create_repo(session=session, project_id=project.id)
 
         run_model, run_spec = await self._create_service_run(session, project, repo, user)
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = "nonexistent-gateway"
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4064,6 +4073,7 @@ class TestApplyPlanServiceGatewayUpdate:
         run_model, run_spec = await self._create_service_run(
             session, project, repo, user, gateway_field=False
         )
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = True
 
         response = await self._apply(client, project, user, run_model, run_spec)
@@ -4089,6 +4099,7 @@ class TestApplyPlanServiceGatewayUpdate:
             session, project, repo, user, gateway_field=None
         )
         assert run_model.service_spec is None
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         run_spec.configuration.gateway = False
 
         response = await self._apply(client, project, user, run_model, run_spec)

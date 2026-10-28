@@ -65,7 +65,7 @@ class TestRecordTaskRun:
     async def test_counts_runs_by_status(self):
         from opentelemetry import metrics
         from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+        from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
 
         reader = InMemoryMetricReader()
         # The global meter provider can only be set once per process
@@ -92,6 +92,7 @@ class TestRecordTaskRun:
         points = metrics_data.resource_metrics[0].scope_metrics[0].metrics[0].data.data_points
         counts = {}
         for point in points:
+            assert isinstance(point, NumberDataPoint)
             assert point.attributes is not None
             assert point.attributes["task"] == "task"
             counts[point.attributes["status"]] = point.value

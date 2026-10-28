@@ -764,6 +764,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         groups = run_spec.configuration.groups
         assert groups is not None
         assert [_gpu_vendor(g.resources) for g in groups] == [
@@ -793,6 +794,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, ServiceConfiguration)
         assert run_spec.configuration.groups is not None
         assert _gpu_vendor(run_spec.configuration.groups[0].resources) == expected_vendor
 
@@ -822,6 +824,7 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
 
         set_run_spec_resources_defaults(run_spec)
 
+        assert isinstance(run_spec.configuration, TaskConfiguration)
         groups = run_spec.configuration.node_groups
         assert [_gpu_vendor(g.resources) for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
