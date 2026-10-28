@@ -98,6 +98,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_job_runtime_data,
     get_run_spec,
+    get_runner_job_submission_mismatch_error,
     get_volume_configuration,
     list_events,
 )
@@ -1732,6 +1733,7 @@ class TestJobRunningWorker:
             )
             await _process_job(session, worker, job)
             ssh_tunnel_cls.assert_called_once()
+            runner_client_mock.pull.assert_called_once_with(job.id, 0)
 
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
@@ -1761,6 +1763,52 @@ class TestJobRunningWorker:
         assert job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
         assert job.exit_status == 0
         assert job.runner_timestamp == 2
+
+    async def test_terminates_job_if_runner_no_longer_runs_it(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+    ):
+        """
+        A runner restarted along with the container is reachable but will never be given the
+        job, so the job is terminated right away rather than after the disconnect timeout.
+        """
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            instance=instance,
+            instance_assigned=True,
+        )
+        job.runner_timestamp = 1
+        await session.commit()
+
+        with (
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
+            ) as runner_client_cls,
+        ):
+            runner_client_mock = runner_client_cls.return_value
+            runner_client_mock.pull.side_effect = get_runner_job_submission_mismatch_error()
+            await _process_job(session, worker, job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.INSTANCE_UNREACHABLE
+        assert job.disconnected_at is None
+        assert job.runner_timestamp == 1
 
     async def test_running_job_disconnect_retries_then_terminates(
         self,

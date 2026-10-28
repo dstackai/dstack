@@ -29,6 +29,8 @@ type Executor interface {
 
 	GetRunnerState() string
 	SetRunnerState(state string)
+	// Empty until a job is submitted
+	GetJobSubmissionId() string
 
 	SetJobState(ctx context.Context, state schemas.JobState)
 	SetJobStateWithTerminationReason(

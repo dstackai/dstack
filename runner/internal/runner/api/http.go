@@ -209,6 +209,37 @@ func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (interf
 	return nil, nil
 }
 
+// jobSubmissionScoped refuses a request meant for another job submission than the runner's own,
+// or for any if the runner has none. The backend may have restarted the container, starting the
+// runner anew, or given the job's address to another container. Either way, the runner the job
+// was submitted to is gone, and the server must not take this one for it. Old servers do not
+// send the ID, and their requests are served as before.
+//
+// The lock is not held through the handler, so the job submission may change in between. It is
+// only set by /api/submit, which is refused once the job is run, and before that the scoped
+// endpoints have no job to act on.
+func (s *Server) jobSubmissionScoped(
+	handler func(http.ResponseWriter, *http.Request) (interface{}, error),
+) func(http.ResponseWriter, *http.Request) (interface{}, error) {
+	return func(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+		query := r.URL.Query()
+		if !query.Has("job_submission_id") {
+			return handler(w, r)
+		}
+		s.executor.RLock()
+		actual := s.executor.GetJobSubmissionId()
+		s.executor.RUnlock()
+		if query.Get("job_submission_id") != actual {
+			msg := "no job submitted"
+			if actual != "" {
+				msg = fmt.Sprintf("another job submitted: %s", actual)
+			}
+			return nil, &api.Error{Status: http.StatusConflict, Msg: msg}
+		}
+		return handler(w, r)
+	}
+}
+
 func isMaxBytesError(err error) bool {
 	var maxBytesError *http.MaxBytesError
 	return errors.As(err, &maxBytesError)

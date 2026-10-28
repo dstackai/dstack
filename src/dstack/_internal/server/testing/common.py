@@ -3,10 +3,12 @@ import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from http import HTTPStatus
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import gpuhunt
+import requests
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -141,6 +143,7 @@ from dstack._internal.server.services.permissions import (
     get_default_permissions,
     set_default_permissions,
 )
+from dstack._internal.server.services.runner.client import RunnerJobSubmissionMismatchError
 from dstack._internal.server.services.users import get_token_hash
 
 
@@ -1363,6 +1366,17 @@ async def list_events(session: AsyncSession) -> list[EventModel]:
 
 async def clear_events(session: AsyncSession) -> None:
     await session.execute(delete(EventModel))
+
+
+def get_runner_job_submission_mismatch_error(
+    path: str = "/api/pull",
+) -> RunnerJobSubmissionMismatchError:
+    """The error `RunnerClient` raises when the runner has no job, e.g., after a restart."""
+    response = requests.Response()
+    response.status_code = HTTPStatus.CONFLICT
+    response._content = b"no job submitted"
+    response.request = requests.Request(method="GET", url=f"http://localhost{path}").prepare()
+    return RunnerJobSubmissionMismatchError(response)
 
 
 def get_private_key_string() -> str:

@@ -380,7 +380,10 @@ def _stop_runner(
     logger.debug("%s: stopping runner", fmt(job_model))
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     try:
-        runner_client.stop()
+        runner_client.stop(job_model.id)
+    except client.RunnerJobSubmissionMismatchError:
+        # The runner the job was submitted to is gone, and this one runs no job of ours to stop
+        logger.debug("%s: runner no longer runs the job, nothing to stop", fmt(job_model))
     except (requests.RequestException, client.RunnerError):
         # Stopping the runner is best-effort: the job is being terminated either way.
         logger.exception("%s: failed to stop runner gracefully", fmt(job_model))

@@ -42,6 +42,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_job_runtime_data,
     get_run_spec,
+    get_runner_job_submission_mismatch_error,
     get_volume_configuration,
     get_volume_provisioning_data,
     list_events,
@@ -322,6 +323,40 @@ class TestJobTerminatingWorker:
 
         remove_server_connection_mock.assert_awaited_once_with(job.id)
 
+    async def test_asks_runner_to_stop_job_submission(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        """The runner refuses a stop meant for another job submission than its own."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+        )
+        job.graceful_termination_attempts = 0
+        _lock_job(job)
+        await session.commit()
+
+        await worker.process(_job_to_pipeline_item(job))
+
+        runner_client_mock.stop.assert_called_once_with(job.id)
+
     async def test_stops_job_gracefully_before_terminating_container(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
     ):
@@ -528,7 +563,7 @@ class TestJobTerminatingWorker:
         ):
             await worker.process(_job_to_pipeline_item(job))
 
-        runner_client_mock.pull.assert_called_once_with(1)
+        runner_client_mock.pull.assert_called_once_with(job.id, 1)
         write_logs.assert_called_once()
         assert write_logs.call_args.kwargs["job_logs"][0].message == b"the tail"
         assert stop_container.await_count == int(container_stopped)
@@ -536,6 +571,52 @@ class TestJobTerminatingWorker:
         await session.refresh(job)
         # Advanced, so the next pass does not collect the same logs again
         assert job.runner_timestamp == 3
+
+    async def test_does_not_wait_for_logs_if_runner_no_longer_runs_job(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobTerminatingWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        """The job's logs went away with the runner it was submitted to, nothing to wait for."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.INSTANCE_UNREACHABLE,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            running_at=get_current_datetime() - timedelta(minutes=1),
+        )
+        job.graceful_termination_attempts = 1
+        job.remove_at = get_current_datetime() + timedelta(seconds=30)
+        job.runner_timestamp = 1
+        _lock_job(job)
+        await session.commit()
+
+        runner_client_mock.pull.side_effect = get_runner_job_submission_mismatch_error()
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+            new=AsyncMock(return_value=True),
+        ) as stop_container:
+            await worker.process(_job_to_pipeline_item(job))
+
+        runner_client_mock.pull.assert_called_once_with(job.id, 1)
+        stop_container.assert_awaited_once()
+
+        await session.refresh(job)
+        assert job.runner_timestamp == 1
 
     @pytest.mark.parametrize(
         "error",

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from collections.abc import Mapping
 from typing import List, Optional
 
@@ -123,7 +124,13 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
             ssh_private_keys,
             jpd,
             jrd,
+            job_model.id,
         )
+    except client.RunnerJobSubmissionMismatchError:
+        # The metrics would be of another container. The job itself is terminated by
+        # `JobRunningPipeline` on its next pull from the runner.
+        logger.debug("Runner no longer runs job %s, skipping metrics", job_model.job_name)
+        return None
     except client.PeerConnectionError as e:
         # The job may already be terminated when collecting metrics - that's ok.
         logger.warning("Failed to connect to job %s to collect metrics: %s", job_model.job_name, e)
@@ -160,6 +167,7 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
 @runner_ssh_tunnel
 def _pull_runner_metrics(
     addresses: Mapping[int, client.LocalAddress],
+    job_submission_id: uuid.UUID,
 ) -> Optional[MetricsResponse]:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
-    return runner_client.get_metrics()
+    return runner_client.get_metrics(job_submission_id)
