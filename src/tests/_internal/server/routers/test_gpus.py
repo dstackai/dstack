@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from unittest.mock import Mock, patch
 
 import gpuhunt
@@ -19,7 +19,7 @@ from dstack._internal.core.models.profiles import CreationPolicy, Profile
 from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import FleetModel, ProjectModel
+from dstack._internal.server.models import DecryptedString, FleetModel, ProjectModel
 from dstack._internal.server.services import gpus as gpus_services
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -136,7 +136,7 @@ def create_mock_backends_with_offers(
 async def call_gpus_api(
     client: AsyncClient,
     project_name: str,
-    user_token: str,
+    user_token: Union[DecryptedString, str],
     run_spec: RunSpec,
     group_by: Optional[List[str]] = None,
     full_offers: Optional[bool] = None,
@@ -144,7 +144,7 @@ async def call_gpus_api(
     reverse: Optional[bool] = None,
 ):
     """Helper to call the GPUs API with standard parameters."""
-    json_data = {"run_spec": run_spec.model_dump()}
+    json_data: Dict[str, Any] = {"run_spec": run_spec.model_dump()}
     if group_by is not None:
         json_data["group_by"] = group_by
     if full_offers is not None:

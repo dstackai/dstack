@@ -3,10 +3,10 @@ import copy
 import json
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable, Iterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union, cast
 from unittest.mock import AsyncMock, patch
 
 import grpc
@@ -28,6 +28,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import router_worker_sync
 from dstack._internal.server.services.runs.router_worker_sync import (
     _add_worker_to_router,
+    _CurrentWorker,
     _get_current_worker_job_id,
     _get_router_workers,
     _get_worker_jobs_with_addresses,
@@ -441,7 +442,11 @@ class TestGetWorkerJobsWithAddresses:
 class TestGetCurrentWorkerJobId:
     def test_returns_job_id_from_label(self):
         job_id = uuid.uuid4()
-        worker = {"id": "1", "url": "http://10.0.0.1:8000", "labels": {_JOB_ID_LABEL: str(job_id)}}
+        worker: _CurrentWorker = {
+            "id": "1",
+            "url": "http://10.0.0.1:8000",
+            "labels": {_JOB_ID_LABEL: str(job_id)},
+        }
         assert _get_current_worker_job_id(worker) == job_id
 
     @pytest.mark.parametrize(
@@ -945,7 +950,7 @@ class TestProbeSglangGrpcWorker:
         channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: response})
 
         worker = await _probe_sglang_grpc_worker(
-            channel, log_prefix="Worker", address="10.0.0.1:8000"
+            cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
         )
 
         expected = {
@@ -975,7 +980,9 @@ class TestProbeSglangGrpcWorker:
         caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
         channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: _rpc_error(code)})
         assert (
-            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            await _probe_sglang_grpc_worker(
+                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            )
             is None
         )
         assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
@@ -985,7 +992,9 @@ class TestProbeSglangGrpcWorker:
             {_SGLANG_GET_SERVER_INFO: _rpc_error(grpc.StatusCode.PERMISSION_DENIED)}
         )
         assert (
-            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            await _probe_sglang_grpc_worker(
+                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            )
             is None
         )
         assert (
@@ -1015,7 +1024,9 @@ class TestProbeSglangGrpcWorker:
         response = sglang_scheduler_pb2.GetServerInfoResponse(server_args=server_args)
         channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: response})
         assert (
-            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            await _probe_sglang_grpc_worker(
+                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            )
             is None
         )
         assert (
@@ -1065,7 +1076,7 @@ class TestProbeVllmGrpcWorker:
         channel = _FakeGrpcChannel({_VLLM_GET_SERVER_INFO: response})
 
         worker = await _probe_vllm_grpc_worker(
-            channel, log_prefix="Worker", address="10.0.0.1:8000"
+            cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
         )
 
         assert worker == {
@@ -1092,7 +1103,9 @@ class TestProbeVllmGrpcWorker:
         caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
         channel = _FakeGrpcChannel({_VLLM_GET_SERVER_INFO: _rpc_error(code)})
         assert (
-            await _probe_vllm_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            await _probe_vllm_grpc_worker(
+                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            )
             is None
         )
         assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
@@ -1102,7 +1115,9 @@ class TestProbeVllmGrpcWorker:
             {_VLLM_GET_SERVER_INFO: _rpc_error(grpc.StatusCode.PERMISSION_DENIED)}
         )
         assert (
-            await _probe_vllm_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
+            await _probe_vllm_grpc_worker(
+                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            )
             is None
         )
         assert (
@@ -1198,9 +1213,11 @@ def _job_id_label(job: JobModel) -> dict[str, str]:
     return {_JOB_ID_LABEL: str(job.id)}
 
 
-def _router_entry(worker_id: str, url: str, labels: Optional[dict[str, str]] = None) -> dict:
+def _router_entry(
+    worker_id: str, url: str, labels: Optional[dict[str, str]] = None
+) -> _CurrentWorker:
     """A worker as listed by the router `GET /workers`, with the fields the sync reads"""
-    entry: dict = {"id": worker_id, "url": url}
+    entry: _CurrentWorker = {"id": worker_id, "url": url}
     if labels is not None:
         entry["labels"] = labels
     return entry
@@ -1211,12 +1228,12 @@ class _FakeRouter:
 
     def __init__(
         self,
-        workers: Optional[list[dict]] = None,
+        workers: Optional[Sequence[Mapping[str, Any]]] = None,
         *,
         connect_error: Optional[Exception] = None,
         update_error: Optional[Exception] = None,
     ):
-        self.workers = list(workers or [])
+        self.workers: list[Mapping[str, Any]] = list(workers or [])
         self.connect_error = connect_error
         self.update_error = update_error
         self.connections = 0
