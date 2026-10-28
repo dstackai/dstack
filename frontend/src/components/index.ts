@@ -59,6 +59,8 @@ export type { AvatarProps } from '@cloudscape-design/chat-components/avatar';
 export { default as LineChart } from '@cloudscape-design/components/line-chart';
 export { default as PropertyFilter } from '@cloudscape-design/components/property-filter';
 export type { PropertyFilterProps } from '@cloudscape-design/components/property-filter';
+export { default as DateRangePicker } from '@cloudscape-design/components/date-range-picker';
+export type { DateRangePickerProps } from '@cloudscape-design/components/date-range-picker';
 export type { LineChartProps } from '@cloudscape-design/components/line-chart/interfaces';
 export type { ModalProps } from '@cloudscape-design/components/modal';
 export { default as AnchorNavigation } from '@cloudscape-design/components/anchor-navigation';

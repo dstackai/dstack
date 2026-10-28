@@ -223,7 +223,7 @@ export const useFilters = ({
             const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
             const filterKeysValues: string[] = Object.values(filterKeys);
 
-            // Keep search params that are not managed by the property filter, e.g. the sort order
+            // Keep search params that are not managed by the property filter, e.g. the sort order and time range
             prevSearchParams.forEach((value, key) => {
                 if (!filterKeysValues.includes(key)) {
                     searchParams.append(key, value);

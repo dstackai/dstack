@@ -741,7 +741,11 @@
         "recorded_at": "Recorded At",
         "actor": "Actor",
         "targets": "Targets",
-        "message": "Message"
+        "message": "Message",
+        "time_range_placeholder": "Filter by time range",
+        "time_range_incomplete": "Select a start and end date for the time range.",
+        "time_range_start_after_end": "The start date must be before the end date.",
+        "time_range_invalid_duration": "The duration must be a positive number."
     },
 
     "users": {
