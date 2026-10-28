@@ -33,7 +33,7 @@ from dstack.plugins.builtin.rest_plugin import PLUGIN_SERVICE_URI_ENV_VAR_NAME, 
 async def create_run_spec(
     session: AsyncSession,
     project: ProjectModel,
-    replicas: str = 1,
+    replicas: int = 1,
 ) -> RunSpec:
     repo = await create_repo(session=session, project_id=project.id)
     run_name = "test-run"
@@ -111,7 +111,8 @@ class TestRESTPlugin:
         mock_response = Mock()
         response_dict = {"spec": spec.model_dump(), "error": None}
 
-        if isinstance(spec, (RunSpec, FleetSpec)):
+        has_profile = isinstance(spec, (RunSpec, FleetSpec))
+        if has_profile:
             response_dict["spec"]["profile"]["tags"] = {"env": "test", "team": "qa"}
         else:
             response_dict["spec"]["configuration_path"] = "/path/to/something"

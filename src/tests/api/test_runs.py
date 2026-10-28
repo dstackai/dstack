@@ -2,7 +2,7 @@ import base64
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import pytest
 
@@ -21,7 +21,9 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
+from dstack.api import Client
 from dstack.api._public.runs import Run, RunCollection
+from dstack.api.server import APIClient
 from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_NO_COMMENT
 
 
@@ -39,6 +41,7 @@ class _RunsAPI:
 class _APIClient:
     def __init__(self):
         self.runs = _RunsAPI()
+        self.logs: Optional[_LogsAPI] = None
 
 
 class _PlansAPI:
@@ -56,10 +59,12 @@ class _PlansAPIClient:
 
 
 class TestRunCollectionList:
-    def test_default_list_fallback_limits_job_submissions(self):
+    def test_default_list_fallback_limits_job_submissions(self, monkeypatch):
         api_client = _APIClient()
-        runs = RunCollection(api_client=api_client, project="main", client=None)
-        runs._model_to_run = lambda run: run
+        runs = RunCollection(
+            api_client=cast(APIClient, api_client), project="main", client=cast(Client, None)
+        )
+        monkeypatch.setattr(runs, "_model_to_run", lambda run: run)
 
         assert runs.list() == ["finished-run"]
 
@@ -129,7 +134,7 @@ def _get_run_model(status: RunStatus, jobs: list[Job]) -> RunModel:
 def _get_run(run_model: RunModel, logs_api: _LogsAPI) -> Run:
     api_client = _APIClient()
     api_client.logs = logs_api
-    return Run(api_client=api_client, project="main", run=run_model)
+    return Run(api_client=cast(APIClient, api_client), project="main", run=run_model)
 
 
 class TestRunLogs:
@@ -193,7 +198,9 @@ class TestRunCollectionGetRunPlan:
         self, ssh_identity_file: Optional[Path] = None, ssh_key_pub: Optional[str] = None
     ) -> RunSpec:
         api_client = _PlansAPIClient()
-        runs = RunCollection(api_client=api_client, project="main", client=None)
+        runs = RunCollection(
+            api_client=cast(APIClient, api_client), project="main", client=cast(Client, None)
+        )
 
         assert (
             runs.get_run_plan(
