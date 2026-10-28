@@ -287,11 +287,11 @@ async def test_migrate_from_state_v1(tmp_path: Path) -> None:
     )
     assert await repo.get_project("proj-1") == Project(name="proj-1", ssh_private_key="test key 1")
     assert await repo.get_project("proj-2") == Project(name="proj-2", ssh_private_key="test key 2")
-    assert set(await repo.list_entrypoints()) == {
+    assert sorted(await repo.list_entrypoints(), key=lambda e: (e.project_name, e.domain)) == [
         ModelEntrypoint(project_name="proj-1", domain="gateway.proj-1.gateway.test", https=True),
         ModelEntrypoint(project_name="proj-2", domain="gateway.proj-2.gateway.test", https=True),
-    }
-    assert set(await repo.list_services()) == {
+    ]
+    assert sorted(await repo.list_services(), key=lambda s: (s.project_name, s.run_name)) == [
         Service(
             project_name="proj-1",
             run_name="run-1",
@@ -362,7 +362,7 @@ async def test_migrate_from_state_v1(tmp_path: Path) -> None:
                 ),
             ),
         ),
-    }
+    ]
     assert await repo.list_models("proj-1") == [
         ChatModel(
             project_name="proj-1",

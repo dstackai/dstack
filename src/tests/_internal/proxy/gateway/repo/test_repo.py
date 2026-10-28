@@ -33,5 +33,8 @@ async def test_persist_repo(tmp_path: Path) -> None:
     assert await repo.get_project("proj-1") == proj_1
     assert await repo.get_project("proj-2") == proj_2
     assert await repo.list_entrypoints() == [entrypoint_1]
-    assert set(await repo.list_services()) == {srv_1, srv_2}
+    assert sorted(await repo.list_services(), key=lambda s: (s.project_name, s.run_name)) == [
+        srv_1,
+        srv_2,
+    ]
     assert await repo.list_models("proj-1") == [model_1]
