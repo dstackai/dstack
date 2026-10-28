@@ -28,7 +28,7 @@ from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY, PUBLIC_KEY_N
 
 
 def _get_run_collection(api_client: MagicMock) -> RunCollection:
-    # `list()` and `get_run_plan()` don't use the client
+    # `RunCollection` only stores the client and never uses it
     return RunCollection(api_client=api_client, project="main", client=cast(Client, None))
 
 
