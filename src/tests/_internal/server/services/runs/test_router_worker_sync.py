@@ -947,10 +947,10 @@ class TestProbeSglangGrpcWorker:
     )
     async def test_reports_worker(self, server_args: dict, expected: dict):
         response = sglang_scheduler_pb2.GetServerInfoResponse(server_args=server_args)
-        channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: response})
+        channel = _fake_grpc_channel({_SGLANG_GET_SERVER_INFO: response})
 
         worker = await _probe_sglang_grpc_worker(
-            cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            channel, log_prefix="Worker", address="10.0.0.1:8000"
         )
 
         expected = {
@@ -978,23 +978,19 @@ class TestProbeSglangGrpcWorker:
         self, caplog: pytest.LogCaptureFixture, code: grpc.StatusCode
     ):
         caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
-        channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: _rpc_error(code)})
+        channel = _fake_grpc_channel({_SGLANG_GET_SERVER_INFO: _rpc_error(code)})
         assert (
-            await _probe_sglang_grpc_worker(
-                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
-            )
+            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
             is None
         )
         assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
 
     async def test_warns_on_unexpected_error(self, caplog: pytest.LogCaptureFixture):
-        channel = _FakeGrpcChannel(
+        channel = _fake_grpc_channel(
             {_SGLANG_GET_SERVER_INFO: _rpc_error(grpc.StatusCode.PERMISSION_DENIED)}
         )
         assert (
-            await _probe_sglang_grpc_worker(
-                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
-            )
+            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
             is None
         )
         assert (
@@ -1022,11 +1018,9 @@ class TestProbeSglangGrpcWorker:
         self, caplog: pytest.LogCaptureFixture, server_args: dict
     ):
         response = sglang_scheduler_pb2.GetServerInfoResponse(server_args=server_args)
-        channel = _FakeGrpcChannel({_SGLANG_GET_SERVER_INFO: response})
+        channel = _fake_grpc_channel({_SGLANG_GET_SERVER_INFO: response})
         assert (
-            await _probe_sglang_grpc_worker(
-                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
-            )
+            await _probe_sglang_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
             is None
         )
         assert (
@@ -1073,10 +1067,10 @@ class TestProbeVllmGrpcWorker:
         response = vllm_engine_pb2.GetServerInfoResponse(
             kv_role=kv_role, kv_connector=kv_connector
         )
-        channel = _FakeGrpcChannel({_VLLM_GET_SERVER_INFO: response})
+        channel = _fake_grpc_channel({_VLLM_GET_SERVER_INFO: response})
 
         worker = await _probe_vllm_grpc_worker(
-            cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
+            channel, log_prefix="Worker", address="10.0.0.1:8000"
         )
 
         assert worker == {
@@ -1101,23 +1095,19 @@ class TestProbeVllmGrpcWorker:
         self, caplog: pytest.LogCaptureFixture, code: grpc.StatusCode
     ):
         caplog.set_level(level=logging.DEBUG, logger=router_worker_sync.__name__)
-        channel = _FakeGrpcChannel({_VLLM_GET_SERVER_INFO: _rpc_error(code)})
+        channel = _fake_grpc_channel({_VLLM_GET_SERVER_INFO: _rpc_error(code)})
         assert (
-            await _probe_vllm_grpc_worker(
-                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
-            )
+            await _probe_vllm_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
             is None
         )
         assert not [r for r in caplog.records if r.levelno > logging.DEBUG]
 
     async def test_warns_on_unexpected_error(self, caplog: pytest.LogCaptureFixture):
-        channel = _FakeGrpcChannel(
+        channel = _fake_grpc_channel(
             {_VLLM_GET_SERVER_INFO: _rpc_error(grpc.StatusCode.PERMISSION_DENIED)}
         )
         assert (
-            await _probe_vllm_grpc_worker(
-                cast(grpc.aio.Channel, channel), log_prefix="Worker", address="10.0.0.1:8000"
-            )
+            await _probe_vllm_grpc_worker(channel, log_prefix="Worker", address="10.0.0.1:8000")
             is None
         )
         assert (
@@ -1350,6 +1340,18 @@ def _sglang_http_handler(server_info: dict) -> Callable[[httpx.Request], httpx.R
 def _grpc_server_http_handler(request: httpx.Request) -> httpx.Response:
     # What an HTTP/1.1 request to an HTTP/2-only gRPC server produces
     raise httpx.RemoteProtocolError("illegal request line")
+
+
+def _fake_grpc_channel(
+    responses: Optional[Mapping[str, Union[Message, grpc.aio.AioRpcError]]] = None,
+    *,
+    unknown_method_code: grpc.StatusCode = grpc.StatusCode.UNIMPLEMENTED,
+) -> grpc.aio.Channel:
+    """A `_FakeGrpcChannel` passed where the probes expect a real channel"""
+    return cast(
+        grpc.aio.Channel,
+        _FakeGrpcChannel(responses, unknown_method_code=unknown_method_code),
+    )
 
 
 class _FakeGrpcChannel:

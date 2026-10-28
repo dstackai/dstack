@@ -372,7 +372,6 @@ class TestPresetStore:
 
         preset = get_verified_preset(store, "523096d6")
 
-        assert preset is not None
         assert preset.name == "dsv4-flash"
         assert preset.best_trial == 2
         assert isinstance(preset.configuration.model, PresetModelBase)
@@ -463,7 +462,6 @@ class TestPresetStore:
 
         preset = get_verified_preset(store, "aa11bb22")
 
-        assert preset is not None
         assert [(group.name, len(group.replicas)) for group in preset.verified_on] == [
             ("small", 1),
             ("large", 2),

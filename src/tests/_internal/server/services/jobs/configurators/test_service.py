@@ -169,10 +169,10 @@ class TestProbes:
         assert len(job_specs[0].probes) == 0
 
 
-def _make_run_spec(replicas, **service_kwargs):
+def _make_run_spec(groups: list[ReplicaGroup], **service_kwargs):
     configuration = ServiceConfiguration(
         port=80,
-        replicas=replicas,
+        groups=groups,
         **service_kwargs,
     )
     return get_run_spec(run_name="run", repo_id="id", configuration=configuration)
@@ -186,7 +186,7 @@ class TestPerGroupOverrides:
 
     async def test_image_name_uses_group_image(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -200,7 +200,7 @@ class TestPerGroupOverrides:
 
     async def test_image_name_uses_dind_when_group_docker_true(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -214,7 +214,7 @@ class TestPerGroupOverrides:
 
     async def test_image_name_uses_nvcc_default_when_group_nvcc_true(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -229,7 +229,7 @@ class TestPerGroupOverrides:
     async def test_image_name_falls_back_to_service_image(self):
         run_spec = _make_run_spec(
             image="svc:1.0",
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -242,7 +242,7 @@ class TestPerGroupOverrides:
 
     async def test_privileged_true_when_group_docker(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -256,7 +256,7 @@ class TestPerGroupOverrides:
 
     async def test_privileged_returns_group_privileged(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -272,7 +272,7 @@ class TestPerGroupOverrides:
     async def test_privileged_defers_to_super_when_group_unset(self):
         run_spec = _make_run_spec(
             image="svc:1.0",
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -286,7 +286,7 @@ class TestPerGroupOverrides:
 
     async def test_dstack_image_commands_injects_start_dockerd_for_docker(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -300,7 +300,7 @@ class TestPerGroupOverrides:
 
     async def test_dstack_image_commands_empty_for_group_image(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -314,7 +314,7 @@ class TestPerGroupOverrides:
 
     async def test_shell_bash_when_group_docker(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -328,7 +328,7 @@ class TestPerGroupOverrides:
 
     async def test_shell_sh_when_group_image(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -342,7 +342,7 @@ class TestPerGroupOverrides:
 
     async def test_python_uses_group_python(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -363,7 +363,7 @@ class TestPerGroupOverrides:
             Mock(return_value=(image_config, {gpuhunt.CPUArchitecture.X86})),
         )
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -385,7 +385,7 @@ class TestPerGroupOverrides:
             mock_get_image_config,
         )
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -400,7 +400,7 @@ class TestPerGroupOverrides:
 
     async def test_spot_policy_uses_group_value(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -414,7 +414,7 @@ class TestPerGroupOverrides:
 
     async def test_spot_policy_defaults_to_ondemand_when_group_unset(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -427,7 +427,7 @@ class TestPerGroupOverrides:
 
     async def test_different_groups_different_spot_policies(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="spot",
                     replicas=Range(min=1, max=1),
@@ -453,7 +453,7 @@ class TestPerGroupOverrides:
 
     async def test_reservation_uses_group_value(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -467,7 +467,7 @@ class TestPerGroupOverrides:
 
     async def test_reservation_defaults_to_none_when_group_unset(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),
@@ -480,7 +480,7 @@ class TestPerGroupOverrides:
 
     async def test_different_groups_different_reservations(self):
         run_spec = _make_run_spec(
-            replicas=[
+            groups=[
                 ReplicaGroup(
                     name="a",
                     replicas=Range(min=1, max=1),

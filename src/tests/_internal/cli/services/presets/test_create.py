@@ -3,7 +3,6 @@ import json
 import os
 import uuid
 from types import SimpleNamespace
-from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
@@ -64,6 +63,7 @@ from dstack._internal.utils.common import get_or_error
 from dstack.api import Client
 from tests._internal.cli.common import (
     get_agent_spec,
+    get_fake_api,
     get_preset,
     get_running_service_run,
     get_session_run,
@@ -118,7 +118,7 @@ class TestFreshSetup:
         )
 
         setup = _fresh_setup(
-            api=_api(project="main"),
+            api=get_fake_api(project="main"),
             configuration=configuration,
             session=_agent_session(tmp_path),
             build_name="qwen-build",
@@ -145,7 +145,7 @@ class TestFreshSetup:
         )
 
         _fresh_setup(
-            api=_api(project="main"),
+            api=get_fake_api(project="main"),
             configuration=PresetConfiguration.model_validate(
                 {"name": "qwen-build", "base": "Qwen/Qwen3.5-27B"}
             ),
@@ -186,6 +186,7 @@ def creation_context(tmp_path, monkeypatch):
             "base": "Qwen/Qwen3.5-27B",
             "min_context_length": 8192,
             "max_ttft": 5000,
+            # Matches the fixture report's benchmark concurrency, which verification compares.
             "concurrency": 1,
             "trials": 1,
             "fleets": ["gpu-fleet"],
@@ -243,7 +244,7 @@ class TestCreatePreset:
         )
 
         create_preset(
-            api=_api(),
+            api=get_fake_api(),
             configuration=PresetConfiguration.model_validate(
                 {"name": "qwen", "base": "Qwen/Qwen3.5-27B"}
             ),
@@ -294,7 +295,7 @@ class TestCreatePreset:
         monkeypatch.setattr(PresetSession, "finish", fail_finish)
 
         result = create_preset(
-            api=_api(),
+            api=get_fake_api(),
             configuration=PresetConfiguration.model_validate(
                 {
                     "name": "qwen",
@@ -337,7 +338,7 @@ class TestCreatePreset:
 
         with pytest.raises(RuntimeError, match="creation failed"):
             create_preset(
-                api=_api(),
+                api=get_fake_api(),
                 configuration=PresetConfiguration.model_validate(
                     {"name": "qwen", "base": "Qwen/Qwen3.5-27B"}
                 ),
@@ -346,7 +347,7 @@ class TestCreatePreset:
 
     @pytest.mark.asyncio
     async def test_checks_active_fleets_before_claude_launch(self, tmp_path, monkeypatch):
-        api = _api(
+        api = get_fake_api(
             project="main",
             client=SimpleNamespace(fleets=SimpleNamespace(list=lambda *args, **kwargs: [])),
         )
@@ -662,7 +663,7 @@ class TestCleanupRuns:
             '{"name":"qwen-build-1"}\n{"name":"unrelated-run"}\n{"name":"qwen-build-2"}\n'
         )
         runs = _FakeRuns()
-        api = _api(
+        api = get_fake_api(
             runs=runs,
             project="main",
             client=SimpleNamespace(runs=runs),
@@ -978,7 +979,7 @@ class TestInterruptAndResume:
 
         with pytest.raises(KeyboardInterrupt):
             create_preset(
-                api=_api(),
+                api=get_fake_api(),
                 configuration=PresetConfiguration.model_validate(
                     {"name": "qwen", "base": "Qwen/Qwen3.5-27B"}
                 ),
@@ -1016,7 +1017,7 @@ class TestInterruptAndResume:
         )
         monkeypatch.setattr(Confirm, "ask", Mock(side_effect=KeyboardInterrupt))
 
-        _stop_or_detach_agent_session(session, _api())
+        _stop_or_detach_agent_session(session, get_fake_api())
 
         assert stopped == ["terminate", "stop_runs"]
         state = json.loads((session_dir / "session.json").read_text())
@@ -1190,7 +1191,7 @@ class TestFleetOffersPreview:
             user="admin",
             job_plans=[SimpleNamespace(offers=[], total_offers=0, max_price=None)],
         )
-        api = _api(
+        api = get_fake_api(
             project="main",
             client=SimpleNamespace(runs=SimpleNamespace(get_plan=lambda *a, **k: plan)),
         )
@@ -1384,7 +1385,7 @@ class TestStopPresetSession:
         self._patch_root(monkeypatch, tmp_path)
         self._session_dir(tmp_path, get_session_state(**{"id": "ab12cd34", "status": status}))
 
-        stop_preset_session(_api(), "ab12cd34")
+        stop_preset_session(get_fake_api(), "ab12cd34")
 
         assert message in capsys.readouterr().out
 
@@ -1408,7 +1409,7 @@ class TestStopPresetSession:
             lambda **kwargs: calls.append(kwargs),
         )
 
-        stop_preset_session(_api(), "ab12cd34")
+        stop_preset_session(get_fake_api(), "ab12cd34")
 
         # Finalized silently like reconcile, honoring the persisted keep-service.
         assert len(calls) == 1
@@ -1451,7 +1452,7 @@ class TestStopPresetSession:
             record_finish,
         )
 
-        stop_preset_session(_api(), "ab12cd34")
+        stop_preset_session(get_fake_api(), "ab12cd34")
 
         # The intent is recorded before the agent dies, so a live owner's retry
         # loop can never resurrect it.
@@ -1472,14 +1473,14 @@ class TestStopActiveSessionRuns:
         )
         return PresetSession(path=session_dir, preset_id="ab12cd34")
 
-    def _api(self, statuses: dict, stopped: list) -> Client:
+    def _runs_api(self, statuses: dict, stopped: list) -> Client:
         def get(project, name):
             return SimpleNamespace(status=statuses[name])
 
         def stop(project, names, abort):
             stopped.extend(names)
 
-        return _api(
+        return get_fake_api(
             project="main",
             client=SimpleNamespace(runs=SimpleNamespace(get=get, stop=stop)),
         )
@@ -1501,7 +1502,7 @@ class TestStopActiveSessionRuns:
     )
     def test_stops_only_non_terminal_runs(self, tmp_path, statuses, expected_stopped):
         stopped: list = []
-        api = self._api(statuses, stopped)
+        api = self._runs_api(statuses, stopped)
 
         # No per-run prompt: active runs are stopped automatically (like dstack stop).
         _stop_active_session_runs(api, self._session(tmp_path))
@@ -1703,8 +1704,3 @@ class TestBeginRun:
         assert state.run.agent_model == "claude-pinned"
         assert state.run.session_id == "sid-1"
         assert state.run.session_process == PresetSessionProcess(pid=1, started_at=None)
-
-
-def _api(**attrs: Any) -> Client:
-    # Only the attributes that the code under test reads
-    return cast(Client, SimpleNamespace(**attrs))

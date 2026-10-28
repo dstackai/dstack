@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import IO, Any, List, Optional
+from typing import IO, Any, List, Optional, cast
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -33,6 +33,7 @@ from dstack._internal.core.models.presets import (
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus, ServiceSpec
+from dstack.api import Client
 
 
 def plain_console(file: IO[str], *, width: int = 250) -> Console:
@@ -286,3 +287,8 @@ def get_verified_preset(store: PresetStore, preset_id: str) -> VerifiedPreset:
     preset = store.get(preset_id)
     assert isinstance(preset, VerifiedPreset)
     return preset
+
+
+def get_fake_api(**attrs: Any) -> Client:
+    # Only the attributes that the code under test reads
+    return cast(Client, SimpleNamespace(**attrs))

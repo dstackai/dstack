@@ -8,7 +8,7 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import cast
 
 import psutil
 import pytest
@@ -63,7 +63,12 @@ from dstack._internal.core.models.configurations import PresetAgentConfig, Prese
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import get_or_error
 from dstack.api import Client
-from tests._internal.cli.common import get_agent_spec, get_session_run, get_session_state
+from tests._internal.cli.common import (
+    get_agent_spec,
+    get_fake_api,
+    get_session_run,
+    get_session_state,
+)
 
 
 def _record_run(session, workspace_record):
@@ -480,7 +485,7 @@ class TestAgentIsolation:
         monkeypatch.setenv("PATH", "/usr/bin")
         monkeypatch.setenv("HOME", "/home/test")
         monkeypatch.setenv("UNRELATED_SECRET", "must-not-be-inherited")
-        api = _api(
+        api = get_fake_api(
             project="main",
             client=SimpleNamespace(base_url="http://127.0.0.1:3000"),
         )
@@ -1831,8 +1836,3 @@ class TestOffsetStoreSharing:
         reloaded = OffsetStore(state)
         for key in ("agent_stdout", "agent_stderr", "runs", "trials"):
             assert reloaded.get(key) == 50
-
-
-def _api(**attrs: Any) -> Client:
-    # Only the attributes that the code under test reads
-    return cast(Client, SimpleNamespace(**attrs))
