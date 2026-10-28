@@ -2,7 +2,7 @@ import logging
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack.api.server._backends import BackendsAPIClient
-from tests.api.common import RequestRecorder
+from tests.api.server.common import RequestRecorder
 
 AWS_CONFIG_PAYLOAD = {
     "type": "aws",
