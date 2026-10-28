@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone
-from typing import Optional
+from types import SimpleNamespace
+from typing import Callable, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -243,13 +244,19 @@ class TestListResourceGroups:
             disks: Optional[list[Disk]] = None,
             pricing_policies: Optional[list[PricingPolicy]] = None,
             instances: Optional[list[Instance]] = None,
+            instances_side_effect: Optional[Callable[..., list[Instance]]] = None,
         ) -> None:
             resources = compute_module.resources
             mocker.patch.object(resources, "list_disks", return_value=disks or [])
             mocker.patch.object(
                 resources, "list_pricing_policies", return_value=pricing_policies or []
             )
-            mocker.patch.object(resources, "list_instances", return_value=instances or [])
+            mocker.patch.object(
+                resources,
+                "list_instances",
+                return_value=instances or [],
+                side_effect=instances_side_effect,
+            )
 
         return mock
 
@@ -391,15 +398,17 @@ class TestListResourceGroups:
             "_region_to_project_id",
             {"eu-north1": "project-1", "us-central1": "project-2"},
         )
-        name = make_name()
-        mock_listings(disks=[make_disk(name=name, labels=make_labels(name))])
 
         def list_instances(sdk, project_id: str) -> list[Instance]:
             if project_id == "project-2":
                 raise make_request_error(StatusCode.UNAVAILABLE)
             return []
 
-        mocker.patch.object(compute_module.resources, "list_instances", side_effect=list_instances)
+        name = make_name()
+        mock_listings(
+            disks=[make_disk(name=name, labels=make_labels(name))],
+            instances_side_effect=list_instances,
+        )
 
         listing = make_compute().list_resource_groups()
 
@@ -414,19 +423,20 @@ class TestDeleteResourceGroup:
 
     @pytest.fixture
     def resources(self, mocker):
-        resources = compute_module.resources
-        mocks = {
-            name: mocker.patch.object(resources, name)
-            for name in [
-                "get_instance",
-                "delete_instance",
-                "delete_disk",
-                "get_pricing_policy",
-                "delete_pricing_policy",
-            ]
-        }
-        mocks["get_instance"].side_effect = make_request_error(StatusCode.NOT_FOUND)
-        mocks["get_pricing_policy"].return_value = make_pricing_policy()
+        resources = SimpleNamespace(
+            **{
+                name: mocker.patch.object(compute_module.resources, name)
+                for name in [
+                    "get_instance",
+                    "delete_instance",
+                    "delete_disk",
+                    "get_pricing_policy",
+                    "delete_pricing_policy",
+                ]
+            }
+        )
+        resources.get_instance.side_effect = make_request_error(StatusCode.NOT_FOUND)
+        resources.get_pricing_policy.return_value = make_pricing_policy()
         return resources
 
     def test_deletes_instance_first(self, resources):

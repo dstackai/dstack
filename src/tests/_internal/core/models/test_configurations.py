@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 
 import pytest
 from pydantic import ValidationError
@@ -71,8 +71,7 @@ class TestParseConfiguration:
             "port": 8000,
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is None
 
     def test_service_model_does_not_override_explicit_probes(self):
@@ -83,8 +82,7 @@ class TestParseConfiguration:
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
             "probes": [{"type": "http", "url": "/health"}],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is not None
         assert len(parsed.probes) == 1
         assert parsed.probes[0].url == "/health"
@@ -97,8 +95,7 @@ class TestParseConfiguration:
             "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
             "probes": [],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.probes is not None
         assert len(parsed.probes) == 0
 
@@ -114,28 +111,28 @@ class TestParseConfiguration:
                 conf["scaling"] = scaling
             return conf
 
-        def parse_service(conf: dict) -> ServiceConfiguration:
-            parsed = parse_run_configuration(conf)
-            assert isinstance(parsed, ServiceConfiguration)
-            return parsed
-
-        assert parse_service(test_conf(1)).replicas == Range(min=1, max=1)
-        assert parse_service(test_conf("2")).replicas == Range(min=2, max=2)
-        assert parse_service(test_conf("3..3")).replicas == Range(min=3, max=3)
+        parsed = _parse_run_configuration_as(test_conf(1), ServiceConfiguration)
+        assert parsed.replicas == Range(min=1, max=1)
+        parsed = _parse_run_configuration_as(test_conf("2"), ServiceConfiguration)
+        assert parsed.replicas == Range(min=2, max=2)
+        parsed = _parse_run_configuration_as(test_conf("3..3"), ServiceConfiguration)
+        assert parsed.replicas == Range(min=3, max=3)
         with pytest.raises(
             ConfigurationError,
             match="When you set `replicas` to a range, ensure to specify `scaling`",
         ):
             parse_run_configuration(test_conf("0..10"))
-        assert parse_service(
+        parsed = _parse_run_configuration_as(
             test_conf(
                 "0..10",
                 {
                     "metric": "rps",
                     "target": 10,
                 },
-            )
-        ).replicas == Range(min=0, max=10)
+            ),
+            ServiceConfiguration,
+        )
+        assert parsed.replicas == Range(min=0, max=10)
         # `metric: rpc` is a typo, so `scaling` itself fails to validate. The config stays
         # rejected, but the message is no longer the `scaling`-is-missing one: pydantic v1 ran a
         # bare `root_validator` even after a field had failed, handing it a partial `values` dict
@@ -166,8 +163,7 @@ class TestParseConfiguration:
                 {"name": "worker", "count": 2, "commands": ["worker"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         router_g = next(g for g in parsed.groups if g.name == "router")
         assert isinstance(router_g.router, ReplicaGroupRouterConfig)
@@ -251,8 +247,7 @@ class TestReplicaGroupContainerFields:
                 {"name": "d", "count": 1, "docker": True, "commands": ["x"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         groups = {g.name: g for g in parsed.groups}
         assert groups["a"].image == "nginx:latest"
@@ -274,8 +269,7 @@ class TestReplicaGroupContainerFields:
                 },
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].privileged is True
 
@@ -295,8 +289,7 @@ class TestReplicaGroupContainerFields:
             "port": 8000,
             "replicas": [{"count": 1, "python": yaml_value, "commands": ["x"]}],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].python == expected
 
@@ -369,8 +362,7 @@ class TestReplicaGroupContainerFields:
                 {"count": 1, "python": "3.12", "nvcc": True, "commands": ["x"]},
             ],
         }
-        parsed = parse_run_configuration(conf)
-        assert isinstance(parsed, ServiceConfiguration)
+        parsed = _parse_run_configuration_as(conf, ServiceConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].python == PythonVersion.PY312
         assert parsed.groups[0].nvcc is True
@@ -962,8 +954,9 @@ class TestNodeGroups:
             )
 
     def test_omitted_nodes_defaults_to_one_node_group(self):
-        parsed = parse_run_configuration({"type": "task", "commands": ["true"]})
-        assert isinstance(parsed, TaskConfiguration)
+        parsed = _parse_run_configuration_as(
+            {"type": "task", "commands": ["true"]}, TaskConfiguration
+        )
         assert parsed.nodes is None
         assert parsed.nodes_num == 1
         assert parsed.node_groups[0].nodes == 1
@@ -1089,15 +1082,15 @@ class TestNodeGroups:
 
     def test_accepts_top_level_resources_with_groups(self):
         """Top-level resources is allowed (not rejected) but not used for group jobs."""
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "task",
                 "image": "debian",
                 "resources": {"gpu": "H100"},
                 "groups": [{"nodes": 1, "commands": ["true"]}],
-            }
+            },
+            TaskConfiguration,
         )
-        assert isinstance(parsed, TaskConfiguration)
         assert parsed.groups is not None
         assert parsed.groups[0].resources == ResourcesSpec()
         assert parsed.resources.gpu is not None
@@ -1106,14 +1099,14 @@ class TestNodeGroups:
 
 class TestServiceGroupsPhase1:
     def test_legacy_replicas_list_parses_to_groups(self):
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "service",
                 "port": 8000,
                 "replicas": [{"count": 1, "commands": ["x"]}],
-            }
+            },
+            ServiceConfiguration,
         )
-        assert isinstance(parsed, ServiceConfiguration)
         assert parsed.replicas is None
         assert parsed.groups is not None
         assert parsed.groups[0].replicas == Range(min=1, max=1)
@@ -1159,14 +1152,14 @@ class TestServiceGroupsPhase1:
         assert "replicas" in dumped_json["groups"][0]
 
     def test_dump_validate_is_fixed_point(self):
-        parsed = parse_run_configuration(
+        parsed = _parse_run_configuration_as(
             {
                 "type": "service",
                 "port": 8000,
                 "groups": [{"replicas": 1, "commands": ["x"]}],
-            }
+            },
+            ServiceConfiguration,
         )
-        assert isinstance(parsed, ServiceConfiguration)
         once = ServiceConfiguration.model_validate(parsed.model_dump())
         twice = ServiceConfiguration.model_validate(once.model_dump())
         assert once.model_dump() == twice.model_dump() == parsed.model_dump()
@@ -1359,3 +1352,14 @@ class TestPresetConfigurationSchema:
         assert "model" not in schema.get("required", [])
         for field in ("model", "base", "repo"):
             assert field in schema["properties"]
+
+
+RunConfigurationT = TypeVar("RunConfigurationT")
+
+
+def _parse_run_configuration_as(
+    data: dict, configuration_type: type[RunConfigurationT]
+) -> RunConfigurationT:
+    configuration = parse_run_configuration(data)
+    assert isinstance(configuration, configuration_type)
+    return configuration
