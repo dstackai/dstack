@@ -289,13 +289,13 @@ class TestGetJobPlansReplicaGroups:
                 replicas=[
                     ReplicaGroup(
                         name="gpu-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         resources=ResourcesSpec(gpu=GPUSpec(name=["L40S"], count=1)),
                         commands=["python server.py"],
                     ),
                     ReplicaGroup(
                         name="cpu-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         resources=ResourcesSpec(cpu=CPUSpec(count=Range[int](min=4, max=4))),
                         commands=["python router.py"],
                     ),

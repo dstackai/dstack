@@ -1939,13 +1939,13 @@ class TestGetRunPlan:
                 replicas=[
                     ReplicaGroup(
                         name="gpu-group",
-                        count=Range[int](min=2, max=2),
+                        replicas=Range[int](min=2, max=2),
                         resources=ResourcesSpec(gpu=GPUSpec()),
                         commands=["python server.py"],
                     ),
                     ReplicaGroup(
                         name="cpu-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         resources=ResourcesSpec(gpu=None),
                         commands=["python router.py"],
                     ),
@@ -2003,11 +2003,11 @@ class TestGetRunPlan:
                 replicas=[
                     ReplicaGroup(
                         name="reserved-group",
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         reservation="my-reservation-id",
                     ),
                     ReplicaGroup(
-                        count=Range[int](min=1, max=1),
+                        replicas=Range[int](min=1, max=1),
                         name="unreserved-group",
                     ),
                 ],

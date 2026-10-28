@@ -189,7 +189,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     image="custom:1.0",
                     commands=["x"],
                 )
@@ -203,7 +203,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     docker=True,
                     commands=["x"],
                 )
@@ -217,7 +217,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     nvcc=True,
                     commands=["x"],
                 )
@@ -232,7 +232,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                 )
             ],
@@ -245,7 +245,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     docker=True,
                     commands=["x"],
                 )
@@ -259,7 +259,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     image="x",
                     privileged=True,
                     commands=["x"],
@@ -275,7 +275,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                 )
             ],
@@ -289,7 +289,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     docker=True,
                     commands=["x"],
                 )
@@ -303,7 +303,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     image="alpine",
                     commands=["x"],
                 )
@@ -317,7 +317,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     docker=True,
                     commands=["x"],
                 )
@@ -331,7 +331,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     image="alpine",
                     commands=["x"],
                 )
@@ -345,7 +345,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     python=PythonVersion.PY312,
                     commands=["x"],
                 )
@@ -366,7 +366,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     image="nginxinc/nginx-unprivileged",
                     commands=["x"],
                 )
@@ -388,7 +388,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     docker=True,
                     commands=["x"],
                 )
@@ -403,7 +403,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                     spot_policy=SpotPolicy.SPOT,
                 )
@@ -417,7 +417,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                 )
             ],
@@ -430,13 +430,13 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="spot",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                     spot_policy=SpotPolicy.SPOT,
                 ),
                 ReplicaGroup(
                     name="od",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["y"],
                     spot_policy=SpotPolicy.ONDEMAND,
                 ),
@@ -456,7 +456,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                     reservation="my-reservation",
                 )
@@ -470,7 +470,7 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                 )
             ],
@@ -483,13 +483,13 @@ class TestPerGroupOverrides:
             replicas=[
                 ReplicaGroup(
                     name="a",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["x"],
                     reservation="res-a",
                 ),
                 ReplicaGroup(
                     name="b",
-                    count=Range(min=1, max=1),
+                    replicas=Range(min=1, max=1),
                     commands=["y"],
                     reservation="res-b",
                 ),
