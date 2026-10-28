@@ -15,6 +15,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
@@ -679,7 +680,7 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == expected_vendor
+        assert _gpu_vendor(run_spec.configuration.resources) == expected_vendor
 
     @pytest.mark.parametrize(
         "gpu_spec",
@@ -694,7 +695,7 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_does_not_override_vendor_set_by_the_user(self):
         run_spec = _task_run_spec(
@@ -703,14 +704,14 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.AMD
+        assert _gpu_vendor(run_spec.configuration.resources) == gpuhunt.AcceleratorVendor.AMD
 
     def test_sets_nvidia_if_the_default_image_is_used(self):
         run_spec = _task_run_spec(resources={"gpu": "1"})
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(run_spec.configuration.resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
     @pytest.mark.parametrize(
         ["image", "docker"],
@@ -726,14 +727,14 @@ class TestSetRunSpecResourcesDefaultsGpuVendor:
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_does_not_set_vendor_if_no_gpu_requested(self):
         run_spec = _task_run_spec(resources={"gpu": "0"})
 
         set_run_spec_resources_defaults(run_spec)
 
-        assert run_spec.configuration.resources.gpu.vendor is None
+        assert _gpu_vendor(run_spec.configuration.resources) is None
 
     def test_sets_default_gpu_spec_if_gpu_is_null(self):
         run_spec = _task_run_spec(resources={"gpu": None})
@@ -762,7 +763,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
 
         groups = run_spec.configuration.groups
         assert groups is not None
-        assert [g.resources.gpu.vendor for g in groups] == [
+        assert [_gpu_vendor(g.resources) for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
             gpuhunt.AcceleratorVendor.NVIDIA,
             gpuhunt.AcceleratorVendor.NVIDIA,
@@ -790,7 +791,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
         set_run_spec_resources_defaults(run_spec)
 
         assert run_spec.configuration.groups is not None
-        assert run_spec.configuration.groups[0].resources.gpu.vendor == expected_vendor
+        assert _gpu_vendor(run_spec.configuration.groups[0].resources) == expected_vendor
 
     def test_sets_defaults_for_top_level_resources(self):
         # The top-level resources are ignored when replica groups are set, but they are still
@@ -803,7 +804,7 @@ class TestSetRunSpecResourcesDefaultsReplicaGroups:
         set_run_spec_resources_defaults(run_spec)
 
         resources = run_spec.configuration.resources
-        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
 
 class TestSetRunSpecResourcesDefaultsNodeGroups:
@@ -819,7 +820,7 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
         set_run_spec_resources_defaults(run_spec)
 
         groups = run_spec.configuration.node_groups
-        assert [g.resources.gpu.vendor for g in groups] == [
+        assert [_gpu_vendor(g.resources) for g in groups] == [
             gpuhunt.AcceleratorVendor.AMD,
             gpuhunt.AcceleratorVendor.NVIDIA,
             gpuhunt.AcceleratorVendor.NVIDIA,
@@ -836,7 +837,7 @@ class TestSetRunSpecResourcesDefaultsNodeGroups:
         set_run_spec_resources_defaults(run_spec)
 
         resources = run_spec.configuration.resources
-        assert resources.gpu.vendor == gpuhunt.AcceleratorVendor.NVIDIA
+        assert _gpu_vendor(resources) == gpuhunt.AcceleratorVendor.NVIDIA
 
 
 class TestValidateRunSpecGpuVendorAndImage:
@@ -976,3 +977,8 @@ class TestValidateRunSpecCpuArchAndImage:
         )
 
         _validate(run_spec)
+
+
+def _gpu_vendor(resources: ResourcesSpec) -> Optional[gpuhunt.AcceleratorVendor]:
+    assert resources.gpu is not None
+    return resources.gpu.vendor

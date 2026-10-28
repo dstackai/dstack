@@ -1245,6 +1245,7 @@ class TestApplyFleetPlan:
         current_spec = get_fleet_spec(conf=current_conf)
         spec = current_spec.model_copy(deep=True)
         # 10.0.0.100 removed, 10.0.0.101 added
+        assert spec.configuration.ssh_config is not None
         spec.configuration.ssh_config.hosts = ["10.0.0.101"]
 
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
@@ -2357,9 +2358,11 @@ class TestGetPlan:
         conf = get_ssh_fleet_configuration(hosts=["10.0.0.100"])
         spec = get_fleet_spec(conf=conf)
         effective_spec = spec.model_copy(deep=True)
+        assert effective_spec.configuration.ssh_config is not None
         effective_spec.configuration.ssh_config.ssh_key = None
         current_spec = spec.model_copy(deep=True)
         # `hosts` can be updated in-place
+        assert current_spec.configuration.ssh_config is not None
         current_spec.configuration.ssh_config.hosts = ["10.0.0.100", "10.0.0.101"]
         fleet = await create_fleet(session=session, project=project, spec=current_spec)
 
@@ -2480,6 +2483,7 @@ class TestGetPlan:
         conf = get_ssh_fleet_configuration(placement=InstanceGroupPlacement.ANY)
         spec = get_fleet_spec(conf=conf)
         effective_spec = spec.model_copy(deep=True)
+        assert effective_spec.configuration.ssh_config is not None
         effective_spec.configuration.ssh_config.ssh_key = None
         current_spec = spec.model_copy(deep=True)
         # `placement` cannot be updated in-place

@@ -226,6 +226,7 @@ class TestResolveSSHKey:
 
         assert public_key_path is None
         assert public_key == public_key_bytes.decode().rsplit(" ", 1)[0]
+        assert private_key is not None
         assert private_key.startswith("-----BEGIN RSA PRIVATE KEY-----")
         assert pkey_from_str(private_key)
 

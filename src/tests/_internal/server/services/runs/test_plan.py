@@ -849,7 +849,6 @@ class TestGetBackendOffersInFleet:
 
         assert offers == [(backend, offer)]
         get_offers_by_requirements_mock.assert_awaited_once()
-        assert (
-            get_offers_by_requirements_mock.await_args.kwargs["master_job_provisioning_data"]
-            is None
-        )
+        await_args = get_offers_by_requirements_mock.await_args
+        assert await_args is not None
+        assert await_args.kwargs["master_job_provisioning_data"] is None

@@ -194,7 +194,9 @@ async def test_chat_completions_stream(mock_chat_client) -> None:
     )
     completion = ""
     async for chunk in response:
-        completion += chunk.choices[0].delta.content
+        content = chunk.choices[0].delta.content
+        assert content is not None
+        completion += content
     assert completion == SAMPLE_RESPONSE
 
 
