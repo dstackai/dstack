@@ -25,6 +25,7 @@ from nebius.api.nebius.compute.v1 import (
     ResourcesSpec,
 )
 
+from dstack._internal.core.backends.base.compute import ComputeTTLCache
 from dstack._internal.core.backends.nebius import compute as compute_module
 from dstack._internal.core.backends.nebius.compute import NebiusCompute
 from dstack._internal.core.backends.nebius.models import (
@@ -53,7 +54,7 @@ CAPACITY_LEVELS = CapacityAvailability.AvailabilityLevel
 CAPACITY_DATA_STATES = CapacityAvailability.DataState
 
 
-def make_compute() -> NebiusCompute:
+def make_compute(resource_advice_cache: Optional[ComputeTTLCache] = None) -> NebiusCompute:
     return NebiusCompute(
         NebiusConfig(
             creds=NebiusServiceAccountCreds(
@@ -61,7 +62,8 @@ def make_compute() -> NebiusCompute:
                 public_key_id="public-key-id",
                 private_key_content="private-key",
             )
-        )
+        ),
+        resource_advice_cache=resource_advice_cache,
     )
 
 
@@ -127,6 +129,35 @@ def make_resource_advice(
 
 
 class TestOfferCache:
+    @pytest.mark.parametrize("identity", ["tenant_id", "service_account_id", "public_key_id"])
+    def test_shared_advice_cache_is_scoped_to_tenant_and_credentials(self, mocker, identity):
+        mocker.patch.object(NebiusCompute, "_sdk", Mock())
+        mocker.patch.object(NebiusCompute, "_tenant_id", "tenant-id")
+        list_advice = mocker.patch.object(
+            compute_module.resources,
+            "list_resource_advice",
+            return_value=[make_resource_advice(on_demand=make_capacity_status(1))],
+        )
+        cache = ComputeTTLCache(
+            cache=TTLCache(maxsize=10, ttl=compute_module.RESOURCE_ADVICE_CACHE_TTL)
+        )
+        first = make_compute(resource_advice_cache=cache)
+        second = make_compute(resource_advice_cache=cache)
+
+        advice = first._get_resource_advice()
+        assert second._get_resource_advice() is advice
+        list_advice.assert_called_once()
+
+        if identity == "tenant_id":
+            mocker.patch.object(second, "_tenant_id", "other-tenant-id")
+        else:
+            setattr(second.config.creds, identity, "other-id")
+        list_advice.return_value = []
+
+        assert second._get_resource_advice() == []
+        assert first._get_resource_advice() is advice
+        assert list_advice.call_count == 2
+
     def test_reuses_tenant_and_capacity_across_offer_refreshes(self, mocker):
         mocker.patch.object(NebiusCompute, "_sdk", Mock())
         get_tenant_id = mocker.patch.object(

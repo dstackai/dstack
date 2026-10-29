@@ -10,6 +10,7 @@ from functools import cached_property
 from typing import List, Optional
 
 from cachetools import TTLCache, cachedmethod
+from cachetools.keys import hashkey
 from grpc import StatusCode
 from nebius.aio.service_error import RequestError
 from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
@@ -130,13 +131,17 @@ class NebiusCompute(
     ComputeWithResourceListingSupport,
     Compute,
 ):
-    def __init__(self, config: NebiusConfig):
+    def __init__(
+        self, config: NebiusConfig, resource_advice_cache: Optional[ComputeTTLCache] = None
+    ):
         super().__init__()
         self.config = config
         self._subnet_id_cache: dict[str, str] = {}
-        self._resource_advice_cache = ComputeTTLCache(
-            cache=TTLCache(maxsize=1, ttl=RESOURCE_ADVICE_CACHE_TTL)
-        )
+        if resource_advice_cache is None:
+            resource_advice_cache = ComputeTTLCache(
+                cache=TTLCache(maxsize=1, ttl=RESOURCE_ADVICE_CACHE_TTL)
+            )
+        self._resource_advice_cache = resource_advice_cache
 
     @cached_property
     def _sdk(self) -> SDK:
@@ -212,8 +217,16 @@ class NebiusCompute(
             for offer in offers
         ]
 
+    def _get_resource_advice_key(self) -> tuple:
+        return hashkey(
+            self._tenant_id,
+            self.config.creds.service_account_id,
+            self.config.creds.public_key_id,
+        )
+
     @cachedmethod(
         cache=lambda self: self._resource_advice_cache.cache,
+        key=_get_resource_advice_key,
         lock=lambda self: self._resource_advice_cache.lock,
     )
     def _get_resource_advice(self) -> list[ResourceAdvice]:
