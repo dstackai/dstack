@@ -7,7 +7,6 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import (
-    DEFAULT_REPLICA_GROUP_NAME,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec
@@ -33,15 +32,6 @@ def compute_desired_replica_counts(
     prev_counts: PerGroupDesiredCounts = (
         json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
-    if (
-        prev_counts == {}
-        and len(replica_groups) == 1
-        and replica_groups[0].name == DEFAULT_REPLICA_GROUP_NAME
-    ):
-        # Special case to avoid dropping the replica count to group.replicas.min
-        # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
-        # TODO: remove once most users upgrade to 0.20.7+.
-        prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
     desired_counts: PerGroupDesiredCounts = {}
     total = 0
     for group in replica_groups:
