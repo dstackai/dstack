@@ -1064,18 +1064,16 @@ async def get_plan(
                 raise ServerClientError(
                     f"Gateway {effective_spec.configuration.name!r} is being deleted. Try again later."
                 )
-            if current_gateway_model.status == GatewayStatus.FAILED:
-                raise ServerClientError(
-                    f"Gateway {effective_spec.configuration.name!r} is in FAILED status and"
-                    " cannot be updated in-place. Delete it and re-apply."
-                )
             current_gateway = gateway_model_to_gateway(
                 current_gateway_model, default_gateway_id=project.default_gateway_id
             )
-            if _can_update_gateway_in_place(
-                diff_gateway_configurations(
-                    current_gateway.configuration,
-                    effective_spec.configuration,
+            if (
+                current_gateway_model.status != GatewayStatus.FAILED
+                and _can_update_gateway_in_place(
+                    diff_gateway_configurations(
+                        current_gateway.configuration,
+                        effective_spec.configuration,
+                    )
                 )
             ):
                 action = ApplyAction.UPDATE
