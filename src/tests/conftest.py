@@ -28,6 +28,10 @@ def pytest_configure(config):
         "markers", "windows: mark test to be run on Windows in addition to POSIX"
     )
     config.addinivalue_line("markers", "windows_only: mark test to be run on Windows only")
+    if config.getoption("--runall"):
+        config.option.runui = True
+        config.option.runpostgres = True
+        config.option.rundocker = True
 
 
 def pytest_addoption(parser):
@@ -37,6 +41,9 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--rundocker", action="store_true", default=False, help="Run tests requiring Docker"
+    )
+    parser.addoption(
+        "--runall", action="store_true", default=False, help="Run all of the opt-in tests above"
     )
 
 

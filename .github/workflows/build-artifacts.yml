@@ -85,19 +85,9 @@ jobs:
         with:
           name: frontend-build
           path: src/dstack/_internal/server/statics
-      - name: Run pytest on POSIX
-        if: matrix.os != 'windows-latest'
+      - name: Run pytest
         # Skip Postgres and Docker tests on macos since macos runner doesn't have Docker.
-        run: |
-          DOCKER_TESTS=""
-          if [ "${{ matrix.os }}" != "macos-latest" ]; then
-            DOCKER_TESTS="--runpostgres --rundocker"
-          fi
-          uv run pytest -n auto src/tests --runui $DOCKER_TESTS
-      - name: Run pytest on Windows
-        if: matrix.os == 'windows-latest'
-        run: |
-          uv run pytest -n auto src/tests --runui --runpostgres
+        run: uv run pytest -n auto src/tests ${{ matrix.os == 'macos-latest' && '--runui' || '--runall' }}
 
   runner-test:
     defaults:
