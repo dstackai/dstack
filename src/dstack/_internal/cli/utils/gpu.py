@@ -4,9 +4,8 @@ from typing import List, Literal
 from rich.table import Table
 
 from dstack._internal.cli.models.offers import OfferCommandGroupByGpuOutput, OfferRequirements
-from dstack._internal.cli.utils.common import console, format_instance_availability
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.gpus import GpuGroup
-from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
 
@@ -61,7 +60,7 @@ def print_gpu_table(gpus: List[GpuGroup], run_spec: RunSpec, group_by: List[str]
     table.add_column(backend_column, style="grey58", ratio=2)
     if region_column:
         table.add_column(region_column, style="grey58", ratio=2)
-    table.add_column()
+    table.add_column("AVAILABILITY")
 
     for i, gpu_group in enumerate(gpus, start=1):
         backend_text = ""
@@ -116,15 +115,10 @@ def print_gpu_table(gpus: List[GpuGroup], run_spec: RunSpec, group_by: List[str]
             max_formatted = f"{gpu_group.price.max:.4f}".rstrip("0").rstrip(".")
             price_display = f"{min_formatted}..{max_formatted}"
 
-        availability = ""
-        has_available = any(
-            av in (InstanceAvailability.UNKNOWN, InstanceAvailability.AVAILABLE)
-            for av in gpu_group.availability
+        availability = ", ".join(
+            av.value.replace("_", " ")
+            for av in sorted(set(gpu_group.availability), key=lambda av: av.value)
         )
-        if not has_available:
-            availability = ", ".join(
-                map(format_instance_availability, set(gpu_group.availability))
-            )
 
         secondary_style = "grey58"
         row_data = [
