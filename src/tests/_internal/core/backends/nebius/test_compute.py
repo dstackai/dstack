@@ -105,6 +105,7 @@ def make_resource_advice(
     region: str = "eu-north1",
     platform: str = "gpu-h100-sxm",
     gpu_count: int = 8,
+    reserved: Optional[CapacityAvailability] = None,
 ) -> ResourceAdvice:
     return ResourceAdvice(
         spec=ResourceAdviceSpec(
@@ -115,7 +116,13 @@ def make_resource_advice(
                 preset=ComputeInstanceDetails.Preset(name=f"{gpu_count}gpu-128vcpu-1600gb"),
             ),
         ),
-        status=ResourceAdviceStatus(on_demand=on_demand, preemptible=preemptible),
+        status=ResourceAdviceStatus(
+            on_demand=on_demand,
+            preemptible=preemptible,
+            reserved=reserved
+            if reserved is not None
+            else make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+        ),
     )
 
 
@@ -317,6 +324,51 @@ class TestGetAllOffersWithAvailability:
         ]
         mock_capacity_advice.assert_called_once()
 
+    @pytest.mark.parametrize(
+        ("shared", "reserved", "expected"),
+        [
+            (
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+                make_capacity_status(1),
+                InstanceAvailability.UNKNOWN,
+            ),
+            (make_capacity_status(0), make_capacity_status(1), InstanceAvailability.UNKNOWN),
+            (make_capacity_status(1), make_capacity_status(1), InstanceAvailability.AVAILABLE),
+            (make_capacity_status(0), CapacityAvailability(), InstanceAvailability.UNKNOWN),
+            (
+                make_capacity_status(0),
+                make_capacity_status(1, data_state=CAPACITY_DATA_STATES.DATA_STATE_STALE),
+                InstanceAvailability.UNKNOWN,
+            ),
+        ],
+    )
+    def test_reservations_keep_only_on_demand_eligible(
+        self, mocker, mock_capacity_advice, shared, reserved, expected
+    ):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[
+                make_offer(1, spot=False, is_preemptible_flat_rate=False),
+                make_offer(0.5, spot=True, is_preemptible_flat_rate=False),
+            ],
+        )
+        mock_capacity_advice.return_value = [
+            make_resource_advice(
+                on_demand=shared, preemptible=make_capacity_status(0), reserved=reserved
+            )
+        ]
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert [offer.availability for offer in offers] == [
+            expected,
+            InstanceAvailability.NOT_AVAILABLE,
+        ]
+        assert offers[0].backend_data["fabric_availability"] == {"fabric-2": expected.value}
+        assert offers[1].backend_data["fabric_availability"] == {"fabric-2": "not_available"}
+        mock_capacity_advice.assert_called_once()
+
     def test_matches_exact_region_platform_and_preset(self, mocker, mock_capacity_advice):
         one_gpu = make_offer(1, spot=False, is_preemptible_flat_rate=False, gpu_count=1)
         one_gpu.instance.name = "gpu-h200-sxm 1gpu-128vcpu-1600gb"
@@ -372,18 +424,21 @@ class TestGetAllOffersWithAvailability:
         assert "fabric_availability" not in original.backend_data
 
     @pytest.mark.parametrize(
-        ("allowed_fabrics", "status", "expected_fabric", "existing_suitable"),
+        ("allowed_fabrics", "status", "reserved", "expected_fabric", "existing_suitable"),
         [
-            (None, make_capacity_status(0), "fabric-3", False),
-            (["fabric-2"], make_capacity_status(0), None, False),
+            (None, make_capacity_status(0), None, "fabric-3", False),
+            (["fabric-2"], make_capacity_status(0), None, None, False),
             (
                 ["fabric-2"],
                 make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
                 None,
+                None,
                 False,
             ),
-            (["fabric-2"], None, "fabric-2", True),
-            (["fabric-3"], make_capacity_status(1), "fabric-3", False),
+            (["fabric-2"], None, None, "fabric-2", True),
+            (["fabric-3"], make_capacity_status(1), None, "fabric-3", False),
+            (["fabric-2"], make_capacity_status(0), make_capacity_status(1), "fabric-2", True),
+            (["fabric-3"], make_capacity_status(0), make_capacity_status(1), "fabric-3", False),
         ],
     )
     def test_capacity_advice_respects_cluster_fabric(
@@ -392,6 +447,7 @@ class TestGetAllOffersWithAvailability:
         mock_capacity_advice,
         allowed_fabrics,
         status,
+        reserved,
         expected_fabric,
         existing_suitable,
     ):
@@ -403,7 +459,7 @@ class TestGetAllOffersWithAvailability:
         ]
         if status is not None:
             mock_capacity_advice.return_value.append(
-                make_resource_advice(on_demand=status, fabric="fabric-2")
+                make_resource_advice(on_demand=status, reserved=reserved, fabric="fabric-2")
             )
         create_cluster = mocker.patch.object(
             compute_module.resources,

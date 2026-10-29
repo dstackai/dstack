@@ -187,12 +187,21 @@ class NebiusCompute(
                     if instance is None:
                         continue
                     name = f"{instance.platform} {instance.preset.name}"
-                    for spot, status in (
-                        (False, item.status.on_demand),
-                        (True, item.status.preemptible),
+                    # AUTO reservation policy can use reserved capacity before the shared pool.
+                    # Advice is tenant-wide; project reservation limits remain unchecked, so
+                    # reserved capacity keeps offers eligible as UNKNOWN, not AVAILABLE.
+                    reserved = _get_capacity_availability(item.status.reserved)
+                    if reserved == InstanceAvailability.AVAILABLE:
+                        reserved = InstanceAvailability.UNKNOWN
+                    on_demand = _get_best_availability(
+                        (_get_capacity_availability(item.status.on_demand), reserved)
+                    )
+                    for spot, availability in (
+                        (False, on_demand),
+                        (True, _get_capacity_availability(item.status.preemptible)),
                     ):
                         key = (item.spec.region, name, spot)
-                        advice_by_offer[key][item.spec.fabric] = _get_capacity_availability(status)
+                        advice_by_offer[key][item.spec.fabric] = availability
         return [
             _apply_resource_advice(
                 offer,
@@ -587,7 +596,7 @@ def _apply_resource_advice(
 def _get_best_availability(availabilities: Iterable[InstanceAvailability]) -> InstanceAvailability:
     """Prefer AVAILABLE, UNKNOWN, NOT_AVAILABLE, then NO_QUOTA; no advice means UNKNOWN."""
     statuses = set(availabilities)
-    # Report NO_QUOTA only when every compatible fabric explicitly reports a quota limit.
+    # Report NO_QUOTA only when every allocation option explicitly reports a limit.
     for availability in (
         InstanceAvailability.AVAILABLE,
         InstanceAvailability.UNKNOWN,
