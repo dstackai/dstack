@@ -101,6 +101,7 @@ def _get_cpus_grouped(
             resources.cpu_arch,
             resources.cpus,
             resources.memory_mib,
+            _get_availability_group_key([offer.availability]),
         )
         configurations.setdefault(key, []).append(offer)
 
@@ -255,6 +256,7 @@ def _process_offers_into_backend_gpus(
                 gpu_count_in_offer,
                 offer.instance.resources.spot,
                 offer.region,
+                _get_availability_group_key([offer.availability]),
             )
 
             if instance_config_key not in backend_data[backend_type]["gpus"]:

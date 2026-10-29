@@ -163,8 +163,9 @@ async def call_gpus_api(
 
 
 class TestAvailabilitySetGrouping:
-    @pytest.mark.parametrize("dimension", ["backend", "region", "spot", "count"])
-    def test_different_sets_do_not_merge_across_dimensions(self, dimension):
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("dimension", ["backend", "region", "spot", "count", "instance"])
+    def test_different_statuses_do_not_merge_across_dimensions(self, cpu, dimension):
         available = create_gpu_offer(BackendType.NEBIUS, "H200", 144384, 2)
         unavailable = available.model_copy(deep=True)
         unavailable.availability = InstanceAvailability.NO_QUOTA
@@ -174,10 +175,17 @@ class TestAvailabilitySetGrouping:
             unavailable.region = "other-region"
         elif dimension == "spot":
             unavailable.instance.resources.spot = True
-        else:
+        elif dimension == "count":
             unavailable.instance.resources.gpus *= 8
+            unavailable.instance.resources.cpus *= 8
+        else:
+            unavailable.instance.name = "other-instance"
 
-        rows = gpus_services._get_gpus_grouped([available, unavailable], set(), reverse=False)
+        if cpu:
+            available.instance.resources.gpus = []
+            unavailable.instance.resources.gpus = []
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers([available, unavailable], set(), reverse=False)
 
         assert [row.availability for row in rows] == [
             [InstanceAvailability.AVAILABLE],
@@ -197,7 +205,7 @@ class TestAvailabilitySetGrouping:
             ({"backend", "region", "count"}, 8),
         ],
     )
-    def test_identical_sets_merge_across_unselected_dimensions(
+    def test_identical_statuses_merge_across_unselected_dimensions(
         self, cpu, reverse_input, group_by, expected_count
     ):
         offers = []
@@ -224,9 +232,12 @@ class TestAvailabilitySetGrouping:
         group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
         rows = group_offers(offers, group_by, reverse=False)
 
-        assert len(rows) == expected_count
+        assert len(rows) == expected_count * 2
         for row in rows:
-            assert [av.value for av in row.availability] == ["no_quota", "not_available"]
+            assert row.availability in [
+                [InstanceAvailability.NO_QUOTA],
+                [InstanceAvailability.NOT_AVAILABLE],
+            ]
             assert set(row.spot) == {"on-demand", "spot"}
             if "count" in group_by:
                 assert row.count.min == row.count.max
@@ -346,21 +357,20 @@ class TestAvailabilitySetGrouping:
         by_set = {tuple(av.value for av in row.availability): row for row in rows}
 
         assert set(by_set) == {
-            ("available", "no_quota", "unknown"),
+            ("available", "unknown"),
             ("no_quota",),
-            ("available", "no_balance"),
-            ("not_available", "unknown"),
+            ("no_balance",),
+            ("not_available",),
             ("idle",),
-            ("available",),
         }
-        merged = by_set[("available", "no_quota", "unknown")]
-        assert merged.count == Range[int](min=4 if cpu else 1, max=12 if cpu else 3)
+        merged = by_set[("available", "unknown")]
+        assert merged.count == Range[int](min=4 if cpu else 1, max=32 if cpu else 8)
         quota = by_set[("no_quota",)]
-        assert quota.count == Range[int](min=16 if cpu else 4, max=16 if cpu else 4)
+        assert quota.count == Range[int](min=4 if cpu else 1, max=16 if cpu else 4)
 
     @pytest.mark.parametrize("cpu", [False, True])
     @pytest.mark.parametrize("reverse_input", [False, True])
-    def test_distinct_sets_keep_their_own_resources_and_prices(self, cpu, reverse_input):
+    def test_distinct_statuses_keep_their_own_resources_and_prices(self, cpu, reverse_input):
         offers = []
         for count, statuses in [
             (1, ["not_available", "no_quota", "no_quota"]),
@@ -388,17 +398,15 @@ class TestAvailabilitySetGrouping:
         rows = group_offers(offers, {"backend"}, reverse=False)
         by_set = {tuple(av.value for av in row.availability): row for row in rows}
 
-        assert len(rows) == 3
-        both = by_set[("no_quota", "not_available")]
-        assert both.count == Range[int](min=4 if cpu else 1, max=8 if cpu else 2)
-        assert both.price == Range[float](min=1, max=4 if cpu else 2)
-        assert both.regions == ["region-1", "region-2"]
+        assert len(rows) == 2
         quota = by_set[("no_quota",)]
-        assert quota.count == Range[int](min=16 if cpu else 4, max=16 if cpu else 4)
-        assert quota.regions == ["region-4"]
+        assert quota.count == Range[int](min=4 if cpu else 1, max=16 if cpu else 4)
+        assert quota.price == Range[float](min=1, max=16 if cpu else 4)
+        assert quota.regions == ["region-1", "region-2", "region-4"]
         capacity = by_set[("not_available",)]
-        assert capacity.count == Range[int](min=32 if cpu else 8, max=32 if cpu else 8)
-        assert capacity.regions == ["region-8"]
+        assert capacity.count == Range[int](min=4 if cpu else 1, max=32 if cpu else 8)
+        assert capacity.price == Range[float](min=1, max=64 if cpu else 8)
+        assert capacity.regions == ["region-1", "region-2", "region-8"]
 
     @pytest.mark.parametrize(
         "group_by",
