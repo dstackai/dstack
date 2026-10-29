@@ -30,7 +30,7 @@ dependencies = [
     "questionary>=2.0.1",
     "pydantic>=2.12",
     "websocket-client",
-    "python-multipart>=0.0.16",
+    "python-multipart>=0.0.31",
     "filelock",
     "psutil",
     "gpuhunt==0.1.34",
