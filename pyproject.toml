@@ -196,7 +196,7 @@ test = [
     "requests-mock>=1.12.1",
     "time-machine>=3.5.1",
     "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
-    "openai>=1.68.2",
+    "openai>=2.47.0",
     "testcontainers>=4.15.0",
 ]
 docs = [
