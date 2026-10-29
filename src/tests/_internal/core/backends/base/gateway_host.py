@@ -99,9 +99,17 @@ class GatewayHostResult:
 
 class GatewayHost:
     """
-    A gateway host emulated in a Docker container, so that the gateway install command runs in a
-    real shell without touching the machine running the tests. The commands that need the
-    network, root, or systemd are stubbed: sudo, wget, uname, uv, and the venvs' python.
+    A gateway host emulated in a Docker container for running the gateway install command.
+
+    The command runs for real in a shell, which covers quoting, version checks, and the order of
+    venv switching and service restart. The commands that need the network, root, or systemd are
+    stubbed: sudo, wget, uname, uv, and the venvs' python. Everything else, including `rm -rf`,
+    runs as is.
+
+    Stubs alone cannot contain the script: any command they don't cover would run on the machine
+    running the tests, and a script change can add one without updating the stubs. The container
+    bounds what such a change can touch. It also lets the script run unmodified against the real
+    `/home/ubuntu/dstack` on the same Ubuntu image that gateways use.
     """
 
     def __init__(self, container: DockerContainer):

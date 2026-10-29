@@ -233,12 +233,13 @@ class TestGetDstackGatewayInstallCommand:
         assert result.returncode == 0, result.stderr
         assert "Update successfully completed" in result.stdout
         assert gateway_host.active_venv() == "green"
+        # The inactive venv is created too for update scripts of older servers that use its pip
         assert gateway_host.events() == [
             f"wget {_UV_URL}",
             f"uv python install {_PYTHON_VERSION}",
             f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
-            "uv pip install --python /home/ubuntu/dstack/green/bin/python"
-            " --refresh-package dstack dstack[gateway]==0.22.3",
+            f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/blue",
+            "uv pip install --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
             "green python -m dstack._internal.proxy.gateway.systemd install",
             "systemctl daemon-reload active=green",
             "systemctl restart dstack.gateway active=green",
@@ -279,8 +280,7 @@ class TestGetDstackGatewayInstallCommand:
             "uv --version",
             f"uv python install {_PYTHON_VERSION}",
             f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
-            "uv pip install --python /home/ubuntu/dstack/green/bin/python"
-            " --refresh-package dstack dstack[gateway]==0.22.3",
+            "uv pip install --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
             "green python -m dstack._internal.proxy.gateway.systemd install",
             "systemctl daemon-reload active=green",
             "systemctl restart dstack.gateway active=green",
@@ -301,7 +301,7 @@ class TestGetDstackGatewayInstallCommand:
         assert "green python -c" not in events
         assert (
             "uv pip install --python /home/ubuntu/dstack/blue/bin/python"
-            " --refresh-package dstack dstack[gateway] @ https://example.com/d.whl"
+            " dstack[gateway] @ https://example.com/d.whl"
         ) in events
 
     def test_replaces_outdated_uv(self, gateway_host: GatewayHost):
