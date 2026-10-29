@@ -52,7 +52,8 @@ if [ "$("$uv" --version 2>/dev/null | cut -d ' ' -f 2)" != "$uv_version" ]; then
   rm -f "$archive"
 fi
 "$uv" python install "$python_version"
-# The venv contains root-owned files, as the systemd service is installed from it with sudo
+# The venv may contain root-owned files, e.g. bytecode written when installing the systemd
+# service from it with sudo
 sudo rm -rf "${gateway_dir:?}/${version:?}"
 # --seed installs pip. If the dstack server is downgraded, the older server runs its own update
 # script, which installs into the inactive venv with its pip, so both venvs must exist.
@@ -60,7 +61,9 @@ sudo rm -rf "${gateway_dir:?}/${version:?}"
 if [ ! -d "$gateway_dir/$active" ]; then
   "$uv" venv --managed-python --seed --python "$python_version" "$gateway_dir/$active"
 fi
-"$uv" pip install --python "$gateway_dir/$version/bin/python" "$gateway_package"
+# Compile bytecode now, as otherwise the app compiles it on the first start, prolonging
+# the downtime during the restart
+"$uv" pip install --compile-bytecode --python "$gateway_dir/$version/bin/python" "$gateway_package"
 sudo "$gateway_dir/$version/bin/python" -m dstack._internal.proxy.gateway.systemd install
 echo "$version" > "$gateway_dir/version"
 sudo systemctl daemon-reload

@@ -240,7 +240,7 @@ class TestGetDstackGatewayInstallCommand:
             "sudo rm -rf /home/ubuntu/dstack/green",
             f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
             f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/blue",
-            "uv pip install --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
             "sudo /home/ubuntu/dstack/green/bin/python -m dstack._internal.proxy.gateway.systemd install",
             "green python -m dstack._internal.proxy.gateway.systemd install",
             "systemctl daemon-reload active=green",
@@ -283,7 +283,7 @@ class TestGetDstackGatewayInstallCommand:
             f"uv python install {_PYTHON_VERSION}",
             "sudo rm -rf /home/ubuntu/dstack/green",
             f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
-            "uv pip install --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
             "sudo /home/ubuntu/dstack/green/bin/python -m dstack._internal.proxy.gateway.systemd install",
             "green python -m dstack._internal.proxy.gateway.systemd install",
             "systemctl daemon-reload active=green",
@@ -304,7 +304,7 @@ class TestGetDstackGatewayInstallCommand:
         events = gateway_host.events()
         assert "green python -c" not in events
         assert (
-            "uv pip install --python /home/ubuntu/dstack/blue/bin/python"
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/blue/bin/python"
             " dstack[gateway] @ https://example.com/d.whl"
         ) in events
 
