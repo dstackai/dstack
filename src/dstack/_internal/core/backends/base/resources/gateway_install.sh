@@ -52,7 +52,8 @@ if [ "$("$uv" --version 2>/dev/null | cut -d ' ' -f 2)" != "$uv_version" ]; then
   rm -f "$archive"
 fi
 "$uv" python install "$python_version"
-rm -rf "${gateway_dir:?}/${version:?}"
+# The venv contains root-owned files, as the systemd service is installed from it with sudo
+sudo rm -rf "${gateway_dir:?}/${version:?}"
 # --seed installs pip. If the dstack server is downgraded, the older server runs its own update
 # script, which installs into the inactive venv with its pip, so both venvs must exist.
 "$uv" venv --managed-python --seed --python "$python_version" "$gateway_dir/$version"

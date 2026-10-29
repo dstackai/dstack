@@ -24,7 +24,8 @@ _EVENTS_PATH = "/tmp/gateway-host-events"
 #   subcommand named in its `uv.fail_on` file.
 # - wget: serves a uv release archive with the stub as uv, for the version in the URL.
 # - uname: reports x86_64 regardless of the machine running the tests.
-# - sudo: logs systemctl calls with the active venv at the time of the call, runs other commands.
+# - sudo: logs systemctl calls with the active venv at the time of the call, logs and runs other
+#   commands.
 _STUB = f"""\
 #!/bin/sh
 set -e
@@ -74,6 +75,7 @@ sudo)
   if [ "$1" = systemctl ]; then
     log "$* active=$(cat {GATEWAY_DIR}/version)"
   else
+    log "sudo $*"
     exec "$@"
   fi
   ;;
