@@ -22,9 +22,16 @@ def pytest_configure(config):
         "markers", "postgres: mark test as testing Postgres to run only with --runpostgres"
     )
     config.addinivalue_line(
+        "markers", "docker: mark test as requiring Docker to run only with --rundocker"
+    )
+    config.addinivalue_line(
         "markers", "windows: mark test to be run on Windows in addition to POSIX"
     )
     config.addinivalue_line("markers", "windows_only: mark test to be run on Windows only")
+    if config.getoption("--runall"):
+        config.option.runui = True
+        config.option.runpostgres = True
+        config.option.rundocker = True
 
 
 def pytest_addoption(parser):
@@ -32,11 +39,18 @@ def pytest_addoption(parser):
     parser.addoption(
         "--runpostgres", action="store_true", default=False, help="Run tests with PostgreSQL"
     )
+    parser.addoption(
+        "--rundocker", action="store_true", default=False, help="Run tests requiring Docker"
+    )
+    parser.addoption(
+        "--runall", action="store_true", default=False, help="Run all of the opt-in tests above"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
     skip_ui = pytest.mark.skip(reason="need --runui option to run")
     skip_postgres = pytest.mark.skip(reason="need --runpostgres option to run")
+    skip_docker = pytest.mark.skip(reason="need --rundocker option to run")
     is_windows = os.name == "nt"
     skip_posix = pytest.mark.skip(reason="requires POSIX")
     skip_windows = pytest.mark.skip(reason="requires Windows")
@@ -45,6 +59,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_ui)
         if not config.getoption("--runpostgres") and "postgres" in item.keywords:
             item.add_marker(skip_postgres)
+        if not config.getoption("--rundocker") and "docker" in item.keywords:
+            item.add_marker(skip_docker)
         for_windows_only = "windows_only" in item.keywords
         for_windows = for_windows_only or "windows" in item.keywords
         if for_windows_only and not is_windows:

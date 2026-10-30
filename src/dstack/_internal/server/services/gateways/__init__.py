@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import itertools
-import shlex
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -16,7 +15,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
-    get_dstack_gateway_package_and_target_version,
+    get_dstack_gateway_install_command,
 )
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GATEWAY_SUPPORT,
@@ -776,11 +775,11 @@ async def init_gateways(session: AsyncSession):
                 "Skipping gateway replicas update due to DSTACK_SKIP_GATEWAY_UPDATE env variable"
             )
         else:
-            gateway_package, target_version = get_dstack_gateway_package_and_target_version()
+            install_command = get_dstack_gateway_install_command()
 
             for gateway_replica, res in await gather_map_async(
                 gateway_replicas,
-                lambda r: _update_gateway_replica(r, gateway_package, target_version),
+                lambda r: _update_gateway_replica(r, install_command),
                 return_exceptions=True,
             ):
                 if isinstance(res, Exception):
@@ -802,10 +801,12 @@ async def init_gateways(session: AsyncSession):
                 )
 
 
+_GATEWAY_UPDATE_TIMEOUT = 600
+
+
 async def _update_gateway_replica(
     gateway_replica_model: GatewayReplicaModel,
-    gateway_package: str,
-    target_version: str | None,
+    install_command: str,
 ) -> bool:
     if gateway_replica_model.ip_address is None:
         logger.warning(
@@ -824,56 +825,11 @@ async def _update_gateway_replica(
     )
     logger.debug("Updating gateway replica %s", connection.ip_address)
 
-    command = (
-        "/bin/sh -c "
-        + shlex.quote(_GATEWAY_UPDATE_SCRIPT)
-        + " sh "  # $0 placeholder
-        + shlex.quote(gateway_package)
-        + " "
-        + shlex.quote(target_version or "")
-    )
-    stdout = await connection.tunnel.aexec(command, timeout=_GATEWAY_UPDATE_TIMEOUT)
+    stdout = await connection.tunnel.aexec(install_command, timeout=_GATEWAY_UPDATE_TIMEOUT)
     if "Update successfully completed" in stdout:
         logger.info("Gateway replica %s updated", connection.ip_address)
         return True
     return False
-
-
-_GATEWAY_UPDATE_TIMEOUT = 600
-
-# Blue/green: install the new build into the currently inactive venv and flip to it
-_GATEWAY_UPDATE_SCRIPT = """\
-set -e
-gateway_package="$1"
-build="$2"
-root=/home/ubuntu/dstack
-if [ -f "$root/version" ]; then
-  version=$(cat "$root/version")
-else
-  version=blue
-fi
-if [ -n "$build" ]; then
-  current_build=$("$root/$version/bin/pip" show dstack | grep Version | awk '{print $2}')
-  if [ "$current_build" = "$build" ]; then
-    echo "The build $build is already installed. Skipping..."
-    exit 0
-  fi
-fi
-if [ "$version" = blue ]; then
-  version=green
-else
-  version=blue
-fi
-# dstack-gateway is a pre-0.21.4 package that may still be installed and require a conflicting dstack version
-"$root/$version/bin/pip" uninstall -y dstack-gateway dstack
-"$root/$version/bin/pip" cache remove dstack
-"$root/$version/bin/pip" install "$gateway_package"
-sudo "$root/$version/bin/python" -m dstack._internal.proxy.gateway.systemd install
-echo "$version" > "$root/version"
-sudo systemctl daemon-reload
-sudo systemctl restart dstack.gateway
-echo "Update successfully completed"
-"""
 
 
 def _recently_updated(gateway_replica_model: GatewayReplicaModel) -> bool:

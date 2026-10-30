@@ -136,19 +136,21 @@ Users can create a gateway using the `dstack apply` command. The gateway YAML co
 Provisioning happens as follows:
 1. Launch a non-GPU instance (usually the smallest) with all ports exposed.
 2. Install Nginx, Certbot, and patch configs.
-3. Create blue-green virtual environments.
-4. Install the `dstack[gateway]` Python package.
-5. Run the systemd service `dstack.gateway.service`.
+3. Run the gateway install script (`core/backends/base/resources/gateway_install.sh`), which installs uv, Python, and the `dstack[gateway]` package and runs the systemd service `dstack.gateway.service`. The same script is used for updates, see below.
 
 ### Update
 
-The gateway has a "blue-green deployment"-like configuration: there are two virtual environments to be swapped on update. The systemd service uses the newly installed package after a restart.
+The gateway has a "blue-green deployment"-like configuration: the app runs from one of two virtual environments, `blue` or `green`, as recorded in `~/dstack/version`. The systemd service uses the newly installed package after a restart.
 
-The update process looks like this:
-1. Install the new package to the unused venv.
-2. Update scripts and systemd service config.
-3. Swap the active venv name in `~/dstack/version`.
-4. Restart the systemd service.
+On startup, the `dstack` server runs the install script on every gateway over SSH. The script:
+1. Exits if the active venv already has the target `dstack` version on the script's `python_version`. Unversioned packages (master builds, `DSTACK_GATEWAY_PACKAGE_URL`) are always reinstalled.
+2. Installs uv (`uv_version`) and Python (`python_version`) if missing. Both are pinned in the script.
+3. Recreates the unused venv and installs the new package into it.
+4. Updates scripts and systemd service config.
+5. Swaps the active venv name in `~/dstack/version`.
+6. Restarts the systemd service.
+
+Changing `python_version` migrates existing gateways to the new Python on their next update. The venvs are created with pip (`uv venv --seed`) because update scripts of older servers call pip directly, e.g. after a server downgrade.
 
 ## Gateway development
 

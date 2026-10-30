@@ -32,7 +32,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_name,
     generate_unique_volume_name,
     get_docker_commands,
-    get_dstack_gateway_commands,
+    get_dstack_gateway_install_command,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import (
@@ -1423,8 +1423,6 @@ def _wait_for_load_balancer_address(
 
 def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
-    gateway_commands = " && ".join(get_dstack_gateway_commands())
-    quoted_gateway_commands = shlex.quote(gateway_commands)
 
     commands = [
         # install packages
@@ -1451,7 +1449,7 @@ def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
         # install gateway
-        f"su ubuntu -c {quoted_gateway_commands}",
+        f"su ubuntu -c {shlex.quote(get_dstack_gateway_install_command())}",
         # start docker-systemctl-replacement as an init replacement (PID 1), which
         # - starts and supervises enabled services (sshd, nginx, dstack.gateway)
         # - stops running services on SIGTERM (graceful shutdown)

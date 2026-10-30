@@ -36,7 +36,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Preserve client/server backward compatibility when updating Pydantic models. New fields must be excluded from client requests when unset, for compatibility with older servers (see `core/compatibility/*.py`). If the allowed domain/type of an existing field is extended, server responses may need to be patched for older clients (see `server/compatibility/*.py`). No need to exclude new fields from server responses, since clients rely on `validate_extra_ignore`.
 
 ## Testing Guidelines
-- Default to `uv run pytest`. Use markers from `src/tests/conftest.py` like `--runpostgres` if need to include specific tests.
+- Default to `uv run pytest` for quick testing. Opt-in tests are skipped by default; enable them when the change touches what they cover, with the flags from `src/tests/conftest.py`: `--runpostgres`, `--rundocker`, `--runui`, or `--runall` for all of them.
 - Scope the run to the change: for trivial or localized edits, run only the affected test modules, `Test*` classes, or `-k` selection instead of the whole suite. Reserve the full suite for broad or cross-cutting changes.
 - Speed up large runs with `-n auto` (pytest-xdist), e.g. `uv run pytest -n auto`.
 - Group tests for the same unit (function/class) using `Test*` classes that mirror unit's name.

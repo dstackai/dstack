@@ -4,6 +4,7 @@ from typing import Optional
 import gpuhunt
 import pytest
 
+from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     GoArchType,
@@ -11,6 +12,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
     generate_unique_volume_name,
+    get_dstack_gateway_install_command,
     normalize_arch,
     parse_provider_ref_from_name,
 )
@@ -23,6 +25,7 @@ from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_volume,
 )
+from tests._internal.core.backends.base.gateway_host import GatewayHost, get_install_script_var
 
 
 class _ComputeWithCachedOffers(ComputeWithAllOffersCached):
@@ -207,3 +210,125 @@ class TestNormalizeArch:
     def test_unknown_arch(self):
         with pytest.raises(ValueError, match="Unsupported architecture: MIPS"):
             normalize_arch("MIPS")
+
+
+_UV_VERSION = get_install_script_var("uv_version")
+_PYTHON_VERSION = get_install_script_var("python_version")
+_UV_URL = (
+    f"https://github.com/astral-sh/uv/releases/download/{_UV_VERSION}"
+    "/uv-x86_64-unknown-linux-musl.tar.gz"
+)
+
+
+@pytest.mark.docker
+class TestGetDstackGatewayInstallCommand:
+    @pytest.fixture(autouse=True)
+    def gateway_package(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(settings, "DSTACK_GATEWAY_PACKAGE_URL", None)
+        monkeypatch.setattr(settings, "DSTACK_VERSION", "0.22.3")
+
+    def test_installs_on_fresh_host(self, gateway_host: GatewayHost):
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode == 0, result.stderr
+        assert "Update successfully completed" in result.stdout
+        assert gateway_host.active_venv() == "green"
+        # The inactive venv is created too for update scripts of older servers that use its pip
+        assert gateway_host.events() == [
+            f"wget {_UV_URL}",
+            f"uv python install {_PYTHON_VERSION}",
+            "sudo rm -rf /home/ubuntu/dstack/green",
+            f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
+            f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/blue",
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
+            "sudo /home/ubuntu/dstack/green/bin/python -m dstack._internal.proxy.gateway.systemd install",
+            "green python -m dstack._internal.proxy.gateway.systemd install",
+            "systemctl daemon-reload active=green",
+            "systemctl restart dstack.gateway active=green",
+        ]
+
+    def test_skips_if_build_and_python_match(self, gateway_host: GatewayHost):
+        gateway_host.add_venv("blue", installed=f"{_PYTHON_VERSION} 0.22.3", active=True)
+
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode == 0, result.stderr
+        assert "Skipping" in result.stdout
+        assert gateway_host.active_venv() == "blue"
+        assert gateway_host.events() == ["blue python -c"]
+
+    @pytest.mark.parametrize(
+        "installed",
+        [
+            pytest.param("3.10 0.22.3", id="outdated-python"),
+            pytest.param(f"{_PYTHON_VERSION} 0.22.2", id="outdated-build"),
+            pytest.param(None, id="broken-venv"),
+        ],
+    )
+    def test_recreates_inactive_venv_and_switches_to_it(
+        self, gateway_host: GatewayHost, installed: Optional[str]
+    ):
+        gateway_host.add_venv("blue", installed=installed, active=True)
+        gateway_host.add_venv("green", installed="3.10 0.22.1")
+        gateway_host.add_uv(_UV_VERSION)
+
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode == 0, result.stderr
+        assert gateway_host.active_venv() == "green"
+        assert not gateway_host.exists("/home/ubuntu/dstack/green/installed")
+        assert gateway_host.events() == [
+            "blue python -c",
+            "uv --version",
+            f"uv python install {_PYTHON_VERSION}",
+            "sudo rm -rf /home/ubuntu/dstack/green",
+            f"uv venv --managed-python --seed --python {_PYTHON_VERSION} /home/ubuntu/dstack/green",
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/green/bin/python dstack[gateway]==0.22.3",
+            "sudo /home/ubuntu/dstack/green/bin/python -m dstack._internal.proxy.gateway.systemd install",
+            "green python -m dstack._internal.proxy.gateway.systemd install",
+            "systemctl daemon-reload active=green",
+            "systemctl restart dstack.gateway active=green",
+        ]
+
+    def test_never_skips_unversioned_package(
+        self, gateway_host: GatewayHost, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "DSTACK_GATEWAY_PACKAGE_URL", "https://example.com/d.whl")
+        gateway_host.add_venv("green", installed=f"{_PYTHON_VERSION} 0.22.3", active=True)
+        gateway_host.add_uv(_UV_VERSION)
+
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode == 0, result.stderr
+        assert gateway_host.active_venv() == "blue"
+        events = gateway_host.events()
+        assert "green python -c" not in events
+        assert (
+            "uv pip install --compile-bytecode --python /home/ubuntu/dstack/blue/bin/python"
+            " dstack[gateway] @ https://example.com/d.whl"
+        ) in events
+
+    def test_replaces_outdated_uv(self, gateway_host: GatewayHost):
+        gateway_host.add_venv("blue", installed="3.10 0.22.2", active=True)
+        gateway_host.add_uv("0.1.0")
+
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode == 0, result.stderr
+        assert gateway_host.events()[1:4] == [
+            "uv --version",
+            f"wget {_UV_URL}",
+            f"uv python install {_PYTHON_VERSION}",
+        ]
+        assert gateway_host.uv_version() == _UV_VERSION
+
+    def test_keeps_active_venv_if_install_fails(self, gateway_host: GatewayHost):
+        gateway_host.add_venv("blue", installed="3.10 0.22.2", active=True)
+        gateway_host.add_uv(_UV_VERSION, fail_on="pip")
+
+        result = gateway_host.run(get_dstack_gateway_install_command())
+
+        assert result.returncode != 0
+        assert "Update successfully completed" not in result.stdout
+        assert gateway_host.active_venv() == "blue"
+        assert not any(e.startswith("systemctl") for e in gateway_host.events())

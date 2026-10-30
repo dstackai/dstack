@@ -55,11 +55,15 @@ Then you can do:
 uv run pytest src/tests
 ```
 
-(Optionally) By default, tests run against SQLite.
-Use the `--runpostgres` flag to run the tests against Postgres as well:
+(Optionally) Some tests are skipped by default because they need extra setup. Enable them with these flags:
+
+* `--runpostgres` – run the tests against Postgres in addition to SQLite. Requires Docker.
+* `--rundocker` – run the tests that use Docker containers. Requires Docker.
+* `--runui` – run the tests of the bundled frontend. Requires the frontend build in `src/dstack/_internal/server/statics`.
+* `--runall` – all of the above.
 
 ```shell
-uv run pytest src/tests --runpostgres
+uv run pytest src/tests --runall
 ```
 
 Alternatively, you can run tests via [tox](https://tox.wiki/) inside an isolated environment ensuring that the `dstack` package itself is built correctly and all requirements are specified and correct. tox and [just](https://just.systems/) must be already installed.
