@@ -348,9 +348,9 @@ Slurm explicitly controls both `nodes` and processes/tasks.
         --epochs=10
 
     resources:
-    gpu: A100:80GB:8
-    memory: 200GB..
-    shm_size: 24GB
+      gpu: A100:80GB:8
+      memory: 200GB..
+      shm_size: 24GB
 
     max_duration: 24h
     ```
@@ -385,11 +385,11 @@ Slurm explicitly controls both `nodes` and processes/tasks.
         fi
 
     resources:
-    gpu: nvidia:1..8
-    shm_size: 16GB
+      gpu: nvidia:1..8
+      shm_size: 16GB
     ```
 
-    If `startup_order` and `stop_criteria` are not configured (as in the PyTorch DDP example above), the master worker starts first and waits until all workers terminate. For MPI workloads, we need to change this.
+    If `startup_order` and `stop_criteria` are not configured (as in the PyTorch DDP example above), the master and worker nodes start in any order, and the run finishes when all nodes are done. For MPI workloads, we need to change this.
 
 #### Nodes and processes comparison
 
@@ -601,7 +601,7 @@ schedule:
 #### Monitoring commands
 
 === "Queue status"
-    The `dstack ps` command displays runs and jobs sorted by priority, reflecting the order in which they will be scheduled.
+    The `dstack ps` command displays runs and their jobs, with the most recently submitted runs first.
 
     <div class="termy">
 
@@ -1520,7 +1520,7 @@ Both systems support fault tolerance for long-running training jobs that may be 
 | | Slurm | dstack |
 |---|-------|--------|
 | **Retry** | `--requeue` flag requeues jobs on node failure (hardware crash) or preemption, not application failures (software crashes); all nodes requeued together (all-or-nothing) | `retry` property with `on_events` (`error`, `interruption`) and `duration`; all jobs stopped and run resubmitted if any job fails (all-or-nothing) |
-| **Graceful stop** | Grace period with `SIGTERM` before `SIGKILL`; `--signal` sends signal before time limit (e.g., `--signal=B:USR1@300`) | Not supported |
+| **Graceful stop** | Grace period with `SIGTERM` before `SIGKILL`; `--signal` sends signal before time limit (e.g., `--signal=B:USR1@300`) | `dstack stop` sends `SIGINT`, then `SIGHUP` after 5 seconds and `SIGKILL` after 10 seconds |
 | **Checkpointing** | Application-based; save to shared filesystem | Application-based; save to persistent volumes |
 | **Instance health** | `HealthCheckProgram` in `slurm.conf` runs custom scripts (DCGM/RVS); non-zero exit drains node (excludes from new scheduling, running jobs continue) | Automatic GPU health monitoring via DCGM; unhealthy instances excluded from scheduling |
 
@@ -1845,7 +1845,7 @@ fi
 
 ### dstack
 
-`dstack` does not support heterogeneous jobs natively. Use separate runs with [workflow orchestration tools (Prefect, Airflow)](#dstack-workflow-orchestration) or submit multiple runs programmatically to coordinate components with different resource requirements.
+`dstack` supports heterogeneous jobs via task [node groups](../../concepts/tasks.md#node-groups). Each group has its own `nodes` count, `resources`, `commands`, and `ports`.
 
 ## What's next?
 

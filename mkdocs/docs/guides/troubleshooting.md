@@ -108,14 +108,14 @@ properties in your configuration.
 
 #### Cause 5: GPU requirements
 
-By default, `dstack` only selects instances with no GPUs or a single NVIDIA GPU.
-If you want to use non-NVIDIA GPUs or multi-GPU instances, set the `gpu` property
-in your configuration.
+By default, `dstack` only selects instances with no GPUs or with NVIDIA GPUs.
+If you want to use other accelerators, such as AMD or Tenstorrent, set the `gpu` and `image`
+properties in your configuration.
 
-Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
+Examples: `gpu: amd` (one or more AMD GPUs), `gpu: A10:4..8` (4 to 8 A10 GPUs),
 `gpu: tt:32` (32 Tenstorrent devices).
 
-> If you don't specify the number of GPUs, `dstack` will only select single-GPU instances.
+> If you don't specify the number of GPUs, it defaults to `1..`.
 
 #### Cause 6: Network volumes
 
@@ -128,14 +128,15 @@ For AWS, the availability zone of the volume and the instance should also match.
 Some `dstack` features are not supported by all backends. If your configuration uses
 one of these features, `dstack` will only select offers from the backends that support it.
 
-- [Backend fleets](../concepts/fleets.md#backend-fleets) configurations,
-  [Instance volumes](../concepts/volumes.md#instance-volumes),
+- [Pre-provisioning](../concepts/fleets.md#pre-provisioning) in backend fleets
+  is only supported by [VM-based](../concepts/backends.md#vm-based) backends.
+- [Instance volumes](../concepts/volumes.md#instance-volumes)
   and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
-  are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
+  are supported by all backends except `daytona`, `lium`, `runpod`, `slurm`, and `vastai`.
 - [Clusters](../concepts/fleets.md#cluster-placement)
   and [multi-node tasks](../concepts/tasks.md#nodes)
-  are only supported by the `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr` backends,
-  as well as SSH fleets.
+  are only supported by the `aws`, `azure`, `crusoe`, `gcp`, `jarvislabs`, `kubernetes`, `nebius`,
+  `oci`, `runpod`, `seeweb`, `slurm`, and `vultr` backends, as well as SSH fleets.
 - [Reservations](../reference/dstack.yml/fleet.md#reservation)
   are only supported by the `aws` and `gcp` backends.
 
@@ -166,10 +167,10 @@ fleet, how many of its offers were tried, and what each attempt returned. Repeat
 reported once; every attempt is logged by the server, so check the [server logs](#server-logs)
 for the full list.
 
-#### Cause 1: Insufficient service quotas
+#### Cause 1: Insufficient cloud quotas
 
-If some runs fail to provision, it may be due to an insufficient service quota. For cloud providers like AWS, GCP,
-Azure, and OCI, you often need to request an increased [service quota](protips.md#service-quotas) before you can use
+If some runs fail to provision, it may be due to an insufficient cloud quota. For cloud providers like AWS, GCP,
+Azure, and OCI, you often need to request an increased [quota](protips.md#cloud-quotas) before you can use
 specific instances.
 
 ### Run starts but fails
@@ -199,14 +200,14 @@ was using spot instances and was interrupted. To address this, you can either se
 #### Cause 1: Gateway misconfiguration
 
 If all services fail to start with a specific gateway, make sure a
-[correct DNS record](../concepts/gateways.md#update-dns-records)
+[correct DNS record](../concepts/gateways.md#domain)
 pointing to the gateway's hostname is configured.
 
 ### Service endpoint doesn't work 
 
 #### Cause 1: Bad Authorization
 
-If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../concepts/services.md#access-the-endpoint) 
+If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../concepts/services.md#authorization) 
 header with the correct `dstack` token was not provided.
 
 [//]: # (#### Other)

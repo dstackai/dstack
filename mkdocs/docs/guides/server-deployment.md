@@ -581,7 +581,7 @@ When upgrading the `dstack` server, follow these guidelines to ensure a smooth t
 
 ### Before upgrading
 
-1. **Check the changelog**: Review the [release notes](https://github.com/dstackai/dstack/releases) for breaking changes, new features, and migration notes.
+1. **Check the changelog**: Review the [upgrade guide](upgrade.md) and the [release notes](https://github.com/dstackai/dstack/releases) for breaking changes, new features, and migration notes.
 2. **Review backward compatibility**: Understand the [backward compatibility](#backward-compatibility) policy.
 3. **Back up your data**: Ensure you always create a backup before upgrading.
 
