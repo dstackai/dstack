@@ -1980,10 +1980,9 @@ img.border {
 a[href^="http"]:not(:where(
   /* skip if marked with external-skip */
   .external-skip,
-  /* exclude http:// dstack links */
-  [href^="http://dstack.ai"],
-  /* exclude https://dstack.ai links */
-  [href^="https://dstack.ai"],
+  /* exclude dstack.ai links, except non-docs product pages */
+  [href^="http://dstack.ai"]:not([href*="dstack.ai/products"]),
+  [href^="https://dstack.ai"]:not([href*="dstack.ai/products"]),
   /* exclude md-content__button links */
   .md-content__button,
 )):after {

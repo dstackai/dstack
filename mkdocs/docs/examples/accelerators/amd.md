@@ -244,8 +244,7 @@ $ dstack metrics &lt;run name&gt;
 ## What's next?
 
 1. Browse the dedicated [SGLang](../inference/sglang.md)
-   and [vLLM](../inference/vllm.md) examples, plus the
-   [Qwen 3.6](../models/qwen36.md) model page.
+   and [vLLM](../inference/vllm.md) examples.
 2. For multi-node inference, see
    [SGLang PD disaggregation](../inference/sglang.md#pd-disaggregation).
 3. For cluster validation, run

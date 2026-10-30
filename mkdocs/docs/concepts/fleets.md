@@ -7,7 +7,7 @@ description: Managing pools of compute instances
 
 Before submitting runs, you must create a fleet. Fleets act as both pools of instances and templates for how those instances are provisioned.
 
-> `dstack` supports two fleet types: [backend fleets](#backend-fleet) (which are provisioned dynamically in the cloud or on Kubernetes), and [SSH fleets](#ssh-fleet) (which use existing on-prem servers).
+> `dstack` supports two fleet types: [backend fleets](#backend-fleets) (which are provisioned dynamically in the cloud or on Kubernetes), and [SSH fleets](#ssh-fleets) (which use existing on-prem servers).
 
 ## Apply a configuration
 
@@ -103,10 +103,10 @@ To create a fleet, define its configuration in a YAML file. The filename must en
     `dstack apply` automatically connects to on-prem servers, installs the required dependencies, and adds them to the created fleet.
 
     ??? info "Host requirements"
-        1.&nbsp;Hosts must be Linux-based and have Docker pre-installed.
+        1.&nbsp;Hosts must be Linux-based with systemd, have a 64-bit x86 or ARM CPU, and have Docker pre-installed.
 
         === "NVIDIA"
-            2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
+            2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with NVIDIA drivers that support CUDA 13.0 and
             [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
         === "AMD"
@@ -120,7 +120,7 @@ To create a fleet, define its configuration in a YAML file. The filename must en
 
         3.&nbsp;The user specified must have passwordless `sudo` access.
 
-        4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+        4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`. The SSH key must be RSA, ECDSA, or Ed25519.
 
         5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks.
 
@@ -134,7 +134,7 @@ Backend fleets support [many options](../reference/dstack.yml/fleet.md); see som
 
 ### Cluster placement
 
-Both [backend fleets](#backend-fleet) and [SSH fleets](#ssh-fleet) allow the `placement` property to be set to `cluster`. 
+Both [backend fleets](#backend-fleets) and [SSH fleets](#ssh-fleets) allow the `placement` property to be set to `cluster`. 
 
 This property ensures that instances are interconnected. This is required for running [multi-node tasks](tasks.md#nodes).
 
@@ -320,7 +320,10 @@ Backend fleets allow you to set `backends` to specify which backends are allowed
 
 Instances of a backend fleet that aren't running any jobs are `idle` and can be reused by new runs.
 `dstack` terminates idle instances above [`nodes.min`](#nodes) after
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration), which defaults to 3 days.
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration). If `idle_duration` is not set,
+it defaults to 3 days for pre-provisioned instances and to 5 minutes for instances provisioned
+when you submit runs. Instances of [container-based](backends.md#container-based) backends are
+terminated as soon as they become idle.
 
 For `idle_duration` to have an effect, `nodes` must be a range. Set `min` to `0` and `target` to
 the number of instances to pre-provision:
@@ -497,6 +500,34 @@ $ dstack fleet
 ```
 
 </div>
+
+### Update fleets
+
+To update a fleet, change its configuration and pass it to `dstack apply`. `dstack` will automatically detect changes and suggest an in-place update.
+
+<div class="termy">
+
+```shell
+$ dstack apply -f fleet.dstack.yml
+
+Found fleet my-fleet. Detected changes that can be updated in-place:
+- Configuration properties:
+  - nodes
+  - max_price
+
+Update the fleet in-place? [y/n]:
+```
+
+</div>
+
+If approved, `dstack` updates the fleet without re-creating it. For example, if `nodes.min` is increased, `dstack` provisions the missing instances, and if `nodes.max` is decreased, `dstack` terminates idle instances above it.
+
+??? info "Supported properties"
+    Backend fleets support in-place changes to `nodes`, `resources`, `backends`, `regions`, `availability_zones`, `instance_types`, `spot_policy`, `max_price`, `reservation`, and `tags`. Except for `nodes`, these changes only apply to instances provisioned after the update.
+
+    SSH fleets support adding and removing `hosts`. Added hosts are provisioned, and removed hosts are terminated.
+
+    Changes to other properties require re-creating the fleet. In this case, `dstack apply` offers to delete the fleet and create it again.
 
 ### Delete fleets
 

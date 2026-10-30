@@ -74,6 +74,8 @@ For more details on server deployment options, see the [Server deployment](guide
 
     To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](concepts/backends.md).
 
+<span id="set-up-the-cli"></span>
+
 ## Install the CLI { #cli }
 
 Once the server is up, you can access it via the `dstack` CLI. 

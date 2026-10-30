@@ -7,8 +7,6 @@ description: Creating and reusing optimized model inference configurations
 
 Presets offer a toolkit that streamlines agent-based model inference optimization and a portable format to deploy the optimized inference endpoint to any cloud, Kubernetes cluster, or on-prem fleet.
 
-> The presets feature is experimental and may change.
-
 ??? info "Prerequisites"
     Before using presets, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
 
@@ -70,7 +68,7 @@ Create the preset dsv4-flash? [y/n]: y
 
 The command executes entirely locally and uses the locally installed `claude` or `codex` CLI along with `dstack`'s bundled skills (see [Agent](#agent)). The agent uses a `dstack` task to find the best serving configuration for the available fleet offers, then submits it as a `dstack` service for a final benchmark.
 
-You can stop watching with `Ctrl`+`C` at any time. The agent keeps running, and `dstack preset logs -f` follows it again. Resume an interrupted creation with `dstack preset resume`:
+Pressing `Ctrl`+`C` asks whether to stop the creation. If you don't stop it, the agent keeps running, and `dstack preset logs -f` follows it again. Resume an interrupted creation with `dstack preset resume`:
 
 <div class="termy">
 

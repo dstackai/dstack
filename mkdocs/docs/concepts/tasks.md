@@ -193,7 +193,7 @@ the index of the node within that group.
 
 > `groups[0].nodes[0]` is the run's master node — it is what `DSTACK_MASTER_NODE_IP` resolves to.
 
-Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#_groups) and top-level `nodes` are mutually exclusive. Support for other properties is coming soon.
+Currently, only `resources`, `commands`, and `ports` can be configured per node group. [`groups`](../reference/dstack.yml/task.md#_groups) and top-level `nodes` are mutually exclusive. Support for other properties is coming soon. If `groups` is set, top-level `resources` is ignored. Set `resources` in each group.
 
 > See the [Ray+RAGEN](../examples/training/ray-ragen.md) example for running a Ray cluster,
 and the [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md) example for running `mpirun` with node groups.
@@ -280,13 +280,20 @@ If you'd like `dstack` to automatically retry, configure the
 
 ```yaml
 type: task
-name: train    
+name: trl-sft
 
 python: 3.12
 
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
+  - uv pip install trl
+  - |
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
 
 retry:
   on_events: [no-capacity, error, interruption]
@@ -314,13 +321,20 @@ This can be done by specifying the [`priority`](../reference/dstack.yml/task.md)
 
 ```yaml
 type: task
-name: train
+name: trl-sft
 
 python: 3.12
 
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
+  - uv pip install trl
+  - |
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
 
 priority: 50
 ```
@@ -534,13 +548,13 @@ resources:
 
 </div>
 
-Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+Cannot be used with `python` or `image`. Not supported on `daytona`, `lium`, `runpod`, `slurm`, or `vastai`.
 
 #### Privileged mode
 
 To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
 
-Not supported with `runpod`, `vastai`, and `kubernetes`.
+Not supported with `daytona`, `lium`, `runpod`, `slurm`, and `vastai`.
 
 #### Private registry
     
@@ -880,8 +894,8 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
     python: 3.12
     
     commands:
-      - pip install -r fine-tuning/qlora/requirements.txt
-      - python fine-tuning/qlora/train.py
+      - pip install -r requirements.txt
+      - python train.py
     
     resources:
       gpu: v2-8
@@ -936,12 +950,20 @@ Below is an example of a task that auto-terminate if any GPU stays below 10% uti
 
 ```yaml
 type: task
-name: train
+name: trl-sft
 
 python: 3.12
+
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
+  - uv pip install trl
+  - |
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
   gpu: H100:8
@@ -961,12 +983,20 @@ Specify `schedule` to start a task periodically at specific UTC times using the 
 
 ```yaml
 type: task
-name: train
+name: trl-sft
 
 python: 3.12
+
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
+  - uv pip install trl
+  - |
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
   gpu: H100:8

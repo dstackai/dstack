@@ -299,7 +299,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
-> Instance volumes are currently supported for all backends except `daytona`, `lium`, `runpod`, and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+> Instance volumes are currently supported with both [SSH fleets](fleets.md#ssh-fleets) and all backends except `daytona`, `lium`, `runpod`, `slurm`, and `vastai`.
 
 ### Attach a volume
 

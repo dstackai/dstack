@@ -8,7 +8,7 @@ description: Setting up Lambda clusters using Kubernetes or 1-Click Clusters wit
 `dstack` allows using Lambda clusters with fast interconnect via two ways:
 
 * [Kubernetes](#kubernetes) – If you create a Kubernetes cluster on Lambda and configure a `kubernetes` backend and create a backend fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
-* [VMs](#vms) – If you create a 1CC cluster on Lambda and create an SSH fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
+* [VMs](#1-click-clusters) – If you create a 1CC cluster on Lambda and create an SSH fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
 
 ## Kubernetes
 

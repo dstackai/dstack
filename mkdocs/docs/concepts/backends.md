@@ -90,7 +90,7 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "ec2:DeletePlacementGroup",
                     "ec2:DeleteVolume",
                     "ec2:DescribeAvailabilityZones",
-                    "ec2:DescribeCapacityReservations"
+                    "ec2:DescribeCapacityReservations",
                     "ec2:DescribeImages",
                     "ec2:DescribeInstances",
                     "ec2:DescribeInstanceAttribute",
@@ -314,7 +314,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     ```shell
     SUBSCRIPTION_ID=...
-    az ad sp create-for-rbac
+    DSTACK_ROLE=...
+    az ad sp create-for-rbac \
         --name dstack-app \
         --role $DSTACK_ROLE \
         --scopes /subscriptions/$SUBSCRIPTION_ID \
@@ -401,6 +402,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -415,6 +418,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -433,6 +438,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -739,6 +746,7 @@ gcloud projects list --format="json(projectId)"
       - name: main
         backends:
           - type: gcp
+            project_id: gcp-project-id
             creds:
               type: default
 
@@ -891,7 +899,7 @@ projects:
 
 <span id="datacrunch"></span>
 
-### Verda (formerly DataCrunch) { #verda }
+### Verda { #verda }
 
 Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
@@ -1399,7 +1407,7 @@ projects:
 
     This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
 
-> To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
+> To learn more, see the [Lambda](../examples/clusters/lambda.md#kubernetes) and [Crusoe](../examples/clusters/crusoe.md#kubernetes) examples.
 
 ### Slurm
 
@@ -1648,5 +1656,3 @@ projects:
     ```
 
     </div>
-
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
