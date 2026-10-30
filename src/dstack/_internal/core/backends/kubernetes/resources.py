@@ -5,11 +5,11 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Literal, Optional, Union, cast, get_args
+from typing import Callable, Literal, Optional, Protocol, Union, cast, get_args
 
 import gpuhunt
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
-from kubernetes.client import CoreV1Api, V1Node, V1Taint
+from kubernetes.client import CoreV1Api, V1Node, V1ObjectMeta, V1Taint
 from kubernetes.utils.quantity import parse_quantity as _parse_quantity
 from typing_extensions import Self
 
@@ -349,14 +349,18 @@ def format_memory(memory: Memory) -> str:
     return f"{float(memory)}Gi"
 
 
-def get_node_name(node: V1Node) -> Optional[str]:
-    if (metadata := node.metadata) is None:
+class ObjectWithMeta(Protocol):
+    metadata: Optional[V1ObjectMeta]
+
+
+def get_object_name(obj: ObjectWithMeta) -> Optional[str]:
+    if (metadata := obj.metadata) is None:
         return None
     return metadata.name
 
 
-def get_node_labels(node: V1Node) -> dict[str, str]:
-    if (metadata := node.metadata) is None:
+def get_object_labels(obj: ObjectWithMeta) -> dict[str, str]:
+    if (metadata := obj.metadata) is None:
         return {}
     if (labels := metadata.labels) is None:
         return {}
@@ -386,7 +390,7 @@ def get_instance_offers(
         nodes_allocated_resources = _get_nodes_allocated_resources(api)
     offers: list[InstanceOfferWithAvailability] = []
     for node in api.list_node().items:
-        if (node_name := get_node_name(node)) is None:
+        if (node_name := get_object_name(node)) is None:
             continue
         offer = _get_instance_offer_from_node(
             node=node,
@@ -406,7 +410,7 @@ def get_instance_offers(
 def get_instance_offer_from_node(
     node: V1Node, region: str
 ) -> Optional[InstanceOfferWithAvailability]:
-    node_name = get_node_name(node)
+    node_name = get_object_name(node)
     if node_name is None:
         return None
     return _get_instance_offer_from_node(
@@ -513,7 +517,7 @@ def _get_instance_offer_from_node(
 def _get_gpus_from_node(
     node: V1Node, node_name: str, node_resources: KubernetesResources
 ) -> list[Gpu]:
-    labels = get_node_labels(node)
+    labels = get_object_labels(node)
     for gpu_resource, gpu_getter in (
         (NVIDIA_GPU_RESOURCE, get_nvidia_gpu_from_node_labels),
         (AMD_GPU_RESOURCE, get_amd_gpu_from_node_labels),
