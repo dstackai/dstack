@@ -85,4 +85,12 @@ def load_apply_configuration(
         raise ConfigurationError(f"Failed to load configuration from {configuration_path}")
     if isinstance(configuration_path, int):
         return APPLY_STDIN_NAME, conf
-    return str(configuration_path.absolute().relative_to(Path.cwd())), conf
+    absolute_path = configuration_path.absolute()
+    try:
+        return str(absolute_path.relative_to(Path.cwd())), conf
+    except ValueError:
+        # The configuration may live outside the current directory, e.g. when
+        # passed by absolute path. Fall back to the absolute path instead of
+        # failing; relative `repos` and `files` entries are resolved against
+        # the configuration's directory, so they keep working either way.
+        return str(absolute_path), conf
