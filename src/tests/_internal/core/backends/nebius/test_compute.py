@@ -5,9 +5,16 @@ from typing import Callable, Optional
 from unittest.mock import Mock
 
 import pytest
+from cachetools import TTLCache
 from grpc import StatusCode
 from nebius.aio.service_error import RequestError, RequestStatusExtended
 from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
+from nebius.api.nebius.capacity.v1 import (
+    ComputeInstanceDetails,
+    ResourceAdvice,
+    ResourceAdviceSpec,
+    ResourceAdviceStatus,
+)
 from nebius.api.nebius.common.v1 import ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
     Disk,
@@ -18,13 +25,14 @@ from nebius.api.nebius.compute.v1 import (
     ResourcesSpec,
 )
 
+from dstack._internal.core.backends.base.compute import ComputeTTLCache
 from dstack._internal.core.backends.nebius import compute as compute_module
 from dstack._internal.core.backends.nebius.compute import NebiusCompute
 from dstack._internal.core.backends.nebius.models import (
     NebiusConfig,
     NebiusServiceAccountCreds,
 )
-from dstack._internal.core.errors import NotYetTerminated
+from dstack._internal.core.errors import NoCapacityError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.orphans import ListedResourceGroup, OwnerType
 from dstack._internal.core.models.instances import (
@@ -34,9 +42,19 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import (
+    PlacementGroup,
+    PlacementGroupConfiguration,
+    PlacementGroupProvisioningData,
+    PlacementStrategy,
+)
+
+CapacityAvailability = ResourceAdviceStatus.Availability
+CAPACITY_LEVELS = CapacityAvailability.AvailabilityLevel
+CAPACITY_DATA_STATES = CapacityAvailability.DataState
 
 
-def make_compute() -> NebiusCompute:
+def make_compute(resource_advice_cache: Optional[ComputeTTLCache] = None) -> NebiusCompute:
     return NebiusCompute(
         NebiusConfig(
             creds=NebiusServiceAccountCreds(
@@ -44,7 +62,8 @@ def make_compute() -> NebiusCompute:
                 public_key_id="public-key-id",
                 private_key_content="private-key",
             )
-        )
+        ),
+        resource_advice_cache=resource_advice_cache,
     )
 
 
@@ -71,10 +90,138 @@ def make_offer(
     )
 
 
+def make_capacity_status(
+    available: int = 0,
+    level: CapacityAvailability.AvailabilityLevel = CAPACITY_LEVELS.AVAILABILITY_LEVEL_LOW,
+    data_state: CapacityAvailability.DataState = CAPACITY_DATA_STATES.DATA_STATE_FRESH,
+) -> CapacityAvailability:
+    return CapacityAvailability(
+        available=available, availability_level=level, data_state=data_state
+    )
+
+
+def make_resource_advice(
+    on_demand: Optional[CapacityAvailability] = None,
+    preemptible: Optional[CapacityAvailability] = None,
+    fabric: str = "fabric-2",
+    region: str = "eu-north1",
+    platform: str = "gpu-h100-sxm",
+    gpu_count: int = 8,
+    reserved: Optional[CapacityAvailability] = None,
+) -> ResourceAdvice:
+    return ResourceAdvice(
+        spec=ResourceAdviceSpec(
+            region=region,
+            fabric=fabric,
+            compute_instance=ComputeInstanceDetails(
+                platform=platform,
+                preset=ComputeInstanceDetails.Preset(name=f"{gpu_count}gpu-128vcpu-1600gb"),
+            ),
+        ),
+        status=ResourceAdviceStatus(
+            on_demand=on_demand,
+            preemptible=preemptible,
+            reserved=reserved
+            if reserved is not None
+            else make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+        ),
+    )
+
+
+class TestOfferCache:
+    @pytest.mark.parametrize("identity", ["tenant_id", "service_account_id", "public_key_id"])
+    def test_shared_advice_cache_is_scoped_to_tenant_and_credentials(self, mocker, identity):
+        mocker.patch.object(NebiusCompute, "_sdk", Mock())
+        mocker.patch.object(NebiusCompute, "_tenant_id", "tenant-id")
+        list_advice = mocker.patch.object(
+            compute_module.resources,
+            "list_resource_advice",
+            return_value=[make_resource_advice(on_demand=make_capacity_status(1))],
+        )
+        cache = ComputeTTLCache(
+            cache=TTLCache(maxsize=10, ttl=compute_module.RESOURCE_ADVICE_CACHE_TTL)
+        )
+        first = make_compute(resource_advice_cache=cache)
+        second = make_compute(resource_advice_cache=cache)
+
+        advice = first._get_resource_advice()
+        assert second._get_resource_advice() is advice
+        list_advice.assert_called_once()
+
+        if identity == "tenant_id":
+            mocker.patch.object(second, "_tenant_id", "other-tenant-id")
+        else:
+            setattr(second.config.creds, identity, "other-id")
+        list_advice.return_value = []
+
+        assert second._get_resource_advice() == []
+        assert first._get_resource_advice() is advice
+        assert list_advice.call_count == 2
+
+    def test_reuses_tenant_and_capacity_across_offer_refreshes(self, mocker):
+        mocker.patch.object(NebiusCompute, "_sdk", Mock())
+        get_tenant_id = mocker.patch.object(
+            compute_module.resources, "get_tenant_id", return_value="tenant-id"
+        )
+        get_projects = mocker.patch.object(
+            compute_module.resources,
+            "get_region_to_project_id_map",
+            return_value={"eu-north1": "project-id"},
+        )
+        list_advice = mocker.patch.object(
+            compute_module.resources,
+            "list_resource_advice",
+            return_value=[make_resource_advice(on_demand=make_capacity_status(1))],
+        )
+        get_catalog_offers = mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False)],
+        )
+        compute = make_compute()
+        timer = Mock(return_value=0)
+        compute._offers_cache = TTLCache(maxsize=1, ttl=compute._offers_cache.ttl, timer=timer)
+        compute._resource_advice_cache.cache = TTLCache(
+            maxsize=1, ttl=compute._resource_advice_cache.cache.ttl, timer=timer
+        )
+
+        first = compute._get_all_offers_with_availability_cached(False)
+        assert first[0].availability == InstanceAvailability.AVAILABLE
+        list_advice.return_value = [make_resource_advice(on_demand=make_capacity_status(0))]
+
+        timer.return_value = 179
+        assert compute._get_all_offers_with_availability_cached(False) is first
+        get_catalog_offers.assert_called_once()
+
+        for now in (180, 360, 540):
+            timer.return_value = now
+            offers = compute._get_all_offers_with_availability_cached(False)
+            assert offers[0].availability == InstanceAvailability.AVAILABLE
+            list_advice.assert_called_once()
+        assert get_catalog_offers.call_count == 4
+
+        timer.return_value = 720
+        offers = compute._get_all_offers_with_availability_cached(False)
+        assert offers[0].availability == InstanceAvailability.NOT_AVAILABLE
+
+        get_tenant_id.assert_called_once()
+        assert get_projects.call_args.kwargs["tenant_id"] == "tenant-id"
+        assert list_advice.call_count == 2
+        assert all(call.args[1] == "tenant-id" for call in list_advice.call_args_list)
+
+
 class TestGetAllOffersWithAvailability:
     @pytest.fixture(autouse=True)
     def _mock_region_to_project_id(self, mocker):
         mocker.patch.object(NebiusCompute, "_region_to_project_id", {"eu-north1": "project-id"})
+        mocker.patch.object(NebiusCompute, "_tenant_id", "tenant-id")
+
+    @pytest.fixture(autouse=True)
+    def mock_capacity_advice(self, mocker):
+        mocker.patch.object(NebiusCompute, "_sdk", Mock())
+        return mocker.patch.object(
+            compute_module.resources, "list_resource_advice", return_value=[]
+        )
 
     @pytest.mark.parametrize(
         ("price", "gpu_count", "expected_price"),
@@ -129,6 +276,340 @@ class TestGetAllOffersWithAvailability:
         offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
 
         assert offers[0].price == 1.2341
+
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            (make_capacity_status(1), InstanceAvailability.AVAILABLE),
+            (
+                make_capacity_status(4, level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_HIGH),
+                InstanceAvailability.AVAILABLE,
+            ),
+            (
+                make_capacity_status(2, level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_MEDIUM),
+                InstanceAvailability.AVAILABLE,
+            ),
+            (make_capacity_status(0), InstanceAvailability.NOT_AVAILABLE),
+            (
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+                InstanceAvailability.NO_QUOTA,
+            ),
+            (CapacityAvailability(), InstanceAvailability.UNKNOWN),
+            (
+                make_capacity_status(1, level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_UNKNOWN),
+                InstanceAvailability.UNKNOWN,
+            ),
+            (
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_UNSPECIFIED),
+                InstanceAvailability.UNKNOWN,
+            ),
+            (
+                make_capacity_status(1, data_state=CAPACITY_DATA_STATES.DATA_STATE_STALE),
+                InstanceAvailability.UNKNOWN,
+            ),
+            (
+                make_capacity_status(
+                    level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED,
+                    data_state=CAPACITY_DATA_STATES.DATA_STATE_UNKNOWN,
+                ),
+                InstanceAvailability.UNKNOWN,
+            ),
+        ],
+    )
+    def test_capacity_status(self, mocker, mock_capacity_advice, status, expected):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False)],
+        )
+        mock_capacity_advice.return_value = [make_resource_advice(on_demand=status)]
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == expected
+        assert offers[0].backend_data["fabrics"] == ["fabric-2"]
+
+    def test_distinguishes_on_demand_and_preemptible(self, mocker, mock_capacity_advice):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[
+                make_offer(1, spot=False, is_preemptible_flat_rate=False),
+                make_offer(0.5, spot=True, is_preemptible_flat_rate=False),
+            ],
+        )
+        mock_capacity_advice.return_value = [
+            make_resource_advice(
+                on_demand=make_capacity_status(
+                    level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED
+                ),
+                preemptible=make_capacity_status(1),
+            )
+        ]
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert [o.availability for o in offers] == [
+            InstanceAvailability.NO_QUOTA,
+            InstanceAvailability.AVAILABLE,
+        ]
+        mock_capacity_advice.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("shared", "reserved", "expected"),
+        [
+            (
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+                make_capacity_status(1),
+                InstanceAvailability.UNKNOWN,
+            ),
+            (make_capacity_status(0), make_capacity_status(1), InstanceAvailability.UNKNOWN),
+            (make_capacity_status(1), make_capacity_status(1), InstanceAvailability.AVAILABLE),
+            (make_capacity_status(0), CapacityAvailability(), InstanceAvailability.UNKNOWN),
+            (
+                make_capacity_status(0),
+                make_capacity_status(1, data_state=CAPACITY_DATA_STATES.DATA_STATE_STALE),
+                InstanceAvailability.UNKNOWN,
+            ),
+        ],
+    )
+    def test_reservations_keep_only_on_demand_eligible(
+        self, mocker, mock_capacity_advice, shared, reserved, expected
+    ):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[
+                make_offer(1, spot=False, is_preemptible_flat_rate=False),
+                make_offer(0.5, spot=True, is_preemptible_flat_rate=False),
+            ],
+        )
+        mock_capacity_advice.return_value = [
+            make_resource_advice(
+                on_demand=shared, preemptible=make_capacity_status(0), reserved=reserved
+            )
+        ]
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert [offer.availability for offer in offers] == [
+            expected,
+            InstanceAvailability.NOT_AVAILABLE,
+        ]
+        assert offers[0].backend_data["fabric_availability"] == {"fabric-2": expected.value}
+        assert offers[1].backend_data["fabric_availability"] == {"fabric-2": "not_available"}
+        mock_capacity_advice.assert_called_once()
+
+    def test_matches_exact_region_platform_and_preset(self, mocker, mock_capacity_advice):
+        one_gpu = make_offer(1, spot=False, is_preemptible_flat_rate=False, gpu_count=1)
+        one_gpu.instance.name = "gpu-h200-sxm 1gpu-128vcpu-1600gb"
+        one_gpu.backend_data["fabrics"] = []
+        eight_gpus = make_offer(8, spot=False, is_preemptible_flat_rate=False)
+        eight_gpus.instance.name = "gpu-h200-sxm 8gpu-128vcpu-1600gb"
+        mocker.patch.object(
+            compute_module, "get_catalog_offers", return_value=[one_gpu, eight_gpus]
+        )
+        mock_capacity_advice.return_value = [
+            ResourceAdvice(),
+            make_resource_advice(
+                on_demand=make_capacity_status(13), platform="gpu-h200-sxm", gpu_count=1
+            ),
+            make_resource_advice(on_demand=make_capacity_status(0), platform="gpu-h200-sxm"),
+            # Available H100s or H200s in another region do not make H200:8 available here.
+            make_resource_advice(on_demand=make_capacity_status(4)),
+            make_resource_advice(
+                on_demand=make_capacity_status(2), platform="gpu-h200-sxm", region="eu-west1"
+            ),
+        ]
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert [o.availability for o in offers] == [
+            InstanceAvailability.AVAILABLE,
+            InstanceAvailability.NOT_AVAILABLE,
+        ]
+
+    @pytest.mark.parametrize(
+        ("fabrics", "expected"),
+        [
+            (["fabric-2"], InstanceAvailability.NOT_AVAILABLE),
+            (["fabric-2", "fabric-3"], InstanceAvailability.AVAILABLE),
+        ],
+    )
+    def test_matches_compatible_fabrics(self, mocker, mock_capacity_advice, fabrics, expected):
+        original = make_offer(1, spot=False, is_preemptible_flat_rate=False)
+        original.backend_data["fabrics"] = fabrics
+        mocker.patch.object(compute_module, "get_catalog_offers", return_value=[original])
+        mock_capacity_advice.return_value = [
+            make_resource_advice(on_demand=make_capacity_status(0), fabric="fabric-2"),
+            make_resource_advice(on_demand=make_capacity_status(4), fabric="fabric-3"),
+        ]
+        compute = make_compute()
+        compute.config.fabrics = ["fabric-2"]
+
+        offers = compute.get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == expected
+        assert offers[0].backend_data["fabrics"] == original.backend_data["fabrics"]
+        assert original.backend_data["fabrics"] == fabrics
+        assert "fabric_availability" not in original.backend_data
+
+    @pytest.mark.parametrize(
+        ("allowed_fabrics", "status", "reserved", "expected_fabric", "existing_suitable"),
+        [
+            (None, make_capacity_status(0), None, "fabric-3", False),
+            (["fabric-2"], make_capacity_status(0), None, None, False),
+            (
+                ["fabric-2"],
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+                None,
+                None,
+                False,
+            ),
+            (["fabric-2"], None, None, "fabric-2", True),
+            (["fabric-3"], make_capacity_status(1), None, "fabric-3", False),
+            (["fabric-2"], make_capacity_status(0), make_capacity_status(1), "fabric-2", True),
+            (["fabric-3"], make_capacity_status(0), make_capacity_status(1), "fabric-3", False),
+        ],
+    )
+    def test_capacity_advice_respects_cluster_fabric(
+        self,
+        mocker,
+        mock_capacity_advice,
+        allowed_fabrics,
+        status,
+        reserved,
+        expected_fabric,
+        existing_suitable,
+    ):
+        original = make_offer(1, spot=False, is_preemptible_flat_rate=False)
+        original.backend_data["fabrics"] = ["fabric-2", "fabric-3"]
+        mocker.patch.object(compute_module, "get_catalog_offers", return_value=[original])
+        mock_capacity_advice.return_value = [
+            make_resource_advice(on_demand=make_capacity_status(4), fabric="fabric-3"),
+        ]
+        if status is not None:
+            mock_capacity_advice.return_value.append(
+                make_resource_advice(on_demand=status, reserved=reserved, fabric="fabric-2")
+            )
+        create_cluster = mocker.patch.object(
+            compute_module.resources,
+            "create_cluster",
+            return_value=SimpleNamespace(resource_id="cluster-id"),
+        )
+        compute = make_compute()
+        compute.config.fabrics = allowed_fabrics
+        offer = compute.get_all_offers_with_availability(unallocated_resources=False)[0]
+        group = PlacementGroup(
+            name="cluster",
+            project_name="main",
+            configuration=PlacementGroupConfiguration(
+                backend=BackendType.NEBIUS,
+                region="eu-north1",
+                placement_strategy=PlacementStrategy.CLUSTER,
+            ),
+            provisioning_data=PlacementGroupProvisioningData(
+                backend=BackendType.NEBIUS,
+                backend_data=json.dumps({"cluster": {"id": "cluster-id", "fabric": "fabric-2"}}),
+            ),
+        )
+
+        assert offer.backend_data["fabrics"] == ["fabric-2", "fabric-3"]
+        assert "fabric_availability" not in original.backend_data
+        assert compute.is_suitable_placement_group(group, offer) is existing_suitable
+        if expected_fabric is None:
+            with pytest.raises(NoCapacityError):
+                compute.create_placement_group(group, offer)
+            create_cluster.assert_not_called()
+        else:
+            group.provisioning_data = compute.create_placement_group(group, offer)
+            assert create_cluster.call_args.kwargs["fabric"] == expected_fabric
+            assert compute.is_suitable_placement_group(group, offer)
+
+    @pytest.mark.parametrize(
+        ("second_status", "expected"),
+        [
+            (None, InstanceAvailability.UNKNOWN),
+            (
+                make_capacity_status(0),
+                InstanceAvailability.NOT_AVAILABLE,
+            ),
+            (
+                make_capacity_status(level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED),
+                InstanceAvailability.NO_QUOTA,
+            ),
+        ],
+    )
+    def test_aggregates_fabric_statuses(
+        self, mocker, mock_capacity_advice, second_status, expected
+    ):
+        original = make_offer(1, spot=False, is_preemptible_flat_rate=False)
+        original.backend_data["fabrics"] = ["fabric-2", "fabric-3"]
+        mocker.patch.object(compute_module, "get_catalog_offers", return_value=[original])
+        mock_capacity_advice.return_value = [
+            make_resource_advice(
+                on_demand=make_capacity_status(
+                    level=CAPACITY_LEVELS.AVAILABILITY_LEVEL_LIMIT_REACHED
+                ),
+                fabric="fabric-2",
+            )
+        ]
+        if second_status is not None:
+            mock_capacity_advice.return_value.append(
+                make_resource_advice(on_demand=second_status, fabric="fabric-3")
+            )
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == expected
+        assert offers[0].backend_data["fabrics"] == original.backend_data["fabrics"]
+        assert "fabric_availability" not in original.backend_data
+
+    def test_preserves_offers_when_advice_fails(self, mocker, mock_capacity_advice):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False)],
+        )
+        mock_capacity_advice.side_effect = make_request_error(StatusCode.PERMISSION_DENIED)
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert len(offers) == 1
+        assert offers[0].availability == InstanceAvailability.UNKNOWN
+
+    def test_skips_advice_for_cpu_offers(self, mocker, mock_capacity_advice):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False, gpu_count=0)],
+        )
+
+        offers = make_compute().get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == InstanceAvailability.UNKNOWN
+        mock_capacity_advice.assert_not_called()
+
+    def test_nonclustered_preset_can_use_any_fabric(self, mocker, mock_capacity_advice):
+        original = make_offer(1, spot=False, is_preemptible_flat_rate=False, gpu_count=1)
+        original.backend_data["fabrics"] = []
+        mocker.patch.object(compute_module, "get_catalog_offers", return_value=[original])
+        mock_capacity_advice.return_value = [
+            make_resource_advice(
+                on_demand=make_capacity_status(0), fabric="fabric-2", gpu_count=1
+            ),
+            make_resource_advice(
+                on_demand=make_capacity_status(1), fabric="fabric-3", gpu_count=1
+            ),
+        ]
+        compute = make_compute()
+        # The fabric setting restricts InfiniBand clusters, not nonclustered VMs.
+        compute.config.fabrics = ["fabric-2"]
+
+        offers = compute.get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == InstanceAvailability.AVAILABLE
+        assert offers[0].backend_data["fabrics"] == []
 
 
 PROVIDER_REF = "abcdef123456"

@@ -25,6 +25,11 @@ from nebius.api.nebius.billing.v1 import (
     PricingPolicyServiceClient,
     PricingPolicySpec,
 )
+from nebius.api.nebius.capacity.v1 import (
+    ListResourceAdviceRequest,
+    ResourceAdvice,
+    ResourceAdviceServiceClient,
+)
 from nebius.api.nebius.common.v1 import Operation, ResourceMetadata
 from nebius.api.nebius.compute.v1 import (
     AttachedDiskSpec,
@@ -158,11 +163,17 @@ def get_operation_error(op: NebiusOperation) -> str:
 
 
 def get_region_to_project_id_map(
-    sdk: SDK, configured_regions: Optional[list[str]], configured_project_ids: Optional[list[str]]
+    sdk: SDK,
+    configured_regions: Optional[list[str]],
+    configured_project_ids: Optional[list[str]],
+    tenant_id: Optional[str] = None,
 ) -> dict[str, str]:
-    """Validate backend settings and build region->project_id map"""
+    """Select one project per region for NebiusConfigurator and NebiusCompute.
 
-    projects = list_tenant_projects(sdk)
+    Use configured projects when supplied, otherwise per-region defaults.
+    """
+
+    projects = list_tenant_projects(sdk, tenant_id=tenant_id)
     if configured_regions:
         validate_regions(
             configured=set(configured_regions), available={p.status.region for p in projects}
@@ -187,7 +198,8 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
         )
 
 
-def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
+def get_tenant_id(sdk: SDK) -> str:
+    """Require one visible tenant; used by project selection and Capacity Advisor."""
     tenants = LOOP.await_(
         TenantServiceClient(sdk).list(
             ListTenantsRequest(),
@@ -197,7 +209,16 @@ def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
     )
     if len(tenants.items) != 1:
         raise ValueError(f"Expected to find 1 tenant, found {(len(tenants.items))}")
-    tenant_id = tenants.items[0].metadata.id
+    return tenants.items[0].metadata.id
+
+
+def list_tenant_projects(sdk: SDK, tenant_id: Optional[str] = None) -> Sequence[Container]:
+    """Return projects for get_region_to_project_id_map() to validate and select.
+
+    Without tenant_id, require exactly one visible tenant.
+    """
+    if tenant_id is None:
+        tenant_id = get_tenant_id(sdk)
     projects = LOOP.await_(
         ProjectServiceClient(sdk).list(
             ListProjectsRequest(parent_id=tenant_id, page_size=999),
@@ -206,6 +227,20 @@ def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
         )
     )
     return projects.items
+
+
+def list_resource_advice(sdk: SDK, tenant_id: str) -> list[ResourceAdvice]:
+    """Fetch every advice page for NebiusCompute's cache; raise if any page fails."""
+    client = ResourceAdviceServiceClient(sdk)
+    return _list_all_pages(
+        lambda page_token: client.list(
+            ListResourceAdviceRequest(
+                parent_id=tenant_id, page_size=LIST_PAGE_SIZE, page_token=page_token
+            ),
+            timeout=REQUEST_TIMEOUT,
+            auth_options=REQUEST_AUTH_OPTIONS,
+        )
+    )
 
 
 def _get_region_to_default_project_id_map(

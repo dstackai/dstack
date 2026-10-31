@@ -2,14 +2,19 @@ import json
 import random
 import shlex
 import time
+from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import ROUND_CEILING, Decimal
 from functools import cached_property
 from typing import List, Optional
 
+from cachetools import TTLCache, cachedmethod
+from cachetools.keys import hashkey
 from grpc import StatusCode
 from nebius.aio.service_error import RequestError
 from nebius.api.nebius.billing.v1 import PricingPolicy, PricingPolicyStatus
+from nebius.api.nebius.capacity.v1 import ResourceAdvice, ResourceAdviceStatus
 from nebius.api.nebius.common.v1 import ResourceMetadata
 from nebius.api.nebius.compute.v1 import Disk, DiskStatus, Instance, InstanceStatus
 from nebius.sdk import SDK
@@ -17,6 +22,7 @@ from nebius.sdk import SDK
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     PROVIDER_REF_TAG_KEY,
+    ComputeTTLCache,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithInstanceVolumesSupport,
@@ -40,6 +46,7 @@ from dstack._internal.core.backends.nebius.models import (
 from dstack._internal.core.errors import (
     BackendError,
     ComputeError,
+    NoCapacityError,
     NotYetTerminated,
     ProvisioningError,
 )
@@ -76,6 +83,8 @@ CONFIGURABLE_DISK_SIZE = Range[Memory](
     min=Memory.parse("40GB"),  # min for the ubuntu24.04-cuda13.0 image
     max=Memory.parse("8192GB"),  # max for the NETWORK_SSD disk type
 )
+RESOURCE_ADVICE_CACHE_TTL = 600
+"""Seconds to cache tenant advice across offer refreshes; matches AWS's quota cache."""
 WAIT_FOR_DISK_TIMEOUT = 20
 WAIT_FOR_PRICING_POLICY_TIMEOUT = 10
 WAIT_FOR_INSTANCE_TIMEOUT = 30
@@ -122,10 +131,17 @@ class NebiusCompute(
     ComputeWithResourceListingSupport,
     Compute,
 ):
-    def __init__(self, config: NebiusConfig):
+    def __init__(
+        self, config: NebiusConfig, resource_advice_cache: Optional[ComputeTTLCache] = None
+    ):
         super().__init__()
         self.config = config
         self._subnet_id_cache: dict[str, str] = {}
+        if resource_advice_cache is None:
+            resource_advice_cache = ComputeTTLCache(
+                cache=TTLCache(maxsize=1, ttl=RESOURCE_ADVICE_CACHE_TTL)
+            )
+        self._resource_advice_cache = resource_advice_cache
 
     @cached_property
     def _sdk(self) -> SDK:
@@ -133,11 +149,16 @@ class NebiusCompute(
         return resources.make_sdk(self.config.creds)
 
     @cached_property
+    def _tenant_id(self) -> str:
+        return resources.get_tenant_id(self._sdk)
+
+    @cached_property
     def _region_to_project_id(self) -> dict[str, str]:
         return resources.get_region_to_project_id_map(
             self._sdk,
             configured_regions=self.config.regions,
             configured_project_ids=self.config.projects,
+            tenant_id=self._tenant_id,
         )
 
     def _get_subnet_id(self, region: str) -> str:
@@ -155,13 +176,62 @@ class NebiusCompute(
             locations=list(self._region_to_project_id),
             extra_filter=_supported_instances,
         )
+        # Capacity Advisor batches GPU advice; prices stay in the offline catalog.
+        advice_by_offer: dict[tuple[str, str, bool], dict[str, InstanceAvailability]] = (
+            defaultdict(dict)
+        )
+        if any(offer.instance.resources.gpus for offer in offers):
+            try:
+                advice = self._get_resource_advice()
+            except Exception:
+                # Missing permissions or a Capacity Advisor outage must not hide catalog offers.
+                logger.warning("Failed to get Nebius capacity advice", exc_info=True)
+            else:
+                for item in advice:
+                    instance = item.spec.compute_instance
+                    if instance is None:
+                        continue
+                    name = f"{instance.platform} {instance.preset.name}"
+                    # AUTO reservation policy can use reserved capacity before the shared pool.
+                    # Advice is tenant-wide; project reservation limits remain unchecked, so
+                    # reserved capacity keeps offers eligible as UNKNOWN, not AVAILABLE.
+                    reserved = _get_capacity_availability(item.status.reserved)
+                    if reserved == InstanceAvailability.AVAILABLE:
+                        reserved = InstanceAvailability.UNKNOWN
+                    on_demand = _get_best_availability(
+                        (_get_capacity_availability(item.status.on_demand), reserved)
+                    )
+                    for spot, availability in (
+                        (False, on_demand),
+                        (True, _get_capacity_availability(item.status.preemptible)),
+                    ):
+                        key = (item.spec.region, name, spot)
+                        advice_by_offer[key][item.spec.fabric] = availability
         return [
-            offer.with_availability(
-                availability=InstanceAvailability.UNKNOWN,
-                price=_get_price_adjusted_for_pricing_policy(offer),
+            _apply_resource_advice(
+                offer,
+                advice_by_offer.get(
+                    (offer.region, offer.instance.name, offer.instance.resources.spot), {}
+                ),
             )
             for offer in offers
         ]
+
+    def _get_resource_advice_key(self) -> tuple:
+        return hashkey(
+            self._tenant_id,
+            self.config.creds.service_account_id,
+            self.config.creds.public_key_id,
+        )
+
+    @cachedmethod(
+        cache=lambda self: self._resource_advice_cache.cache,
+        key=_get_resource_advice_key,
+        lock=lambda self: self._resource_advice_cache.lock,
+    )
+    def _get_resource_advice(self) -> list[ResourceAdvice]:
+        """Return advice for offer collection; fetch on cache miss and propagate API errors."""
+        return resources.list_resource_advice(self._sdk, self._tenant_id)
 
     def get_offer_disk_size_range(
         self, offer: InstanceOfferWithAvailability
@@ -387,14 +457,14 @@ class NebiusCompute(
         master_instance_offer_backend_data = validate_extra_ignore(
             NebiusOfferBackendData, master_instance_offer.backend_data
         )
-        fabrics = list(master_instance_offer_backend_data.fabrics)
-        if self.config.fabrics is not None:
-            fabrics = [f for f in fabrics if f in self.config.fabrics]
+        fabrics = self._get_eligible_fabrics(master_instance_offer_backend_data)
+        if master_instance_offer_backend_data.fabrics and not fabrics:
+            raise NoCapacityError("No eligible InfiniBand fabrics for the instance offer")
         placement_group_backend_data = NebiusPlacementGroupBackendData(cluster=None)
         # Only create a Nebius cluster if the instance supports it.
         # For other instances, return dummy PlacementGroupProvisioningData.
         if fabrics:
-            fabric = random.choice(fabrics)
+            fabric = random.choice(list(fabrics))
             op = resources.create_cluster(
                 self._sdk,
                 name=placement_group.name,
@@ -435,8 +505,18 @@ class NebiusCompute(
         )
         return (
             placement_group_backend_data.cluster is None
-            or placement_group_backend_data.cluster.fabric in instance_offer_backend_data.fabrics
+            or placement_group_backend_data.cluster.fabric
+            in self._get_eligible_fabrics(instance_offer_backend_data)
         )
+
+    def _get_eligible_fabrics(self, data: NebiusOfferBackendData) -> set[str]:
+        """Cluster fabrics that are compatible, allowed, and AVAILABLE or UNKNOWN."""
+        return {
+            fabric
+            for fabric in data.fabrics
+            if (self.config.fabrics is None or fabric in self.config.fabrics)
+            and data.fabric_availability.get(fabric, InstanceAvailability.UNKNOWN).is_available()
+        }
 
 
 class NebiusInstanceBackendData(CoreModel):
@@ -469,6 +549,76 @@ class NebiusPlacementGroupBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "NebiusPlacementGroupBackendData":
         assert raw is not None
         return validate_json_extra_ignore(cls, raw)
+
+
+def _get_capacity_availability(
+    status: ResourceAdviceStatus.Availability,
+) -> InstanceAvailability:
+    """Convert fresh Nebius advice to offer status; stale or unknown data returns UNKNOWN."""
+    if status.data_state != ResourceAdviceStatus.Availability.DataState.DATA_STATE_FRESH:
+        return InstanceAvailability.UNKNOWN
+    level = status.availability_level
+    levels = ResourceAdviceStatus.Availability.AvailabilityLevel
+    # Nebius defines LIMIT_REACHED as a customer quota or capacity-block limit.
+    # `limit` is the maximum quota, not the remaining quota; zero `available` alone
+    # does not mean quota exhaustion.
+    if level == levels.AVAILABILITY_LEVEL_LIMIT_REACHED:
+        return InstanceAvailability.NO_QUOTA
+    if level not in (
+        levels.AVAILABILITY_LEVEL_HIGH,
+        levels.AVAILABILITY_LEVEL_MEDIUM,
+        levels.AVAILABILITY_LEVEL_LOW,
+    ):
+        return InstanceAvailability.UNKNOWN
+    if status.available > 0:
+        return InstanceAvailability.AVAILABLE
+    return InstanceAvailability.NOT_AVAILABLE
+
+
+def _apply_resource_advice(
+    offer: InstanceOffer,
+    advice_by_fabric: dict[str, InstanceAvailability],
+) -> InstanceOfferWithAvailability:
+    """Set offer status across compatible fabrics; keep per-fabric advice for cluster placement."""
+    availability = InstanceAvailability.UNKNOWN
+    backend_data = offer.backend_data
+    if offer.instance.resources.gpus:
+        data = validate_extra_ignore(NebiusOfferBackendData, offer.backend_data)
+        if data.fabrics:
+            fabrics = data.fabrics
+            fabric_availability = {
+                f: advice_by_fabric.get(f, InstanceAvailability.UNKNOWN) for f in fabrics
+            }
+            availability = _get_best_availability(fabric_availability.values())
+            backend_data = {
+                **offer.backend_data,
+                "fabric_availability": {
+                    fabric: status.value for fabric, status in fabric_availability.items()
+                },
+            }
+        else:
+            # Presets without GPU clustering can use any fabric in the region.
+            availability = _get_best_availability(advice_by_fabric.values())
+    return offer.with_availability(
+        availability=availability,
+        price=_get_price_adjusted_for_pricing_policy(offer),
+        backend_data=backend_data,
+    )
+
+
+def _get_best_availability(availabilities: Iterable[InstanceAvailability]) -> InstanceAvailability:
+    """Prefer AVAILABLE, UNKNOWN, NOT_AVAILABLE, then NO_QUOTA; no advice means UNKNOWN."""
+    statuses = set(availabilities)
+    # Report NO_QUOTA only when every allocation option explicitly reports a limit.
+    for availability in (
+        InstanceAvailability.AVAILABLE,
+        InstanceAvailability.UNKNOWN,
+        InstanceAvailability.NOT_AVAILABLE,
+        InstanceAvailability.NO_QUOTA,
+    ):
+        if availability in statuses:
+            return availability
+    return InstanceAvailability.UNKNOWN
 
 
 def _wait_for_instance(sdk: SDK, op: resources.NebiusOperation) -> None:

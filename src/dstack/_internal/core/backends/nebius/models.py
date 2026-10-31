@@ -7,6 +7,7 @@ from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.instances import InstanceAvailability
 
 DEFAULT_PROJECT_NAME_PREFIX = "default"
 
@@ -182,6 +183,8 @@ class NebiusConfig(NebiusStoredConfig):
 
 class NebiusOfferBackendData(CoreModel):
     fabrics: set[str] = set()
+    fabric_availability: dict[str, InstanceAvailability] = {}
+    """Per-fabric offer status for cluster placement; missing entries mean UNKNOWN."""
     is_preemptible_flat_rate: bool = False
     """
     True if the price of this spot instance does not change and pricing policies are not supported.
