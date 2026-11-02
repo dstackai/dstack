@@ -97,7 +97,7 @@ We then asked the agent to make PD work and use it on every trial. At 48 agents 
 2. At 128 agents, the agent started from SemiAnalysis's published layout with the engine count doubled to fill 64 GPUs. Splitting the DEP16 decode engines into DEP8 cut the decode step from 35.7 to 24.5 ms and raised throughput 32%, to 8,599 tok/s at 2,035 ms.
 3. At 192 agents, giving decode more KV memory reached 10,808 tok/s, 1.8x aggregated's throughput per chip, but p50 TTFT rose to 3,170 ms, more than 10x aggregated's and over the 3 s budget.
 
-At 128 agents, the PD configuration matches SemiAnalysis's [InferenceX run](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37506762704/job/112417831364) on GB200 NVL72 per chip, which served GLM-5.2: 134.4 against 136.4 output tok/s, at a similar 2.07 against 2.27 requests in flight per chip.
+At 128 agents, the PD configuration matches SemiAnalysis's [InferenceX run](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37506762704/job/112417831364) on GB200 NVL72 per chip: 134.4 against 136.4 output tok/s, at a similar 2.07 against 2.27 requests in flight per chip. Their run served GLM-5.2, which has the same architecture as GLM-5.3.
 
 ### More agents
 
@@ -126,7 +126,7 @@ Almost all of the gain came from layout decisions: whether to disaggregate, how 
 1. Replayed, accelerated traffic. The pauses are capped at 5 s and the prompt text is generated, so production traffic will differ in cache reuse, timing and concurrency. For production, give presets your own traffic as the workload.
 2. Not a controlled comparison with providers. Their figures come from OpenRouter's measurements of different traffic, and we serve the NVFP4 checkpoint while Baseten's fast endpoints serve FP8. The cost comparison is make or buy: it sets the cost of self-hosting against the price of buying the same tokens, not against what providers pay to serve them. It assumes the fleet runs this load continuously at $4.00 per chip-hour, SemiAnalysis's published retail price for GB200 NVL72.
 3. Layout first. The agent spent its sessions on layout rather than engine settings, source patches or kernels, so more gains are likely.
-4. The comparison with SemiAnalysis is approximate. Their run served GLM-5.2, the SGLang builds differ, we used 64 chips against their 32, and our benchmark window was 929 s against their 3,625 s, so we compare only throughput per chip.
+4. The comparison with SemiAnalysis is approximate. Their run served the GLM-5.2 NVFP4 checkpoint, which has the same architecture but a different quantization recipe. The SGLang builds also differ, we used 64 chips against their 32, and our benchmark window was 929 s against their 3,625 s, so we compare only throughput per chip.
 
 ## Deploy
 
