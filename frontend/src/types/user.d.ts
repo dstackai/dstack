@@ -42,7 +42,6 @@ declare interface IUserAuthData extends Pick<IUserWithCreds['creds'], 'token'> {
 
 declare interface IUserBillingInfo {
     balance: number;
-    is_payment_method_attached: boolean;
     default_payment_amount: number;
     billing_history: IPayment[];
 }

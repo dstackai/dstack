@@ -40,10 +40,10 @@ export const LoginByGithubCallback: React.FC = () => {
                     }
                     githubCallback({ code, state })
                         .unwrap()
-                        .then(async ({ creds: { token } }) => {
+                        .then(async ({ username, creds: { token } }) => {
                             dispatch(setAuthData({ token }));
                             if (product.hasPresets) {
-                                const result = await getProjects({}).unwrap();
+                                const result = await getProjects({ username, limit: 1 }).unwrap();
                                 if (result.data.length === 0) {
                                     navigate(ROUTES.PROJECT.ADD);
                                     return;
