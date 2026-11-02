@@ -207,7 +207,7 @@ def call_api_method(
     If you don't expect any error status code, just call the method directly.
 
     Args:
-        method: the `CoreV1Api` bound method.
+        method: the Kubernetes API bound method, e.g., of `CoreV1Api`.
         expected: Expected error statuses, e.g., 404.
         args: positional arguments of the method.
         kwargs: keyword arguments of the method.
