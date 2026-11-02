@@ -1249,7 +1249,7 @@ def _get_run_cost(run: Run) -> float:
     # FIXME: The cost is summed only over the loaded job submissions, so it is
     # underestimated when `job_submissions_limit` drops older submissions,
     # e.g. in the UI run list for runs with retries or redeployments.
-    # Calculate run costs efficiently using metering tables instead.
+    # Once metering tables are introduced, calculate run costs efficiently from them.
     run_cost = math.fsum(
         _get_job_submission_cost(submission)
         for job in run.jobs
