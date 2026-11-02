@@ -6,7 +6,7 @@ import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } f
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
-import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { useNewestProjectWithoutFleets } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { ROUTES } from 'routes';
 import { useGetRunsQuery, useLazyGetRunsQuery } from 'services/run';
 
@@ -50,7 +50,7 @@ export const RunList: React.FC = () => {
         filteringStatusType,
         handleLoadItems,
     } = useFilters();
-    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
+    const projectDontHasFleet = useNewestProjectWithoutFleets();
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
@@ -130,8 +130,6 @@ export const RunList: React.FC = () => {
                 : ROUTES.RUNS.LAUNCH,
         );
     };
-
-    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
     return (
         <Table
