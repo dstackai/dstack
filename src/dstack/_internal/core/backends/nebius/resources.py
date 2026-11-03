@@ -2,7 +2,7 @@ import logging
 import re
 import time
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from collections.abc import Container as ContainerT
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile
@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 from grpc import StatusCode
 from nebius.aio.operation import Operation as SDKOperation
+from nebius.aio.request import Request
 from nebius.aio.service_error import RequestError
 from nebius.aio.token.options import OPTION_RENEW_REQUEST_TIMEOUT, OPTION_RENEW_SYNCHRONOUS
 from nebius.api.nebius.billing.v1 import (
@@ -78,16 +79,15 @@ from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import validate_extra_ignore
 from dstack._internal.utils.common import get_or_error
-from dstack._internal.utils.event_loop import DaemonEventLoop
 from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__
 
 #
 # Guidelines on using the Nebius SDK:
 #
-# Do not use Request.wait() or other sync SDK methods, they suffer from deadlocks.
-# Instead, use async methods and await them with LOOP.await_()
-LOOP = DaemonEventLoop()
+# Use sync methods such as Request.wait() and Operation.sync_update(). The SDK runs requests
+# on its own event loop thread, and its sync methods raise LoopError if called from a thread
+# with a running event loop, so call them only from sync code, e.g. via run_async().
 # Pass a timeout to all methods to avoid infinite waiting
 REQUEST_TIMEOUT = 10
 # Pass REQUEST_AUTH_OPTIONS to all methods to avoid infinite retries in case of invalid credentials
@@ -147,9 +147,7 @@ def wait_for_operation(
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")
         time.sleep(interval)
-        LOOP.await_(
-            op.update(per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS)
-        )
+        op.sync_update(per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS)
 
 
 def get_operation_error(op: NebiusOperation) -> str:
@@ -188,22 +186,26 @@ def validate_regions(configured: set[str], available: set[str]) -> None:
 
 
 def list_tenant_projects(sdk: SDK) -> Sequence[Container]:
-    tenants = LOOP.await_(
-        TenantServiceClient(sdk).list(
+    tenants = (
+        TenantServiceClient(sdk)
+        .list(
             ListTenantsRequest(),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
     if len(tenants.items) != 1:
         raise ValueError(f"Expected to find 1 tenant, found {(len(tenants.items))}")
     tenant_id = tenants.items[0].metadata.id
-    projects = LOOP.await_(
-        ProjectServiceClient(sdk).list(
+    projects = (
+        ProjectServiceClient(sdk)
+        .list(
             ListProjectsRequest(parent_id=tenant_id, page_size=999),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
     return projects.items
 
@@ -272,12 +274,14 @@ def _get_region_to_configured_project_id_map(
 
 
 def get_default_subnet(sdk: SDK, project_id: str) -> Subnet:
-    subnets = LOOP.await_(
-        SubnetServiceClient(sdk).list(
+    subnets = (
+        SubnetServiceClient(sdk)
+        .list(
             ListSubnetsRequest(parent_id=project_id, page_size=999),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
     for subnet in subnets.items:
         if subnet.metadata.name.startswith("default-subnet"):
@@ -311,21 +315,17 @@ def create_disk(
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(
-            client.create(
-                request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
-            )
-        )
+        return client.create(
+            request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+        ).wait()
 
 
 def delete_disk(sdk: SDK, disk_id: str) -> None:
-    LOOP.await_(
-        DiskServiceClient(sdk).delete(
-            DeleteDiskRequest(id=disk_id),
-            per_retry_timeout=REQUEST_TIMEOUT,
-            auth_options=REQUEST_AUTH_OPTIONS,
-        )
-    )
+    DiskServiceClient(sdk).delete(
+        DeleteDiskRequest(id=disk_id),
+        per_retry_timeout=REQUEST_TIMEOUT,
+        auth_options=REQUEST_AUTH_OPTIONS,
+    ).wait()
 
 
 def list_disks(sdk: SDK, project_id: str) -> list[Disk]:
@@ -352,31 +352,29 @@ def create_pricing_policy(
             pricing=PricingMethod(max_price_v1=MaxPriceV1(max_price=max_price)),
         ),
     )
-    return LOOP.await_(
-        client.create(
-            request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
-        )
-    )
+    return client.create(
+        request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+    ).wait()
 
 
 def get_pricing_policy(sdk: SDK, pricing_policy_id: str) -> PricingPolicy:
-    return LOOP.await_(
-        PricingPolicyServiceClient(sdk).get(
+    return (
+        PricingPolicyServiceClient(sdk)
+        .get(
             GetPricingPolicyRequest(id=pricing_policy_id),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
 
 
 def delete_pricing_policy(sdk: SDK, pricing_policy_id: str) -> None:
-    LOOP.await_(
-        PricingPolicyServiceClient(sdk).delete(
-            DeletePricingPolicyRequest(id=pricing_policy_id),
-            per_retry_timeout=REQUEST_TIMEOUT,
-            auth_options=REQUEST_AUTH_OPTIONS,
-        )
-    )
+    PricingPolicyServiceClient(sdk).delete(
+        DeletePricingPolicyRequest(id=pricing_policy_id),
+        per_retry_timeout=REQUEST_TIMEOUT,
+        auth_options=REQUEST_AUTH_OPTIONS,
+    ).wait()
 
 
 def list_pricing_policies(sdk: SDK, project_id: str) -> list[PricingPolicy]:
@@ -446,30 +444,32 @@ def create_instance(
         ),
     )
     with wrap_capacity_errors():
-        return LOOP.await_(
-            client.create(
-                request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
-            )
-        )
+        return client.create(
+            request, per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS
+        ).wait()
 
 
 def get_instance(sdk: SDK, instance_id: str) -> Instance:
-    return LOOP.await_(
-        InstanceServiceClient(sdk).get(
+    return (
+        InstanceServiceClient(sdk)
+        .get(
             GetInstanceRequest(id=instance_id),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
 
 
 def delete_instance(sdk: SDK, instance_id: str) -> NebiusOperation:
-    return LOOP.await_(
-        InstanceServiceClient(sdk).delete(
+    return (
+        InstanceServiceClient(sdk)
+        .delete(
             DeleteInstanceRequest(id=instance_id),
             per_retry_timeout=REQUEST_TIMEOUT,
             auth_options=REQUEST_AUTH_OPTIONS,
         )
+        .wait()
     )
 
 
@@ -488,8 +488,9 @@ def list_instances(sdk: SDK, project_id: str) -> list[Instance]:
 
 def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> NebiusOperation:
     with wrap_capacity_errors():
-        return LOOP.await_(
-            GpuClusterServiceClient(sdk).create(
+        return (
+            GpuClusterServiceClient(sdk)
+            .create(
                 CreateGpuClusterRequest(
                     metadata=ResourceMetadata(name=name, parent_id=project_id),
                     spec=GpuClusterSpec(infiniband_fabric=fabric),
@@ -497,17 +498,16 @@ def create_cluster(sdk: SDK, name: str, project_id: str, fabric: str) -> NebiusO
                 per_retry_timeout=REQUEST_TIMEOUT,
                 auth_options=REQUEST_AUTH_OPTIONS,
             )
+            .wait()
         )
 
 
 def delete_cluster(sdk: SDK, cluster_id: str) -> None:
-    LOOP.await_(
-        GpuClusterServiceClient(sdk).delete(
-            DeleteGpuClusterRequest(id=cluster_id),
-            per_retry_timeout=REQUEST_TIMEOUT,
-            auth_options=REQUEST_AUTH_OPTIONS,
-        )
-    )
+    GpuClusterServiceClient(sdk).delete(
+        DeleteGpuClusterRequest(id=cluster_id),
+        per_retry_timeout=REQUEST_TIMEOUT,
+        auth_options=REQUEST_AUTH_OPTIONS,
+    ).wait()
 
 
 def filter_invalid_labels(labels: Dict[str, str]) -> Dict[str, str]:
@@ -549,14 +549,14 @@ def is_valid_label_value(value: str) -> bool:
     return match is not None
 
 
-def _list_all_pages(list_page: Callable[[str], Awaitable[Any]]) -> list:
+def _list_all_pages(list_page: Callable[[str], Request[Any, Any]]) -> list:
     """
     Calls `list_page` with the next page token until all pages are fetched.
     """
     items = []
     page_token = ""
     while True:
-        response = LOOP.await_(list_page(page_token))
+        response = list_page(page_token).wait()
         items.extend(response.items)
         page_token = response.next_page_token
         if not page_token:
