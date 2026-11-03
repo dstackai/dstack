@@ -1,7 +1,7 @@
 ---
 title: "Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72"
 date: 2026-11-02
-description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower latency, and self-hosting them costs under a third of buying the same tokens."
+description: "Optimized with dstack presets, 14 GB200 NVL72 nodes serve 48 GLM-5.3 coding agents as fast as the three fastest OpenRouter endpoints, with lower p50 TTFT, and self-hosting them costs under a third of buying the same tokens."
 slug: glm53-gb200-nvl72-coding-agents
 image: https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png
 categories:
@@ -10,7 +10,7 @@ categories:
 
 # Serve GLM-5.3 Coding Agents Faster and Cheaper on GB200 NVL72
 
-With `dstack` [presets](../../docs/concepts/presets.md), an agent optimized a GB200 NVL72 fleet to serve GLM-5.3 coding agents as fast as the three fastest endpoints on OpenRouter, with lower latency. Self-hosting them this way costs under a third of buying the same tokens from those endpoints. By a coding agent we mean one session of a tool like Claude Code: a multi-turn conversation that resends its whole context, about 135k tokens, on every request and spawns subagents along the way.
+With `dstack` [presets](../../docs/concepts/presets.md), an agent optimized a GB200 NVL72 fleet to serve GLM-5.3 coding agents as fast as the three fastest endpoints on OpenRouter, with lower p50 TTFT. Self-hosting them this way costs under a third of buying the same tokens from those endpoints. By a coding agent we mean one session of a tool like Claude Code: a multi-turn conversation that resends its whole context, about 135k tokens, on every request and spawns subagents along the way.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-glm-53-gb200-nvl72-crusoe.png" width="630" />
 
@@ -163,5 +163,7 @@ Both presets are public. Pull one, export it as a service configuration, and app
 ### Crusoe
 
 This work was done jointly with [Crusoe](https://crusoe.ai), who provided the GB200 NVL72 capacity for it. We are sincerely grateful for their compute and support.
+
+*Special thanks to Martin Cala and Michael YenChi from the Crusoe team for their help and technical assistance throughout this work.*
 
 > If you'd like to rent high-quality GPU clusters, including GB200 NVL72, for training or inference, we recommend going with Crusoe.
