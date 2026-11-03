@@ -52,6 +52,15 @@ logger = get_logger(__name__)
 
 
 BackendTuple = Tuple[BackendModel, Backend]
+BackendSelector = Callable[
+    [ProjectModel, BackendType, List[BackendTuple]],
+    Coroutine[None, None, Optional[BackendTuple]],
+]
+"""
+Selects a backend of the given type from the project backends,
+see `set_select_project_backend_with_model_by_type()`.
+Must return one of the given backends or `None`.
+"""
 
 
 @dataclass
@@ -97,15 +106,10 @@ async def lease_project_backends(project: ProjectModel) -> AsyncGenerator[List[B
         yield [b for _, b in backends_with_models]
 
 
-_select_project_backend_with_model_by_type = None
+_select_project_backend_with_model_by_type: Optional[BackendSelector] = None
 
 
-def set_select_project_backend_with_model_by_type(
-    func: Callable[
-        [ProjectModel, BackendType, List[BackendTuple]],
-        Coroutine[None, None, Optional[BackendTuple]],
-    ],
-):
+def set_select_project_backend_with_model_by_type(func: BackendSelector):
     """
     Overrides how `lease_project_backend*_by_type()` select a backend from the project backends
     if `overrides=True` is passed. This can be used if a backend needs to be replaced with
@@ -214,6 +218,7 @@ async def close_unused_backends():
 async def close_all_backends():
     """
     Retires all backends and closes those that are not leased.
+    Backends that are still leased stay open: shutdown does not wait for their leases.
     """
     await _retire_and_close_backends(should_retire=lambda c: True)
 

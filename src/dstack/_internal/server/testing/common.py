@@ -150,7 +150,7 @@ from dstack._internal.server.services.users import get_token_hash
 
 def lease_yielding(value: Any) -> Callable[..., AbstractAsyncContextManager[Any]]:
     """
-    Returns a replacement for a `lease_*()` function from `services.backends`
+    Returns a replacement for a `lease_*()` function from `services.backends.cache`
     that yields `value`, e.g. to use as a mock's `side_effect`.
     """
 
@@ -163,7 +163,7 @@ def lease_yielding(value: Any) -> Callable[..., AbstractAsyncContextManager[Any]
 
 def mock_lease(value: Any) -> Mock:
     """
-    Returns a mock to patch a `lease_*()` function from `services.backends` with.
+    Returns a mock to patch a `lease_*()` function from `services.backends.cache` with.
     The lease yields `value`.
     """
     return Mock(side_effect=lease_yielding(value))
