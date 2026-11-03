@@ -32,6 +32,14 @@ def close_mock(backend: Backend) -> Mock:
     return cast(Mock, backend.close)
 
 
+async def close_unused_backends_now(monkeypatch: pytest.MonkeyPatch):
+    """
+    Closes all backends that are not leased, as if they all were idle.
+    """
+    monkeypatch.setattr(backends_cache, "_BACKEND_IDLE_TTL", -1)
+    await backends_cache.close_unused_backends()
+
+
 class TestBackendsCache:
     @pytest.fixture(autouse=True)
     def _setup(self, monkeypatch):
@@ -122,19 +130,16 @@ class TestBackendsCache:
         close_mock(aws_backend).assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_close_all_backends_does_not_close_leased_backends(self):
+    async def test_does_not_close_leased_backends(self, monkeypatch):
         project = make_project(make_backend_model(BackendType.AWS))
         async with backends_cache.lease_project_backends(project) as [backend]:
-            await backends_cache.close_all_backends()
+            await close_unused_backends_now(monkeypatch)
             close_mock(backend).assert_not_called()
-            async with backends_cache.lease_project_backends(project) as [new_backend]:
-                assert new_backend is not backend
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(backend).assert_called_once()
-        close_mock(new_backend).assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_releases_lease_if_cancelled(self):
+    async def test_releases_lease_if_cancelled(self, monkeypatch):
         project = make_project(make_backend_model(BackendType.AWS))
         leased = asyncio.Event()
 
@@ -148,19 +153,19 @@ class TestBackendsCache:
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(self.backends[0]).assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_does_not_raise_if_backend_fails_to_close(self):
+    async def test_does_not_raise_if_backend_fails_to_close(self, monkeypatch):
         project = make_project(make_backend_model(BackendType.AWS))
         async with backends_cache.lease_project_backends(project) as [backend]:
             close_mock(backend).side_effect = RuntimeError("close failed")
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(backend).assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_or_error_raises_and_releases_leases(self):
+    async def test_or_error_raises_and_releases_leases(self, monkeypatch):
         project = make_project(make_backend_model(BackendType.AWS))
         with pytest.raises(BackendNotAvailable):
             async with backends_cache.lease_project_backend_by_type_or_error(
@@ -168,7 +173,7 @@ class TestBackendsCache:
             ):
                 pass
         [aws_backend] = self.backends
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(aws_backend).assert_called_once()
 
     @pytest.mark.asyncio
@@ -201,7 +206,7 @@ class TestBackendsCache:
                 project, BackendType.AWS, overrides=True
             ):
                 pass
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(self.backends[0]).assert_called_once()
 
     @pytest.mark.asyncio
@@ -219,5 +224,5 @@ class TestBackendsCache:
                 project, BackendType.AWS, overrides=True
             ):
                 pass
-        await backends_cache.close_all_backends()
+        await close_unused_backends_now(monkeypatch)
         close_mock(self.backends[0]).assert_called_once()

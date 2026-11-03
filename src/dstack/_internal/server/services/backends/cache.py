@@ -12,13 +12,27 @@ a backend is never closed while it is leased.
 
 A cached backend is either active or retired. New leases use only active backends.
 A backend is retired if its config changes (a new backend replaces it), if it is deleted
-from the project, if it is not leased for `_BACKEND_IDLE_TTL`, or on server shutdown.
-A retired backend may stay leased by operations that started before it was retired, and they
-keep using it until they finish.
+from the project, or if it is not leased for `_BACKEND_IDLE_TTL`. A retired backend may stay
+leased by operations that started before it was retired, and they keep using it until they finish.
 
 Retired backends are closed by `close_unused_backends()`, which runs periodically, once they
 are not leased. Leases never close backends: closing does not delay callers, and releasing
 a lease does not await, so cancellation cannot interrupt it.
+
+Cancelling a task that leases backends has two known problems:
+
+* Backends are initialized and used in executor threads (`run_async()`), which cancellation
+  does not interrupt. If the task is cancelled while a backend is in use, its lease is
+  released while the thread still uses the backend, so a retired backend can be closed under it.
+* If the task is cancelled while backends are initialized for its lease, the initialized
+  backends are not cached, so they are never closed.
+
+They are accepted because such tasks are only cancelled on server shutdown, when pipelines
+cancel their workers, and backends are not closed on shutdown: the process exits anyway.
+If code that leases backends is ever cancelled in other cases, e.g. by `asyncio.wait_for()`
+around it, both problems can happen while the server runs. Then the lease must not be released
+until the executor work finishes (e.g. shield `run_async()` and re-raise the cancellation after
+it completes), and backends initialized for a cancelled lease must still be cached.
 """
 
 import asyncio
@@ -210,20 +224,6 @@ async def close_unused_backends():
     and closes retired backends that are not leased.
     """
     idle_since = time.monotonic() - _BACKEND_IDLE_TTL
-    await _retire_and_close_backends(
-        should_retire=lambda c: c.leases == 0 and c.last_used < idle_since
-    )
-
-
-async def close_all_backends():
-    """
-    Retires all backends and closes those that are not leased.
-    Backends that are still leased stay open: shutdown does not wait for their leases.
-    """
-    await _retire_and_close_backends(should_retire=lambda c: True)
-
-
-async def _retire_and_close_backends(should_retire: Callable[[_CachedBackend], bool]):
     to_close: List[_CachedBackend] = []
     for project_id in list(_BACKENDS_CACHE):
         async with _get_project_cache_lock(project_id):
@@ -231,7 +231,7 @@ async def _retire_and_close_backends(should_retire: Callable[[_CachedBackend], b
             if project_backends is None:
                 continue
             for backend_type, cached_backend in list(project_backends.active.items()):
-                if should_retire(cached_backend):
+                if cached_backend.leases == 0 and cached_backend.last_used < idle_since:
                     del project_backends.active[backend_type]
                     project_backends.retired.append(cached_backend)
             to_close.extend(c for c in project_backends.retired if c.leases == 0)
