@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator, Iterable, Iterator
+from collections.abc import AsyncGenerator, Iterable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
@@ -294,7 +294,7 @@ def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
 @asynccontextmanager
 async def lease_project_backends_with_models(
     project: ProjectModel,
-) -> AsyncIterator[List[BackendTuple]]:
+) -> AsyncGenerator[List[BackendTuple], None]:
     cached_backends = await _acquire_project_backends(project)
     try:
         yield [(c.model, c.backend) for c in cached_backends]
@@ -303,7 +303,7 @@ async def lease_project_backends_with_models(
 
 
 @asynccontextmanager
-async def lease_project_backends(project: ProjectModel) -> AsyncIterator[List[Backend]]:
+async def lease_project_backends(project: ProjectModel) -> AsyncGenerator[List[Backend], None]:
     async with lease_project_backends_with_models(project) as backends_with_models:
         yield [b for _, b in backends_with_models]
 
@@ -332,7 +332,7 @@ async def lease_project_backend_with_model_by_type(
     project: ProjectModel,
     backend_type: BackendType,
     overrides: bool = False,
-) -> AsyncIterator[Optional[BackendTuple]]:
+) -> AsyncGenerator[Optional[BackendTuple], None]:
     async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
         if overrides and _select_project_backend_with_model_by_type is not None:
             return await _select_project_backend_with_model_by_type(
@@ -352,7 +352,7 @@ async def lease_project_backend_with_model_by_type_or_error(
     project: ProjectModel,
     backend_type: BackendType,
     overrides: bool = False,
-) -> AsyncIterator[BackendTuple]:
+) -> AsyncGenerator[BackendTuple, None]:
     async with lease_project_backend_with_model_by_type(
         project=project, backend_type=backend_type, overrides=overrides
     ) as backend_with_model:
@@ -366,7 +366,7 @@ async def lease_project_backend_by_type(
     project: ProjectModel,
     backend_type: BackendType,
     overrides: bool = False,
-) -> AsyncIterator[Optional[Backend]]:
+) -> AsyncGenerator[Optional[Backend], None]:
     async with lease_project_backend_with_model_by_type(
         project=project, backend_type=backend_type, overrides=overrides
     ) as backend_with_model:
@@ -378,7 +378,7 @@ async def lease_project_backend_by_type_or_error(
     project: ProjectModel,
     backend_type: BackendType,
     overrides: bool = False,
-) -> AsyncIterator[Backend]:
+) -> AsyncGenerator[Backend, None]:
     async with lease_project_backend_with_model_by_type_or_error(
         project=project, backend_type=backend_type, overrides=overrides
     ) as (_, backend):
@@ -388,7 +388,7 @@ async def lease_project_backend_by_type_or_error(
 @asynccontextmanager
 async def lease_project_backend_with_model_by_id(
     project: ProjectModel, backend_id: UUID
-) -> AsyncIterator[Optional[BackendTuple]]:
+) -> AsyncGenerator[Optional[BackendTuple], None]:
     async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
         for backend_model, backend in backends_with_models:
             if backend_model.id == backend_id:
@@ -402,7 +402,7 @@ async def lease_project_backend_with_model_by_id(
 @asynccontextmanager
 async def lease_project_backend_with_model_by_id_or_error(
     project: ProjectModel, backend_id: UUID
-) -> AsyncIterator[BackendTuple]:
+) -> AsyncGenerator[BackendTuple, None]:
     async with lease_project_backend_with_model_by_id(
         project=project, backend_id=backend_id
     ) as backend_with_model:
@@ -471,7 +471,7 @@ async def _close_retired_backends(should_retire: Callable[[_CachedBackend], bool
 async def _lease_selected_project_backend(
     project: ProjectModel,
     select: Callable[[List[BackendTuple]], Coroutine[None, None, Optional[BackendTuple]]],
-) -> AsyncIterator[Optional[BackendTuple]]:
+) -> AsyncGenerator[Optional[BackendTuple], None]:
     # All project backends are leased while `select` runs outside of the cache lock,
     # so that the selected backend cannot be closed in between.
     # Only the selected backend counts as used.

@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Optional
@@ -388,7 +388,7 @@ async def _process_wait_for_instance_provisioning_data(
 async def _lease_backend_for_provisioning_wait(
     project_id: uuid.UUID,
     backend_type: BackendType,
-) -> AsyncIterator[Optional[Backend]]:
+) -> AsyncGenerator[Optional[Backend], None]:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(ProjectModel)
