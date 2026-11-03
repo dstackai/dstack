@@ -1,3 +1,25 @@
+"""
+Caches project backends and controls their lifetime.
+
+Backends may hold resources that garbage collection does not free, e.g. SDK clients that run
+background threads (see `Compute.close()`). So backends are cached per project instead of
+being created per use, and every backend is closed explicitly once it is no longer used.
+
+Callers use backends through leases (`lease_project_backend*()`) and must not use a backend
+or its compute after the lease is released. This lets the cache know when a backend is unused:
+a backend is never closed while it is leased.
+
+A cached backend is either active or retired. New leases use only active backends.
+A backend is retired if its config changes (a new backend replaces it), if it is deleted
+from the project, if it is not leased for `_BACKEND_IDLE_TTL`, or on server shutdown.
+A retired backend may stay leased by operations that started before it was retired, and they
+keep using it until they finish.
+
+Retired backends are closed by `close_unused_backends()`, which runs periodically, once they
+are not leased. Leases never close backends: closing does not delay callers, and releasing
+a lease does not await, so cancellation cannot interrupt it.
+"""
+
 import asyncio
 import time
 from collections.abc import AsyncGenerator
@@ -49,11 +71,7 @@ _BACKEND_IDLE_TTL = 300
 _BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
 _BACKENDS_CACHE: Dict[UUID, _ProjectBackends] = {}
 """
-A backend is cached per project and used through leases (`lease_project_backend*()`).
-The cache retires a backend if its config changes, if it is deleted from the project,
-or if it is not leased for `_BACKEND_IDLE_TTL`. New leases use only active backends.
-`close_unused_backends()` closes retired backends once they are not leased,
-so callers must not use backends outside of leases.
+Active and retired backends by project ID. Retired backends stay here until they are closed.
 """
 
 
