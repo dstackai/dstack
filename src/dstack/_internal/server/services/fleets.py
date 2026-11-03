@@ -1606,7 +1606,11 @@ def _validate_ssh_key(ssh_key: SSHKey):
         )
     # Plans and gateway synchronization compare public keys. A stale .pub file must not
     # hide replacement of the private key at the same path.
-    if " ".join(ssh_key.public.split()[:2]) != ssh_utils.generate_public_key(private_key):
+    public_key = ssh_utils.generate_public_key(private_key)
+    if not ssh_key.public.strip():
+        # Older API requests may provide only the private key.
+        ssh_key.public = public_key
+    elif " ".join(ssh_key.public.split()[:2]) != public_key:
         raise ServerClientError("Public SSH key does not match the private key")
 
 

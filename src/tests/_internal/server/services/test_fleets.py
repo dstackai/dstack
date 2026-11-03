@@ -286,6 +286,13 @@ class TestCheckCanUpdateSSHConfig:
 
 
 class TestValidateSSHKey:
+    def test_derives_empty_public_key(self):
+        key = get_ssh_key()
+        public_key = key.public
+        key.public = ""
+        _validate_ssh_key(key)
+        assert key.public == public_key
+
     @pytest.mark.parametrize("per_host", [False, True])
     def test_rejects_stale_head_node_public_key(self, per_host):
         head_node = SSHProxyParams(

@@ -56,6 +56,7 @@ from dstack._internal.server.testing.common import (
     get_ssh_fleet_configuration,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
+from dstack._internal.utils import ssh as ssh_utils
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -1077,7 +1078,12 @@ class TestApplyFleetPlan:
                         "user": "ubuntu",
                         "port": None,
                         "identity_file": None,
-                        "ssh_key": None,  # should not return ssh_key
+                        "ssh_key": {
+                            "public": ssh_utils.generate_public_key(
+                                ssh_utils.pkey_from_str(get_private_key_string())
+                            ),
+                            "private": None,
+                        },
                         "proxy_jump": None,
                         "hosts": ["1.1.1.1"],
                         "network": None,
@@ -1299,7 +1305,12 @@ class TestApplyFleetPlan:
                         "user": "ubuntu",
                         "port": None,
                         "identity_file": None,
-                        "ssh_key": None,  # should not return ssh_key
+                        "ssh_key": {
+                            "public": ssh_utils.generate_public_key(
+                                ssh_utils.pkey_from_str(get_private_key_string())
+                            ),
+                            "private": None,
+                        },
                         "proxy_jump": None,
                         "hosts": ["10.0.0.101"],
                         "network": None,
@@ -2359,7 +2370,9 @@ class TestGetPlan:
         spec = get_fleet_spec(conf=conf)
         effective_spec = spec.model_copy(deep=True)
         assert effective_spec.configuration.ssh_config is not None
-        effective_spec.configuration.ssh_config.ssh_key = None
+        effective_spec.configuration.ssh_config.ssh_key = SSHKey(
+            public=ssh_utils.generate_public_key(ssh_utils.pkey_from_str(get_private_key_string()))
+        )
         current_spec = spec.model_copy(deep=True)
         # `hosts` can be updated in-place
         assert current_spec.configuration.ssh_config is not None
@@ -2484,7 +2497,9 @@ class TestGetPlan:
         spec = get_fleet_spec(conf=conf)
         effective_spec = spec.model_copy(deep=True)
         assert effective_spec.configuration.ssh_config is not None
-        effective_spec.configuration.ssh_config.ssh_key = None
+        effective_spec.configuration.ssh_config.ssh_key = SSHKey(
+            public=ssh_utils.generate_public_key(ssh_utils.pkey_from_str(get_private_key_string()))
+        )
         current_spec = spec.model_copy(deep=True)
         # `placement` cannot be updated in-place
         current_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
