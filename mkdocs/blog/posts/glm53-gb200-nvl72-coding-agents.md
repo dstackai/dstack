@@ -18,7 +18,7 @@ This work was done jointly with [Crusoe](https://crusoe.ai), who provided the GB
 
 <!-- more -->
 
-On 14 GB200 nodes, 48 agents get the same p50 output speed per user as the three fastest GLM-5.3 endpoints on OpenRouter, about 3x lower p50 TTFT, and 3x or more higher output speed at p99, where a coding agent's slowest turns are. Serving the same work ourselves costs $12.55 per million output tokens, against $43–66 when buying it from these endpoints.
+On 14 GB200 nodes, 48 agents get the same p50 output speed per user as the three fastest GLM-5.3 endpoints on OpenRouter, about 3x lower p50 TTFT, and 2x or more higher output speed at p99, where a coding agent's slowest turns are. Serving the same work ourselves costs $12.77 per million output tokens, against $43–66 when buying it from these endpoints.
 
 === "tok/s/user p50"
     <img src="https://dstack.ai/static-assets/static-assets/images/glm53-gb200-nvl72-coding-agents-fig-1.png" width="750" />
@@ -35,7 +35,7 @@ On 14 GB200 nodes, 48 agents get the same p50 output speed per user as the three
 === "Cost"
     <img src="https://dstack.ai/static-assets/static-assets/images/glm53-gb200-nvl72-coding-agents-fig-5.png" width="750" />
 
-> Provider figures are OpenRouter's for 19–26 October. Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at $4.00 per chip-hour divided by the 17.85 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts.
+> Provider figures are OpenRouter's for 19–26 October. Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at $4.00 per chip-hour divided by the 17.54 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts.
 
 ## Purpose
 
@@ -107,7 +107,7 @@ We then raised the agent count for each winner. Aggregated, replayed at normal p
 
 ### Self-hosting vs buying tokens
 
-Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on TTFT and on output speed at p99. Self-hosting costs $12.55 per million output tokens, against $43–66 to buy the same tokens from these endpoints.
+Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting costs $12.77 per million output tokens, against $43–66 to buy the same tokens from these endpoints.
 
 ### Aggregated vs PD
 
