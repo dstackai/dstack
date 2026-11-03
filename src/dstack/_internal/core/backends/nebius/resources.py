@@ -96,6 +96,9 @@ REQUEST_AUTH_OPTIONS = {
     OPTION_RENEW_REQUEST_TIMEOUT: "5",
 }
 LIST_PAGE_SIZE = 100
+# Close every SDK created with make_sdk() using close_sdk(). An SDK runs an event loop thread
+# that keeps it alive, so an SDK that is not closed is never garbage collected.
+SDK_CLOSE_TIMEOUT = 10
 # The SDK's own `Operation` does not satisfy the `OperationMessage` bound of `SDKOperation`:
 # the protocol declares a mutable `id: str`, while the `Operation` setter accepts `str | None`
 NebiusOperation = SDKOperation[Operation]  # pyright: ignore[reportInvalidTypeArguments]
@@ -134,6 +137,13 @@ def make_sdk(creds: NebiusServiceAccountCreds) -> SDK:
             service_account_id=creds.service_account_id,
             user_agent_prefix=f"dstack/{__version__}",
         )
+
+
+def close_sdk(sdk: SDK) -> None:
+    try:
+        sdk.sync_close(timeout=SDK_CLOSE_TIMEOUT)
+    except Exception:
+        logger.warning("Failed to close Nebius SDK", exc_info=True)
 
 
 def wait_for_operation(
