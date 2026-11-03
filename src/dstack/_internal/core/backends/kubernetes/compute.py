@@ -41,7 +41,11 @@ from dstack._internal.core.backends.base.offers import (
     gpu_matches_gpu_spec,
 )
 from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCEPTIONS
-from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
+from dstack._internal.core.backends.kubernetes.models import (
+    JUMP_POD_DEFAULT_CPU,
+    JUMP_POD_DEFAULT_MEMORY,
+    KubernetesConfig,
+)
 from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_DEVICE_ID_LABEL_PREFIX,
     AMD_GPU_NAME_TO_DEVICE_IDS,
@@ -116,6 +120,10 @@ logger = get_logger(__name__)
 JUMP_POD_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
 JUMP_POD_SSH_PORT = 22
 JUMP_POD_USER = "root"
+# Under disk pressure, the kubelet first evicts pods whose disk usage exceeds their
+# ephemeral-storage request. Covers the writable layer and the logs with the default log
+# rotation (5 x 10Mi).
+JUMP_POD_EPHEMERAL_STORAGE_REQUEST = "64Mi"
 
 JOB_POD_SCHEDULING_TIMEOUT = 10
 
@@ -245,6 +253,8 @@ class KubernetesCompute(
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=cluster.proxy_jump.port,
             authorized_keys=project_authorized_keys,
+            cpu_request_limit=cluster.proxy_jump.cpu or JUMP_POD_DEFAULT_CPU,
+            memory_request_limit=cluster.proxy_jump.memory or JUMP_POD_DEFAULT_MEMORY,
         )
 
         pod_name = generate_unique_instance_name_for_job(
@@ -876,6 +886,8 @@ def _create_jump_pod_service_if_not_exists(
     jump_pod_service_name: str,
     jump_pod_port: Optional[int],
     authorized_keys: list[str],
+    cpu_request_limit: str,
+    memory_request_limit: str,
 ) -> None:
     base_labels = build_base_labels(
         component="ssh-proxy",
@@ -977,6 +989,16 @@ def _create_jump_pod_service_if_not_exists(
             if not tolerations:
                 logger.warning("No appropriate node found, the jump pod may never be scheduled")
         commands = _get_jump_pod_commands(authorized_keys)
+        # Equal CPU and memory requests and limits for the Guaranteed QoS class
+        limits = {
+            KubernetesResource.CPU.value: cpu_request_limit,
+            KubernetesResource.MEMORY.value: memory_request_limit,
+        }
+        requests = {
+            **limits,
+            # No limit, as exceeding it gets the pod evicted
+            KubernetesResource.EPHEMERAL_STORAGE.value: JUMP_POD_EPHEMERAL_STORAGE_REQUEST,
+        }
         replica_set = client.V1ReplicaSet(
             metadata=client.V1ObjectMeta(
                 name=jump_pod_name,
@@ -1001,6 +1023,10 @@ def _create_jump_pod_service_if_not_exists(
                                         container_port=JUMP_POD_SSH_PORT,
                                     )
                                 ],
+                                resources=client.V1ResourceRequirements(
+                                    requests=requests,
+                                    limits=limits,
+                                ),
                             )
                         ],
                         restart_policy=RestartPolicy.ALWAYS,
@@ -1093,6 +1119,18 @@ def _check_and_configure_jump_pod_service(
         if _is_pod_ready(jump_pod):
             break
     else:
+        for jump_pod in jump_pods:
+            # E.g., no node has enough free resources or all nodes have untolerated taints.
+            # Provisioning waits for the jump pod, so without this warning, the only symptom is
+            # runs hitting the provisioning timeout.
+            condition = _get_pod_unscheduled_condition(jump_pod)
+            if condition is not None:
+                logger.warning(
+                    "Jump pod %s cannot be scheduled: %s: %s",
+                    get_object_name(jump_pod),
+                    condition.reason,
+                    condition.message,
+                )
         logger.debug("Jump pod %s is not ready yet", jump_pod_name)
         return None
 
@@ -1448,11 +1486,18 @@ def _get_unscheduled_pod_reason_message(
         name=pod_name,
         namespace=namespace,
     )
-    if pod is not None and pod.status is not None and pod.status.conditions:
-        for cond in pod.status.conditions:
-            if cond.type == "PodScheduled" and cond.status == "False":
-                return cond.reason, cond.message
+    if pod is not None and (condition := _get_pod_unscheduled_condition(pod)) is not None:
+        return condition.reason, condition.message
     return None, None
+
+
+def _get_pod_unscheduled_condition(pod: client.V1Pod) -> Optional[client.V1PodCondition]:
+    if pod.status is None:
+        return None
+    for condition in pod.status.conditions or []:
+        if condition.type == "PodScheduled" and condition.status == "False":
+            return condition
+    return None
 
 
 def _is_pod_ready(pod: client.V1Pod) -> bool:

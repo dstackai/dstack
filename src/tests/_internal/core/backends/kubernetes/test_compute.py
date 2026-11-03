@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Generator
 from datetime import datetime, timezone
 from typing import Optional
@@ -8,6 +9,7 @@ from kubernetes import client
 from kubernetes.client.exceptions import ApiException
 
 from dstack._internal.core.backends.kubernetes.compute import (
+    JUMP_POD_EPHEMERAL_STORAGE_REQUEST,
     KubernetesCompute,
     _check_and_configure_jump_pod_service,
     _create_jump_pod_service_if_not_exists,
@@ -142,7 +144,18 @@ def _make_pod(
     ready: bool = True,
     node_name: Optional[str] = "node-a",
     terminating: bool = False,
+    unschedulable_message: Optional[str] = None,
 ) -> client.V1Pod:
+    conditions = [client.V1PodCondition(type="Ready", status="True" if ready else "False")]
+    if unschedulable_message is not None:
+        conditions.append(
+            client.V1PodCondition(
+                type="PodScheduled",
+                status="False",
+                reason="Unschedulable",
+                message=unschedulable_message,
+            )
+        )
     return client.V1Pod(
         metadata=client.V1ObjectMeta(
             name=name,
@@ -152,12 +165,7 @@ def _make_pod(
             ),
         ),
         spec=client.V1PodSpec(containers=[], node_name=node_name),
-        status=client.V1PodStatus(
-            phase=phase,
-            conditions=[
-                client.V1PodCondition(type="Ready", status="True" if ready else "False"),
-            ],
-        ),
+        status=client.V1PodStatus(phase=phase, conditions=conditions),
     )
 
 
@@ -202,7 +210,14 @@ class TestCreateJumpPodServiceIfNotExists:
         _mock_read(apps_api.read_namespaced_replica_set, replica_set)
         return api, apps_api
 
-    def call(self, api: Mock, apps_api: Mock, jump_pod_port: Optional[int] = None) -> None:
+    def call(
+        self,
+        api: Mock,
+        apps_api: Mock,
+        jump_pod_port: Optional[int] = None,
+        cpu: str = "500m",
+        memory: str = "1Gi",
+    ) -> None:
         _create_jump_pod_service_if_not_exists(
             api=api,
             apps_api=apps_api,
@@ -212,15 +227,28 @@ class TestCreateJumpPodServiceIfNotExists:
             jump_pod_service_name=JUMP_POD_SERVICE_NAME,
             jump_pod_port=jump_pod_port,
             authorized_keys=["ssh-ed25519 AAAA project"],
+            cpu_request_limit=cpu,
+            memory_request_limit=memory,
         )
 
-    def assert_replica_set_created(self, apps_api: Mock) -> None:
+    def assert_replica_set_created(
+        self, apps_api: Mock, *, cpu: str = "500m", memory: str = "1Gi"
+    ) -> None:
         apps_api.create_namespaced_replica_set.assert_called_once()
         replica_set = apps_api.create_namespaced_replica_set.call_args.kwargs["body"]
         assert replica_set.metadata.name == JUMP_POD_NAME
         assert replica_set.spec.replicas == 1
         assert replica_set.spec.selector.match_labels == JUMP_POD_SELECTOR
         assert replica_set.spec.template.metadata.labels == JUMP_POD_LABELS
+        resources = replica_set.spec.template.spec.containers[0].resources
+        # Equal CPU and memory requests and limits for the Guaranteed QoS class, and
+        # an ephemeral-storage request without a limit
+        assert resources.limits == {"cpu": cpu, "memory": memory}
+        assert resources.requests == {
+            "cpu": cpu,
+            "memory": memory,
+            "ephemeral-storage": JUMP_POD_EPHEMERAL_STORAGE_REQUEST,
+        }
 
     def assert_service_created(
         self, api: Mock, *, selector: dict[str, str], node_port: Optional[int]
@@ -249,6 +277,13 @@ class TestCreateJumpPodServiceIfNotExists:
         api.create_namespace.assert_not_called()
         self.assert_replica_set_created(apps_api)
         self.assert_service_created(api, selector=JUMP_POD_SELECTOR, node_port=None)
+
+    def test_sets_jump_pod_resources(self):
+        api, apps_api = self.make_apis()
+
+        self.call(api, apps_api, cpu="1", memory="2Gi")
+
+        self.assert_replica_set_created(apps_api, cpu="1", memory="2Gi")
 
     def test_does_nothing_if_replica_set_and_service_exist(self):
         api, apps_api = self.make_apis(
@@ -408,12 +443,39 @@ class TestCheckAndConfigureJumpPodService:
             pytest.param(_make_pod(terminating=True), id="terminating"),
         ],
     )
-    def test_waits_if_no_pod_is_ready(self, run_ssh_command_mock: Mock, pod: client.V1Pod):
+    def test_waits_if_no_pod_is_ready(
+        self, caplog: pytest.LogCaptureFixture, run_ssh_command_mock: Mock, pod: client.V1Pod
+    ):
+        caplog.set_level(logging.WARNING)
         api = self.make_api(pods=[pod])
 
         assert self.call(api) is None
         api.read_namespaced_pod.assert_not_called()
         run_ssh_command_mock.assert_not_called()
+        assert "cannot be scheduled" not in caplog.text
+
+    def test_warns_if_pod_cannot_be_scheduled(
+        self, caplog: pytest.LogCaptureFixture, run_ssh_command_mock: Mock
+    ):
+        caplog.set_level(logging.WARNING)
+        api = self.make_api(
+            pods=[
+                _make_pod(
+                    name="pending",
+                    phase="Pending",
+                    ready=False,
+                    node_name=None,
+                    unschedulable_message="0/3 nodes are available: 3 Insufficient memory.",
+                ),
+            ]
+        )
+
+        assert self.call(api) is None
+        run_ssh_command_mock.assert_not_called()
+        assert (
+            "Jump pod pending cannot be scheduled: Unschedulable:"
+            " 0/3 nodes are available: 3 Insufficient memory."
+        ) in caplog.text
 
     def test_waits_if_no_pods(self, run_ssh_command_mock: Mock):
         # E.g., the ReplicaSet has not created a pod yet.
