@@ -71,3 +71,20 @@ class RegisterEntrypointRequest(BaseModel):
     domain: str
     https: bool
     read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
+
+
+class ReplicaHeadNodeKeyUpdate(BaseModel):
+    project_name: str
+    run_name: str
+    job_id: str
+    ssh_head_proxy_private_key: str
+    """Private key for the head node configured by the fleet's `proxy_jump`."""
+
+
+class UpdateReplicaHeadNodeKeysRequest(BaseModel):
+    replicas: list[ReplicaHeadNodeKeyUpdate]
+
+
+class UpdateReplicaHeadNodeKeysResponse(BaseModel):
+    failures: dict[str, str]
+    """Job IDs whose key could not be updated; successful updates are saved together."""

@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from itertools import chain
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from aiorwlock import RWLock
 from pydantic import BaseModel
@@ -52,6 +52,14 @@ class GatewayProxyRepo(BaseProxyRepo):
     async def set_service(self, service: Service) -> None:
         async with self.writer():
             self._state.services.setdefault(service.project_name, {})[service.run_name] = service
+
+    async def set_services(self, services: Iterable[Service]) -> None:
+        """Save a batch of changed services with one state-file write."""
+        async with self.writer():
+            for service in services:
+                self._state.services.setdefault(service.project_name, {})[service.run_name] = (
+                    service
+                )
 
     async def delete_service(self, project_name: str, run_name: str) -> None:
         async with self.writer():

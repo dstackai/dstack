@@ -42,6 +42,9 @@ class ServiceConnection:
     using the same socket path. The in-server proxy opens connections on demand.
     """
 
+    replica: Replica
+    """Replica configuration applied to this connection, including its key for future SSH opens."""
+
     def __init__(
         self,
         project: Project,
@@ -49,6 +52,8 @@ class ServiceConnection:
         replica: Replica,
         reconnect_semaphore: asyncio.Semaphore,
     ) -> None:
+        self.replica = replica
+        self._auto_reconnect = service.domain is not None
         self._temp_dir = TemporaryDirectory()
         options = {
             **SSH_DEFAULT_OPTIONS,
@@ -81,7 +86,7 @@ class ServiceConnection:
                 ),
             ],
             options=options,
-            background=service.domain is None,
+            background=not (self._auto_reconnect or replica.ssh_head_proxy is not None),
         )
         self._client = ServiceClient(
             transport=AsyncHTTPTransport(uds=str(self._app_socket_path)),
@@ -94,7 +99,6 @@ class ServiceConnection:
         self._lifecycle_lock = asyncio.Lock()
         self._closed = False
         self._monitor_task: Optional[asyncio.Task] = None
-        self._auto_reconnect = service.domain is not None
         self._replica_id = replica.id
         self._reconnect_semaphore = reconnect_semaphore
 
@@ -113,7 +117,7 @@ class ServiceConnection:
                 # Removal may have started while SSH was connecting.
                 raise UnexpectedProxyError("Service connection was removed while opening")
             self._is_open.set()
-            if self._auto_reconnect:
+            if self._auto_reconnect or self.replica.ssh_head_proxy is not None:
                 self._monitor_task = asyncio.create_task(self._monitor_tunnel())
 
     async def close(self) -> None:
@@ -134,6 +138,20 @@ class ServiceConnection:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
         return self._client
 
+    async def update_head_node_key(self, replica: Replica) -> None:
+        """Replace the head-node key without reopening the tunnel or HTTP client.
+
+        The pool calls this only when the head-node private key is the sole change
+        from self.replica. Apply the key file before replacing that configuration,
+        so a failed write leaves the previous configuration available for retry.
+        The replacement key is used on the next SSH open; the socket path is unchanged.
+        """
+        async with self._lifecycle_lock:
+            if self._closed:
+                raise UnexpectedProxyError("Cannot update a closed service connection")
+            self._tunnel.update_proxy_identity(0, get_or_error(replica.ssh_head_proxy_private_key))
+            self.replica = replica
+
     async def _close(self) -> None:
         async with self._lifecycle_lock:
             if self._monitor_task is not None:
@@ -152,6 +170,13 @@ class ServiceConnection:
         while True:
             started_at = loop.time()
             await self._tunnel.wait_closed()
+            if not self._auto_reconnect:
+                # The in-server pool retains stopped replicas. Reopen only when another
+                # request selects this replica, rather than retrying stopped workloads.
+                async with self._lifecycle_lock:
+                    self._is_open.clear()
+                    await self._tunnel.aclose()
+                return
             if loop.time() - started_at >= MAX_TUNNEL_RECONNECT_DELAY:
                 retry_delay = 0
             logger.warning("SSH tunnel to replica %s exited, reconnecting", self._replica_id)
@@ -187,6 +212,18 @@ class ServiceConnectionPool:
     ) -> ServiceConnection:
         connection = self.connections.get(replica.id)
         if connection is not None:
+            if (
+                replica.ssh_head_proxy is not None
+                and connection.replica.ssh_head_proxy_private_key
+                != replica.ssh_head_proxy_private_key
+                and connection.replica.model_copy(
+                    update={"ssh_head_proxy_private_key": replica.ssh_head_proxy_private_key}
+                )
+                == replica
+            ):
+                await connection.update_head_node_key(replica)
+            if service.domain is None and replica.ssh_head_proxy is not None:
+                await connection.open()
             return connection
         connection = ServiceConnection(project, service, replica, self._reconnect_semaphore)
         self.connections[replica.id] = connection
@@ -234,12 +271,10 @@ async def get_service_replica_client(
         )
     # Nginx not available, forward directly to the tunnel
     replica = random.choice(service.replicas)
-    connection = await service_conn_pool.get(replica.id)
-    if connection is None:
-        project = await repo.get_project(service.project_name)
-        if project is None:
-            raise UnexpectedProxyError(
-                f"Expected to find project {service.project_name} but could not"
-            )
-        connection = await service_conn_pool.get_or_add(project, service, replica)
+    project = await repo.get_project(service.project_name)
+    if project is None:
+        raise UnexpectedProxyError(
+            f"Expected to find project {service.project_name} but could not"
+        )
+    connection = await service_conn_pool.get_or_add(project, service, replica)
     return await connection.client()

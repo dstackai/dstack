@@ -10,15 +10,17 @@ from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterReplicaRequest,
     RegisterServiceRequest,
     SetServiceIdRequest,
+    UpdateReplicaHeadNodeKeysRequest,
+    UpdateReplicaHeadNodeKeysResponse,
 )
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.lib.deps import get_service_connection_pool
 from dstack._internal.proxy.lib.services.service_connection import ServiceConnectionPool
 
-router = APIRouter(prefix="/{project_name}")
+router = APIRouter()
 
 
-@router.post("/services/register")
+@router.post("/{project_name}/services/register")
 async def register_service(
     project_name: str,
     body: RegisterServiceRequest,
@@ -46,7 +48,7 @@ async def register_service(
     return OkResponse()
 
 
-@router.post("/services/{run_name}/unregister")
+@router.post("/{project_name}/services/{run_name}/unregister")
 async def unregister_service(
     project_name: str,
     run_name: str,
@@ -64,7 +66,7 @@ async def unregister_service(
     return OkResponse()
 
 
-@router.post("/services/{run_name}/set_id")
+@router.post("/{project_name}/services/{run_name}/set_id")
 async def set_service_id(
     project_name: str,
     run_name: str,
@@ -81,7 +83,7 @@ async def set_service_id(
     return OkResponse()
 
 
-@router.post("/services/{run_name}/replicas/register")
+@router.post("/{project_name}/services/{run_name}/replicas/register")
 async def register_replica(
     project_name: str,
     run_name: str,
@@ -109,7 +111,19 @@ async def register_replica(
     return OkResponse()
 
 
-@router.post("/services/{run_name}/replicas/{job_id}/unregister")
+@router.post("/replicas/head_node_keys")
+async def update_replica_head_node_keys(
+    body: UpdateReplicaHeadNodeKeysRequest,
+    repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
+    service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
+) -> UpdateReplicaHeadNodeKeysResponse:
+    failures = await registry_services.update_replica_head_node_keys(
+        updates=body.replicas, repo=repo, service_conn_pool=service_conn_pool
+    )
+    return UpdateReplicaHeadNodeKeysResponse(failures=failures)
+
+
+@router.post("/{project_name}/services/{run_name}/replicas/{job_id}/unregister")
 async def unregister_replica(
     project_name: str,
     run_name: str,
@@ -129,7 +143,7 @@ async def unregister_replica(
     return OkResponse()
 
 
-@router.post("/entrypoints/register")
+@router.post("/{project_name}/entrypoints/register")
 async def register_entrypoint(
     project_name: str,
     body: RegisterEntrypointRequest,

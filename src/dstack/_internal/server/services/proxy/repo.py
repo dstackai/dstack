@@ -182,6 +182,8 @@ class ServerProxyRepo(BaseProxyRepo):
     async def get_project(self, name: str) -> Optional[Project]:
         res = await self.session.execute(select(ProjectModel).where(ProjectModel.name == name))
         project = res.scalar_one_or_none()
+        # Release the DB connection before opening/replacing a service SSH tunnel.
+        await self.session.commit()
         if project is None:
             return None
         return Project(

@@ -51,7 +51,7 @@ class TestListServices:
                     "id": service_id,
                     "project_name": "test-proj",
                     "run_name": "srv-1",
-                    "replicas": [{"id": replica_id}],
+                    "replicas": [{"id": replica_id, "ssh_head_proxy_public_key": None}],
                 }
             ]
         }
