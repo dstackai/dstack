@@ -65,9 +65,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.backends.cache import (
-    lease_project_backend_with_model_by_type_or_error,
-)
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import (
@@ -254,7 +252,7 @@ async def create_gateway(
     configuration = effective_configuration
 
     # Leasing the backend also checks that it can be initialized, not just that it's configured.
-    async with lease_project_backend_with_model_by_type_or_error(
+    async with backends_cache.lease_project_backend_with_model_by_type_or_error(
         project=project, backend_type=configuration.backend
     ) as (backend_model, _):
         pass
