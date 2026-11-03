@@ -1,9 +1,10 @@
 """
 Caches project backends and controls their lifetime.
 
-Backends may hold resources that garbage collection does not free, e.g. SDK clients that run
-background threads (see `Compute.close()`). So backends are cached per project instead of
-being created per use, and every backend is closed explicitly once it is no longer used.
+Backends are cached per project because creating them is expensive, e.g. creating API clients
+and filling offers caches. Backends may also hold resources that garbage collection does not
+free, e.g. SDK clients that run background threads (see `Compute.close()`), so the cache
+closes every backend explicitly once it is no longer used.
 
 Callers use backends through leases (`lease_project_backend*()`) and must not use a backend
 or its compute after the lease is released. This lets the cache know when a backend is unused:
