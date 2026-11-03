@@ -472,27 +472,36 @@ async def _lease_selected_project_backend(
     project: ProjectModel,
     select: Callable[[List[BackendTuple]], Coroutine[None, None, Optional[BackendTuple]]],
 ) -> AsyncGenerator[Optional[BackendTuple], None]:
-    # All project backends are leased while `select` runs outside of the cache lock,
-    # so that the selected backend cannot be closed in between.
-    # Only the selected backend counts as used.
+    """
+    Leases the backend chosen by `select` from the project backends.
+
+    `select` may do I/O, so it runs outside of the cache lock: otherwise it would block
+    other leases of the project and could deadlock if it leased backends itself. Then the
+    selected backend could be retired and closed before it is leased, so all project backends
+    are leased while `select` runs, and the ones not selected are released after it.
+    They are leased without updating `last_used` so that only the selected backend
+    counts as used for idle retirement.
+    """
     cached_backends = await _acquire_project_backends(project, touch=False)
+    selected: Optional[_CachedBackend] = None
     try:
         backend_with_model = await select([(c.model, c.backend) for c in cached_backends])
-    except BaseException:
-        _release_backends(cached_backends, touch=False)
-        raise
-    selected = [
-        c
-        for c in cached_backends
-        if backend_with_model is not None and c.backend is backend_with_model[1]
-    ]
-    _release_backends([c for c in cached_backends if c not in selected], touch=False)
-    for c in selected:
-        c.last_used = time.monotonic()
+        if backend_with_model is not None:
+            selected = next(
+                (c for c in cached_backends if c.backend is backend_with_model[1]), None
+            )
+            if selected is None:
+                raise ValueError("`select` must return one of the given backends")
+    finally:
+        _release_backends([c for c in cached_backends if c is not selected], touch=False)
+    if selected is None:
+        yield None
+        return
+    selected.last_used = time.monotonic()
     try:
         yield backend_with_model
     finally:
-        _release_backends(selected)
+        _release_backends([selected])
 
 
 async def _acquire_project_backends(

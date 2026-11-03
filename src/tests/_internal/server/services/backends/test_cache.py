@@ -189,3 +189,41 @@ class TestBackendsCache:
             project, BackendType.AWS
         ) as backend:
             assert backend is None
+
+    @pytest.mark.asyncio
+    async def test_releases_leases_if_selector_fails(self, monkeypatch):
+        project = make_project(make_backend_model(BackendType.DSTACK))
+
+        async def select(project, backend_type, backends_with_models):
+            raise RuntimeError("select failed")
+
+        monkeypatch.setattr(
+            backends_services, "_select_project_backend_with_model_by_type", select
+        )
+        with pytest.raises(RuntimeError):
+            async with backends_services.lease_project_backend_by_type(
+                project, BackendType.AWS, overrides=True
+            ):
+                pass
+        await backends_services.close_all_backends()
+        close_mock(self.backends[0]).assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_raises_and_releases_leases_if_selector_returns_unknown_backend(
+        self, monkeypatch
+    ):
+        project = make_project(make_backend_model(BackendType.DSTACK))
+
+        async def select(project, backend_type, backends_with_models):
+            return backends_with_models[0][0], Mock()
+
+        monkeypatch.setattr(
+            backends_services, "_select_project_backend_with_model_by_type", select
+        )
+        with pytest.raises(ValueError):
+            async with backends_services.lease_project_backend_by_type(
+                project, BackendType.AWS, overrides=True
+            ):
+                pass
+        await backends_services.close_all_backends()
+        close_mock(self.backends[0]).assert_called_once()
