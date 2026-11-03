@@ -17,6 +17,7 @@ import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_install_command,
 )
+from dstack._internal.core.backends.configurators import check_backend_type_available
 from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GATEWAY_SUPPORT,
     BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
@@ -64,7 +65,6 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.backends import check_backend_type_available
 from dstack._internal.server.services.backends.cache import (
     lease_project_backend_with_model_by_type_or_error,
 )
