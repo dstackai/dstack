@@ -1,7 +1,6 @@
 import logging
 import uuid
-from collections.abc import AsyncGenerator, Mapping
-from contextlib import asynccontextmanager
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import Optional
 
@@ -13,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal import settings
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
     get_dstack_runner_download_url,
     get_dstack_runner_version,
@@ -22,7 +20,6 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import ProvisioningError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     GpuDriverInfo,
@@ -335,9 +332,9 @@ async def _process_wait_for_instance_provisioning_data(
         )
         return result
 
-    async with _lease_backend_for_provisioning_wait(
-        project_id=instance_model.project_id,
-        backend_type=job_provisioning_data.backend,
+    project_model = await _load_project_with_backends(instance_model.project_id)
+    async with backends_cache.lease_project_backend_by_type(
+        project=project_model, backend_type=job_provisioning_data.backend
     ) as backend:
         if backend is None:
             logger.warning(
@@ -384,26 +381,14 @@ async def _process_wait_for_instance_provisioning_data(
     return result
 
 
-@asynccontextmanager
-async def _lease_backend_for_provisioning_wait(
-    project_id: uuid.UUID,
-    backend_type: BackendType,
-) -> AsyncGenerator[Optional[Backend], None]:
+async def _load_project_with_backends(project_id: uuid.UUID) -> ProjectModel:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(ProjectModel)
             .where(ProjectModel.id == project_id)
             .options(joinedload(ProjectModel.backends))
         )
-        project_model = res.unique().scalar_one_or_none()
-    if project_model is None:
-        yield None
-        return
-    async with backends_cache.lease_project_backend_by_type(
-        project=project_model,
-        backend_type=backend_type,
-    ) as backend:
-        yield backend
+        return res.unique().scalar_one()
 
 
 @runner_ssh_tunnel

@@ -166,8 +166,8 @@ class TestCheckInstance:
         await session.commit()
         backend = Mock()
         monkeypatch.setattr(
-            instances_check,
-            "_lease_backend_for_provisioning_wait",
+            instances_check.backends_cache,
+            "lease_project_backend_by_type",
             mock_lease(backend),
         )
 
