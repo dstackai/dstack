@@ -10,7 +10,6 @@ from sqlalchemy.orm import joinedload, selectinload
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.backends.features import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
-    BackendNotAvailable,
     ResourceExistsError,
     ServerClientError,
 )
@@ -518,23 +517,21 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
-    try:
-        backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project,
-            backend_type=volume.provisioning_data.backend,
+    async with backends_services.lease_project_backend_by_type(
+        project=volume_model.project,
+        backend_type=volume.provisioning_data.backend,
+    ) as backend:
+        if backend is None:
+            logger.error(
+                f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
+            )
+            return
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithVolumeSupport)
+        await common.run_async(
+            compute.delete_volume,
+            volume=volume,
         )
-    except BackendNotAvailable:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
-        )
-        return
-
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
-    await common.run_async(
-        compute.delete_volume,
-        volume=volume,
-    )
 
 
 # Clouds charge volumes assuming 30-day months, e.g. https://aws.amazon.com/ebs/pricing/

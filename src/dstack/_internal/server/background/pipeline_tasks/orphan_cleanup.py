@@ -382,67 +382,69 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
     orphan_cleanup_model = process_context.orphan_cleanup_model
     if not process_context.needs_cleanup:
         return _ProcessResult(update_map=_OrphanCleanupUpdateMap())
-    backend = await backends_services.get_project_backend_by_type(
+    async with backends_services.lease_project_backend_by_type(
         project=orphan_cleanup_model.backend.project,
         backend_type=orphan_cleanup_model.backend.type,
-    )
-    if backend is None:
-        logger.warning(
-            "Failed to clean up orphaned resources in %s/%s: backend is not available",
-            orphan_cleanup_model.backend.project.name,
-            orphan_cleanup_model.backend.type.value,
-        )
-        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithResourceListingSupport)
-    listed_at = get_current_datetime()
-    try:
-        resource_listing = await run_async(compute.list_resource_groups)
-    except BackendError as e:
-        logger.warning(
-            "Failed to list resource groups in %s/%s due to backend error: %s",
-            orphan_cleanup_model.backend.project.name,
-            orphan_cleanup_model.backend.type.value,
-            repr(e),
-        )
-        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
-    except Exception:
-        logger.exception(
-            "Failed to list resource groups in %s/%s due to unexpected error",
-            orphan_cleanup_model.backend.project.name,
-            orphan_cleanup_model.backend.type.value,
-        )
-        return _get_backoff_cleanup_process_result(orphan_cleanup_model)
-    for failure in resource_listing.failures:
-        logger.warning(
-            "Failed to list resources of %s in %s for orphan cleanup in %s/%s: %s",
-            failure.backend.value,
-            failure.region if failure.region is not None else "all regions",
-            orphan_cleanup_model.backend.project.name,
-            orphan_cleanup_model.backend.type.value,
-            failure.message,
-        )
-    resource_groups = resource_listing.resource_groups
-    owner_records = await _load_owner_records(
-        project_id=orphan_cleanup_model.backend.project_id,
-        resource_groups=resource_groups,
-    )
-    decisions = [
-        _get_resource_group_decision(
-            orphan_cleanup_model, resource_group, owner_records, listed_at
-        )
-        for resource_group in resource_groups
-    ]
-    final_decisions: list[_ResourceGroupDecision] = []
-    orphan_events: list[_OrphanEvent] = []
-    for resource_group, decision in zip(resource_groups, decisions):
-        if decision == _ResourceGroupDecision.ORPHAN:
-            decision = await _handle_orphaned_resource_group(
-                compute, orphan_cleanup_model, resource_group
+    ) as backend:
+        if backend is None:
+            logger.warning(
+                "Failed to clean up orphaned resources in %s/%s: backend is not available",
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
             )
-            if decision in (_ResourceGroupDecision.ORPHAN, _ResourceGroupDecision.DELETING):
-                orphan_events.append(_get_orphan_event(resource_group, owner_records, decision))
-        final_decisions.append(decision)
+            return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithResourceListingSupport)
+        listed_at = get_current_datetime()
+        try:
+            resource_listing = await run_async(compute.list_resource_groups)
+        except BackendError as e:
+            logger.warning(
+                "Failed to list resource groups in %s/%s due to backend error: %s",
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                repr(e),
+            )
+            return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+        except Exception:
+            logger.exception(
+                "Failed to list resource groups in %s/%s due to unexpected error",
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+            )
+            return _get_backoff_cleanup_process_result(orphan_cleanup_model)
+        for failure in resource_listing.failures:
+            logger.warning(
+                "Failed to list resources of %s in %s for orphan cleanup in %s/%s: %s",
+                failure.backend.value,
+                failure.region if failure.region is not None else "all regions",
+                orphan_cleanup_model.backend.project.name,
+                orphan_cleanup_model.backend.type.value,
+                failure.message,
+            )
+        resource_groups = resource_listing.resource_groups
+        owner_records = await _load_owner_records(
+            project_id=orphan_cleanup_model.backend.project_id,
+            resource_groups=resource_groups,
+        )
+        decisions = [
+            _get_resource_group_decision(
+                orphan_cleanup_model, resource_group, owner_records, listed_at
+            )
+            for resource_group in resource_groups
+        ]
+        final_decisions: list[_ResourceGroupDecision] = []
+        orphan_events: list[_OrphanEvent] = []
+        for resource_group, decision in zip(resource_groups, decisions):
+            if decision == _ResourceGroupDecision.ORPHAN:
+                decision = await _handle_orphaned_resource_group(
+                    compute, orphan_cleanup_model, resource_group
+                )
+                if decision in (_ResourceGroupDecision.ORPHAN, _ResourceGroupDecision.DELETING):
+                    orphan_events.append(
+                        _get_orphan_event(resource_group, owner_records, decision)
+                    )
+            final_decisions.append(decision)
     if any(d is _ResourceGroupDecision.DELETE_FAILED for d in final_decisions):
         result = _get_backoff_cleanup_process_result(orphan_cleanup_model)
     elif (

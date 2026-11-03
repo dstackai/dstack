@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.compute import ComputeWithGatewayLoadBalancerSupport
-from dstack._internal.core.errors import BackendError, BackendNotAvailable
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     GatewayReplicaStatus,
@@ -351,60 +351,58 @@ async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedR
     configuration = gateways_services.get_gateway_configuration(gateway_model)
     update_map: _GatewayUpdateMap = {}
     if get_effective_load_balancer(configuration) is not None:
-        try:
-            (
-                _,
-                backend,
-            ) = await backends_services.get_project_backend_with_model_by_type_or_error(
-                project=gateway_model.project, backend_type=configuration.backend
-            )
-        except BackendNotAvailable:
-            return _SubmittedResult(
-                update_map={
-                    "status": GatewayStatus.FAILED,
-                    "status_message": "Backend not available",
-                }
-            )
-        compute = backend.compute()
-        if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
-            logger.error(
-                "%s: backend does not support load balancer operations", fmt(gateway_model)
-            )
-            return _SubmittedResult(
-                update_map={
-                    "status": GatewayStatus.FAILED,
-                    "status_message": "Backend does not support load balancer operations",
-                }
-            )
-        lb_configuration = get_gateway_lb_configuration(gateway_model)
-        logger.info("%s: creating gateway load balancer...", fmt(gateway_model))
-        try:
-            backend_data = await run_async(compute.create_gateway_load_balancer, lb_configuration)
-        except BackendError as e:
-            status_message = f"Backend error: {repr(e)}"
-            if len(e.args) > 0:
-                status_message = str(e.args[0])
-            logger.warning(
-                "%s: failed to create gateway load balancer: %s",
-                fmt(gateway_model),
-                status_message,
-            )
-            return _SubmittedResult(
-                update_map={
-                    "status": GatewayStatus.FAILED,
-                    "status_message": status_message,
-                }
-            )
-        except Exception:
-            logger.exception(
-                "%s: unexpected error when creating gateway load balancer", fmt(gateway_model)
-            )
-            return _SubmittedResult(
-                update_map={
-                    "status": GatewayStatus.FAILED,
-                    "status_message": "Unexpected error when creating load balancer",
-                }
-            )
+        async with backends_services.lease_project_backend_by_type(
+            project=gateway_model.project, backend_type=configuration.backend
+        ) as backend:
+            if backend is None:
+                return _SubmittedResult(
+                    update_map={
+                        "status": GatewayStatus.FAILED,
+                        "status_message": "Backend not available",
+                    }
+                )
+            compute = backend.compute()
+            if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+                logger.error(
+                    "%s: backend does not support load balancer operations", fmt(gateway_model)
+                )
+                return _SubmittedResult(
+                    update_map={
+                        "status": GatewayStatus.FAILED,
+                        "status_message": "Backend does not support load balancer operations",
+                    }
+                )
+            lb_configuration = get_gateway_lb_configuration(gateway_model)
+            logger.info("%s: creating gateway load balancer...", fmt(gateway_model))
+            try:
+                backend_data = await run_async(
+                    compute.create_gateway_load_balancer, lb_configuration
+                )
+            except BackendError as e:
+                status_message = f"Backend error: {repr(e)}"
+                if len(e.args) > 0:
+                    status_message = str(e.args[0])
+                logger.warning(
+                    "%s: failed to create gateway load balancer: %s",
+                    fmt(gateway_model),
+                    status_message,
+                )
+                return _SubmittedResult(
+                    update_map={
+                        "status": GatewayStatus.FAILED,
+                        "status_message": status_message,
+                    }
+                )
+            except Exception:
+                logger.exception(
+                    "%s: unexpected error when creating gateway load balancer", fmt(gateway_model)
+                )
+                return _SubmittedResult(
+                    update_map={
+                        "status": GatewayStatus.FAILED,
+                        "status_message": "Unexpected error when creating load balancer",
+                    }
+                )
         logger.info("%s: gateway load balancer created.", fmt(gateway_model))
         update_map["hostname"] = backend_data.hostname
         update_map["backend_data"] = backend_data.backend_data
@@ -682,28 +680,33 @@ async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _Proces
 async def _terminate_gateway_load_balancer(gateway_model: GatewayModel) -> bool:
     """Terminates the gateway's load balancer. Returns True on success, False on failure."""
     configuration = gateways_services.get_gateway_configuration(gateway_model)
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_type_or_error(
-            project=gateway_model.project, backend_type=configuration.backend
-        )
-    except BackendNotAvailable:
-        logger.error(
-            "%s: backend not available, cannot terminate load balancer", fmt(gateway_model)
-        )
-        return False
-    compute = backend.compute()
-    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
-        logger.error("%s: backend does not support load balancer operations", fmt(gateway_model))
-        return False
-    lb_configuration = get_gateway_lb_configuration(gateway_model)
-    logger.info("%s: terminating gateway load balancer...", fmt(gateway_model))
-    try:
-        await run_async(
-            compute.terminate_gateway_load_balancer, lb_configuration, gateway_model.backend_data
-        )
-    except Exception:
-        logger.exception("%s: error when terminating gateway load balancer", fmt(gateway_model))
-        return False
+    async with backends_services.lease_project_backend_by_type(
+        project=gateway_model.project, backend_type=configuration.backend
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "%s: backend not available, cannot terminate load balancer", fmt(gateway_model)
+            )
+            return False
+        compute = backend.compute()
+        if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+            logger.error(
+                "%s: backend does not support load balancer operations", fmt(gateway_model)
+            )
+            return False
+        lb_configuration = get_gateway_lb_configuration(gateway_model)
+        logger.info("%s: terminating gateway load balancer...", fmt(gateway_model))
+        try:
+            await run_async(
+                compute.terminate_gateway_load_balancer,
+                lb_configuration,
+                gateway_model.backend_data,
+            )
+        except Exception:
+            logger.exception(
+                "%s: error when terminating gateway load balancer", fmt(gateway_model)
+            )
+            return False
     logger.info("%s: gateway load balancer terminated.", fmt(gateway_model))
     return True
 

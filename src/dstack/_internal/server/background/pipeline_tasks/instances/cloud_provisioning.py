@@ -37,6 +37,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import get_fleet_offers, is_cloud_cluster
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
@@ -103,147 +104,150 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         master_job_provisioning_data = cluster_context.master_job_provisioning_data
 
-    offers = await get_fleet_offers(
-        project=instance_model.project,
-        profile=profile,
-        requirements=requirements,
-        fleet_model=instance_model.fleet,
-        placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
-        blocks="auto" if instance_model.total_blocks is None else instance_model.total_blocks,
-        exclude_not_available=True,
-        master_job_provisioning_data=master_job_provisioning_data,
-        infer_master_job_provisioning_data_from_fleet_instances=False,
-        include_only_create_instance_supported_backends=True,
-    )
-
-    offers_iter = iter(offers)
-    offers_tried = 0
-    # Limit number of offers tried to prevent long-running processing in case all offers fail.
-    while offers_tried < server_settings.MAX_OFFERS_TRIED:
-        backend_with_instance_offer = next(offers_iter, None)
-        if backend_with_instance_offer is None:
-            break
-        backend, instance_offer = backend_with_instance_offer
-
-        if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
-            continue
-        compute = backend.compute()
-        assert isinstance(compute, ComputeWithCreateInstanceSupport)
-        if master_job_provisioning_data is not None:
-            # `get_fleet_offers()` already restricts backend and region from the master.
-            # Availability zone still has to be narrowed per offer.
-            instance_offer = get_instance_offer_with_restricted_az(
-                instance_offer=instance_offer,
-                master_job_provisioning_data=master_job_provisioning_data,
-            )
-        if (
-            cluster_context is not None
-            and cluster_context.is_current_instance_master
-            and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
-            and isinstance(compute, ComputeWithPlacementGroupSupport)
-            and await can_use_placement_groups(
-                compute=compute,
-                instance_offer=instance_offer,
-                reservation=instance_configuration.reservation,
-            )
-        ):
-            (
-                placement_group_model,
-                created_placement_group_model,
-            ) = await _find_or_create_suitable_placement_group_model(
-                instance_model=instance_model,
-                placement_group_models=placement_group_models,
-                instance_offer=instance_offer,
-                compute=compute,
-            )
-            if placement_group_model is None:
-                continue
-            if created_placement_group_model:
-                placement_group_models.append(placement_group_model)
-                result.new_placement_group_models.append(placement_group_model)
-
-        logger.debug(
-            "Trying %s in %s/%s for $%0.4f per hour",
-            instance_offer.instance.name,
-            instance_offer.backend.value,
-            instance_offer.region,
-            instance_offer.price,
+    async with backends_services.lease_project_backends(instance_model.project) as backends:
+        offers = await get_fleet_offers(
+            backends=backends,
+            profile=profile,
+            requirements=requirements,
+            fleet_model=instance_model.fleet,
+            placement_group=placement_group_model_to_placement_group_optional(
+                placement_group_model
+            ),
+            blocks="auto" if instance_model.total_blocks is None else instance_model.total_blocks,
+            exclude_not_available=True,
+            master_job_provisioning_data=master_job_provisioning_data,
+            infer_master_job_provisioning_data_from_fleet_instances=False,
+            include_only_create_instance_supported_backends=True,
         )
-        offers_tried += 1
-        try:
-            job_provisioning_data = await run_async(
-                compute.create_instance,
-                instance_offer,
-                instance_configuration,
-                placement_group_model_to_placement_group_optional(placement_group_model),
-            )
-        except SkipOffer as exc:
-            offers_tried -= 1
-            logger.info(
-                "%s launch in %s/%s skipped: %s",
+
+        offers_iter = iter(offers)
+        offers_tried = 0
+        # Limit number of offers tried to prevent long-running processing in case all offers fail.
+        while offers_tried < server_settings.MAX_OFFERS_TRIED:
+            backend_with_instance_offer = next(offers_iter, None)
+            if backend_with_instance_offer is None:
+                break
+            backend, instance_offer = backend_with_instance_offer
+
+            if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
+                continue
+            compute = backend.compute()
+            assert isinstance(compute, ComputeWithCreateInstanceSupport)
+            if master_job_provisioning_data is not None:
+                # `get_fleet_offers()` already restricts backend and region from the master.
+                # Availability zone still has to be narrowed per offer.
+                instance_offer = get_instance_offer_with_restricted_az(
+                    instance_offer=instance_offer,
+                    master_job_provisioning_data=master_job_provisioning_data,
+                )
+            if (
+                cluster_context is not None
+                and cluster_context.is_current_instance_master
+                and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
+                and isinstance(compute, ComputeWithPlacementGroupSupport)
+                and await can_use_placement_groups(
+                    compute=compute,
+                    instance_offer=instance_offer,
+                    reservation=instance_configuration.reservation,
+                )
+            ):
+                (
+                    placement_group_model,
+                    created_placement_group_model,
+                ) = await _find_or_create_suitable_placement_group_model(
+                    instance_model=instance_model,
+                    placement_group_models=placement_group_models,
+                    instance_offer=instance_offer,
+                    compute=compute,
+                )
+                if placement_group_model is None:
+                    continue
+                if created_placement_group_model:
+                    placement_group_models.append(placement_group_model)
+                    result.new_placement_group_models.append(placement_group_model)
+
+            logger.debug(
+                "Trying %s in %s/%s for $%0.4f per hour",
                 instance_offer.instance.name,
                 instance_offer.backend.value,
                 instance_offer.region,
-                exc,
-                extra={"instance_name": instance_model.name},
+                instance_offer.price,
             )
-            continue
-        except BackendError as exc:
-            logger.warning(
-                "%s launch in %s/%s failed: %s",
-                instance_offer.instance.name,
-                instance_offer.backend.value,
-                instance_offer.region,
-                repr(exc),
-                extra={"instance_name": instance_model.name},
+            offers_tried += 1
+            try:
+                job_provisioning_data = await run_async(
+                    compute.create_instance,
+                    instance_offer,
+                    instance_configuration,
+                    placement_group_model_to_placement_group_optional(placement_group_model),
+                )
+            except SkipOffer as exc:
+                offers_tried -= 1
+                logger.info(
+                    "%s launch in %s/%s skipped: %s",
+                    instance_offer.instance.name,
+                    instance_offer.backend.value,
+                    instance_offer.region,
+                    exc,
+                    extra={"instance_name": instance_model.name},
+                )
+                continue
+            except BackendError as exc:
+                logger.warning(
+                    "%s launch in %s/%s failed: %s",
+                    instance_offer.instance.name,
+                    instance_offer.backend.value,
+                    instance_offer.region,
+                    repr(exc),
+                    extra={"instance_name": instance_model.name},
+                )
+                continue
+            except Exception:
+                logger.exception(
+                    "Got exception when launching %s in %s/%s",
+                    instance_offer.instance.name,
+                    instance_offer.backend.value,
+                    instance_offer.region,
+                )
+                continue
+
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.PROVISIONING,
             )
-            continue
-        except Exception:
-            logger.exception(
-                "Got exception when launching %s in %s/%s",
-                instance_offer.instance.name,
-                instance_offer.backend.value,
-                instance_offer.region,
+            result.instance_update_map["backend"] = backend.TYPE
+            result.instance_update_map["region"] = instance_offer.region
+            result.instance_update_map["price"] = instance_offer.price
+            result.instance_update_map["instance_configuration"] = (
+                instance_configuration.model_dump_json()
             )
-            continue
+            result.instance_update_map["job_provisioning_data"] = (
+                job_provisioning_data.model_dump_json()
+            )
+            result.instance_update_map["offer"] = instance_offer.model_dump_json()
+            result.instance_update_map["total_blocks"] = instance_offer.total_blocks
+            result.instance_update_map["started_at"] = NOW_PLACEHOLDER
+
+            if (
+                instance_model.fleet_id is not None
+                and cluster_context is not None
+                and cluster_context.is_current_instance_master
+            ):
+                # Clean up placement groups that did not end up being used.
+                result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
+                if placement_group_model is not None:
+                    result.schedule_pg_deletion_except_id = placement_group_model.id
+            return result
 
         set_status_update(
             update_map=result.instance_update_map,
             instance_model=instance_model,
-            new_status=InstanceStatus.PROVISIONING,
+            new_status=InstanceStatus.TERMINATED,
+            termination_reason=InstanceTerminationReason.NO_OFFERS,
+            termination_reason_message="All offers failed" if offers else "No offers found",
         )
-        result.instance_update_map["backend"] = backend.TYPE
-        result.instance_update_map["region"] = instance_offer.region
-        result.instance_update_map["price"] = instance_offer.price
-        result.instance_update_map["instance_configuration"] = (
-            instance_configuration.model_dump_json()
-        )
-        result.instance_update_map["job_provisioning_data"] = (
-            job_provisioning_data.model_dump_json()
-        )
-        result.instance_update_map["offer"] = instance_offer.model_dump_json()
-        result.instance_update_map["total_blocks"] = instance_offer.total_blocks
-        result.instance_update_map["started_at"] = NOW_PLACEHOLDER
-
-        if (
-            instance_model.fleet_id is not None
-            and cluster_context is not None
-            and cluster_context.is_current_instance_master
-        ):
-            # Clean up placement groups that did not end up being used.
-            result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
-            if placement_group_model is not None:
-                result.schedule_pg_deletion_except_id = placement_group_model.id
         return result
-
-    set_status_update(
-        update_map=result.instance_update_map,
-        instance_model=instance_model,
-        new_status=InstanceStatus.TERMINATED,
-        termination_reason=InstanceTerminationReason.NO_OFFERS,
-        termination_reason_message="All offers failed" if offers else "No offers found",
-    )
-    return result
 
 
 async def _get_cluster_master_context(

@@ -1,11 +1,12 @@
 import asyncio
 import json
 import time
-from collections.abc import Iterable, Iterator
+from collections.abc import AsyncIterator, Iterable, Iterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from cachetools import TTLCache
 from pydantic import ValidationError
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -65,8 +66,8 @@ async def create_backend(
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
-    backend = await get_project_backend_by_type(project=project, backend_type=configurator.TYPE)
-    if backend is not None:
+    backend_exists = any(configurator.TYPE == b.type for b in project.backends)
+    if backend_exists:
         raise ResourceExistsError()
     backend = await validate_and_create_backend_model(
         project=project, configurator=configurator, config=config
@@ -260,26 +261,249 @@ async def delete_backends(
 BackendTuple = Tuple[BackendModel, Backend]
 
 
+@dataclass
+class _CachedBackend:
+    model: BackendModel
+    backend: Backend
+    leases: int = 0
+    last_used: float = field(default_factory=time.monotonic)
+    retired: bool = False
+
+
+_BACKEND_IDLE_TTL = 300
 _BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
-_BACKENDS_CACHE = TTLCache[UUID, Dict[BackendType, BackendTuple]](maxsize=1000, ttl=300)
+_BACKENDS_CACHE: Dict[UUID, Dict[BackendType, _CachedBackend]] = {}
+"""
+A backend is cached per project and used through leases (`lease_project_backend*()`).
+The cache retires a backend if its config changes, if it is deleted from the project,
+or if it is not leased for `_BACKEND_IDLE_TTL`. A retired backend is closed
+once its last lease is released, so callers must not use backends outside of leases.
+"""
 
 
 def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
     return _BACKENDS_CACHE_LOCKS.setdefault(project_id, asyncio.Lock())
 
 
-async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
+@asynccontextmanager
+async def lease_project_backends_with_models(
+    project: ProjectModel,
+) -> AsyncIterator[List[BackendTuple]]:
+    cached_backends = await _acquire_project_backends(project)
+    try:
+        yield [(c.model, c.backend) for c in cached_backends]
+    finally:
+        await _release_backends(cached_backends)
+
+
+@asynccontextmanager
+async def lease_project_backends(project: ProjectModel) -> AsyncIterator[List[Backend]]:
+    async with lease_project_backends_with_models(project) as backends_with_models:
+        yield [b for _, b in backends_with_models]
+
+
+_select_project_backend_with_model_by_type = None
+
+
+def set_select_project_backend_with_model_by_type(
+    func: Callable[
+        [ProjectModel, BackendType, List[BackendTuple]],
+        Coroutine[None, None, Optional[BackendTuple]],
+    ],
+):
+    """
+    Overrides how `lease_project_backend*_by_type()` select a backend from the project backends
+    if `overrides=True` is passed. This can be used if a backend needs to be replaced with
+    another backend. For example, DstackBackend in dstack Sky can be used in place of
+    other backends.
+    """
+    global _select_project_backend_with_model_by_type
+    _select_project_backend_with_model_by_type = func
+
+
+@asynccontextmanager
+async def lease_project_backend_with_model_by_type(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> AsyncIterator[Optional[BackendTuple]]:
+    async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
+        if overrides and _select_project_backend_with_model_by_type is not None:
+            return await _select_project_backend_with_model_by_type(
+                project, backend_type, backends_with_models
+            )
+        for backend_model, backend in backends_with_models:
+            if backend.TYPE == backend_type:
+                return backend_model, backend
+        return None
+
+    async with _lease_selected_project_backend(project, select) as backend_with_model:
+        yield backend_with_model
+
+
+@asynccontextmanager
+async def lease_project_backend_with_model_by_type_or_error(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> AsyncIterator[BackendTuple]:
+    async with lease_project_backend_with_model_by_type(
+        project=project, backend_type=backend_type, overrides=overrides
+    ) as backend_with_model:
+        if backend_with_model is None:
+            raise BackendNotAvailable()
+        yield backend_with_model
+
+
+@asynccontextmanager
+async def lease_project_backend_by_type(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> AsyncIterator[Optional[Backend]]:
+    async with lease_project_backend_with_model_by_type(
+        project=project, backend_type=backend_type, overrides=overrides
+    ) as backend_with_model:
+        yield backend_with_model[1] if backend_with_model is not None else None
+
+
+@asynccontextmanager
+async def lease_project_backend_by_type_or_error(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> AsyncIterator[Backend]:
+    async with lease_project_backend_with_model_by_type_or_error(
+        project=project, backend_type=backend_type, overrides=overrides
+    ) as (_, backend):
+        yield backend
+
+
+@asynccontextmanager
+async def lease_project_backend_with_model_by_id(
+    project: ProjectModel, backend_id: UUID
+) -> AsyncIterator[Optional[BackendTuple]]:
+    async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
+        for backend_model, backend in backends_with_models:
+            if backend_model.id == backend_id:
+                return backend_model, backend
+        return None
+
+    async with _lease_selected_project_backend(project, select) as backend_with_model:
+        yield backend_with_model
+
+
+@asynccontextmanager
+async def lease_project_backend_with_model_by_id_or_error(
+    project: ProjectModel, backend_id: UUID
+) -> AsyncIterator[BackendTuple]:
+    async with lease_project_backend_with_model_by_id(
+        project=project, backend_id=backend_id
+    ) as backend_with_model:
+        if backend_with_model is None:
+            raise BackendNotAvailable()
+        yield backend_with_model
+
+
+async def get_project_backend_model_by_type(
+    project: ProjectModel, backend_type: BackendType
+) -> Optional[BackendModel]:
+    for backend in project.backends:
+        if backend.type == backend_type:
+            return backend
+    return None
+
+
+async def get_project_backend_model_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendModel:
+    backend_model = await get_project_backend_model_by_type(
+        project=project, backend_type=backend_type
+    )
+    if backend_model is None:
+        raise BackendNotAvailable()
+    return backend_model
+
+
+async def close_idle_backends():
+    """
+    Retires and closes backends that are not leased for `_BACKEND_IDLE_TTL`.
+    """
+    idle_since = time.monotonic() - _BACKEND_IDLE_TTL
+    to_close: List[_CachedBackend] = []
+    for project_id in list(_BACKENDS_CACHE):
+        async with _get_project_cache_lock(project_id):
+            project_backends = _BACKENDS_CACHE.get(project_id, {})
+            for backend_type, cached_backend in list(project_backends.items()):
+                if cached_backend.leases == 0 and cached_backend.last_used < idle_since:
+                    del project_backends[backend_type]
+                    to_close.extend(_retire_backend(cached_backend))
+            if not project_backends:
+                _BACKENDS_CACHE.pop(project_id, None)
+    await _close_backends(to_close)
+
+
+async def close_all_backends():
+    """
+    Retires all cached backends. Backends that are leased are closed once released.
+    """
+    to_close: List[_CachedBackend] = []
+    for project_id in list(_BACKENDS_CACHE):
+        async with _get_project_cache_lock(project_id):
+            for cached_backend in _BACKENDS_CACHE.pop(project_id, {}).values():
+                to_close.extend(_retire_backend(cached_backend))
+    await _close_backends(to_close)
+
+
+@asynccontextmanager
+async def _lease_selected_project_backend(
+    project: ProjectModel,
+    select: Callable[[List[BackendTuple]], Coroutine[None, None, Optional[BackendTuple]]],
+) -> AsyncIterator[Optional[BackendTuple]]:
+    # All project backends are leased while `select` runs outside of the cache lock,
+    # so that the selected backend cannot be closed in between.
+    cached_backends = await _acquire_project_backends(project, touch=False)
+    try:
+        backend_with_model = await select([(c.model, c.backend) for c in cached_backends])
+    except BaseException:
+        await _release_backends(cached_backends, touch=False)
+        raise
+    selected = [
+        c
+        for c in cached_backends
+        if backend_with_model is not None and c.backend is backend_with_model[1]
+    ]
+    await _release_backends(
+        [c for c in cached_backends if c not in selected],
+        touch=False,
+    )
+    for c in selected:
+        c.last_used = time.monotonic()
+    try:
+        yield backend_with_model
+    finally:
+        await _release_backends(selected)
+
+
+async def _acquire_project_backends(
+    project: ProjectModel, touch: bool = True
+) -> List[_CachedBackend]:
+    to_close: List[_CachedBackend] = []
     async with _get_project_cache_lock(project.id):
-        key = project.id
-        project_backends = _BACKENDS_CACHE.get(key, {})
+        project_backends = _BACKENDS_CACHE.setdefault(project.id, {})
+        backend_models = {backend_model.type: backend_model for backend_model in project.backends}
+        for backend_type, cached_backend in list(project_backends.items()):
+            backend_model = backend_models.get(backend_type)
+            if (
+                backend_model is None
+                or cached_backend.model.config != backend_model.config
+                or cached_backend.model.auth != backend_model.auth
+            ):
+                del project_backends[backend_type]
+                to_close.extend(_retire_backend(cached_backend))
         to_init: List[Tuple[BackendModel, Configurator, StoredBackendRecord]] = []
         for backend_model in project.backends:
-            cached_backend = project_backends.get(backend_model.type)
-            if (
-                cached_backend is not None
-                and cached_backend[0].config == backend_model.config
-                and cached_backend[0].auth == backend_model.auth
-            ):
+            if backend_model.type in project_backends:
                 continue
             configurator = get_configurator(backend_model.type)
             if configurator is None:
@@ -320,7 +544,9 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                         )
                 else:
                     backend, duration = result
-                    project_backends[backend_model.type] = (backend_model, backend)
+                    project_backends[backend_model.type] = _CachedBackend(
+                        model=backend_model, backend=backend
+                    )
                     initialized_results.append(f"{backend_model.type.value}={duration:.1f}s")
             logger.debug(
                 "Initialized %d backends in %.1fs: %s",
@@ -329,12 +555,51 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                 ", ".join(initialized_results),
             )
 
-        # `__setitem__()` will also expire the cache.
-        # Note that there is no global cache lock so a race condition is possible:
-        # one coroutine updates/re-assigns backends expired by another coroutine.
-        # This is ok since the only effect is that project's cache gets restored.
-        _BACKENDS_CACHE[key] = project_backends
-    return list(project_backends.values())
+        cached_backends = list(project_backends.values())
+        now = time.monotonic()
+        for cached_backend in cached_backends:
+            cached_backend.leases += 1
+            if touch:
+                cached_backend.last_used = now
+    await _close_backends(to_close)
+    return cached_backends
+
+
+async def _release_backends(cached_backends: List[_CachedBackend], touch: bool = True):
+    to_close: List[_CachedBackend] = []
+    now = time.monotonic()
+    for cached_backend in cached_backends:
+        cached_backend.leases -= 1
+        if touch:
+            cached_backend.last_used = now
+        if cached_backend.retired and cached_backend.leases == 0:
+            to_close.append(cached_backend)
+    await _close_backends(to_close)
+
+
+def _retire_backend(cached_backend: _CachedBackend) -> List[_CachedBackend]:
+    """
+    Marks the backend as retired and returns it if it can be closed now.
+    """
+    cached_backend.retired = True
+    if cached_backend.leases == 0:
+        return [cached_backend]
+    return []
+
+
+async def _close_backends(cached_backends: List[_CachedBackend]):
+    for cached_backend, result in zip(
+        cached_backends,
+        await asyncio.gather(
+            *(run_async(c.backend.close) for c in cached_backends), return_exceptions=True
+        ),
+    ):
+        if isinstance(result, BaseException):
+            logger.error(
+                "Failed to close %s backend",
+                cached_backend.model.type.value,
+                exc_info=result,
+            )
 
 
 async def _get_backend_tracked(
@@ -343,128 +608,6 @@ async def _get_backend_tracked(
     t = time.time()
     backend = await run_async(configurator.get_backend, backend_record)
     return backend, time.time() - t
-
-
-_get_project_backend_with_model_by_type = None
-
-
-def set_get_project_backend_with_model_by_type(
-    func: Callable[[ProjectModel, BackendType], Coroutine[None, None, Optional[BackendTuple]]],
-):
-    """
-    Overrides `get_project_effective_backend_with_model_by_type` with `func`.
-    Then get_project_backend_* functions can pass overrides=True to call `func`
-    This can be used if a backend needs to be replaced with another backend.
-    For example, DstackBackend in dstack Sky can be used in place of other backends.
-    """
-    global _get_project_backend_with_model_by_type
-    _get_project_backend_with_model_by_type = func
-
-
-async def get_project_backend_with_model_by_type(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> Optional[BackendTuple]:
-    if overrides and _get_project_backend_with_model_by_type is not None:
-        return await _get_project_backend_with_model_by_type(project, backend_type)
-    backends_with_models = await get_project_backends_with_models(project=project)
-    for backend_model, backend in backends_with_models:
-        if backend.TYPE == backend_type:
-            return backend_model, backend
-    return None
-
-
-async def get_project_backend_with_model_by_type_or_error(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> BackendTuple:
-    backend_with_model = await get_project_backend_with_model_by_type(
-        project=project,
-        backend_type=backend_type,
-        overrides=overrides,
-    )
-    if backend_with_model is None:
-        raise BackendNotAvailable()
-    return backend_with_model
-
-
-async def get_project_backends(project: ProjectModel) -> List[Backend]:
-    backends_with_models = await get_project_backends_with_models(project)
-    backends = [b for _, b in backends_with_models]
-    return backends
-
-
-async def get_project_backend_by_type(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> Optional[Backend]:
-    backend_with_model = await get_project_backend_with_model_by_type(
-        project=project,
-        backend_type=backend_type,
-        overrides=overrides,
-    )
-    if backend_with_model is None:
-        return None
-    return backend_with_model[1]
-
-
-async def get_project_backend_by_type_or_error(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> Backend:
-    backend = await get_project_backend_by_type(
-        project=project,
-        backend_type=backend_type,
-        overrides=overrides,
-    )
-    if backend is None:
-        raise BackendNotAvailable()
-    return backend
-
-
-async def get_project_backend_model_by_type(
-    project: ProjectModel, backend_type: BackendType
-) -> Optional[BackendModel]:
-    for backend in project.backends:
-        if backend.type == backend_type:
-            return backend
-    return None
-
-
-async def get_project_backend_model_by_type_or_error(
-    project: ProjectModel, backend_type: BackendType
-) -> BackendModel:
-    backend_model = await get_project_backend_model_by_type(
-        project=project, backend_type=backend_type
-    )
-    if backend_model is None:
-        raise BackendNotAvailable()
-    return backend_model
-
-
-async def get_project_backend_with_model_by_id(
-    project: ProjectModel, backend_id: UUID
-) -> Optional[BackendTuple]:
-    backends_with_models = await get_project_backends_with_models(project=project)
-    for backend_model, backend in backends_with_models:
-        if backend_model.id == backend_id:
-            return backend_model, backend
-    return None
-
-
-async def get_project_backend_with_model_by_id_or_error(
-    project: ProjectModel, backend_id: UUID
-) -> BackendTuple:
-    backend_with_model = await get_project_backend_with_model_by_id(
-        project=project, backend_id=backend_id
-    )
-    if backend_with_model is None:
-        raise BackendNotAvailable()
-    return backend_with_model
 
 
 async def get_backend_offers(

@@ -964,32 +964,32 @@ async def _detach_volumes_from_job_instance(
     run_termination_reason: Optional[RunTerminationReason],
 ) -> _VolumeDetachResult:
     job_spec = get_job_spec(job_model)
-    backend = await backends_services.get_project_backend_by_type(
+    async with backends_services.lease_project_backend_by_type(
         project=instance_model.project,
         backend_type=jpd.backend,
-    )
-    if backend is None:
-        logger.error(
-            "Failed to detach volumes from %s. Backend not available.", instance_model.name
-        )
-        return _VolumeDetachResult(all_detached=False)
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "Failed to detach volumes from %s. Backend not available.", instance_model.name
+            )
+            return _VolumeDetachResult(all_detached=False)
 
-    detached_volume_ids = set()
-    all_detached = True
-    for volume_model in volume_models:
-        detached = await _detach_volume_from_job_instance(
-            backend=backend,
-            job_model=job_model,
-            jpd=jpd,
-            job_spec=job_spec,
-            instance_model=instance_model,
-            volume_model=volume_model,
-            run_termination_reason=run_termination_reason,
-        )
-        if detached:
-            detached_volume_ids.add(volume_model.id)
-        else:
-            all_detached = False
+        detached_volume_ids = set()
+        all_detached = True
+        for volume_model in volume_models:
+            detached = await _detach_volume_from_job_instance(
+                backend=backend,
+                job_model=job_model,
+                jpd=jpd,
+                job_spec=job_spec,
+                instance_model=instance_model,
+                volume_model=volume_model,
+                run_termination_reason=run_termination_reason,
+            )
+            if detached:
+                detached_volume_ids.add(volume_model.id)
+            else:
+                all_detached = False
 
     return _VolumeDetachResult(
         all_detached=all_detached,

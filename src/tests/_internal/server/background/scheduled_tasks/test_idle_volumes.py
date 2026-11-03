@@ -20,6 +20,7 @@ from dstack._internal.server.testing.common import (
     create_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
+    lease_yielding,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -64,11 +65,9 @@ class TestProcessIdleVolumes:
         )
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-        ) as m:
+        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
             aws_mock = Mock()
-            m.return_value = aws_mock
+            m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             await process_idle_volumes()
             m.assert_not_called()
@@ -110,11 +109,9 @@ class TestProcessIdleVolumes:
         volume.auto_cleanup_enabled = None
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-        ) as m:
+        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
             aws_mock = Mock()
-            m.return_value = aws_mock
+            m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             await process_idle_volumes()
             m.assert_not_called()

@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendError, BackendNotAvailable
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.pipeline_tasks import volumes as volumes_pipeline
@@ -24,6 +24,7 @@ from dstack._internal.server.testing.common import (
     create_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
+    lease_yielding,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -215,7 +216,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -224,7 +225,7 @@ class TestVolumeWorkerSubmitted:
                 volume_id="vol-1234",
                 size_gb=100,
             )
-            get_backend_mock.return_value = backend_mock
+            get_backend_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_volume_to_pipeline_item(volume))
 
@@ -256,7 +257,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -267,7 +268,7 @@ class TestVolumeWorkerSubmitted:
                     size_gb=100,
                 )
             )
-            get_backend_mock.return_value = backend_mock
+            get_backend_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_volume_to_pipeline_item(volume))
 
@@ -297,9 +298,9 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
-            get_backend_mock.side_effect = BackendNotAvailable()
+            get_backend_mock.side_effect = lease_yielding(None)
             await worker.process(_volume_to_pipeline_item(volume))
             get_backend_mock.assert_called_once()
 
@@ -329,14 +330,14 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.create_volume.side_effect = BackendError(
                 "Some error"
             )
-            get_backend_mock.return_value = backend_mock
+            get_backend_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_volume_to_pipeline_item(volume))
 
@@ -438,11 +439,11 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backend_mock.return_value = backend_mock
+            get_backend_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_volume_to_pipeline_item(volume))
 
@@ -474,7 +475,7 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             await worker.process(_volume_to_pipeline_item(volume))
             get_backend_mock.assert_not_called()
@@ -504,9 +505,9 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
-            get_backend_mock.side_effect = BackendNotAvailable()
+            get_backend_mock.side_effect = lease_yielding(None)
             await worker.process(_volume_to_pipeline_item(volume))
             get_backend_mock.assert_called_once()
 
@@ -535,14 +536,14 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.delete_volume.side_effect = BackendError(
                 "Delete failed"
             )
-            get_backend_mock.return_value = backend_mock
+            get_backend_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_volume_to_pipeline_item(volume))
 

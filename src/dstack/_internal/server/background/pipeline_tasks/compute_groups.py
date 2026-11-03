@@ -289,52 +289,52 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
         return result
     compute_group = compute_group_model_to_compute_group(compute_group_model)
     cgpd = compute_group.provisioning_data
-    backend = await backends_services.get_project_backend_by_type(
+    async with backends_services.lease_project_backend_by_type(
         project=compute_group_model.project,
         backend_type=cgpd.backend,
-    )
-    if backend is None:
-        logger.error(
-            "Failed to terminate compute group %s. Backend %s not available."
-            " Please terminate it manually to avoid unexpected charges.",
-            compute_group.name,
-            cgpd.backend,
-        )
-        return _get_terminated_result()
-    logger.debug("Terminating compute group %s", compute_group.name)
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGroupProvisioningSupport)
-    try:
-        await run_async(
-            compute.terminate_compute_group,
-            compute_group,
-        )
-    except Exception as e:
-        retry_at = get_current_datetime()
-        first_termination_retry_at = compute_group_model.first_termination_retry_at
-        if compute_group_model.first_termination_retry_at is None:
-            result.compute_group_update_map["first_termination_retry_at"] = NOW_PLACEHOLDER
-            first_termination_retry_at = retry_at
-        assert first_termination_retry_at is not None
-        result.compute_group_update_map["last_termination_retry_at"] = NOW_PLACEHOLDER
-        if _next_termination_retry_at(retry_at) < _get_termination_deadline(
-            first_termination_retry_at
-        ):
-            logger.warning(
-                "Failed to terminate compute group %s. Will retry. Error: %r",
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "Failed to terminate compute group %s. Backend %s not available."
+                " Please terminate it manually to avoid unexpected charges.",
+                compute_group.name,
+                cgpd.backend,
+            )
+            return _get_terminated_result()
+        logger.debug("Terminating compute group %s", compute_group.name)
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGroupProvisioningSupport)
+        try:
+            await run_async(
+                compute.terminate_compute_group,
+                compute_group,
+            )
+        except Exception as e:
+            retry_at = get_current_datetime()
+            first_termination_retry_at = compute_group_model.first_termination_retry_at
+            if compute_group_model.first_termination_retry_at is None:
+                result.compute_group_update_map["first_termination_retry_at"] = NOW_PLACEHOLDER
+                first_termination_retry_at = retry_at
+            assert first_termination_retry_at is not None
+            result.compute_group_update_map["last_termination_retry_at"] = NOW_PLACEHOLDER
+            if _next_termination_retry_at(retry_at) < _get_termination_deadline(
+                first_termination_retry_at
+            ):
+                logger.warning(
+                    "Failed to terminate compute group %s. Will retry. Error: %r",
+                    compute_group.name,
+                    e,
+                    exc_info=not isinstance(e, BackendError),
+                )
+                return result
+            logger.error(
+                "Failed all attempts to terminate compute group %s."
+                " Please terminate it manually to avoid unexpected charges."
+                " Error: %r",
                 compute_group.name,
                 e,
                 exc_info=not isinstance(e, BackendError),
             )
-            return result
-        logger.error(
-            "Failed all attempts to terminate compute group %s."
-            " Please terminate it manually to avoid unexpected charges."
-            " Error: %r",
-            compute_group.name,
-            e,
-            exc_info=not isinstance(e, BackendError),
-        )
     terminated_result = _get_terminated_result()
     terminated_result.compute_group_update_map.update(result.compute_group_update_map)
     terminated_result.instances_update_map.update(result.instances_update_map)

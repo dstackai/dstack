@@ -36,6 +36,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     RunModel,
 )
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
     get_fleet_master_instance_provisioning_data,
@@ -797,19 +798,20 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        backend_offers = await get_offers_by_requirements(
-            project=project,
-            profile=profile,
-            requirements=requirements,
-            multinode=multinode,
-            master_job_provisioning_data=master_instance_provisioning_data,
-            volumes=volumes,
-            privileged=job.job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-            max_offers=max_offers,
-            full_offers=full_offers,
-            unallocated_resources=unallocated_resources,
-        )
+        async with backends_services.lease_project_backends(project) as backends:
+            backend_offers = await get_offers_by_requirements(
+                backends=backends,
+                profile=profile,
+                requirements=requirements,
+                multinode=multinode,
+                master_job_provisioning_data=master_instance_provisioning_data,
+                volumes=volumes,
+                privileged=job.job_spec.privileged,
+                instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                max_offers=max_offers,
+                full_offers=full_offers,
+                unallocated_resources=unallocated_resources,
+            )
     return backend_offers
 
 
@@ -877,18 +879,19 @@ async def get_non_fleet_offers(
     if skip_backend_offers:
         backend_offers = []
     else:
-        backend_offers = await get_offers_by_requirements(
-            project=project,
-            profile=run_spec.merged_profile,
-            requirements=job.job_spec.requirements,
-            exclude_not_available=False,
-            multinode=is_multinode_job(job),
-            volumes=volumes,
-            privileged=job.job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-            full_offers=full_offers,
-            unallocated_resources=unallocated_resources,
-        )
+        async with backends_services.lease_project_backends(project) as backends:
+            backend_offers = await get_offers_by_requirements(
+                backends=backends,
+                profile=run_spec.merged_profile,
+                requirements=job.job_spec.requirements,
+                exclude_not_available=False,
+                multinode=is_multinode_job(job),
+                volumes=volumes,
+                privileged=job.job_spec.privileged,
+                instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                full_offers=full_offers,
+                unallocated_resources=unallocated_resources,
+            )
     return instance_offers, backend_offers
 
 

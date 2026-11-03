@@ -1,7 +1,7 @@
 import datetime as dt
 import logging
 from typing import ClassVar, Optional
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 import pytest_asyncio
@@ -54,6 +54,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_remote_connection_info,
     list_events,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 from tests._internal.server.background.pipeline_tasks.instances.helpers import (
@@ -166,8 +167,8 @@ class TestCheckInstance:
         backend = Mock()
         monkeypatch.setattr(
             instances_check,
-            "_get_backend_for_provisioning_wait",
-            AsyncMock(return_value=backend),
+            "_lease_backend_for_provisioning_wait",
+            mock_lease(backend),
         )
 
         await process_instance(session, worker, instance)

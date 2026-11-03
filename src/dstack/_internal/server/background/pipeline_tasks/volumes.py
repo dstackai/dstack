@@ -8,7 +8,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
-from dstack._internal.core.errors import BackendError, BackendNotAvailable
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     NOW_PLACEHOLDER,
@@ -306,59 +306,57 @@ class _ProcessResult:
 
 async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
-    try:
-        backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project,
-            backend_type=volume.configuration.backend,
-            overrides=True,
-        )
-    except BackendNotAvailable:
-        logger.error(
-            "Failed to process volume %s. Backend %s not available.",
-            volume.name,
-            volume.configuration.backend.value,
-        )
-        return _ProcessResult(
-            update_map={
-                "status": VolumeStatus.FAILED,
-                "status_message": "Backend not available",
-            }
-        )
-
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
-    try:
-        if volume.configuration.is_external:
-            logger.info("Registering external volume %s", volume_model.name)
-            vpd = await run_async(
-                compute.register_volume,
-                volume=volume,
+    async with backends_services.lease_project_backend_by_type(
+        project=volume_model.project,
+        backend_type=volume.configuration.backend,
+        overrides=True,
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "Failed to process volume %s. Backend %s not available.",
+                volume.name,
+                volume.configuration.backend.value,
             )
-        else:
-            logger.info("Provisioning new volume %s", volume_model.name)
-            vpd = await run_async(
-                compute.create_volume,
-                volume=volume,
+            return _ProcessResult(
+                update_map={
+                    "status": VolumeStatus.FAILED,
+                    "status_message": "Backend not available",
+                }
             )
-    except BackendError as e:
-        logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
-        status_message = f"Backend error: {repr(e)}"
-        if len(e.args) > 0:
-            status_message = str(e.args[0])
-        return _ProcessResult(
-            update_map={
-                "status": VolumeStatus.FAILED,
-                "status_message": status_message,
-            }
-        )
-    except Exception as e:
-        logger.exception("Got exception when creating volume %s", volume_model.name)
-        return _ProcessResult(
-            update_map={
-                "status": VolumeStatus.FAILED,
-                "status_message": f"Unexpected error: {repr(e)}",
-            }
-        )
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithVolumeSupport)
+        try:
+            if volume.configuration.is_external:
+                logger.info("Registering external volume %s", volume_model.name)
+                vpd = await run_async(
+                    compute.register_volume,
+                    volume=volume,
+                )
+            else:
+                logger.info("Provisioning new volume %s", volume_model.name)
+                vpd = await run_async(
+                    compute.create_volume,
+                    volume=volume,
+                )
+        except BackendError as e:
+            logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
+            status_message = f"Backend error: {repr(e)}"
+            if len(e.args) > 0:
+                status_message = str(e.args[0])
+            return _ProcessResult(
+                update_map={
+                    "status": VolumeStatus.FAILED,
+                    "status_message": status_message,
+                }
+            )
+        except Exception as e:
+            logger.exception("Got exception when creating volume %s", volume_model.name)
+            return _ProcessResult(
+                update_map={
+                    "status": VolumeStatus.FAILED,
+                    "status_message": f"Unexpected error: {repr(e)}",
+                }
+            )
 
     logger.info("Added new volume %s", volume_model.name)
     # Provisioned volumes marked as active since they become available almost immediately in AWS
@@ -383,32 +381,30 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessRe
             f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
         )
         return _get_deleted_result()
-    try:
-        backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project,
-            backend_type=volume.provisioning_data.backend,
-        )
-    except BackendNotAvailable:
-        # TODO: Retry deletion
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
-            " Please terminate it manually to avoid unexpected charges.",
-        )
-        return _get_deleted_result()
-
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
-    try:
-        await run_async(
-            compute.delete_volume,
-            volume=volume,
-        )
-    except Exception:
-        # TODO: Retry deletion
-        logger.exception(
-            "Got exception when deleting volume %s. Please terminate it manually to avoid unexpected charges.",
-            volume.name,
-        )
+    async with backends_services.lease_project_backend_by_type(
+        project=volume_model.project,
+        backend_type=volume.provisioning_data.backend,
+    ) as backend:
+        if backend is None:
+            # TODO: Retry deletion
+            logger.error(
+                f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
+                " Please terminate it manually to avoid unexpected charges.",
+            )
+            return _get_deleted_result()
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithVolumeSupport)
+        try:
+            await run_async(
+                compute.delete_volume,
+                volume=volume,
+            )
+        except Exception:
+            # TODO: Retry deletion
+            logger.exception(
+                "Got exception when deleting volume %s. Please terminate it manually to avoid unexpected charges.",
+                volume.name,
+            )
     return _get_deleted_result()
 
 

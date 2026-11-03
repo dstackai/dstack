@@ -35,6 +35,7 @@ from dstack._internal.server.testing.common import (
     create_gateway_replica,
     create_project,
     get_gateway_replica_configuration,
+    lease_yielding,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -535,7 +536,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -545,7 +546,7 @@ class TestGatewayWorkerSubmitted:
                     hostname="gateway-lb.example.com", backend_data="lb-backend-data"
                 )
             )
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -575,7 +576,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             get_backends_mock.assert_not_called()
@@ -602,12 +603,12 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
             await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
@@ -643,13 +644,13 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.create_gateway_load_balancer.side_effect = exception
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
             await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
@@ -1698,12 +1699,12 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -1742,7 +1743,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             get_backends_mock.assert_not_called()
@@ -1778,7 +1779,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1786,7 +1787,7 @@ class TestGatewayWorkerDeleted:
             backend_mock.compute.return_value.terminate_gateway_load_balancer.side_effect = (
                 Exception("boom")
             )
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -1827,12 +1828,12 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
-            get_backends_mock.return_value = [(backend, backend_mock)]
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -1867,7 +1868,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.get_project_backends_with_models"
+            "dstack._internal.server.services.backends.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             # Migration happens before the load balancer would be evaluated for termination,

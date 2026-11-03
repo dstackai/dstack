@@ -75,6 +75,7 @@ from dstack._internal.server.testing.common import (
     get_run_spec,
     get_ssh_fleet_configuration,
     list_events,
+    mock_lease,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 from dstack._internal.utils.common import render_datetime_as_api
@@ -1581,8 +1582,10 @@ class TestGetRunPlan:
         }
         if reverse_offers is not None:
             body["reverse_offers"] = reverse_offers
-        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
-            mock.return_value = [backend]
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend]),
+        ):
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1655,14 +1658,16 @@ class TestGetRunPlan:
             privileged=False,
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1706,12 +1711,14 @@ class TestGetRunPlan:
         if body_full_offers is not None:
             body["full_offers"] = body_full_offers
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             get_offers_mock = backend_mock.compute.return_value.get_offers
             get_offers_mock.return_value = []
-            m.return_value = [backend_mock]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1761,12 +1768,14 @@ class TestGetRunPlan:
         if body_unallocated_resources is not None:
             body["unallocated_resources"] = body_unallocated_resources
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             get_offers_mock = backend_mock.compute.return_value.get_offers
             get_offers_mock.return_value = []
-            m.return_value = [backend_mock]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1828,14 +1837,16 @@ class TestGetRunPlan:
             privileged=True,
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1874,11 +1885,13 @@ class TestGetRunPlan:
             configuration=TaskConfiguration(commands=["echo hi"], nodes=2),
         )
         body = {"run_spec": json.loads(run_spec.model_dump_json())}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
-            m.return_value = [backend_mock]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -1965,11 +1978,13 @@ class TestGetRunPlan:
                 return [gpu_offer]
             return [cpu_offer]
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.side_effect = offers_by_requirements
-            m.return_value = [backend_mock]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -2015,18 +2030,20 @@ class TestGetRunPlan:
         )
         body = {"run_spec": json.loads(run_spec.model_dump_json())}
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            aws_backend_mock = Mock()
+        aws_backend_mock = Mock()
+        verda_backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([aws_backend_mock, verda_backend_mock]),
+        ):
             aws_backend_mock.TYPE = BackendType.AWS
             aws_backend_mock.compute.return_value.get_offers.return_value = [
                 get_instance_offer_with_availability(backend=BackendType.AWS, price=2)
             ]
-            verda_backend_mock = Mock()
             verda_backend_mock.TYPE = BackendType.VERDA
             verda_backend_mock.compute.return_value.get_offers.return_value = [
                 get_instance_offer_with_availability(backend=BackendType.VERDA, price=1)
             ]
-            m.return_value = [aws_backend_mock, verda_backend_mock]
 
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -2091,14 +2108,16 @@ class TestGetRunPlan:
             docker=True,
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -2154,14 +2173,16 @@ class TestGetRunPlan:
             volumes=[InstanceMountPoint.parse("/data:/data")],
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -2482,8 +2503,10 @@ class TestGetRunPlan:
             get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
         ]
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock_aws, backend_mock_vastai]
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_vastai]),
+        ):
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -2553,8 +2576,10 @@ class TestGetRunPlan:
             get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
         ]
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock_aws, backend_mock_vastai]
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_vastai]),
+        ):
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
@@ -2687,8 +2712,11 @@ class TestGetRunPlan:
         )
         body = {"run_spec": run_spec.model_dump(), "for_offers_only": True}
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
@@ -2704,7 +2732,6 @@ class TestGetRunPlan:
                     availability_zones=["us-a"],
                 )
             ]
-            m.return_value = [backend_mock_aws]
 
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
@@ -2808,8 +2835,12 @@ class TestGetRunPlan:
             ),
         )
         body = {"run_spec": run_spec.model_dump(), "for_offers_only": True}
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
@@ -2823,7 +2854,6 @@ class TestGetRunPlan:
                     availability=InstanceAvailability.AVAILABLE,
                 )
             ]
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
@@ -2837,7 +2867,6 @@ class TestGetRunPlan:
                     availability=InstanceAvailability.AVAILABLE,
                 )
             ]
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
             response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),

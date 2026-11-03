@@ -1,6 +1,7 @@
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Optional
 
@@ -334,59 +335,60 @@ async def _process_wait_for_instance_provisioning_data(
         )
         return result
 
-    backend = await _get_backend_for_provisioning_wait(
+    async with _lease_backend_for_provisioning_wait(
         project_id=instance_model.project_id,
         backend_type=job_provisioning_data.backend,
-    )
-    if backend is None:
-        logger.warning(
-            "Instance %s failed because instance's backend is not available",
-            instance_model.name,
-        )
-        set_status_update(
-            update_map=result.instance_update_map,
-            instance_model=instance_model,
-            new_status=InstanceStatus.TERMINATING,
-            termination_reason=InstanceTerminationReason.ERROR,
-            termination_reason_message="Backend not available",
-        )
-        return result
+    ) as backend:
+        if backend is None:
+            logger.warning(
+                "Instance %s failed because instance's backend is not available",
+                instance_model.name,
+            )
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.TERMINATING,
+                termination_reason=InstanceTerminationReason.ERROR,
+                termination_reason_message="Backend not available",
+            )
+            return result
 
-    try:
-        await run_async(
-            backend.compute().update_provisioning_data,
-            job_provisioning_data,
-            instance_model.project.ssh_public_key,
-            instance_model.project.ssh_private_key,
-        )
-        result.instance_update_map["job_provisioning_data"] = (
-            job_provisioning_data.model_dump_json()
-        )
-    except ProvisioningError as exc:
-        logger.warning(
-            "Error while waiting for instance %s to become running: %s",
-            instance_model.name,
-            repr(exc),
-        )
-        set_status_update(
-            update_map=result.instance_update_map,
-            instance_model=instance_model,
-            new_status=InstanceStatus.TERMINATING,
-            termination_reason=InstanceTerminationReason.ERROR,
-            termination_reason_message="Error while waiting for instance to become running",
-        )
-    except Exception:
-        logger.exception(
-            "Got exception when updating instance %s provisioning data",
-            instance_model.name,
-        )
+        try:
+            await run_async(
+                backend.compute().update_provisioning_data,
+                job_provisioning_data,
+                instance_model.project.ssh_public_key,
+                instance_model.project.ssh_private_key,
+            )
+            result.instance_update_map["job_provisioning_data"] = (
+                job_provisioning_data.model_dump_json()
+            )
+        except ProvisioningError as exc:
+            logger.warning(
+                "Error while waiting for instance %s to become running: %s",
+                instance_model.name,
+                repr(exc),
+            )
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.TERMINATING,
+                termination_reason=InstanceTerminationReason.ERROR,
+                termination_reason_message="Error while waiting for instance to become running",
+            )
+        except Exception:
+            logger.exception(
+                "Got exception when updating instance %s provisioning data",
+                instance_model.name,
+            )
     return result
 
 
-async def _get_backend_for_provisioning_wait(
+@asynccontextmanager
+async def _lease_backend_for_provisioning_wait(
     project_id: uuid.UUID,
     backend_type: BackendType,
-) -> Optional[Backend]:
+) -> AsyncIterator[Optional[Backend]]:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(ProjectModel)
@@ -395,11 +397,13 @@ async def _get_backend_for_provisioning_wait(
         )
         project_model = res.unique().scalar_one_or_none()
     if project_model is None:
-        return None
-    return await backends_services.get_project_backend_by_type(
+        yield None
+        return
+    async with backends_services.lease_project_backend_by_type(
         project=project_model,
         backend_type=backend_type,
-    )
+    ) as backend:
+        yield backend
 
 
 @runner_ssh_tunnel

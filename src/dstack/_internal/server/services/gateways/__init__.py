@@ -66,7 +66,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
-    get_project_backend_with_model_by_type_or_error,
+    lease_project_backend_with_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
@@ -253,9 +253,11 @@ async def create_gateway(
         _validate_gateway_configuration(effective_configuration)
     configuration = effective_configuration
 
-    backend_model, _ = await get_project_backend_with_model_by_type_or_error(
+    # Leasing the backend also checks that it can be initialized, not just that it's configured.
+    async with lease_project_backend_with_model_by_type_or_error(
         project=project, backend_type=configuration.backend
-    )
+    ) as (backend_model, _):
+        pass
 
     lock_namespace = f"gateway_names_{project.name}"
     if is_db_sqlite():

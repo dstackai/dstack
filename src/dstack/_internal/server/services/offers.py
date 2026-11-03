@@ -23,13 +23,12 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import Volume, VolumeConfigurationWithRegion
-from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.utils.common import run_async
 
 
 async def get_offers_by_requirements(
-    project: ProjectModel,
+    backends: List[Backend],
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
@@ -44,8 +43,11 @@ async def get_offers_by_requirements(
     full_offers: bool = False,
     unallocated_resources: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    backends: List[Backend] = await backends_services.get_project_backends(project=project)
-
+    """
+    Returns offers of `backends` matching the requirements. The caller must lease `backends`
+    (see `backends_services.lease_project_backends()`) and must not use the returned backends
+    after the lease is released.
+    """
     backend_types: Optional[list[BackendType]] = profile.backends
     regions: Optional[list[str]] = profile.regions
     availability_zones: Optional[list[str]] = profile.availability_zones

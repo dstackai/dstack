@@ -1,10 +1,11 @@
 import json
 import uuid
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any, Dict, List, Literal, Optional, Union
+from unittest.mock import Mock
 from uuid import UUID
 
 import gpuhunt
@@ -145,6 +146,27 @@ from dstack._internal.server.services.permissions import (
 )
 from dstack._internal.server.services.runner.client import RunnerJobSubmissionMismatchError
 from dstack._internal.server.services.users import get_token_hash
+
+
+def lease_yielding(value: Any) -> Callable[..., AbstractAsyncContextManager[Any]]:
+    """
+    Returns a replacement for a `lease_*()` function from `services.backends`
+    that yields `value`, e.g. to use as a mock's `side_effect`.
+    """
+
+    @asynccontextmanager
+    async def lease(*args, **kwargs):
+        yield value
+
+    return lease
+
+
+def mock_lease(value: Any) -> Mock:
+    """
+    Returns a mock to patch a `lease_*()` function from `services.backends` with.
+    The lease yields `value`.
+    """
+    return Mock(side_effect=lease_yielding(value))
 
 
 def get_auth_headers(token: Union[DecryptedString, str]) -> Dict:
