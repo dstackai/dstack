@@ -35,7 +35,7 @@ On 14 GB200 nodes, 48 agents get the same p50 output speed per user as the three
 === "Cost"
     <img src="https://dstack.ai/static-assets/static-assets/images/glm53-gb200-nvl72-coding-agents-fig-5.png" width="750" />
 
-> Provider figures are OpenRouter's for 19–26 October. Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at $4.00 per chip-hour divided by the 17.54 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts.
+> Provider figures are OpenRouter's for 19–26 October. Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at [$4.00 per chip-hour](https://inferencex.semianalysis.com/chips/gb200-nvl72) divided by the 17.54 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts.
 
 ## Purpose
 
@@ -124,7 +124,7 @@ Almost all of the gain came from layout decisions: whether to disaggregate, how 
 ## Limitations
 
 1. Replayed, accelerated traffic. The pauses are capped at 5 s and the prompt text is generated, so production traffic will differ in cache reuse, timing and concurrency. For production, give presets your own traffic as the workload.
-2. Not a controlled comparison with providers. Their figures come from OpenRouter's measurements of different traffic, and we serve the NVFP4 checkpoint while Baseten's fast endpoints serve FP8. The cost comparison is make or buy: it sets the cost of self-hosting against the price of buying the same tokens, not against what providers pay to serve them. It assumes the fleet runs this load continuously at $4.00 per chip-hour, SemiAnalysis's published retail price for GB200 NVL72.
+2. Not a controlled comparison with providers. Their figures come from OpenRouter's measurements of different traffic, and we serve the NVFP4 checkpoint while Baseten's fast endpoints serve FP8. The cost comparison is make or buy: it sets the cost of self-hosting against the price of buying the same tokens, not against what providers pay to serve them. It assumes the fleet runs this load continuously at $4.00 per chip-hour, [SemiAnalysis's retail price](https://inferencex.semianalysis.com/chips/gb200-nvl72) for GB200 NVL72.
 3. Layout first. The agent spent its sessions on layout rather than engine settings, source patches or kernels, so more gains are likely.
 4. The comparison with SemiAnalysis is approximate. Their run served the GLM-5.2 NVFP4 checkpoint, which has the same architecture but a different quantization recipe. The SGLang builds also differ, we used 64 chips against their 32, and our benchmark window was 929 s against their 3,625 s, so we compare only throughput per chip.
 
