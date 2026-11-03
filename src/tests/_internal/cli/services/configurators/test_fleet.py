@@ -210,6 +210,7 @@ class TestApplyPlanMessages:
         assert changed is not None
         if per_host:
             changed = changed.hosts[0]
+            assert isinstance(changed, SSHHostParams)
         if head_node:
             changed = changed.proxy_jump
         assert changed is not None
