@@ -9,7 +9,14 @@ from typing import Callable, Literal, Optional, Protocol, Union, cast, get_args
 
 import gpuhunt
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
-from kubernetes.client import CoreV1Api, V1Node, V1ObjectMeta, V1Taint
+from kubernetes.client import (
+    CoreV1Api,
+    V1Node,
+    V1NodeSelectorRequirement,
+    V1ObjectMeta,
+    V1Taint,
+    V1Toleration,
+)
 from kubernetes.utils.quantity import parse_quantity as _parse_quantity
 from typing_extensions import Self
 
@@ -28,7 +35,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.utils import docker as docker_utils
-from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.common import get_or_error, list_enum_values_for_annotation
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -91,6 +98,12 @@ class TaintEffect(str, Enum):
     NO_EXECUTE = "NoExecute"
     NO_SCHEDULE = "NoSchedule"
     PREFER_NO_SCHEDULE = "PreferNoSchedule"
+
+
+class Operator(str, Enum):
+    EQUAL = "Equal"
+    EXISTS = "Exists"
+    IN = "In"
 
 
 class KubernetesResource(str, Enum):
@@ -375,6 +388,48 @@ def validate_label_value(value: str) -> None:
         raise ValueError("Value too long")
     if LABEL_VALUE_REGEX.fullmatch(value) is None:
         raise ValueError("Invalid value")
+
+
+def parse_node_selector_requirement(requirement: str) -> V1NodeSelectorRequirement:
+    """
+    Parses `key=value`, `key=` (an empty value), or `key` (any value).
+    """
+    key, value_sep, value = requirement.partition("=")
+    _validate_key(key)
+    if not value_sep:
+        return V1NodeSelectorRequirement(key=key, operator=Operator.EXISTS)
+    validate_label_value(value)
+    return V1NodeSelectorRequirement(key=key, operator=Operator.IN, values=[value])
+
+
+def parse_toleration(toleration: str) -> V1Toleration:
+    """
+    Parses `key[=value][:effect]`, the `kubectl taint` format with an optional effect.
+    Without `=value`, tolerates any value; without `:effect`, tolerates any effect.
+    """
+    key_value, effect_sep, effect = toleration.partition(":")
+    key, value_sep, value = key_value.partition("=")
+    # An empty key would tolerate all taints
+    _validate_key(key)
+    taint_effect: Optional[TaintEffect] = None
+    if effect_sep:
+        try:
+            taint_effect = TaintEffect(effect)
+        except ValueError:
+            raise ValueError(
+                f"Invalid effect, must be one of: {list_enum_values_for_annotation(TaintEffect)}"
+            )
+    if not value_sep:
+        return V1Toleration(key=key, operator=Operator.EXISTS, effect=taint_effect)
+    validate_label_value(value)
+    return V1Toleration(key=key, operator=Operator.EQUAL, value=value, effect=taint_effect)
+
+
+def _validate_key(key: str) -> None:
+    try:
+        validate_label_key(key)
+    except ValueError as e:
+        raise ValueError(f"Invalid key: {e}") from e
 
 
 def build_dockerconfigjson(image_name: str, username: str, password: str) -> str:

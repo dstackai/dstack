@@ -60,6 +60,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     OBJECT_NAME_MAX_LENGTH,
     AnyKubernetesGPUResource,
     KubernetesResource,
+    Operator,
     PodPhase,
     ResourceLimits,
     ResourceRequests,
@@ -80,7 +81,9 @@ from dstack._internal.core.backends.kubernetes.resources import (
     get_registry_auth_secret_name,
     is_hard_taint,
     is_taint_tolerated,
+    parse_node_selector_requirement,
     parse_quantity,
+    parse_toleration,
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     LEGACY_CURRENT_CONTEXT_REGION,
@@ -137,11 +140,6 @@ JUMP_POD_USER = "root"
 JUMP_POD_EPHEMERAL_STORAGE_REQUEST = "64Mi"
 
 JOB_POD_SCHEDULING_TIMEOUT = 10
-
-
-class Operator(str, Enum):
-    EXISTS = "Exists"
-    IN = "In"
 
 
 class RestartPolicy(str, Enum):
@@ -267,6 +265,8 @@ class KubernetesCompute(
             authorized_keys=project_authorized_keys,
             cpu_request_limit=cluster.proxy_jump.cpu or JUMP_POD_DEFAULT_CPU,
             memory_request_limit=cluster.proxy_jump.memory or JUMP_POD_DEFAULT_MEMORY,
+            node_selector=cluster.proxy_jump.node_selector,
+            tolerations=cluster.proxy_jump.tolerations,
         )
 
         pod_name = generate_unique_instance_name_for_job(
@@ -888,6 +888,8 @@ def _create_jump_pod_service_if_not_exists(
     authorized_keys: list[str],
     cpu_request_limit: str,
     memory_request_limit: str,
+    node_selector: Optional[list[str]],
+    tolerations: Optional[list[str]],
 ) -> None:
     base_labels = build_base_labels(
         component="ssh-proxy",
@@ -959,35 +961,19 @@ def _create_jump_pod_service_if_not_exists(
         # Otherwise, the existing legacy pod will be adopted by a newly created ReplicaSet.
 
     if should_create_replica_set:
-        # False if we found at least one node without any "hard" taint, that is, if we don't need
-        # to specify the toleration.
-        toleration_required = True
-        # (key, effect) pairs.
-        tolerated_taints: set[tuple[str, str]] = set()
-        for node in api.list_node().items:
-            if (node_spec := node.spec) is None:
-                continue
-            # True if the node has at least one NoExecute or NoSchedule taint.
-            has_hard_taint = False
-            taints = node_spec.taints or []
-            for taint in taints:
-                # A "soft" taint, ignore.
-                if not is_hard_taint(taint):
-                    continue
-                has_hard_taint = True
-                if is_taint_tolerated(taint):
-                    tolerated_taints.add((taint.key, taint.effect))
-            if not has_hard_taint:
-                toleration_required = False
-                break
-        tolerations: list[client.V1Toleration] = []
-        if toleration_required:
-            for key, effect in tolerated_taints:
-                tolerations.append(
-                    client.V1Toleration(key=key, operator=Operator.EXISTS, effect=effect)
-                )
-            if not tolerations:
-                logger.warning("No appropriate node found, the jump pod may never be scheduled")
+        affinity: Optional[client.V1Affinity] = None
+        # Not for an empty `node_selector`, as an empty node selector term matches no nodes
+        if node_selector:
+            affinity = _get_jump_pod_affinity(node_selector)
+        pod_tolerations: list[client.V1Toleration]
+        if tolerations is not None:
+            pod_tolerations = [parse_toleration(toleration) for toleration in tolerations]
+        elif node_selector is not None:
+            # Autodetection considers all nodes, not only the selected ones, so the user
+            # specifies tolerations for the selected nodes, if any are needed.
+            pod_tolerations = []
+        else:
+            pod_tolerations = _get_jump_pod_tolerations_from_node_taints(api)
         commands = _get_jump_pod_commands(authorized_keys)
         # Equal CPU and memory requests and limits for the Guaranteed QoS class
         limits = {
@@ -1030,7 +1016,8 @@ def _create_jump_pod_service_if_not_exists(
                             )
                         ],
                         restart_policy=RestartPolicy.ALWAYS,
-                        tolerations=tolerations,
+                        affinity=affinity,
+                        tolerations=pod_tolerations,
                     ),
                 ),
             ),
@@ -1218,6 +1205,60 @@ def _check_and_configure_jump_pod_service(
         port=jump_pod_port,
         username=JUMP_POD_USER,
     )
+
+
+def _get_jump_pod_affinity(node_selector: list[str]) -> client.V1Affinity:
+    # A nodeSelector cannot express `Exists`. A single node affinity term matches like
+    # a nodeSelector: a node must meet all requirements.
+    return client.V1Affinity(
+        node_affinity=client.V1NodeAffinity(
+            required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                node_selector_terms=[
+                    client.V1NodeSelectorTerm(
+                        match_expressions=[
+                            parse_node_selector_requirement(requirement)
+                            for requirement in node_selector
+                        ],
+                    ),
+                ],
+            ),
+        ),
+    )
+
+
+def _get_jump_pod_tolerations_from_node_taints(
+    api: client.CoreV1Api,
+) -> list[client.V1Toleration]:
+    # False if we found at least one node without any "hard" taint, that is, if we don't need
+    # to specify the toleration.
+    toleration_required = True
+    # (key, effect) pairs.
+    tolerated_taints: set[tuple[str, str]] = set()
+    for node in api.list_node().items:
+        if (node_spec := node.spec) is None:
+            continue
+        # True if the node has at least one NoExecute or NoSchedule taint.
+        has_hard_taint = False
+        taints = node_spec.taints or []
+        for taint in taints:
+            # A "soft" taint, ignore.
+            if not is_hard_taint(taint):
+                continue
+            has_hard_taint = True
+            if is_taint_tolerated(taint):
+                tolerated_taints.add((taint.key, taint.effect))
+        if not has_hard_taint:
+            toleration_required = False
+            break
+    tolerations: list[client.V1Toleration] = []
+    if toleration_required:
+        for key, effect in tolerated_taints:
+            tolerations.append(
+                client.V1Toleration(key=key, operator=Operator.EXISTS, effect=effect)
+            )
+        if not tolerations:
+            logger.warning("No appropriate node found, the jump pod may never be scheduled")
+    return tolerations
 
 
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:

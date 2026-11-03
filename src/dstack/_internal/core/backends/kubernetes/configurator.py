@@ -13,7 +13,12 @@ from dstack._internal.core.backends.kubernetes.models import (
     KubernetesProxyJumpConfig,
     KubernetesStoredConfig,
 )
-from dstack._internal.core.backends.kubernetes.resources import parse_quantity, validate_quantity
+from dstack._internal.core.backends.kubernetes.resources import (
+    parse_node_selector_requirement,
+    parse_quantity,
+    parse_toleration,
+    validate_quantity,
+)
 from dstack._internal.core.backends.kubernetes.utils import (
     check_cluster,
     get_clusters_from_backend_config,
@@ -112,6 +117,7 @@ class KubernetesConfigurator(
     def _check_proxy_jump(
         self, proxy_jump: KubernetesProxyJumpConfig, *, context_name: Optional[str] = None
     ):
+        in_context = f" in context {context_name!r}" if context_name is not None else ""
         for field, quantity, min_quantity in [
             ("cpu", proxy_jump.cpu, _JUMP_POD_MIN_CPU),
             ("memory", proxy_jump.memory, _JUMP_POD_MIN_MEMORY),
@@ -126,7 +132,17 @@ class KubernetesConfigurator(
                 if parse_quantity(quantity) >= parse_quantity(min_quantity):
                     continue
                 reason = f"must be at least {min_quantity}"
-            msg = f"invalid proxy_jump.{field} value {quantity!r}"
-            if context_name is not None:
-                msg = f"{msg} in context {context_name!r}"
-            raise ServerClientError(f"{msg}: {reason}")
+            raise ServerClientError(
+                f"invalid proxy_jump.{field} value {quantity!r}{in_context}: {reason}"
+            )
+        for field, items, parse in [
+            ("node_selector", proxy_jump.node_selector, parse_node_selector_requirement),
+            ("tolerations", proxy_jump.tolerations, parse_toleration),
+        ]:
+            for item in items or []:
+                try:
+                    parse(item)
+                except ValueError as e:
+                    raise ServerClientError(
+                        f"invalid proxy_jump.{field} item {item!r}{in_context}: {e}"
+                    )
