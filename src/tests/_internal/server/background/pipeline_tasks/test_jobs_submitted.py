@@ -431,7 +431,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -516,7 +516,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -615,7 +615,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -681,7 +681,7 @@ class TestJobSubmittedWorker:
         )
         previous_last_processed_at = job.last_processed_at
 
-        with patch("dstack._internal.server.services.backends.lease_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
             m.assert_not_called()
 
@@ -741,7 +741,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -794,7 +794,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -849,7 +849,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -920,7 +920,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -980,7 +980,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -1036,7 +1036,7 @@ class TestJobSubmittedWorker:
         previous_last_processed_at = job.last_processed_at
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.lease_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
             m.assert_not_called()
 
@@ -1077,7 +1077,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -1875,7 +1875,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -1953,7 +1953,7 @@ class TestJobSubmittedWorker:
         )
         job = await create_job(session=session, run=run)
 
-        with patch("dstack._internal.server.services.backends.lease_project_backends") as m:
+        with patch("dstack._internal.server.services.backends.cache.lease_project_backends") as m:
             await _process_job(session=session, worker=worker, job_model=job)
 
         # Backend offers must not be requested with the reuse policy.
@@ -1997,7 +1997,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2052,7 +2052,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -2085,7 +2085,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -2140,7 +2140,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -2212,7 +2212,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -2490,7 +2490,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2563,7 +2563,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2625,7 +2625,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2678,7 +2678,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.RUNPOD
@@ -2745,7 +2745,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -2814,7 +2814,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.RUNPOD
@@ -2874,7 +2874,7 @@ class TestJobSubmittedWorker:
         offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.RUNPOD

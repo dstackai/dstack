@@ -48,8 +48,8 @@ from dstack._internal.server.routers import (
     users,
     volumes,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import prometheus as prometheus_service
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
@@ -225,7 +225,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown()
     if pipeline_manager is not None:
         await pipeline_manager.drain()
-    await backends_services.close_all_backends()
+    await backends_cache.close_all_backends()
     await gateway_connections_pool.remove_all()
     await job_server_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()

@@ -83,8 +83,8 @@ from dstack._internal.server.models import (
     VolumeAttachmentModel,
     VolumeModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
     can_create_new_cloud_instance_in_fleet,
@@ -1886,7 +1886,7 @@ async def _process_volume_attachments(
     if len(prepared_job_volumes.volume_model_ids) == 0:
         return _VolumeAttachmentResult(attachments=[], locked_volume_ids=[])
 
-    async with backends_services.lease_project_backend_by_type_or_error(
+    async with backends_cache.lease_project_backend_by_type_or_error(
         project=project, backend_type=job_provisioning_data.backend
     ) as backend:
         compute = backend.compute()
@@ -2429,7 +2429,7 @@ async def _provision_new_capacity(
         fleet_model=fleet_model,
     )
     multinode = requirements.multinode or is_multinode_job(job)
-    async with backends_services.lease_project_backends(project) as backends:
+    async with backends_cache.lease_project_backends(project) as backends:
         offers = await get_offers_by_requirements(
             backends=backends,
             profile=profile,

@@ -45,8 +45,8 @@ from dstack._internal.server.models import (
     ProjectModel,
     ProviderRefModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -382,7 +382,7 @@ async def _process_orphan_cleanup(process_context: _ProcessContext) -> _ProcessR
     orphan_cleanup_model = process_context.orphan_cleanup_model
     if not process_context.needs_cleanup:
         return _ProcessResult(update_map=_OrphanCleanupUpdateMap())
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=orphan_cleanup_model.backend.project,
         backend_type=orphan_cleanup_model.backend.type,
     ) as backend:

@@ -38,6 +38,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import (
     get_locker,
@@ -517,7 +518,7 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=volume_model.project,
         backend_type=volume.provisioning_data.backend,
     ) as backend:

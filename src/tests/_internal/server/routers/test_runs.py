@@ -1583,7 +1583,7 @@ class TestGetRunPlan:
         if reverse_offers is not None:
             body["reverse_offers"] = reverse_offers
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend]),
         ):
             response = await client.post(
@@ -1661,7 +1661,7 @@ class TestGetRunPlan:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -1713,7 +1713,7 @@ class TestGetRunPlan:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -1770,7 +1770,7 @@ class TestGetRunPlan:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -1840,7 +1840,7 @@ class TestGetRunPlan:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -1887,7 +1887,7 @@ class TestGetRunPlan:
         body = {"run_spec": json.loads(run_spec.model_dump_json())}
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -1980,7 +1980,7 @@ class TestGetRunPlan:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2033,7 +2033,7 @@ class TestGetRunPlan:
         aws_backend_mock = Mock()
         verda_backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([aws_backend_mock, verda_backend_mock]),
         ):
             aws_backend_mock.TYPE = BackendType.AWS
@@ -2111,7 +2111,7 @@ class TestGetRunPlan:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -2176,7 +2176,7 @@ class TestGetRunPlan:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -2504,7 +2504,7 @@ class TestGetRunPlan:
         ]
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_vastai]),
         ):
             response = await client.post(
@@ -2577,7 +2577,7 @@ class TestGetRunPlan:
         ]
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_vastai]),
         ):
             response = await client.post(
@@ -2714,7 +2714,7 @@ class TestGetRunPlan:
 
         backend_mock_aws = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -2838,7 +2838,7 @@ class TestGetRunPlan:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS

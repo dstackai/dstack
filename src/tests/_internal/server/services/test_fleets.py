@@ -37,7 +37,7 @@ class TestGetPlanSSHFleetHostsValidation:
     def lease_project_backends_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = mock_lease([])
         monkeypatch.setattr(
-            "dstack._internal.server.services.backends.lease_project_backends", mock
+            "dstack._internal.server.services.backends.cache.lease_project_backends", mock
         )
         return mock
 

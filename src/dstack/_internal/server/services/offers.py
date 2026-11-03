@@ -45,7 +45,7 @@ async def get_offers_by_requirements(
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Returns offers of `backends` matching the requirements. The caller must lease `backends`
-    (see `backends_services.lease_project_backends()`) and must not use the returned backends
+    (see `backends_cache.lease_project_backends()`) and must not use the returned backends
     after the lease is released.
     """
     backend_types: Optional[list[BackendType]] = profile.backends

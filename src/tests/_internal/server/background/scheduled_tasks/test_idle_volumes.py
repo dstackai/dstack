@@ -65,7 +65,9 @@ class TestProcessIdleVolumes:
         )
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             aws_mock = Mock()
             m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -109,7 +111,9 @@ class TestProcessIdleVolumes:
         volume.auto_cleanup_enabled = None
         await session.commit()
 
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             aws_mock = Mock()
             m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)

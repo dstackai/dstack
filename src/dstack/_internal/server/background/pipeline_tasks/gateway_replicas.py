@@ -45,9 +45,9 @@ from dstack._internal.server.models import (
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_gateway_lb_configuration,
@@ -454,7 +454,7 @@ async def _provision_gateway_replica(
     gateway_model: GatewayModel,
     replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
-    async with backends_services.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_with_model_by_id(
         project=gateway_model.project, backend_id=replica_model.backend_id
     ) as backend_with_model:
         if backend_with_model is None:
@@ -581,7 +581,7 @@ async def _register_replica_with_load_balancer(
     """
     if replica_model.instance_id is None:
         return "instance_id is None, cannot register with load balancer"
-    async with backends_services.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_with_model_by_id(
         project=gateway_model.project, backend_id=replica_model.backend_id
     ) as backend_with_model:
         if backend_with_model is None:
@@ -1468,7 +1468,7 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
     mark_terminated_update_map = _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.TERMINATED, active=False, deleted=True
     )
-    async with backends_services.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_with_model_by_id(
         project=gateway_model.project,
         backend_id=replica_model.backend_id,
     ) as backend_with_model:

@@ -216,7 +216,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -257,7 +257,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -298,7 +298,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             get_backend_mock.side_effect = lease_yielding(None)
             await worker.process(_volume_to_pipeline_item(volume))
@@ -330,7 +330,7 @@ class TestVolumeWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -439,7 +439,7 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -475,7 +475,7 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             await worker.process(_volume_to_pipeline_item(volume))
             get_backend_mock.assert_not_called()
@@ -505,7 +505,7 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             get_backend_mock.side_effect = lease_yielding(None)
             await worker.process(_volume_to_pipeline_item(volume))
@@ -536,7 +536,7 @@ class TestVolumeWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_cache.lease_project_backend_by_type"
         ) as get_backend_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)

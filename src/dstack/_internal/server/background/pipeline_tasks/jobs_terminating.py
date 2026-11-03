@@ -48,9 +48,9 @@ from dstack._internal.server.models import (
     VolumeAttachmentModel,
     VolumeModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import logs as logs_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     get_instance_ssh_private_keys,
@@ -964,7 +964,7 @@ async def _detach_volumes_from_job_instance(
     run_termination_reason: Optional[RunTerminationReason],
 ) -> _VolumeDetachResult:
     job_spec = get_job_spec(job_model)
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=instance_model.project,
         backend_type=jpd.backend,
     ) as backend:

@@ -41,7 +41,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import events, users
 from dstack._internal.server.services import templates as templates_service
-from dstack._internal.server.services.backends import (
+from dstack._internal.server.services.backends.store import (
     get_backend_config_without_creds_from_backend_model,
 )
 from dstack._internal.server.services.locking import (

@@ -165,7 +165,9 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             backend_mock = Mock()
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
@@ -191,7 +193,9 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             backend_mock = Mock()
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
@@ -211,7 +215,9 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             backend_mock = Mock()
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock

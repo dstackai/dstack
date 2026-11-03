@@ -841,7 +841,7 @@ class TestGetBackendOffersInFleet:
         offer = get_instance_offer_with_availability()
         backend = AsyncMock()
         monkeypatch.setattr(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend]),
         )
         get_offers_by_requirements_mock.return_value = [(backend, offer)]

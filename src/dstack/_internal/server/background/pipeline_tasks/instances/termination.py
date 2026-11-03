@@ -13,7 +13,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
     set_status_update,
 )
 from dstack._internal.server.models import InstanceModel
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.runner.pool import (
     instance_connection_pool,
@@ -35,7 +35,7 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
 
     job_provisioning_data = get_instance_provisioning_data(instance_model)
     if job_provisioning_data is not None and job_provisioning_data.backend != BackendType.REMOTE:
-        async with backends_services.lease_project_backend_by_type(
+        async with backends_cache.lease_project_backend_by_type(
             project=instance_model.project,
             backend_type=job_provisioning_data.backend,
         ) as backend:

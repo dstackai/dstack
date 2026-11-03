@@ -2251,7 +2251,7 @@ class TestGetPlan:
         spec = get_fleet_spec()
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2296,7 +2296,7 @@ class TestGetPlan:
         )
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.RUNPOD
@@ -2334,7 +2334,7 @@ class TestGetPlan:
         )
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock]),
         ):
             backend_mock.TYPE = BackendType.RUNPOD

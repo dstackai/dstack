@@ -404,7 +404,7 @@ def _patch_compute(compute: _ListingCompute):
     backend = Mock()
     backend.compute.return_value = compute
     return patch.object(
-        orphan_cleanup_pipeline.backends_services,
+        orphan_cleanup_pipeline.backends_cache,
         "lease_project_backend_by_type",
         mock_lease(backend),
     )

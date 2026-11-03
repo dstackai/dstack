@@ -42,7 +42,7 @@ class TestTermination:
         if error is not None:
             terminate_instance.side_effect = error
         with patch.object(
-            instances_termination.backends_services,
+            instances_termination.backends_cache,
             "lease_project_backend_by_type",
             mock_lease(backend),
         ):

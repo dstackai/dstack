@@ -811,7 +811,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.side_effect = lease_yielding(backend_mock)
@@ -862,7 +862,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.side_effect = lease_yielding(backend_mock)
@@ -881,7 +881,7 @@ class TestJobTerminatingWorker:
         await session.commit()
         with (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.lease_project_backend_by_type"
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
             ) as m,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_terminating.get_current_datetime"
@@ -910,7 +910,7 @@ class TestJobTerminatingWorker:
         _lock_job(job)
         await session.commit()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.side_effect = lease_yielding(backend_mock)
@@ -1018,7 +1018,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.lease_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.side_effect = lease_yielding(backend_mock)

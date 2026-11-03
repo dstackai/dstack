@@ -34,8 +34,8 @@ from dstack._internal.server.models import (
     VolumeAttachmentModel,
     VolumeModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.volumes import (
@@ -306,7 +306,7 @@ class _ProcessResult:
 
 async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=volume_model.project,
         backend_type=volume.configuration.backend,
         overrides=True,
@@ -381,7 +381,7 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessRe
             f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
         )
         return _get_deleted_result()
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=volume_model.project,
         backend_type=volume.provisioning_data.backend,
     ) as backend:

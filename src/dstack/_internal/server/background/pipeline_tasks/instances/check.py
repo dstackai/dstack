@@ -53,7 +53,7 @@ from dstack._internal.server.schemas.runner import (
     ComponentStatus,
     InstanceHealthResponse,
 )
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import (
     get_instance_provisioning_data,
     get_instance_ssh_private_keys,
@@ -399,7 +399,7 @@ async def _lease_backend_for_provisioning_wait(
     if project_model is None:
         yield None
         return
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=project_model,
         backend_type=backend_type,
     ) as backend:

@@ -484,7 +484,7 @@ class TestListGpus:
             ),
         ]
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(create_mock_backends_with_offers({BackendType.AWS: offers})),
         ):
             response = await call_gpus_api(
@@ -557,7 +557,7 @@ class TestListGpus:
             {BackendType.AWS: aws, BackendType.AZURE: [unavailable]}
         )
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(
@@ -632,7 +632,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(client, project.name, user.token, run_spec)
@@ -666,7 +666,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(
@@ -705,7 +705,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(
@@ -776,7 +776,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(
@@ -806,7 +806,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
@@ -830,7 +830,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             # reuse skips backend offers, keeping only the existing instance.
@@ -869,7 +869,7 @@ class TestListGpus:
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease(mocked_backends),
         ):
             response = await call_gpus_api(client, project.name, user.token, run_spec)
@@ -893,7 +893,7 @@ class TestListGpus:
 
         backend_mock_aws = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS
@@ -1045,7 +1045,7 @@ class TestListGpus:
         backend_mock_aws = Mock()
         backend_mock_runpod = Mock()
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backends",
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
             mock_lease([backend_mock_aws, backend_mock_runpod]),
         ):
             backend_mock_aws.TYPE = BackendType.AWS

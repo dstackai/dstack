@@ -66,10 +66,10 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     is_placeholder_instance,
@@ -461,7 +461,7 @@ async def get_plan(
         include_only_create_instance_supported_backends = True
         if nodes is not None:
             include_only_create_instance_supported_backends = nodes.target != 0
-        async with backends_services.lease_project_backends(project) as backends:
+        async with backends_cache.lease_project_backends(project) as backends:
             offers_with_backends = await get_fleet_offers(
                 backends=backends,
                 profile=effective_spec.merged_profile,

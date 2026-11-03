@@ -536,7 +536,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -576,7 +576,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             get_backends_mock.assert_not_called()
@@ -603,7 +603,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -644,7 +644,7 @@ class TestGatewayWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1699,7 +1699,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1743,7 +1743,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             get_backends_mock.assert_not_called()
@@ -1779,7 +1779,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1828,7 +1828,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
@@ -1868,7 +1868,7 @@ class TestGatewayWorkerDeleted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
         ) as get_backends_mock:
             await worker.process(_gateway_to_pipeline_item(gateway))
             # Migration happens before the load balancer would be evaluated for termination,

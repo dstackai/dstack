@@ -37,7 +37,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.fleets import get_fleet_offers, is_cloud_cluster
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
@@ -104,7 +104,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         master_job_provisioning_data = cluster_context.master_job_provisioning_data
 
-    async with backends_services.lease_project_backends(instance_model.project) as backends:
+    async with backends_cache.lease_project_backends(instance_model.project) as backends:
         offers = await get_fleet_offers(
             backends=backends,
             profile=profile,

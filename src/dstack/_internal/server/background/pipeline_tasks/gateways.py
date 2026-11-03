@@ -39,9 +39,9 @@ from dstack._internal.server.models import (
     GatewayReplicaModel,
     ProjectModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.gateways import (
     emit_gateway_status_change_event,
     get_gateway_lb_configuration,
@@ -351,7 +351,7 @@ async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedR
     configuration = gateways_services.get_gateway_configuration(gateway_model)
     update_map: _GatewayUpdateMap = {}
     if get_effective_load_balancer(configuration) is not None:
-        async with backends_services.lease_project_backend_by_type(
+        async with backends_cache.lease_project_backend_by_type(
             project=gateway_model.project, backend_type=configuration.backend
         ) as backend:
             if backend is None:
@@ -680,7 +680,7 @@ async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _Proces
 async def _terminate_gateway_load_balancer(gateway_model: GatewayModel) -> bool:
     """Terminates the gateway's load balancer. Returns True on success, False on failure."""
     configuration = gateways_services.get_gateway_configuration(gateway_model)
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=gateway_model.project, backend_type=configuration.backend
     ) as backend:
         if backend is None:

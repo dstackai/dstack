@@ -28,7 +28,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ComputeGroupModel, InstanceModel, ProjectModel
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.compute_groups import compute_group_model_to_compute_group
 from dstack._internal.server.services.instances import emit_instance_status_change_event
 from dstack._internal.server.services.locking import get_locker
@@ -289,7 +289,7 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
         return result
     compute_group = compute_group_model_to_compute_group(compute_group_model)
     cgpd = compute_group.provisioning_data
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=compute_group_model.project,
         backend_type=cgpd.backend,
     ) as backend:

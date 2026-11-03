@@ -29,7 +29,7 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     ProjectModel,
 )
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
@@ -245,7 +245,7 @@ async def _delete_placement_group(
             "Failed to delete placement group %s. provisioning_data is None.", placement_group.name
         )
         return _get_deleted_result()
-    async with backends_services.lease_project_backend_by_type(
+    async with backends_cache.lease_project_backend_by_type(
         project=placement_group_model.project,
         backend_type=placement_group.provisioning_data.backend,
     ) as backend:

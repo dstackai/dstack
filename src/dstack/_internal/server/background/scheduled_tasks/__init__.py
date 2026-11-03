@@ -30,7 +30,7 @@ from dstack._internal.server.background.scheduled_tasks.prometheus_metrics impor
     collect_prometheus_metrics,
     delete_prometheus_metrics,
 )
-from dstack._internal.server.services.backends import close_unused_backends
+from dstack._internal.server.services.backends.cache import close_unused_backends
 
 _scheduler = AsyncIOScheduler()
 

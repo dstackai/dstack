@@ -197,7 +197,9 @@ class TestPlacementGroupWorker:
         placement_group.lock_token = uuid.uuid4()
         placement_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             aws_mock = Mock()
             m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -226,7 +228,9 @@ class TestPlacementGroupWorker:
         placement_group.lock_owner = "PlacementGroupPipeline"
         original_last_processed_at = placement_group.last_processed_at
         await session.commit()
-        with patch("dstack._internal.server.services.backends.lease_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
+        ) as m:
             aws_mock = Mock()
             m.side_effect = lease_yielding(aws_mock)
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)

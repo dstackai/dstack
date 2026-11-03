@@ -36,7 +36,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     RunModel,
 )
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
     get_fleet_master_instance_provisioning_data,
@@ -798,7 +798,7 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        async with backends_services.lease_project_backends(project) as backends:
+        async with backends_cache.lease_project_backends(project) as backends:
             backend_offers = await get_offers_by_requirements(
                 backends=backends,
                 profile=profile,
@@ -879,7 +879,7 @@ async def get_non_fleet_offers(
     if skip_backend_offers:
         backend_offers = []
     else:
-        async with backends_services.lease_project_backends(project) as backends:
+        async with backends_cache.lease_project_backends(project) as backends:
             backend_offers = await get_offers_by_requirements(
                 backends=backends,
                 profile=run_spec.merged_profile,

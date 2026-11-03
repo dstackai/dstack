@@ -64,8 +64,8 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.backends import (
-    check_backend_type_available,
+from dstack._internal.server.services.backends import check_backend_type_available
+from dstack._internal.server.services.backends.cache import (
     lease_project_backend_with_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
