@@ -439,18 +439,21 @@ If hosts are behind a head node (aka "login node"), configure [`proxy_jump`](../
 
 </div>
 
-To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
+!!! info "SSH proxy"
+    If the server does not use the [SSH proxy](../guides/server-deployment.md#ssh-proxy), attaching to runs with `dstack apply` or `dstack attach` requires the head-node key to be loaded into an SSH agent or configured for the head node in `~/.ssh/config`:
 
-<div editor-title="~/.ssh/config">
+    <div editor-title="~/.ssh/config">
 
     ```
     Host 3.255.177.50
         IdentityFile ~/.ssh/head_node_key
     ```
 
-</div>
+    </div>
 
-where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes on a per-worker basis.
+    `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` for per-host overrides.
+
+    With the SSH proxy (recommended), users do not need the head-node key to attach to runs.
 
 ### Environment variables
 
