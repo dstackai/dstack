@@ -1394,6 +1394,8 @@ projects:
 
     Ensure you've created a ClusterRoleBinding and RoleBinding to grant the roles to the user or the service account you're using.
 
+    The `list` verb on `secrets` is only needed for [orphan cleanup](../reference/env.md#DSTACK_SERVER_ORPHAN_CLEANUP_MODE) to find registry auth secrets left without their pods, and `dstack` works without it. Kubernetes can't limit it to `dstack`'s secrets, so it lets `dstack` read the contents of all secrets in the namespace. Grant it only if the namespace is dedicated to `dstack`.
+
 ??? info "Resources and offers"
     If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.
 
