@@ -187,7 +187,7 @@ async def close_unused_backends():
     and closes retired backends that are not leased.
     """
     idle_since = time.monotonic() - _BACKEND_IDLE_TTL
-    await _close_retired_backends(
+    await _retire_and_close_backends(
         should_retire=lambda c: c.leases == 0 and c.last_used < idle_since
     )
 
@@ -196,10 +196,10 @@ async def close_all_backends():
     """
     Retires all backends and closes those that are not leased.
     """
-    await _close_retired_backends(should_retire=lambda c: True)
+    await _retire_and_close_backends(should_retire=lambda c: True)
 
 
-async def _close_retired_backends(should_retire: Callable[[_CachedBackend], bool]):
+async def _retire_and_close_backends(should_retire: Callable[[_CachedBackend], bool]):
     to_close: List[_CachedBackend] = []
     for project_id in list(_BACKENDS_CACHE):
         async with _get_project_cache_lock(project_id):
