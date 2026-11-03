@@ -15,7 +15,7 @@ from typing import (
 )
 
 import yaml
-from kubernetes.client import V1Status, VersionApi
+from kubernetes.client import V1ListMeta, V1Status, VersionApi
 from kubernetes.client.exceptions import ApiException
 from kubernetes.watch import Watch
 from pydantic import Field
@@ -30,6 +30,7 @@ from dstack._internal.core.backends.kubernetes.models import (
     KubernetesBackendConfigWithCreds,
     KubernetesProxyJumpConfig,
 )
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.common import CoreModel, validate_extra_ignore
 from dstack._internal.utils.logging import get_logger
 
@@ -266,6 +267,41 @@ def try_delete_object_if_exists(
 
 class ObjectList(Protocol[T]):
     items: list[T]
+
+
+class ObjectListWithMeta(ObjectList[T], Protocol[T]):
+    metadata: Optional[V1ListMeta]
+
+
+_LIST_PAGE_SIZE = 500
+_LIST_MAX_PAGES = 1000
+"""Guards against an API that never stops returning continue tokens."""
+
+
+def list_all_objects(
+    method: Callable[..., ObjectListWithMeta[T]], *, namespace: str, label_selector: str
+) -> list[T]:
+    """
+    Lists all objects of a namespaced kind matching `label_selector`, page by page.
+    Raises `ComputeError` instead of returning a partial list if there are too many pages.
+    """
+    objects: list[T] = []
+    continue_token: Optional[str] = None
+    for _ in range(_LIST_MAX_PAGES):
+        object_list = method(
+            namespace=namespace,
+            label_selector=label_selector,
+            limit=_LIST_PAGE_SIZE,
+            _continue=continue_token,
+        )
+        objects.extend(object_list.items)
+        continue_token = object_list.metadata._continue if object_list.metadata else None
+        if not continue_token:
+            return objects
+    raise ComputeError(
+        f"Listing with {getattr(method, '__name__', method)} in namespace {namespace}"
+        f" exceeded the limit of {_LIST_MAX_PAGES} pages"
+    )
 
 
 @contextmanager

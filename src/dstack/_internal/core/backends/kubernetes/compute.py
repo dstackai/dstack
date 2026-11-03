@@ -26,6 +26,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
@@ -33,6 +34,7 @@ from dstack._internal.core.backends.base.compute import (
     generate_unique_volume_name,
     get_docker_commands,
     get_dstack_gateway_install_command,
+    get_job_provider_ref,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import (
@@ -41,11 +43,13 @@ from dstack._internal.core.backends.base.offers import (
     gpu_matches_gpu_spec,
 )
 from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCEPTIONS
+from dstack._internal.core.backends.kubernetes.features import resource_groups
 from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_DEVICE_ID_LABEL_PREFIX,
     AMD_GPU_NAME_TO_DEVICE_IDS,
     AMD_GPU_NODE_TAINT,
+    INSTANCE_LABEL,
     LABEL_VALUE_MAX_LENGTH,
     NVIDIA_GPU_NODE_TAINT,
     NVIDIA_GPU_PRODUCT_LABEL,
@@ -59,6 +63,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     adjust_resources_by_resource_requests,
     build_base_labels,
     build_dockerconfigjson,
+    delete_job_pod_objects,
     filter_invalid_labels,
     format_memory,
     get_amd_gpu_from_node_labels,
@@ -67,6 +72,8 @@ from dstack._internal.core.backends.kubernetes.resources import (
     get_nvidia_gpu_from_node_labels,
     get_object_labels,
     get_object_name,
+    get_pod_service_name,
+    get_registry_auth_secret_name,
     is_hard_taint,
     is_taint_tolerated,
     parse_quantity,
@@ -82,6 +89,10 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    ResourceListing,
+)
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayReplicaConfiguration,
@@ -161,6 +172,7 @@ class KubernetesCompute(
     ComputeWithVolumeSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     unallocated_resources_argument_has_effect = True
@@ -235,7 +247,7 @@ class KubernetesCompute(
         # to all job pods of the same project.
         # The service is created here and configured later in update_provisioning_data()
         jump_pod_name = f"dstack-{run.project_name}-ssh-jump-pod"
-        jump_pod_service_name = _get_pod_service_name(jump_pod_name)
+        jump_pod_service_name = get_pod_service_name(jump_pod_name)
         _create_jump_pod_service_if_not_exists(
             api=api,
             apps_api=client.AppsV1Api(cluster.api_client),
@@ -257,6 +269,7 @@ class KubernetesCompute(
             project=run.project_name,
             name=job.job_spec.job_name,
             user=run.user,
+            provider_ref=get_job_provider_ref(job),
         )
         labels = merge_tags(
             base_tags=base_labels,
@@ -267,7 +280,7 @@ class KubernetesCompute(
         registry_auth_secret_name: Optional[str] = None
         with ExitStack() as exit_stack:
             if job.job_spec.registry_auth is not None:
-                registry_auth_secret_name = _get_registry_auth_secret_name(pod_name)
+                registry_auth_secret_name = get_registry_auth_secret_name(pod_name)
                 _create_registry_auth_secret(
                     api=api,
                     namespace=namespace,
@@ -327,7 +340,7 @@ class KubernetesCompute(
                 # It's not clear if we should add an entry to the SkipOfferCache in this case.
                 raise ComputeError(f"Pod {pod_name} already finished: {pod_phase}")
 
-            pod_service_name = _get_pod_service_name(pod_name)
+            pod_service_name = get_pod_service_name(pod_name)
             api.create_namespaced_service(
                 namespace=namespace,
                 body=client.V1Service(
@@ -432,7 +445,7 @@ class KubernetesCompute(
             return
         provisioning_data.internal_ip = pod_ip
         service = api.read_namespaced_service(
-            name=_get_pod_service_name(provisioning_data.instance_id),
+            name=get_pod_service_name(provisioning_data.instance_id),
             namespace=namespace,
         )
         service_spec = get_or_error(service.spec)
@@ -475,30 +488,17 @@ class KubernetesCompute(
                 )
         if cluster is None:
             raise ComputeError(f"Unknown region: {region!r}")
-        api = client.CoreV1Api(cluster.api_client)
-        namespace = cluster.namespace
-        deleted = [
-            try_delete_object_if_exists(
-                api.delete_namespaced_service,
-                namespace=namespace,
-                name=_get_pod_service_name(instance_id),
-                description="pod service",
-            ),
-            try_delete_object_if_exists(
-                api.delete_namespaced_pod,
-                namespace=namespace,
-                name=instance_id,
-                description="pod",
-            ),
-            try_delete_object_if_exists(
-                api.delete_namespaced_secret,
-                namespace=namespace,
-                name=_get_registry_auth_secret_name(instance_id),
-                description="registry auth secret",
-            ),
-        ]
-        if not all(deleted):
-            raise ComputeError("Not all objects were deleted, check logs")
+        delete_job_pod_objects(
+            api=client.CoreV1Api(cluster.api_client),
+            namespace=cluster.namespace,
+            pod_name=instance_id,
+        )
+
+    def list_resource_groups(self) -> ResourceListing:
+        return resource_groups.list_resource_groups(list(self.region_cluster_map.values()))
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        resource_groups.delete_resource_group(self.region_cluster_map, group)
 
     def create_gateway_replica(
         self,
@@ -579,7 +579,7 @@ class KubernetesCompute(
         )
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
-                name=_get_pod_service_name(instance_name),
+                name=get_pod_service_name(instance_name),
                 labels=labels,
             ),
             spec=client.V1ServiceSpec(
@@ -612,7 +612,7 @@ class KubernetesCompute(
         address = _wait_for_load_balancer_address(
             api=api,
             namespace=namespace,
-            service_name=_get_pod_service_name(instance_name),
+            service_name=get_pod_service_name(instance_name),
         )
         if address is None:
             self.terminate_instance(instance_name, region=configuration.region)
@@ -1569,25 +1569,14 @@ def _run_ssh_command(
     return proc.returncode, proc.stdout
 
 
-_SELECTOR_LABEL_KEY = "app.kubernetes.io/instance"
-
-
 def _build_service_selector_from_labels(labels: dict[str, str]) -> dict[str, str]:
-    return {_SELECTOR_LABEL_KEY: labels[_SELECTOR_LABEL_KEY]}
+    return {INSTANCE_LABEL: labels[INSTANCE_LABEL]}
 
 
 def _build_label_selector_from_labels(labels: dict[str, str]) -> client.V1LabelSelector:
-    return client.V1LabelSelector(match_labels={_SELECTOR_LABEL_KEY: labels[_SELECTOR_LABEL_KEY]})
+    return client.V1LabelSelector(match_labels={INSTANCE_LABEL: labels[INSTANCE_LABEL]})
 
 
 def _build_query_label_selector_from_unique_name(unique_name: str) -> str:
     # See build_base_labels()
-    return f"{_SELECTOR_LABEL_KEY}={unique_name}"
-
-
-def _get_pod_service_name(pod_name: str) -> str:
-    return f"{pod_name}-service"
-
-
-def _get_registry_auth_secret_name(pod_name: str) -> str:
-    return f"{pod_name}-registry-auth"
+    return f"{INSTANCE_LABEL}={unique_name}"

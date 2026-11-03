@@ -14,6 +14,8 @@ from kubernetes.utils.quantity import parse_quantity as _parse_quantity
 from typing_extensions import Self
 
 from dstack._internal.core.backends.base.compute import normalize_arch
+from dstack._internal.core.backends.kubernetes.utils import try_delete_object_if_exists
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -261,6 +263,13 @@ def adjust_resources_by_resource_requests(
     resources.disk = Disk(size_mib=disk_mib)
 
 
+INSTANCE_LABEL = "app.kubernetes.io/instance"
+"""The label carrying the object's unique name, shared by the objects of a job pod."""
+
+PROVIDER_REF_LABEL = "k8s.dstack.ai/provider-ref"
+"""The label carrying `provider_ref` for orphan cleanup."""
+
+
 def build_base_labels(
     *,
     component: Literal["ssh-proxy", "job", "gateway", "volume"],
@@ -268,12 +277,13 @@ def build_base_labels(
     project: str,
     name: Optional[str] = None,
     user: Optional[str] = None,
+    provider_ref: Optional[str] = None,
 ) -> dict[str, str]:
     labels = {
         "app.kubernetes.io/name": f"dstack-{component}",
         # app.kubernetes.io/component would be redundant as app.kubernetes.io/name already includes
         # it with dstack- prefix
-        "app.kubernetes.io/instance": unique_name,
+        INSTANCE_LABEL: unique_name,
         "app.kubernetes.io/managed-by": "dstack",
         "k8s.dstack.ai/project": project,
     }
@@ -281,7 +291,42 @@ def build_base_labels(
         labels["k8s.dstack.ai/name"] = name
     if user is not None:
         labels["k8s.dstack.ai/user"] = user
+    if provider_ref is not None:
+        labels[PROVIDER_REF_LABEL] = provider_ref
     return labels
+
+
+def get_pod_service_name(pod_name: str) -> str:
+    return f"{pod_name}-service"
+
+
+def get_registry_auth_secret_name(pod_name: str) -> str:
+    return f"{pod_name}-registry-auth"
+
+
+def delete_job_pod_objects(api: CoreV1Api, namespace: str, pod_name: str) -> None:
+    deleted = [
+        try_delete_object_if_exists(
+            api.delete_namespaced_service,
+            namespace=namespace,
+            name=get_pod_service_name(pod_name),
+            description="pod service",
+        ),
+        try_delete_object_if_exists(
+            api.delete_namespaced_pod,
+            namespace=namespace,
+            name=pod_name,
+            description="pod",
+        ),
+        try_delete_object_if_exists(
+            api.delete_namespaced_secret,
+            namespace=namespace,
+            name=get_registry_auth_secret_name(pod_name),
+            description="registry auth secret",
+        ),
+    ]
+    if not all(deleted):
+        raise ComputeError("Not all objects were deleted, check logs")
 
 
 def filter_invalid_labels(labels: dict[str, str]) -> dict[str, str]:
