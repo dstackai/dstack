@@ -35,7 +35,7 @@ On 14 GB200 nodes, 48 agents get the same p50 output speed per user as the three
 === "Cost"
     <img src="https://dstack.ai/static-assets/static-assets/images/glm53-gb200-nvl72-coding-agents-fig-5.png" width="750" />
 
-> Provider figures are OpenRouter's for 19–26 October. Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at [$4.00 per chip-hour](https://inferencex.semianalysis.com/chips/gb200-nvl72) divided by the 17.54 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts.
+> Output speed follows OpenRouter's definition: output tokens per second from sending the request to the end of the response, TTFT included. The self-hosting cost is 56 chips at [$4.00 per chip-hour](https://inferencex.semianalysis.com/chips/gb200-nvl72) divided by the 17.54 million output tokens the fleet produces per hour. The cost of buying applies each endpoint's list prices, including cache-read prices, to our exact token counts. Provider figures are OpenRouter's for 19–26 October.
 
 ## Purpose
 
@@ -77,7 +77,7 @@ The baseline is the SGLang cookbook recipe for GLM-5.3 NVFP4. The cookbook publi
 
 ## Results
 
-### Aggregated wins while caches fit
+### Preset agent converged on TP8 with HiCache
 
 The preset agent was not told which layout to use. Its PD attempts failed to reach a benchmark because of setup problems, so it stayed with aggregated and, over three sessions, converged on seven two-node TP8 engines with HiCache, which keeps context evicted from GPU memory in host memory. Throughput rose from 2,188 to 5,114 tok/s (+134%) and p50 TTFT fell from 383 to 293 ms (−23%), with no source patches.
 
@@ -87,7 +87,7 @@ The preset agent was not told which layout to use. Its PD attempts failed to rea
 2. Decode context parallelism split each session's cache across eight GPUs for about 5x the capacity, but combining partial attention results on every decode step ate the gain. Seven TP8 engines with 140 GB of host-memory cache per GPU rank kept decode steps fast and won session 2 at 4,412 tok/s. The session's baseline dropped to 1,642 tok/s because the preset agent first removed session 1's odd fourth engine.
 3. Single-node TP4 engines decoded faster but processed long prompts slower, losing 28%. Back on TP8, a write-back HiCache policy and SGLang's newer speculative decoding path brought session 3 to 5,114 tok/s at 293 ms.
 
-### PD helps only at high load
+### PD scales throughput, not TTFT
 
 We then asked the preset agent to make PD work and use it on every trial. At 48 agents its best was 3,693 tok/s at 887 ms p50 TTFT on 16 nodes, still behind aggregated's 5,114 tok/s at 293 ms on 14. With data-parallel attention its decode steps took longer, and only four engines generated replies against aggregated's seven.
 
@@ -99,25 +99,25 @@ We then asked the preset agent to make PD work and use it on every trial. At 48 
 
 At 128 agents, the PD configuration matches SemiAnalysis's [InferenceX run](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37506762704/job/112417831364) on GB200 NVL72 per chip: 134.4 against 136.4 output tok/s, at a similar 2.07 against 2.27 requests in flight per chip. Their run served GLM-5.2, which has the same architecture as GLM-5.3.
 
-### Cache overflow hurts aggregated
+### Aggregated stops scaling once its cache fills
 
 We then raised the agent count for each winner. Aggregated, replayed at normal pace with pauses capped at 300 s instead of 5 s, rose from 2,150 tok/s at 48 agents to 3,722 at 120, then fell to 2,307 at 240 as cache reuse dropped from 97.2% to 76.6% and p99 TTFT reached 690 s. PD, at the accelerated pace, kept cache reuse around 95% and rose from 3,530 tok/s at 48 agents to 10,545 at 192, while p50 TTFT climbed from 727 ms to 3,250 ms.
 
 ## Conclusion
 
-### Self-hosting beats buying tokens
+### Self-hosting costs 70% less than buying tokens
 
 Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting costs $12.77 per million output tokens, against $43–66 to buy the same tokens from these endpoints.
 
-### Choose the layout by load
+### Cache fit decides aggregated vs PD
 
 Aggregated is faster while the sessions' caches fit in memory: there is no KV transfer, all seven engines generate replies, and cache-aware routing sends each session back to the engine that holds its context. PD keeps more context reusable as load grows, so it produces more tokens per chip, but each agent waits longer for its first token.
 
-### Cache memory caps agent capacity
+### Duplicated KV caps aggregated
 
 How many agents a fleet holds depends on whether their caches fit and reuse stays high, not on a fixed number; for our aggregated fleet it was 48 at the accelerated pace. Aggregated duplicates the KV cache across the GPUs of each TP8 engine, so once GPU and host memory fill up, evicted context has to be recomputed and throughput falls. PD scaled to 192 agents on throughput, but not on TTFT. The aggregated configuration was optimized for 48 agents, so its higher-load runs test that configuration rather than one tuned for them.
 
-### Layout drove most gains
+### Custom kernels can add further gains
 
 Almost all of the gain came from layout decisions: whether to disaggregate, how many engines, how wide, and whether to extend the cache into host memory. The preset agent found them in about two days, without patching the engine or writing kernels, which remain open for further gains.
 
