@@ -30,7 +30,7 @@ from dstack._internal.server.background.scheduled_tasks.prometheus_metrics impor
     collect_prometheus_metrics,
     delete_prometheus_metrics,
 )
-from dstack._internal.server.services.backends import close_idle_backends
+from dstack._internal.server.services.backends import close_unused_backends
 
 _scheduler = AsyncIOScheduler()
 
@@ -54,7 +54,7 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
     _scheduler.add_job(delete_events, IntervalTrigger(minutes=7), max_instances=1)
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
-    _scheduler.add_job(close_idle_backends, IntervalTrigger(minutes=1), max_instances=1)
+    _scheduler.add_job(close_unused_backends, IntervalTrigger(minutes=1), max_instances=1)
     _scheduler.add_job(
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )

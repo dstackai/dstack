@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from types import SimpleNamespace
 from typing import cast
@@ -67,7 +68,9 @@ class TestBackendsCache:
             project.backends = [make_backend_model(BackendType.AWS, config="new")]
             async with backends_services.lease_project_backends(project) as [new_backend]:
                 assert new_backend is not old_backend
+            await backends_services.close_unused_backends()
             close_mock(old_backend).assert_not_called()
+        await backends_services.close_unused_backends()
         close_mock(old_backend).assert_called_once()
         close_mock(new_backend).assert_not_called()
 
@@ -82,6 +85,7 @@ class TestBackendsCache:
         project.backends = project.backends[:1]
         async with backends_services.lease_project_backends(project) as backends:
             assert backends == [aws_backend]
+        await backends_services.close_unused_backends()
         close_mock(gcp_backend).assert_called_once()
         close_mock(aws_backend).assert_not_called()
 
@@ -99,7 +103,7 @@ class TestBackendsCache:
             assert backend is aws_backend
             # Only GCP is idle: AWS is leased and was used just now
             monkeypatch.setattr(backends_services, "_BACKEND_IDLE_TTL", 0)
-            await backends_services.close_idle_backends()
+            await backends_services.close_unused_backends()
         close_mock(gcp_backend).assert_called_once()
         close_mock(aws_backend).assert_not_called()
 
@@ -113,17 +117,39 @@ class TestBackendsCache:
         aws_backend, gcp_backend = self.backends
         monkeypatch.setattr(backends_services, "_BACKEND_IDLE_TTL", 0)
         async with backends_services.lease_project_backend_by_type(project, BackendType.AWS):
-            await backends_services.close_idle_backends()
+            await backends_services.close_unused_backends()
         close_mock(gcp_backend).assert_called_once()
         close_mock(aws_backend).assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_close_all_backends_waits_for_leases(self):
+    async def test_close_all_backends_does_not_close_leased_backends(self):
         project = make_project(make_backend_model(BackendType.AWS))
         async with backends_services.lease_project_backends(project) as [backend]:
             await backends_services.close_all_backends()
             close_mock(backend).assert_not_called()
+            async with backends_services.lease_project_backends(project) as [new_backend]:
+                assert new_backend is not backend
+        await backends_services.close_all_backends()
         close_mock(backend).assert_called_once()
+        close_mock(new_backend).assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_releases_lease_if_cancelled(self):
+        project = make_project(make_backend_model(BackendType.AWS))
+        leased = asyncio.Event()
+
+        async def hold_lease():
+            async with backends_services.lease_project_backends(project):
+                leased.set()
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(hold_lease())
+        await leased.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await backends_services.close_all_backends()
+        close_mock(self.backends[0]).assert_called_once()
 
     @pytest.mark.asyncio
     async def test_does_not_raise_if_backend_fails_to_close(self):

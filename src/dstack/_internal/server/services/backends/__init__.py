@@ -267,17 +267,23 @@ class _CachedBackend:
     backend: Backend
     leases: int = 0
     last_used: float = field(default_factory=time.monotonic)
-    retired: bool = False
+
+
+@dataclass
+class _ProjectBackends:
+    active: Dict[BackendType, _CachedBackend] = field(default_factory=dict)
+    retired: List[_CachedBackend] = field(default_factory=list)
 
 
 _BACKEND_IDLE_TTL = 300
 _BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
-_BACKENDS_CACHE: Dict[UUID, Dict[BackendType, _CachedBackend]] = {}
+_BACKENDS_CACHE: Dict[UUID, _ProjectBackends] = {}
 """
 A backend is cached per project and used through leases (`lease_project_backend*()`).
 The cache retires a backend if its config changes, if it is deleted from the project,
-or if it is not leased for `_BACKEND_IDLE_TTL`. A retired backend is closed
-once its last lease is released, so callers must not use backends outside of leases.
+or if it is not leased for `_BACKEND_IDLE_TTL`. New leases use only active backends.
+`close_unused_backends()` closes retired backends once they are not leased,
+so callers must not use backends outside of leases.
 """
 
 
@@ -293,7 +299,7 @@ async def lease_project_backends_with_models(
     try:
         yield [(c.model, c.backend) for c in cached_backends]
     finally:
-        await _release_backends(cached_backends)
+        _release_backends(cached_backends)
 
 
 @asynccontextmanager
@@ -425,33 +431,39 @@ async def get_project_backend_model_by_type_or_error(
     return backend_model
 
 
-async def close_idle_backends():
+async def close_unused_backends():
     """
-    Retires and closes backends that are not leased for `_BACKEND_IDLE_TTL`.
+    Retires backends that are not leased for `_BACKEND_IDLE_TTL`
+    and closes retired backends that are not leased.
     """
     idle_since = time.monotonic() - _BACKEND_IDLE_TTL
-    to_close: List[_CachedBackend] = []
-    for project_id in list(_BACKENDS_CACHE):
-        async with _get_project_cache_lock(project_id):
-            project_backends = _BACKENDS_CACHE.get(project_id, {})
-            for backend_type, cached_backend in list(project_backends.items()):
-                if cached_backend.leases == 0 and cached_backend.last_used < idle_since:
-                    del project_backends[backend_type]
-                    to_close.extend(_retire_backend(cached_backend))
-            if not project_backends:
-                _BACKENDS_CACHE.pop(project_id, None)
-    await _close_backends(to_close)
+    await _close_retired_backends(
+        should_retire=lambda c: c.leases == 0 and c.last_used < idle_since
+    )
 
 
 async def close_all_backends():
     """
-    Retires all cached backends. Backends that are leased are closed once released.
+    Retires all backends and closes those that are not leased.
     """
+    await _close_retired_backends(should_retire=lambda c: True)
+
+
+async def _close_retired_backends(should_retire: Callable[[_CachedBackend], bool]):
     to_close: List[_CachedBackend] = []
     for project_id in list(_BACKENDS_CACHE):
         async with _get_project_cache_lock(project_id):
-            for cached_backend in _BACKENDS_CACHE.pop(project_id, {}).values():
-                to_close.extend(_retire_backend(cached_backend))
+            project_backends = _BACKENDS_CACHE.get(project_id)
+            if project_backends is None:
+                continue
+            for backend_type, cached_backend in list(project_backends.active.items()):
+                if should_retire(cached_backend):
+                    del project_backends.active[backend_type]
+                    project_backends.retired.append(cached_backend)
+            to_close.extend(c for c in project_backends.retired if c.leases == 0)
+            project_backends.retired = [c for c in project_backends.retired if c.leases > 0]
+            if not project_backends.active and not project_backends.retired:
+                del _BACKENDS_CACHE[project_id]
     await _close_backends(to_close)
 
 
@@ -462,48 +474,45 @@ async def _lease_selected_project_backend(
 ) -> AsyncIterator[Optional[BackendTuple]]:
     # All project backends are leased while `select` runs outside of the cache lock,
     # so that the selected backend cannot be closed in between.
+    # Only the selected backend counts as used.
     cached_backends = await _acquire_project_backends(project, touch=False)
     try:
         backend_with_model = await select([(c.model, c.backend) for c in cached_backends])
     except BaseException:
-        await _release_backends(cached_backends, touch=False)
+        _release_backends(cached_backends, touch=False)
         raise
     selected = [
         c
         for c in cached_backends
         if backend_with_model is not None and c.backend is backend_with_model[1]
     ]
-    await _release_backends(
-        [c for c in cached_backends if c not in selected],
-        touch=False,
-    )
+    _release_backends([c for c in cached_backends if c not in selected], touch=False)
     for c in selected:
         c.last_used = time.monotonic()
     try:
         yield backend_with_model
     finally:
-        await _release_backends(selected)
+        _release_backends(selected)
 
 
 async def _acquire_project_backends(
     project: ProjectModel, touch: bool = True
 ) -> List[_CachedBackend]:
-    to_close: List[_CachedBackend] = []
     async with _get_project_cache_lock(project.id):
-        project_backends = _BACKENDS_CACHE.setdefault(project.id, {})
+        project_backends = _BACKENDS_CACHE.setdefault(project.id, _ProjectBackends())
         backend_models = {backend_model.type: backend_model for backend_model in project.backends}
-        for backend_type, cached_backend in list(project_backends.items()):
+        for backend_type, cached_backend in list(project_backends.active.items()):
             backend_model = backend_models.get(backend_type)
             if (
                 backend_model is None
                 or cached_backend.model.config != backend_model.config
                 or cached_backend.model.auth != backend_model.auth
             ):
-                del project_backends[backend_type]
-                to_close.extend(_retire_backend(cached_backend))
+                del project_backends.active[backend_type]
+                project_backends.retired.append(cached_backend)
         to_init: List[Tuple[BackendModel, Configurator, StoredBackendRecord]] = []
         for backend_model in project.backends:
-            if backend_model.type in project_backends:
+            if backend_model.type in project_backends.active:
                 continue
             configurator = get_configurator(backend_model.type)
             if configurator is None:
@@ -544,7 +553,7 @@ async def _acquire_project_backends(
                         )
                 else:
                     backend, duration = result
-                    project_backends[backend_model.type] = _CachedBackend(
+                    project_backends.active[backend_model.type] = _CachedBackend(
                         model=backend_model, backend=backend
                     )
                     initialized_results.append(f"{backend_model.type.value}={duration:.1f}s")
@@ -555,36 +564,22 @@ async def _acquire_project_backends(
                 ", ".join(initialized_results),
             )
 
-        cached_backends = list(project_backends.values())
+        cached_backends = list(project_backends.active.values())
         now = time.monotonic()
         for cached_backend in cached_backends:
             cached_backend.leases += 1
             if touch:
                 cached_backend.last_used = now
-    await _close_backends(to_close)
     return cached_backends
 
 
-async def _release_backends(cached_backends: List[_CachedBackend], touch: bool = True):
-    to_close: List[_CachedBackend] = []
+def _release_backends(cached_backends: List[_CachedBackend], touch: bool = True):
+    # Releasing does not await, so it cannot be interrupted by cancellation
     now = time.monotonic()
     for cached_backend in cached_backends:
         cached_backend.leases -= 1
         if touch:
             cached_backend.last_used = now
-        if cached_backend.retired and cached_backend.leases == 0:
-            to_close.append(cached_backend)
-    await _close_backends(to_close)
-
-
-def _retire_backend(cached_backend: _CachedBackend) -> List[_CachedBackend]:
-    """
-    Marks the backend as retired and returns it if it can be closed now.
-    """
-    cached_backend.retired = True
-    if cached_backend.leases == 0:
-        return [cached_backend]
-    return []
 
 
 async def _close_backends(cached_backends: List[_CachedBackend]):
