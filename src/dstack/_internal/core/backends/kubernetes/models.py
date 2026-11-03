@@ -6,6 +6,12 @@ from typing_extensions import Self
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
+# Measured with the jump pod image (OpenSSH 9.9). The container takes ~9 MiB plus ~1.6 MiB per
+# tunneled SSH session (two sshd-session processes), so 1Gi fits ~600 sessions. Each running job
+# holds one or more sessions per server replica. At 500m, it tunnels ~130-180 MiB/s.
+JUMP_POD_DEFAULT_CPU = "500m"
+JUMP_POD_DEFAULT_MEMORY = "1Gi"
+
 
 class KubernetesProxyJumpConfig(CoreModel):
     hostname: Annotated[
@@ -13,6 +19,24 @@ class KubernetesProxyJumpConfig(CoreModel):
     ] = None
     port: Annotated[
         Optional[int], Field(description="Any port accessible outside of the cluster")
+    ] = None
+    cpu: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The jump pod's CPU request and limit, as a Kubernetes quantity,"
+                f" e.g., `1`, `500m`. Defaults to `{JUMP_POD_DEFAULT_CPU}`"
+            )
+        ),
+    ] = None
+    memory: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The jump pod's memory request and limit, as a Kubernetes quantity,"
+                f" e.g., `2Gi`, `512Mi`. Defaults to `{JUMP_POD_DEFAULT_MEMORY}`"
+            )
+        ),
     ] = None
 
 

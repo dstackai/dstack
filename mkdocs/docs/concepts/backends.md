@@ -1257,6 +1257,29 @@ projects:
 
     The jump host can be a GPU node or a CPU-only node — it makes no difference. The only requirement is that both the `dstack` server and CLI can reach `hostname:port`.
 
+    The jump pod is managed by a ReplicaSet, so Kubernetes recreates it if it's evicted or its node is removed. To make eviction less likely, the jump pod's CPU and memory requests equal its limits, which gives it the [`Guaranteed`](https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#guaranteed) QoS class. Set `proxy_jump.cpu` and `proxy_jump.memory` to change the defaults, `500m` and `1Gi`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        cpu: 1
+        memory: 2Gi
+    ```
+
+    Each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
+
+    When the jump pod restarts or is recreated, its SSH sessions drop. The `dstack` server reconnects automatically, but `dstack attach` may fail for runs submitted before that. If reliable SSH access to runs is important, deploy [`dstack-sshproxy`](../guides/server-deployment.md#ssh-proxy).
+
+    !!! warning "Changing `cpu` and `memory`"
+        New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
+
+        ```shell
+        kubectl -n <namespace> set resources replicaset dstack-<project>-ssh-jump-pod \
+          --requests=cpu=1,memory=2Gi --limits=cpu=1,memory=2Gi
+        kubectl -n <namespace> delete pod -l app.kubernetes.io/instance=dstack-<project>-ssh-jump-pod
+        ```
+
 !!! info "Region and namespace"
     Each enabled context becomes its own `dstack` region, named after the context. When creating a `dstack` [volume](volumes.md) or [gateway](gateways.md), the `region` field selects which cluster the resource is provisioned in.
 

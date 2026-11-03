@@ -12,6 +12,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     get_nvidia_gpu_from_node_labels,
     validate_label_key,
     validate_label_value,
+    validate_quantity,
 )
 from dstack._internal.core.models.instances import Disk, Gpu, Resources
 from dstack._internal.core.models.resources import (
@@ -218,3 +219,45 @@ class TestLabelValidation:
     def test_invalid_value(self, value: str, expected_error: str):
         with pytest.raises(ValueError, match=expected_error):
             validate_label_value(value)
+
+
+class TestValidateQuantity:
+    @pytest.mark.parametrize(
+        "quantity",
+        [
+            pytest.param("1", id="integer"),
+            pytest.param("0.5", id="decimal"),
+            pytest.param(".5", id="no-integer-part"),
+            pytest.param("1.", id="no-fractional-part"),
+            pytest.param("500m", id="milli"),
+            pytest.param("100u", id="micro"),
+            pytest.param("1k", id="decimal-si"),
+            pytest.param("1E", id="exa"),
+            pytest.param("512Mi", id="binary-si"),
+            pytest.param("1Ei", id="binary-si-exbi"),
+            pytest.param("1e3", id="exponent"),
+            pytest.param("1.5E-3", id="signed-exponent"),
+            # A valid format, the value is checked separately
+            pytest.param("-1", id="negative"),
+        ],
+    )
+    def test_valid(self, quantity: str):
+        validate_quantity(quantity)
+
+    # parse_quantity() accepts some of these, but the API rejects them
+    @pytest.mark.parametrize(
+        "quantity",
+        [
+            pytest.param("1 Gi", id="space"),
+            pytest.param("1K", id="uppercase-kilo"),
+            pytest.param("500mi", id="lowercase-binary-si"),
+            pytest.param("1gi", id="lowercase-gibi"),
+            pytest.param("1GB", id="bytes-unit"),
+            pytest.param("1e", id="exponent-without-number"),
+            pytest.param("Gi", id="no-number"),
+            pytest.param("", id="empty"),
+        ],
+    )
+    def test_invalid(self, quantity: str):
+        with pytest.raises(ValueError, match="Invalid quantity"):
+            validate_quantity(quantity)

@@ -46,6 +46,11 @@ LABEL_KEY_NAME_REGEX = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$
 LABEL_VALUE_MAX_LENGTH = 63
 LABEL_VALUE_REGEX = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?)?$")
 
+# https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
+QUANTITY_REGEX = re.compile(
+    r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[KMGTPE]i|[numkMGTPE]|[eE][+-]?[0-9]+)?$"
+)
+
 NVIDIA_GPU_RESOURCE = "nvidia.com/gpu"
 NVIDIA_GPU_NODE_TAINT = NVIDIA_GPU_RESOURCE
 NVIDIA_GPU_PRODUCT_LABEL = f"{NVIDIA_GPU_RESOURCE}.product"
@@ -388,6 +393,13 @@ def build_dockerconfigjson(image_name: str, username: str, password: str) -> str
 
 
 parse_quantity = cast(Callable[[Union[str, int, float, Decimal]], Decimal], _parse_quantity)
+
+
+def validate_quantity(quantity: str) -> None:
+    # Stricter than parse_quantity(), which also accepts some strings that the API rejects,
+    # e.g., `1 Gi`, `1K`, `500mi`
+    if QUANTITY_REGEX.fullmatch(quantity) is None:
+        raise ValueError("Invalid quantity")
 
 
 def format_memory(memory: Memory) -> str:
