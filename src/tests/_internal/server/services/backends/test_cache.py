@@ -7,7 +7,6 @@ from unittest.mock import Mock
 import pytest
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends import cache as backends_cache
@@ -165,13 +164,21 @@ class TestBackendsCache:
         close_mock(backend).assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_or_error_raises_and_releases_leases(self, monkeypatch):
+    async def test_leases_backend_by_id(self):
+        aws_model = make_backend_model(BackendType.AWS)
+        project = make_project(aws_model, make_backend_model(BackendType.GCP))
+        async with backends_cache.lease_project_backend_by_id(project, aws_model.id) as backend:
+            assert backend is self.backends[0]
+
+    @pytest.mark.asyncio
+    async def test_returns_none_and_releases_leases_if_backend_not_found(self, monkeypatch):
         project = make_project(make_backend_model(BackendType.AWS))
-        with pytest.raises(BackendNotAvailable):
-            async with backends_cache.lease_project_backend_by_type_or_error(
-                project, BackendType.GCP
-            ):
-                pass
+        async with backends_cache.lease_project_backend_by_type(
+            project, BackendType.GCP
+        ) as backend:
+            assert backend is None
+        async with backends_cache.lease_project_backend_by_id(project, uuid.uuid4()) as backend:
+            assert backend is None
         [aws_backend] = self.backends
         await close_unused_backends_now(monkeypatch)
         close_mock(aws_backend).assert_called_once()

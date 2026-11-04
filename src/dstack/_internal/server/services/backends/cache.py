@@ -54,7 +54,6 @@ from dstack._internal.core.backends.configurators import (
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
-    BackendNotAvailable,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
@@ -104,20 +103,12 @@ def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
 
 
 @asynccontextmanager
-async def lease_project_backends_with_models(
-    project: ProjectModel,
-) -> AsyncGenerator[List[BackendTuple], None]:
+async def lease_project_backends(project: ProjectModel) -> AsyncGenerator[List[Backend], None]:
     cached_backends = await _acquire_project_backends(project)
     try:
-        yield [(c.model, c.backend) for c in cached_backends]
+        yield [c.backend for c in cached_backends]
     finally:
         _release_backends(cached_backends)
-
-
-@asynccontextmanager
-async def lease_project_backends(project: ProjectModel) -> AsyncGenerator[List[Backend], None]:
-    async with lease_project_backends_with_models(project) as backends_with_models:
-        yield [b for _, b in backends_with_models]
 
 
 _select_project_backend_with_model_by_type: Optional[BackendSelector] = None
@@ -125,7 +116,7 @@ _select_project_backend_with_model_by_type: Optional[BackendSelector] = None
 
 def set_select_project_backend_with_model_by_type(func: BackendSelector):
     """
-    Overrides how `lease_project_backend*_by_type()` select a backend from the project backends
+    Overrides how `lease_project_backend_by_type()` selects a backend from the project backends
     if `overrides=True` is passed. This can be used if a backend needs to be replaced with
     another backend. For example, DstackBackend in dstack Sky can be used in place of
     other backends.
@@ -135,11 +126,11 @@ def set_select_project_backend_with_model_by_type(func: BackendSelector):
 
 
 @asynccontextmanager
-async def lease_project_backend_with_model_by_type(
+async def lease_project_backend_by_type(
     project: ProjectModel,
     backend_type: BackendType,
     overrides: bool = False,
-) -> AsyncGenerator[Optional[BackendTuple], None]:
+) -> AsyncGenerator[Optional[Backend], None]:
     async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
         if overrides and _select_project_backend_with_model_by_type is not None:
             return await _select_project_backend_with_model_by_type(
@@ -150,72 +141,22 @@ async def lease_project_backend_with_model_by_type(
                 return backend_model, backend
         return None
 
-    async with _lease_selected_project_backend(project, select) as backend_with_model:
-        yield backend_with_model
-
-
-@asynccontextmanager
-async def lease_project_backend_with_model_by_type_or_error(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> AsyncGenerator[BackendTuple, None]:
-    async with lease_project_backend_with_model_by_type(
-        project=project, backend_type=backend_type, overrides=overrides
-    ) as backend_with_model:
-        if backend_with_model is None:
-            raise BackendNotAvailable()
-        yield backend_with_model
-
-
-@asynccontextmanager
-async def lease_project_backend_by_type(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> AsyncGenerator[Optional[Backend], None]:
-    async with lease_project_backend_with_model_by_type(
-        project=project, backend_type=backend_type, overrides=overrides
-    ) as backend_with_model:
-        yield backend_with_model[1] if backend_with_model is not None else None
-
-
-@asynccontextmanager
-async def lease_project_backend_by_type_or_error(
-    project: ProjectModel,
-    backend_type: BackendType,
-    overrides: bool = False,
-) -> AsyncGenerator[Backend, None]:
-    async with lease_project_backend_with_model_by_type_or_error(
-        project=project, backend_type=backend_type, overrides=overrides
-    ) as (_, backend):
+    async with _lease_selected_project_backend(project, select) as backend:
         yield backend
 
 
 @asynccontextmanager
-async def lease_project_backend_with_model_by_id(
+async def lease_project_backend_by_id(
     project: ProjectModel, backend_id: UUID
-) -> AsyncGenerator[Optional[BackendTuple], None]:
+) -> AsyncGenerator[Optional[Backend], None]:
     async def select(backends_with_models: List[BackendTuple]) -> Optional[BackendTuple]:
         for backend_model, backend in backends_with_models:
             if backend_model.id == backend_id:
                 return backend_model, backend
         return None
 
-    async with _lease_selected_project_backend(project, select) as backend_with_model:
-        yield backend_with_model
-
-
-@asynccontextmanager
-async def lease_project_backend_with_model_by_id_or_error(
-    project: ProjectModel, backend_id: UUID
-) -> AsyncGenerator[BackendTuple, None]:
-    async with lease_project_backend_with_model_by_id(
-        project=project, backend_id=backend_id
-    ) as backend_with_model:
-        if backend_with_model is None:
-            raise BackendNotAvailable()
-        yield backend_with_model
+    async with _lease_selected_project_backend(project, select) as backend:
+        yield backend
 
 
 async def close_unused_backends():
@@ -245,7 +186,7 @@ async def close_unused_backends():
 async def _lease_selected_project_backend(
     project: ProjectModel,
     select: Callable[[List[BackendTuple]], Coroutine[None, None, Optional[BackendTuple]]],
-) -> AsyncGenerator[Optional[BackendTuple], None]:
+) -> AsyncGenerator[Optional[Backend], None]:
     """
     Leases the backend chosen by `select` from the project backends.
 
@@ -273,7 +214,7 @@ async def _lease_selected_project_backend(
         return
     selected.last_used = time.monotonic()
     try:
-        yield backend_with_model
+        yield selected.backend
     finally:
         _release_backends([selected])
 

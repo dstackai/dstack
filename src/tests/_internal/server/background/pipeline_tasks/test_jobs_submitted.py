@@ -2490,7 +2490,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2563,7 +2563,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS
@@ -2581,6 +2581,56 @@ class TestJobSubmittedWorker:
         assert volume.lock_token is not None
         assert volume.lock_expires_at is not None
         backend_mock.compute.return_value.attach_volume.assert_not_called()
+
+    async def test_terminates_job_when_volume_backend_is_not_available(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+        )
+
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(None),
+        ):
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(volume)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
+        assert job.termination_reason_message == "Failed to attach volume: backend not available"
+        assert volume.lock_owner is None
 
     async def test_reclaims_stale_related_volume_lock(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
@@ -2625,7 +2675,7 @@ class TestJobSubmittedWorker:
 
         backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type_or_error",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
             mock_lease(backend_mock),
         ):
             backend_mock.TYPE = BackendType.AWS

@@ -454,17 +454,16 @@ async def _provision_gateway_replica(
     gateway_model: GatewayModel,
     replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
-    async with backends_cache.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_by_id(
         project=gateway_model.project, backend_id=replica_model.backend_id
-    ) as backend_with_model:
-        if backend_with_model is None:
+    ) as backend:
+        if backend is None:
             return _GatewayReplicaUpdateMap(
                 status=GatewayReplicaStatus.TERMINATED,
                 status_message="Backend not available",
                 active=False,
                 deleted=True,
             )
-        _, backend = backend_with_model
         compute = backend.compute()
         assert isinstance(compute, ComputeWithGatewaySupport)
         replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
@@ -581,12 +580,11 @@ async def _register_replica_with_load_balancer(
     """
     if replica_model.instance_id is None:
         return "instance_id is None, cannot register with load balancer"
-    async with backends_cache.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_by_id(
         project=gateway_model.project, backend_id=replica_model.backend_id
-    ) as backend_with_model:
-        if backend_with_model is None:
+    ) as backend:
+        if backend is None:
             return "Backend not available"
-        _, backend = backend_with_model
         compute = backend.compute()
         if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
             return "Backend does not support load balancer operations"
@@ -1468,11 +1466,11 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
     mark_terminated_update_map = _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.TERMINATED, active=False, deleted=True
     )
-    async with backends_cache.lease_project_backend_with_model_by_id(
+    async with backends_cache.lease_project_backend_by_id(
         project=gateway_model.project,
         backend_id=replica_model.backend_id,
-    ) as backend_with_model:
-        if backend_with_model is None:
+    ) as backend:
+        if backend is None:
             logger.error(
                 "%s: backend not available, cannot terminate."
                 " Marking TERMINATED without termination",
@@ -1480,7 +1478,6 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
             )
             await _commit_update(item, replica_model, mark_terminated_update_map)
             return
-        _, backend = backend_with_model
         compute = backend.compute()
         assert isinstance(compute, ComputeWithGatewaySupport)
         replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)

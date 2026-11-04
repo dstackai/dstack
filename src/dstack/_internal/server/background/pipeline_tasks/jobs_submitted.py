@@ -1886,9 +1886,16 @@ async def _process_volume_attachments(
     if len(prepared_job_volumes.volume_model_ids) == 0:
         return _VolumeAttachmentResult(attachments=[], locked_volume_ids=[])
 
-    async with backends_cache.lease_project_backend_by_type_or_error(
+    async with backends_cache.lease_project_backend_by_type(
         project=project, backend_type=job_provisioning_data.backend
     ) as backend:
+        if backend is None:
+            logger.info("%s: failed to attach volume: backend not available", fmt(job_model))
+            return _VolumeAttachmentResult(
+                attachments=[],
+                locked_volume_ids=[],
+                termination_message="Failed to attach volume: backend not available",
+            )
         compute = backend.compute()
         assert isinstance(compute, ComputeWithVolumeSupport)
 

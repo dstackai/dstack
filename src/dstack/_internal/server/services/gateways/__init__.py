@@ -23,6 +23,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
 )
 from dstack._internal.core.errors import (
+    BackendNotAvailable,
     GatewayError,
     ResourceNotExistsError,
     ServerClientError,
@@ -66,6 +67,9 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import cache as backends_cache
+from dstack._internal.server.services.backends.store import (
+    get_project_backend_model_by_type_or_error,
+)
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import (
@@ -252,10 +256,14 @@ async def create_gateway(
     configuration = effective_configuration
 
     # Leasing the backend also checks that it can be initialized, not just that it's configured.
-    async with backends_cache.lease_project_backend_with_model_by_type_or_error(
+    async with backends_cache.lease_project_backend_by_type(
         project=project, backend_type=configuration.backend
-    ) as (backend_model, _):
-        pass
+    ) as backend:
+        if backend is None:
+            raise BackendNotAvailable()
+    backend_model = await get_project_backend_model_by_type_or_error(
+        project=project, backend_type=configuration.backend
+    )
 
     lock_namespace = f"gateway_names_{project.name}"
     if is_db_sqlite():

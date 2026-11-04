@@ -414,10 +414,10 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             aws = Mock()
-            m.side_effect = lease_yielding((backend, aws))
+            m.side_effect = lease_yielding(aws)
             aws.compute.return_value = Mock(spec=ComputeMockSpec)
             aws.compute.return_value.create_gateway_replica.return_value = (
                 GatewayReplicaProvisioningData(
@@ -460,10 +460,10 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             aws = Mock()
-            m.side_effect = lease_yielding((backend, aws))
+            m.side_effect = lease_yielding(aws)
             aws.compute.return_value = Mock(spec=ComputeMockSpec)
             aws.compute.return_value.create_gateway_replica.side_effect = BackendError(
                 "Some error"
@@ -500,7 +500,7 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             m.side_effect = lease_yielding(None)
             await worker.process(_replica_to_pipeline_item(replica))
@@ -536,7 +536,7 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             await worker.process(_replica_to_pipeline_item(replica))
             m.assert_not_called()
@@ -571,7 +571,7 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             await worker.process(_replica_to_pipeline_item(replica))
             m.assert_not_called()
@@ -606,10 +606,10 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             aws = Mock()
-            m.side_effect = lease_yielding((backend, aws))
+            m.side_effect = lease_yielding(aws)
             aws.compute.return_value = Mock(spec=ComputeMockSpec)
             aws.compute.return_value.create_gateway_replica.side_effect = RuntimeError(
                 "Unexpected!"
@@ -648,7 +648,7 @@ class TestGatewayReplicaWorkerSubmitted:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as m:
             await worker.process(_replica_to_pipeline_item(replica))
             m.assert_not_called()
@@ -2214,14 +2214,14 @@ class TestGatewayReplicaWorkerProvisioning:
                 "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
             ) as pool_add,
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
         ):
             pool_add.return_value = MagicMock()
             pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2263,7 +2263,7 @@ class TestGatewayReplicaWorkerProvisioning:
                 "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
             ) as pool_add,
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
         ):
             pool_add.return_value = MagicMock()
@@ -2305,7 +2305,7 @@ class TestGatewayReplicaWorkerProvisioning:
                 "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
             ) as pool_add,
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
         ):
             pool_add.return_value = MagicMock()
@@ -2315,7 +2315,7 @@ class TestGatewayReplicaWorkerProvisioning:
             backend_mock.compute.return_value.register_gateway_replica_with_load_balancer.side_effect = Exception(
                 "boom"
             )
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2352,14 +2352,14 @@ class TestGatewayReplicaWorkerProvisioning:
                 "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
             ) as pool_add,
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
         ):
             pool_add.return_value = MagicMock()
             pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2591,7 +2591,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2599,7 +2599,7 @@ class TestGatewayReplicaWorkerTerminating:
         ):
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2669,7 +2669,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2677,7 +2677,7 @@ class TestGatewayReplicaWorkerTerminating:
         ):
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica_to_terminate))
 
@@ -2720,7 +2720,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2728,7 +2728,7 @@ class TestGatewayReplicaWorkerTerminating:
         ):
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2773,7 +2773,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2784,7 +2784,7 @@ class TestGatewayReplicaWorkerTerminating:
             backend_mock.compute.return_value.deregister_gateway_replica_from_load_balancer.side_effect = Exception(
                 "boom"
             )
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2824,7 +2824,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2832,7 +2832,7 @@ class TestGatewayReplicaWorkerTerminating:
         ):
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2868,11 +2868,11 @@ class TestGatewayReplicaWorkerTerminating:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as get_backends_mock:
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -2916,7 +2916,7 @@ class TestGatewayReplicaWorkerTerminating:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
         ) as get_backends_mock:
             get_backends_mock.side_effect = lease_yielding(None)
             await worker.process(_replica_to_pipeline_item(replica))
@@ -2961,7 +2961,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -2969,7 +2969,7 @@ class TestGatewayReplicaWorkerTerminating:
         ):
             backend_mock = Mock()
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
@@ -3015,7 +3015,7 @@ class TestGatewayReplicaWorkerTerminating:
 
         with (
             patch(
-                "dstack._internal.server.services.backends.cache.lease_project_backend_with_model_by_id"
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_id"
             ) as get_backends_mock,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.gateway_replicas.gateway_connections_pool.remove"
@@ -3026,7 +3026,7 @@ class TestGatewayReplicaWorkerTerminating:
             backend_mock.compute.return_value.terminate_gateway_replica.side_effect = Exception(
                 "Terminate failed"
             )
-            get_backends_mock.side_effect = lease_yielding((backend, backend_mock))
+            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_replica_to_pipeline_item(replica))
 
