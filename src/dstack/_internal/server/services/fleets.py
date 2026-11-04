@@ -1509,16 +1509,14 @@ async def _check_ssh_hosts_not_yet_added(
 def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
     if spec.configuration.ssh_config is not None:
         ssh_config = spec.configuration.ssh_config
-        if ssh_config.ssh_key is not None:
-            ssh_config.ssh_key.private = None
-        if ssh_config.proxy_jump is not None and ssh_config.proxy_jump.ssh_key is not None:
-            ssh_config.proxy_jump.ssh_key.private = None
+        ssh_config.ssh_key = None
+        if ssh_config.proxy_jump is not None:
+            ssh_config.proxy_jump.ssh_key = None
         for host in spec.configuration.ssh_config.hosts:
             if not isinstance(host, str):
-                if host.ssh_key is not None:
-                    host.ssh_key.private = None
-                if host.proxy_jump is not None and host.proxy_jump.ssh_key is not None:
-                    host.proxy_jump.ssh_key.private = None
+                host.ssh_key = None
+                if host.proxy_jump is not None:
+                    host.proxy_jump.ssh_key = None
 
 
 def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
@@ -1531,16 +1529,13 @@ def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
         validate_dstack_resource_name(spec.configuration.name)
     _validate_fleet_configuration_subtype_specific_fields(spec.configuration)
     if spec.configuration.ssh_config is not None:
-        ssh_config = spec.configuration.ssh_config
-        _validate_all_ssh_params_specified(ssh_config)
-        ssh_params: list[SSHParams | SSHHostParams] = [ssh_config]
-        ssh_params.extend(host for host in ssh_config.hosts if isinstance(host, SSHHostParams))
-        for params in ssh_params:
-            if params.ssh_key is not None:
-                _validate_ssh_key(params.ssh_key)
-            if params.proxy_jump is not None and params.proxy_jump.ssh_key is not None:
-                _validate_ssh_key(params.proxy_jump.ssh_key)
-        _validate_internal_ips(ssh_config)
+        _validate_all_ssh_params_specified(spec.configuration.ssh_config)
+        if spec.configuration.ssh_config.ssh_key is not None:
+            _validate_ssh_key(spec.configuration.ssh_config.ssh_key)
+        for host in spec.configuration.ssh_config.hosts:
+            if isinstance(host, SSHHostParams) and host.ssh_key is not None:
+                _validate_ssh_key(host.ssh_key)
+        _validate_internal_ips(spec.configuration.ssh_config)
     _set_fleet_spec_defaults(spec)
 
 
@@ -1598,20 +1593,12 @@ def _validate_ssh_key(ssh_key: SSHKey):
     if ssh_key.private is None:
         raise ServerClientError("Private key not provided")
     try:
-        private_key = ssh_utils.pkey_from_str(ssh_key.private)
+        ssh_utils.pkey_from_str(ssh_key.private)
     except ValueError:
         raise ServerClientError(
             "Unsupported key type. "
             "The key type should be RSA, ECDSA, or Ed25519 and should not be encrypted with passphrase."
         )
-    # Plans and gateway synchronization compare public keys. A stale .pub file must not
-    # hide replacement of the private key at the same path.
-    public_key = ssh_utils.generate_public_key(private_key)
-    if not ssh_key.public.strip():
-        # Older API requests may provide only the private key.
-        ssh_key.public = public_key
-    elif " ".join(ssh_key.public.split()[:2]) != public_key:
-        raise ServerClientError("Public SSH key does not match the private key")
 
 
 def _validate_internal_ips(ssh_config: SSHParams):

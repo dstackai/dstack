@@ -530,14 +530,12 @@ If approved, `dstack` updates the fleet without re-creating it. For example, if 
 
     SSH fleets support adding and removing `hosts`. Added hosts are provisioned, and removed hosts are terminated.
 
-    SSH fleets also support updating `identity_file` and `proxy_jump.identity_file`, including per-host overrides and key contents at the same path.
+    SSH fleets also support updating `identity_file` and `proxy_jump.identity_file`, including per-host overrides.
 
     Changes to other properties require re-creating the fleet. In this case, `dstack apply` offers to delete the fleet and create it again.
 
 ??? info "SSH key rotation"
-    In-place SSH key updates do not interrupt workloads or existing SSH connections. After `dstack apply` succeeds, you can remove the old public key from the fleet hosts.
-
-    For a head node (`proxy_jump`), first wait for [gateways](gateways.md) serving the fleet's services to use the new key and the [SSH proxy](../guides/server-deployment.md#ssh-proxy)'s 10-second cache to expire. `dstack apply` does not wait for either.
+    Updating `identity_file` and `proxy_jump.identity_file` does not require stopping runs. Allow up to 15 seconds for changes to propagate before removing the old public key from the host.
 
 ### Delete fleets
 

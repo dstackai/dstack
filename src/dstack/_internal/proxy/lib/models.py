@@ -1,7 +1,7 @@
 """Things stored in BaseProxyRepo implementations."""
 
 from datetime import datetime
-from functools import cached_property, lru_cache
+from functools import cached_property
 from typing import Any, Iterable, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -36,13 +36,7 @@ class Replica(ImmutableModel):
     def ssh_head_proxy_public_key(self) -> Optional[str]:
         if self.ssh_head_proxy_private_key is None:
             return None
-        return _get_head_node_public_key(self.ssh_head_proxy_private_key)
-
-
-@lru_cache(maxsize=128)
-def _get_head_node_public_key(private_key: str) -> str:
-    # Replicas sharing a head node often share a key; parse it once, not per replica.
-    return ssh_utils.generate_public_key(ssh_utils.pkey_from_str(private_key))
+        return ssh_utils.get_public_key_from_private_key(self.ssh_head_proxy_private_key)
 
 
 class IPAddressPartitioningKey(ImmutableModel):

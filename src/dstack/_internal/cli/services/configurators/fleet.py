@@ -424,10 +424,7 @@ def _ssh_config_diff_fields(
         new_value = getattr(new, field)
         path = f"{prefix}.{field}"
         if field == "ssh_key":
-            # Key material is an internal field. Refer to its user-configured file,
-            # including replacements whose path has not changed. Never print keys.
-            if old.identity_file == new.identity_file:
-                fields.append(f"{prefix}.identity_file (key contents changed)")
+            continue
         elif field == "hosts":
             old_hosts = {h if isinstance(h, str) else h.hostname: h for h in old_value}
             new_names = [h if isinstance(h, str) else h.hostname for h in new_value]

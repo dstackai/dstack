@@ -53,6 +53,7 @@ from dstack._internal.server.testing.common import (
     get_gateway_replica_configuration,
     get_job_provisioning_data,
     get_run_spec,
+    get_ssh_key,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -769,9 +770,12 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
     pytestmark = pytest.mark.usefixtures("image_config_mock")
 
-    @pytest.mark.parametrize("failure", [None, "update", "changed-again"])
+    @pytest.mark.parametrize(
+        "failure,public_key",
+        [(None, PUBLIC_KEY), (None, ""), ("update", PUBLIC_KEY), ("changed-again", PUBLIC_KEY)],
+    )
     async def test_updates_head_node_key_without_unregistering_or_changing_job(
-        self, test_db, session, worker, mock_gateway_connection, failure
+        self, test_db, session, worker, mock_gateway_connection, failure, public_key
     ):
         project = await create_project(session)
         user = await create_user(session)
@@ -794,7 +798,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
             ready=True,
             replica_num=1,
         )
-        key = SSHKey(public=PUBLIC_KEY, private=PRIVATE_KEY)
+        key = SSHKey(public=public_key, private=PRIVATE_KEY)
         rci = RemoteConnectionInfo(
             host="host",
             port=22,
@@ -836,7 +840,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
                 )
             if failure == "changed-again":
                 assert job.instance is not None
-                rci.ssh_proxy_keys = [SSHKey(public="ssh-rsa another", private="another private")]
+                rci.ssh_proxy_keys = [get_ssh_key()]
                 job.instance.remote_connection_info = rci.model_dump_json()
                 await session.commit()
 

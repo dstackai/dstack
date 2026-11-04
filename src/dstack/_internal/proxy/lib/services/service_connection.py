@@ -271,10 +271,12 @@ async def get_service_replica_client(
         )
     # Nginx not available, forward directly to the tunnel
     replica = random.choice(service.replicas)
-    project = await repo.get_project(service.project_name)
-    if project is None:
-        raise UnexpectedProxyError(
-            f"Expected to find project {service.project_name} but could not"
-        )
-    connection = await service_conn_pool.get_or_add(project, service, replica)
+    connection = await service_conn_pool.get(replica.id)
+    if connection is None or replica.ssh_head_proxy is not None:
+        project = await repo.get_project(service.project_name)
+        if project is None:
+            raise UnexpectedProxyError(
+                f"Expected to find project {service.project_name} but could not"
+            )
+        connection = await service_conn_pool.get_or_add(project, service, replica)
     return await connection.client()

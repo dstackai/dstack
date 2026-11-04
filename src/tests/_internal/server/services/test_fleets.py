@@ -35,8 +35,6 @@ from dstack._internal.server.models import FleetModel, InstanceModel, ProjectMod
 from dstack._internal.server.services.backends import get_project_backends
 from dstack._internal.server.services.fleets import (
     _check_can_update_ssh_config,
-    _validate_fleet_spec_and_set_defaults,
-    _validate_ssh_key,
     apply_plan,
     get_fleet_master_instance_provisioning_data,
     get_plan,
@@ -123,14 +121,16 @@ class TestApplySSHFleetKeys:
             keys = keys.hosts[0]
             assert isinstance(keys, SSHHostParams)
         if rotation != "jump":
+            keys.identity_file = "new-key"
             keys.ssh_key = new_key
         assert keys.proxy_jump is not None
         if rotation != "host":
+            keys.proxy_jump.identity_file = "new-key"
             keys.proxy_jump.ssh_key = new_key
         plan = await get_plan(session, project, user, new)
         assert plan.action == ApplyAction.UPDATE
         assert plan.current_resource is not None and plan.effective_spec is not None
-        assert plan.current_resource.spec != plan.effective_spec  # same file path, different key
+        assert plan.current_resource.spec != plan.effective_spec
         assert PRIVATE_KEY not in plan.effective_spec.model_dump_json()
         updated = await apply_plan(
             session,
@@ -182,6 +182,7 @@ class TestApplySSHFleetKeys:
         await session.commit()
         new = spec.model_copy(deep=True)
         assert new.configuration.ssh_config is not None
+        new.configuration.ssh_config.identity_file = "new-key"
         new.configuration.ssh_config.ssh_key = SSHKey(public=PUBLIC_KEY, private=PRIVATE_KEY)
         plan = await get_plan(session, project, user, new)
         fleet_id, instance_id = fleet.id, instance.id
@@ -283,44 +284,6 @@ class TestCheckCanUpdateSSHConfig:
         setattr(target, field, value)
         with pytest.raises(ServerClientError):
             _check_can_update_ssh_config(current, new)
-
-
-class TestValidateSSHKey:
-    def test_derives_empty_public_key(self):
-        key = get_ssh_key()
-        public_key = key.public
-        key.public = ""
-        _validate_ssh_key(key)
-        assert key.public == public_key
-
-    @pytest.mark.parametrize("per_host", [False, True])
-    def test_rejects_stale_head_node_public_key(self, per_host):
-        head_node = SSHProxyParams(
-            hostname="head",
-            user="ubuntu",
-            identity_file="key",
-            ssh_key=SSHKey(public=get_ssh_key().public, private=PRIVATE_KEY),
-        )
-        ssh_config = SSHParams(
-            user="ubuntu",
-            ssh_key=get_ssh_key(),
-            hosts=[SSHHostParams(hostname="host", proxy_jump=head_node)] if per_host else ["host"],
-            proxy_jump=None if per_host else head_node,
-        )
-        spec = get_fleet_spec(conf=FleetConfiguration(name="fleet", ssh_config=ssh_config))
-        with pytest.raises(ServerClientError, match="Public SSH key does not match"):
-            _validate_fleet_spec_and_set_defaults(spec)
-
-    def test_rejects_stale_public_key(self):
-        key = get_ssh_key()
-        key.private = PRIVATE_KEY
-        with pytest.raises(ServerClientError, match="Public SSH key does not match"):
-            _validate_ssh_key(key)
-
-    def test_ignores_public_key_comment(self):
-        key = get_ssh_key()
-        key.public += " rotated-key\n"
-        _validate_ssh_key(key)
 
 
 class TestGetPlanSSHFleetHostsValidation:

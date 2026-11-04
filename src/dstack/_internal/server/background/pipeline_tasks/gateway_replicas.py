@@ -75,6 +75,7 @@ from dstack._internal.server.services.services import (
     should_configure_service_https_on_gateway_replica,
 )
 from dstack._internal.server.utils import tracing
+from dstack._internal.utils import ssh as ssh_utils
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -723,9 +724,12 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
     for instance_id, connection_info in instance_connection_info:
         rci = validate_json_extra_ignore(RemoteConnectionInfo, get_or_error(connection_info))
         if rci.ssh_proxy is not None:
-            instance_head_node_public_keys[instance_id] = " ".join(
-                get_or_error(rci.ssh_proxy_keys)[0].public.split()[:2]
-            )
+            key = get_or_error(rci.ssh_proxy_keys)[0]
+            public_key = " ".join(key.public.split()[:2])
+            # Existing API requests may provide only the private key.
+            if not public_key:
+                public_key = ssh_utils.get_public_key_from_private_key(get_or_error(key.private))
+            instance_head_node_public_keys[instance_id] = public_key
     plan = _plan_state_sync(
         currently_registered=currently_registered_services,
         expected=expected_runs,

@@ -182,11 +182,11 @@ class TestApplyPlanMessages:
         confirm_ask.assert_called_once_with("Update the fleet in-place?")
 
     @pytest.mark.parametrize(
-        "per_host,head_node,same_path",
-        [(False, False, False), (False, True, True), (True, False, True), (True, True, False)],
+        "per_host,head_node",
+        [(False, False), (False, True), (True, False), (True, True)],
     )
     def test_identifies_the_changed_ssh_key_without_printing_key_material(
-        self, monkeypatch, per_host, head_node, same_path
+        self, monkeypatch, per_host, head_node
     ):
         console, confirm_ask = patch_console_and_confirm(monkeypatch)
         current = get_ssh_fleet_spec()
@@ -214,15 +214,14 @@ class TestApplyPlanMessages:
         if head_node:
             changed = changed.proxy_jump
         assert changed is not None
-        if not same_path:
-            changed.identity_file = "new-key"
+        changed.identity_file = "new-key"
         changed.ssh_key = SSHKey(public="new-public-key", private="new-private-key")
 
         plan = create_fleet_plan(current_spec=current, spec=new, action=ApplyAction.UPDATE)
         FleetConfigurator(Mock())._apply_plan(plan, get_command_args())
 
         output = console.export_text()
-        label = f"{path}.identity_file" + (" (key contents changed)" if same_path else "")
+        label = f"{path}.identity_file"
         assert f"  - {label}\n" in output
         assert "ssh_key" not in output
         assert "public-key" not in output
