@@ -96,7 +96,7 @@ def sample_model_options(name: str = "test-model") -> dict:
 
 @pytest.mark.asyncio
 class TestUpdateReplicaHeadNodeKeys:
-    @pytest.mark.parametrize("failure", ["missing", "key-file"])
+    @pytest.mark.parametrize("failure", ["missing", "key-file", "state-save"])
     async def test_batch_saves_once_preserves_tunnels_and_retries_failures(
         self, tmp_path, system_mocks, monkeypatch, failure
     ):
@@ -135,6 +135,19 @@ class TestUpdateReplicaHeadNodeKeys:
         system_mocks.open_conn.reset_mock()
         system_mocks.close_conn.reset_mock()
         system_mocks.reload_nginx.reset_mock()
+        if failure == "state-save":
+            with patch.object(repo, "save", side_effect=OSError("state save failed")):
+                with pytest.raises(OSError, match="state save failed"):
+                    await client.post(
+                        "/api/registry/replicas/head_node_keys", json={"replicas": updates}
+                    )
+            # Keep reporting the old keys so the server retries the failed save.
+            assert (await client.get("/api/services/list")).json() == before
+            restored = GatewayProxyRepo.load(state_file)
+            for n in range(2):
+                service = await restored.get_service(f"project-{n}", f"run-{n}")
+                assert service is not None
+                assert service.replicas[0].ssh_head_proxy_private_key == PRIVATE_KEY
         batch = list(updates)
         if failure == "missing":
             batch.append({**updates[0], "job_id": "missing"})
@@ -153,9 +166,12 @@ class TestUpdateReplicaHeadNodeKeys:
                     "/api/registry/replicas/head_node_keys", json={"replicas": batch}
                 )
             assert response.status_code == 200
-            assert set(response.json()["failures"]) == {
-                "missing" if failure == "missing" else "job-1"
+            expected_failures = {
+                "missing": {"missing"},
+                "key-file": {"job-1"},
+                "state-save": set(),
             }
+            assert set(response.json()["failures"]) == expected_failures[failure]
             assert save.call_count == 1
             restored = GatewayProxyRepo.load(state_file)
             for n in range(2):

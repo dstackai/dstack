@@ -535,7 +535,7 @@ If approved, `dstack` updates the fleet without re-creating it. For example, if 
     Changes to other properties require re-creating the fleet. In this case, `dstack apply` offers to delete the fleet and create it again.
 
 ??? info "SSH key rotation"
-    Updating `identity_file` and `proxy_jump.identity_file` does not require stopping runs. Allow up to 15 seconds for changes to propagate before removing the old public key from the host.
+    Updating `identity_file` and `proxy_jump.identity_file` does not require stopping runs. Allow about 20 seconds for changes to propagate before removing the old public key from the host.
 
 ### Delete fleets
 
