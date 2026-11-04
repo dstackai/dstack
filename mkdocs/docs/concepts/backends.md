@@ -1450,7 +1450,7 @@ projects:
     | `ephemeral-storage` | `100Gi`  | _not set_ |
     | `nvidia.com/gpu`    | `4`      | `4`       |
 
-    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
+    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range. With `--full-offers`, `dstack offer` and `dstack apply` show the node's full resources instead.
 
 ??? info "MIG"
     If the cluster's NVIDIA GPUs are partitioned with [MIG](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/latest/index.html),
@@ -1458,8 +1458,8 @@ projects:
 
     To run on slices, specify the GPU memory, e.g., `gpu: A100:10GB` for one slice or `gpu: A100:10GB:2` for two.
     If the GPU memory isn't specified or has no maximum (e.g., `gpu: A100` or `gpu: 24GB..`), the run gets whole GPUs only.
-    `dstack offer` and `dstack apply` show offers the same way, unless you pass `--full-offers`.
-    Slices are listed separately from whole GPUs, e.g., `A100:10GB:14` and `A100:80GB:4` on the same node.
+    `dstack offer` and `dstack apply` follow the same rule.
+    With `--full-offers`, they also list matching slices, e.g., `A100:10GB:14` next to `A100:80GB:4` on the same node.
 
     MIG must be configured with the GPU Operator's [MIG Manager](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html)
     (the `single` or `mixed` [strategy](https://docs.nvidia.com/datacenter/cloud-native/kubernetes/latest/index.html)).
