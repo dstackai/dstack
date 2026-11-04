@@ -18,6 +18,7 @@ from dstack._internal.utils.logging import get_logger
 
 CERTBOT_TIMEOUT = 40
 CERTBOT_2ND_TIMEOUT = 5
+CERTBOT_RENEW_TIMEOUT = 600
 NGINX_DIR = Path("/etc/nginx")
 logger = get_logger(__name__)
 
@@ -108,6 +109,29 @@ class Nginx:
             await run_async(sudo_rm, conf_path)
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
+
+    async def renew_certificates(self) -> None:
+        """Renew the certificates that are due."""
+        # Holding the lock keeps this certbot run from colliding with `run_certbot`
+        async with self._lock:
+            await run_async(self.run_certbot_renew)
+
+    @staticmethod
+    def run_certbot_renew() -> None:
+        # Certbot renews each certificate with the ACME server that issued it.
+        # The deploy hook reloads nginx only if some certificate was renewed.
+        cmd = ["sudo", "timeout", "--kill-after", str(CERTBOT_2ND_TIMEOUT)]
+        cmd += [str(CERTBOT_RENEW_TIMEOUT), "certbot", "renew"]
+        cmd += ["--non-interactive", "--quiet", "--no-random-sleep-on-renew"]
+        cmd += ["--deploy-hook", "systemctl reload nginx.service"]
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=CERTBOT_RENEW_TIMEOUT + CERTBOT_2ND_TIMEOUT + 1,  # shouldn't happen
+        )
+        if r.returncode != 0:
+            msg = r.stderr.decode().strip().replace("\n", " ")
+            raise UnexpectedProxyError(f"Error renewing TLS certificates: {msg}")
 
     @staticmethod
     def reload() -> None:

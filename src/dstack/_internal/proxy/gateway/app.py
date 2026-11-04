@@ -1,6 +1,8 @@
 """FastAPI app running on a gateway."""
 
-from contextlib import asynccontextmanager
+import asyncio
+import random
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Optional
 
@@ -30,11 +32,16 @@ from dstack._internal.proxy.gateway.services.server_client import HTTPMultiClien
 from dstack._internal.proxy.gateway.services.stats import StatsCollector
 from dstack._internal.proxy.lib.routers.model_proxy import router as model_proxy_router
 from dstack._internal.utils.common import run_async
+from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__
 
 STATE_FILE = DSTACK_DIR_ON_GATEWAY / "state-v2.json"
 LEGACY_STATE_FILE = DSTACK_DIR_ON_GATEWAY / "state.json"
 LEGACY_KEYS_DIR = Path("~/.ssh/projects").expanduser().resolve()
+# `certbot renew` only renews certificates close to expiry. Twice a day matches the
+# schedule of the timer that certbot's own packages install.
+CERT_RENEWAL_INTERVAL = 12 * 3600
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -45,10 +52,27 @@ async def lifespan(app: FastAPI):
     service_conn_pool = await injector.get_service_connection_pool()
     await run_async(nginx.write_global_conf)
     await apply_all(repo, nginx, service_conn_pool)
+    renewal_task = asyncio.create_task(renew_certificates_periodically(nginx))
 
     yield
 
+    renewal_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await renewal_task
     await service_conn_pool.remove_all()
+
+
+async def renew_certificates_periodically(nginx: Nginx) -> None:
+    # Gateways on some backends, e.g. Kubernetes, have no system timer that runs
+    # `certbot renew`, so the gateway renews its certificates itself. The random
+    # first delay spreads renewals of many gateways over the interval.
+    await asyncio.sleep(random.uniform(0, CERT_RENEWAL_INTERVAL))
+    while True:
+        try:
+            await nginx.renew_certificates()
+        except Exception as e:
+            logger.warning("Failed to renew TLS certificates: %r", e)
+        await asyncio.sleep(CERT_RENEWAL_INTERVAL)
 
 
 def make_app(repo: Optional[GatewayProxyRepo] = None, nginx: Optional[Nginx] = None) -> FastAPI:
