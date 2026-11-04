@@ -728,7 +728,9 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
             public_key = " ".join(key.public.split()[:2])
             # Existing API requests may provide only the private key.
             if not public_key:
-                public_key = ssh_utils.get_public_key_from_private_key(get_or_error(key.private))
+                public_key = await run_async(
+                    ssh_utils.get_public_key_from_private_key, get_or_error(key.private)
+                )
             instance_head_node_public_keys[instance_id] = public_key
     plan = _plan_state_sync(
         currently_registered=currently_registered_services,
