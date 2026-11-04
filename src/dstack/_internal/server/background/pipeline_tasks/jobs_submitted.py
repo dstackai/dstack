@@ -84,7 +84,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import events
-from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
     can_create_new_cloud_instance_in_fleet,
@@ -1886,90 +1886,96 @@ async def _process_volume_attachments(
     if len(prepared_job_volumes.volume_model_ids) == 0:
         return _VolumeAttachmentResult(attachments=[], locked_volume_ids=[])
 
-    backend = await get_project_backend_by_type_or_error(
-        project=project,
-        backend_type=job_provisioning_data.backend,
-    )
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
+    async with backends_cache.lease_project_backend_by_type(
+        project=project, backend_type=job_provisioning_data.backend
+    ) as backend:
+        if backend is None:
+            logger.info("%s: failed to attach volume: backend not available", fmt(job_model))
+            return _VolumeAttachmentResult(
+                attachments=[],
+                locked_volume_ids=[],
+                termination_message="Failed to attach volume: backend not available",
+            )
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithVolumeSupport)
 
-    volume_models = await _lock_related_volume_models(
-        item=item, volume_model_ids=prepared_job_volumes.volume_model_ids
-    )
-    if volume_models is None:
-        return _VolumeAttachmentResult(
-            attachments=[],
-            locked_volume_ids=[],
-            termination_message="Failed to attach volume: Cannot attach a volume locked for processing",
+        volume_models = await _lock_related_volume_models(
+            item=item, volume_model_ids=prepared_job_volumes.volume_model_ids
         )
+        if volume_models is None:
+            return _VolumeAttachmentResult(
+                attachments=[],
+                locked_volume_ids=[],
+                termination_message="Failed to attach volume: Cannot attach a volume locked for processing",
+            )
 
-    locked_volume_ids = sorted(
-        {
-            volume_model.id
-            for mount_point_volume_models in volume_models
-            for volume_model in mount_point_volume_models
-        }
-    )
-    attachments: list[_VolumeAttachmentPayload] = []
-    related_volume_lock_owner = _get_related_volume_lock_owner(item.id)
-    for mount_point_volume_models in volume_models:
-        for volume_model in mount_point_volume_models:
-            volume = volume_model_to_volume(volume_model)
-            try:
-                if volume_model.deleted:
-                    raise ServerClientError("Cannot attach a deleted volume")
-                if volume_model.to_be_deleted:
-                    raise ServerClientError("Cannot attach a volume marked for deletion")
-                if (
-                    volume_model.lock_expires_at is not None
-                    and volume_model.lock_owner != related_volume_lock_owner
-                ):
-                    raise ServerClientError("Cannot attach a volume locked for processing")
-                if (
-                    job_provisioning_data.get_base_backend() != volume.get_backend()
-                    or job_provisioning_data.region.lower() != volume.get_region().lower()
-                ):
-                    continue
-                if volume.provisioning_data is None or not volume.provisioning_data.attachable:
-                    continue
-                attachment_data = await run_async(
-                    compute.attach_volume,
-                    volume=volume,
-                    provisioning_data=job_provisioning_data,
-                )
-                attachments.append(
-                    _VolumeAttachmentPayload(
-                        volume_id=volume_model.id,
-                        attachment_data=attachment_data.model_dump_json(),
-                        volume_name=volume.name,
+        locked_volume_ids = sorted(
+            {
+                volume_model.id
+                for mount_point_volume_models in volume_models
+                for volume_model in mount_point_volume_models
+            }
+        )
+        attachments: list[_VolumeAttachmentPayload] = []
+        related_volume_lock_owner = _get_related_volume_lock_owner(item.id)
+        for mount_point_volume_models in volume_models:
+            for volume_model in mount_point_volume_models:
+                volume = volume_model_to_volume(volume_model)
+                try:
+                    if volume_model.deleted:
+                        raise ServerClientError("Cannot attach a deleted volume")
+                    if volume_model.to_be_deleted:
+                        raise ServerClientError("Cannot attach a volume marked for deletion")
+                    if (
+                        volume_model.lock_expires_at is not None
+                        and volume_model.lock_owner != related_volume_lock_owner
+                    ):
+                        raise ServerClientError("Cannot attach a volume locked for processing")
+                    if (
+                        job_provisioning_data.get_base_backend() != volume.get_backend()
+                        or job_provisioning_data.region.lower() != volume.get_region().lower()
+                    ):
+                        continue
+                    if volume.provisioning_data is None or not volume.provisioning_data.attachable:
+                        continue
+                    attachment_data = await run_async(
+                        compute.attach_volume,
+                        volume=volume,
+                        provisioning_data=job_provisioning_data,
                     )
-                )
-                break
-            except ServerClientError as e:
-                logger.info("%s: failed to attach volume: %s", fmt(job_model), repr(e))
-                return _VolumeAttachmentResult(
-                    attachments=attachments,
-                    locked_volume_ids=locked_volume_ids,
-                    termination_message=f"Failed to attach volume: {e.msg}",
-                )
-            except BackendError as e:
-                logger.warning("%s: failed to attach volume: %s", fmt(job_model), repr(e))
-                return _VolumeAttachmentResult(
-                    attachments=attachments,
-                    locked_volume_ids=locked_volume_ids,
-                    termination_message=f"Failed to attach volume: {str(e)}",
-                )
-            except Exception:
-                logger.exception("%s: got exception when attaching volume", fmt(job_model))
-                return _VolumeAttachmentResult(
-                    attachments=attachments,
-                    locked_volume_ids=locked_volume_ids,
-                    termination_message="Failed to attach volume: unexpected error",
-                )
-    return _VolumeAttachmentResult(
-        attachments=attachments,
-        locked_volume_ids=locked_volume_ids,
-    )
+                    attachments.append(
+                        _VolumeAttachmentPayload(
+                            volume_id=volume_model.id,
+                            attachment_data=attachment_data.model_dump_json(),
+                            volume_name=volume.name,
+                        )
+                    )
+                    break
+                except ServerClientError as e:
+                    logger.info("%s: failed to attach volume: %s", fmt(job_model), repr(e))
+                    return _VolumeAttachmentResult(
+                        attachments=attachments,
+                        locked_volume_ids=locked_volume_ids,
+                        termination_message=f"Failed to attach volume: {e.msg}",
+                    )
+                except BackendError as e:
+                    logger.warning("%s: failed to attach volume: %s", fmt(job_model), repr(e))
+                    return _VolumeAttachmentResult(
+                        attachments=attachments,
+                        locked_volume_ids=locked_volume_ids,
+                        termination_message=f"Failed to attach volume: {str(e)}",
+                    )
+                except Exception:
+                    logger.exception("%s: got exception when attaching volume", fmt(job_model))
+                    return _VolumeAttachmentResult(
+                        attachments=attachments,
+                        locked_volume_ids=locked_volume_ids,
+                        termination_message="Failed to attach volume: unexpected error",
+                    )
+        return _VolumeAttachmentResult(
+            attachments=attachments,
+            locked_volume_ids=locked_volume_ids,
+        )
 
 
 async def _lock_related_volume_models(
@@ -2430,98 +2436,134 @@ async def _provision_new_capacity(
         fleet_model=fleet_model,
     )
     multinode = requirements.multinode or is_multinode_job(job)
-    offers = await get_offers_by_requirements(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=True,
-        multinode=multinode,
-        master_job_provisioning_data=master_job_provisioning_data,
-        volumes=volumes,
-        privileged=job.job_spec.privileged,
-        instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
-        placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
-    )
-    extra_authorized_keys = get_extra_authorized_keys(run.run_spec)
-    offers_iter = iter(offers)
-    offers_tried = 0
-    offers_taken = 0
-    skip_reasons: list[str] = []
-    offer_errors: list[_OfferAttemptError] = []
-    while offers_tried < settings.MAX_OFFERS_TRIED:
-        backend_with_offer = next(offers_iter, None)
-        if backend_with_offer is None:
-            break
-        offers_taken += 1
-        backend, offer = backend_with_offer
-        logger.debug(
-            "%s: trying %s in %s/%s for $%0.4f per hour",
-            fmt(job_model),
-            offer.instance.name,
-            offer.backend.value,
-            offer.region,
-            offer.price,
+    async with backends_cache.lease_project_backends(project) as backends:
+        offers = await get_offers_by_requirements(
+            backends=backends,
+            profile=profile,
+            requirements=requirements,
+            exclude_not_available=True,
+            multinode=multinode,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+            privileged=job.job_spec.privileged,
+            instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
+            placement_group=placement_group_model_to_placement_group_optional(
+                placement_group_model
+            ),
         )
-        offer_volumes = _get_offer_volumes(volumes, offer)
-        job_configurations = [
-            JobConfiguration(job=job_to_run, volumes=offer_volumes) for job_to_run in jobs
-        ]
-        compute = backend.compute()
-        if master_job_provisioning_data is not None:
-            offer = get_instance_offer_with_restricted_az(
-                instance_offer=offer,
-                master_job_provisioning_data=master_job_provisioning_data,
+        extra_authorized_keys = get_extra_authorized_keys(run.run_spec)
+        offers_iter = iter(offers)
+        offers_tried = 0
+        offers_taken = 0
+        skip_reasons: list[str] = []
+        offer_errors: list[_OfferAttemptError] = []
+        while offers_tried < settings.MAX_OFFERS_TRIED:
+            backend_with_offer = next(offers_iter, None)
+            if backend_with_offer is None:
+                break
+            offers_taken += 1
+            backend, offer = backend_with_offer
+            logger.debug(
+                "%s: trying %s in %s/%s for $%0.4f per hour",
+                fmt(job_model),
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
+                offer.price,
             )
-        if (
-            # The first real instance in an empty cluster fleet is responsible
-            # for creating/selecting the placement group. A placeholder alone
-            # must not suppress that path.
-            not filter_non_placeholder_instances(fleet_model.instances)
-            and is_cloud_cluster(fleet_model)
-            and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
-            and isinstance(compute, ComputeWithPlacementGroupSupport)
-            and await can_use_placement_groups(
-                compute=compute,
-                instance_offer=offer,
-                reservation=requirements.reservation,
-            )
-        ):
-            placement_group_model = await find_or_create_suitable_placement_group(
-                fleet_model=fleet_model,
-                placement_groups=placement_group_models,
-                instance_offer=offer,
-                compute=compute,
-            )
-            if placement_group_model is None:
-                skip_reasons.append("no compatible placement group")
-                continue
-            if placement_group_model.id not in known_placement_group_ids:
-                new_placement_group_models.append(placement_group_model)
-                placement_group_models.append(placement_group_model)
-                known_placement_group_ids.add(placement_group_model.id)
-        offers_tried += 1
-        try:
-            # Use run_jobs only for a real batch (2+ jobs). A 1-job batch must
-            # stay on run_job: Slurm gets node_count=1 there, and RunPod's
-            # Instant Cluster API rejects pod_count=1 (only sizes like 2/4/8).
-            use_group_provisioning = (
-                offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT and len(jobs) > 1
-            )
-            if use_group_provisioning:
-                assert isinstance(compute, ComputeWithGroupProvisioningSupport)
-                compute_group_provisioning_data = await run_async(
-                    compute.run_jobs,
+            offer_volumes = _get_offer_volumes(volumes, offer)
+            job_configurations = [
+                JobConfiguration(job=job_to_run, volumes=offer_volumes) for job_to_run in jobs
+            ]
+            compute = backend.compute()
+            if master_job_provisioning_data is not None:
+                offer = get_instance_offer_with_restricted_az(
+                    instance_offer=offer,
+                    master_job_provisioning_data=master_job_provisioning_data,
+                )
+            if (
+                # The first real instance in an empty cluster fleet is responsible
+                # for creating/selecting the placement group. A placeholder alone
+                # must not suppress that path.
+                not filter_non_placeholder_instances(fleet_model.instances)
+                and is_cloud_cluster(fleet_model)
+                and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
+                and isinstance(compute, ComputeWithPlacementGroupSupport)
+                and await can_use_placement_groups(
+                    compute=compute,
+                    instance_offer=offer,
+                    reservation=requirements.reservation,
+                )
+            ):
+                placement_group_model = await find_or_create_suitable_placement_group(
+                    fleet_model=fleet_model,
+                    placement_groups=placement_group_models,
+                    instance_offer=offer,
+                    compute=compute,
+                )
+                if placement_group_model is None:
+                    skip_reasons.append("no compatible placement group")
+                    continue
+                if placement_group_model.id not in known_placement_group_ids:
+                    new_placement_group_models.append(placement_group_model)
+                    placement_group_models.append(placement_group_model)
+                    known_placement_group_ids.add(placement_group_model.id)
+            offers_tried += 1
+            try:
+                # Use run_jobs only for a real batch (2+ jobs). A 1-job batch must
+                # stay on run_job: Slurm gets node_count=1 there, and RunPod's
+                # Instant Cluster API rejects pod_count=1 (only sizes like 2/4/8).
+                use_group_provisioning = (
+                    offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT and len(jobs) > 1
+                )
+                if use_group_provisioning:
+                    assert isinstance(compute, ComputeWithGroupProvisioningSupport)
+                    compute_group_provisioning_data = await run_async(
+                        compute.run_jobs,
+                        run,
+                        job_configurations,
+                        offer,
+                        project_ssh_public_key,
+                        project_ssh_private_key,
+                        placement_group_model_to_placement_group_optional(placement_group_model),
+                        requirements,
+                        extra_authorized_keys,
+                    )
+                    return _ProvisionNewCapacityResult(
+                        provisioning_data=compute_group_provisioning_data,
+                        offer=offer,
+                        effective_profile=profile,
+                        placement_group_cleanup=_build_placement_group_cleanup(
+                            fleet_model=fleet_model,
+                            offers_tried=offers_tried,
+                            selected_placement_group_id=(
+                                None if placement_group_model is None else placement_group_model.id
+                            ),
+                            new_placement_group_models=new_placement_group_models,
+                        ),
+                    )
+                placeholder_instance = job_model.instance
+                if (
+                    placeholder_instance is not None
+                    and is_placeholder_instance(placeholder_instance)
+                    and len(job.job_submissions) > 0
+                ):
+                    # `run_job()` sets the placeholder's `provider_ref` on the resources it creates
+                    job.job_submissions[-1].provider_ref = placeholder_instance.provider_ref
+                job_provisioning_data = await run_async(
+                    compute.run_job,
                     run,
-                    job_configurations,
+                    job,
                     offer,
                     project_ssh_public_key,
                     project_ssh_private_key,
+                    offer_volumes,
                     placement_group_model_to_placement_group_optional(placement_group_model),
                     requirements,
                     extra_authorized_keys,
                 )
                 return _ProvisionNewCapacityResult(
-                    provisioning_data=compute_group_provisioning_data,
+                    provisioning_data=job_provisioning_data,
                     offer=offer,
                     effective_profile=profile,
                     placement_group_cleanup=_build_placement_group_cleanup(
@@ -2533,91 +2575,58 @@ async def _provision_new_capacity(
                         new_placement_group_models=new_placement_group_models,
                     ),
                 )
-            placeholder_instance = job_model.instance
-            if (
-                placeholder_instance is not None
-                and is_placeholder_instance(placeholder_instance)
-                and len(job.job_submissions) > 0
-            ):
-                # `run_job()` sets the placeholder's `provider_ref` on the resources it creates
-                job.job_submissions[-1].provider_ref = placeholder_instance.provider_ref
-            job_provisioning_data = await run_async(
-                compute.run_job,
-                run,
-                job,
-                offer,
-                project_ssh_public_key,
-                project_ssh_private_key,
-                offer_volumes,
-                placement_group_model_to_placement_group_optional(placement_group_model),
-                requirements,
-                extra_authorized_keys,
-            )
-            return _ProvisionNewCapacityResult(
-                provisioning_data=job_provisioning_data,
-                offer=offer,
-                effective_profile=profile,
-                placement_group_cleanup=_build_placement_group_cleanup(
-                    fleet_model=fleet_model,
-                    offers_tried=offers_tried,
-                    selected_placement_group_id=(
-                        None if placement_group_model is None else placement_group_model.id
-                    ),
-                    new_placement_group_models=new_placement_group_models,
+            except SkipOffer as e:
+                offers_tried -= 1
+                skip_reasons.append(str(e) or "offer skipped")
+                logger.info(
+                    "%s: %s launch in %s/%s skipped: %s",
+                    fmt(job_model),
+                    offer.instance.name,
+                    offer.backend.value,
+                    offer.region,
+                    e,
+                )
+                continue
+            except BackendError as e:
+                offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
+                logger.warning(
+                    "%s: %s launch in %s/%s failed: %s",
+                    fmt(job_model),
+                    offer.instance.name,
+                    offer.backend.value,
+                    offer.region,
+                    repr(e),
+                )
+                continue
+            except Exception as e:
+                offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
+                logger.exception(
+                    "%s: got exception when launching %s in %s/%s",
+                    fmt(job_model),
+                    offer.instance.name,
+                    offer.backend.value,
+                    offer.region,
+                )
+                continue
+        return _FailedNewCapacityProvisioning(
+            message=_get_new_capacity_failure_message(
+                fleet_name=fleet_model.name,
+                attempts=_NewCapacityAttempts(
+                    total=len(offers),
+                    tried=offers_tried,
+                    skip_reasons=skip_reasons,
+                    errors=offer_errors,
+                    # Offers are left only if the attempt limit, not the offer list, ended the loop.
+                    limit_reached=offers_taken < len(offers),
                 ),
-            )
-        except SkipOffer as e:
-            offers_tried -= 1
-            skip_reasons.append(str(e) or "offer skipped")
-            logger.info(
-                "%s: %s launch in %s/%s skipped: %s",
-                fmt(job_model),
-                offer.instance.name,
-                offer.backend.value,
-                offer.region,
-                e,
-            )
-            continue
-        except BackendError as e:
-            offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
-            logger.warning(
-                "%s: %s launch in %s/%s failed: %s",
-                fmt(job_model),
-                offer.instance.name,
-                offer.backend.value,
-                offer.region,
-                repr(e),
-            )
-            continue
-        except Exception as e:
-            offer_errors.append(_get_offer_attempt_error(offer=offer, error=e))
-            logger.exception(
-                "%s: got exception when launching %s in %s/%s",
-                fmt(job_model),
-                offer.instance.name,
-                offer.backend.value,
-                offer.region,
-            )
-            continue
-    return _FailedNewCapacityProvisioning(
-        message=_get_new_capacity_failure_message(
-            fleet_name=fleet_model.name,
-            attempts=_NewCapacityAttempts(
-                total=len(offers),
-                tried=offers_tried,
-                skip_reasons=skip_reasons,
-                errors=offer_errors,
-                # Offers are left only if the attempt limit, not the offer list, ended the loop.
-                limit_reached=offers_taken < len(offers),
             ),
-        ),
-        placement_group_cleanup=_build_placement_group_cleanup(
-            fleet_model=fleet_model,
-            offers_tried=offers_tried,
-            selected_placement_group_id=None,
-            new_placement_group_models=new_placement_group_models,
-        ),
-    )
+            placement_group_cleanup=_build_placement_group_cleanup(
+                fleet_model=fleet_model,
+                offers_tried=offers_tried,
+                selected_placement_group_id=None,
+                new_placement_group_models=new_placement_group_models,
+            ),
+        )
 
 
 _MAX_OFFER_ERROR_LEN = 200

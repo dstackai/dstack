@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.backends.configurators import check_backend_type_available
 from dstack._internal.core.backends.features import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
-    BackendNotAvailable,
     ResourceExistsError,
     ServerClientError,
 )
@@ -37,8 +37,8 @@ from dstack._internal.server.models import (
     VolumeAttachmentModel,
     VolumeModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import (
     get_locker,
@@ -481,7 +481,7 @@ def _validate_volume_configuration(configuration: AnyVolumeConfiguration):
         and configuration.size is None
     ):
         raise ServerClientError("Volume must specify either existing identifier or size")
-    backends_services.check_backend_type_available(configuration.backend)
+    check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:
         raise ServerClientError(
             f"Volumes are not supported for {configuration.backend.value} backend."
@@ -518,23 +518,21 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         )
         return
 
-    try:
-        backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project,
-            backend_type=volume.provisioning_data.backend,
+    async with backends_cache.lease_project_backend_by_type(
+        project=volume_model.project,
+        backend_type=volume.provisioning_data.backend,
+    ) as backend:
+        if backend is None:
+            logger.error(
+                f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
+            )
+            return
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithVolumeSupport)
+        await common.run_async(
+            compute.delete_volume,
+            volume=volume,
         )
-    except BackendNotAvailable:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
-        )
-        return
-
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
-    await common.run_async(
-        compute.delete_volume,
-        volume=volume,
-    )
 
 
 # Clouds charge volumes assuming 30-day months, e.g. https://aws.amazon.com/ebs/pricing/

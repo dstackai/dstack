@@ -486,3 +486,27 @@ class TestDeleteResourceGroup:
             make_compute().delete_resource_group(group)
 
         resources.delete_pricing_policy.assert_not_called()
+
+
+class TestClose:
+    def test_closes_created_sdk_once(self, mocker):
+        sdk = Mock()
+        mocker.patch.object(compute_module.resources, "make_sdk", return_value=sdk)
+        compute = make_compute()
+        assert compute._sdk is sdk
+        compute.close()
+        compute.close()
+        sdk.sync_close.assert_called_once_with(timeout=compute_module.resources.SDK_CLOSE_TIMEOUT)
+
+    def test_does_not_create_sdk(self, mocker):
+        make_sdk = mocker.patch.object(compute_module.resources, "make_sdk")
+        make_compute().close()
+        make_sdk.assert_not_called()
+
+    def test_does_not_raise_if_sdk_fails_to_close(self, mocker):
+        sdk = Mock()
+        sdk.sync_close.side_effect = TimeoutError()
+        mocker.patch.object(compute_module.resources, "make_sdk", return_value=sdk)
+        compute = make_compute()
+        assert compute._sdk is sdk
+        compute.close()

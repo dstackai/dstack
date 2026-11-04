@@ -1,7 +1,7 @@
 import datetime as dt
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import time_machine
@@ -21,6 +21,7 @@ from dstack._internal.server.testing.common import (
     create_instance,
     create_project,
     get_job_provisioning_data,
+    mock_lease,
 )
 from tests._internal.server.background.pipeline_tasks.instances.helpers import (
     instance_to_pipeline_item,
@@ -40,10 +41,9 @@ class TestTermination:
         terminate_instance = backend.compute.return_value.terminate_instance
         if error is not None:
             terminate_instance.side_effect = error
-        with patch.object(
-            instances_termination.backends_services,
-            "get_project_backend_by_type",
-            AsyncMock(return_value=backend),
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend),
         ):
             yield terminate_instance
 

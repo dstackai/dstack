@@ -46,6 +46,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_remote_connection_info,
     get_run_spec,
+    mock_lease,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -229,8 +230,8 @@ class TestGetJobPlansNodeGroups:
         async def find_optimal_fleet_with_offers_side_effect(*, job, **kwargs):
             gpu = job.job_spec.requirements.resources.gpu
             if gpu is not None and gpu.name:
-                return Mock(), [], [(Mock(), gpu_offer)]
-            return Mock(), [], [(Mock(), cpu_offer)]
+                return Mock(), [], [gpu_offer]
+            return Mock(), [], [cpu_offer]
 
         monkeypatch.setattr(
             "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
@@ -310,8 +311,8 @@ class TestGetJobPlansReplicaGroups:
         async def find_optimal_fleet_with_offers_side_effect(*, job, **kwargs):
             gpu = job.job_spec.requirements.resources.gpu
             if gpu is not None and gpu.name:
-                return Mock(), [], [(Mock(), gpu_offer)]
-            return Mock(), [], [(Mock(), cpu_offer)]
+                return Mock(), [], [gpu_offer]
+            return Mock(), [], [cpu_offer]
 
         monkeypatch.setattr(
             "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
@@ -839,6 +840,10 @@ class TestGetBackendOffersInFleet:
         )
         offer = get_instance_offer_with_availability()
         backend = AsyncMock()
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend]),
+        )
         get_offers_by_requirements_mock.return_value = [(backend, offer)]
 
         offers = await _get_backend_offers_in_fleet(
@@ -849,8 +854,9 @@ class TestGetBackendOffersInFleet:
             volumes=None,
         )
 
-        assert offers == [(backend, offer)]
+        assert offers == [offer]
         get_offers_by_requirements_mock.assert_awaited_once()
         await_args = get_offers_by_requirements_mock.await_args
         assert await_args is not None
+        assert await_args.kwargs["backends"] == [backend]
         assert await_args.kwargs["master_job_provisioning_data"] is None

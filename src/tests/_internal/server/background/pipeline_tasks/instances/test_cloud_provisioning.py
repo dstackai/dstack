@@ -35,6 +35,7 @@ from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_placement_group_provisioning_data,
+    mock_lease,
 )
 from tests._internal.server.background.pipeline_tasks.instances.helpers import (
     instance_to_pipeline_item,
@@ -86,9 +87,11 @@ class TestCloudProvisioning:
             total_blocks=requested_blocks,
             busy_blocks=0,
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
+        backend_mock = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             backend_mock.TYPE = BackendType.AWS
             gpu = Gpu(name="T4", memory_mib=16384, vendor=gpuhunt.AcceleratorVendor.NVIDIA)
             offer = InstanceOfferWithAvailability(
@@ -161,8 +164,10 @@ class TestCloudProvisioning:
             region=offer.region,
             price=offer.price,
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [aws_mock, gcp_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([aws_mock, gcp_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -190,8 +195,10 @@ class TestCloudProvisioning:
         aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
         aws_mock.compute.return_value.get_offers.return_value = [offer]
         aws_mock.compute.return_value.create_instance.side_effect = err
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [aws_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([aws_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -210,8 +217,10 @@ class TestCloudProvisioning:
             project=project,
             status=InstanceStatus.PENDING,
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = []
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -248,8 +257,10 @@ class TestCloudProvisioning:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -296,8 +307,10 @@ class TestCloudProvisioning:
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, sibling_instance)
 
         await session.refresh(master_instance)
@@ -349,8 +362,10 @@ class TestCloudProvisioning:
         master_item = instance_to_pipeline_item(master_instance)
         sibling_item = instance_to_pipeline_item(sibling_instance)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = []
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([]),
+        ):
             await worker.process(master_item)
 
         await session.refresh(master_instance)
@@ -383,8 +398,10 @@ class TestCloudProvisioning:
             region="us-east-1",
         )
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [gcp_mock, aws_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([gcp_mock, aws_mock]),
+        ):
             await worker.process(sibling_item)
 
         await session.refresh(sibling_instance)
@@ -409,8 +426,10 @@ class TestCloudProvisioning:
                 region="us-east-1",
             )
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [promoted_backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([promoted_backend_mock]),
+        ):
             await process_instance(session, worker, sibling_instance)
 
         await session.refresh(sibling_instance)
@@ -478,8 +497,10 @@ class TestCloudProvisioning:
             backend=BackendType.AWS,
             region="us-east-1",
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [gcp_mock, aws_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([gcp_mock, aws_mock]),
+        ):
             await process_instance(session, worker, sibling_instance)
 
         await session.refresh(sibling_instance)
@@ -540,8 +561,10 @@ class TestCloudProvisioning:
             backend=BackendType.AWS,
             region="us-east-1",
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, sibling_instance)
 
         await session.refresh(sibling_instance)
@@ -605,8 +628,10 @@ class TestCloudProvisioning:
             backend=BackendType.AWS,
             region="us-east-1",
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, sibling_instance)
 
         await session.refresh(sibling_instance)
@@ -677,8 +702,10 @@ class TestCloudProvisioning:
             backend=BackendType.AWS,
             region="us-east-1",
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, later_instance)
             assert backend_mock.compute.return_value.create_instance.call_count == 1
             await process_instance(session, worker, earlier_instance)
@@ -736,8 +763,10 @@ class TestCloudProvisioning:
         backend_mock.compute.return_value.create_placement_group.return_value = (
             get_placement_group_provisioning_data()
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -790,8 +819,10 @@ class TestCloudProvisioning:
         compute_mock.are_placement_groups_compatible_with_reservation.return_value = compatible
         compute_mock.create_instance.return_value = get_job_provisioning_data()
         compute_mock.create_placement_group.return_value = get_placement_group_provisioning_data()
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -859,8 +890,10 @@ class TestCloudProvisioning:
             get_placement_group_provisioning_data()
         )
         backend_mock.compute.return_value.is_suitable_placement_group.return_value = can_reuse
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)
@@ -918,8 +951,10 @@ class TestCloudProvisioning:
         backend_mock.compute.return_value.create_instance.return_value = (
             get_job_provisioning_data()
         )
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, master_instance)
 
         await session.refresh(master_instance)
@@ -979,8 +1014,10 @@ class TestCloudProvisioning:
             raise err
 
         backend_mock.compute.return_value.create_placement_group = create_placement_group_method
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = [backend_mock]
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock]),
+        ):
             await process_instance(session, worker, instance)
 
         await session.refresh(instance)

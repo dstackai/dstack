@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithGatewayLoadBalancerSupport,
     ComputeWithGatewaySupport,
 )
-from dstack._internal.core.errors import BackendError, BackendNotAvailable, GatewayError
+from dstack._internal.core.errors import BackendError, GatewayError
 from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunStatus, ServiceSpec
@@ -45,9 +45,9 @@ from dstack._internal.server.models import (
     ServiceRegistrationModel,
     ServiceReplicaRegistrationModel,
 )
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
     get_gateway_lb_configuration,
@@ -454,45 +454,45 @@ async def _provision_gateway_replica(
     gateway_model: GatewayModel,
     replica_model: GatewayReplicaModel,
 ) -> _GatewayReplicaUpdateMap:
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project, backend_id=replica_model.backend_id
-        )
-    except BackendNotAvailable:
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message="Backend not available",
-            active=False,
-            deleted=True,
-        )
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project, backend_id=replica_model.backend_id
+    ) as backend:
+        if backend is None:
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message="Backend not available",
+                active=False,
+                deleted=True,
+            )
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGatewaySupport)
+        replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
 
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGatewaySupport)
-    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
-
-    logger.debug("%s: creating gateway replica", fmt(replica_model))
-    try:
-        gpd = await run_async(
-            compute.create_gateway_replica, replica_configuration, gateway_model.backend_data
-        )
-    except BackendError as e:
-        status_message = f"Backend error: {repr(e)}"
-        if len(e.args) > 0:
-            status_message = str(e.args[0])
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message=status_message,
-            active=False,
-            deleted=True,
-        )
-    except Exception:
-        logger.exception("%s: unexpected error when creating gateway replica", fmt(replica_model))
-        return _GatewayReplicaUpdateMap(
-            status=GatewayReplicaStatus.TERMINATED,
-            status_message="Unexpected error",
-            active=False,
-            deleted=True,
-        )
+        logger.debug("%s: creating gateway replica", fmt(replica_model))
+        try:
+            gpd = await run_async(
+                compute.create_gateway_replica, replica_configuration, gateway_model.backend_data
+            )
+        except BackendError as e:
+            status_message = f"Backend error: {repr(e)}"
+            if len(e.args) > 0:
+                status_message = str(e.args[0])
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message=status_message,
+                active=False,
+                deleted=True,
+            )
+        except Exception:
+            logger.exception(
+                "%s: unexpected error when creating gateway replica", fmt(replica_model)
+            )
+            return _GatewayReplicaUpdateMap(
+                status=GatewayReplicaStatus.TERMINATED,
+                status_message="Unexpected error",
+                active=False,
+                deleted=True,
+            )
 
     return _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.PROVISIONING,
@@ -580,26 +580,25 @@ async def _register_replica_with_load_balancer(
     """
     if replica_model.instance_id is None:
         return "instance_id is None, cannot register with load balancer"
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project, backend_id=replica_model.backend_id
-        )
-    except BackendNotAvailable:
-        return "Backend not available"
-    compute = backend.compute()
-    if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
-        return "Backend does not support load balancer operations"
-    lb_configuration = get_gateway_lb_configuration(gateway_model)
-    try:
-        await run_async(
-            compute.register_gateway_replica_with_load_balancer,
-            replica_model.instance_id,
-            lb_configuration,
-            gateway_model.backend_data,
-        )
-    except Exception:
-        logger.exception("%s: error registering with load balancer", fmt(replica_model))
-        return "Error registering with load balancer"
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project, backend_id=replica_model.backend_id
+    ) as backend:
+        if backend is None:
+            return "Backend not available"
+        compute = backend.compute()
+        if not isinstance(compute, ComputeWithGatewayLoadBalancerSupport):
+            return "Backend does not support load balancer operations"
+        lb_configuration = get_gateway_lb_configuration(gateway_model)
+        try:
+            await run_async(
+                compute.register_gateway_replica_with_load_balancer,
+                replica_model.instance_id,
+                lb_configuration,
+                gateway_model.backend_data,
+            )
+        except Exception:
+            logger.exception("%s: error registering with load balancer", fmt(replica_model))
+            return "Error registering with load balancer"
     logger.info("%s: registered with load balancer", fmt(replica_model))
     return None
 
@@ -1467,46 +1466,48 @@ async def _process_terminating_item(item: GatewayReplicaPipelineItem):
     mark_terminated_update_map = _GatewayReplicaUpdateMap(
         status=GatewayReplicaStatus.TERMINATED, active=False, deleted=True
     )
-    try:
-        (_, backend) = await backends_services.get_project_backend_with_model_by_id_or_error(
-            project=gateway_model.project,
-            backend_id=replica_model.backend_id,
-        )
-    except BackendNotAvailable:
-        logger.error(
-            "%s: backend not available, cannot terminate. Marking TERMINATED without termination",
-            fmt(replica_model),
-        )
-        await _commit_update(item, replica_model, mark_terminated_update_map)
-        return
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGatewaySupport)
-    replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
-    if replica_model.instance_id is None:
-        logger.warning(
-            "%s: instance_id is None, skipping gateway replica termination", fmt(replica_model)
-        )
-        await _commit_update(item, replica_model, mark_terminated_update_map)
-        return
-    if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
-        await _commit_update(item, replica_model, update_map={})
-        return
+    async with backends_cache.lease_project_backend_by_id(
+        project=gateway_model.project,
+        backend_id=replica_model.backend_id,
+    ) as backend:
+        if backend is None:
+            logger.error(
+                "%s: backend not available, cannot terminate."
+                " Marking TERMINATED without termination",
+                fmt(replica_model),
+            )
+            await _commit_update(item, replica_model, mark_terminated_update_map)
+            return
+        compute = backend.compute()
+        assert isinstance(compute, ComputeWithGatewaySupport)
+        replica_configuration = get_gateway_replica_configuration(replica_model, gateway_model)
+        if replica_model.instance_id is None:
+            logger.warning(
+                "%s: instance_id is None, skipping gateway replica termination", fmt(replica_model)
+            )
+            await _commit_update(item, replica_model, mark_terminated_update_map)
+            return
+        if _is_legacy_aws_acm_gateway_with_pending_migration(gateway_model):
+            await _commit_update(item, replica_model, update_map={})
+            return
 
-    if gateway_model.hostname is not None:
-        await _deregister_gateway_replica_from_load_balancer(compute, gateway_model, replica_model)
+        if gateway_model.hostname is not None:
+            await _deregister_gateway_replica_from_load_balancer(
+                compute, gateway_model, replica_model
+            )
 
-    logger.debug("%s: terminating gateway replica", fmt(replica_model))
-    try:
-        await run_async(
-            compute.terminate_gateway_replica,
-            replica_model.instance_id,
-            replica_configuration,
-            replica_model.backend_data,
-        )
-    except Exception:
-        logger.exception("%s: error when terminating gateway replica", fmt(replica_model))
-        await _commit_update(item, replica_model, update_map={})
-        return
+        logger.debug("%s: terminating gateway replica", fmt(replica_model))
+        try:
+            await run_async(
+                compute.terminate_gateway_replica,
+                replica_model.instance_id,
+                replica_configuration,
+                replica_model.backend_data,
+            )
+        except Exception:
+            logger.exception("%s: error when terminating gateway replica", fmt(replica_model))
+            await _commit_update(item, replica_model, update_map={})
+            return
 
     if replica_model.ip_address is not None:
         await gateway_connections_pool.remove(replica_model.ip_address)

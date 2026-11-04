@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +50,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_job_provisioning_data,
     list_events,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -402,10 +403,9 @@ async def _lock(session: AsyncSession, orphan_cleanup: OrphanCleanupModel) -> Pi
 def _patch_compute(compute: _ListingCompute):
     backend = Mock()
     backend.compute.return_value = compute
-    return patch.object(
-        orphan_cleanup_pipeline.backends_services,
-        "get_project_backend_by_type",
-        AsyncMock(return_value=backend),
+    return patch(
+        "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+        mock_lease(backend),
     )
 
 

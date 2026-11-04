@@ -1,17 +1,17 @@
+import heapq
 import itertools
 import math
 import uuid
 from collections.abc import Hashable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Union
+from typing import Optional
 
 from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, raiseload
 from sqlalchemy.orm.attributes import set_committed_value
 
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.fleets import FleetSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
@@ -36,6 +36,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     RunModel,
 )
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
     get_fleet_master_instance_provisioning_data,
@@ -58,10 +59,7 @@ from dstack._internal.server.services.jobs import (
     is_multinode_job,
     remove_job_spec_sensitive_info,
 )
-from dstack._internal.server.services.offers import (
-    get_offers_by_requirements,
-    merge_offer_iterables,
-)
+from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.requirements.combine import (
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
@@ -362,7 +360,7 @@ class _FleetCandidate:
 @dataclass
 class _FleetCandidateWithBackendOffers:
     candidate: _FleetCandidate
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    backend_offers: list[InstanceOfferWithAvailability]
     sort_key: tuple[bool, float, float]
 
 
@@ -382,7 +380,7 @@ async def find_optimal_fleet_with_offers(
 ) -> tuple[
     Optional[FleetModel],
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-    list[tuple[Backend, InstanceOfferWithAvailability]],
+    list[InstanceOfferWithAvailability],
 ]:
     """
     Finds the optimal fleet for the run among the given fleets and returns
@@ -447,9 +445,7 @@ async def find_optimal_fleet_with_offers(
                 instance_offers=(
                     available_instance_offers if exclude_not_available else all_instance_offers
                 ),
-                min_instance_offer_price=_get_min_instance_or_backend_offer_price(
-                    available_instance_offers
-                ),
+                min_instance_offer_price=_get_min_instance_offer_price(available_instance_offers),
                 # Require at least one available instance so that fleets without matching
                 # instances are not treated as having capacity when nodes_required_num is 0
                 # (e.g. a service scaling from zero replicas).
@@ -470,7 +466,7 @@ async def find_optimal_fleet_with_offers(
     # Second step: gather backend offers unless skipped.
     candidates_with_backend_offers: list[_FleetCandidateWithBackendOffers] = []
     for candidate in candidates:
-        backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+        backend_offers: list[InstanceOfferWithAvailability]
         if _skip_backend_offers:
             backend_offers = []
         else:
@@ -494,7 +490,7 @@ async def find_optimal_fleet_with_offers(
                 sort_key=(
                     not candidate.has_pool_capacity,
                     candidate.min_instance_offer_price,
-                    _get_min_instance_or_backend_offer_price(available_backend_offers),
+                    _get_min_backend_offer_price(available_backend_offers),
                 ),
             )
         )
@@ -686,8 +682,8 @@ def select_targeted_instance_offers(
             candidates.append(
                 _TargetedInstanceOffersCandidate(
                     lacks_capacity=not has_capacity,
-                    available_price=_get_min_instance_or_backend_offer_price(available_offers),
-                    selected_price=_get_min_instance_or_backend_offer_price(all_offers),
+                    available_price=_get_min_instance_offer_price(available_offers),
+                    selected_price=_get_min_instance_offer_price(all_offers),
                     offers=all_offers,
                 )
             )
@@ -776,7 +772,7 @@ async def _get_backend_offers_in_fleet(
     max_offers: Optional[int] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
-) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
+) -> list[InstanceOfferWithAvailability]:
     if fleet_spec is None:
         fleet_spec = get_fleet_spec(fleet_model)
     try:
@@ -797,19 +793,21 @@ async def _get_backend_offers_in_fleet(
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.
         multinode = requirements.multinode or is_multinode_job(job)
-        backend_offers = await get_offers_by_requirements(
-            project=project,
-            profile=profile,
-            requirements=requirements,
-            multinode=multinode,
-            master_job_provisioning_data=master_instance_provisioning_data,
-            volumes=volumes,
-            privileged=job.job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-            max_offers=max_offers,
-            full_offers=full_offers,
-            unallocated_resources=unallocated_resources,
-        )
+        async with backends_cache.lease_project_backends(project) as backends:
+            backends_with_offers = await get_offers_by_requirements(
+                backends=backends,
+                profile=profile,
+                requirements=requirements,
+                multinode=multinode,
+                master_job_provisioning_data=master_instance_provisioning_data,
+                volumes=volumes,
+                privileged=job.job_spec.privileged,
+                instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                max_offers=max_offers,
+                full_offers=full_offers,
+                unallocated_resources=unallocated_resources,
+            )
+        backend_offers = [offer for _, offer in backends_with_offers]
     return backend_offers
 
 
@@ -860,7 +858,7 @@ async def get_non_fleet_offers(
     unallocated_resources: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-    list[tuple[Backend, InstanceOfferWithAvailability]],
+    list[InstanceOfferWithAvailability],
 ]:
     """
     Returns instance and backend offers for job irrespective of fleets or instances,
@@ -873,22 +871,24 @@ async def get_non_fleet_offers(
         job=job,
         volumes=volumes,
     )
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    backend_offers: list[InstanceOfferWithAvailability]
     if skip_backend_offers:
         backend_offers = []
     else:
-        backend_offers = await get_offers_by_requirements(
-            project=project,
-            profile=run_spec.merged_profile,
-            requirements=job.job_spec.requirements,
-            exclude_not_available=False,
-            multinode=is_multinode_job(job),
-            volumes=volumes,
-            privileged=job.job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-            full_offers=full_offers,
-            unallocated_resources=unallocated_resources,
-        )
+        async with backends_cache.lease_project_backends(project) as backends:
+            backends_with_offers = await get_offers_by_requirements(
+                backends=backends,
+                profile=run_spec.merged_profile,
+                requirements=job.job_spec.requirements,
+                exclude_not_available=False,
+                multinode=is_multinode_job(job),
+                volumes=volumes,
+                privileged=job.job_spec.privileged,
+                instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                full_offers=full_offers,
+                unallocated_resources=unallocated_resources,
+            )
+        backend_offers = [offer for _, offer in backends_with_offers]
     return instance_offers, backend_offers
 
 
@@ -901,7 +901,7 @@ async def get_backend_offers_in_run_candidate_fleets(
     max_offers_per_fleet: Optional[int] = None,
     full_offers: bool = False,
     unallocated_resources: bool = False,
-) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
+) -> list[InstanceOfferWithAvailability]:
     """
     Returns backend offers across the run's selected candidate fleets.
 
@@ -919,10 +919,10 @@ async def get_backend_offers_in_run_candidate_fleets(
         run_spec=run_spec,
     )
     seen_offer_identities = set()
-    offers: list[tuple[Backend, InstanceOfferWithAvailability]] = []
+    offers: list[InstanceOfferWithAvailability] = []
     for candidate_fleet_model in candidate_fleet_models:
         offers_from_fleet = []
-        for backend, offer in await _get_backend_offers_in_fleet(
+        for offer in await _get_backend_offers_in_fleet(
             project=project,
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
@@ -934,9 +934,9 @@ async def get_backend_offers_in_run_candidate_fleets(
         ):
             offer_identity = _get_backend_offer_identity(offer)
             if offer_identity not in seen_offer_identities:
-                offers_from_fleet.append((backend, offer))
+                offers_from_fleet.append(offer)
                 seen_offer_identities.add(offer_identity)
-        offers = list(merge_offer_iterables(offers, offers_from_fleet))
+        offers = list(heapq.merge(offers, offers_from_fleet, key=lambda o: o.price))
     return offers
 
 
@@ -951,7 +951,7 @@ async def get_offers_in_run_candidate_fleets(
     unallocated_resources: bool = False,
 ) -> tuple[
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-    list[tuple[Backend, InstanceOfferWithAvailability]],
+    list[InstanceOfferWithAvailability],
 ]:
     """
     Returns existing-instance and backend offers across the run's candidate fleets.
@@ -980,7 +980,7 @@ async def get_offers_in_run_candidate_fleets(
         )
     instance_offers.sort(key=lambda offer: offer[1].price or 0)
 
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]]
+    backend_offers: list[InstanceOfferWithAvailability]
     if skip_backend_offers:
         backend_offers = []
     else:
@@ -1040,14 +1040,14 @@ def _freeze_offer_identity_value(value: object) -> Hashable:
 
 def _get_job_plan(
     instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
+    backend_offers: list[InstanceOfferWithAvailability],
     job: Job,
     max_offers: Optional[int],
     reverse_offers: bool = False,
 ) -> JobPlan:
     job_offers: list[InstanceOfferWithAvailability] = []
     job_offers.extend(offer for _, offer in instance_offers)
-    job_offers.extend(offer for _, offer in backend_offers)
+    job_offers.extend(backend_offers)
     if reverse_offers:
         job_offers.sort(key=lambda offer: (not offer.availability.is_available(), -offer.price))
     else:
@@ -1074,15 +1074,19 @@ def _get_offers_from_instances(
     return instances_with_offers
 
 
-def _get_min_instance_or_backend_offer_price(
-    offers: Union[
-        list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-        list[tuple[Backend, InstanceOfferWithAvailability]],
-    ],
+def _get_min_instance_offer_price(
+    instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
 ) -> float:
     min_offer_price = math.inf
-    if len(offers) > 0:
-        min_offer_price = offers[0][1].price
+    if len(instance_offers) > 0:
+        min_offer_price = instance_offers[0][1].price
+    return min_offer_price
+
+
+def _get_min_backend_offer_price(backend_offers: list[InstanceOfferWithAvailability]) -> float:
+    min_offer_price = math.inf
+    if len(backend_offers) > 0:
+        min_offer_price = backend_offers[0].price
     return min_offer_price
 
 
@@ -1097,8 +1101,6 @@ def _exclude_non_available_instance_offers(
 
 
 def _exclude_non_available_backend_offers(
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
-) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
-    return [
-        (backend, offer) for backend, offer in backend_offers if offer.availability.is_available()
-    ]
+    backend_offers: list[InstanceOfferWithAvailability],
+) -> list[InstanceOfferWithAvailability]:
+    return [offer for offer in backend_offers if offer.availability.is_available()]
