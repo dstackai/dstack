@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import type { MultiselectProps, PropertyFilterProps } from 'components';
 
+import useAppSelector from 'hooks/useAppSelector';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import {
     EMPTY_QUERY,
@@ -14,6 +15,8 @@ import {
 } from 'libs/filters';
 import { useLazyGetProjectFleetsQuery } from 'services/fleet';
 import { useGetProjectsQuery, useLazyGetProjectQuery, useLazyGetProjectsQuery } from 'services/project';
+
+import { selectUserName } from 'App/slice';
 
 import { formatGpuVendor, getFleetFilterValue, getPropertyFilterOptions, rangeToObject } from '../helpers';
 
@@ -203,7 +206,8 @@ export const useFilters = ({
     const [getProjects] = useLazyGetProjectsQuery();
     const [getProject] = useLazyGetProjectQuery();
     const [getProjectFleets] = useLazyGetProjectFleetsQuery();
-    const { data: projectsData } = useGetProjectsQuery({ limit: 2 });
+    const userName = useAppSelector(selectUserName);
+    const { data: projectsData } = useGetProjectsQuery({ username: userName ?? '', limit: 2 }, { skip: !userName });
     const propertyFilterRef = useRef<PropertyFilterProps.Ref>(null);
     const projectNameIsChecked = useRef(false);
     const prevSelectedProjectName = useRef<string | undefined>();
@@ -469,15 +473,16 @@ export const useFilters = ({
 
         setFilteringStatusType('loading');
 
-        if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects(
-                getTokenAwareNamePatternFilterRequestParams({
+        if (filteringProperty?.key === filterKeys.PROJECT_NAME && userName) {
+            await getProjects({
+                username: userName,
+                ...getTokenAwareNamePatternFilterRequestParams({
                     filteringText,
                     limit,
                     propertyKey: filterKeys.PROJECT_NAME,
                     tokens: propertyFilterQuery.tokens,
                 }),
-            )
+            })
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({
