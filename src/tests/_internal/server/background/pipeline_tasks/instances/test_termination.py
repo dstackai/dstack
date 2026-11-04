@@ -41,9 +41,8 @@ class TestTermination:
         terminate_instance = backend.compute.return_value.terminate_instance
         if error is not None:
             terminate_instance.side_effect = error
-        with patch.object(
-            instances_termination.backends_cache,
-            "lease_project_backend_by_type",
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
             mock_lease(backend),
         ):
             yield terminate_instance

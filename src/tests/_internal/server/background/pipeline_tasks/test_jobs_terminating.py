@@ -45,8 +45,8 @@ from dstack._internal.server.testing.common import (
     get_runner_job_submission_mismatch_error,
     get_volume_configuration,
     get_volume_provisioning_data,
-    lease_yielding,
     list_events,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -810,11 +810,11 @@ class TestJobTerminatingWorker:
         _lock_job(job)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
         ) as m:
-            backend_mock = Mock()
-            m.side_effect = lease_yielding(backend_mock)
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
             await worker.process(_job_to_pipeline_item(job))
@@ -861,11 +861,11 @@ class TestJobTerminatingWorker:
         _lock_job(job)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
-            m.side_effect = lease_yielding(backend_mock)
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = False
             await worker.process(_job_to_pipeline_item(job))
@@ -879,10 +879,12 @@ class TestJobTerminatingWorker:
 
         _lock_job(job)
         await session.commit()
+        backend_mock = Mock()
         with (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
-            ) as m,
+                "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+                mock_lease(backend_mock),
+            ),
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_terminating.get_current_datetime"
             ) as datetime_mock,
@@ -890,8 +892,6 @@ class TestJobTerminatingWorker:
             datetime_mock.return_value = job.volumes_detached_at.replace(
                 tzinfo=timezone.utc
             ) + timedelta(minutes=30)
-            backend_mock = Mock()
-            m.side_effect = lease_yielding(backend_mock)
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = False
             await worker.process(_job_to_pipeline_item(job))
@@ -909,11 +909,11 @@ class TestJobTerminatingWorker:
 
         _lock_job(job)
         await session.commit()
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
-            m.side_effect = lease_yielding(backend_mock)
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
             await worker.process(_job_to_pipeline_item(job))
@@ -1017,11 +1017,11 @@ class TestJobTerminatingWorker:
         _lock_job(job)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
-            m.side_effect = lease_yielding(backend_mock)
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.is_volume_detached.return_value = True
 

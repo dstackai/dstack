@@ -21,7 +21,7 @@ from dstack._internal.server.testing.common import (
     create_compute_group,
     create_fleet,
     create_project,
-    lease_yielding,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -165,13 +165,13 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.side_effect = lease_yielding(backend_mock)
             backend_mock.TYPE = BackendType.RUNPOD
             await worker.process(_compute_group_to_pipeline_item(compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
@@ -193,13 +193,13 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.side_effect = lease_yielding(backend_mock)
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
             await worker.process(_compute_group_to_pipeline_item(compute_group))
@@ -215,13 +215,13 @@ class TestComputeGroupWorker:
         compute_group.lock_token = uuid.uuid4()
         compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as m:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
-            m.side_effect = lease_yielding(backend_mock)
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
             await worker.process(_compute_group_to_pipeline_item(compute_group))

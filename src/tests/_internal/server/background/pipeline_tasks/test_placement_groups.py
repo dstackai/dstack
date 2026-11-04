@@ -19,7 +19,7 @@ from dstack._internal.server.testing.common import (
     create_fleet,
     create_placement_group,
     create_project,
-    lease_yielding,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -197,11 +197,11 @@ class TestPlacementGroupWorker:
         placement_group.lock_token = uuid.uuid4()
         placement_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
+        aws_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as m:
-            aws_mock = Mock()
-            m.side_effect = lease_yielding(aws_mock)
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(aws_mock),
+        ):
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             await worker.process(_placement_group_to_pipeline_item(placement_group))
             aws_mock.compute.return_value.delete_placement_group.assert_called_once()
@@ -228,11 +228,11 @@ class TestPlacementGroupWorker:
         placement_group.lock_owner = "PlacementGroupPipeline"
         original_last_processed_at = placement_group.last_processed_at
         await session.commit()
+        aws_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as m:
-            aws_mock = Mock()
-            m.side_effect = lease_yielding(aws_mock)
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(aws_mock),
+        ):
             aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             aws_mock.compute.return_value.delete_placement_group.side_effect = (
                 PlacementGroupInUseError()

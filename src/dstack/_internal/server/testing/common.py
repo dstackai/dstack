@@ -1,7 +1,7 @@
 import json
 import uuid
 from collections.abc import Callable
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -148,25 +148,17 @@ from dstack._internal.server.services.runner.client import RunnerJobSubmissionMi
 from dstack._internal.server.services.users import get_token_hash
 
 
-def lease_yielding(value: Any) -> Callable[..., AbstractAsyncContextManager[Any]]:
+def mock_lease(value: Any) -> Mock:
     """
-    Returns a replacement for a `lease_*()` function from `services.backends.cache`
-    that yields `value`, e.g. to use as a mock's `side_effect`.
+    Returns a mock to patch a `lease_*()` function from `services.backends.cache` with.
+    The lease yields `value`.
     """
 
     @asynccontextmanager
     async def lease(*args, **kwargs):
         yield value
 
-    return lease
-
-
-def mock_lease(value: Any) -> Mock:
-    """
-    Returns a mock to patch a `lease_*()` function from `services.backends.cache` with.
-    The lease yields `value`.
-    """
-    return Mock(side_effect=lease_yielding(value))
+    return Mock(side_effect=lease)
 
 
 def get_auth_headers(token: Union[DecryptedString, str]) -> Dict:

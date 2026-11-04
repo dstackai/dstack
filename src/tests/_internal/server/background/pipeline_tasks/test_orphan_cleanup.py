@@ -403,9 +403,8 @@ async def _lock(session: AsyncSession, orphan_cleanup: OrphanCleanupModel) -> Pi
 def _patch_compute(compute: _ListingCompute):
     backend = Mock()
     backend.compute.return_value = compute
-    return patch.object(
-        orphan_cleanup_pipeline.backends_cache,
-        "lease_project_backend_by_type",
+    return patch(
+        "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
         mock_lease(backend),
     )
 

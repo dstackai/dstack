@@ -35,8 +35,8 @@ from dstack._internal.server.testing.common import (
     create_gateway_replica,
     create_project,
     get_gateway_replica_configuration,
-    lease_yielding,
     list_events,
+    mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -535,10 +535,11 @@ class TestGatewayWorkerSubmitted:
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.create_gateway_load_balancer.return_value = (
@@ -546,7 +547,6 @@ class TestGatewayWorkerSubmitted:
                     hostname="gateway-lb.example.com", backend_data="lb-backend-data"
                 )
             )
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -602,13 +602,13 @@ class TestGatewayWorkerSubmitted:
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
             await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
@@ -643,14 +643,14 @@ class TestGatewayWorkerSubmitted:
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.create_gateway_load_balancer.side_effect = exception
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
             await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
@@ -1698,13 +1698,13 @@ class TestGatewayWorkerDeleted:
         gateway.to_be_deleted = True
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -1778,16 +1778,16 @@ class TestGatewayWorkerDeleted:
         original_last_processed_at = gateway.last_processed_at
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value.terminate_gateway_load_balancer.side_effect = (
                 Exception("boom")
             )
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 
@@ -1827,13 +1827,13 @@ class TestGatewayWorkerDeleted:
         gateway.to_be_deleted = True
         await session.commit()
 
+        backend_mock = Mock()
         with patch(
-            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type"
-        ) as get_backends_mock:
-            backend_mock = Mock()
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
+            mock_lease(backend_mock),
+        ):
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value = Mock(spec=ComputeWithGatewaySupport)
-            get_backends_mock.side_effect = lease_yielding(backend_mock)
 
             await worker.process(_gateway_to_pipeline_item(gateway))
 

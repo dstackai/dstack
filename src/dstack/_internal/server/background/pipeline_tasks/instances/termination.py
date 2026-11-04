@@ -1,5 +1,3 @@
-from typing import Optional
-
 from dstack._internal.core.backends.features import get_backends_with_resource_listing_support
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
@@ -37,8 +35,9 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
 
     job_provisioning_data = get_instance_provisioning_data(instance_model)
     if job_provisioning_data is not None and job_provisioning_data.backend != BackendType.REMOTE:
-        exc = await _terminate_in_backend(instance_model, job_provisioning_data)
-        if exc is not None:
+        try:
+            await _terminate_in_backend(instance_model, job_provisioning_data)
+        except Exception as exc:
             first_retry_at = instance_model.first_termination_retry_at
             if first_retry_at is None:
                 first_retry_at = now
@@ -86,10 +85,7 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
 
 async def _terminate_in_backend(
     instance_model: InstanceModel, job_provisioning_data: JobProvisioningData
-) -> Optional[Exception]:
-    """
-    Returns the exception if the backend failed to terminate the instance.
-    """
+):
     async with backends_cache.lease_project_backend_by_type(
         project=instance_model.project,
         backend_type=job_provisioning_data.backend,
@@ -100,18 +96,14 @@ async def _terminate_in_backend(
                 instance_model.name,
                 job_provisioning_data.backend,
             )
-            return None
+            return
         logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
-        try:
-            await run_async(
-                backend.compute().terminate_instance,
-                job_provisioning_data.instance_id,
-                job_provisioning_data.region,
-                job_provisioning_data.backend_data,
-            )
-        except Exception as exc:
-            return exc
-    return None
+        await run_async(
+            backend.compute().terminate_instance,
+            job_provisioning_data.instance_id,
+            job_provisioning_data.region,
+            job_provisioning_data.backend_data,
+        )
 
 
 def _is_to_be_deleted_by_orphan_cleanup(

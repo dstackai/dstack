@@ -166,8 +166,7 @@ class TestCheckInstance:
         await session.commit()
         backend = Mock()
         monkeypatch.setattr(
-            instances_check.backends_cache,
-            "lease_project_backend_by_type",
+            "dstack._internal.server.services.backends.cache.lease_project_backend_by_type",
             mock_lease(backend),
         )
 
