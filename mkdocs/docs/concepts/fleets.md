@@ -535,7 +535,9 @@ If approved, `dstack` updates the fleet without re-creating it. For example, if 
     Changes to other properties require re-creating the fleet. In this case, `dstack apply` offers to delete the fleet and create it again.
 
 ??? info "SSH key rotation"
-    To rotate SSH keys, authorize the new public key and apply the updated fleet configuration. Runs and established SSH connections continue. For `proxy_jump`, keep the old public key authorized until [gateways](gateways.md) and the optional [SSH proxy](../guides/server-deployment.md#ssh-proxy) receive the replacement; `dstack apply` does not wait for them.
+    Authorize the new public key on the hosts or head node, update `identity_file` or `proxy_jump.identity_file`, and run `dstack apply`. Running workloads and existing SSH connections are not interrupted.
+
+    For head-node keys, `dstack apply` does not wait for [gateways](gateways.md) to update their saved keys or the [SSH proxy](../guides/server-deployment.md#ssh-proxy)'s 10-second cache to expire. Revoking the old public key before these components use the new key can prevent new SSH connections or service-tunnel reconnects.
 
 ### Delete fleets
 
