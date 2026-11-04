@@ -45,6 +45,7 @@ class TestBackendsCache:
         monkeypatch.setattr(backends_cache, "_BACKENDS_CACHE", {})
         monkeypatch.setattr(backends_cache, "_BACKENDS_CACHE_LOCKS", {})
         monkeypatch.setattr(backends_cache, "get_stored_backend_record", lambda m: m)
+        # Backends are created concurrently, so their order is not deterministic
         self.backends: list[Mock] = []
 
         def get_backend(backend_model):
@@ -57,6 +58,9 @@ class TestBackendsCache:
             "get_configurator",
             lambda backend_type: Mock(get_backend=Mock(side_effect=get_backend)),
         )
+
+    def get_created_backend(self, backend_type: BackendType) -> Mock:
+        return next(b for b in self.backends if b.TYPE == backend_type)
 
     @pytest.mark.asyncio
     async def test_reuses_backends_between_leases(self):
@@ -88,7 +92,8 @@ class TestBackendsCache:
         )
         async with backends_cache.lease_project_backends(project):
             pass
-        aws_backend, gcp_backend = self.backends
+        aws_backend = self.get_created_backend(BackendType.AWS)
+        gcp_backend = self.get_created_backend(BackendType.GCP)
         project.backends = project.backends[:1]
         async with backends_cache.lease_project_backends(project) as backends:
             assert backends == [aws_backend]
@@ -103,7 +108,8 @@ class TestBackendsCache:
         )
         async with backends_cache.lease_project_backends(project):
             pass
-        aws_backend, gcp_backend = self.backends
+        aws_backend = self.get_created_backend(BackendType.AWS)
+        gcp_backend = self.get_created_backend(BackendType.GCP)
         async with backends_cache.lease_project_backend_by_type(
             project, BackendType.AWS
         ) as backend:
@@ -121,7 +127,8 @@ class TestBackendsCache:
         )
         async with backends_cache.lease_project_backends(project):
             pass
-        aws_backend, gcp_backend = self.backends
+        aws_backend = self.get_created_backend(BackendType.AWS)
+        gcp_backend = self.get_created_backend(BackendType.GCP)
         monkeypatch.setattr(backends_cache, "_BACKEND_IDLE_TTL", 0)
         async with backends_cache.lease_project_backend_by_type(project, BackendType.AWS):
             await backends_cache.close_unused_backends()
@@ -168,7 +175,7 @@ class TestBackendsCache:
         aws_model = make_backend_model(BackendType.AWS)
         project = make_project(aws_model, make_backend_model(BackendType.GCP))
         async with backends_cache.lease_project_backend_by_id(project, aws_model.id) as backend:
-            assert backend is self.backends[0]
+            assert backend is self.get_created_backend(BackendType.AWS)
 
     @pytest.mark.asyncio
     async def test_returns_none_and_releases_leases_if_backend_not_found(self, monkeypatch):
