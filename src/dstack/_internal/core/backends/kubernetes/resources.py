@@ -200,9 +200,7 @@ class ResourceRequestsLimits:
     disk_mib: Optional[int]
     gpu: int
 
-    def to_kubernetes_map(
-        self, gpu_resource: Optional[Union[AnyKubernetesGPUResource, str]] = None
-    ) -> dict[str, str]:
+    def to_kubernetes_map(self, gpu_resource: Optional[str] = None) -> dict[str, str]:
         """
         Args:
             gpu_resource: `nvidia.com/gpu`, `amd.com/gpu`, or a `mixed` strategy MIG resource,
@@ -218,8 +216,6 @@ class ResourceRequestsLimits:
         if self.gpu > 0:
             if gpu_resource is None:
                 raise ValueError("gpu_resource is not specified")
-            if isinstance(gpu_resource, KubernetesResource):
-                gpu_resource = gpu_resource.value
             dct[gpu_resource] = str(self.gpu)
         return dct
 
@@ -546,8 +542,8 @@ class KubernetesOfferBackendData(CoreModel):
     """Whether the offer's GPUs are NVIDIA MIG slices rather than whole GPUs."""
     mig_resource: Optional[str] = None
     """The `mixed` strategy MIG resource that pods request for the offer's GPUs, e.g.,
-    `nvidia.com/mig-1g.10gb`. Not set for other offers, including `single` strategy MIG slices,
-    whose pods request `nvidia.com/gpu` or `amd.com/gpu`."""
+    `nvidia.com/mig-1g.10gb`. Set only with `mig`. Not set for other offers, including `single`
+    strategy MIG slices, whose pods request `nvidia.com/gpu`."""
 
     @classmethod
     def load(cls, data: Mapping[str, Any]) -> Self:

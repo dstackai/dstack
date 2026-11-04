@@ -903,13 +903,11 @@ def _offer_modifier(
     resource_requests: ResourceRequests, mig_allowed: bool, offer: InstanceOfferWithAvailability
 ) -> Optional[InstanceOfferWithAvailability]:
     backend_data = KubernetesOfferBackendData.load(offer.backend_data)
-    if backend_data.mig:
-        if resource_requests.gpu == 0:
-            # Without GPUs, a `mixed` strategy MIG offer is a duplicate of the node's main offer
-            if backend_data.mig_resource is not None:
-                return None
-        elif not mig_allowed:
-            return None
+    if resource_requests.gpu == 0 and backend_data.mig_resource is not None:
+        # Without GPUs, a `mixed` strategy MIG offer is a duplicate of the node's main offer
+        return None
+    if resource_requests.gpu > 0 and backend_data.mig and not mig_allowed:
+        return None
     offer_copy = offer.model_copy(deep=True)
     adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
     return offer_copy
@@ -931,13 +929,8 @@ def _node_has_allocatable_resource(node: client.V1Node, resource: str) -> bool:
 
 class _KubernetesSkipOfferCache(BaseSkipOfferCache[tuple[UUID, str, Optional[str]]]):
     """
-    Like `RegionalSkipOfferCache`, but tracks `mixed` strategy MIG offers separately by their
-    MIG resource.
-
-    A pod for any other offer requests `nvidia.com/gpu` or `amd.com/gpu` on any node with a
-    matching GPU, so if it is not scheduled, no such offer in the region can be. A pod for a
-    `mixed` strategy MIG offer requests only that offer's MIG resource, so other MIG resources
-    and whole GPUs in the region may still be available.
+    Like `RegionalSkipOfferCache`, but also keys `mixed` strategy MIG offers by their MIG resource:
+    their pods request only that resource, while other pods can use any matching GPU in the region.
     """
 
     def _build_key(
