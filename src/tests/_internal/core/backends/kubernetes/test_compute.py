@@ -127,6 +127,7 @@ JUMP_POD_LABELS = build_base_labels(
 JUMP_POD_SELECTOR = {"app.kubernetes.io/instance": JUMP_POD_NAME}
 # Both the labels and the service selector before https://github.com/dstackai/dstack/pull/3891
 PRE_3891_JUMP_POD_LABELS = {"app.kubernetes.io/name": JUMP_POD_NAME}
+GPU_NODE_TAINT = client.V1Taint(key="nvidia.com/gpu", value="present", effect="NoSchedule")
 
 
 def _mock_read(method: Mock, obj: Optional[object]) -> None:
@@ -180,13 +181,17 @@ def _make_service(selector: dict[str, str], node_port: int) -> client.V1Service:
     )
 
 
-def _make_node(name: str, external_ip: Optional[str] = None) -> client.V1Node:
+def _make_node(
+    name: str,
+    external_ip: Optional[str] = None,
+    taints: Optional[list[client.V1Taint]] = None,
+) -> client.V1Node:
     addresses: list[client.V1NodeAddress] = []
     if external_ip is not None:
         addresses.append(client.V1NodeAddress(type="ExternalIP", address=external_ip))
     return client.V1Node(
         metadata=client.V1ObjectMeta(name=name),
-        spec=client.V1NodeSpec(),
+        spec=client.V1NodeSpec(taints=taints),
         status=client.V1NodeStatus(addresses=addresses),
     )
 
@@ -199,13 +204,16 @@ class TestCreateJumpPodServiceIfNotExists:
         pod: Optional[client.V1Pod] = None,
         replica_set: Optional[client.V1ReplicaSet] = None,
         service: Optional[client.V1Service] = None,
+        nodes: Optional[list[client.V1Node]] = None,
     ) -> tuple[Mock, Mock]:
         api = Mock(spec=client.CoreV1Api)
         _mock_read(api.read_namespace, client.V1Namespace() if namespace_exists else None)
         _mock_read(api.read_namespaced_pod, pod)
         _mock_read(api.read_namespaced_service, service)
-        # An untainted node, so the jump pod needs no tolerations.
-        api.list_node.return_value = client.V1NodeList(items=[_make_node("node-a")])
+        if nodes is None:
+            # An untainted node, so the jump pod needs no tolerations.
+            nodes = [_make_node("node-a")]
+        api.list_node.return_value = client.V1NodeList(items=nodes)
         apps_api = Mock(spec=client.AppsV1Api)
         _mock_read(apps_api.read_namespaced_replica_set, replica_set)
         return api, apps_api
@@ -217,6 +225,8 @@ class TestCreateJumpPodServiceIfNotExists:
         jump_pod_port: Optional[int] = None,
         cpu: str = "500m",
         memory: str = "1Gi",
+        node_selector: Optional[list[str]] = None,
+        tolerations: Optional[list[str]] = None,
     ) -> None:
         _create_jump_pod_service_if_not_exists(
             api=api,
@@ -229,7 +239,14 @@ class TestCreateJumpPodServiceIfNotExists:
             authorized_keys=["ssh-ed25519 AAAA project"],
             cpu_request_limit=cpu,
             memory_request_limit=memory,
+            node_selector=node_selector,
+            tolerations=tolerations,
         )
+
+    def get_pod_spec(self, apps_api: Mock) -> client.V1PodSpec:
+        apps_api.create_namespaced_replica_set.assert_called_once()
+        replica_set = apps_api.create_namespaced_replica_set.call_args.kwargs["body"]
+        return replica_set.spec.template.spec
 
     def assert_replica_set_created(
         self, apps_api: Mock, *, cpu: str = "500m", memory: str = "1Gi"
@@ -284,6 +301,85 @@ class TestCreateJumpPodServiceIfNotExists:
         self.call(api, apps_api, cpu="1", memory="2Gi")
 
         self.assert_replica_set_created(apps_api, cpu="1", memory="2Gi")
+
+    def test_autodetects_tolerations_if_all_nodes_are_tainted(self):
+        api, apps_api = self.make_apis(nodes=[_make_node("node-a", taints=[GPU_NODE_TAINT])])
+
+        self.call(api, apps_api)
+
+        pod_spec = self.get_pod_spec(apps_api)
+        assert pod_spec.affinity is None
+        assert pod_spec.tolerations == [
+            client.V1Toleration(key="nvidia.com/gpu", operator="Exists", effect="NoSchedule")
+        ]
+
+    def test_sets_node_affinity_without_autodetected_tolerations(self):
+        api, apps_api = self.make_apis(nodes=[_make_node("node-a", taints=[GPU_NODE_TAINT])])
+
+        self.call(api, apps_api, node_selector=["example.com/jump-host", "example.com/pool=cpu"])
+
+        pod_spec = self.get_pod_spec(apps_api)
+        assert pod_spec.affinity == client.V1Affinity(
+            node_affinity=client.V1NodeAffinity(
+                required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                    # A single term, so that all requirements must match
+                    node_selector_terms=[
+                        client.V1NodeSelectorTerm(
+                            match_expressions=[
+                                client.V1NodeSelectorRequirement(
+                                    key="example.com/jump-host", operator="Exists"
+                                ),
+                                client.V1NodeSelectorRequirement(
+                                    key="example.com/pool", operator="In", values=["cpu"]
+                                ),
+                            ]
+                        )
+                    ]
+                )
+            )
+        )
+        assert pod_spec.tolerations == []
+        api.list_node.assert_not_called()
+
+    def test_empty_node_selector_disables_autodetected_tolerations(self):
+        api, apps_api = self.make_apis(nodes=[_make_node("node-a", taints=[GPU_NODE_TAINT])])
+
+        self.call(api, apps_api, node_selector=[])
+
+        pod_spec = self.get_pod_spec(apps_api)
+        # An empty node selector term would match no nodes
+        assert pod_spec.affinity is None
+        assert pod_spec.tolerations == []
+        api.list_node.assert_not_called()
+
+    @pytest.mark.parametrize("node_selector", [None, ["example.com/pool=cpu"]])
+    @pytest.mark.parametrize(
+        ["tolerations", "expected"],
+        [
+            pytest.param(
+                ["example.com/pool=cpu:NoSchedule"],
+                [
+                    client.V1Toleration(
+                        key="example.com/pool", operator="Equal", value="cpu", effect="NoSchedule"
+                    )
+                ],
+                id="set",
+            ),
+            pytest.param([], [], id="empty"),
+        ],
+    )
+    def test_sets_tolerations_without_autodetection(
+        self,
+        node_selector: Optional[list[str]],
+        tolerations: list[str],
+        expected: list[client.V1Toleration],
+    ):
+        api, apps_api = self.make_apis(nodes=[_make_node("node-a", taints=[GPU_NODE_TAINT])])
+
+        self.call(api, apps_api, node_selector=node_selector, tolerations=tolerations)
+
+        assert self.get_pod_spec(apps_api).tolerations == expected
+        api.list_node.assert_not_called()
 
     def test_does_nothing_if_replica_set_and_service_exist(self):
         api, apps_api = self.make_apis(

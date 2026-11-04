@@ -43,4 +43,8 @@ def _get_kubernetes_proxy_jump_excludes(
         excludes["cpu"] = True
     if all(proxy_jump.memory is None for proxy_jump in proxy_jumps):
         excludes["memory"] = True
+    if all(proxy_jump.node_selector is None for proxy_jump in proxy_jumps):
+        excludes["node_selector"] = True
+    if all(proxy_jump.tolerations is None for proxy_jump in proxy_jumps):
+        excludes["tolerations"] = True
     return excludes

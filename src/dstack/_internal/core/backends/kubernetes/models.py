@@ -38,6 +38,27 @@ class KubernetesProxyJumpConfig(CoreModel):
             )
         ),
     ] = None
+    node_selector: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The labels that the jump pod's node must have."
+                " Each item is `key=value`, `key=` (an empty value), or `key` (any value)"
+            )
+        ),
+    ] = None
+    tolerations: Annotated[
+        Optional[list[str]],
+        Field(
+            description=(
+                "The node taints that the jump pod tolerates."
+                " Each item is `key[=value][:effect]`, as in `kubectl taint`."
+                " Without `=value`, any value is tolerated; without `:effect`, any effect."
+                " If not set, defaults to the GPU node taints when every node is tainted,"
+                " or to none if `node_selector` is set"
+            )
+        ),
+    ] = None
 
 
 class KubernetesContextConfig(CoreModel):
