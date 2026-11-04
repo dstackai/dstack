@@ -41,6 +41,8 @@ export const copyToClipboard = (copyText: string, success?: () => void, failed?:
     navigator.clipboard.writeText(copyText).then(success, failed);
 };
 
+export const TOKEN_MASK = '********';
+
 export const MINUTE = 60000;
 
 export const getDateAgoSting = (time: number): string => {
