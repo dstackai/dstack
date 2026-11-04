@@ -43,12 +43,13 @@ _ANY_MODEL_ADAPTER = pydantic.TypeAdapter(AnyModel)
 
 class ServerProxyRepo(BaseProxyRepo):
     """
-    A repo implementation used by dstack-proxy running within dstack-server.
+    A request-scoped repo used by dstack-proxy running within dstack-server.
     Retrieves data from dstack-server's database.
     """
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self._service_projects: dict[str, ProjectModel] = {}
 
     async def get_service(self, project_name: str, run_name: str) -> Optional[Service]:
         res = await self.session.execute(
@@ -76,6 +77,8 @@ class ServerProxyRepo(BaseProxyRepo):
         run_spec = get_run_spec(run)
         if not isinstance(run_spec.configuration, ServiceConfiguration):
             return None
+        # Reuse the project loaded by this query when opening/updating service connections.
+        self._service_projects[project_name] = jobs[0].project
         router_group = next(
             (g for g in run_spec.configuration.replica_groups if g.router is not None),
             None,
@@ -180,8 +183,10 @@ class ServerProxyRepo(BaseProxyRepo):
         return max(models, key=lambda m: m.created_at)
 
     async def get_project(self, name: str) -> Optional[Project]:
-        res = await self.session.execute(select(ProjectModel).where(ProjectModel.name == name))
-        project = res.scalar_one_or_none()
+        project = self._service_projects.get(name)
+        if project is None:
+            res = await self.session.execute(select(ProjectModel).where(ProjectModel.name == name))
+            project = res.scalar_one_or_none()
         # Release the DB connection before opening/replacing a service SSH tunnel.
         await self.session.commit()
         if project is None:
