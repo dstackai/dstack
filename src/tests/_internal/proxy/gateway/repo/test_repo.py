@@ -39,3 +39,35 @@ async def test_persist_repo(tmp_path: Path) -> None:
         srv_2,
     ]
     assert await repo.list_models("proj-1") == [model_1]
+
+
+@pytest.mark.asyncio
+class TestSetServices:
+    async def test_failed_replace_preserves_state_and_retries(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        state_file = tmp_path / "state.json"
+        repo = GatewayProxyRepo.load(state_file)
+        old_service = make_service("project", "run")
+        new_service = old_service.model_copy(update={"auth": not old_service.auth})
+        await repo.set_services([old_service])
+        previous_content = state_file.read_bytes()
+
+        def fail_replace(source: Path, target: Path) -> None:
+            # The replacement is complete, but cannot be installed over the saved state.
+            assert source.read_bytes() != previous_content
+            raise OSError("state replacement failed")
+
+        with monkeypatch.context() as scoped:
+            scoped.setattr(Path, "replace", fail_replace)
+            with pytest.raises(OSError, match="state replacement failed"):
+                await repo.set_services([new_service])
+
+        assert await repo.get_service("project", "run") == old_service
+        assert state_file.read_bytes() == previous_content
+        assert await GatewayProxyRepo.load(state_file).get_service("project", "run") == old_service
+        assert list(tmp_path.iterdir()) == [state_file]
+
+        await repo.set_services([new_service])
+        assert await repo.get_service("project", "run") == new_service
+        assert await GatewayProxyRepo.load(state_file).get_service("project", "run") == new_service

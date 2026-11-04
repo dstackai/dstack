@@ -189,6 +189,26 @@ class SSHTunnel:
     def close_command(self) -> List[str]:
         return [*self._control_command_prefix(), "-O", "exit", self.destination]
 
+    def update_proxy_identity(self, index: int, private_key: str) -> None:
+        """Replace a proxy-hop key for the next open, keeping the current tunnel open.
+
+        ServiceConnection calls this when a fleet's head-node key changes. Replace
+        the key file atomically so concurrent SSH startup never reads a partial key.
+        """
+        params, _ = self.ssh_proxies[index]
+        identity_path = os.path.join(self.temp_dir.name, f"proxy_identity_{index}")
+        # A concurrent SSH startup must see either complete key, never a partial write.
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.temp_dir.name, delete=False) as f:
+            temporary_path = f.name
+            try:
+                f.write(private_key)
+                f.close()
+                os.replace(temporary_path, identity_path)
+            finally:
+                if os.path.exists(temporary_path):
+                    os.unlink(temporary_path)
+        self.ssh_proxies[index] = (params, identity_path)
+
     def check_command(self) -> List[str]:
         return [*self._control_command_prefix(), "-O", "check", self.destination]
 

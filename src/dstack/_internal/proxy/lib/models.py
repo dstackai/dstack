@@ -1,6 +1,7 @@
 """Things stored in BaseProxyRepo implementations."""
 
 from datetime import datetime
+from functools import cached_property
 from typing import Any, Iterable, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -9,6 +10,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
+from dstack._internal.utils import ssh as ssh_utils
 
 
 # Models should be immutable so that they can be stored in memory and safely shared by
@@ -29,6 +31,12 @@ class Replica(ImmutableModel):
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     internal_ip: Optional[str] = None
+
+    @cached_property
+    def ssh_head_proxy_public_key(self) -> Optional[str]:
+        if self.ssh_head_proxy_private_key is None:
+            return None
+        return ssh_utils.get_public_key_from_private_key(self.ssh_head_proxy_private_key)
 
 
 class IPAddressPartitioningKey(ImmutableModel):

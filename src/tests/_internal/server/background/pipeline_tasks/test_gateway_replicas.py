@@ -17,7 +17,12 @@ from dstack._internal.core.models.gateways import (
     GatewayReplicaStatus,
     GatewayStatus,
 )
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import (
+    InstanceStatus,
+    RemoteConnectionInfo,
+    SSHConnectionParams,
+    SSHKey,
+)
 from dstack._internal.core.models.runs import JobStatus, RunStatus, ServiceSpec
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListReplicaItem
 from dstack._internal.server import settings
@@ -48,10 +53,12 @@ from dstack._internal.server.testing.common import (
     get_gateway_replica_configuration,
     get_job_provisioning_data,
     get_run_spec,
+    get_ssh_key,
     list_events,
     mock_lease,
 )
 from dstack._internal.utils.common import get_current_datetime
+from tests._internal.utils.test_ssh import PRIVATE_KEY, PUBLIC_KEY
 
 
 @pytest.fixture
@@ -763,6 +770,108 @@ class TestGatewayReplicaWorkerRunningStateSync:
     """
 
     pytestmark = pytest.mark.usefixtures("image_config_mock")
+
+    @pytest.mark.parametrize(
+        "failure,public_key",
+        [(None, PUBLIC_KEY), (None, ""), ("update", PUBLIC_KEY), ("changed-again", PUBLIC_KEY)],
+    )
+    async def test_updates_head_node_key_without_unregistering_or_changing_job(
+        self, test_db, session, worker, mock_gateway_connection, failure, public_key
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session, project_id=project.id)
+        backend = await create_backend(session, project.id)
+        gateway = await create_gateway(
+            session, project.id, backend.id, status=GatewayStatus.RUNNING
+        )
+        replica = await create_gateway_replica(session, backend, gateway_id=gateway.id)
+        run, job = await self._create_service_run_and_job(
+            session, project, repo, user, gateway, run_name="rotation"
+        )
+        assert job.instance is not None
+        other_job = await create_job(
+            session,
+            run,
+            status=JobStatus.RUNNING,
+            instance=job.instance,
+            registered=True,
+            ready=True,
+            replica_num=1,
+        )
+        key = SSHKey(public=public_key, private=PRIVATE_KEY)
+        rci = RemoteConnectionInfo(
+            host="host",
+            port=22,
+            ssh_user="ubuntu",
+            ssh_keys=[key],
+            ssh_proxy=SSHConnectionParams(hostname="jump", port=22, username="ubuntu"),
+            ssh_proxy_keys=[key],
+        )
+        job.instance.remote_connection_info = rci.model_dump_json()
+        for service_job in (job, other_job):
+            session.add(
+                ServiceReplicaRegistrationModel(
+                    job_id=service_job.id, gateway_replica_id=replica.id, is_registered=True
+                )
+            )
+        _lock_replica(replica)
+        await session.commit()
+        reported = {
+            service_job.id: ServiceListReplicaItem(
+                id=service_job.id.hex, ssh_head_proxy_public_key="old key"
+            )
+            for service_job in (job, other_job)
+        }
+        service = ServiceListItem(
+            id=run.id.hex,
+            project_name=project.name,
+            run_name=run.run_name,
+            replicas=list(reported.values()),
+        )
+        client = _get_client_mock(mock_gateway_connection)
+        client.list_services.return_value = [service]
+
+        async def update(updates):
+            if failure == "update":
+                raise GatewayError("update failed")
+            for item in updates:
+                reported[uuid.UUID(item.job_id)].ssh_head_proxy_public_key = " ".join(
+                    PUBLIC_KEY.split()[:2]
+                )
+            if failure == "changed-again":
+                assert job.instance is not None
+                rci.ssh_proxy_keys = [get_ssh_key()]
+                job.instance.remote_connection_info = rci.model_dump_json()
+                await session.commit()
+
+            return {}
+
+        client.update_replica_head_node_keys.side_effect = update
+        await worker.process(_replica_to_pipeline_item(replica))
+        client.update_replica_head_node_keys.assert_awaited_once()
+        updates = client.update_replica_head_node_keys.call_args.args[0]
+        assert {item.job_id for item in updates} == {job.id.hex, other_job.id.hex}
+        assert all(
+            item.project_name == project.name
+            and item.run_name == run.run_name
+            and item.ssh_head_proxy_private_key == PRIVATE_KEY
+            for item in updates
+        )
+        client.register_replica.assert_not_called()
+        client.unregister_replica.assert_not_called()
+        client.register_service.assert_not_called()
+        client.unregister_service.assert_not_called()
+        client.update_replica_head_node_keys.reset_mock(side_effect=True)
+        client.update_replica_head_node_keys.return_value = {}
+        await session.refresh(replica)
+        _lock_replica(replica)
+        await session.commit()
+        await worker.process(_replica_to_pipeline_item(replica))
+        assert client.update_replica_head_node_keys.call_count == (0 if failure is None else 1)
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.submission_num == 0
 
     async def _create_service_run_and_job(
         self,
