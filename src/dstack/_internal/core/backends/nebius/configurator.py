@@ -35,6 +35,7 @@ class NebiusConfigurator(
 
     def validate_config(self, config: NebiusBackendConfigWithCreds, default_creds_enabled: bool):
         assert isinstance(config.creds, NebiusServiceAccountCreds)
+        sdk = None
         try:
             sdk = resources.make_sdk(config.creds)
             # check that it's possible to build the projects map with configured settings
@@ -46,6 +47,9 @@ class NebiusConfigurator(
                 fields=[["creds"]],
                 details=str(e),
             )
+        finally:
+            if sdk is not None:
+                resources.close_sdk(sdk)
         valid_fabrics = get_all_infiniband_fabrics()
         if invalid_fabrics := set(config.fabrics or []) - valid_fabrics:
             raise_invalid_credentials_error(

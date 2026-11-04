@@ -204,6 +204,14 @@ class Compute(ABC):
         """
         pass
 
+    def close(self) -> None:
+        """
+        Releases resources that are not freed by garbage collection, e.g. SDK clients that run
+        background threads. The compute must not be used after `close()`.
+        It is called from async code in executor, so it can block. Must be idempotent.
+        """
+        pass
+
 
 class ComputeWithAllOffersCached(ABC):
     """

@@ -227,10 +227,7 @@ export const OfferList: React.FC<OfferListProps> = ({
     });
 
     const gpus = useMemo(
-        () =>
-            gpuEnabled
-                ? (groupedQuery.currentData?.gpus ?? []).map((gpu) => ({ ...gpu, price: gpu.offer_price ?? gpu.price }))
-                : (groupedQuery.currentData?.cpus ?? []).map(toCpuCard),
+        () => (gpuEnabled ? (groupedQuery.currentData?.gpus ?? []) : (groupedQuery.currentData?.cpus ?? []).map(toCpuCard)),
         [groupedQuery.currentData, gpuEnabled],
     );
 
@@ -302,9 +299,12 @@ export const OfferList: React.FC<OfferListProps> = ({
                                       max: round(convertMiBToGB(gpu.cpu.memory_range.max)),
                                   })
                                 : round(convertMiBToGB(gpu.memory_mib))}
-                            GB <span className={styles.greyText}>{gpu.cpu ? 'RAM' : 'VRAM'}</span>
+                            GB <span className={styles.unitText}>{gpu.cpu ? 'RAM' : 'VRAM'}</span>
                         </div>
-                        <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>
+                        <div>
+                            <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>{' '}
+                            <span className={styles.unitText}>{!ungrouped && !gpu.cpu ? '/GPU/h' : '/h'}</span>
+                        </div>
                         <div>
                             {gpu.backend ? formatBackend(gpu.backend) : (gpu.backends?.map(formatBackend).join(', ') ?? '-')}
                         </div>

@@ -1271,12 +1271,32 @@ projects:
 
     When the jump pod restarts or is recreated, its SSH sessions drop. The `dstack` server reconnects automatically, but `dstack attach` may fail for runs submitted before that. If reliable SSH access to runs is important, deploy [`dstack-sshproxy`](../guides/server-deployment.md#ssh-proxy).
 
-    !!! warning "Changing `cpu` and `memory`"
+    To run the jump pod only on specific nodes, e.g., nodes with an `ExternalIP` or CPU-only nodes, label them and set `proxy_jump.node_selector`. If these nodes are [tainted](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/), also set `proxy_jump.tolerations`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        node_selector:
+        - example.com/jump-host
+        tolerations:
+        - example.com/dedicated=jump-host:NoSchedule
+    ```
+
+    Each `node_selector` item is `key=value`, `key=` (an empty value), or `key` (any value), and a node must match all of them. Since a `nodeSelector` can't match any value, `dstack` applies `node_selector` as a required [node affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity) term. If none of the selected nodes can run the jump pod, it stays pending and runs can't be provisioned, so label several nodes.
+
+    Each `tolerations` item is `key[=value][:effect]`, the `kubectl taint` format, so a taint added with `kubectl taint` can be copied as is. Without `=value`, any value is tolerated; without `:effect`, any effect. If `tolerations` isn't set, `dstack` tolerates the GPU node taints when every node is tainted, but not if `node_selector` is set.
+
+    !!! warning "Changing `cpu`, `memory`, `node_selector`, and `tolerations`"
         New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
 
         ```shell
+        # cpu and memory
         kubectl -n <namespace> set resources replicaset dstack-<project>-ssh-jump-pod \
           --requests=cpu=1,memory=2Gi --limits=cpu=1,memory=2Gi
+        # node_selector and tolerations: edit spec.template.spec.affinity and .tolerations
+        kubectl -n <namespace> edit replicaset dstack-<project>-ssh-jump-pod
+        # Recreate the pod
         kubectl -n <namespace> delete pod -l app.kubernetes.io/instance=dstack-<project>-ssh-jump-pod
         ```
 
