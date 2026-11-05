@@ -863,7 +863,7 @@ class TestBuildConstraints:
             "min_context_length": 32768,
             "max_ttft": 5000,
             "trials_num": 3,
-            "concurrency": 8,
+            "concurrency": [8],
             "input_tokens": 1024,
             "output_tokens": 1024,
             "shared_prefix_tokens": 0,
@@ -897,7 +897,7 @@ class TestBuildConstraints:
             "min_context_length": 32768,
             "max_ttft": 5000,
             "trials_num": 3,
-            "concurrency": 8,
+            "concurrency": [8],
             "dataset": "spec_bench",
             "baseline": True,
             "fleets": ["gpu-fleet"],
@@ -927,7 +927,7 @@ class TestBuildConstraints:
         assert data["model"] == {"repo": "Qwen/Qwen3-32B-AWQ", "name": "qwen3"}
         assert data["min_context_length"] == 32768
         assert data["trials_num"] == 10
-        assert data["concurrency"] == 16
+        assert data["concurrency"] == [16]
         assert data["fleets"] == ["a", "b"]
 
 

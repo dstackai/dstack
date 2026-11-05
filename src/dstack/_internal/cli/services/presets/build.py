@@ -32,6 +32,7 @@ def build_preset(
     base_model: str,
     repo: str,
     context_length: int,
+    benchmarks: list[PresetBenchmark],
     benchmark: PresetBenchmark,
     configuration: PresetConfiguration,
     best_trial: int,
@@ -53,6 +54,7 @@ def build_preset(
         configuration=configuration,
         created_at=created_at,
         service=service,
+        benchmarks=benchmarks,
         benchmark=benchmark,
         verified_on=verification_replica_groups,
     )

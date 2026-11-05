@@ -31,6 +31,7 @@ from dstack._internal.core.models.presets import (
     PresetBenchmark,
     PresetVerificationReplicaGroup,
     PresetWorkload,
+    select_benchmark,
 )
 from dstack._internal.core.models.runs import JobStatus, Run, RunStatus
 
@@ -99,6 +100,10 @@ def build_verified_preset(
     _check_report_answers_request(report, preset_configuration)
     if service.model is None or service.model.name != preset_configuration.model.api_model_name:
         raise CLIError("The agent's final service model name does not match the requested model")
+    benchmarks = sorted(
+        (_normalized_benchmark(b, preset_configuration) for b in report.benchmarks),
+        key=lambda b: b.workload.concurrency,
+    )
     return build_preset(
         name=name,
         service=_portable_service(
@@ -114,7 +119,8 @@ def build_verified_preset(
         # it cannot be confused with the service's client-facing model name.
         repo=report.model,
         context_length=report.context_length,
-        benchmark=_normalized_benchmark(report.benchmark, preset_configuration),
+        benchmarks=benchmarks,
+        benchmark=select_benchmark(benchmarks, preset_configuration.max_ttft),
         best_trial=report.trial,
         configuration=preset_configuration,
         preset_id=preset_id,
@@ -139,9 +145,11 @@ def _check_report_answers_request(
     report: PresetAgentSuccess, configuration: PresetConfiguration
 ) -> None:
     """The report must answer what the configuration asked: the same benchmark
-    workload, and the requested model — exactly when it was exact, any variant of
-    the base otherwise."""
-    _check_workload_answers_request(report.benchmark.workload, configuration)
+    workload at every concurrency of the sweep, and the requested model — exactly
+    when it was exact, any variant of the base otherwise."""
+    for benchmark in report.benchmarks:
+        _check_workload_answers_request(benchmark.workload, configuration)
+    _check_sweep_answers_request(report.benchmarks, configuration)
     if configuration.model.allows_variant_selection:
         if report.base != configuration.model.api_model_name:
             raise CLIError("The agent's final report base does not match the requested model")
@@ -172,10 +180,18 @@ def _check_workload_answers_request(
                 f"The agent's final benchmark shared prefix of {workload.shared_prefix_tokens}"
                 f" tokens does not match the requested {shared_prefix_tokens}"
             )
-    if configuration.concurrency is not None and workload.concurrency != configuration.concurrency:
+
+
+def _check_sweep_answers_request(
+    benchmarks: Sequence[PresetBenchmark], configuration: PresetConfiguration
+) -> None:
+    """One benchmark per requested concurrency, no more and no fewer: a missing
+    point would hide where the service stops meeting the constraints."""
+    reported = sorted(b.workload.concurrency for b in benchmarks)
+    if configuration.concurrency is not None and reported != configuration.concurrency:
         raise CLIError(
-            f"The agent's final benchmark concurrency of {workload.concurrency} does not match the"
-            f" requested concurrency of {configuration.concurrency}"
+            f"The agent's final benchmark concurrencies {reported} do not match the"
+            f" requested {configuration.concurrency}"
         )
 
 

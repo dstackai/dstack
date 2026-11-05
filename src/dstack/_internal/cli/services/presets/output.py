@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from rich.table import Table
 
@@ -198,9 +198,9 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
         share = round(100 * shared_prefix_tokens / input_tokens)
         if share:
             objective.append(f"prefix={share}%")
-    concurrency = (best or {}).get("concurrency") or constraints.get("concurrency")
-    if concurrency:
-        objective.append(f"c={concurrency}")
+    sweep = constraints.get("concurrency") or (best or {}).get("concurrency")
+    if sweep:
+        objective.append(f"c={_format_concurrency(sweep)}")
     min_context_length = constraints.get("min_context_length")
     if verbose and isinstance(min_context_length, int):
         objective.append(f"ctx>={_format_token_count(min_context_length)}")
@@ -211,14 +211,18 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
         tps = _format_number(best["tok_s"])
         if objective:
             # Lead with per-user tps: comparable across rows regardless of concurrency.
-            tpot_ms = best.get("tpot_ms")
-            if isinstance(tpot_ms, (int, float)) and tpot_ms > 0:
-                parts.append(f"tps/user={_format_number(1000 / tpot_ms)}")
+            per_user = best.get("per_user_tok_s_range")
+            if per_user:
+                parts.append(f"tps/user={_format_range(per_user, _format_number)}")
+            # Which point of a sweep the numbers are from; redundant for one value.
+            if isinstance(sweep, list) and len(sweep) > 1 and best.get("concurrency"):
+                parts.append(f"c={best['concurrency']}")
             if verbose:
-                parts.append(f"tps={tps}")
-            ttft_ms = best.get("ttft_ms")
-            if isinstance(ttft_ms, (int, float)):
-                parts.append(f"ttft={_format_duration_ms(ttft_ms)}")
+                tok_s_range = best.get("tok_s_range") or [best["tok_s"]]
+                parts.append(f"tps={_format_range(tok_s_range, _format_number)}")
+            ttft_range = best.get("ttft_ms_range")
+            if ttft_range:
+                parts.append(f"ttft={_format_range(ttft_range, _format_duration_ms)}")
             context_length = best.get("context_length")
             if isinstance(context_length, int):
                 parts.append(f"ctx={_format_token_count(context_length)}")
@@ -304,7 +308,7 @@ def format_preset_objective(
         share = round(100 * workload.shared_prefix_tokens / workload.input_tokens)
         if share:
             parts.append(f"prefix={share}%")
-    parts.append(f"c={workload.concurrency}")
+    parts.append(f"c={_format_concurrency([b.workload.concurrency for b in preset.benchmarks])}")
     return f"[secondary]{' '.join(parts)}[/]"
 
 
@@ -323,7 +327,7 @@ def _format_creation_objective(
         share = round(100 * (configuration.shared_prefix_tokens or 0) / input_tokens)
         if share:
             parts.append(f"prefix={share}%")
-    parts.append(f"c={configuration.concurrency or workload.concurrency}")
+    parts.append(f"c={_format_concurrency(configuration.concurrency or [workload.concurrency])}")
     if verbose and configuration.min_context_length is not None:
         parts.append(f"ctx>={_format_token_count(configuration.min_context_length)}")
     if verbose and configuration.max_ttft is not None:
@@ -345,21 +349,43 @@ def _breaches_constraints(preset: AnyStoredPreset) -> bool:
 
 
 def format_preset_benchmark(preset: AnyStoredPreset, *, verbose: bool = False) -> str:
-    benchmark = preset.benchmark
-    metrics = benchmark.metrics
+    # A sweep shows each metric as its range across concurrencies, and `c=` names
+    # the selected point.
+    benchmarks = preset.benchmarks
     parts = [
-        f"tps/user={_format_number(benchmark.effective_per_user_tok_per_s)}",
+        "tps/user="
+        + _format_range([b.effective_per_user_tok_per_s for b in benchmarks], _format_number)
     ]
+    if len(benchmarks) > 1:
+        parts.append(f"c={preset.benchmark.workload.concurrency}")
     if verbose:
-        parts.append(f"tps={_format_number(benchmark.effective_output_tok_per_s)}")
+        parts.append(
+            "tps="
+            + _format_range([b.effective_output_tok_per_s for b in benchmarks], _format_number)
+        )
     parts += [
-        f"ttft={_format_duration_ms(metrics.ttft_ms.p50)}",
+        "ttft=" + _format_range([b.metrics.ttft_ms.p50 for b in benchmarks], _format_duration_ms),
         f"ctx={_format_token_count(preset.context_length)}",
     ]
     text = " ".join(parts)
     if _breaches_constraints(preset):
         return f"[secondary]*{text}[/]"
     return text
+
+
+def _format_range(values: list[float], fmt: Callable[[float], str]) -> str:
+    low, high = fmt(min(values)), fmt(max(values))
+    return low if low == high else f"{low}..{high}"
+
+
+def _format_concurrency(value: Any) -> str:
+    """A sweep in the shape the user wrote it: `8`, `2,3`, or `2..16` when every
+    step doubles. A pre-sweep record carries a bare int."""
+    if not isinstance(value, list):
+        return str(value)
+    if len(value) > 1 and all(b == a * 2 for a, b in zip(value, value[1:])):
+        return f"{value[0]}..{value[-1]}"
+    return ",".join(str(v) for v in value)
 
 
 def _format_duration_ms(value: float) -> str:

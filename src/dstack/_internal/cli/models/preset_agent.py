@@ -9,6 +9,7 @@ from pydantic import (
     ValidationError,
     ValidatorFunctionWrapHandler,
     WrapValidator,
+    model_validator,
 )
 
 from dstack._internal.core.models.common import CoreModel
@@ -53,7 +54,19 @@ class PresetAgentSuccess(CoreModel):
     base: Annotated[str, Field(min_length=1)]
     model: Annotated[str, Field(min_length=1)]
     context_length: PositiveInt
-    benchmark: PresetBenchmark
+    benchmarks: Annotated[list[PresetBenchmark], Field(min_length=1)]
+
+    @model_validator(mode="before")
+    @classmethod
+    def wrap_legacy_single_benchmark(cls, data: Any) -> Any:
+        # An agent process started by a pre-sweep CLI reports one `benchmark`, and
+        # a session detached before the upgrade is attached and verified by the
+        # new CLI. The one point is its whole sweep; the sweep check in `verify`
+        # still requires it to be the requested concurrency.
+        if isinstance(data, dict) and "benchmark" in data and "benchmarks" not in data:
+            data = dict(data)
+            data["benchmarks"] = [data.pop("benchmark")]
+        return data
 
 
 class PresetAgentFailure(CoreModel):

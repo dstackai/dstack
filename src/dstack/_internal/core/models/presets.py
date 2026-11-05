@@ -128,6 +128,22 @@ class PresetBenchmark(CoreModel):
         return self
 
 
+def select_benchmark(
+    benchmarks: Sequence[PresetBenchmark], max_ttft: Optional[int]
+) -> PresetBenchmark:
+    """Picks the sweep point a preset is judged by.
+
+    Rule 1: Keep the points whose p50 TTFT is within `max_ttft`.
+    Rule 2: If any are kept, pick the one with the highest output throughput.
+    Rule 3: If none are kept, pick the one with the lowest p50 TTFT, so the
+    preset records how close it got to the cap rather than how fast it ran.
+    Rule 4: If two points tie on TTFT in rule 3, pick the higher throughput."""
+    passing = [b for b in benchmarks if max_ttft is None or b.metrics.ttft_ms.p50 <= max_ttft]
+    if passing:
+        return max(passing, key=lambda b: b.effective_output_tok_per_s)
+    return min(benchmarks, key=lambda b: (b.metrics.ttft_ms.p50, -b.effective_output_tok_per_s))
+
+
 class PresetVerificationReplicaGroup(CoreModel):
     # The service replica group this was measured for.
     name: str
@@ -153,16 +169,35 @@ class PortablePreset(CoreModel):
     # stored as-is. `files` paths are stored relative to the preset directory,
     # absolute after load.
     service: ServiceConfiguration
+    benchmarks: Annotated[List[PresetBenchmark], Field(min_length=1)]
+    """The final service benchmarked at every concurrency of the sweep, ascending."""
     benchmark: PresetBenchmark
+    """The one of `benchmarks` the preset is judged and listed by, chosen by
+    `select_benchmark`. Kept as its own field so clients that predate the sweep
+    keep reading it."""
     # The hardware it was verified on: the actual resources of every running
     # replica, by service replica group.
     verified_on: List[PresetVerificationReplicaGroup]
+
+    @model_validator(mode="before")
+    @classmethod
+    def wrap_legacy_single_benchmark(cls, data: Any) -> Any:
+        # Before the sweep, a preset was benchmarked at one concurrency and
+        # stored it as `benchmark` alone. That one point is its whole sweep.
+        if isinstance(data, dict) and "benchmark" in data and "benchmarks" not in data:
+            data = {**data, "benchmarks": [data["benchmark"]]}
+        return data
 
     @model_validator(mode="after")
     def validate_artifact(self) -> Self:
         service = self.service
         if service.model is None:
             raise ValueError("preset service must specify model")
+        concurrencies = [b.workload.concurrency for b in self.benchmarks]
+        if concurrencies != sorted(set(concurrencies)):
+            raise ValueError("preset benchmarks must be at unique, ascending concurrencies")
+        if self.benchmark not in self.benchmarks:
+            raise ValueError("preset benchmark must be one of its benchmarks")
         if any(group.resources is None for group in service.replica_groups):
             raise ValueError("preset service must specify resources")
         for field in PRESET_EXCLUDED_FIELDS:
@@ -304,7 +339,7 @@ class PresetConstraints(CoreModel):
     min_context_length: PositiveInt
     max_ttft: PositiveInt
     trials_num: PositiveInt
-    concurrency: PositiveInt
+    concurrency: Annotated[list[PositiveInt], Field(min_length=1)]
     baseline: bool
     fleets: Annotated[list[str], Field(min_length=1)]
     env: list[str]

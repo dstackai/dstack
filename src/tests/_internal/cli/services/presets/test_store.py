@@ -383,7 +383,7 @@ class TestPresetStore:
         assert preset.configuration.input_tokens == 10000
         assert preset.configuration.output_tokens == 1500
         assert preset.configuration.shared_prefix_tokens == 0
-        assert preset.configuration.concurrency == 4
+        assert preset.configuration.concurrency == [4]
         # `priority` is not an excluded field, so the regrouping keeps it.
         assert preset.service.priority == 0
         assert [group.name for group in preset.verified_on] == [
@@ -392,6 +392,8 @@ class TestPresetStore:
         assert get_or_error(preset.verified_on[0].replicas[0].gpu).name == ["MI300X"]
         # The old format never recorded a dataset name for a synthetic workload.
         assert preset.benchmark.workload.dataset is None
+        # One concurrency, so the one benchmark is the whole sweep.
+        assert preset.benchmarks == [preset.benchmark]
         assert store.list() == [preset]
 
     def test_upgrade_maps_validation_replicas_to_replica_groups(self, tmp_path: Path):

@@ -4,7 +4,11 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from dstack._internal.cli.models.preset_agent import AnyPresetAgentResult, PresetAgentSuccess
+from dstack._internal.cli.models.preset_agent import (
+    AnyPresetAgentResult,
+    PresetAgentFailure,
+    PresetAgentSuccess,
+)
 from dstack._internal.cli.services.presets.agent import (
     PresetAgentProcessOutput,
 )
@@ -61,6 +65,7 @@ class TestBuildVerifiedPreset:
             base_model="Qwen/Qwen3.5-27B",
             repo="community/Qwen3.5-27B-GPTQ-Int4",
             context_length=32768,
+            benchmarks=[get_preset_benchmark()],
             benchmark=get_preset_benchmark(),
             configuration=configuration,
             best_trial=1,
@@ -76,12 +81,12 @@ class TestBuildVerifiedPreset:
         assert preset.configuration.spot_policy is None
         assert "secret" not in preset.model_dump_json()
 
-    def test_successful_report_requires_benchmark(self):
+    def test_successful_report_requires_benchmarks(self):
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
-        data.pop("benchmark")
+        data.pop("benchmarks")
 
-        with pytest.raises(ValidationError, match="benchmark"):
+        with pytest.raises(ValidationError, match="benchmarks"):
             validate_extra_ignore(AnyPresetAgentResult, data)
 
     def test_builds_portable_self_contained_preset(self, tmp_path):
@@ -222,11 +227,11 @@ class TestBuildVerifiedPreset:
                 created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
 
-    def test_rejects_a_benchmark_at_another_concurrency(self, tmp_path):
+    def test_rejects_benchmarks_at_other_concurrencies(self, tmp_path):
         run = get_running_service_run()
 
         with pytest.raises(
-            CLIError, match="concurrency of 8 does not match the requested concurrency of 4"
+            CLIError, match=r"concurrencies \[8\] do not match the requested \[4\]"
         ):
             build_verified_preset(
                 run=run,
@@ -238,6 +243,44 @@ class TestBuildVerifiedPreset:
                 name=None,
                 created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
             )
+
+    def test_rejects_a_partial_sweep(self, tmp_path):
+        run = get_running_service_run()
+
+        with pytest.raises(
+            CLIError, match=r"concurrencies \[2, 4\] do not match the requested \[2, 4, 8\]"
+        ):
+            build_verified_preset(
+                run=run,
+                preset_configuration=_shared_prefix_configuration(concurrency="2..8"),
+                report=_sweep_report(run, [2, 4]),
+                workspace_path=tmp_path,
+                session_path=tmp_path,
+                preset_id="ab12cd34",
+                name=None,
+                created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+            )
+
+    def test_stores_every_point_and_selects_the_fastest_within_max_ttft(self, tmp_path):
+        run = get_running_service_run()
+
+        preset = build_verified_preset(
+            run=run,
+            preset_configuration=_shared_prefix_configuration(concurrency="2..8", max_ttft=500),
+            # Reported out of order; throughput rises with concurrency, but the top
+            # point breaches the TTFT cap.
+            report=_sweep_report(
+                run, [8, 2, 4], duration_seconds={2: 8.0, 4: 4.0, 8: 2.0}, ttft_p50={8: 900.0}
+            ),
+            workspace_path=tmp_path,
+            session_path=tmp_path,
+            preset_id="ab12cd34",
+            name=None,
+            created_at=datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+
+        assert [b.workload.concurrency for b in preset.benchmarks] == [2, 4, 8]
+        assert preset.benchmark.workload.concurrency == 4
 
     def test_verifies_a_benchmark_on_the_requested_dataset(self, tmp_path):
         run = get_running_service_run()
@@ -346,22 +389,22 @@ class TestLoadPresetAgentReport:
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["benchmarks"][0]["command"] = (
             "python bench.py --header 'Authorization: Bearer sk-live-0123456789abcdef'"
         )
 
         report = self._load(tmp_path, data, redacted_values=("sk-live-0123456789abcdef",))
 
         assert isinstance(report, PresetAgentSuccess)
-        assert report.benchmark is not None
-        assert report.benchmark.command.endswith("Bearer [redacted]'")
-        assert "sk-live" not in report.benchmark.command
+        assert report.benchmarks
+        assert report.benchmarks[0].command.endswith("Bearer [redacted]'")
+        assert "sk-live" not in report.benchmarks[0].command
 
     def test_still_rejects_unknown_bearer_token(self, tmp_path):
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["benchmarks"][0]["command"] = (
             "curl -H 'Authorization: Bearer sk-unknown-9876543210fedcba'"
         )
 
@@ -374,7 +417,7 @@ class TestLoadPresetAgentReport:
         run = get_running_service_run()
         data = get_successful_preset_report(run).model_dump()
         data["run_id"] = str(data["run_id"])
-        data["benchmark"]["command"] = (
+        data["benchmarks"][0]["command"] = (
             "./benchenv/bin/python bench_service.py --base $DSTACK_SERVER_URL/x"
             " (auth via DSTACK_TOKEN bearer header from env)"
         )
@@ -382,11 +425,46 @@ class TestLoadPresetAgentReport:
         report = self._load(tmp_path, data, redacted_values=())
 
         assert isinstance(report, PresetAgentSuccess)
-        assert report.benchmark is not None
-        assert "bearer header" in report.benchmark.command
+        assert report.benchmarks
+        assert "bearer header" in report.benchmarks[0].command
+
+    def test_reads_a_pre_sweep_success_as_a_one_point_sweep(self, tmp_path):
+        # A session detached under a pre-sweep CLI finishes with that CLI's schema.
+        run = get_running_service_run()
+        data = get_successful_preset_report(run).model_dump()
+        data["run_id"] = str(data["run_id"])
+        data["benchmark"] = data.pop("benchmarks")[0]
+
+        report = self._load(tmp_path, data, redacted_values=())
+
+        assert isinstance(report, PresetAgentSuccess)
+        assert [b.workload.concurrency for b in report.benchmarks] == [1]
+
+    def test_reads_a_sweep_success_unchanged(self, tmp_path):
+        run = get_running_service_run()
+        data = get_successful_preset_report(run).model_dump()
+        data["run_id"] = str(data["run_id"])
+        second = {**data["benchmarks"][0], "workload": {**data["benchmarks"][0]["workload"]}}
+        second["workload"]["concurrency"] = 2
+        data["benchmarks"].append(second)
+
+        report = self._load(tmp_path, data, redacted_values=())
+
+        assert isinstance(report, PresetAgentSuccess)
+        assert [b.workload.concurrency for b in report.benchmarks] == [1, 2]
+
+    def test_leaves_a_failure_report_alone(self, tmp_path):
+        report = self._load(
+            tmp_path,
+            {"success": False, "failure_summary": "no configuration met max_ttft"},
+            redacted_values=(),
+        )
+
+        assert isinstance(report, PresetAgentFailure)
+        assert report.failure_summary == "no configuration met max_ttft"
 
 
-def _shared_prefix_configuration() -> PresetConfiguration:
+def _shared_prefix_configuration(**overrides: Any) -> PresetConfiguration:
     """The configuration from dstackai/dstack#4198: a shared prefix and no dataset."""
     return PresetConfiguration.model_validate(
         {
@@ -399,12 +477,36 @@ def _shared_prefix_configuration() -> PresetConfiguration:
             "input_tokens": 131072,
             "output_tokens": 512,
             "shared_prefix_tokens": 130048,
+            **overrides,
         }
     )
 
 
 def _shared_prefix_report(run: Run, **workload: Any) -> PresetAgentSuccess:
     return _report_with_workload(run, {**SHARED_PREFIX_WORKLOAD, **workload})
+
+
+def _sweep_report(
+    run: Run,
+    concurrencies: list[int],
+    *,
+    duration_seconds: dict[int, float] | None = None,
+    ttft_p50: dict[int, float] | None = None,
+) -> PresetAgentSuccess:
+    """One shared-prefix benchmark per concurrency, in the given order. The
+    metrics are the fixture's unless overridden per concurrency."""
+    benchmarks = []
+    for concurrency in concurrencies:
+        benchmark = get_preset_benchmark()
+        benchmark.workload = PresetWorkload.model_validate(
+            {**SHARED_PREFIX_WORKLOAD, "concurrency": concurrency}
+        )
+        if duration_seconds and concurrency in duration_seconds:
+            benchmark.metrics.duration_seconds = duration_seconds[concurrency]
+        if ttft_p50 and concurrency in ttft_p50:
+            benchmark.metrics.ttft_ms.p50 = ttft_p50[concurrency]
+        benchmarks.append(benchmark)
+    return get_successful_preset_report(run).model_copy(update={"benchmarks": benchmarks})
 
 
 def _dataset_report(run: Run, **workload: Any) -> PresetAgentSuccess:
@@ -425,4 +527,4 @@ def _dataset_report(run: Run, **workload: Any) -> PresetAgentSuccess:
 def _report_with_workload(run: Run, workload: dict[str, Any]) -> PresetAgentSuccess:
     benchmark = get_preset_benchmark()
     benchmark.workload = PresetWorkload.model_validate(workload)
-    return get_successful_preset_report(run).model_copy(update={"benchmark": benchmark})
+    return get_successful_preset_report(run).model_copy(update={"benchmarks": [benchmark]})
