@@ -333,8 +333,7 @@ During trials, run benchmarks via SSH inside the task, directly against the
 serving engine: run one benchmark per value of `concurrency`, using
 <!--?if dataset-->`dataset`<!--?else-->`input_tokens`, `output_tokens`, and
 `shared_prefix_tokens`<!--?end--> from `constraints.json`, and measure all trials the same
-way so that their results are comparable with each other. Use a different
-seed for each point of the sweep.
+way so that their results are comparable with each other.
 
 In case the task is using a router (see `## Cluster Placement`), run benchmarks
 via SSH inside the router node, directly against the router engine, never against a

@@ -642,11 +642,16 @@ def _summarize_session_trials(
 def _select_trial_point(
     record: dict[str, Any], max_ttft: Optional[float]
 ) -> Optional[tuple[float, dict[str, Any], dict[str, Any], list[dict[str, Any]]]]:
-    """The sweep point a trial is judged by, as `select_benchmark` picks it for a
-    preset: the highest throughput within `max_ttft`, else the closest TTFT.
-    A record from before the sweep holds a single `benchmark`. Returns
-    `(tok_s, metrics, workload, sweep)`, where `sweep` is the metrics of every
-    point with usable numbers, or `None` when there is none."""
+    """Select the benchmark point used to judge a trial.
+
+    Choose the highest-throughput point whose p50 TTFT meets `max_ttft`.
+    If no point meets the limit, choose the point with the lowest p50 TTFT.
+    Older trial records may contain a single `benchmark` instead of `benchmarks`.
+
+    Return `(tok_s, metrics, workload, sweep)`, where `metrics` and `workload`
+    describe the selected point and `sweep` contains metrics for all usable
+    points. Return `None` if no point has usable throughput data.
+    """
     benchmarks = record.get("benchmarks")
     if not isinstance(benchmarks, list):
         benchmarks = [record.get("benchmark")]
@@ -698,8 +703,10 @@ def _trial_entry(
         "tok_s": tok_s,
         "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
         "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
-        # The trial's spread across its sweep, as `[low, high]`, None when no
-        # point reports the value. One point gives `low == high`.
+        # Store the lowest and highest throughput and TTFT values across the trial's
+        # concurrency points. For example, throughput values 132, 237, and 380
+        # tokens/sec become [132, 380]. One value becomes [value, value]; no values
+        # becomes None.
         "tok_s_range": _range([m["total_output_tokens"] / m["duration_seconds"] for m in sweep]),
         "per_user_tok_s_range": _range(
             [1000 / v for v in (_latency(m, "tpot_ms", "mean") for m in sweep) if v]

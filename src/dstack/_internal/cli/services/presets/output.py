@@ -214,7 +214,7 @@ def _add_session(table: Table, session: dict[str, Any], *, verbose: bool = False
             per_user = best.get("per_user_tok_s_range")
             if per_user:
                 parts.append(f"tps/user={_format_range(per_user, _format_number)}")
-            # Which point of a sweep the numbers are from; redundant for one value.
+            # Show the selected concurrency when the sweep has multiple values.
             if isinstance(sweep, list) and len(sweep) > 1 and best.get("concurrency"):
                 parts.append(f"c={best['concurrency']}")
             if verbose:
@@ -349,8 +349,7 @@ def _breaches_constraints(preset: AnyStoredPreset) -> bool:
 
 
 def format_preset_benchmark(preset: AnyStoredPreset, *, verbose: bool = False) -> str:
-    # A sweep shows each metric as its range across concurrencies, and `c=` names
-    # the selected point.
+    # Show benchmark ranges across the sweep and identify the selected concurrency.
     benchmarks = preset.benchmarks
     parts = [
         "tps/user="
@@ -379,8 +378,7 @@ def _format_range(values: list[float], fmt: Callable[[float], str]) -> str:
 
 
 def _format_concurrency(value: Any) -> str:
-    """A sweep in the shape the user wrote it: `8`, `2,3`, or `2..16` when every
-    step doubles. A pre-sweep record carries a bare int."""
+    """Format concurrency values for display, for example: 8, 2,3, or 2..16."""
     if not isinstance(value, list):
         return str(value)
     if len(value) > 1 and all(b == a * 2 for a, b in zip(value, value[1:])):

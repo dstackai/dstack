@@ -59,10 +59,8 @@ class PresetAgentSuccess(CoreModel):
     @model_validator(mode="before")
     @classmethod
     def wrap_legacy_single_benchmark(cls, data: Any) -> Any:
-        # An agent process started by a pre-sweep CLI reports one `benchmark`, and
-        # a session detached before the upgrade is attached and verified by the
-        # new CLI. The one point is its whole sweep; the sweep check in `verify`
-        # still requires it to be the requested concurrency.
+        # Older agents report a single `benchmark`. Wrap it in a list so
+        # the new CLI can read reports from sessions started before the upgrade.
         if isinstance(data, dict) and "benchmark" in data and "benchmarks" not in data:
             data = dict(data)
             data["benchmarks"] = [data.pop("benchmark")]
