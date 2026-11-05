@@ -84,3 +84,29 @@ Keep locked regions short and bounded. See `LOCKING.md` for how to take advisory
 `DSTACK_DB_COMMAND_TIMEOUT` (default 300 seconds) bounds every operation on a Postgres connection, so a coroutine waiting on a connection whose socket died silently gets an error and releases the slot instead of holding it forever. It applies to migrations too, since they run on the same engine, so it must leave room for index builds and backfills.
 
 `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW` size the pool per process. Raising them lets more coroutines hold connections at once, which hides a long hold rather than fixing it, and each replica needs `pool_size + max_overflow` connections from the Postgres `max_connections` budget.
+
+## Queries
+
+### Cursor pagination
+
+List APIs paginate with a cursor: the timestamp and id of the last returned row, e.g. `prev_created_at` and `prev_id`. Rows with the same timestamp are ordered by id in the opposite direction, so the cursor filter is an OR:
+
+```python
+or_(
+    Model.created_at > prev_created_at,
+    and_(Model.created_at == prev_created_at, Model.id < prev_id),
+)
+```
+
+Always add the timestamp bound next to it, `>=` for ascending and `<=` for descending:
+
+```python
+filters.append(Model.created_at >= prev_created_at)
+filters.append(or_(...))
+```
+
+The bound doesn't change the results, but without it a request can read the whole table. Postgres can use the OR with an index only by looking up each branch separately and sorting the combined result. When it expects many rows after the cursor, it reads the timestamp index in order instead, and it can start that scan only from a single condition such as `created_at >= value`, which it doesn't derive from the OR. Then the scan starts at the oldest row and filters out everything before the cursor. Postgres expects many rows after the cursor when the cursor is old, and always with a generic plan of a prepared statement, which is planned without the cursor value. See [#4465](https://github.com/dstackai/dstack/issues/4465).
+
+A row comparison such as `(created_at, id) > (prev_created_at, prev_id)` would avoid the OR, but it requires both columns to be ordered in the same direction.
+
+The bound only removes reading rows before the cursor. A request still reads rows after the cursor until it finds `limit` rows that match its other filters, so on a large table a filter that matches few rows, such as one project's rows, also needs an index that starts with the filter column.
