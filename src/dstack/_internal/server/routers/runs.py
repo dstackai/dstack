@@ -105,6 +105,10 @@ async def get_run(
     If given `id`, returns deleted runs.
     """
     _, project = user_project
+    # TODO: Limit job submissions returned per job and introduce a paginated API
+    # to list job submissions. Every call returns the full submission history,
+    # which grows with retries and redeployments. Note that `Run.cost` is summed
+    # over the loaded submissions, so it must be computed separately first.
     run = await runs.get_run(
         session=session,
         project=project,

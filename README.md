@@ -24,7 +24,7 @@ It streamlines development, training, and inference, and is compatible with any 
 
 ## Latest news ✨
 - [2026/08] [dstack 0.21.0: Pydantic v2, Gateway replicas](https://github.com/dstackai/dstack/releases/tag/0.21.0)
-- [2026/07] [dstack 0.20.29: Presets — agent-driven inference optimization (experimental)](https://dstack.ai/docs/concepts/presets/)
+- [2026/07] [dstack 0.20.29: Presets — agent-driven inference optimization](https://dstack.ai/docs/concepts/presets/)
 - [2026/07] [dstack 0.20.27: Slurm backend](https://github.com/dstackai/dstack/releases/tag/0.20.27)
 - [2026/05] [dstack 0.20.21: Kubernetes multiple clusters](https://github.com/dstackai/dstack/releases/tag/0.20.21)
 - [2026/05] [dstack 0.20.20: NVIDIA Dynamo integration](https://github.com/dstackai/dstack/releases/tag/0.20.20)
@@ -107,7 +107,7 @@ AI agents like Claude, Codex, and Cursor can now create and manage fleets and su
 * [Dev environments](https://dstack.ai/docs/concepts/dev-environments) &mdash; Launch dev environments to be accessed by agents or from your IDE
 * [Tasks](https://dstack.ai/docs/concepts/tasks) &mdash; Run training, batch or other jobs across a single node or clusters
 * [Services](https://dstack.ai/docs/concepts/services) &mdash; Deploy model inference as secure and scalable endpoints
-* [Presets](https://dstack.ai/docs/concepts/presets) &mdash; Agent-driven inference optimization (experimental)
+* [Presets](https://dstack.ai/docs/concepts/presets) &mdash; Agent-driven inference optimization
 * [Volumes](https://dstack.ai/docs/concepts/volumes) &mdash; Managing instance and network volumes for persisting data
 
 Configuration can be defined as YAML files within your repo.

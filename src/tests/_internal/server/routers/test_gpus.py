@@ -1,3 +1,4 @@
+from itertools import product
 from typing import Any, Dict, List, Optional, Union
 from unittest.mock import Mock, patch
 
@@ -32,6 +33,7 @@ from dstack._internal.server.testing.common import (
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_run_spec,
+    mock_lease,
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -161,6 +163,283 @@ async def call_gpus_api(
     )
 
 
+class TestAvailabilitySetGrouping:
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("dimension", ["backend", "region", "spot", "count", "instance"])
+    def test_different_statuses_do_not_merge_across_dimensions(self, cpu, dimension):
+        available = create_gpu_offer(BackendType.NEBIUS, "H200", 144384, 2)
+        unavailable = available.model_copy(deep=True)
+        unavailable.availability = InstanceAvailability.NO_QUOTA
+        if dimension == "backend":
+            unavailable.backend = BackendType.AWS
+        elif dimension == "region":
+            unavailable.region = "other-region"
+        elif dimension == "spot":
+            unavailable.instance.resources.spot = True
+        elif dimension == "count":
+            unavailable.instance.resources.gpus *= 8
+            unavailable.instance.resources.cpus *= 8
+        else:
+            unavailable.instance.name = "other-instance"
+
+        if cpu:
+            available.instance.resources.gpus = []
+            unavailable.instance.resources.gpus = []
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers([available, unavailable], set(), reverse=False)
+
+        assert [row.availability for row in rows] == [
+            [InstanceAvailability.AVAILABLE],
+            [InstanceAvailability.NO_QUOTA],
+        ]
+
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("reverse_input", [False, True])
+    @pytest.mark.parametrize(
+        ("group_by", "expected_count"),
+        [
+            (set(), 1),
+            ({"backend"}, 2),
+            ({"backend", "region"}, 4),
+            ({"count"}, 2),
+            ({"backend", "count"}, 4),
+            ({"backend", "region", "count"}, 8),
+        ],
+    )
+    def test_identical_statuses_merge_across_unselected_dimensions(
+        self, cpu, reverse_input, group_by, expected_count
+    ):
+        offers = []
+        for backend, region, count, spot in product(
+            [BackendType.AWS, BackendType.NEBIUS], ["east", "west"], [1, 8], [False, True]
+        ):
+            for status in ["not_available", "no_quota", "not_available"]:
+                offer = create_gpu_offer(
+                    backend,
+                    "H200",
+                    144384,
+                    count * 2,
+                    region=region,
+                    gpu_count=count,
+                    spot=spot,
+                    availability=InstanceAvailability(status),
+                )
+                if cpu:
+                    offer.instance.resources.gpus = []
+                offers.append(offer)
+        if reverse_input:
+            offers.reverse()
+
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers(offers, group_by, reverse=False)
+
+        assert len(rows) == expected_count * 2
+        for row in rows:
+            assert row.availability in [
+                [InstanceAvailability.NO_QUOTA],
+                [InstanceAvailability.NOT_AVAILABLE],
+            ]
+            assert set(row.spot) == {"on-demand", "spot"}
+            if "count" in group_by:
+                assert row.count.min == row.count.max
+            else:
+                assert row.count == Range[int](min=4 if cpu else 1, max=32 if cpu else 8)
+            if "backend" in group_by:
+                assert row.backend in {BackendType.AWS, BackendType.NEBIUS}
+            else:
+                assert set(row.backends or []) == {BackendType.AWS, BackendType.NEBIUS}
+            if "region" in group_by:
+                assert row.region in {"east", "west"}
+            elif "backend" in group_by:
+                assert row.regions == ["east", "west"]
+
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("reverse_input", [False, True])
+    @pytest.mark.parametrize(
+        ("group_by", "expected_count"),
+        [
+            (set(), 1),
+            ({"backend"}, 2),
+            ({"backend", "region"}, 4),
+            ({"count"}, 2),
+            ({"backend", "count"}, 4),
+            ({"backend", "region", "count"}, 8),
+        ],
+    )
+    def test_available_and_unknown_merge_with_actual_statuses_preserved(
+        self, cpu, reverse_input, group_by, expected_count
+    ):
+        offers = []
+        for backend, region, count, spot in product(
+            [BackendType.AWS, BackendType.NEBIUS], ["east", "west"], [1, 8], [False, True]
+        ):
+            statuses = (
+                ["unknown", "available", "unknown"]
+                if spot
+                else ["available" if count == 1 else "unknown"]
+            )
+            for status in statuses:
+                offer = create_gpu_offer(
+                    backend,
+                    "H200",
+                    144384,
+                    count * 2,
+                    region=region,
+                    gpu_count=count,
+                    spot=spot,
+                    availability=InstanceAvailability(status),
+                )
+                if cpu:
+                    offer.instance.resources.gpus = []
+                offers.append(offer)
+        if reverse_input:
+            offers.reverse()
+        original_statuses = [offer.availability for offer in offers]
+
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers(offers, group_by, reverse=False)
+
+        assert len(rows) == expected_count
+        assert all(
+            row.availability == [InstanceAvailability.AVAILABLE, InstanceAvailability.UNKNOWN]
+            for row in rows
+        )
+        assert all(set(row.spot) == {"on-demand", "spot"} for row in rows)
+        assert [offer.availability for offer in offers] == original_statuses
+
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("status", ["available", "unknown"])
+    def test_single_positive_status_is_preserved(self, cpu, status):
+        offer = create_gpu_offer(
+            BackendType.NEBIUS, "H200", 144384, 2, availability=InstanceAvailability(status)
+        )
+        if cpu:
+            offer.instance.resources.gpus = []
+
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers([offer], set(), reverse=False)
+
+        assert len(rows) == 1
+        assert rows[0].availability == [InstanceAvailability(status)]
+
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("reverse_input", [False, True])
+    def test_merging_available_and_unknown_keeps_other_status_distinctions(
+        self, cpu, reverse_input
+    ):
+        offers = []
+        for count, statuses in [
+            (1, ["available", "no_quota"]),
+            (2, ["unknown", "no_quota"]),
+            (3, ["unknown", "available", "no_quota"]),
+            (4, ["no_quota"]),
+            (5, ["available", "no_balance"]),
+            (6, ["unknown", "not_available"]),
+            (7, ["idle"]),
+            (8, ["available"]),
+        ]:
+            for status in statuses:
+                offer = create_gpu_offer(
+                    BackendType.NEBIUS,
+                    "H200",
+                    144384,
+                    count * 2,
+                    gpu_count=count,
+                    availability=InstanceAvailability(status),
+                )
+                if cpu:
+                    offer.instance.resources.gpus = []
+                offers.append(offer)
+        if reverse_input:
+            offers.reverse()
+
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers(offers, set(), reverse=False)
+        by_set = {tuple(av.value for av in row.availability): row for row in rows}
+
+        assert set(by_set) == {
+            ("available", "unknown"),
+            ("no_quota",),
+            ("no_balance",),
+            ("not_available",),
+            ("idle",),
+        }
+        merged = by_set[("available", "unknown")]
+        assert merged.count == Range[int](min=4 if cpu else 1, max=32 if cpu else 8)
+        quota = by_set[("no_quota",)]
+        assert quota.count == Range[int](min=4 if cpu else 1, max=16 if cpu else 4)
+
+    @pytest.mark.parametrize("cpu", [False, True])
+    @pytest.mark.parametrize("reverse_input", [False, True])
+    def test_distinct_statuses_keep_their_own_resources_and_prices(self, cpu, reverse_input):
+        offers = []
+        for count, statuses in [
+            (1, ["not_available", "no_quota", "no_quota"]),
+            (2, ["no_quota", "not_available"]),
+            (4, ["no_quota"]),
+            (8, ["not_available"]),
+        ]:
+            for status in statuses:
+                offer = create_gpu_offer(
+                    BackendType.NEBIUS,
+                    "H200",
+                    144384,
+                    count * count,
+                    gpu_count=count,
+                    region=f"region-{count}",
+                    availability=InstanceAvailability(status),
+                )
+                if cpu:
+                    offer.instance.resources.gpus = []
+                offers.append(offer)
+        if reverse_input:
+            offers.reverse()
+
+        group_offers = gpus_services._get_cpus_grouped if cpu else gpus_services._get_gpus_grouped
+        rows = group_offers(offers, {"backend"}, reverse=False)
+        by_set = {tuple(av.value for av in row.availability): row for row in rows}
+
+        assert len(rows) == 2
+        quota = by_set[("no_quota",)]
+        assert quota.count == Range[int](min=4 if cpu else 1, max=16 if cpu else 4)
+        assert quota.price == Range[float](min=1, max=16 if cpu else 4)
+        assert quota.regions == ["region-1", "region-2", "region-4"]
+        capacity = by_set[("not_available",)]
+        assert capacity.count == Range[int](min=4 if cpu else 1, max=32 if cpu else 8)
+        assert capacity.price == Range[float](min=1, max=64 if cpu else 8)
+        assert capacity.regions == ["region-1", "region-2", "region-8"]
+
+    @pytest.mark.parametrize(
+        "group_by",
+        [
+            set(),
+            {"backend"},
+            {"backend", "region"},
+            {"count"},
+            {"backend", "count"},
+            {"backend", "region", "count"},
+        ],
+    )
+    def test_available_single_gpu_is_separate_from_unavailable_eight_gpus(self, group_by):
+        offers = [
+            create_gpu_offer(BackendType.NEBIUS, "H200", 144384, 2),
+            create_gpu_offer(
+                BackendType.NEBIUS,
+                "H200",
+                144384,
+                16,
+                gpu_count=8,
+                availability=InstanceAvailability.NOT_AVAILABLE,
+            ),
+        ]
+        rows = gpus_services._get_gpus_grouped(offers, group_by, reverse=False)
+
+        assert [(row.count.min, row.count.max, row.availability) for row in rows] == [
+            (1, 1, [InstanceAvailability.AVAILABLE]),
+            (8, 8, [InstanceAvailability.NOT_AVAILABLE]),
+        ]
+
+
 class TestListGpus:
     def test_reverse_sorts_by_whole_offer_price(self):
         offers = [
@@ -204,8 +483,10 @@ class TestListGpus:
                 BackendType.AWS, "T4", 16384, 100, availability=InstanceAvailability.NO_QUOTA
             ),
         ]
-        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
-            mock.return_value = create_mock_backends_with_offers({BackendType.AWS: offers})
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(create_mock_backends_with_offers({BackendType.AWS: offers})),
+        ):
             response = await call_gpus_api(
                 client, project.name, user.token, run_spec, group_by=group_by, reverse=reverse
             )
@@ -236,7 +517,7 @@ class TestListGpus:
     @pytest.mark.parametrize(
         ("group_by", "prices"),
         [
-            ([], [(1, 10)]),
+            ([], [(1, 4), (10, 10)]),
             (["backend"], [(1, 4), (10, 10)]),
             (["backend", "region"], [(1, 4), (2, 2), (10, 10)]),
             (["count"], [(1, 2), (4, 4), (10, 10)]),
@@ -272,10 +553,13 @@ class TestListGpus:
             availability=InstanceAvailability.NO_QUOTA,
         )
         unavailable.instance.resources.cpu_arch = gpuhunt.CPUArchitecture.X86
-        with patch("dstack._internal.server.services.backends.get_project_backends") as mock:
-            mock.return_value = create_mock_backends_with_offers(
-                {BackendType.AWS: aws, BackendType.AZURE: [unavailable]}
-            )
+        mocked_backends = create_mock_backends_with_offers(
+            {BackendType.AWS: aws, BackendType.AZURE: [unavailable]}
+        )
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(
                 client,
                 project.name,
@@ -300,11 +584,20 @@ class TestListGpus:
                     "cpu_arch": ["arm", "x86"],
                     "count": {"min": 2, "max": 8},
                     "memory_mib": {"min": 4096, "max": 16384},
-                    "price": {"min": 1, "max": 10},
-                    "availability": ["available", "no_quota"],
+                    "price": {"min": 1, "max": 4},
+                    "availability": ["available"],
                     "spot": ["on-demand", "spot"],
-                    "backends": ["aws", "azure"],
-                }
+                    "backends": ["aws"],
+                },
+                {
+                    "cpu_arch": ["x86"],
+                    "count": {"min": 4, "max": 4},
+                    "memory_mib": {"min": 8192, "max": 8192},
+                    "price": {"min": 10, "max": 10},
+                    "availability": ["no_quota"],
+                    "spot": ["on-demand"],
+                    "backends": ["azure"],
+                },
             ]
         if "count" in group_by:
             assert all(group["count"]["min"] == group["count"]["max"] for group in cpus)
@@ -338,8 +631,10 @@ class TestListGpus:
         offers_by_backend = {BackendType.AWS: [offer_aws], BackendType.RUNPOD: [offer_runpod]}
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(client, project.name, user.token, run_spec)
 
         assert response.status_code == 200
@@ -370,8 +665,10 @@ class TestListGpus:
         offer = create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)
         mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(
                 client, project.name, user.token, run_spec, full_offers=body_full_offers
             )
@@ -407,8 +704,10 @@ class TestListGpus:
         offer = create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)
         mocked_backends = create_mock_backends_with_offers({BackendType.AWS: [offer]})
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(
                 client,
                 project.name,
@@ -476,8 +775,10 @@ class TestListGpus:
         }
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(
                 client,
                 project.name,
@@ -504,8 +805,10 @@ class TestListGpus:
         }
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
             response = await call_gpus_api(client, project.name, user.token, run_spec)
 
@@ -526,8 +829,10 @@ class TestListGpus:
         }
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             # reuse skips backend offers, keeping only the existing instance.
             run_spec = get_run_spec(
                 run_name="test-run",
@@ -563,8 +868,10 @@ class TestListGpus:
         }
         mocked_backends = create_mock_backends_with_offers(offers_by_backend)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            m.return_value = mocked_backends
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease(mocked_backends),
+        ):
             response = await call_gpus_api(client, project.name, user.token, run_spec)
 
         assert response.status_code == 200
@@ -584,11 +891,13 @@ class TestListGpus:
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock_aws]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = []
-            m.return_value = [backend_mock_aws]
 
             response = await client.post(
                 f"/api/project/{project.name}/gpus/list",
@@ -733,8 +1042,12 @@ class TestListGpus:
             BackendType.RUNPOD, "T4", 16384, 0.25, spot=True, region="us-east-1"
         )
 
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock_aws = Mock()
+        backend_mock_aws = Mock()
+        backend_mock_runpod = Mock()
+        with patch(
+            "dstack._internal.server.services.backends.cache.lease_project_backends",
+            mock_lease([backend_mock_aws, backend_mock_runpod]),
+        ):
             backend_mock_aws.TYPE = BackendType.AWS
             backend_mock_aws.compute.return_value.get_offers.return_value = [
                 offer_t4_spot,
@@ -743,15 +1056,12 @@ class TestListGpus:
                 offer_t4_multi,
             ]
 
-            backend_mock_runpod = Mock()
             backend_mock_runpod.TYPE = BackendType.RUNPOD
             backend_mock_runpod.compute.return_value.get_offers.return_value = [
                 offer_runpod_rtx_east,
                 offer_runpod_rtx_eu,
                 offer_runpod_t4_east,
             ]
-
-            m.return_value = [backend_mock_aws, backend_mock_runpod]
 
             response = await client.post(
                 f"/api/project/{project.name}/gpus/list",
@@ -761,7 +1071,7 @@ class TestListGpus:
             assert response.status_code == 200
             data = response.json()
 
-            assert len(data["gpus"]) == 2
+            assert len(data["gpus"]) == 3
 
             t4_gpu = next((gpu for gpu in data["gpus"] if gpu["name"] == "T4"), None)
             rtx_gpu = next((gpu for gpu in data["gpus"] if gpu["name"] == "RTX4090"), None)
@@ -785,14 +1095,18 @@ class TestListGpus:
             assert response_count_grouped.status_code == 200
             count_grouped_data = response_count_grouped.json()
 
-            assert len(count_grouped_data["gpus"]) == 3
+            assert len(count_grouped_data["gpus"]) == 4
 
             t4_single_group = None
             t4_multi_group = None
             rtx_single_group = None
 
             for gpu in count_grouped_data["gpus"]:
-                if gpu["name"] == "T4" and gpu["count"]["min"] == 1 and gpu["count"]["max"] == 1:
+                if (
+                    gpu["name"] == "T4"
+                    and gpu["count"] == {"min": 1, "max": 1}
+                    and gpu["availability"] == ["available"]
+                ):
                     t4_single_group = gpu
                 elif gpu["name"] == "T4" and gpu["count"]["min"] == 4 and gpu["count"]["max"] == 4:
                     t4_multi_group = gpu
@@ -825,7 +1139,7 @@ class TestListGpus:
             assert response_backend.status_code == 200
             backend_data = response_backend.json()
 
-            assert len(backend_data["gpus"]) == 3
+            assert len(backend_data["gpus"]) == 4
 
             t4_runpod = next(
                 (

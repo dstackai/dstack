@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from nebius.api.nebius.capacity.v1 import ListResourceAdviceResponse, ResourceAdvice
@@ -28,12 +28,16 @@ class TestListResourceAdvice:
         client_cls = mocker.patch.object(resources, "ResourceAdviceServiceClient")
         first = ResourceAdvice(metadata=ResourceMetadata(id="advice-1"))
         second = ResourceAdvice(metadata=ResourceMetadata(id="advice-2"))
-        client_cls.return_value.list = AsyncMock(
-            side_effect=[
-                ListResourceAdviceResponse(items=[first], next_page_token="page-2"),
-                ListResourceAdviceResponse(items=[second]),
-            ]
-        )
+        client_cls.return_value.list.side_effect = [
+            Mock(
+                wait=Mock(
+                    return_value=ListResourceAdviceResponse(
+                        items=[first], next_page_token="page-2"
+                    )
+                )
+            ),
+            Mock(wait=Mock(return_value=ListResourceAdviceResponse(items=[second]))),
+        ]
 
         advice = resources.list_resource_advice(sdk, "tenant-id")
 
@@ -51,12 +55,16 @@ class TestListResourceAdvice:
 
     def test_does_not_return_partial_advice_on_failure(self, mocker):
         client = mocker.patch.object(resources, "ResourceAdviceServiceClient").return_value
-        client.list = AsyncMock(
-            side_effect=[
-                ListResourceAdviceResponse(items=[ResourceAdvice()], next_page_token="page-2"),
-                TimeoutError("capacity request timed out"),
-            ]
-        )
+        client.list.side_effect = [
+            Mock(
+                wait=Mock(
+                    return_value=ListResourceAdviceResponse(
+                        items=[ResourceAdvice()], next_page_token="page-2"
+                    )
+                )
+            ),
+            Mock(wait=Mock(side_effect=TimeoutError("capacity request timed out"))),
+        ]
 
         with pytest.raises(TimeoutError):
             resources.list_resource_advice(Mock(), "tenant-id")

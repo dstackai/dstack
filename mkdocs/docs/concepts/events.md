@@ -26,6 +26,8 @@ In the UI, the `Events` tab is included on the run, job, fleet, and instance pag
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-ui-events-run.png){ width=800 }
 
+> The global `Events` page with advanced filtering is only available in [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/).
+
 ## CLI
 
 To query events via the CLI, use the `dstack event` command.

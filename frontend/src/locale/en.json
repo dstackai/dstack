@@ -55,7 +55,9 @@
         "quickstart": "Quickstart",
         "ask_ai": "Ask AI",
         "new": "New",
-        "full_view": "Full view"
+        "full_view": "Full view",
+        "show_token": "Show token",
+        "hide_token": "Hide token"
     },
 
     "auth": {
@@ -574,6 +576,8 @@
         "backend": "Backend",
         "backend_plural": "Backends",
         "availability_not_available": "Not available",
+        "availability_available": "Available",
+        "availability_unknown": "Unknown",
         "availability_no_quota": "No quota",
         "availability_no_balance": "No balance",
         "availability_busy": "Busy",
@@ -741,7 +745,11 @@
         "recorded_at": "Recorded At",
         "actor": "Actor",
         "targets": "Targets",
-        "message": "Message"
+        "message": "Message",
+        "time_range_placeholder": "Filter by time range",
+        "time_range_incomplete": "Select a start and end date for the time range.",
+        "time_range_start_after_end": "The start date must be before the end date.",
+        "time_range_invalid_duration": "The duration must be a positive number."
     },
 
     "users": {
@@ -838,9 +846,7 @@
         "balance": "Balance",
         "billing_history": "Billing history",
         "payment_method": "Payment method",
-        "no_payment_method": "No payment method attached",
         "top_up_balance": "Top up balance",
-        "edit_payment_method": "Edit payment method",
         "payment_amount": "Payment amount",
         "amount_description": "Minimum: ${{value}}",
         "make_payment": "Make a payment",

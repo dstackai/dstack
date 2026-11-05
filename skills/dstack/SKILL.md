@@ -565,7 +565,7 @@ Common issues:
 ## Additional resources
 
 **Core documentation:**
-- [Overview](https://dstack.ai/docs/overview.md)
+- [Overview](https://dstack.ai/docs/index.md)
 - [Installation](https://dstack.ai/docs/installation.md)
 - [Quickstart](https://dstack.ai/docs/quickstart.md)
 
@@ -580,8 +580,8 @@ Common issues:
 - [Server deployment](https://dstack.ai/docs/guides/server-deployment.md)
 
 **Accelerator-specific examples:**
-- [AMD](https://dstack.ai/examples/accelerators/amd/index.md)
-- [Google TPU](https://dstack.ai/examples/accelerators/tpu/index.md)
-- [Tenstorrent](https://dstack.ai/examples/accelerators/tenstorrent/index.md)
+- [AMD](https://dstack.ai/docs/examples/accelerators/amd.md)
+- [Google TPU](https://dstack.ai/docs/examples/accelerators/tpu.md)
+- [Tenstorrent](https://dstack.ai/docs/examples/accelerators/tenstorrent.md)
 
 **Full documentation:** https://dstack.ai/llms-full.txt

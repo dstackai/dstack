@@ -34,7 +34,7 @@ It streamlines development, training, and inference, and is compatible with any 
 * [Dev environments](concepts/dev-environments.md) &mdash; Launch dev environments to be accessed by agents or from your IDE
 * [Tasks](concepts/tasks.md) &mdash; Run training, batch or other jobs across a single node or clusters
 * [Services](concepts/services.md) &mdash; Deploy model inference as secure and scalable endpoints
-* [Presets](concepts/presets.md) &mdash; Agent-driven inference optimization (experimental)
+* [Presets](concepts/presets.md) &mdash; Agent-driven inference optimization
 * [Volumes](concepts/volumes.md) &mdash; Managing instance and network volumes for persisting data
 
 Configuration can be defined as YAML files within your repo.

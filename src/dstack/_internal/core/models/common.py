@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Optional, TypeVar, Union, overload
+from typing import Annotated, Any, Optional, TypeVar, Union, overload
 
 from pydantic import (
     BaseModel,
@@ -7,7 +7,6 @@ from pydantic import (
     Field,
     TypeAdapter,
 )
-from typing_extensions import Annotated
 
 # pydantic v2 generates draft 2020-12. The published `configuration.json` / `profiles.json`
 # advertise the dialect they were generated for, so this has to move with pydantic.

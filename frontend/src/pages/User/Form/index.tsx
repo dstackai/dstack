@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
@@ -15,9 +15,10 @@ import {
     Popover,
     SpaceBetween,
     StatusIndicator,
+    TokenVisibilityButton,
 } from 'components';
 
-import { copyToClipboard } from 'libs';
+import { copyToClipboard, TOKEN_MASK } from 'libs';
 
 import { TActiveSelectOption, TRoleSelectOption } from './types';
 
@@ -42,6 +43,7 @@ export const UserForm: React.FC<Props> = ({
 }) => {
     const { t } = useTranslation();
     const isEditing = !!initialValues;
+    const [isTokenVisible, setIsTokenVisible] = useState(false);
 
     const { handleSubmit, control } = useForm<IUser>({
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -170,7 +172,16 @@ export const UserForm: React.FC<Props> = ({
                                     </Popover>
                                 </Box>
 
-                                {initialValues.creds.token}
+                                {isTokenVisible ? initialValues.creds.token : TOKEN_MASK}
+
+                                <Box margin={{ left: 's' }} display="inline-block">
+                                    <TokenVisibilityButton
+                                        disabled={loading}
+                                        visible={isTokenVisible}
+                                        onChange={setIsTokenVisible}
+                                        variant="inline-link"
+                                    />
+                                </Box>
 
                                 <Box margin={{ left: 'l' }} display="inline-block">
                                     <Button

@@ -53,7 +53,7 @@ Despite hiding most of the complexity, `dstack` still requires instance-specific
     Ensure VPCs allow internal traffic between nodes for MPI/NCCL to function.
 
 === "A3 Mega"
-    A3 Edge/High require at least 4 `extra_vpcs` for data NICs.
+    A3 Mega requires at least 8 `extra_vpcs` for data NICs.
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -309,6 +309,28 @@ Once you've configured the `gcp` backend, create the fleet configuration:
     ```
 
     </div>
+
+??? info "Reservations"
+    To use an existing [reservation](https://cloud.google.com/compute/docs/instances/reservations-overview),
+    specify its name via [`reservation`](../../reference/dstack.yml/fleet.md#reservation):
+
+    ```yaml
+    type: fleet
+    name: a3mega-fleet
+
+    placement: cluster
+    nodes: 2
+
+    instance_types:
+      - a3-megagpu-8g
+
+    reservation: my-reservation
+    ```
+
+    For a [shared reservation](https://cloud.google.com/compute/docs/instances/reservations-shared) owned by another project,
+    specify `projects/<project id>/reservations/<reservation name>`.
+
+    `dstack` then provisions on-demand instances of the reservation's machine type in its zone.
 
 Once the fleet is created, you can run multi-node tasks, in addition to dev environments, services, and regular tasks.
 

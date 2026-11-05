@@ -59,6 +59,13 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             if plan.effective_spec.configuration.name is not None:
                 action_message += f"Gateway [code]{plan.effective_spec.configuration.name}[/] does not exist yet."
             confirm_message += "Create the gateway?"
+        elif plan.current_resource.status == GatewayStatus.FAILED:
+            action_message += (
+                f"Found gateway [code]{plan.effective_spec.configuration.name}[/]"
+                " in [error]FAILED[/] status."
+            )
+            confirm_message += "Re-create the gateway?"
+            delete_gateway_name = plan.current_resource.name
         else:
             action_message += f"Found gateway [code]{plan.effective_spec.configuration.name}[/]."
             diff = diff_gateway_configurations(

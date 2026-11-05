@@ -110,7 +110,7 @@ Provisioning...
 ## Distributed training
 
 !!! info "Prerequisites"
-    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
+    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#cluster-placement)).
 
 ### Define a configuration
 

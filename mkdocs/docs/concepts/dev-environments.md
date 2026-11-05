@@ -267,13 +267,13 @@ init:
 
 </div>
 
-Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+Cannot be used with `python` or `image`. Not supported on `daytona`, `lium`, `runpod`, `slurm`, or `vastai`.
 
 #### Privileged mode
 
 To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
 
-Not supported with `runpod`, `vastai`, and `kubernetes`.
+Not supported with `daytona`, `lium`, `runpod`, `slurm`, and `vastai`.
 
 #### Private registry
     

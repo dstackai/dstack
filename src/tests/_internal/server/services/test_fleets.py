@@ -4,7 +4,6 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import (
@@ -17,7 +16,6 @@ from dstack._internal.core.models.fleets import (
 )
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.server.models import FleetModel, ProjectModel
-from dstack._internal.server.services.backends import get_project_backends
 from dstack._internal.server.services.fleets import (
     get_fleet_master_instance_provisioning_data,
     get_plan,
@@ -30,14 +28,17 @@ from dstack._internal.server.testing.common import (
     get_fleet_spec,
     get_job_provisioning_data,
     get_ssh_key,
+    mock_lease,
 )
 
 
 class TestGetPlanSSHFleetHostsValidation:
     @pytest.fixture
-    def get_project_backends_mock(self, monkeypatch: pytest.MonkeyPatch) -> list[Backend]:
-        mock = Mock(spec_set=get_project_backends, return_value=[])
-        monkeypatch.setattr("dstack._internal.server.services.backends.get_project_backends", mock)
+    def lease_project_backends_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = mock_lease([])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.backends.cache.lease_project_backends", mock
+        )
         return mock
 
     def get_ssh_fleet_spec(
@@ -74,7 +75,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_ok_same_fleet_update(self, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -88,7 +89,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_ok_deleted_instances_ignored(self, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -106,7 +107,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_ok_no_common_hosts_with_another_fleet(self, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -120,7 +121,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_error_another_fleet_same_project(self, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -138,7 +139,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_error_another_fleet_another_project(self, session: AsyncSession):
         another_user = await create_user(session=session, name="another-user")
         another_project = await create_project(
@@ -160,7 +161,7 @@ class TestGetPlanSSHFleetHostsValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    @pytest.mark.usefixtures("test_db", "lease_project_backends_mock")
     async def test_error_fleet_spec_without_name(self, session: AsyncSession):
         # Even if the user apply the same configuration again, we cannot be sure if it is the same
         # fleet or a brand new fleet, as we identify fleets by name.

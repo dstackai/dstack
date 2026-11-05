@@ -8,8 +8,7 @@ description: Exporting resources across projects
 Exports allow making resources from one project available to other projects. When a project exports a resource,
 the specified importer projects can see and use it as if it were their own.
 
-!!! info "Export support"
-    Exports are only supported in `dstack` Sky and `dstack` Factory.
+> Exports are only supported in [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/).
 
 An export is created in the exporter project and specifies the resources to export and the
 importer projects that will gain access to them.
@@ -20,7 +19,7 @@ for running tasks, dev environments, and services. Imported resources appear wit
 
 Currently, [SSH fleets](fleets.md#ssh-fleets) and [gateways](gateways.md) can be exported.
 
-!!! info "Required project role"
+??? info "Required role"
     The user creating or updating an export must have the project admin role on both the exporter project and
     any importer project they add. Alternatively, a global admin can add any project as an importer.
 
@@ -128,9 +127,9 @@ $ dstack export create global-export --gateway shared-gateway --global
 
 ```
 
-Only promoting an export to global requires the global admin role. Regular project admins can add or remove resources, remove global status, or delete the export.
-
 </div>
+
+Only promoting an export to global requires the global admin role. Regular project admins can add or remove resources, remove global status, or delete the export.
 
 ## Access imported resources
 

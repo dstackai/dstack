@@ -90,7 +90,7 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "ec2:DeletePlacementGroup",
                     "ec2:DeleteVolume",
                     "ec2:DescribeAvailabilityZones",
-                    "ec2:DescribeCapacityReservations"
+                    "ec2:DescribeCapacityReservations",
                     "ec2:DescribeImages",
                     "ec2:DescribeInstances",
                     "ec2:DescribeInstanceAttribute",
@@ -314,7 +314,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     ```shell
     SUBSCRIPTION_ID=...
-    az ad sp create-for-rbac
+    DSTACK_ROLE=...
+    az ad sp create-for-rbac \
         --name dstack-app \
         --role $DSTACK_ROLE \
         --scopes /subscriptions/$SUBSCRIPTION_ID \
@@ -401,6 +402,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -415,6 +418,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -433,6 +438,8 @@ There are two ways to configure Azure: using a client secret or using the defaul
       - name: main
         backends:
           - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
             creds:
               type: default
             regions: [westeurope]
@@ -739,6 +746,7 @@ gcloud projects list --format="json(projectId)"
       - name: main
         backends:
           - type: gcp
+            project_id: gcp-project-id
             creds:
               type: default
 
@@ -900,7 +908,7 @@ projects:
 
 <span id="datacrunch"></span>
 
-### Verda (formerly DataCrunch) { #verda }
+### Verda { #verda }
 
 Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
@@ -1258,6 +1266,49 @@ projects:
 
     The jump host can be a GPU node or a CPU-only node — it makes no difference. The only requirement is that both the `dstack` server and CLI can reach `hostname:port`.
 
+    The jump pod is managed by a ReplicaSet, so Kubernetes recreates it if it's evicted or its node is removed. To make eviction less likely, the jump pod's CPU and memory requests equal its limits, which gives it the [`Guaranteed`](https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/#guaranteed) QoS class. Set `proxy_jump.cpu` and `proxy_jump.memory` to change the defaults, `500m` and `1Gi`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        cpu: 1
+        memory: 2Gi
+    ```
+
+    Each SSH session through the jump pod takes about 2 MiB of memory. Each `dstack` server replica keeps at least one session open per running job, and each `dstack attach` adds one more. If the jump pod exceeds its memory limit, Kubernetes restarts it.
+
+    When the jump pod restarts or is recreated, its SSH sessions drop. The `dstack` server reconnects automatically, but `dstack attach` may fail for runs submitted before that. If reliable SSH access to runs is important, deploy [`dstack-sshproxy`](../guides/server-deployment.md#ssh-proxy).
+
+    To run the jump pod only on specific nodes, e.g., nodes with an `ExternalIP` or CPU-only nodes, label them and set `proxy_jump.node_selector`. If these nodes are [tainted](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/), also set `proxy_jump.tolerations`:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        node_selector:
+        - example.com/jump-host
+        tolerations:
+        - example.com/dedicated=jump-host:NoSchedule
+    ```
+
+    Each `node_selector` item is `key=value`, `key=` (an empty value), or `key` (any value), and a node must match all of them. Since a `nodeSelector` can't match any value, `dstack` applies `node_selector` as a required [node affinity](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity) term. If none of the selected nodes can run the jump pod, it stays pending and runs can't be provisioned, so label several nodes.
+
+    Each `tolerations` item is `key[=value][:effect]`, the `kubectl taint` format, so a taint added with `kubectl taint` can be copied as is. Without `=value`, any value is tolerated; without `:effect`, any effect. If `tolerations` isn't set, `dstack` tolerates the GPU node taints when every node is tainted, but not if `node_selector` is set.
+
+    !!! warning "Changing `cpu`, `memory`, `node_selector`, and `tolerations`"
+        New values don't apply to an existing jump pod. To apply them, update the jump pod's ReplicaSet in the context's namespace and delete the pod so that Kubernetes recreates it:
+
+        ```shell
+        # cpu and memory
+        kubectl -n <namespace> set resources replicaset dstack-<project>-ssh-jump-pod \
+          --requests=cpu=1,memory=2Gi --limits=cpu=1,memory=2Gi
+        # node_selector and tolerations: edit spec.template.spec.affinity and .tolerations
+        kubectl -n <namespace> edit replicaset dstack-<project>-ssh-jump-pod
+        # Recreate the pod
+        kubectl -n <namespace> delete pod -l app.kubernetes.io/instance=dstack-<project>-ssh-jump-pod
+        ```
+
 !!! info "Region and namespace"
     Each enabled context becomes its own `dstack` region, named after the context. When creating a `dstack` [volume](volumes.md) or [gateway](gateways.md), the `region` field selects which cluster the resource is provisioned in.
 
@@ -1372,6 +1423,8 @@ projects:
 
     Ensure you've created a ClusterRoleBinding and RoleBinding to grant the roles to the user or the service account you're using.
 
+    The `list` verb on `secrets` is only needed for [orphan cleanup](../reference/env.md#DSTACK_SERVER_ORPHAN_CLEANUP_MODE) to find registry auth secrets left without their pods, and `dstack` works without it. Kubernetes can't limit it to `dstack`'s secrets, so it lets `dstack` read the contents of all secrets in the namespace. Grant it only if the namespace is dedicated to `dstack`.
+
 ??? info "Resources and offers"
     If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.
 
@@ -1406,9 +1459,26 @@ projects:
     | `ephemeral-storage` | `100Gi`  | _not set_ |
     | `nvidia.com/gpu`    | `4`      | `4`       |
 
-    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
+    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range. With `--full-offers`, `dstack offer` and `dstack apply` show the node's full resources instead.
 
-> To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
+??? info "MIG"
+    If the cluster's NVIDIA GPUs are partitioned with [MIG](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/latest/index.html),
+    `dstack` treats each MIG slice as a GPU with the slice's memory. For example, a `1g.10gb` slice of an A100 is an `A100:10GB` GPU.
+
+    To run on slices, specify the GPU memory, e.g., `gpu: A100:10GB` for one slice or `gpu: A100:10GB:2` for two.
+    If the GPU memory isn't specified or has no maximum (e.g., `gpu: A100` or `gpu: 24GB..`), the run gets whole GPUs only.
+    `dstack offer` and `dstack apply` follow the same rule.
+    With `--full-offers`, they also list matching slices, e.g., `A100:10GB:14` next to `A100:80GB:4` on the same node.
+
+    MIG must be configured with the GPU Operator's [MIG Manager](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html)
+    (the `single` or `mixed` [strategy](https://docs.nvidia.com/datacenter/cloud-native/kubernetes/latest/index.html)).
+
+    Limitations:
+
+    * Slices with the same memory are the same GPU for `dstack`, so `gpu: A100:40GB` can get either a `3g.40gb` or a `4g.40gb` slice.
+    * `dstack metrics` doesn't show GPU metrics for slices.
+
+> To learn more, see the [Lambda](../examples/clusters/lambda.md#kubernetes) and [Crusoe](../examples/clusters/crusoe.md#kubernetes) examples.
 
 ### Slurm
 
@@ -1657,5 +1727,3 @@ projects:
     ```
 
     </div>
-
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.

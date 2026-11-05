@@ -1,12 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Box, Button, ColumnLayout, Container, Header, Link, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
+import {
+    Box,
+    Button,
+    ColumnLayout,
+    Container,
+    Header,
+    Link,
+    Loader,
+    Popover,
+    SpaceBetween,
+    StatusIndicator,
+    TokenVisibilityButton,
+} from 'components';
 import { PermissionGuard } from 'components/PermissionGuard';
 
 import { useAppSelector, useBreadcrumbs, usePermissionGuard } from 'hooks';
-import { copyToClipboard } from 'libs';
+import { copyToClipboard, TOKEN_MASK } from 'libs';
 import { ROUTES } from 'routes';
 import { useDeleteUsersMutation, useGetUserQuery } from 'services/user';
 import { GlobalUserRole } from 'types';
@@ -26,6 +38,7 @@ export const Settings: React.FC = () => {
 
     const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !params.userName });
     const [, { isLoading: isDeleting }] = useDeleteUsersMutation();
+    const [isTokenVisible, setIsTokenVisible] = useState(false);
 
     const [isAvailableDelete] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
 
@@ -71,7 +84,7 @@ export const Settings: React.FC = () => {
                 {isLoading && <Loader />}
 
                 {data && (
-                    <ColumnLayout columns={2} variant="text-grid">
+                    <ColumnLayout columns={1} variant="text-grid">
                         <SpaceBetween size="l">
                             {/*<div>*/}
                             {/*    <Box variant="awsui-key-label">{t('users.user_name')}</Box>*/}
@@ -104,7 +117,13 @@ export const Settings: React.FC = () => {
                                         <Button formAction="none" iconName="copy" variant="link" onClick={onCopyToken} />
                                     </Popover>
 
-                                    <div>{data.creds.token}</div>
+                                    <div className={styles.tokenValue}>{isTokenVisible ? data.creds.token : TOKEN_MASK}</div>
+
+                                    <TokenVisibilityButton
+                                        visible={isTokenVisible}
+                                        onChange={setIsTokenVisible}
+                                        variant="inline-link"
+                                    />
                                 </div>
                             </div>
                         </SpaceBetween>

@@ -7,7 +7,7 @@ description: Deploying and fine-tuning models on Google Cloud TPUs using Optimum
 
 If you've configured the `gcp` backend in `dstack`, you can run dev environments, tasks, and services on [TPUs](https://cloud.google.com/tpu/docs/intro-to-tpu).
 Choose a TPU instance by specifying the TPU version and the number of cores (e.g. `v5litepod-8`) in the `gpu` property under `resources`,
-or request TPUs by specifying `tpu` as `vendor` ([see examples](../../guides/protips.md#gpu)).
+or request TPUs by specifying `tpu` as `vendor` ([see examples](../../guides/protips.md#gpu-specification)).
 
 TPU support is experimental and disabled by default. Before using these examples, set `tpu: true`
 in your [GCP backend settings](../../concepts/backends.md#gcp).

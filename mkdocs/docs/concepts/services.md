@@ -5,10 +5,12 @@ description: Deploying models and web apps as endpoints
 
 # Services
 
-Services allow you to deploy models or web apps as secure and scalable endpoints.
+Services allow you to deploy models as secure and scalable inference endpoints, with support for replica groups, routers, and PD disaggregation.
 
 ??? info "Prerequisites"
     Before running a service, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
+
+> To optimize model inference with an agent, it's recommended to use [presets](presets.md).
 
 ## Apply a configuration
 
@@ -120,7 +122,7 @@ Provisioning...
 Service is published at:
   http://localhost:3000/proxy/services/main/qwen36/
 Model Qwen/Qwen3.6-27B is published at:
-  http://localhost:3000/proxy/models/main/
+  http://localhost:3000/proxy/services/main/qwen36/v1
 ```
 
 </div>
@@ -296,7 +298,7 @@ Below are examples for running `Qwen/Qwen3.8-Flash-Next` with SMG and `zai-org/G
 
     </div>
 
-[`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive.
+[`groups`](../reference/dstack.yml/service.md#groups) and top-level [`replicas`](../reference/dstack.yml/service.md#replicas) are mutually exclusive. If `groups` is set, top-level `resources` is ignored. Set `resources` in each group.
 
 > Properties such as `regions`, `port`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
@@ -359,6 +361,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
               --model-path $MODEL_ID \
               --disaggregation-mode prefill \
               --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 \
               --port 8000 \
               --disaggregation-bootstrap-port 8998
         resources:
@@ -371,18 +374,13 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
               --model-path $MODEL_ID \
               --disaggregation-mode decode \
               --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 \
               --port 8000
         resources:
           gpu: H200
 
     port: 8000
     model: zai-org/GLM-4.5-Air-FP8
-
-    # Custom probe is required for PD disaggregation.
-    probes:
-      - type: http
-        url: /health
-        interval: 15s
     ```
 
     </div>
@@ -568,12 +566,6 @@ groups:
 port: 30000
 model: Qwen/Qwen2.5-72B-Instruct
 
-# Custom probe is required for PD disaggregation.
-probes:
-  - type: http
-    url: /health
-    interval: 15s
-
 volumes:
   - /usr/lib64/libibverbs/libbnxt_re-rdmav34.so:/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so
 ```
@@ -635,16 +627,18 @@ $ curl https://llama31.example.com/v1/chat/completions \
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 python: 3.12
 
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -712,7 +706,7 @@ $ dstack ps --verbose
 
     If multiple probes are configured for the service, their statuses are displayed in the order in which the probes appear in the configuration.
 
-Probes are executed for each service replica while the replica is `running`. A probe execution is considered successful if the replica responds with a `2xx` status code. Probe statuses do not affect how `dstack` handles replicas, except during [rolling deployments](#rolling-deployment).
+Probes are executed for each service replica while the replica is `running`. A probe execution is considered successful if the replica responds with a `2xx` status code. A replica starts receiving requests only after each of its probes succeeds [`ready_after`](../reference/dstack.yml/service.md#ready_after) times in a row. After that, probe statuses do not affect how `dstack` handles the replica, except during [rolling deployments](#rolling-deployment).
 
 ??? info "HTTP request configuration"
     You can configure the HTTP request method, headers, and other properties. To include secret values in probe requests, use environment variable interpolation, which is enabled for the `url`, `headers[i].value`, and `body` properties.
@@ -755,6 +749,8 @@ In this case, `dstack` will use the service's `/v1/chat/completions` service.
 
 When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
 To customize or disable this, set `probes` explicitly.
+
+> The `model` property is optional. Services can run any kind of web application.
 
 ### Scaling
 
@@ -961,13 +957,13 @@ port: 9000
 
 </div>
 
-Cannot be used with `python` or `image`. Not supported on `runpod`, `vastai`, or `kubernetes`.
+Cannot be used with `python` or `image`. Not supported on `daytona`, `lium`, `runpod`, `slurm`, or `vastai`.
 
 #### Privileged mode
 
 To enable privileged mode, set [`privileged`](../reference/dstack.yml/dev-environment.md#privileged) to `true`.
 
-Not supported with `runpod`, `vastai`, and `kubernetes`.
+Not supported with `daytona`, `lium`, `runpod`, `slurm`, and `vastai`.
 
 #### Private registry
 
@@ -1016,7 +1012,7 @@ Sometimes, when you run a service, you may want to mount local files. This is po
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 files:
   - .:examples  # Maps the directory with `.dstack.yml` to `<working dir>/examples`
@@ -1026,10 +1022,12 @@ python: 3.12
 
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -1049,7 +1047,7 @@ The container path is optional. If not specified, it will be automatically calcu
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 files:
   - ../examples  # Maps the parent directory of `.dstack.yml` to `<working dir>/../examples`
@@ -1059,10 +1057,12 @@ python: 3.12
 
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -1088,7 +1088,7 @@ Imagine you have a Git repo (clonned locally) containing an `examples` subdirect
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 repos:
   # Clones the repo from the parent directory (`examples/..`) to `<working dir>`
@@ -1098,10 +1098,12 @@ python: 3.12
 
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -1125,7 +1127,7 @@ The local path can be either relative to the configuration file or absolute.
 
     ```yaml
     type: service
-    name: llama-2-7b-service
+    name: qwen3-service
 
     repos:
       # Clones the repo in the parent directory (`examples/..`) to `/my-repo`
@@ -1135,10 +1137,12 @@ The local path can be either relative to the configuration file or absolute.
 
     env:
       - HF_TOKEN
-      - MODEL=NousResearch/Llama-2-7b-chat-hf
+      - MODEL=Qwen/Qwen3-4B
     commands:
       - uv pip install vllm
-      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+      - |
+        vllm serve $MODEL \
+          --port 8000
     port: 8000
 
     resources:
@@ -1154,7 +1158,7 @@ The local path can be either relative to the configuration file or absolute.
 
     ```yaml
     type: service
-    name: llama-2-7b-service
+    name: qwen3-service
 
     repos:
       - local_path: ..
@@ -1165,10 +1169,12 @@ The local path can be either relative to the configuration file or absolute.
 
     env:
       - HF_TOKEN
-      - MODEL=NousResearch/Llama-2-7b-chat-hf
+      - MODEL=Qwen/Qwen3-4B
     commands:
       - uv pip install vllm
-      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+      - |
+        vllm serve $MODEL \
+          --port 8000
     port: 8000
 
     resources:
@@ -1189,7 +1195,7 @@ The local path can be either relative to the configuration file or absolute.
 
     ```yaml
     type: service
-    name: llama-2-7b-service
+    name: qwen3-service
 
     repos:
       # Clone the repo to `<working dir>`
@@ -1199,10 +1205,12 @@ The local path can be either relative to the configuration file or absolute.
 
     env:
       - HF_TOKEN
-      - MODEL=NousResearch/Llama-2-7b-chat-hf
+      - MODEL=Qwen/Qwen3-4B
     commands:
       - uv pip install vllm
-      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+      - |
+        vllm serve $MODEL \
+          --port 8000
     port: 8000
 
     resources:
@@ -1238,8 +1246,8 @@ env:
 commands:
   - uv pip install vllm
   - |
-    vllm serve $MODEL_ID
-      --max-model-len $MAX_MODEL_LEN
+    vllm serve $MODEL_ID \
+      --max-model-len $MAX_MODEL_LEN \
       --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
 
@@ -1342,6 +1350,9 @@ auth: false
 # Do not strip the path prefix
 strip_prefix: false
 
+repos:
+  - .
+
 env:
   # Configure Dash to work with a path prefix
   # Replace `main` with your dstack project name
@@ -1407,15 +1418,17 @@ Below is an example of a service that auto-terminate if any GPU stays below 10% 
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 python: 3.12
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -1436,15 +1449,17 @@ Specify `schedule` to start a service periodically at specific UTC times using t
 
 ```yaml
 type: service
-name: llama-2-7b-service
+name: qwen3-service
 
 python: 3.12
 env:
   - HF_TOKEN
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - MODEL=Qwen/Qwen3-4B
 commands:
   - uv pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - |
+    vllm serve $MODEL \
+      --port 8000
 port: 8000
 
 resources:
@@ -1518,7 +1533,7 @@ Update the run? [y/n]:
 
 If approved, `dstack` gradually updates the service replicas. To update a replica, `dstack` starts a new replica, waits for it to become `running` and for all of its [probes](#probes) to pass, then terminates the old replica. This process is repeated for each replica, one at a time.
 
-You can track the progress of rolling deployment in both `dstack apply` or `dstack ps`.
+You can track the progress of rolling deployment in both `dstack apply` and `dstack ps`.
 Older replicas have lower `deployment` numbers; newer ones have higher.
 
 <!--
@@ -1554,7 +1569,7 @@ The rolling deployment stops when all replicas are updated or when a new deploym
 
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md) and [tasks](tasks.md)
-    2. Learn how to manage [fleets](fleets.md)
-    3. See how to set up [gateways](gateways.md)
+    2. Learn how to use [presets](presets.md) to optimize inference
+    3. See how to manage [fleets](fleets.md) and set up [gateways](gateways.md)
     4. Check the [vLLM](../examples/inference/vllm.md) and
        [NIM](../examples/inference/nim.md) examples

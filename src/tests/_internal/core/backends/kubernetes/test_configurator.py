@@ -1,3 +1,4 @@
+import re
 from unittest.mock import Mock
 
 import pytest
@@ -74,6 +75,152 @@ class TestKubernetesConfigurator:
             ],
         )
         with pytest.raises(ServerClientError, match="duplicate contexts: ctx-1, ctx-3"):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    @pytest.mark.parametrize(
+        ["cpu", "memory"],
+        [
+            pytest.param("100m", "32Mi", id="minimum"),
+            pytest.param("1", "2Gi", id="integer-cpu"),
+            pytest.param(0.5, "1.5Gi", id="number-cpu"),
+        ],
+    )
+    def test_validate_config_valid_proxy_jump_resources(self, cpu, memory):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                KubernetesContextConfig(
+                    name="ctx",
+                    proxy_jump=KubernetesProxyJumpConfig(cpu=cpu, memory=memory),
+                ),
+            ],
+        )
+        KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    @pytest.mark.parametrize(
+        ["proxy_jump", "expected_error"],
+        [
+            pytest.param(
+                KubernetesProxyJumpConfig(cpu="50m"),
+                "invalid proxy_jump.cpu value '50m': must be at least 100m",
+                id="cpu-below-minimum",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(cpu="-1"),
+                "invalid proxy_jump.cpu value '-1': must be at least 100m",
+                id="negative-cpu",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(memory="512"),
+                "invalid proxy_jump.memory value '512': must be at least 32Mi",
+                id="memory-in-bytes",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(memory="1 Gi"),
+                "invalid proxy_jump.memory value '1 Gi': must be a Kubernetes quantity",
+                id="invalid-memory-quantity",
+            ),
+        ],
+    )
+    def test_validate_config_invalid_proxy_jump_resources(
+        self, proxy_jump: KubernetesProxyJumpConfig, expected_error: str
+    ):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            proxy_jump=proxy_jump,
+            namespace="ns",
+        )
+        with pytest.raises(ServerClientError, match=re.escape(expected_error)):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    def test_validate_config_invalid_context_proxy_jump_resources(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                "ctx-1",
+                KubernetesContextConfig(
+                    name="ctx-2",
+                    proxy_jump=KubernetesProxyJumpConfig(cpu="1", memory="500mi"),
+                ),
+            ],
+        )
+        with pytest.raises(
+            ServerClientError,
+            match=re.escape(
+                "invalid proxy_jump.memory value '500mi' in context 'ctx-2':"
+                " must be a Kubernetes quantity"
+            ),
+        ):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    def test_validate_config_valid_proxy_jump_placement(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                KubernetesContextConfig(
+                    name="ctx",
+                    proxy_jump=KubernetesProxyJumpConfig(
+                        node_selector=["example.com/jump-host", "example.com/pool=cpu"],
+                        tolerations=["example.com/pool", "nvidia.com/gpu=:NoSchedule"],
+                    ),
+                ),
+            ],
+        )
+        KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    @pytest.mark.parametrize(
+        ["proxy_jump", "expected_error"],
+        [
+            pytest.param(
+                KubernetesProxyJumpConfig(node_selector=["example.com/pool=cpu", "=cpu"]),
+                "invalid proxy_jump.node_selector item '=cpu': Invalid key: Empty name",
+                id="node-selector-empty-key",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(tolerations=[":NoSchedule"]),
+                "invalid proxy_jump.tolerations item ':NoSchedule': Invalid key: Empty name",
+                id="tolerations-empty-key",
+            ),
+            pytest.param(
+                KubernetesProxyJumpConfig(tolerations=["nvidia.com/gpu:noschedule"]),
+                "invalid proxy_jump.tolerations item 'nvidia.com/gpu:noschedule': Invalid effect",
+                id="tolerations-invalid-effect",
+            ),
+        ],
+    )
+    def test_validate_config_invalid_proxy_jump_placement(
+        self, proxy_jump: KubernetesProxyJumpConfig, expected_error: str
+    ):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            proxy_jump=proxy_jump,
+            namespace="ns",
+        )
+        with pytest.raises(ServerClientError, match=re.escape(expected_error)):
+            KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
+
+    @pytest.mark.usefixtures("get_clusters_mock")
+    def test_validate_config_invalid_context_proxy_jump_placement(self):
+        config = KubernetesBackendConfigWithCreds(
+            kubeconfig=KubeconfigConfig(data="mocked", filename="-"),
+            contexts=[
+                KubernetesContextConfig(
+                    name="ctx",
+                    proxy_jump=KubernetesProxyJumpConfig(tolerations=["key=a b"]),
+                ),
+            ],
+        )
+        with pytest.raises(
+            ServerClientError,
+            match=re.escape(
+                "invalid proxy_jump.tolerations item 'key=a b' in context 'ctx': Invalid value"
+            ),
+        ):
             KubernetesConfigurator().validate_config(config, default_creds_enabled=True)
 
     def test_validate_config_cluster_check_failed(

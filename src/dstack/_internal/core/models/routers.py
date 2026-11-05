@@ -1,8 +1,7 @@
 from enum import Enum
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import Field, field_serializer, field_validator
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 

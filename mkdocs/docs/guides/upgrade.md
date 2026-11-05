@@ -5,16 +5,36 @@ description: Upgrading to newer versions of dstack
 
 # Upgrade guide
 
-<!-- TODO: Add general sections on how to migrate to newer releases and how major and minor versions compatibility  and deprecation policy is handled -->
+<!-- TODO: Describe the deprecation policy -->
+
+!!! info "Backward compatibility"
+    `dstack` follows the `{major}.{minor}.{patch}` versioning scheme. The sections below cover each minor version and list the changes that may require action when upgrading.
+
+    - The server is backward-compatible with CLIs of the same minor version or older.
+    - CLIs of a newer minor version are rejected by older servers (e.g., a `0.22.*` CLI with a `0.21.*` server).
+
+!!! info "Rolling upgrades"
+    - The server applies database migrations automatically on startup.
+    - Rolling upgrades are supported from older versions, including when skipping releases (e.g., `0.21.0` to `0.22.6`).
+
+Exceptions are noted in the sections below.
+
+## 0.22.* { #0_22 }
+
+!!! info "Rolling upgrades"
+    Rolling upgrades to `0.22.*` are supported from `0.21.*`. If upgrading from `0.20.*`, scale server replicas down to `1` before upgrading.
+
+### Exports and Events
+
+Support for [exports](../concepts/exports.md) and the global `Events` page has moved from the open-source version to [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/). The `dstack event` CLI command and the `Events` tabs on resource pages remain available in the open-source version.
+
+### Deprecations
+
+The `DSTACK_ROUTER_INTERNAL_IP` environment variable is deprecated in favor of [`${{ groups[i].replicas[j].IP_ADDRESS }}`](../concepts/services.md#replica-groups).
 
 ## 0.21.* { #0_21 }
 
-### CLI compatibility
-
-- CLI versions `0.20.*` and later remain backward compatible with the `0.21.*` `dstack` server.
-- CLI versions `0.21.*` are not compatible with server versions prior to `0.21.*`.
-
-> Upgrade the server before upgrading the CLI, or upgrade both at the same time. CLI versions prior to `0.20.0` must be upgraded along with the server.
+> CLI versions prior to `0.20.0` must be upgraded along with the server.
 
 ### Pydantic v2
 
@@ -50,7 +70,7 @@ Use the corresponding replacements:
 
 ### Deprecations
 
-The following API response fields are no longer populated by the server and will be removed in **0.22**:
+The following API response fields are no longer populated by the server and will be removed in a future release:
 
 - `Resources.description`
 - `Gateway.backend`
@@ -61,13 +81,6 @@ The following API response fields are no longer populated by the server and will
 > For more details on the changes, see the [release notes](https://github.com/dstackai/dstack/releases).
 
 ## 0.20.* { #0_20 }
-
-### CLI compatibility
-
-- CLI versions `0.19.*` and earlier remain backward compatible with the `0.20.*` `dstack` server.
-- CLI versions `0.20.` are not compatible with server versions prior to `0.20.*`.
-
-> Do not upgrade the CLI to `0.20.*` until the server has been upgraded.
 
 ### Fleets
 

@@ -9,6 +9,7 @@ import { ROUTES } from 'routes';
 import { useGetUserQuery } from 'services/user';
 
 import { EventList } from 'pages/Events/List';
+import { getEventsOrderSearchParams } from 'pages/Events/List/hooks/useEventsOrder';
 
 export const Events: React.FC = () => {
     const { t } = useTranslation();
@@ -33,8 +34,12 @@ export const Events: React.FC = () => {
         },
     ]);
 
-    const goToEventsPage = () => {
-        navigate(ROUTES.EVENTS.LIST + `?${filterParamName}=${data?.id}`);
+    const goToEventsPage = (ascending: boolean) => {
+        const searchParams = new URLSearchParams({
+            [filterParamName]: data?.id ?? '',
+            ...getEventsOrderSearchParams(ascending),
+        });
+        navigate(`${ROUTES.EVENTS.LIST}?${searchParams}`);
     };
 
     if (isLoading || !data)
@@ -46,7 +51,7 @@ export const Events: React.FC = () => {
 
     return (
         <EventList
-            renderHeader={() => {
+            renderHeader={({ ascending }) => {
                 return (
                     <Header
                         variant="awsui-h1-sticky"
@@ -60,7 +65,7 @@ export const Events: React.FC = () => {
                                         { text: 'Target user', id: 'target_users' },
                                     ]}
                                 />
-                                <Button onClick={goToEventsPage}>{t('common.full_view')}</Button>
+                                <Button onClick={() => goToEventsPage(ascending)}>{t('common.full_view')}</Button>
                             </SpaceBetween>
                         }
                     />

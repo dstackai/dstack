@@ -1,40 +1,28 @@
 import { useMemo } from 'react';
 
-import { useGetOnlyNoFleetsProjectsQuery, useGetProjectsQuery } from 'services/project';
+import { useGetOnlyNoFleetsProjectsQuery } from 'services/project';
 
-type Args = { projectNames?: IProject['project_name'][] };
+type Args = { projectNames: IProject['project_name'][] };
 
 export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
-    const { data: projectsData } = useGetProjectsQuery(
-        {},
-        {
-            skip: !!projectNames?.length,
-        },
-    );
-
     const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery();
-
-    const projectNameForChecking = useMemo<IProject['project_name'][]>(() => {
-        if (projectNames) {
-            return projectNames;
-        }
-
-        if (projectsData?.data) {
-            return projectsData.data.map((project) => project.project_name);
-        }
-
-        return [];
-    }, [projectNames, projectsData]);
 
     const projectHavingFleetMap = useMemo<Record<IProject['project_name'], boolean>>(() => {
         const map: Record<IProject['project_name'], boolean> = {};
 
-        projectNameForChecking.forEach((projectName) => {
+        projectNames.forEach((projectName) => {
             map[projectName] = !noFleetsProjectsData?.some((i) => i.project_name === projectName);
         });
 
         return map;
-    }, [projectNameForChecking, noFleetsProjectsData]);
+    }, [projectNames, noFleetsProjectsData]);
 
     return projectHavingFleetMap;
+};
+
+export const useNewestProjectWithoutFleets = (): IProject['project_name'] | undefined => {
+    const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery();
+
+    // The endpoint sorts projects by ascending creation time
+    return noFleetsProjectsData?.[noFleetsProjectsData.length - 1]?.project_name;
 };

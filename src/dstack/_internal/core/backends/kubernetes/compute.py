@@ -8,11 +8,11 @@ from contextlib import ExitStack
 from decimal import Decimal
 from enum import Enum
 from functools import partial
-from typing import List, Optional
+from typing import List, Optional, Self
+from uuid import UUID
 
 from gpuhunt import AcceleratorVendor
 from kubernetes import client
-from typing_extensions import Self
 
 from dstack._internal.core.backends.base.authorized_keys import (
     build_authorized_keys,
@@ -26,32 +26,44 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithResourceListingSupport,
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
     generate_unique_name,
     generate_unique_volume_name,
     get_docker_commands,
-    get_dstack_gateway_commands,
+    get_dstack_gateway_install_command,
+    get_job_provider_ref,
     merge_tags,
 )
 from dstack._internal.core.backends.base.offers import (
+    BaseSkipOfferCache,
     OfferModifier,
-    RegionalSkipOfferCache,
     gpu_matches_gpu_spec,
 )
 from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCEPTIONS
-from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
+from dstack._internal.core.backends.kubernetes.features import resource_groups
+from dstack._internal.core.backends.kubernetes.models import (
+    JUMP_POD_DEFAULT_CPU,
+    JUMP_POD_DEFAULT_MEMORY,
+    KubernetesConfig,
+)
 from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_DEVICE_ID_LABEL_PREFIX,
     AMD_GPU_NAME_TO_DEVICE_IDS,
     AMD_GPU_NODE_TAINT,
+    AMD_GPU_RESOURCE,
+    INSTANCE_LABEL,
     LABEL_VALUE_MAX_LENGTH,
     NVIDIA_GPU_NODE_TAINT,
     NVIDIA_GPU_PRODUCT_LABEL,
+    NVIDIA_GPU_RESOURCE,
     OBJECT_NAME_MAX_LENGTH,
-    AnyKubernetesGPUResource,
+    KubernetesOfferBackendData,
     KubernetesResource,
+    KubernetesResources,
+    Operator,
     PodPhase,
     ResourceLimits,
     ResourceRequests,
@@ -59,17 +71,24 @@ from dstack._internal.core.backends.kubernetes.resources import (
     adjust_resources_by_resource_requests,
     build_base_labels,
     build_dockerconfigjson,
+    delete_job_pod_objects,
     filter_invalid_labels,
     format_memory,
     get_amd_gpu_from_node_labels,
+    get_gpu_resource_from_kubernetes_map,
     get_instance_offer_from_node,
     get_instance_offers,
-    get_node_labels,
-    get_node_name,
     get_nvidia_gpu_from_node_labels,
+    get_object_labels,
+    get_object_name,
+    get_pod_service_name,
+    get_registry_auth_secret_name,
     is_hard_taint,
+    is_nvidia_mig_product,
     is_taint_tolerated,
+    parse_node_selector_requirement,
     parse_quantity,
+    parse_toleration,
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     LEGACY_CURRENT_CONTEXT_REGION,
@@ -82,12 +101,17 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.orphans import (
+    ListedResourceGroup,
+    ResourceListing,
+)
 from dstack._internal.core.models.common import CoreModel, validate_json_extra_ignore
 from dstack._internal.core.models.gateways import (
     GatewayReplicaConfiguration,
     GatewayReplicaProvisioningData,
 )
 from dstack._internal.core.models.instances import (
+    InstanceOffer,
     InstanceOfferWithAvailability,
     SSHConnectionParams,
 )
@@ -116,13 +140,23 @@ logger = get_logger(__name__)
 JUMP_POD_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
 JUMP_POD_SSH_PORT = 22
 JUMP_POD_USER = "root"
+# Under disk pressure, the kubelet first evicts pods whose disk usage exceeds their
+# ephemeral-storage request. Covers the writable layer and the logs with the default log
+# rotation (5 x 10Mi).
+JUMP_POD_EPHEMERAL_STORAGE_REQUEST = "64Mi"
 
 JOB_POD_SCHEDULING_TIMEOUT = 10
 
 
-class Operator(str, Enum):
-    EXISTS = "Exists"
-    IN = "In"
+class RestartPolicy(str, Enum):
+    """
+    This policy determines how Kubernetes reacts to containers exiting due to errors
+    or other reasons. The default value is `Always`.
+    """
+
+    ALWAYS = "Always"
+    ON_FAILURE = "OnFailure"
+    NEVER = "Never"
 
 
 class KubernetesBackendData(CoreModel):
@@ -150,6 +184,7 @@ class KubernetesCompute(
     ComputeWithVolumeSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
+    ComputeWithResourceListingSupport,
     Compute,
 ):
     unallocated_resources_argument_has_effect = True
@@ -157,7 +192,7 @@ class KubernetesCompute(
     def __init__(self, config: KubernetesConfig):
         super().__init__()
         self.region_cluster_map = {c.region: c for c in get_clusters_from_backend_config(config)}
-        self.skip_offer_cache = RegionalSkipOfferCache(ttl=60)
+        self.skip_offer_cache = _KubernetesSkipOfferCache(ttl=60)
 
     def get_all_offers_with_availability(
         self, unallocated_resources: bool
@@ -191,7 +226,8 @@ class KubernetesCompute(
         if full_offers:
             return []
         resource_requests = ResourceRequests.from_resources_spec(requirements.resources)
-        return [partial(_offer_modifier, resource_requests)]
+        mig_allowed = _is_mig_allowed(requirements.resources.gpu)
+        return [partial(_offer_modifier, resource_requests, mig_allowed)]
 
     def run_job(
         self,
@@ -224,15 +260,20 @@ class KubernetesCompute(
         # to all job pods of the same project.
         # The service is created here and configured later in update_provisioning_data()
         jump_pod_name = f"dstack-{run.project_name}-ssh-jump-pod"
-        jump_pod_service_name = _get_pod_service_name(jump_pod_name)
+        jump_pod_service_name = get_pod_service_name(jump_pod_name)
         _create_jump_pod_service_if_not_exists(
             api=api,
+            apps_api=client.AppsV1Api(cluster.api_client),
             namespace=namespace,
             project_name=run.project_name,
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=cluster.proxy_jump.port,
             authorized_keys=project_authorized_keys,
+            cpu_request_limit=cluster.proxy_jump.cpu or JUMP_POD_DEFAULT_CPU,
+            memory_request_limit=cluster.proxy_jump.memory or JUMP_POD_DEFAULT_MEMORY,
+            node_selector=cluster.proxy_jump.node_selector,
+            tolerations=cluster.proxy_jump.tolerations,
         )
 
         pod_name = generate_unique_instance_name_for_job(
@@ -245,6 +286,7 @@ class KubernetesCompute(
             project=run.project_name,
             name=job.job_spec.job_name,
             user=run.user,
+            provider_ref=get_job_provider_ref(job),
         )
         labels = merge_tags(
             base_tags=base_labels,
@@ -255,7 +297,7 @@ class KubernetesCompute(
         registry_auth_secret_name: Optional[str] = None
         with ExitStack() as exit_stack:
             if job.job_spec.registry_auth is not None:
-                registry_auth_secret_name = _get_registry_auth_secret_name(pod_name)
+                registry_auth_secret_name = get_registry_auth_secret_name(pod_name)
                 _create_registry_auth_secret(
                     api=api,
                     namespace=namespace,
@@ -284,6 +326,9 @@ class KubernetesCompute(
                 job_spec=job.job_spec,
                 volumes=volumes,
                 requirements=requirements,
+                mig_resource=KubernetesOfferBackendData.load(
+                    instance_offer.backend_data
+                ).mig_resource,
                 authorized_keys=authorized_keys,
             )
             exit_stack.callback(
@@ -315,7 +360,7 @@ class KubernetesCompute(
                 # It's not clear if we should add an entry to the SkipOfferCache in this case.
                 raise ComputeError(f"Pod {pod_name} already finished: {pod_phase}")
 
-            pod_service_name = _get_pod_service_name(pod_name)
+            pod_service_name = get_pod_service_name(pod_name)
             api.create_namespaced_service(
                 namespace=namespace,
                 body=client.V1Service(
@@ -420,23 +465,26 @@ class KubernetesCompute(
             return
         provisioning_data.internal_ip = pod_ip
         service = api.read_namespaced_service(
-            name=_get_pod_service_name(provisioning_data.instance_id),
+            name=get_pod_service_name(provisioning_data.instance_id),
             namespace=namespace,
         )
         service_spec = get_or_error(service.spec)
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
         pod_spec = get_or_error(pod.spec)
         node = api.read_node(name=get_or_error(pod_spec.node_name))
+        resource_requirements = get_or_error(pod_spec.containers[0].resources)
+        requests_map = resource_requirements.requests or {}
         # TODO: Set provisioning_data.gpu_driver from the node labels:
         # nvidia.com/cuda.driver-version.full set by GPU Feature Discovery
         # (or nvidia.com/cuda.driver.{major,minor,rev} set by older GFD versions),
         # amd.com/gpu.driver-version set by the AMD GPU Operator.
-        instance_offer = get_instance_offer_from_node(node=node, region=cluster.region)
+        instance_offer = get_instance_offer_from_node(
+            node=node,
+            region=cluster.region,
+            gpu_resource=get_gpu_resource_from_kubernetes_map(requests_map),
+        )
         if instance_offer is not None:
-            resource_requirements = get_or_error(pod_spec.containers[0].resources)
-            resource_requests = ResourceRequests.from_kubernetes_map(
-                resource_requirements.requests or {}
-            )
+            resource_requests = ResourceRequests.from_kubernetes_map(requests_map)
             adjust_resources_by_resource_requests(
                 instance_offer.instance.resources, resource_requests, force=True
             )
@@ -463,30 +511,17 @@ class KubernetesCompute(
                 )
         if cluster is None:
             raise ComputeError(f"Unknown region: {region!r}")
-        api = client.CoreV1Api(cluster.api_client)
-        namespace = cluster.namespace
-        deleted = [
-            try_delete_object_if_exists(
-                api.delete_namespaced_service,
-                namespace=namespace,
-                name=_get_pod_service_name(instance_id),
-                description="pod service",
-            ),
-            try_delete_object_if_exists(
-                api.delete_namespaced_pod,
-                namespace=namespace,
-                name=instance_id,
-                description="pod",
-            ),
-            try_delete_object_if_exists(
-                api.delete_namespaced_secret,
-                namespace=namespace,
-                name=_get_registry_auth_secret_name(instance_id),
-                description="registry auth secret",
-            ),
-        ]
-        if not all(deleted):
-            raise ComputeError("Not all objects were deleted, check logs")
+        delete_job_pod_objects(
+            api=client.CoreV1Api(cluster.api_client),
+            namespace=cluster.namespace,
+            pod_name=instance_id,
+        )
+
+    def list_resource_groups(self) -> ResourceListing:
+        return resource_groups.list_resource_groups(list(self.region_cluster_map.values()))
+
+    def delete_resource_group(self, group: ListedResourceGroup) -> None:
+        resource_groups.delete_resource_group(self.region_cluster_map, group)
 
     def create_gateway_replica(
         self,
@@ -557,7 +592,8 @@ class KubernetesCompute(
                             run_as_group=0,
                         ),
                     )
-                ]
+                ],
+                restart_policy=RestartPolicy.ALWAYS,
             ),
         )
         api.create_namespaced_pod(
@@ -566,7 +602,7 @@ class KubernetesCompute(
         )
         service = client.V1Service(
             metadata=client.V1ObjectMeta(
-                name=_get_pod_service_name(instance_name),
+                name=get_pod_service_name(instance_name),
                 labels=labels,
             ),
             spec=client.V1ServiceSpec(
@@ -599,7 +635,7 @@ class KubernetesCompute(
         address = _wait_for_load_balancer_address(
             api=api,
             namespace=namespace,
-            service_name=_get_pod_service_name(instance_name),
+            service_name=get_pod_service_name(instance_name),
         )
         if address is None:
             self.terminate_instance(instance_name, region=configuration.region)
@@ -771,29 +807,45 @@ class KubernetesCompute(
 
 
 def _get_pod_spec_parameters_for_gpu(
-    api: client.CoreV1Api, gpu_spec: GPUSpec
-) -> tuple[AnyKubernetesGPUResource, client.V1NodeAffinity, str]:
+    api: client.CoreV1Api, gpu_spec: GPUSpec, mig_resource: Optional[str]
+) -> tuple[str, client.V1NodeAffinity, str]:
+    """
+    Returns the GPU resource to request, the node affinity, and the node taint to tolerate.
+
+    Args:
+        mig_resource: The `mixed` strategy MIG resource of the offer, if any. If set, it is
+            requested instead of `nvidia.com/gpu`.
+    """
     nodes = api.list_node().items
     gpu_vendor = gpu_spec.vendor
     # If no vendor specified, we assume it's NVIDIA. Technically, it's possible to request either
     # NVIDIA or AMD in the run configuration using only GPU names (e.g.,`gpu: H100,MI300X:8`),
     # but we ignore such configurations as it's hard to translate them to K8s request.
     if gpu_vendor is None or gpu_vendor == AcceleratorVendor.NVIDIA:
-        node_affinity = _get_nvidia_gpu_node_affinity(gpu_spec, nodes)
-        return KubernetesResource.NVIDIA_GPU, node_affinity, NVIDIA_GPU_NODE_TAINT
+        node_affinity = _get_nvidia_gpu_node_affinity(gpu_spec, nodes, mig_resource)
+        gpu_resource = mig_resource if mig_resource is not None else NVIDIA_GPU_RESOURCE
+        return gpu_resource, node_affinity, NVIDIA_GPU_NODE_TAINT
     if gpu_vendor == AcceleratorVendor.AMD:
         node_affinity = _get_amd_gpu_node_affinity(gpu_spec, nodes)
-        return KubernetesResource.AMD_GPU, node_affinity, AMD_GPU_NODE_TAINT
+        return AMD_GPU_RESOURCE, node_affinity, AMD_GPU_NODE_TAINT
     raise ComputeError(f"Unsupported GPU vendor: {gpu_vendor}")
 
 
 def _get_nvidia_gpu_node_affinity(
-    gpu_spec: GPUSpec, nodes: list[client.V1Node]
+    gpu_spec: GPUSpec, nodes: list[client.V1Node], mig_resource: Optional[str]
 ) -> client.V1NodeAffinity:
+    mig_allowed = _is_mig_allowed(gpu_spec)
     matching_gpu_label_values: set[str] = set()
     for node in nodes:
-        labels = get_node_labels(node)
-        gpu = get_nvidia_gpu_from_node_labels(labels)
+        labels = get_object_labels(node)
+        if mig_resource is None:
+            # `single` strategy MIG slices are also `nvidia.com/gpu`
+            if is_nvidia_mig_product(labels) and not mig_allowed:
+                continue
+        elif not _node_has_allocatable_resource(node, mig_resource):
+            continue
+        # With the `mixed` strategy, the product label is the parent GPU's product name
+        gpu = get_nvidia_gpu_from_node_labels(labels, mig_resource)
         if gpu is not None and gpu_matches_gpu_spec(gpu, gpu_spec):
             matching_gpu_label_values.add(labels[NVIDIA_GPU_PRODUCT_LABEL])
     if not matching_gpu_label_values:
@@ -825,7 +877,7 @@ def _get_amd_gpu_node_affinity(
 ) -> client.V1NodeAffinity:
     matching_device_ids: set[int] = set()
     for node in nodes:
-        labels = get_node_labels(node)
+        labels = get_object_labels(node)
         gpu = get_amd_gpu_from_node_labels(labels)
         if gpu is not None and gpu_matches_gpu_spec(gpu, gpu_spec):
             matching_device_ids.update(AMD_GPU_NAME_TO_DEVICE_IDS[gpu.name])
@@ -847,21 +899,59 @@ def _get_amd_gpu_node_affinity(
 
 
 def _offer_modifier(
-    resource_requests: ResourceRequests, offer: InstanceOfferWithAvailability
-) -> InstanceOfferWithAvailability:
+    resource_requests: ResourceRequests, mig_allowed: bool, offer: InstanceOfferWithAvailability
+) -> Optional[InstanceOfferWithAvailability]:
+    backend_data = KubernetesOfferBackendData.load(offer.backend_data)
+    if resource_requests.gpu == 0 and backend_data.mig_resource is not None:
+        # Without GPUs, a `mixed` strategy MIG offer is a duplicate of the node's main offer
+        return None
+    if resource_requests.gpu > 0 and backend_data.mig and not mig_allowed:
+        return None
     offer_copy = offer.model_copy(deep=True)
     adjust_resources_by_resource_requests(offer_copy.instance.resources, resource_requests)
     return offer_copy
 
 
+def _is_mig_allowed(gpu_spec: Optional[GPUSpec]) -> bool:
+    """
+    Returns whether a run may get MIG slices: only if it caps GPU memory, e.g., `A100:10GB` or
+    `..20GB`, so that, e.g., `A100` or `24GB..` only get whole GPUs.
+    """
+    return gpu_spec is not None and gpu_spec.memory is not None and gpu_spec.memory.max is not None
+
+
+def _node_has_allocatable_resource(node: client.V1Node, resource: str) -> bool:
+    if node.status is None or node.status.allocatable is None:
+        return False
+    return KubernetesResources.from_kubernetes_map(node.status.allocatable)[resource] > 0
+
+
+class _KubernetesSkipOfferCache(BaseSkipOfferCache[tuple[UUID, str, Optional[str]]]):
+    """
+    Like `RegionalSkipOfferCache`, but also keys `mixed` strategy MIG offers by their MIG resource:
+    their pods request only that resource, while other pods can use any matching GPU in the region.
+    """
+
+    def _build_key(
+        self, run: Run, job: Job, offer: InstanceOffer
+    ) -> tuple[UUID, str, Optional[str]]:
+        mig_resource = KubernetesOfferBackendData.load(offer.backend_data).mig_resource
+        return (run.id, offer.region, mig_resource)
+
+
 def _create_jump_pod_service_if_not_exists(
     api: client.CoreV1Api,
+    apps_api: client.AppsV1Api,
     namespace: str,
     project_name: str,
     jump_pod_name: str,
     jump_pod_service_name: str,
     jump_pod_port: Optional[int],
     authorized_keys: list[str],
+    cpu_request_limit: str,
+    memory_request_limit: str,
+    node_selector: Optional[list[str]],
+    tolerations: Optional[list[str]],
 ) -> None:
     base_labels = build_base_labels(
         component="ssh-proxy",
@@ -870,8 +960,9 @@ def _create_jump_pod_service_if_not_exists(
     )
     labels = filter_invalid_labels(base_labels)
 
-    service: Optional[client.V1Service] = None
     pod: Optional[client.V1Pod] = None
+    replica_set: Optional[client.V1ReplicaSet] = None
+    service: Optional[client.V1Service] = None
     _namespace = call_api_method(
         api.read_namespace,
         expected=404,
@@ -883,115 +974,164 @@ def _create_jump_pod_service_if_not_exists(
                 name=namespace,
             ),
         )
-        api.create_namespace(body=_namespace)
-    else:
-        service = call_api_method(
-            api.read_namespaced_service,
-            expected=404,
-            name=jump_pod_service_name,
-            namespace=namespace,
+        # 409 if created concurrently, e.g., by run_job() of another job.
+        call_api_method(
+            api.create_namespace,
+            expected=409,
+            body=_namespace,
         )
+    else:
         pod = call_api_method(
             api.read_namespaced_pod,
             expected=404,
             name=jump_pod_name,
             namespace=namespace,
         )
-
-    # The service may exist without the pod if the node on which the jump pod was running
-    # has been deleted.
-    if service is not None and pod is not None:
-        return
-
-    call_api_method(
-        api.delete_namespaced_pod,
-        expected=404,
-        namespace=namespace,
-        name=jump_pod_name,
-    )
-    # False if we found at least one node without any "hard" taint, that is, if we don't need to
-    # specify the toleration.
-    toleration_required = True
-    # (key, effect) pairs.
-    tolerated_taints: set[tuple[str, str]] = set()
-    for node in api.list_node().items:
-        if (node_spec := node.spec) is None:
-            continue
-        # True if the node has at least one NoExecute or NoSchedule taint.
-        has_hard_taint = False
-        taints = node_spec.taints or []
-        for taint in taints:
-            # A "soft" taint, ignore.
-            if not is_hard_taint(taint):
-                continue
-            has_hard_taint = True
-            if is_taint_tolerated(taint):
-                tolerated_taints.add((taint.key, taint.effect))
-        if not has_hard_taint:
-            toleration_required = False
-            break
-    tolerations: list[client.V1Toleration] = []
-    if toleration_required:
-        for key, effect in tolerated_taints:
-            tolerations.append(
-                client.V1Toleration(key=key, operator=Operator.EXISTS, effect=effect)
-            )
-        if not tolerations:
-            logger.warning("No appropriate node found, the jump pod may never be scheduled")
-    commands = _get_jump_pod_commands(authorized_keys)
-    pod = client.V1Pod(
-        metadata=client.V1ObjectMeta(
+        replica_set = call_api_method(
+            apps_api.read_namespaced_replica_set,
+            expected=404,
             name=jump_pod_name,
-            labels=labels,
-        ),
-        spec=client.V1PodSpec(
-            containers=[
-                client.V1Container(
-                    name=f"{jump_pod_name}-container",
-                    image=JUMP_POD_IMAGE,
-                    command=["/bin/sh"],
-                    args=["-c", " && ".join(commands)],
-                    ports=[
-                        client.V1ContainerPort(
-                            container_port=JUMP_POD_SSH_PORT,
-                        )
-                    ],
-                )
-            ],
-            tolerations=tolerations,
-        ),
-    )
-    api.create_namespaced_pod(
-        namespace=namespace,
-        body=pod,
-    )
-    call_api_method(
-        api.delete_namespaced_service,
-        expected=404,
-        namespace=namespace,
-        name=jump_pod_service_name,
-    )
-    service = client.V1Service(
-        metadata=client.V1ObjectMeta(
+            namespace=namespace,
+        )
+        service = call_api_method(
+            api.read_namespaced_service,
+            expected=404,
             name=jump_pod_service_name,
-            labels=labels,
-        ),
-        spec=client.V1ServiceSpec(
-            type="NodePort",
-            selector=_build_service_selector_from_labels(base_labels),
-            ports=[
-                client.V1ServicePort(
-                    port=JUMP_POD_SSH_PORT,
-                    target_port=JUMP_POD_SSH_PORT,
-                    node_port=jump_pod_port,
-                )
-            ],
-        ),
-    )
-    api.create_namespaced_service(
-        namespace=namespace,
-        body=service,
-    )
+            namespace=namespace,
+        )
+
+    should_create_replica_set = replica_set is None
+    service_selector = _build_service_selector_from_labels(base_labels)
+    if pod is not None:
+        # A legacy pod created before the ReplicaSet setup was introduced.
+        pod_phase = PodPhase(get_or_error(get_or_error(pod.status).phase))
+        if pod_phase.is_finished():
+            # Most probably evicted -- e.g., due to node pressure. Do cleanup.
+            call_api_method(
+                api.delete_namespaced_pod,
+                expected=404,
+                namespace=namespace,
+                name=jump_pod_name,
+            )
+        elif get_object_labels(pod).get("app.kubernetes.io/managed-by") != "dstack":
+            # A legacy pod created before https://github.com/dstackai/dstack/pull/3891
+            # It uses different labels -- we don't create a ReplicaSet for it to avoid propagating
+            # the old label schema indefinitely but still recreate the service if it's gone using
+            # the old selector.
+            should_create_replica_set = False
+            service_selector = {"app.kubernetes.io/name": jump_pod_name}
+        # Otherwise, the existing legacy pod will be adopted by a newly created ReplicaSet.
+
+    if should_create_replica_set:
+        affinity: Optional[client.V1Affinity] = None
+        # Not for an empty `node_selector`, as an empty node selector term matches no nodes
+        if node_selector:
+            affinity = _get_jump_pod_affinity(node_selector)
+        pod_tolerations: list[client.V1Toleration]
+        if tolerations is not None:
+            pod_tolerations = [parse_toleration(toleration) for toleration in tolerations]
+        elif node_selector is not None:
+            # Autodetection considers all nodes, not only the selected ones, so the user
+            # specifies tolerations for the selected nodes, if any are needed.
+            pod_tolerations = []
+        else:
+            pod_tolerations = _get_jump_pod_tolerations_from_node_taints(api)
+        commands = _get_jump_pod_commands(authorized_keys)
+        # Equal CPU and memory requests and limits for the Guaranteed QoS class
+        limits = {
+            KubernetesResource.CPU.value: cpu_request_limit,
+            KubernetesResource.MEMORY.value: memory_request_limit,
+        }
+        requests = {
+            **limits,
+            # No limit, as exceeding it gets the pod evicted
+            KubernetesResource.EPHEMERAL_STORAGE.value: JUMP_POD_EPHEMERAL_STORAGE_REQUEST,
+        }
+        replica_set = client.V1ReplicaSet(
+            metadata=client.V1ObjectMeta(
+                name=jump_pod_name,
+                labels=labels,
+            ),
+            spec=client.V1ReplicaSetSpec(
+                replicas=1,
+                selector=_build_label_selector_from_labels(base_labels),
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(
+                        labels=labels,
+                    ),
+                    spec=client.V1PodSpec(
+                        containers=[
+                            client.V1Container(
+                                name=f"{jump_pod_name}-container",
+                                image=JUMP_POD_IMAGE,
+                                command=["/bin/sh"],
+                                args=["-c", " && ".join(commands)],
+                                ports=[
+                                    client.V1ContainerPort(
+                                        container_port=JUMP_POD_SSH_PORT,
+                                    )
+                                ],
+                                resources=client.V1ResourceRequirements(
+                                    requests=requests,
+                                    limits=limits,
+                                ),
+                            )
+                        ],
+                        restart_policy=RestartPolicy.ALWAYS,
+                        affinity=affinity,
+                        tolerations=pod_tolerations,
+                    ),
+                ),
+            ),
+        )
+        call_api_method(
+            apps_api.create_namespaced_replica_set,
+            expected=409,
+            namespace=namespace,
+            body=replica_set,
+        )
+
+    node_port = jump_pod_port
+    if service is not None:
+        service_spec = get_or_error(service.spec)
+        if service_spec.selector != service_selector:
+            # A service created before https://github.com/dstackai/dstack/pull/3891 selects pods
+            # by the old labels, which the ReplicaSet pods lack. Recreate it with the same NodePort
+            # so that ssh_proxy of running jobs stays valid.
+            if service_spec.ports:
+                node_port = service_spec.ports[0].node_port
+            call_api_method(
+                api.delete_namespaced_service,
+                expected=404,
+                namespace=namespace,
+                name=jump_pod_service_name,
+            )
+            service = None
+
+    if service is None:
+        service = client.V1Service(
+            metadata=client.V1ObjectMeta(
+                name=jump_pod_service_name,
+                labels=labels,
+            ),
+            spec=client.V1ServiceSpec(
+                type="NodePort",
+                selector=service_selector,
+                ports=[
+                    client.V1ServicePort(
+                        port=JUMP_POD_SSH_PORT,
+                        target_port=JUMP_POD_SSH_PORT,
+                        node_port=node_port,
+                    )
+                ],
+            ),
+        )
+        call_api_method(
+            api.create_namespaced_service,
+            expected=409,
+            namespace=namespace,
+            body=service,
+        )
 
 
 def _check_and_configure_jump_pod_service(
@@ -1003,15 +1143,44 @@ def _check_and_configure_jump_pod_service(
     project_ssh_private_key: str,
     authorized_keys: list[str],
 ) -> Optional[SSHConnectionParams]:
-    jump_pod = api.read_namespaced_pod(
+    # Matches ReplicaSet pods and a legacy pod named `jump_pod_name`, whether adopted by the
+    # ReplicaSet or not.
+    jump_pods = api.list_namespaced_pod(
         namespace=namespace,
-        name=jump_pod_name,
-    )
-    jump_pod_phase = PodPhase(get_or_error(get_or_error(jump_pod.status).phase))
-    if jump_pod_phase.is_finished():
-        raise ProvisioningError(f"Jump pod {jump_pod_name} is unexpectedly finished")
-    if not jump_pod_phase.is_running():
-        logger.debug("Jump pod %s is not running yet", jump_pod_name)
+        label_selector=_build_query_label_selector_from_unique_name(jump_pod_name),
+    ).items
+    if not jump_pods:
+        # A legacy pod created before https://github.com/dstackai/dstack/pull/3891 lacks the label.
+        legacy_jump_pod = call_api_method(
+            api.read_namespaced_pod,
+            expected=404,
+            namespace=namespace,
+            name=jump_pod_name,
+        )
+        if legacy_jump_pod is not None:
+            # It's never adopted by the ReplicaSet and thus never replaced, no point in waiting.
+            jump_pod_phase = PodPhase(get_or_error(get_or_error(legacy_jump_pod.status).phase))
+            if jump_pod_phase.is_finished():
+                raise ProvisioningError(f"Jump pod {jump_pod_name} is unexpectedly finished")
+            jump_pods = [legacy_jump_pod]
+    # No pods at all is not an error -- the ReplicaSet may not have created a pod yet.
+    for jump_pod in jump_pods:
+        if _is_pod_ready(jump_pod):
+            break
+    else:
+        for jump_pod in jump_pods:
+            # E.g., no node has enough free resources or all nodes have untolerated taints.
+            # Provisioning waits for the jump pod, so without this warning, the only symptom is
+            # runs hitting the provisioning timeout.
+            condition = _get_pod_unscheduled_condition(jump_pod)
+            if condition is not None:
+                logger.warning(
+                    "Jump pod %s cannot be scheduled: %s: %s",
+                    get_object_name(jump_pod),
+                    condition.reason,
+                    condition.message,
+                )
+        logger.debug("Jump pod %s is not ready yet", jump_pod_name)
         return None
 
     if jump_pod_hostname is None:
@@ -1024,7 +1193,7 @@ def _check_and_configure_jump_pod_service(
                 if node_address.type == "ExternalIP"
             ]
             if node_external_ips:
-                if get_node_name(node) == jump_pod_node_name:
+                if get_object_name(node) == jump_pod_node_name:
                     jump_pod_hostname = node_external_ips[0]
                     break
                 cluster_external_ips.extend(node_external_ips)
@@ -1100,6 +1269,60 @@ def _check_and_configure_jump_pod_service(
     )
 
 
+def _get_jump_pod_affinity(node_selector: list[str]) -> client.V1Affinity:
+    # A nodeSelector cannot express `Exists`. A single node affinity term matches like
+    # a nodeSelector: a node must meet all requirements.
+    return client.V1Affinity(
+        node_affinity=client.V1NodeAffinity(
+            required_during_scheduling_ignored_during_execution=client.V1NodeSelector(
+                node_selector_terms=[
+                    client.V1NodeSelectorTerm(
+                        match_expressions=[
+                            parse_node_selector_requirement(requirement)
+                            for requirement in node_selector
+                        ],
+                    ),
+                ],
+            ),
+        ),
+    )
+
+
+def _get_jump_pod_tolerations_from_node_taints(
+    api: client.CoreV1Api,
+) -> list[client.V1Toleration]:
+    # False if we found at least one node without any "hard" taint, that is, if we don't need
+    # to specify the toleration.
+    toleration_required = True
+    # (key, effect) pairs.
+    tolerated_taints: set[tuple[str, str]] = set()
+    for node in api.list_node().items:
+        if (node_spec := node.spec) is None:
+            continue
+        # True if the node has at least one NoExecute or NoSchedule taint.
+        has_hard_taint = False
+        taints = node_spec.taints or []
+        for taint in taints:
+            # A "soft" taint, ignore.
+            if not is_hard_taint(taint):
+                continue
+            has_hard_taint = True
+            if is_taint_tolerated(taint):
+                tolerated_taints.add((taint.key, taint.effect))
+        if not has_hard_taint:
+            toleration_required = False
+            break
+    tolerations: list[client.V1Toleration] = []
+    if toleration_required:
+        for key, effect in tolerated_taints:
+            tolerations.append(
+                client.V1Toleration(key=key, operator=Operator.EXISTS, effect=effect)
+            )
+        if not tolerations:
+            logger.warning("No appropriate node found, the jump pod may never be scheduled")
+    return tolerations
+
+
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys)
     commands = [
@@ -1159,6 +1382,7 @@ def _create_job_pod(
     job_spec: JobSpec,
     volumes: list[Volume],
     requirements: Requirements,
+    mig_resource: Optional[str],
     authorized_keys: list[str],
 ) -> None:
     node_affinity: Optional[client.V1NodeAffinity] = None
@@ -1170,11 +1394,13 @@ def _create_job_pod(
     resources_spec = requirements.resources
     resource_requests = ResourceRequests.from_resources_spec(resources_spec)
     resource_limits = ResourceLimits.from_resources_spec(resources_spec)
-    gpu_resource: Optional[AnyKubernetesGPUResource] = None
+    gpu_resource: Optional[str] = None
     if resource_requests.gpu > 0:
         gpu_spec = resources_spec.gpu
         assert gpu_spec is not None
-        gpu_resource, node_affinity, node_taint = _get_pod_spec_parameters_for_gpu(api, gpu_spec)
+        gpu_resource, node_affinity, node_taint = _get_pod_spec_parameters_for_gpu(
+            api, gpu_spec, mig_resource
+        )
         logger.debug("Requesting GPU resource: %s=%d", gpu_resource, resource_requests.gpu)
         # It should be NoSchedule, but we also add NoExecute toleration just in case.
         for effect in [TaintEffect.NO_SCHEDULE, TaintEffect.NO_EXECUTE]:
@@ -1299,6 +1525,7 @@ def _create_job_pod(
                     env=env_vars,
                 )
             ],
+            restart_policy=RestartPolicy.NEVER,
             image_pull_secrets=(
                 [client.V1LocalObjectReference(name=registry_auth_secret_name)]
                 if registry_auth_secret_name is not None
@@ -1365,11 +1592,28 @@ def _get_unscheduled_pod_reason_message(
         name=pod_name,
         namespace=namespace,
     )
-    if pod is not None and pod.status is not None and pod.status.conditions:
-        for cond in pod.status.conditions:
-            if cond.type == "PodScheduled" and cond.status == "False":
-                return cond.reason, cond.message
+    if pod is not None and (condition := _get_pod_unscheduled_condition(pod)) is not None:
+        return condition.reason, condition.message
     return None, None
+
+
+def _get_pod_unscheduled_condition(pod: client.V1Pod) -> Optional[client.V1PodCondition]:
+    if pod.status is None:
+        return None
+    for condition in pod.status.conditions or []:
+        if condition.type == "PodScheduled" and condition.status == "False":
+            return condition
+    return None
+
+
+def _is_pod_ready(pod: client.V1Pod) -> bool:
+    if pod.metadata is None:
+        return False
+    if pod.metadata.deletion_timestamp is not None:
+        return False
+    if pod.status is None:
+        return False
+    return any(c.type == "Ready" and c.status == "True" for c in (pod.status.conditions or []))
 
 
 def _wait_for_load_balancer_address(
@@ -1409,8 +1653,6 @@ def _wait_for_load_balancer_address(
 
 def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
-    gateway_commands = " && ".join(get_dstack_gateway_commands())
-    quoted_gateway_commands = shlex.quote(gateway_commands)
 
     commands = [
         # install packages
@@ -1437,7 +1679,7 @@ def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
         # install gateway
-        f"su ubuntu -c {quoted_gateway_commands}",
+        f"su ubuntu -c {shlex.quote(get_dstack_gateway_install_command())}",
         # start docker-systemctl-replacement as an init replacement (PID 1), which
         # - starts and supervises enabled services (sshd, nginx, dstack.gateway)
         # - stops running services on SIGTERM (graceful shutdown)
@@ -1479,13 +1721,13 @@ def _run_ssh_command(
 
 
 def _build_service_selector_from_labels(labels: dict[str, str]) -> dict[str, str]:
-    label_key = "app.kubernetes.io/instance"
-    return {label_key: labels[label_key]}
+    return {INSTANCE_LABEL: labels[INSTANCE_LABEL]}
 
 
-def _get_pod_service_name(pod_name: str) -> str:
-    return f"{pod_name}-service"
+def _build_label_selector_from_labels(labels: dict[str, str]) -> client.V1LabelSelector:
+    return client.V1LabelSelector(match_labels={INSTANCE_LABEL: labels[INSTANCE_LABEL]})
 
 
-def _get_registry_auth_secret_name(pod_name: str) -> str:
-    return f"{pod_name}-registry-auth"
+def _build_query_label_selector_from_unique_name(unique_name: str) -> str:
+    # See build_base_labels()
+    return f"{INSTANCE_LABEL}={unique_name}"

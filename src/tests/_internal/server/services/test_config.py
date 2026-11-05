@@ -118,7 +118,7 @@ class TestServerConfigManager:
             with (
                 patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
-                    "dstack._internal.server.services.backends.update_backend",
+                    "dstack._internal.server.services.backends.store.update_backend",
                     new_callable=AsyncMock,
                 ) as update_backend,
             ):
@@ -174,7 +174,7 @@ class TestServerConfigManager:
             with (
                 patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
-                    "dstack._internal.server.services.backends.update_backend",
+                    "dstack._internal.server.services.backends.store.update_backend",
                     new_callable=AsyncMock,
                 ) as update_backend,
             ):
@@ -212,12 +212,12 @@ class TestServerConfigManager:
             with (
                 patch.object(settings, "SERVER_DIR_PATH", tmp_path),
                 patch(
-                    "dstack._internal.server.services.backends.get_backend_config",
+                    "dstack._internal.server.services.backends.store.get_backend_config",
                     new_callable=AsyncMock,
                     return_value=None,
                 ),
                 patch(
-                    "dstack._internal.server.services.backends.update_backend",
+                    "dstack._internal.server.services.backends.store.update_backend",
                     new_callable=AsyncMock,
                 ) as update_backend,
             ):

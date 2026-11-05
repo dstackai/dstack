@@ -1,8 +1,7 @@
 import dataclasses
-from typing import Optional
+from typing import Optional, Self
 
 import gpuhunt
-from typing_extensions import Self
 
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.core.models.resources import (

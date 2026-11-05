@@ -76,7 +76,7 @@ hide:
             Set up GCP A4 and A3 clusters with optimized networking
         </p>
     </a>
-    <a href="/docs/examples/clusters/efa"
+    <a href="/docs/examples/clusters/aws"
        class="feature-cell sky">
         <h3>
             AWS
@@ -165,32 +165,6 @@ hide:
        </h3>
        <p>
             Deploy Qwen3 with TensorRT-LLM
-        </p>
-    </a>
-</div>
-
-## Models
-
-<div class="tx-landing__highlights_grid">
-    <a href="/docs/examples/models/deepseek-v4"
-       class="feature-cell">
-        <h3>
-            DeepSeek V4
-        </h3>
-
-        <p>
-            Deploy DeepSeek V4 with SGLang on B200:8
-        </p>
-    </a>
-
-    <a href="/docs/examples/models/qwen36"
-       class="feature-cell">
-        <h3>
-            Qwen 3.6
-        </h3>
-
-        <p>
-            Deploy Qwen3.6-27B with SGLang on NVIDIA or AMD
         </p>
     </a>
 </div>

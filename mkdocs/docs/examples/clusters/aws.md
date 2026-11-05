@@ -62,8 +62,8 @@ Provisioning...
 ---> 100%
 
  FLEET      INSTANCE  BACKEND          INSTANCE TYPE  GPU          PRICE   STATUS  CREATED 
- efa-fleet  0         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago      
-            1         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago    
+ efa-fleet  0         aws (us-west-2)  p5.48xlarge    H100:8:80GB  $98.32  idle    3 mins ago      
+            1         aws (us-west-2)  p5.48xlarge    H100:8:80GB  $98.32  idle    3 mins ago    
 ```
 
 </div>
@@ -85,6 +85,26 @@ Provisioning...
 
     instance_types: ["g6.8xlarge"] # If not specified, g6.xlarge is used (won't have EFA)
     ```
+
+??? info "Reservations"
+    To use an existing [Capacity Reservation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservations.html)
+    or [Capacity Block](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-blocks.html),
+    specify its ID via [`reservation`](../../reference/dstack.yml/fleet.md#reservation):
+
+    ```yaml
+    type: fleet
+    name: efa-fleet
+
+    nodes: 2
+    placement: cluster
+
+    resources:
+      gpu: H100:8
+
+    reservation: cr-0123456789abcdef0
+    ```
+
+    `dstack` then provisions on-demand instances of the reservation's instance type in its availability zone.
       
 ## Run NCCL tests
 

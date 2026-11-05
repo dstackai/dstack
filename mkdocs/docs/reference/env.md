@@ -47,7 +47,7 @@ tasks, and services:
 - `DSTACK_NODES_NUM`{ #DSTACK_NODES_NUM } – The number of nodes in the run
 - `DSTACK_GPUS_PER_NODE`{ #DSTACK_GPUS_PER_NODE } – The number of GPUs per node
 - `DSTACK_NODE_RANK`{ #DSTACK_NODE_RANK } – The rank of the node
-- `DSTACK_MASTER_NODE_IP`{ #DSTACK_NODE_RANK } – The internal IP address of the master node.
+- `DSTACK_MASTER_NODE_IP`{ #DSTACK_MASTER_NODE_IP } – The internal IP address of the master node.
 
      Below is an example of using `DSTACK_NODES_NUM`, `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, and `DSTACK_MASTER_NODE_IP`
      for distributed training:
@@ -121,6 +121,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_ELASTICSEARCH_INDEX`{ #DSTACK_SERVER_ELASTICSEARCH_INDEX } – The Elasticsearch/OpenSearch index pattern. Defaults to `dstack-logs`.
 - `DSTACK_SERVER_ELASTICSEARCH_API_KEY`{ #DSTACK_SERVER_ELASTICSEARCH_API_KEY } – The Elasticsearch/OpenSearch API key for authentication.
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
+- `DSTACK_PROMETHEUS_AUTH_TOKEN`{ #DSTACK_PROMETHEUS_AUTH_TOKEN } – If set, requests to `/metrics` must pass this token in the `Authorization: Bearer <token>` header. If not set, `/metrics` requires no authentication.
 - `DSTACK_SENTRY_DSN`{ #DSTACK_SENTRY_DSN } – The Sentry DSN. If set, enables error reporting and tracing via the Sentry SDK. See [observability](../guides/server-deployment.md#observability).
 - `DSTACK_SENTRY_TRACES_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_SAMPLE_RATE } – The Sentry sample rate for API request traces. Defaults to `0.1`.
 - `DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE`{ #DSTACK_SENTRY_TRACES_BACKGROUND_SAMPLE_RATE } – The Sentry sample rate for background task traces. Defaults to `0.01`.
@@ -136,6 +137,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY`{ #DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY } – Forbids registering new services without a gateway if set to any value.
 - `DSTACK_FORBID_DSTACK_IN_RUNS`{ #DSTACK_FORBID_DSTACK_IN_RUNS } – Forbids submitting runs with `dstack: true` (dstack server access inside runs) if set to any value.
 - `DSTACK_SERVER_CODE_UPLOAD_LIMIT`{ #DSTACK_SERVER_CODE_UPLOAD_LIMIT } - The repo size limit when uploading diffs or local repos, in bytes. Set to `0` to disable size limits. Defaults to `2MiB`.
+- `DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR`{ #DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR } - The maximum size of logs a job can write per hour, in bytes. If exceeded, the job fails with the `log_quota_exceeded` termination reason. Set to `0` to disable the limit. Defaults to `50MiB`.
 - `DSTACK_SERVER_S3_BUCKET`{ #DSTACK_SERVER_S3_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
 - `DSTACK_SERVER_S3_BUCKET_REGION`{ #DSTACK_SERVER_S3_BUCKET_REGION } - The region of the S3 Bucket.
 - `DSTACK_SERVER_GCS_BUCKET`{ #DSTACK_SERVER_GCS_BUCKET } - The bucket that repo diffs will be uploaded to if set. If unset, diffs are uploaded to the database.
@@ -151,7 +153,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_GATEWAY_MAX_REPLICAS`{ #DSTACK_SERVER_GATEWAY_MAX_REPLICAS } - Maximum number of replicas allowed for a gateway. Defaults to `9`.
 - `DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS`{ #DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS } – Minimum time interval between consecutive health checks of the same instance.
 - `DSTACK_SERVER_EVENTS_TTL_SECONDS`{ #DSTACK_SERVER_EVENTS_TTL_SECONDS } - Maximum age of event records. Set to `0` to disable event storage. Defaults to 30 days.
-- `DSTACK_SERVER_ORPHAN_CLEANUP_MODE`{ #DSTACK_SERVER_ORPHAN_CLEANUP_MODE } – Controls the cleanup of cloud resources that `dstack` created but no longer tracks, e.g. after the server crashed during provisioning or failed to terminate an instance. `report` emits events about such resources, `delete` also deletes them, and `off` disables the cleanup. Resources are recognized by the tags (or names) `dstack` sets on them, so a resource created by copying the tags of a `dstack` instance is treated as an orphan and deleted in `delete` mode. Defaults to `report`. Currently supported for the `aws`, `azure`, `gcp`, `nebius`, and `runpod` backends.
+- `DSTACK_SERVER_ORPHAN_CLEANUP_MODE`{ #DSTACK_SERVER_ORPHAN_CLEANUP_MODE } – Controls the cleanup of cloud resources that `dstack` created but no longer tracks, e.g. after the server crashed during provisioning or failed to terminate an instance. `report` emits events about such resources, `delete` also deletes them, and `off` disables the cleanup. Resources are recognized by the tags (or names) `dstack` sets on them, so a resource created by copying the tags of a `dstack` instance is treated as an orphan and deleted in `delete` mode. Defaults to `report`. Currently supported for the `aws`, `azure`, `gcp`, `kubernetes`, `nebius`, and `runpod` backends.
 - `DSTACK_SERVER_ORPHAN_CLEANUP_INTERVAL_SECONDS`{ #DSTACK_SERVER_ORPHAN_CLEANUP_INTERVAL_SECONDS } – Minimum interval between orphan cleanups of the same backend. A backend is cleaned up only after instances were provisioned or terminated in its project. Defaults to `3600`.
 - `DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY`{ #DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY } – A default Docker registry to use for job images that do not specify an explicit registry. E.g., if set to `registry.example`, then `image: ubuntu` becomes equivalent to `image: registry.example/ubuntu`. **Note**: This setting should only be used for configuring registries that act as a pull-through cache for Docker Hub. The default `dstack` images are also pulled from the configured registry.
 - `DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME`{ #DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME } – Username for authenticating with the default Docker registry. See `DSTACK_SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD`.

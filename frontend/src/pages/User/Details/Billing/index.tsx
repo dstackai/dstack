@@ -9,11 +9,7 @@ import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { centsToFormattedString, getServerError, goToUrl } from 'libs';
 import { ROUTES } from 'routes';
-import {
-    useGetUserBillingInfoQuery,
-    useUserBillingCheckoutSessionMutation,
-    // useUserBillingPortalSessionMutation,
-} from 'services/user';
+import { useGetUserBillingInfoQuery, useUserBillingCheckoutSessionMutation } from 'services/user';
 import { GlobalUserRole } from 'types';
 
 import { selectUserName } from 'App/slice';
@@ -37,7 +33,6 @@ export const Billing: React.FC = () => {
 
     const { data, isLoading } = useGetUserBillingInfoQuery({ username: paramUserName });
     const [billingCheckout, { isLoading: isLoadingBillingCheckout }] = useUserBillingCheckoutSessionMutation();
-    // const [billingPortalSession, { isLoading: isLoadingBillingPortalSession }] = useUserBillingPortalSessionMutation();
 
     useBreadcrumbs([
         {
@@ -81,21 +76,6 @@ export const Billing: React.FC = () => {
         setShowPaymentModal(true);
     };
 
-    // const editPaymentMethod = () => {
-    //     billingPortalSession({
-    //         username: paramUserName,
-    //     })
-    //         .unwrap()
-    //         .then((data) => goToUrl(data.url))
-    //         .catch((error) => {
-    //             pushNotification({
-    //                 type: 'error',
-    //                 content: t('common.server_error', { error: getServerError(error) }),
-    //             });
-    //         })
-    //         .finally(closeModal);
-    // };
-
     const closeModal = () => {
         setShowPaymentModal(false);
     };
@@ -119,12 +99,6 @@ export const Billing: React.FC = () => {
                                     </Button>
                                 </Hotspot>
                             )}
-
-                            {/* {data?.is_payment_method_attached && (
-                                <Button formAction="none" onClick={editPaymentMethod} disabled={isLoadingBillingPortalSession}>
-                                    {t('billing.edit_payment_method')}
-                                </Button>
-                            )} */}
                         </SpaceBetween>
                     </SpaceBetween>
                 )}

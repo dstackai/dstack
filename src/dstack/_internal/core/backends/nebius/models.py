@@ -1,9 +1,8 @@
 import json
 from pathlib import Path
-from typing import Annotated, Dict, Literal, Optional, Union
+from typing import Annotated, Dict, Literal, Optional, Self, Union
 
 from pydantic import Field, field_serializer, model_validator
-from typing_extensions import Self
 
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel

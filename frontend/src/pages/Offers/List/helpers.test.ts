@@ -1,9 +1,13 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+
 import {
     formatGpuVendor,
     getOfferAvailability,
     getOfferResources,
     getOfferSearchParams,
     rangeToObject,
+    renderRangeJSX,
     toCpuCard,
     toOfferCard,
 } from './helpers';
@@ -19,6 +23,16 @@ const makeGpu = (name: string, price: { min: number; max: number }, availability
 });
 
 describe('Offers helpers', () => {
+    test.each([
+        [{ min: 52.7436, max: 217.54 }, '52.74..217.54'],
+        [{ min: 1.236, max: 1.236 }, '1.24'],
+        [{ min: 2, max: 2 }, '2'],
+    ] as const)('displays price %j as %s', (price, expected) => {
+        const html = renderToStaticMarkup(createElement('span', null, renderRangeJSX(price)));
+
+        expect(html.replace(/<[^>]*>/g, '')).toBe(expected);
+    });
+
     test('GPU selection preserves precise memory and explicit fleet scope', () => {
         const gpu = { ...makeGpu('H100', { min: 1, max: 8 }), memory_mib: 275032 };
         const params = getOfferSearchParams(new URLSearchParams('project_name=main&fleet=chosen&group_by=gpu'), gpu);
@@ -104,20 +118,42 @@ describe('Offers helpers', () => {
     });
 
     test.each([
-        [['no_quota', 'no_balance', 'not_available'], 'not_available'],
-        [['no_quota', 'no_balance'], 'no_balance'],
-        [['no_quota'], 'no_quota'],
-        [['idle'], 'idle'],
-        [['busy'], 'busy'],
-        [['no_quota', 'available'], undefined],
-        [['not_available', 'idle'], 'idle'],
-        [['busy', 'idle'], 'idle'],
-        [['idle', 'available'], undefined],
-        [['no_balance', 'unknown'], undefined],
-        [[], undefined],
-    ] as [TAvailability[], TAvailability | undefined][])('availability %j shows %s', (statuses, expected) =>
-        expect(getOfferAvailability(statuses)).toBe(expected),
-    );
+        [['available'], ['available']],
+        [['unknown'], ['unknown']],
+        [
+            ['unknown', 'available', 'unknown'],
+            ['available', 'unknown'],
+        ],
+        [
+            ['no_quota', 'no_balance', 'not_available', 'no_quota'],
+            ['no_balance', 'no_quota', 'not_available'],
+        ],
+        [
+            ['not_available', 'no_quota'],
+            ['no_quota', 'not_available'],
+        ],
+        [
+            ['no_quota', 'not_available'],
+            ['no_quota', 'not_available'],
+        ],
+        [
+            ['no_quota', 'available'],
+            ['available', 'no_quota'],
+        ],
+        [
+            ['idle', 'busy'],
+            ['busy', 'idle'],
+        ],
+        [
+            ['no_balance', 'unknown'],
+            ['no_balance', 'unknown'],
+        ],
+        [[], []],
+    ] as [TAvailability[], TAvailability[]][])('availability %j shows the complete sorted set %j', (statuses, expected) => {
+        const original = [...statuses];
+        expect(getOfferAvailability(statuses)).toEqual(expected);
+        expect(statuses).toEqual(original);
+    });
 
     test('rangeToObject parses open and closed ranges', () => {
         expect(rangeToObject('0')).toEqual({ min: 0, max: 0 });

@@ -276,5 +276,5 @@ $ dstack apply -f crusoe-nccl-tests.dstack.yml
 ## What's next
 
 1. Learn about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), [services](../../concepts/services.md)
-2. Check out [backends](../../concepts/backends.md#crusoe-cloud) and [fleets](../../concepts/fleets.md#cloud-fleets)
+2. Check out [backends](../../concepts/backends.md#crusoe) and [fleets](../../concepts/fleets.md#backend-fleets)
 3. Check the docs on [Crusoe's networking](https://docs.crusoecloud.com/networking/infiniband/) and ["Crusoe Managed" Kubernetes](https://docs.crusoecloud.com/orchestration/cmk/index.html)

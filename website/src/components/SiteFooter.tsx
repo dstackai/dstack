@@ -51,7 +51,6 @@ const footerColumns: FooterColumn[] = [
       { label: 'Training', href: docsUrl('examples/training/trl/') },
       { label: 'Clusters', href: docsUrl('examples/clusters/aws/') },
       { label: 'Inference', href: docsUrl('examples/inference/sglang/') },
-      { label: 'Models', href: docsUrl('examples/models/deepseek-v4/') },
       { label: 'Accelerators', href: docsUrl('examples/accelerators/amd/') },
     ],
   },

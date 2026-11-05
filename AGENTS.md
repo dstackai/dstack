@@ -20,7 +20,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Frontend: from `frontend/` run `npm install`, `npm run build`, then copy `frontend/build` into `src/dstack/_internal/server/statics/`; for dev, `npm run start` with API on port 8000.
 
 ## Coding Style & Naming Conventions
-- Python targets 3.10+ with 4-space indentation and max line length of 99 (see `pyproject.toml`; `E501` is ignored but keep lines readable).
+- Python targets 3.11+ with 4-space indentation and max line length of 99 (see `pyproject.toml`; `E501` is ignored but keep lines readable).
 - Imports are sorted via Ruff’s isort settings (`dstack` treated as first-party).
 - Keep primary/public functions before local helper functions in a module section.
 - Roughly keep function definitions in the order they are referenced within a file so call flow stays easy to follow.
@@ -36,7 +36,7 @@ Before touching a subsystem, read the relevant notes in `contributing/`: `ARCHIT
 - Preserve client/server backward compatibility when updating Pydantic models. New fields must be excluded from client requests when unset, for compatibility with older servers (see `core/compatibility/*.py`). If the allowed domain/type of an existing field is extended, server responses may need to be patched for older clients (see `server/compatibility/*.py`). No need to exclude new fields from server responses, since clients rely on `validate_extra_ignore`.
 
 ## Testing Guidelines
-- Default to `uv run pytest`. Use markers from `src/tests/conftest.py` like `--runpostgres` if need to include specific tests.
+- Default to `uv run pytest` for quick testing. Opt-in tests are skipped by default; enable them when the change touches what they cover, with the flags from `src/tests/conftest.py`: `--runpostgres`, `--rundocker`, `--runui`, or `--runall` for all of them.
 - Scope the run to the change: for trivial or localized edits, run only the affected test modules, `Test*` classes, or `-k` selection instead of the whole suite. Reserve the full suite for broad or cross-cutting changes.
 - Speed up large runs with `-n auto` (pytest-xdist), e.g. `uv run pytest -n auto`.
 - Group tests for the same unit (function/class) using `Test*` classes that mirror unit's name.

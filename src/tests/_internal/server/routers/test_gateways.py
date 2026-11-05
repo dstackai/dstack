@@ -1643,8 +1643,68 @@ class TestGetGatewayPlan:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("populate_configuration", [True, False])
-    async def test_get_plan_rejects_failed_gateway(
+    @pytest.mark.parametrize("client_version", [None, "0.22.7"])
+    async def test_get_plan_with_failed_gateway_is_create(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        populate_configuration: bool,
+        client_version: Optional[str],
+    ):
+        gateway_name = "my-gateway"
+        user, project = await self._create_project_with_failed_gateway(
+            session, gateway_name, populate_configuration
+        )
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/get_plan",
+            json={"spec": self._failed_gateway_spec(gateway_name)},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["action"] == ApplyAction.CREATE
+        assert data["current_resource"]["name"] == gateway_name
+        assert data["current_resource"]["status"] == GatewayStatus.FAILED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_get_plan_with_failed_gateway_rejected_for_old_client(
         self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
+        gateway_name = "my-gateway"
+        user, project = await self._create_project_with_failed_gateway(
+            session, gateway_name, populate_configuration
+        )
+        headers = get_auth_headers(user.token)
+        headers["X-API-Version"] = "0.22.6"
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/get_plan",
+            json={"spec": self._failed_gateway_spec(gateway_name)},
+            headers=headers,
+        )
+        assert response.status_code == 400
+        assert "FAILED status" in response.json()["detail"][0]["msg"]
+
+    @staticmethod
+    def _failed_gateway_spec(name: str) -> dict:
+        return {
+            "configuration": {
+                "type": "gateway",
+                "name": name,
+                "backend": "aws",
+                "region": "us-east-1",
+                "domain": "new.example.com",
+            }
+        }
+
+    @staticmethod
+    async def _create_project_with_failed_gateway(
+        session: AsyncSession, name: str, populate_configuration: bool
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -1656,7 +1716,7 @@ class TestGetGatewayPlan:
             session=session,
             project_id=project.id,
             backend_id=backend.id,
-            name="my-gateway",
+            name=name,
             region="us-east-1",
             wildcard_domain="old.example.com",
             status=GatewayStatus.FAILED,
@@ -1668,23 +1728,7 @@ class TestGetGatewayPlan:
             gateway_id=gateway.id,
             populate_configuration=populate_configuration,
         )
-        response = await client.post(
-            f"/api/project/{project.name}/gateways/get_plan",
-            json={
-                "spec": {
-                    "configuration": {
-                        "type": "gateway",
-                        "name": "my-gateway",
-                        "backend": "aws",
-                        "region": "us-east-1",
-                        "domain": "new.example.com",
-                    }
-                }
-            },
-            headers=get_auth_headers(user.token),
-        )
-        assert response.status_code == 400
-        assert "FAILED status" in response.json()["detail"][0]["msg"]
+        return user, project
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

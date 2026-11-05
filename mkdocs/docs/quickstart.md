@@ -10,10 +10,10 @@ description: Quick guide to creating fleets and submitting runs
 
 ## Create a fleet
 
-> Before submitting runs, you must create a [fleet](concepts/fleets.md).
+Before you submit runs, you have to create [fleets](concepts/fleets.md).
 
 === "Backend fleet"
-    If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](concepts/backends.md), create a fleet as follows:
+    If you're using cloud providers or Kubernetes clusters, create a fleet as follows:
 
     <div editor-title="fleet.dstack.yml"> 
 
@@ -33,6 +33,8 @@ description: Quick guide to creating fleets and submitting runs
     ```
 
     </div>
+
+    > To use backend fleets, ensure you have configured [backends](concepts/backends.md).
 
     Pass the fleet configuration to `dstack apply`:
 
@@ -96,7 +98,7 @@ description: Quick guide to creating fleets and submitting runs
 
     > Hosts must have Docker and GPU drivers installed and meet the other [requirements](concepts/fleets.md#ssh-fleets).
 
-    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#ssh-placement) property must be set to `cluster`.
+    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#cluster-placement) property must be set to `cluster`.
 
 ## Submit your first run
 
@@ -265,7 +267,7 @@ description: Quick guide to creating fleets and submitting runs
     Service is published at: 
       http://localhost:3000/proxy/services/main/qwen36-service/
     Model Qwen/Qwen3.6-27B is published at:
-      http://localhost:3000/proxy/models/main/
+      http://localhost:3000/proxy/services/main/qwen36-service/v1
     ```
     
     </div>
@@ -279,6 +281,6 @@ description: Quick guide to creating fleets and submitting runs
 Something not working? See the [troubleshooting](guides/troubleshooting.md) guide.
 
 !!! info "What's next?"
-    1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), [services](concepts/services.md), and [fleets](concepts/services.md)
+    1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), [services](concepts/services.md), and [fleets](concepts/fleets.md)
     2. Browse [examples](examples.md)
     3. Join [Discord](https://discord.gg/u8SmfwPpMd)

@@ -207,6 +207,8 @@ Use the same SMG version for the router and the worker images: the worker image 
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
+> The `scaling` property requires creating a [gateway](../../concepts/gateways.md).
+
 !!! info "Cluster"
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
 

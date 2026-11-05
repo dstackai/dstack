@@ -1,5 +1,6 @@
+from typing import Annotated
+
 from pydantic import Field, TypeAdapter
-from typing_extensions import Annotated
 
 from dstack._internal.core.backends.daytona.models import DaytonaBackendConfigWithCreds
 from dstack._internal.core.backends.models import (

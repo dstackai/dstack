@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import yaml
 from pydantic import Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import Annotated
 
 import dstack._internal.core.backends.configurators
 from dstack._internal.core.backends.models import (
@@ -21,9 +20,9 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import encryption as encryption_services
 from dstack._internal.server.services import projects as projects_services
+from dstack._internal.server.services.backends import store as backends_store
 from dstack._internal.server.services.backends.handlers import delete_backends_safe
 from dstack._internal.server.services.encryption import AnyEncryptionKeyConfig
 from dstack._internal.server.services.permissions import (
@@ -145,7 +144,7 @@ class ServerConfigManager:
             backends_to_delete.difference_update([backend_type])
             backend_exists = any(backend_type == b.type for b in project.backends)
             try:
-                current_backend_config = await backends_services.get_backend_config(
+                current_backend_config = await backends_store.get_backend_config(
                     project=project,
                     backend_type=backend_type,
                 )
@@ -157,7 +156,7 @@ class ServerConfigManager:
                 )
                 continue
             if current_backend_config is not None:
-                current_source_backend_config = await backends_services.get_source_backend_config(
+                current_source_backend_config = await backends_store.get_source_backend_config(
                     project=project,
                     backend_type=backend_type,
                 )
@@ -170,10 +169,10 @@ class ServerConfigManager:
             # Update backend in this case.
             if current_backend_config is None and not backend_exists:
                 apply_action = "create"
-                apply_func = backends_services.create_backend
+                apply_func = backends_store.create_backend
             else:
                 apply_action = "update"
-                apply_func = backends_services.update_backend
+                apply_func = backends_store.update_backend
             try:
                 await apply_func(session=session, project=project, config=backend_config)
             except Exception as e:
@@ -204,7 +203,7 @@ class ServerConfigManager:
         for (
             backend_type
         ) in dstack._internal.core.backends.configurators.list_available_backend_types():
-            backend_config = await backends_services.get_backend_config(
+            backend_config = await backends_store.get_backend_config(
                 project=project, backend_type=backend_type
             )
             if backend_config is not None:
@@ -232,7 +231,7 @@ class ServerConfigManager:
 async def get_backend_config_yaml(
     project: ProjectModel, backend_type: BackendType
 ) -> BackendInfoYAML:
-    backend_config = await backends_services.get_backend_config(
+    backend_config = await backends_store.get_backend_config(
         project=project, backend_type=backend_type
     )
     if backend_config is None:
@@ -250,7 +249,7 @@ async def create_backend_config_yaml(
     config_yaml: str,
 ):
     config = config_yaml_to_backend_config(config_yaml)
-    await backends_services.create_backend(session=session, project=project, config=config)
+    await backends_store.create_backend(session=session, project=project, config=config)
 
 
 async def update_backend_config_yaml(
@@ -259,7 +258,7 @@ async def update_backend_config_yaml(
     config_yaml: str,
 ):
     config = config_yaml_to_backend_config(config_yaml)
-    await backends_services.update_backend(session=session, project=project, config=config)
+    await backends_store.update_backend(session=session, project=project, config=config)
 
 
 def config_yaml_to_backend_config(config_yaml: str) -> AnyBackendConfigWithCreds:

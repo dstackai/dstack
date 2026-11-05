@@ -7,273 +7,106 @@ description: Tips and tricks for using dstack efficiently
 
 Below are tips and tricks to use `dstack` more efficiently.
 
-## Dev environments
+## Agents
 
-Before running a task or service, it's recommended that you first start with a dev environment. Dev environments
-allow you to run commands interactively.
-
-Once the commands work, go ahead and run them as a task or a service.
-
-??? info "Notebooks"
-    **VS Code**
-    
-    When you access a dev environment using your desktop VS Code, it allows you to work with Jupyter notebooks via its
-    pre-configured and easy-to-use extension.
-
-    **JupyterLab**
-
-    If you prefer to use JupyterLab, you can run it as a task:
-
-    ```yaml
-    type: task
-    
-    commands:
-        - pip install jupyterlab
-        - jupyter lab --allow-root
-    
-    ports:
-        - 8888
-    
-    ```
-
-## Tasks
-
-Tasks can be used not only for batch jobs but also for web applications.
-
-<div editor-title="app.dstack.yml">
-
-```yaml
-type: task
-name: streamlit-task
-
-python: 3.12
-
-commands:
-  - uv pip install streamlit
-  - streamlit hello
-ports: 
-  - 8501
-
-```
-
-</div>
-
-While you run a task, `dstack apply` forwards the remote ports to `localhost`.
+It's highly recommended to use `dstack` with AI agents like Claude, Codex, and Cursor.
+To help them use the CLI and edit configuration files, install [`dstack` skills](../installation.md#skills):
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f app.dstack.yml
-
-  Welcome to Streamlit. Check out our demo in your browser.
-
-  Local URL: http://localhost:8501
+$ npx skills add dstackai/dstack
 ```
 
 </div>
 
-This allows you to access the remote `8501` port on `localhost:8501` while the CLI is attached.
+## Fleets
 
-??? info "Port mapping"
-    If you want to override the local port, use the `--port` option:
-        
-    <div class="termy">
-    
-    ```shell
-    $ dstack apply -f app.dstack.yml --port 3000:8501
-    ```
-    
-    </div>
-    
-    This will forward the remote `8501` port to `localhost:3000`.
+By default, `dstack` picks a suitable fleet for the run. To use a specific fleet, pass `--fleet` to `dstack apply`,
+or set [`fleets`](../reference/dstack.yml/dev-environment.md#_fleets) in the run configuration.
 
-!!! info "Tasks vs. services"
-    [Services](../concepts/services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
-    and other service features. If you don't need them, you can use [tasks](../concepts/tasks.md) for running apps.
+<div class="termy">
 
-## Utilization policy
-
-If you want your run to automatically terminate if any of GPUs are underutilized, you can specify `utilization_policy`.
-
-Below is an example of a dev environment that auto-terminate if any GPU stays below 10% utilization for 1 hour.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: dev-environment
-name: my-dev
-
-python: 3.12
-ide: cursor
-
-resources:
-  gpu: H100:8
-
-utilization_policy:
-  min_gpu_utilization: 10
-  time_window: 1h
+```shell
+$ dstack apply -f .dstack.yml --fleet my-fleet
 ```
 
 </div>
 
-## Docker in Docker
+> To see the offers available through a fleet, use `dstack offer --fleet my-fleet`.
 
-Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
+!!! info "Clusters"
+    To run multi-node tasks, use a fleet with [`placement`](../concepts/fleets.md#cluster-placement) set to `cluster`.
+    To check the interconnect, run [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md). For cluster setup on specific clouds,
+    see the [AWS](../examples/clusters/aws.md), [GCP](../examples/clusters/gcp.md), [Lambda](../examples/clusters/lambda.md),
+    [Crusoe](../examples/clusters/crusoe.md), and [Nebius](../examples/clusters/nebius.md) guides.
 
-=== "Dev environment"
+??? info "Instances"
+    Use `instances` to restrict a run to particular existing fleet instances. You can specify
+    instance names, hostnames or IP addresses, or a fleet name with an instance number.
+    For the `fleet` form, use `<project>/<fleet>` when the fleet belongs to another project:
+
     <div editor-title=".dstack.yml">
 
     ```yaml
     type: dev-environment
     name: vscode
-
-    docker: true
-
     ide: vscode
-    init:
-      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
-    ```
 
-    </div>
-
-=== "Task"
-    <div editor-title=".dstack.yml">
-
-    ```yaml
-    type: task
-    name: docker-nvidia-smi
-
-    docker: true
-
-    commands:
-      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
-
-    resources:
-      gpu: 1
-    ```
-
-    </div>
-
-??? info "Volumes"
-
-    To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
-    and add attach it in your run configuration.
-
-    === "Network volums"
-    
-        ```yaml
-            type: dev-environment
-            name: vscode
-        
-            docker: true
-            ide: vscode
-        
-            volumes:
-              - name: docker-volume
-                path: /var/lib/docker
-        ```
-
-    === "Instance volumes"
-
-        ```yaml
-            type: dev-environment
-            name: vscode
-        
-            docker: true
-            ide: vscode
-        
-            volumes:
-              - name: /docker-volume
-                path: /var/lib/docker
-                optional: true
-        ```
-
-## dstack in dstack
-
-Set `dstack` to `true` when a run needs to use the dstack CLI. dstack configures the server and current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: task
-image: dstackai/dstack
-dstack: true
-env:
-  - DSTACK_TOKEN
-commands:
-  - dstack ps
-```
-
-</div>
-
-> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
-
-## Fleets
-
-### Creation policy
-
-By default, when you run `dstack apply` with a dev environment, task, or service,
-if no `idle` instances from the available fleets meet the requirements, `dstack` provisions a new instance using configured backends.
-
-To ensure `dstack apply` doesn't provision a new instance but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
-```
-
-</div>
-
-Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
-
-### Instances
-
-Use `instances` to restrict a run to particular existing fleet instances. You can specify
-instance names, hostnames or IP addresses, or a fleet name with an instance number.
-For the `fleet` form, use `<project>/<fleet>` when the fleet belongs to another project:
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: dev-environment
-name: vscode
-ide: vscode
-
-instances:
-  - name: my-fleet-3
-  - hostname: 203.0.113.10
-  - fleet: my-fleet
-    instance: 3
-```
-
-</div>
-
-??? info "Short syntax"
-
-    To match by instance name, you can use the string shorthand:
-
-    ```yaml
     instances:
-      - my-fleet-3
+      - name: my-fleet-3
+      - hostname: 203.0.113.10
+      - fleet: my-fleet
+        instance: 3
     ```
 
-When `instances` is set, the run is only placed on a matching existing instance and
-`dstack` never provisions new instances. If no matching instance is available, the run
-fails with a no-capacity error (use [`retry`](../reference/dstack.yml/dev-environment.md#retry)
-to wait for a targeted instance to free up).
+    </div>
 
-### Idle duration
+    ??? info "Short syntax"
 
-If the run is submitted to a fleet with `nodes` set to a range and a new instance is provisioned, the shorter of the fleet's and run's `idle_duration` is used.
-If the run reuses an existing fleet instance, only the fleet's
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) applies.
+        To match by instance name, you can use the string shorthand:
 
-If an instance remains `idle`, it is automatically terminated after `idle_duration`,
-unless the fleet is already at `nodes.min`.
+        ```yaml
+        instances:
+          - my-fleet-3
+        ```
 
-> Not applied for container-based backends (Kubernetes, Vast.ai, Runpod).
+    When `instances` is set, the run is only placed on a matching existing instance and
+    `dstack` never provisions new instances. If no matching instance is available, the run
+    fails with a no-capacity error (use [`retry`](../reference/dstack.yml/dev-environment.md#retry)
+    to wait for a targeted instance to free up).
+
+!!! info "Idle duration"
+    If the run is submitted to a fleet with `nodes` set to a range and a new instance is provisioned, the shorter of the fleet's and run's `idle_duration` is used.
+    If the run reuses an existing fleet instance, only the fleet's
+    [`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) applies.
+
+    If an instance remains `idle`, it is automatically terminated after `idle_duration`,
+    unless the fleet is already at `nodes.min`.
+
+    > Not applied for [container-based](../concepts/backends.md#container-based) backends.
+
+## Working directory
+
+By default, runs use the working directory set in the Docker image. With the [default image](../concepts/dev-environments.md#default-image),
+it's `/dstack/run`. With a custom image that doesn't set one, it's `/`.
+
+This is also where `dstack` clones [`repos`](../concepts/dev-environments.md#repos) by default and mounts
+[`files`](../concepts/dev-environments.md#files) with relative paths. In commands, you can reference it via `DSTACK_WORKING_DIR`.
+
+If you'd like to use a different directory, set [`working_dir`](../concepts/dev-environments.md#working-directory)
+to an absolute path (`~` is supported).
+
+## Files and repos
+
+To mount local files or directories into the run's container, use [`files`](../concepts/dev-environments.md#files).
+
+To clone a Git repo into the run's [working directory](../concepts/dev-environments.md#working-directory), use
+[`repos`](../concepts/dev-environments.md#repos). It accepts the path to a local repo, in which case `dstack` also
+applies your local changes, or the URL of a remote repo.
+
+> Each `files` entry and the local changes of a repo are limited to 2MB. To exclude files, use `.gitignore` or `.dstackignore`.
+> To increase the limit, set [`DSTACK_SERVER_CODE_UPLOAD_LIMIT`](../reference/env.md#DSTACK_SERVER_CODE_UPLOAD_LIMIT).
 
 ## Volumes
 
@@ -364,13 +197,20 @@ If you'd like `dstack` to automatically retry, configure the
 
 ```yaml
 type: task
-name: train    
+name: trl-sft
 
 python: 3.12
 
+env:
+  - MODEL=Qwen/Qwen2.5-0.5B
+  - DATASET=stanfordnlp/imdb
+
 commands:
-  - uv pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
+  - uv pip install trl
+  - |
+    trl sft \
+      --model_name_or_path $MODEL --dataset_name $DATASET \
+      --num_processes $DSTACK_GPUS_PER_NODE
 
 retry:
   on_events: [no-capacity]
@@ -379,6 +219,207 @@ retry:
 ```
 
 </div>
+
+## Utilization policy
+
+If you want your run to automatically terminate if any of GPUs are underutilized, you can specify `utilization_policy`.
+
+Below is an example of a dev environment that auto-terminate if any GPU stays below 10% utilization for 1 hour.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: my-dev
+
+python: 3.12
+ide: cursor
+
+resources:
+  gpu: H100:8
+
+utilization_policy:
+  min_gpu_utilization: 10
+  time_window: 1h
+```
+
+</div>
+
+## Tasks
+
+Tasks can be used not only for batch jobs but also for web applications.
+
+<div editor-title="app.dstack.yml">
+
+```yaml
+type: task
+name: streamlit-task
+
+python: 3.12
+
+commands:
+  - uv pip install streamlit
+  - streamlit hello
+ports: 
+  - 8501
+
+```
+
+</div>
+
+While you run a task, `dstack apply` forwards the remote ports to `localhost`.
+
+<div class="termy">
+
+```shell
+$ dstack apply -f app.dstack.yml
+
+  Welcome to Streamlit. Check out our demo in your browser.
+
+  Local URL: http://localhost:8501
+```
+
+</div>
+
+This allows you to access the remote `8501` port on `localhost:8501` while the CLI is attached.
+
+??? info "Port mapping"
+    If you want to override the local port, use the `--port` option:
+        
+    <div class="termy">
+    
+    ```shell
+    $ dstack apply -f app.dstack.yml --port 3000:8501
+    ```
+    
+    </div>
+    
+    This will forward the remote `8501` port to `localhost:3000`.
+
+!!! info "Tasks vs. services"
+    [Services](../concepts/services.md) provide external access, `https`, replicas with autoscaling, OpenAI-compatible endpoint
+    and other service features. If you don't need them, you can use [tasks](../concepts/tasks.md) for running apps.
+
+## Dev environments
+
+Before running a task or service, it's recommended that you first start with a dev environment. Dev environments
+allow you to run commands interactively.
+
+Once the commands work, go ahead and run them as a task or a service.
+
+??? info "Notebooks"
+    **VS Code**
+    
+    When you access a dev environment using your desktop VS Code, it allows you to work with Jupyter notebooks via its
+    pre-configured and easy-to-use extension.
+
+    **JupyterLab**
+
+    If you prefer to use JupyterLab, you can run it as a task:
+
+    ```yaml
+    type: task
+    
+    commands:
+        - pip install jupyterlab
+        - jupyter lab --allow-root
+    
+    ports:
+        - 8888
+    
+    ```
+
+## Docker in Docker
+
+Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
+
+=== "Dev environment"
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    name: vscode
+
+    docker: true
+
+    ide: vscode
+    init:
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+    ```
+
+    </div>
+
+=== "Task"
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: task
+    name: docker-nvidia-smi
+
+    docker: true
+
+    commands:
+      - docker run --gpus all nvidia/cuda:12.3.0-base-ubuntu22.04 nvidia-smi
+
+    resources:
+      gpu: 1
+    ```
+
+    </div>
+
+??? info "Volumes"
+
+    To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
+    and add attach it in your run configuration.
+
+    === "Network volums"
+    
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - name: docker-volume
+                path: /var/lib/docker
+        ```
+
+    === "Instance volumes"
+
+        ```yaml
+            type: dev-environment
+            name: vscode
+        
+            docker: true
+            ide: vscode
+        
+            volumes:
+              - instance_path: /docker-volume
+                path: /var/lib/docker
+                optional: true
+        ```
+
+## dstack in dstack
+
+Set `dstack` to `true` when a run needs to use the dstack CLI. dstack configures the server and current project automatically. To run authenticated commands, pass `DSTACK_TOKEN` explicitly.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: task
+image: dstackai/dstack
+dstack: true
+env:
+  - DSTACK_TOKEN
+commands:
+  - dstack ps
+```
+
+</div>
+
+> Besides inspecting runs, you can submit new runs with `dstack apply` and attach to them with `dstack attach`.
 
 ## Profiles
 
@@ -551,36 +592,11 @@ To inspect offers available through a specific fleet, pass `--fleet NAME`.
 
 The `offer` command allows you to filter and group offers with various [advanced options](../reference/cli/dstack/offer.md#usage).
 
-
 ## Metrics
 
 `dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](../concepts/metrics.md) for details.
 
-## Pull progress
-
-When using a VM-based backend or an SSH instance, you can see the Docker image pull progress in the CLI while the job is in the `pulling` state.
-
-<div class="termy">
-
-```shell
-$ dstack apply -y
-
-Launching orange-yak-1...
- NAME          BACKEND          STATUS                    SUBMITTED  
- orange-yak-1  aws (eu-west-3)  pulling 1.19/3.44/4.76GB  3 mins ago
-```
-
-</div>
-
-The three slash-separated indicators represent:
-
-- Image data already extracted.
-- Image data already downloaded.
-- Total target image size.
-
-The exact total size is not always known initially, in which case a lower estimate is displayed with the `≥` sign. All values exclude any image layers already cached on the host prior to the pull.
-
-## Service quotas
+## Cloud quotas
 
 If you're using your own AWS, GCP, Azure, or OCI accounts, before you can use GPUs or spot instances, you have to request the
 corresponding service quotas for each type of instance in each region.
@@ -589,29 +605,28 @@ corresponding service quotas for each type of instance in each region.
     Check this [guide ](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) on EC2 service quotas.
     The relevant service quotas include:
 
-    - `Running On-Demand P instances` (on-demand V100, A100 80GB x8)
-    - `All P4, P3 and P2 Spot Instance Requests` (spot V100, A100 80GB x8)
+    - `Running On-Demand P instances` (on-demand V100, A100 80GB x8, H100)
+    - `All P Spot Instance Requests` (spot V100, A100 80GB x8, H100)
     - `Running On-Demand G and VT instances` (on-demand T4, A10G, L4)
     - `All G and VT Spot Instance Requests` (spot T4, A10G, L4)
-    - `Running Dedicated p5 Hosts` (on-demand H100)
-    - `All P5 Spot Instance Requests` (spot H100)
 
 ??? info "GCP"
     Check this [guide ](https://cloud.google.com/compute/resource-usage) on Compute Engine service quotas.
     The relevant service quotas include:
 
     - `NVIDIA V100 GPUs` (on-demand V100)
-    - `Preemtible V100 GPUs` (spot V100)
+    - `Preemptible V100 GPUs` (spot V100)
     - `NVIDIA T4 GPUs` (on-demand T4)
-    - `Preemtible T4 GPUs` (spot T4)
+    - `Preemptible T4 GPUs` (spot T4)
     - `NVIDIA L4 GPUs` (on-demand L4)
-    - `Preemtible L4 GPUs` (spot L4)
+    - `Preemptible L4 GPUs` (spot L4)
     - `NVIDIA A100 GPUs` (on-demand A100)
-    - `Preemtible A100 GPUs` (spot A100)
+    - `Preemptible A100 GPUs` (spot A100)
     - `NVIDIA A100 80GB GPUs` (on-demand A100 80GB)
-    - `Preemtible A100 80GB GPUs` (spot A100 80GB)
+    - `Preemptible A100 80GB GPUs` (spot A100 80GB)
     - `NVIDIA H100 GPUs` (on-demand H100)
-    - `Preemtible H100 GPUs` (spot H100)
+    - `Preemptible H100 GPUs` (spot H100)
+    - `GPUs (all regions)` (global quota for all GPU types)
 
 ??? info "Azure"
     Check this [guide ](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal) on Azure service quotas.
@@ -634,6 +649,17 @@ corresponding service quotas for each type of instance in each region.
     - `GPUs for GPU2 based VM and BM instances` (on-demand P100)
     - `GPUs for GPU3 based VM and BM instances` (on-demand V100)
 
-Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
+Note, for AWS and Azure, service quota values are measured with the number of CPUs rather than GPUs.
 
 [//]: # (TODO: Mention spot policy)
+
+## Reservations
+
+To use existing reservations on AWS or GCP, set
+[`reservation`](../reference/dstack.yml/fleet.md#reservation) in the fleet configuration.
+See the [AWS](../examples/clusters/aws.md) and [GCP](../examples/clusters/gcp.md) cluster guides.
+
+On Nebius and Crusoe, reservations are applied automatically, with no configuration needed.
+
+If you already have a reserved cluster provisioned in a cloud or data center, you can use it with `dstack` via
+[SSH fleets](../concepts/fleets.md#ssh-fleets).

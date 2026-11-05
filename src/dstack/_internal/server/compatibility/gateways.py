@@ -2,11 +2,13 @@ from typing import Optional
 
 from packaging.version import Version
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayConfiguration,
     GatewayPlan,
     GatewaySpec,
+    GatewayStatus,
 )
 
 
@@ -47,6 +49,17 @@ def patch_gateway(gateway: Gateway, client_version: Optional[Version]) -> None:
 def patch_gateway_plan(plan: GatewayPlan, client_version: Optional[Version]) -> None:
     if client_version is None:
         return
+    if (
+        client_version < Version("0.22.7")
+        and plan.current_resource is not None
+        and plan.current_resource.status == GatewayStatus.FAILED
+    ):
+        # Pre-0.22.7 CLIs display a misleading message if current_resource is a failed gateway,
+        # so return an error the same way pre-0.22.7 servers used to do.
+        raise ServerClientError(
+            f"Gateway {plan.current_resource.name!r} is in FAILED status and"
+            " cannot be updated in-place. Delete it and re-apply."
+        )
     _patch_gateway_configuration(plan.spec.configuration, client_version)
     _patch_gateway_configuration(plan.effective_spec.configuration, client_version)
     if plan.current_resource is not None:

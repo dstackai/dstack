@@ -3,7 +3,7 @@ name = "dstack"
 dynamic = ["version", "readme"]
 authors = [{ name = "Andrey Cheptsov", email = "andrey@dstack.ai" }]
 description = "dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -15,7 +15,6 @@ dependencies = [
     "requests",
     "requests-unixsocket>=0.4.1",
     "typing-extensions>=4.0.0",
-    "tomli>=2.0; python_version < '3.11'",
     "cryptography",
     "packaging",
     "python-dateutil",
@@ -30,10 +29,10 @@ dependencies = [
     "questionary>=2.0.1",
     "pydantic>=2.12",
     "websocket-client",
-    "python-multipart>=0.0.16",
+    "python-multipart>=0.0.31",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.34",
+    "gpuhunt==0.1.35",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -90,7 +89,7 @@ ignore-case = true
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 99
 
 [tool.ruff.lint]
@@ -149,8 +148,6 @@ filterwarnings = [
     # Fail on any use of a pydantic v1 shim (`.dict()`, `parse_obj_as`, class-based `Config`, ...)
     # so they cannot creep back after the v2 migration.
     "error::pydantic.PydanticDeprecatedSince20",
-    # Remove or change to 3.11 once support for Python 3.10 is dropped.
-    "ignore:You are using a Python version \\(3.10:FutureWarning:^google\\.",
 ]
 
 [tool.tox]
@@ -196,7 +193,7 @@ test = [
     "requests-mock>=1.12.1",
     "time-machine>=3.5.1",
     "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
-    "openai>=1.68.2",
+    "openai>=2.47.0",
     "testcontainers>=4.15.0",
 ]
 docs = [
@@ -259,7 +256,7 @@ aws = [
 azure = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
-    "azure-mgmt-compute>=29.1.0",
+    "azure-mgmt-compute>=38.0.0",
     "azure-mgmt-network>=23.0.0,<28.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",

@@ -107,12 +107,19 @@ plugins:
         "docs/reference/cli/dstack/endpoint.md": "docs/reference/cli/dstack/preset.md"
         "docs/examples/llms/llama31.md": "docs/examples/inference/vllm.md"
         "docs/examples/llms/llama32.md": "docs/examples/inference/vllm.md"
-        "docs/examples/llms/qwen36.md": "docs/examples/models/qwen36.md"
+        "docs/examples/llms/qwen36.md": "docs/examples/inference/sglang.md"
         "examples/llms/llama31/index.md": "docs/examples/inference/vllm.md"
         "examples/llms/llama32/index.md": "docs/examples/inference/vllm.md"
-        "examples/llms/qwen36/index.md": "docs/examples/models/qwen36.md"
+        "examples/llms/qwen36/index.md": "docs/examples/inference/sglang.md"
         "docs/examples/deployment/nim/index.md": "docs/examples/inference/nim.md"
         "docs/examples/deployment/vllm/index.md": "docs/examples/inference/vllm.md"
+        "docs/examples/models/qwen36.md": "docs/examples/inference/sglang.md"
+        "docs/examples/models/deepseek-v4.md": "docs/examples/inference/sglang.md"
+        "docs/examples/models/wan22/index.md": "docs/examples.md"
+        "docs/examples/accelerators/intel/index.md": "docs/examples.md"
+        "docs/examples/llms/deepseek/index.md": "docs/examples/inference/sglang.md"
+        "docs/examples/llms/llama/index.md": "docs/examples/inference/vllm.md"
+        "docs/examples/misc/docker-compose/index.md": "docs/concepts/dev-environments.md#docker-in-docker"
         "backends.md": "docs/concepts/backends.md"
         "blog/monitoring-gpu-usage.md": "blog/posts/dstack-metrics.md"
         "blog/inactive-dev-environments-auto-shutdown.md": "blog/posts/inactivity-duration.md"
@@ -193,8 +200,8 @@ plugins:
         "examples/inference/vllm.md": "docs/examples/inference/vllm.md"
         "examples/inference/nim.md": "docs/examples/inference/nim.md"
         "examples/inference/trtllm.md": "docs/examples/inference/trtllm.md"
-        "examples/models/deepseek-v4.md": "docs/examples/models/deepseek-v4.md"
-        "examples/models/qwen36.md": "docs/examples/models/qwen36.md"
+        "examples/models/deepseek-v4.md": "docs/examples/inference/sglang.md"
+        "examples/models/qwen36.md": "docs/examples/inference/sglang.md"
         "examples/accelerators/amd.md": "docs/examples/accelerators/amd.md"
         "examples/accelerators/tpu.md": "docs/examples/accelerators/tpu.md"
         "examples/accelerators/tenstorrent.md": "docs/examples/accelerators/tenstorrent.md"
@@ -335,9 +342,6 @@ nav:
             - vLLM: docs/examples/inference/vllm.md
             - NIM: docs/examples/inference/nim.md
             - TensorRT-LLM: docs/examples/inference/trtllm.md
-        - Models:
-            - DeepSeek V4: docs/examples/models/deepseek-v4.md
-            - Qwen 3.6: docs/examples/models/qwen36.md
         - Accelerators:
             - AMD: docs/examples/accelerators/amd.md
             - Tenstorrent: docs/examples/accelerators/tenstorrent.md

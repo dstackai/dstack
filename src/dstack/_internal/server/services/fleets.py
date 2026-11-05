@@ -69,6 +69,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     is_placeholder_instance,
@@ -276,6 +277,9 @@ async def list_projects_fleet_models(
             if prev_id is None:
                 filters.append(FleetModel.created_at > prev_created_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                filters.append(FleetModel.created_at >= prev_created_at)
                 filters.append(
                     or_(
                         FleetModel.created_at > prev_created_at,
@@ -286,6 +290,7 @@ async def list_projects_fleet_models(
             if prev_id is None:
                 filters.append(FleetModel.created_at < prev_created_at)
             else:
+                filters.append(FleetModel.created_at <= prev_created_at)
                 filters.append(
                     or_(
                         FleetModel.created_at < prev_created_at,
@@ -460,16 +465,17 @@ async def get_plan(
         include_only_create_instance_supported_backends = True
         if nodes is not None:
             include_only_create_instance_supported_backends = nodes.target != 0
-        offers_with_backends = await get_fleet_offers(
-            project=project,
-            profile=effective_spec.merged_profile,
-            requirements=requirements,
-            fleet_spec=effective_spec,
-            blocks=effective_spec.configuration.blocks,
-            include_only_create_instance_supported_backends=(
-                include_only_create_instance_supported_backends
-            ),
-        )
+        async with backends_cache.lease_project_backends(project) as backends:
+            offers_with_backends = await get_fleet_offers(
+                backends=backends,
+                profile=effective_spec.merged_profile,
+                requirements=requirements,
+                fleet_spec=effective_spec,
+                blocks=effective_spec.configuration.blocks,
+                include_only_create_instance_supported_backends=(
+                    include_only_create_instance_supported_backends
+                ),
+            )
         offers = [offer for _, offer in offers_with_backends]
 
     _remove_fleet_spec_sensitive_info(effective_spec)
@@ -490,7 +496,7 @@ async def get_plan(
 
 
 async def get_fleet_offers(
-    project: ProjectModel,
+    backends: List[Backend],
     profile: Profile,
     requirements: Requirements,
     placement_group: Optional[PlacementGroup] = None,
@@ -528,7 +534,7 @@ async def get_fleet_offers(
                     break
 
     offers = await offers_services.get_offers_by_requirements(
-        project=project,
+        backends=backends,
         profile=profile,
         requirements=requirements,
         exclude_not_available=exclude_not_available,

@@ -148,6 +148,13 @@ class NebiusCompute(
         assert isinstance(self.config.creds, NebiusServiceAccountCreds)
         return resources.make_sdk(self.config.creds)
 
+    def close(self) -> None:
+        # `_sdk` is created on first use. Close only an existing SDK and only once
+        if "_sdk" in self.__dict__:
+            sdk = self._sdk
+            del self._sdk
+            resources.close_sdk(sdk)
+
     @cached_property
     def _tenant_id(self) -> str:
         return resources.get_tenant_id(self._sdk)
@@ -651,11 +658,9 @@ def _wait_for_instance(sdk: SDK, op: resources.NebiusOperation) -> None:
             op.status(),
         )
         time.sleep(WAIT_FOR_INSTANCE_UPDATE_INTERVAL)
-        resources.LOOP.await_(
-            op.update(
-                per_retry_timeout=resources.REQUEST_TIMEOUT,
-                auth_options=resources.REQUEST_AUTH_OPTIONS,
-            )
+        op.sync_update(
+            per_retry_timeout=resources.REQUEST_TIMEOUT,
+            auth_options=resources.REQUEST_AUTH_OPTIONS,
         )
 
 

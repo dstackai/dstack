@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Badge from '@cloudscape-design/components/badge';
 import { skipToken } from '@reduxjs/toolkit/query';
 
-import { Alert, Button, Cards, CardsProps, MultiselectCSD, Popover, PropertyFilter, SpaceBetween, Toggle } from 'components';
+import { Alert, Button, Cards, CardsProps, MultiselectCSD, PropertyFilter, SpaceBetween, Toggle } from 'components';
 
 import { useCollection } from 'hooks';
 import { getServerError } from 'libs';
@@ -88,7 +88,7 @@ export const getRequestParams = ({
                         ...(gpuMemoryMinMax ? { memory: gpuMemoryMinMax as unknown as TRange } : {}),
                     },
                 },
-                spot_policy,
+                spot_policy: spot_policy ?? 'auto',
                 volumes: [],
                 files: [],
                 setup: [],
@@ -227,10 +227,7 @@ export const OfferList: React.FC<OfferListProps> = ({
     });
 
     const gpus = useMemo(
-        () =>
-            gpuEnabled
-                ? (groupedQuery.currentData?.gpus ?? []).map((gpu) => ({ ...gpu, price: gpu.offer_price ?? gpu.price }))
-                : (groupedQuery.currentData?.cpus ?? []).map(toCpuCard),
+        () => (gpuEnabled ? (groupedQuery.currentData?.gpus ?? []) : (groupedQuery.currentData?.cpus ?? []).map(toCpuCard)),
         [groupedQuery.currentData, gpuEnabled],
     );
 
@@ -293,9 +290,6 @@ export const OfferList: React.FC<OfferListProps> = ({
             id: 'resources',
             content: (gpu) => {
                 const availability = getOfferAvailability(gpu.availability);
-                const label = availability && (
-                    <span className={styles.greyText}>{t(`offer.availability_${availability}`)}</span>
-                );
                 return (
                     <div className={styles.cardContent}>
                         <div>
@@ -305,27 +299,20 @@ export const OfferList: React.FC<OfferListProps> = ({
                                       max: round(convertMiBToGB(gpu.cpu.memory_range.max)),
                                   })
                                 : round(convertMiBToGB(gpu.memory_mib))}
-                            GB <span className={styles.greyText}>{gpu.cpu ? 'RAM' : 'VRAM'}</span>
+                            GB <span className={styles.unitText}>{gpu.cpu ? 'RAM' : 'VRAM'}</span>
                         </div>
-                        <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>
+                        <div>
+                            <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>{' '}
+                            <span className={styles.unitText}>{!ungrouped && !gpu.cpu ? '/GPU/h' : '/h'}</span>
+                        </div>
                         <div>
                             {gpu.backend ? formatBackend(gpu.backend) : (gpu.backends?.map(formatBackend).join(', ') ?? '-')}
                         </div>
                         <div>{gpu.spot.join(', ') || '-'}</div>
                         {ungrouped && gpu.region && <div>{gpu.region}</div>}
-                        {label &&
-                            (gpu.availability.length === 1 ? (
-                                label
-                            ) : (
-                                <Popover
-                                    dismissButton={false}
-                                    position="top"
-                                    size="small"
-                                    content={gpu.availability.map((a) => t(`offer.availability_${a}`)).join(', ')}
-                                >
-                                    {label}
-                                </Popover>
-                            ))}
+                        <span className={styles.greyText}>
+                            {availability.map((a) => t(`offer.availability_${a}`)).join(', ')}
+                        </span>
                     </div>
                 );
             },

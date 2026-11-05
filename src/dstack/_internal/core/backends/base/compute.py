@@ -1,3 +1,4 @@
+import importlib.resources
 import os
 import random
 import re
@@ -200,6 +201,14 @@ class Compute(ABC):
         It should not wait but return immediately.
         If it raises `ProvisioningError`, there will be no further attempts to update the provisioning data,
         and the run will be terminated.
+        """
+        pass
+
+    def close(self) -> None:
+        """
+        Releases resources that are not freed by garbage collection, e.g. SDK clients that run
+        background threads. The compute must not be used after `close()`.
+        It is called from async code in executor, so it can block. Must be idempotent.
         """
         pass
 
@@ -493,6 +502,8 @@ class ComputeWithResourceListingSupport(ABC):
         fails, return no groups of the region and report it in `ResourceListing.failures`.
         Otherwise, `primary_id=None` may be reported for resources of a tracked owner
         whose owner resource was not listed, and they would be deleted.
+        Internal resources that the backend lacks permissions to list may be skipped with
+        a warning instead, if deleting their group deletes them anyway.
         Raise if nothing could be listed.
         """
         pass
@@ -1275,12 +1286,12 @@ def get_gateway_user_data(authorized_key: str) -> str:
         package_update=True,
         packages=[
             "nginx",
-            "python3.10-venv",
+            "wget",
         ],
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[
             ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
+            ["su", "ubuntu", "-c", get_dstack_gateway_install_command()],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -1389,15 +1400,30 @@ def get_dstack_gateway_package_and_target_version() -> tuple[str, str | None]:
     return package, None
 
 
-def get_dstack_gateway_commands() -> List[str]:
-    gateway_package, _ = get_dstack_gateway_package_and_target_version()
-    return [
-        "mkdir -p /home/ubuntu/dstack",
-        "python3 -m venv /home/ubuntu/dstack/blue",
-        "python3 -m venv /home/ubuntu/dstack/green",
-        f"/home/ubuntu/dstack/blue/bin/pip install '{gateway_package}'",
-        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack._internal.proxy.gateway.systemd install --run",
-    ]
+def get_dstack_gateway_install_command() -> str:
+    """
+    Returns a shell command that installs the gateway app on a fresh gateway host or updates it
+    on an existing one. Must be run as the `ubuntu` user.
+    """
+    gateway_package, target_version = get_dstack_gateway_package_and_target_version()
+    return shlex.join(
+        [
+            "/bin/sh",
+            "-c",
+            _get_dstack_gateway_install_script(),
+            "sh",  # $0
+            gateway_package,
+            target_version or "",
+        ]
+    )
+
+
+def _get_dstack_gateway_install_script() -> str:
+    return (
+        importlib.resources.files("dstack._internal.core.backends.base")
+        .joinpath("resources/gateway_install.sh")
+        .read_text()
+    )
 
 
 def merge_tags(

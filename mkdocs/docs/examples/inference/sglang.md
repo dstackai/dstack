@@ -8,9 +8,6 @@ description: Deploying Qwen3.6-27B using SGLang on NVIDIA and AMD GPUs
 This example shows how to deploy `Qwen/Qwen3.6-27B` using
 [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
-> For a `DeepSeek-V4-Pro` deployment on `B200:8`, see the
-[DeepSeek V4](../models/deepseek-v4.md) model page.
-
 ## Apply a configuration
 
 Here's an example of a service that deploys
@@ -201,12 +198,6 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     port: 8000
     model: zai-org/GLM-4.5-Air-FP8
-
-    # Custom probe is required for PD disaggregation.
-    probes:
-      - type: http
-        url: /health
-        interval: 15s
     ```
 
     </div>
@@ -378,12 +369,6 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
     port: 30000
     model: Qwen/Qwen2.5-72B-Instruct
 
-    # Custom probe is required for PD disaggregation.
-    probes:
-      - type: http
-        url: /health
-        interval: 15s
-
     volumes:
       - /usr/lib64/libibverbs/libbnxt_re-rdmav34.so:/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so
     ```
@@ -394,6 +379,8 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
         Mooncake uses the RDMA/RoCE interconnect for KV Cache transer. To use the RDMA/RoCE interconnect on Broadcom `bnxt_re` devices, Mooncake requires the Broadcom-specific userspace provider library `libbnxt_re-rdmav34.so` to be available inside the container at `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`. We make this library available by mounting the host provider library from `/usr/lib64/libibverbs/libbnxt_re-rdmav34.so`.
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
+
+> The `scaling` property requires creating a [gateway](../../concepts/gateways.md).
 
 !!! info "Cluster"
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.

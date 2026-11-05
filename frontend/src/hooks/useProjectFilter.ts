@@ -4,6 +4,9 @@ import { SelectCSDProps } from 'components';
 
 import { useGetProjectsQuery } from 'services/project';
 
+import { selectUserName } from 'App/slice';
+
+import useAppSelector from './useAppSelector';
 import { useLocalStorageState } from './useLocalStorageState';
 
 type Args = {
@@ -16,7 +19,8 @@ export const useProjectFilter = ({ localStorePrefix }: Args) => {
         null,
     );
 
-    const { data: projectsData, isLoading } = useGetProjectsQuery({});
+    const userName = useAppSelector(selectUserName);
+    const { data: projectsData, isLoading } = useGetProjectsQuery({ username: userName ?? '' }, { skip: !userName });
 
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
         if (!projectsData?.data?.length) return [];

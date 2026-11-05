@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal import settings
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
     get_dstack_runner_download_url,
     get_dstack_runner_version,
@@ -21,7 +20,6 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import ProvisioningError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     GpuDriverInfo,
@@ -52,7 +50,7 @@ from dstack._internal.server.schemas.runner import (
     ComponentStatus,
     InstanceHealthResponse,
 )
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.backends import cache as backends_cache
 from dstack._internal.server.services.instances import (
     get_instance_provisioning_data,
     get_instance_ssh_private_keys,
@@ -334,72 +332,63 @@ async def _process_wait_for_instance_provisioning_data(
         )
         return result
 
-    backend = await _get_backend_for_provisioning_wait(
-        project_id=instance_model.project_id,
-        backend_type=job_provisioning_data.backend,
-    )
-    if backend is None:
-        logger.warning(
-            "Instance %s failed because instance's backend is not available",
-            instance_model.name,
-        )
-        set_status_update(
-            update_map=result.instance_update_map,
-            instance_model=instance_model,
-            new_status=InstanceStatus.TERMINATING,
-            termination_reason=InstanceTerminationReason.ERROR,
-            termination_reason_message="Backend not available",
-        )
-        return result
+    project_model = await _load_project_with_backends(instance_model.project_id)
+    async with backends_cache.lease_project_backend_by_type(
+        project=project_model, backend_type=job_provisioning_data.backend
+    ) as backend:
+        if backend is None:
+            logger.warning(
+                "Instance %s failed because instance's backend is not available",
+                instance_model.name,
+            )
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.TERMINATING,
+                termination_reason=InstanceTerminationReason.ERROR,
+                termination_reason_message="Backend not available",
+            )
+            return result
 
-    try:
-        await run_async(
-            backend.compute().update_provisioning_data,
-            job_provisioning_data,
-            instance_model.project.ssh_public_key,
-            instance_model.project.ssh_private_key,
-        )
-        result.instance_update_map["job_provisioning_data"] = (
-            job_provisioning_data.model_dump_json()
-        )
-    except ProvisioningError as exc:
-        logger.warning(
-            "Error while waiting for instance %s to become running: %s",
-            instance_model.name,
-            repr(exc),
-        )
-        set_status_update(
-            update_map=result.instance_update_map,
-            instance_model=instance_model,
-            new_status=InstanceStatus.TERMINATING,
-            termination_reason=InstanceTerminationReason.ERROR,
-            termination_reason_message="Error while waiting for instance to become running",
-        )
-    except Exception:
-        logger.exception(
-            "Got exception when updating instance %s provisioning data",
-            instance_model.name,
-        )
+        try:
+            await run_async(
+                backend.compute().update_provisioning_data,
+                job_provisioning_data,
+                instance_model.project.ssh_public_key,
+                instance_model.project.ssh_private_key,
+            )
+            result.instance_update_map["job_provisioning_data"] = (
+                job_provisioning_data.model_dump_json()
+            )
+        except ProvisioningError as exc:
+            logger.warning(
+                "Error while waiting for instance %s to become running: %s",
+                instance_model.name,
+                repr(exc),
+            )
+            set_status_update(
+                update_map=result.instance_update_map,
+                instance_model=instance_model,
+                new_status=InstanceStatus.TERMINATING,
+                termination_reason=InstanceTerminationReason.ERROR,
+                termination_reason_message="Error while waiting for instance to become running",
+            )
+        except Exception:
+            logger.exception(
+                "Got exception when updating instance %s provisioning data",
+                instance_model.name,
+            )
     return result
 
 
-async def _get_backend_for_provisioning_wait(
-    project_id: uuid.UUID,
-    backend_type: BackendType,
-) -> Optional[Backend]:
+async def _load_project_with_backends(project_id: uuid.UUID) -> ProjectModel:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(ProjectModel)
             .where(ProjectModel.id == project_id)
             .options(joinedload(ProjectModel.backends))
         )
-        project_model = res.unique().scalar_one_or_none()
-    if project_model is None:
-        return None
-    return await backends_services.get_project_backend_by_type(
-        project=project_model,
-        backend_type=backend_type,
-    )
+        return res.unique().scalar_one()
 
 
 @runner_ssh_tunnel

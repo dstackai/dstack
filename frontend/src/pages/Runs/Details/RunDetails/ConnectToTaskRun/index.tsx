@@ -12,6 +12,7 @@ import {
     SpaceBetween,
     StatusIndicator,
     Tabs,
+    TokenVisibilityButton,
     Wizard,
 } from 'components';
 
@@ -35,7 +36,9 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
     const mappedAppSpecs = appSpecs.filter((spec) => getMappedPort(spec) != null);
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
-    const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
+    const [configCliCommand, copyCliCommand, isTokenVisible, setIsTokenVisible] = useConfigProjectCliCommand({
+        projectName: run.project_name,
+    });
 
     return (
         <ExpandableSection
@@ -172,24 +175,31 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
                                                 <Code className={styles.code}>{configCliCommand}</Code>
 
                                                 <div className={styles.copy}>
-                                                    <Popover
-                                                        dismissButton={false}
-                                                        position="top"
-                                                        size="small"
-                                                        triggerType="custom"
-                                                        content={
-                                                            <StatusIndicator type="success">
-                                                                {t('common.copied')}
-                                                            </StatusIndicator>
-                                                        }
-                                                    >
-                                                        <Button
-                                                            formAction="none"
-                                                            iconName="copy"
-                                                            variant="normal"
-                                                            onClick={copyCliCommand}
+                                                    <SpaceBetween direction="horizontal" size="xs">
+                                                        <TokenVisibilityButton
+                                                            visible={isTokenVisible}
+                                                            onChange={setIsTokenVisible}
                                                         />
-                                                    </Popover>
+
+                                                        <Popover
+                                                            dismissButton={false}
+                                                            position="top"
+                                                            size="small"
+                                                            triggerType="custom"
+                                                            content={
+                                                                <StatusIndicator type="success">
+                                                                    {t('common.copied')}
+                                                                </StatusIndicator>
+                                                            }
+                                                        >
+                                                            <Button
+                                                                formAction="none"
+                                                                iconName="copy"
+                                                                variant="normal"
+                                                                onClick={copyCliCommand}
+                                                            />
+                                                        </Popover>
+                                                    </SpaceBetween>
                                                 </div>
                                             </div>
                                         </SpaceBetween>

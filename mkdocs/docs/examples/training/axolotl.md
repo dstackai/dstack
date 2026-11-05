@@ -84,7 +84,7 @@ Provisioning...
 ## Distributed training
 
 !!! info "Prerequisites"
-    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
+    Before running a multi-node task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#cluster-placement)).
 
 This section walks through running distributed fine-tuning of `Llama-3.1-70B` with QLoRA and FSDP across multiple nodes.
 
@@ -125,16 +125,16 @@ commands:
   - |
     accelerate launch \
       --config_file=fsdp1.yaml \
-      -m axolotl.cli.train qlora-fsdp-70b.yaml \
-      --hub-model-id $HUB_MODEL_ID \
-      --output-dir /checkpoints/qlora-llama3-70b \
-      --wandb-project $WANDB_PROJECT \
-      --wandb-name $DSTACK_RUN_NAME \
       --main_process_ip=$DSTACK_MASTER_NODE_IP \
       --main_process_port=8008 \
       --machine_rank=$DSTACK_NODE_RANK \
       --num_processes=$DSTACK_GPUS_NUM \
-      --num_machines=$DSTACK_NODES_NUM
+      --num_machines=$DSTACK_NODES_NUM \
+      -m axolotl.cli.train qlora-fsdp-70b.yaml \
+      --hub-model-id $HUB_MODEL_ID \
+      --output-dir /checkpoints/qlora-llama3-70b \
+      --wandb-project $WANDB_PROJECT \
+      --wandb-name $DSTACK_RUN_NAME
 
 resources:
   gpu: 80GB:8
