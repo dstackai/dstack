@@ -9,12 +9,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Any, Final, Iterable, List, Optional, TypeVar, Union
+from typing import Any, Final, Iterable, List, Optional, ParamSpec, TypeVar, Union
 from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import TypeAdapter
-from typing_extensions import ParamSpec
 
 from dstack._internal.core.models.duration import Duration
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator

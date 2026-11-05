@@ -1,10 +1,9 @@
 from collections.abc import Mapping
 from http import HTTPStatus
-from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
+from typing import Any, Dict, List, Literal, NotRequired, Optional, TypedDict, cast
 
 import requests
 from gpuhunt.providers.runpod import RunpodProvider
-from typing_extensions import NotRequired
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 from dstack._internal.utils.logging import get_logger

@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional, Self
 from urllib.parse import urlparse
 
 from pydantic import UUID4, ConfigDict, Field, model_validator
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType

@@ -3,12 +3,11 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Annotated, BinaryIO, Callable, Dict, Optional, Union, cast
+from typing import Annotated, BinaryIO, Callable, Dict, Literal, Optional, Union, cast
 
 import git
 import pydantic
 from pydantic import Field, TypeAdapter
-from typing_extensions import Literal
 
 from dstack._internal.core.deprecated import Deprecated
 from dstack._internal.core.errors import (

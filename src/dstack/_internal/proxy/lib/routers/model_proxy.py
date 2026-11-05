@@ -1,8 +1,7 @@
-from typing import AsyncIterator, Optional
+from typing import Annotated, AsyncIterator, Optional
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
-from typing_extensions import Annotated
 
 from dstack._internal.proxy.lib.deps import ProxyAuth, get_proxy_repo, get_service_connection_pool
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError

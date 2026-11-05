@@ -1,9 +1,8 @@
 import time
-from typing import List, Optional
+from typing import List, Optional, assert_never
 
 import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
-from typing_extensions import assert_never
 
 from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
 from dstack._internal.core.backends.base.backend import Compute

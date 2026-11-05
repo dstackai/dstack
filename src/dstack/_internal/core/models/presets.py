@@ -1,8 +1,7 @@
 import re
-from typing import Any, List, Literal, Optional, Sequence
+from typing import Annotated, Any, List, Literal, Optional, Self, Sequence
 
 from pydantic import Field, PositiveFloat, PositiveInt, field_validator, model_validator
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import (
