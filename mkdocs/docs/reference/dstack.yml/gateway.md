@@ -47,3 +47,9 @@ Set to `null` to disable certificates (e.g. for [private gateways](../../concept
           show_root_heading: false
           type:
             required: true
+
+### `otel`
+
+#SCHEMA# dstack._internal.core.models.gateways.GatewayOTelConfig
+    overrides:
+      show_root_heading: false

@@ -6,9 +6,10 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.services.gateways import get_project_gateway_model_by_reference
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     clear_events,
@@ -17,6 +18,7 @@ from dstack._internal.server.testing.common import (
     create_gateway,
     create_gateway_replica,
     create_project,
+    create_secret,
     create_user,
     get_auth_headers,
     list_events,
@@ -112,6 +114,7 @@ class TestListAndGetGateways:
                     "load_balancer": None,
                     "certificate": {"type": "lets-encrypt"},
                     "tags": None,
+                    "otel": None,
                     "replicas": None,
                 },
             }
@@ -199,6 +202,7 @@ class TestListAndGetGateways:
                 "load_balancer": None,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
+                "otel": None,
                 "replicas": None,
             },
         }
@@ -541,6 +545,7 @@ class TestCreateGateway:
                 "load_balancer": None,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
+                "otel": None,
                 "replicas": None,
             },
         }
@@ -632,6 +637,7 @@ class TestCreateGateway:
                 "load_balancer": None,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
+                "otel": None,
                 "replicas": None,
             },
         }
@@ -974,6 +980,7 @@ class TestDefaultGateway:
                 "load_balancer": None,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
+                "otel": None,
                 "replicas": None,
             },
         }
@@ -1371,6 +1378,7 @@ class TestUpdateGateway:
                 "load_balancer": None,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
+                "otel": None,
                 "replicas": None,
             },
         }
@@ -3037,3 +3045,130 @@ class TestApplyGatewayPlanDefault:
 
         await session.refresh(project)
         assert project.default_gateway_id is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestGatewayOTel:
+    async def test_creates_gateway_with_secret_references(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_secret(session=session, project=project, name="token", value="s3cret")
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+        otel = {
+            "endpoint": "https://otlp.example.com",
+            "headers": {"Authorization": "Bearer ${{ secrets.token }}"},
+            "traces": True,
+        }
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "otel": otel,
+                        }
+                    },
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["configuration"]["otel"]["headers"] == otel["headers"]
+        assert "s3cret" not in response.text
+        gateway = await get_project_gateway_model_by_reference(
+            session, project, EntityReference(name="my-gateway", project=None)
+        )
+        assert gateway is not None
+        assert "secrets.token" in (gateway.configuration or "")
+        assert "s3cret" not in (gateway.configuration or "")
+        events = await list_events(session)
+        assert all("s3cret" not in e.message for e in events)
+
+    async def test_cannot_update_otel_in_place(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="my-gateway",
+            region="us-east-1",
+        )
+        await create_gateway_replica(session=session, backend=backend, gateway_id=gateway.id)
+        get_response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "my-gateway"},
+            headers=get_auth_headers(user.token),
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/apply",
+            json={
+                "plan": {
+                    "spec": {
+                        "configuration": {
+                            "type": "gateway",
+                            "name": "my-gateway",
+                            "backend": "aws",
+                            "region": "us-east-1",
+                            "otel": {"endpoint": "https://otlp.example.com", "traces": True},
+                        }
+                    },
+                    "current_resource": get_response.json(),
+                },
+                "force": False,
+            },
+            headers=get_auth_headers(user.token),
+        )
+
+        assert response.status_code == 400
+        assert "cannot be updated in-place" in response.json()["detail"][0]["msg"]
+
+    async def test_rejects_missing_secret(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/get_plan",
+            json={
+                "spec": {
+                    "configuration": {
+                        "type": "gateway",
+                        "name": "my-gateway",
+                        "backend": "aws",
+                        "region": "us-east-1",
+                        "otel": {"endpoint": "${{ secrets.missing }}", "traces": True},
+                    }
+                }
+            },
+            headers=get_auth_headers(user.token),
+        )
+
+        assert response.status_code == 400
+        assert "secrets.missing" in response.text
