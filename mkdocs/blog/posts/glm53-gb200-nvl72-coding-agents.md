@@ -105,9 +105,9 @@ We then raised the agent count for each winner. Aggregated, replayed at normal p
 
 ## Conclusion
 
-### Self-hosting costs 70% less than buying tokens
+### Self-hosting is economically viable
 
-Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting costs $12.77 per million output tokens, against $43–66 to buy the same tokens from these endpoints.
+Optimized for 48 agents, 14 GB200 nodes match the fastest GLM-5.3 endpoints on p50 output speed and beat them on p50 TTFT and on output speed at p99. Self-hosting costs $12.77 per million output tokens, at least 70% less than the $43–66 it costs to buy the same tokens from these endpoints.
 
 ### Cache fit decides aggregated vs PD
 
@@ -123,10 +123,11 @@ Almost all of the gain came from layout decisions: whether to disaggregate, how 
 
 ## Limitations
 
-1. Replayed, accelerated traffic. The pauses are capped at 5 s and the prompt text is generated, so production traffic will differ in cache reuse, timing and concurrency. For production, give presets your own traffic as the workload.
-2. Not a controlled comparison with providers. Their figures come from OpenRouter's measurements of different traffic, and we serve the NVFP4 checkpoint while Baseten's fast endpoints serve FP8. The cost comparison is make or buy: it sets the cost of self-hosting against the price of buying the same tokens, not against what providers pay to serve them. It assumes the fleet runs this load continuously at $4.00 per chip-hour, [SemiAnalysis's retail price](https://inferencex.semianalysis.com/chips/gb200-nvl72) for GB200 NVL72.
-3. Layout first. The preset agent spent its sessions on layout rather than engine settings, source patches or kernels, so more gains are likely.
-4. The comparison with SemiAnalysis is approximate. Their run served the GLM-5.2 NVFP4 checkpoint, which has the same architecture but a different quantization recipe. The SGLang builds also differ, we used 64 chips against their 32, and our benchmark window was 929 s against their 3,625 s, so we compare only throughput per chip.
+1. The recorded sessions are replayed with pauses capped at 5 s and generated prompt text, so production traffic will differ in cache reuse, timing and concurrency. For production, give presets your own traffic as the workload.
+2. Provider figures are OpenRouter's measurements of its users' requests to each endpoint, not of our workload, and we serve the NVFP4 checkpoint while Baseten's fast endpoints serve FP8.
+3. The cost compares self-hosting with buying the same tokens, not with what providers pay to serve them. It counts only GPU rental and assumes the 56 chips produce 17.54 million output tokens in every hour they are rented, at $4.00 per chip-hour, [SemiAnalysis's retail price](https://inferencex.semianalysis.com/chips/gb200-nvl72) for GB200 NVL72. It leaves out the router node, storage, operations and idle hours.
+4. The preset agent spent its sessions on layout rather than engine settings, source patches or kernels, so more gains are likely.
+5. The comparison with SemiAnalysis is approximate. Their run served the GLM-5.2 NVFP4 checkpoint, which has the same architecture but a different quantization recipe. The SGLang builds also differ, we used 64 chips against their 32, and our benchmark window was 929 s against their 3,625 s, so we compare only throughput per chip.
 
 ## Deploy
 
