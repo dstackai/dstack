@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Literal, Optional, Protocol, Union, cast, get_args
+from typing import Callable, Literal, Optional, Protocol, Self, Union, cast, get_args
 
 import gpuhunt
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
@@ -18,7 +18,6 @@ from kubernetes.client import (
     V1Toleration,
 )
 from kubernetes.utils.quantity import parse_quantity as _parse_quantity
-from typing_extensions import Self
 
 from dstack._internal.core.backends.base.compute import normalize_arch
 from dstack._internal.core.backends.kubernetes.utils import try_delete_object_if_exists

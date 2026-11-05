@@ -1,5 +1,6 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
-from typing_extensions import Annotated
 
 import dstack._internal.proxy.gateway.services.registry as registry_services
 from dstack._internal.proxy.gateway.deps import get_gateway_proxy_repo, get_nginx

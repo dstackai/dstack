@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import Field, PositiveInt
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import PresetConfiguration

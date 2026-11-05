@@ -3,14 +3,13 @@ import uuid
 from collections.abc import Generator
 from http import HTTPStatus
 from pathlib import Path
-from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
+from typing import BinaryIO, Dict, List, Literal, Optional, Self, TypeVar, Union, overload
 
 import packaging.version
 import pydantic
 import requests
 import requests.exceptions
 import requests_unixsocket
-from typing_extensions import Self
 
 from dstack._internal.core.consts import DSTACK_PROJECT_ENV
 from dstack._internal.core.errors import DstackError

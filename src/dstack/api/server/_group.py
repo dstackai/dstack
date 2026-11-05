@@ -1,8 +1,7 @@
 from logging import Logger
-from typing import Optional, Union
+from typing import Optional, Protocol, Union
 
 import requests
-from typing_extensions import Protocol
 
 
 class APIRequest(Protocol):

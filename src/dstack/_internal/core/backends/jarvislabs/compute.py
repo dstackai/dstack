@@ -1,11 +1,11 @@
 import shlex
 import subprocess
 import tempfile
-from typing import Callable, List, Optional, cast
+from typing import Callable, List, NotRequired, Optional, cast
 
 import gpuhunt
 from gpuhunt.providers.jarvislabs import JarvisLabsProvider
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (

@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Optional
+from typing import Annotated, AsyncGenerator, Optional
 
 from fastapi import Depends, FastAPI, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from typing_extensions import Annotated
 
 from dstack._internal.proxy.lib.auth import BaseProxyAuthProvider
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError

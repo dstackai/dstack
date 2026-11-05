@@ -2,10 +2,9 @@
 Data structures related to `type: service` runs.
 """
 
-from typing import Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import Field
-from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.common import CoreModel
 
