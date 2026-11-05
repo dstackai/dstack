@@ -89,8 +89,8 @@ def parse_datetime(value: str) -> datetime:
     """
     Parse a datetime the way the API parses one: an ISO 8601 string or a Unix timestamp.
 
-    Unlike `datetime.fromisoformat()` on Python 3.10, accepts the `Z` suffix and fractional
-    seconds of any precision. Raises `ValueError` if `value` is not a datetime.
+    Accepts the `Z` suffix and fractional seconds of any precision. Raises `ValueError` if
+    `value` is not a datetime.
     """
     return _DATETIME_ADAPTER.validate_strings(value)
 
