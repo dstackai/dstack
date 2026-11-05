@@ -12,8 +12,8 @@ from dstack._internal.core.models.configurations import RateLimit, ServiceConfig
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, get_service_port
 from dstack._internal.proxy.gateway.schemas.registry import (
-    ReplicaHeadNodeKeyUpdate,
-    UpdateReplicaHeadNodeKeysResponse,
+    ReplicaProxyJumpKeyUpdate,
+    UpdateReplicaProxyJumpKeysResponse,
 )
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem, ServiceListResponse
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
@@ -145,21 +145,21 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def update_replica_head_node_keys(
-        self, updates: list[ReplicaHeadNodeKeyUpdate]
+    async def update_replica_proxy_jump_keys(
+        self, updates: list[ReplicaProxyJumpKeyUpdate]
     ) -> dict[str, str]:
-        """Send one synchronization batch of SSH-fleet head-node key replacements.
+        """Send one synchronization batch of SSH fleet `proxy_jump` key replacements.
 
         The gateway preserves existing service tunnels and saves successful updates
         once. Return failures by job ID; the next sync retries keys still different.
         """
         resp = await self._client.post(
-            self._url("/api/registry/replicas/head_node_keys"),
+            self._url("/api/registry/replicas/proxy_jump_keys"),
             json={"replicas": [item.model_dump() for item in updates]},
         )
         resp.raise_for_status()
         self.is_server_ready = True
-        return UpdateReplicaHeadNodeKeysResponse.model_validate(resp.json()).failures
+        return UpdateReplicaProxyJumpKeysResponse.model_validate(resp.json()).failures
 
     async def unregister_replica(self, project: str, run_name: str, job_id: uuid.UUID):
         resp = await self._client.post(

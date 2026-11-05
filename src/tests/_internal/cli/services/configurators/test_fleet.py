@@ -182,11 +182,11 @@ class TestApplyPlanMessages:
         confirm_ask.assert_called_once_with("Update the fleet in-place?")
 
     @pytest.mark.parametrize(
-        "per_host,head_node",
+        "per_host,proxy_jump",
         [(False, False), (False, True), (True, False), (True, True)],
     )
     def test_identifies_the_changed_ssh_key_without_printing_key_material(
-        self, monkeypatch, per_host, head_node
+        self, monkeypatch, per_host, proxy_jump
     ):
         console, confirm_ask = patch_console_and_confirm(monkeypatch)
         current = get_ssh_fleet_spec()
@@ -198,7 +198,7 @@ class TestApplyPlanMessages:
             target = SSHHostParams(hostname="10.0.0.100")
             ssh.hosts = [target]
             path += ".hosts[0]"
-        if head_node:
+        if proxy_jump:
             jump = SSHProxyParams(hostname="head", user="ubuntu", identity_file="old-key")
             target.proxy_jump = jump
             target = jump
@@ -211,7 +211,7 @@ class TestApplyPlanMessages:
         if per_host:
             changed = changed.hosts[0]
             assert isinstance(changed, SSHHostParams)
-        if head_node:
+        if proxy_jump:
             changed = changed.proxy_jump
         assert changed is not None
         changed.identity_file = "new-key"

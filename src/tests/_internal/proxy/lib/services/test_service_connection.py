@@ -192,7 +192,7 @@ class TestServiceConnection:
 @pytest.mark.asyncio
 class TestServiceConnectionPool:
     @pytest.mark.parametrize("gateway", [False, True])
-    async def test_head_node_key_update_preserves_client_socket_and_reconnects_with_new_key(
+    async def test_proxy_jump_key_update_preserves_client_socket_and_reconnects_with_new_key(
         self, project, service, pool, tunnel_factory, gateway
     ):
         service = service.model_copy(update={"domain": service.domain if gateway else None})

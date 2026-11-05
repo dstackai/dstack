@@ -212,19 +212,19 @@ async def register_replica(
     logger.info("Replica %s in service %s is registered now", replica.id, service.fmt())
 
 
-async def update_replica_head_node_keys(
-    updates: list[schemas.ReplicaHeadNodeKeyUpdate],
+async def update_replica_proxy_jump_keys(
+    updates: list[schemas.ReplicaProxyJumpKeyUpdate],
     repo: GatewayProxyRepo,
     service_conn_pool: ServiceConnectionPool,
 ) -> dict[str, str]:
-    """Replace registered replicas' head-node keys in one gateway synchronization batch.
+    """Replace replicas' SSH fleet `proxy_jump` keys in one gateway synchronization batch.
 
     Keep existing tunnels, registrations, and Nginx configuration. Save successful
     replacements once, including across services/projects. Return failures by job ID
     so one removed replica or failed key-file write cannot block the other updates.
     Repeating the same keys is a no-op; the next sync retries any remaining differences.
     """
-    by_service: dict[tuple[str, str], dict[str, schemas.ReplicaHeadNodeKeyUpdate]] = {}
+    by_service: dict[tuple[str, str], dict[str, schemas.ReplicaProxyJumpKeyUpdate]] = {}
     for item in updates:
         by_service.setdefault((item.project_name.lower(), item.run_name.lower()), {})[
             item.job_id
@@ -246,25 +246,25 @@ async def update_replica_head_node_keys(
                 if item is None:
                     continue
                 if replica.ssh_head_proxy is None:
-                    failures[replica.id] = "Replica has no head node"
+                    failures[replica.id] = "Replica has no proxy_jump"
                     continue
-                if replica.ssh_head_proxy_private_key == item.ssh_head_proxy_private_key:
+                if replica.ssh_head_proxy_private_key == item.ssh_proxy_jump_private_key:
                     continue
                 # A fresh Replica discards its cached old public key. Preserve the
                 # unchanged Replica objects so polling does not reparse their keys.
                 updated_replica = models.Replica(
                     **{
                         **replica.model_dump(),
-                        "ssh_head_proxy_private_key": item.ssh_head_proxy_private_key,
+                        "ssh_head_proxy_private_key": item.ssh_proxy_jump_private_key,
                     }
                 )
                 try:
                     await service_conn_pool.get_or_add(project, service, updated_replica)
                 except Exception as exc:
                     logger.warning(
-                        "Could not update replica %s head-node SSH key: %r", replica.id, exc
+                        "Could not update replica %s proxy_jump SSH key: %r", replica.id, exc
                     )
-                    failures[replica.id] = "Could not update head-node key"
+                    failures[replica.id] = "Could not update proxy_jump key"
                     continue
                 replicas[index] = updated_replica
                 changed = True

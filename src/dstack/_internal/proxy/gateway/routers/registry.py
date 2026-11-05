@@ -10,8 +10,8 @@ from dstack._internal.proxy.gateway.schemas.registry import (
     RegisterReplicaRequest,
     RegisterServiceRequest,
     SetServiceIdRequest,
-    UpdateReplicaHeadNodeKeysRequest,
-    UpdateReplicaHeadNodeKeysResponse,
+    UpdateReplicaProxyJumpKeysRequest,
+    UpdateReplicaProxyJumpKeysResponse,
 )
 from dstack._internal.proxy.gateway.services.nginx import Nginx
 from dstack._internal.proxy.lib.deps import get_service_connection_pool
@@ -111,16 +111,16 @@ async def register_replica(
     return OkResponse()
 
 
-@router.post("/replicas/head_node_keys")
-async def update_replica_head_node_keys(
-    body: UpdateReplicaHeadNodeKeysRequest,
+@router.post("/replicas/proxy_jump_keys")
+async def update_replica_proxy_jump_keys(
+    body: UpdateReplicaProxyJumpKeysRequest,
     repo: Annotated[GatewayProxyRepo, Depends(get_gateway_proxy_repo)],
     service_conn_pool: Annotated[ServiceConnectionPool, Depends(get_service_connection_pool)],
-) -> UpdateReplicaHeadNodeKeysResponse:
-    failures = await registry_services.update_replica_head_node_keys(
+) -> UpdateReplicaProxyJumpKeysResponse:
+    failures = await registry_services.update_replica_proxy_jump_keys(
         updates=body.replicas, repo=repo, service_conn_pool=service_conn_pool
     )
-    return UpdateReplicaHeadNodeKeysResponse(failures=failures)
+    return UpdateReplicaProxyJumpKeysResponse(failures=failures)
 
 
 @router.post("/{project_name}/services/{run_name}/replicas/{job_id}/unregister")

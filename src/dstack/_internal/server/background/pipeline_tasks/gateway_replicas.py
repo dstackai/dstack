@@ -25,7 +25,7 @@ from dstack._internal.core.models.common import validate_json_extra_ignore
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunStatus, ServiceSpec
-from dstack._internal.proxy.gateway.schemas.registry import ReplicaHeadNodeKeyUpdate
+from dstack._internal.proxy.gateway.schemas.registry import ReplicaProxyJumpKeyUpdate
 from dstack._internal.proxy.gateway.schemas.services import ServiceListItem
 from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -719,7 +719,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
         instance_connection_info = res.all()
 
     # Parse keys and compare gateway state without holding a DB connection.
-    instance_head_node_public_keys = {}
+    instance_proxy_jump_public_keys = {}
     for instance_id, connection_info in instance_connection_info:
         rci = validate_json_extra_ignore(RemoteConnectionInfo, get_or_error(connection_info))
         if rci.ssh_proxy is not None:
@@ -730,11 +730,11 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
                 public_key = await run_async(
                     ssh_utils.get_public_key_from_private_key, get_or_error(key.private)
                 )
-            instance_head_node_public_keys[instance_id] = public_key
+            instance_proxy_jump_public_keys[instance_id] = public_key
     plan = _plan_state_sync(
         currently_registered=currently_registered_services,
         expected=expected_runs,
-        instance_head_node_public_keys=instance_head_node_public_keys,
+        instance_proxy_jump_public_keys=instance_proxy_jump_public_keys,
     )
     async with get_session_ctx() as session:
         run_models_by_id, job_models_by_id = await _load_runs_and_jobs_for_state_sync(
@@ -948,7 +948,7 @@ async def _perform_state_sync(
     # Send all replacements together. The gateway keeps working tunnels open and
     # saves its state once, rather than rewriting the full state for each replica.
     key_updates = []
-    for run_id, job_ids in plan.update_replica_head_node_keys.items():
+    for run_id, job_ids in plan.update_replica_proxy_jump_keys.items():
         run = run_models_by_id.get(run_id)
         if run is None:
             continue
@@ -960,11 +960,11 @@ async def _perform_state_sync(
             if rci is None or rci.ssh_proxy is None:
                 continue
             key_updates.append(
-                ReplicaHeadNodeKeyUpdate(
+                ReplicaProxyJumpKeyUpdate(
                     project_name=run.project.name,
                     run_name=run.run_name,
                     job_id=job_id.hex,
-                    ssh_head_proxy_private_key=get_or_error(
+                    ssh_proxy_jump_private_key=get_or_error(
                         get_or_error(rci.ssh_proxy_keys)[0].private
                     ),
                 )
@@ -972,15 +972,15 @@ async def _perform_state_sync(
     if key_updates:
         try:
             async with connection.client() as client:
-                failures = await client.update_replica_head_node_keys(key_updates)
+                failures = await client.update_replica_proxy_jump_keys(key_updates)
         except Exception as exc:
             logger.warning(
-                "%s: could not update service head-node SSH keys: %r", fmt(replica_model), exc
+                "%s: could not update service proxy_jump SSH keys: %r", fmt(replica_model), exc
             )
         else:
             for job_id, error in failures.items():
                 logger.warning(
-                    "%s: could not update replica %s head-node SSH key: %s",
+                    "%s: could not update replica %s proxy_jump SSH key: %s",
                     fmt(replica_model),
                     job_id,
                     error,
@@ -1301,7 +1301,7 @@ async def _load_runs_and_jobs_for_state_sync(
     run_ids = (
         plan.register_services
         | plan.register_replicas.keys()
-        | plan.update_replica_head_node_keys.keys()
+        | plan.update_replica_proxy_jump_keys.keys()
         | {s.id for s in plan.unregister_services if s.id is not None}
     )
     run_models_by_id: dict[uuid.UUID, RunModel] = {}
@@ -1318,7 +1318,7 @@ async def _load_runs_and_jobs_for_state_sync(
         job_ids |= replica_ids
     for replica_ids in plan.unregister_replicas.values():
         job_ids |= replica_ids
-    for replica_ids in plan.update_replica_head_node_keys.values():
+    for replica_ids in plan.update_replica_proxy_jump_keys.values():
         job_ids |= replica_ids
     job_models_by_id: dict[uuid.UUID, JobModel] = {}
     if job_ids:
@@ -1451,8 +1451,8 @@ class _StateSyncPlan:
     register_replicas: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
     unregister_replicas: dict[_ServiceRef, set[uuid.UUID]] = field(default_factory=dict)
     set_run_ids: dict[_ServiceRef, uuid.UUID] = field(default_factory=dict)
-    update_replica_head_node_keys: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
-    """Run IDs mapped to registered job IDs whose saved gateway head-node key needs replacing."""
+    update_replica_proxy_jump_keys: dict[uuid.UUID, set[uuid.UUID]] = field(default_factory=dict)
+    """Run IDs mapped to registered job IDs whose saved gateway proxy_jump key needs replacing."""
 
 
 @dataclass
@@ -1472,7 +1472,7 @@ class _StateSyncResult:
 def _plan_state_sync(
     currently_registered: list[ServiceListItem],
     expected: Sequence[RunModel],
-    instance_head_node_public_keys: dict[uuid.UUID, str],
+    instance_proxy_jump_public_keys: dict[uuid.UUID, str],
 ) -> _StateSyncPlan:
     plan = _StateSyncPlan()
     expected_run_id_to_run = {run.id: run for run in expected}
@@ -1506,17 +1506,17 @@ def _plan_state_sync(
             expected_job_ids = {job.id for job in run.jobs}
             plan.register_replicas[run.id] = expected_job_ids - currently_registered_job_ids
             plan.unregister_replicas[service_ref] = currently_registered_job_ids - expected_job_ids
-            gateway_head_node_public_keys = {
-                uuid.UUID(r.id): r.ssh_head_proxy_public_key for r in service.replicas
+            gateway_proxy_jump_public_keys = {
+                uuid.UUID(r.id): r.ssh_proxy_jump_public_key for r in service.replicas
             }
             for job in run.jobs:
                 if job.id not in currently_registered_job_ids or job.instance_id is None:
                     continue
-                public_key = instance_head_node_public_keys.get(job.instance_id)
+                public_key = instance_proxy_jump_public_keys.get(job.instance_id)
                 if public_key is None:
                     continue
-                if gateway_head_node_public_keys[job.id] != public_key:
-                    plan.update_replica_head_node_keys.setdefault(run.id, set()).add(job.id)
+                if gateway_proxy_jump_public_keys[job.id] != public_key:
+                    plan.update_replica_proxy_jump_keys.setdefault(run.id, set()).add(job.id)
         else:
             plan.unregister_services.add(service_ref)
             plan.unregister_replicas[service_ref] = {

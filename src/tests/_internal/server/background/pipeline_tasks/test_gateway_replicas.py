@@ -775,7 +775,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         "failure,public_key",
         [(None, PUBLIC_KEY), (None, ""), ("update", PUBLIC_KEY), ("changed-again", PUBLIC_KEY)],
     )
-    async def test_updates_head_node_key_without_unregistering_or_changing_job(
+    async def test_updates_proxy_jump_key_without_unregistering_or_changing_job(
         self, test_db, session, worker, mock_gateway_connection, failure, public_key
     ):
         project = await create_project(session)
@@ -819,7 +819,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
         await session.commit()
         reported = {
             service_job.id: ServiceListReplicaItem(
-                id=service_job.id.hex, ssh_head_proxy_public_key="old key"
+                id=service_job.id.hex, ssh_proxy_jump_public_key="old key"
             )
             for service_job in (job, other_job)
         }
@@ -836,7 +836,7 @@ class TestGatewayReplicaWorkerRunningStateSync:
             if failure == "update":
                 raise GatewayError("update failed")
             for item in updates:
-                reported[uuid.UUID(item.job_id)].ssh_head_proxy_public_key = " ".join(
+                reported[uuid.UUID(item.job_id)].ssh_proxy_jump_public_key = " ".join(
                     PUBLIC_KEY.split()[:2]
                 )
             if failure == "changed-again":
@@ -847,28 +847,28 @@ class TestGatewayReplicaWorkerRunningStateSync:
 
             return {}
 
-        client.update_replica_head_node_keys.side_effect = update
+        client.update_replica_proxy_jump_keys.side_effect = update
         await worker.process(_replica_to_pipeline_item(replica))
-        client.update_replica_head_node_keys.assert_awaited_once()
-        updates = client.update_replica_head_node_keys.call_args.args[0]
+        client.update_replica_proxy_jump_keys.assert_awaited_once()
+        updates = client.update_replica_proxy_jump_keys.call_args.args[0]
         assert {item.job_id for item in updates} == {job.id.hex, other_job.id.hex}
         assert all(
             item.project_name == project.name
             and item.run_name == run.run_name
-            and item.ssh_head_proxy_private_key == PRIVATE_KEY
+            and item.ssh_proxy_jump_private_key == PRIVATE_KEY
             for item in updates
         )
         client.register_replica.assert_not_called()
         client.unregister_replica.assert_not_called()
         client.register_service.assert_not_called()
         client.unregister_service.assert_not_called()
-        client.update_replica_head_node_keys.reset_mock(side_effect=True)
-        client.update_replica_head_node_keys.return_value = {}
+        client.update_replica_proxy_jump_keys.reset_mock(side_effect=True)
+        client.update_replica_proxy_jump_keys.return_value = {}
         await session.refresh(replica)
         _lock_replica(replica)
         await session.commit()
         await worker.process(_replica_to_pipeline_item(replica))
-        assert client.update_replica_head_node_keys.call_count == (0 if failure is None else 1)
+        assert client.update_replica_proxy_jump_keys.call_count == (0 if failure is None else 1)
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
         assert job.submission_num == 0

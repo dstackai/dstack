@@ -62,6 +62,7 @@ class RegisterReplicaRequest(BaseModel):
     ssh_port: int
     ssh_proxy: Optional[SSHConnectionParams] = None
     ssh_proxy_private_key: Optional[str] = None
+    # TODO: Rename ssh_head_proxy* to ssh_proxy_jump* while preserving registration API compatibility.
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     internal_ip: Optional[str] = None
@@ -73,18 +74,18 @@ class RegisterEntrypointRequest(BaseModel):
     read_timeout: int = DEFAULT_SERVICE_READ_TIMEOUT
 
 
-class ReplicaHeadNodeKeyUpdate(BaseModel):
+class ReplicaProxyJumpKeyUpdate(BaseModel):
     project_name: str
     run_name: str
     job_id: str
-    ssh_head_proxy_private_key: str
-    """Private key for the head node configured by the fleet's `proxy_jump`."""
+    ssh_proxy_jump_private_key: str
+    """Private key for the SSH fleet's `proxy_jump`."""
 
 
-class UpdateReplicaHeadNodeKeysRequest(BaseModel):
-    replicas: list[ReplicaHeadNodeKeyUpdate]
+class UpdateReplicaProxyJumpKeysRequest(BaseModel):
+    replicas: list[ReplicaProxyJumpKeyUpdate]
 
 
-class UpdateReplicaHeadNodeKeysResponse(BaseModel):
+class UpdateReplicaProxyJumpKeysResponse(BaseModel):
     failures: dict[str, str]
     """Job IDs whose key could not be updated; successful updates are saved together."""

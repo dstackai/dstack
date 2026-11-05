@@ -95,7 +95,7 @@ def sample_model_options(name: str = "test-model") -> dict:
 
 
 @pytest.mark.asyncio
-class TestUpdateReplicaHeadNodeKeys:
+class TestUpdateReplicaProxyJumpKeys:
     @pytest.mark.parametrize("failure", ["missing", "key-file", "state-save"])
     async def test_batch_saves_once_preserves_tunnels_and_retries_failures(
         self, tmp_path, system_mocks, monkeypatch, failure
@@ -123,13 +123,13 @@ class TestUpdateReplicaHeadNodeKeys:
                     project_name=project,
                     run_name=run,
                     job_id=job,
-                    ssh_head_proxy_private_key=replacement.private,
+                    ssh_proxy_jump_private_key=replacement.private,
                 )
             )
         # Populate the cached old public keys before replacing their private keys.
         before = (await client.get("/api/services/list")).json()
         assert all(
-            service["replicas"][0]["ssh_head_proxy_public_key"] == " ".join(PUBLIC_KEY.split()[:2])
+            service["replicas"][0]["ssh_proxy_jump_public_key"] == " ".join(PUBLIC_KEY.split()[:2])
             for service in before["services"]
         )
         system_mocks.open_conn.reset_mock()
@@ -139,7 +139,7 @@ class TestUpdateReplicaHeadNodeKeys:
             with patch.object(repo, "save", side_effect=OSError("state save failed")):
                 with pytest.raises(OSError, match="state save failed"):
                     await client.post(
-                        "/api/registry/replicas/head_node_keys", json={"replicas": updates}
+                        "/api/registry/replicas/proxy_jump_keys", json={"replicas": updates}
                     )
             # Keep reporting the old keys so the server retries the failed save.
             assert (await client.get("/api/services/list")).json() == before
@@ -151,7 +151,7 @@ class TestUpdateReplicaHeadNodeKeys:
         batch = list(updates)
         if failure == "missing":
             batch.append({**updates[0], "job_id": "missing"})
-        original_update = ServiceConnection.update_head_node_key
+        original_update = ServiceConnection.update_proxy_jump_key
 
         async def fail_one_key_file(connection, replica):
             if replica.id == "job-1":
@@ -161,9 +161,9 @@ class TestUpdateReplicaHeadNodeKeys:
         with patch.object(repo, "save", wraps=repo.save) as save:
             with monkeypatch.context() as scoped:
                 if failure == "key-file":
-                    scoped.setattr(ServiceConnection, "update_head_node_key", fail_one_key_file)
+                    scoped.setattr(ServiceConnection, "update_proxy_jump_key", fail_one_key_file)
                 response = await client.post(
-                    "/api/registry/replicas/head_node_keys", json={"replicas": batch}
+                    "/api/registry/replicas/proxy_jump_keys", json={"replicas": batch}
                 )
             assert response.status_code == 200
             expected_failures = {
@@ -182,13 +182,13 @@ class TestUpdateReplicaHeadNodeKeys:
             # Retry a failed write, then repeat a successful batch as after a lost response.
             for _ in range(2):
                 response = await client.post(
-                    "/api/registry/replicas/head_node_keys", json={"replicas": updates}
+                    "/api/registry/replicas/proxy_jump_keys", json={"replicas": updates}
                 )
                 assert response.json() == {"failures": {}}
                 assert save.call_count == (2 if failure == "key-file" else 1)
         after = (await client.get("/api/services/list")).json()
         assert all(
-            service["replicas"][0]["ssh_head_proxy_public_key"] == replacement.public
+            service["replicas"][0]["ssh_proxy_jump_public_key"] == replacement.public
             for service in after["services"]
         )
         system_mocks.open_conn.assert_not_awaited()

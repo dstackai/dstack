@@ -25,12 +25,12 @@ class TestListServices:
         assert resp.status_code == 200
         assert resp.json() == {"services": []}
 
-    @pytest.mark.parametrize("head_node_key", [None, "head-private-key"])
-    async def test_list(self, monkeypatch, head_node_key):
+    @pytest.mark.parametrize("proxy_jump_key", [None, "head-private-key"])
+    async def test_list(self, monkeypatch, proxy_jump_key):
         event_loop_thread = threading.get_ident()
 
         def get_public_key(private_key):
-            assert private_key == head_node_key
+            assert private_key == proxy_jump_key
             # Uncached RSA parsing must run outside the gateway's event loop.
             assert threading.get_ident() != event_loop_thread
             return "public-key"
@@ -49,7 +49,7 @@ class TestListServices:
                     ssh_destination="ubuntu@server",
                     ssh_port=22,
                     ssh_proxy=None,
-                    ssh_head_proxy_private_key=head_node_key,
+                    ssh_head_proxy_private_key=proxy_jump_key,
                 )
             ]
         )
@@ -67,7 +67,7 @@ class TestListServices:
                     "replicas": [
                         {
                             "id": replica_id,
-                            "ssh_head_proxy_public_key": "public-key" if head_node_key else None,
+                            "ssh_proxy_jump_public_key": "public-key" if proxy_jump_key else None,
                         }
                     ],
                 }

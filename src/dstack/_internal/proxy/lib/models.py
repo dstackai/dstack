@@ -27,13 +27,14 @@ class Replica(ImmutableModel):
     ssh_proxy: Optional[SSHConnectionParams] = None
     ssh_proxy_private_key: Optional[str] = None
     "`None` means same as service project's key"
-    # Optional outer proxy, a head node/bastion
+    # SSH fleet proxy_jump.
+    # TODO: Rename ssh_head_proxy* to ssh_proxy_jump* while preserving gateway state/API compatibility.
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     internal_ip: Optional[str] = None
 
     @cached_property
-    def ssh_head_proxy_public_key(self) -> Optional[str]:
+    def ssh_proxy_jump_public_key(self) -> Optional[str]:
         if self.ssh_head_proxy_private_key is None:
             return None
         return ssh_utils.get_public_key_from_private_key(self.ssh_head_proxy_private_key)

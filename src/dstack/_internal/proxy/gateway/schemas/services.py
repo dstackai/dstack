@@ -3,12 +3,12 @@ from dstack._internal.core.models.common import CoreModel
 
 class ServiceListReplicaItem(CoreModel):
     id: str
-    ssh_head_proxy_public_key: str | None = None
-    """Public key matching the head-node private key saved for this replica on the gateway.
+    ssh_proxy_jump_public_key: str | None = None
+    """Public key matching the SSH fleet's `proxy_jump` key saved for this replica on the gateway.
 
-    The server compares this with the instance's current head-node key during gateway
+    The server compares this with the instance's current `proxy_jump` key during gateway
     synchronization and sends a replacement private key when they differ.
-    `None` means no head-node private key is saved for this replica.
+    `None` means no `proxy_jump` private key is saved for this replica.
     """
 
 

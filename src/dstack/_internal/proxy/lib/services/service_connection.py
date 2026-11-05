@@ -138,10 +138,10 @@ class ServiceConnection:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
         return self._client
 
-    async def update_head_node_key(self, replica: Replica) -> None:
-        """Replace the head-node key without reopening the tunnel or HTTP client.
+    async def update_proxy_jump_key(self, replica: Replica) -> None:
+        """Replace the SSH fleet's `proxy_jump` key without reopening the tunnel or HTTP client.
 
-        The pool calls this only when the head-node private key is the sole change
+        The pool calls this only when the `proxy_jump` private key is the sole change
         from self.replica. Apply the key file before replacing that configuration,
         so a failed write leaves the previous configuration available for retry.
         The replacement key is used on the next SSH open; the socket path is unchanged.
@@ -221,7 +221,7 @@ class ServiceConnectionPool:
                 )
                 == replica
             ):
-                await connection.update_head_node_key(replica)
+                await connection.update_proxy_jump_key(replica)
             if service.domain is None and replica.ssh_head_proxy is not None:
                 await connection.open()
             return connection

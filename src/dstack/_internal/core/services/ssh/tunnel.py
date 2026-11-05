@@ -192,7 +192,7 @@ class SSHTunnel:
     def update_proxy_identity(self, index: int, private_key: str) -> None:
         """Replace a proxy-hop key for the next open, keeping the current tunnel open.
 
-        ServiceConnection calls this when a fleet's head-node key changes. Replace
+        ServiceConnection calls this when a fleet's `proxy_jump` key changes. Replace
         the key file atomically so concurrent SSH startup never reads a partial key.
         """
         params, _ = self.ssh_proxies[index]
