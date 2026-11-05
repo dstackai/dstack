@@ -418,6 +418,9 @@ async def list_events(
             if prev_id is None:
                 event_filters.append(EventModel.recorded_at > prev_recorded_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                event_filters.append(EventModel.recorded_at >= prev_recorded_at)
                 event_filters.append(
                     or_(
                         EventModel.recorded_at > prev_recorded_at,
@@ -428,6 +431,7 @@ async def list_events(
             if prev_id is None:
                 event_filters.append(EventModel.recorded_at < prev_recorded_at)
             else:
+                event_filters.append(EventModel.recorded_at <= prev_recorded_at)
                 event_filters.append(
                     or_(
                         EventModel.recorded_at < prev_recorded_at,

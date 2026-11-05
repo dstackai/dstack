@@ -150,6 +150,9 @@ async def list_projects_volume_models(
             if prev_id is None:
                 filters.append(VolumeModel.created_at > prev_created_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                filters.append(VolumeModel.created_at >= prev_created_at)
                 filters.append(
                     or_(
                         VolumeModel.created_at > prev_created_at,
@@ -160,6 +163,7 @@ async def list_projects_volume_models(
             if prev_id is None:
                 filters.append(VolumeModel.created_at < prev_created_at)
             else:
+                filters.append(VolumeModel.created_at <= prev_created_at)
                 filters.append(
                     or_(
                         VolumeModel.created_at < prev_created_at,

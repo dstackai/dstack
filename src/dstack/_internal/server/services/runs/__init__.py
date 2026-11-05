@@ -302,6 +302,9 @@ async def list_projects_run_models(
             if prev_run_id is None:
                 filters.append(RunModel.submitted_at > prev_submitted_at)
             else:
+                # Redundant with the OR below, but unlike the OR it lets the database
+                # start the index scan at the cursor instead of scanning from the start.
+                filters.append(RunModel.submitted_at >= prev_submitted_at)
                 filters.append(
                     or_(
                         RunModel.submitted_at > prev_submitted_at,
@@ -314,6 +317,7 @@ async def list_projects_run_models(
             if prev_run_id is None:
                 filters.append(RunModel.submitted_at < prev_submitted_at)
             else:
+                filters.append(RunModel.submitted_at <= prev_submitted_at)
                 filters.append(
                     or_(
                         RunModel.submitted_at < prev_submitted_at,
