@@ -30,6 +30,7 @@ from dstack._internal.core.backends.nebius import compute as compute_module
 from dstack._internal.core.backends.nebius.compute import NebiusCompute
 from dstack._internal.core.backends.nebius.models import (
     NebiusConfig,
+    NebiusOfferBackendData,
     NebiusServiceAccountCreds,
 )
 from dstack._internal.core.errors import NoCapacityError, NotYetTerminated
@@ -57,11 +58,12 @@ CAPACITY_DATA_STATES = CapacityAvailability.DataState
 def make_compute(resource_advice_cache: Optional[ComputeTTLCache] = None) -> NebiusCompute:
     return NebiusCompute(
         NebiusConfig(
+            capacity_advisor=True,
             creds=NebiusServiceAccountCreds(
                 service_account_id="service-account-id",
                 public_key_id="public-key-id",
                 private_key_content="private-key",
-            )
+            ),
         ),
         resource_advice_cache=resource_advice_cache,
     )
@@ -222,6 +224,26 @@ class TestGetAllOffersWithAvailability:
         return mocker.patch.object(
             compute_module.resources, "list_resource_advice", return_value=[]
         )
+
+    def test_capacity_advisor_disabled_by_default(self, mocker, mock_capacity_advice):
+        mocker.patch.object(
+            compute_module,
+            "get_catalog_offers",
+            return_value=[make_offer(1, spot=False, is_preemptible_flat_rate=False)],
+        )
+        compute = make_compute()
+        compute.config = NebiusConfig(creds=compute.config.creds, fabrics=["fabric-2"])
+
+        offers = compute.get_all_offers_with_availability(unallocated_resources=False)
+
+        assert offers[0].availability == InstanceAvailability.UNKNOWN
+        mock_capacity_advice.assert_not_called()
+        assert compute._get_eligible_fabrics(
+            NebiusOfferBackendData(
+                fabrics={"fabric-2", "fabric-3"},
+                fabric_availability={"fabric-2": InstanceAvailability.NOT_AVAILABLE},
+            )
+        ) == {"fabric-2"}
 
     @pytest.mark.parametrize(
         ("price", "gpu_count", "expected_price"),

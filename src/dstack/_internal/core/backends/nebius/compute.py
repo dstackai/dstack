@@ -180,7 +180,7 @@ class NebiusCompute(
         advice_by_offer: dict[tuple[str, str, bool], dict[str, InstanceAvailability]] = (
             defaultdict(dict)
         )
-        if any(offer.instance.resources.gpus for offer in offers):
+        if self.config.capacity_advisor and any(offer.instance.resources.gpus for offer in offers):
             try:
                 advice = self._get_resource_advice()
             except Exception:
@@ -510,12 +510,17 @@ class NebiusCompute(
         )
 
     def _get_eligible_fabrics(self, data: NebiusOfferBackendData) -> set[str]:
-        """Cluster fabrics that are compatible, allowed, and AVAILABLE or UNKNOWN."""
+        """Return compatible, allowed cluster fabrics, applying capacity advice when enabled."""
         return {
             fabric
             for fabric in data.fabrics
             if (self.config.fabrics is None or fabric in self.config.fabrics)
-            and data.fabric_availability.get(fabric, InstanceAvailability.UNKNOWN).is_available()
+            and (
+                not self.config.capacity_advisor
+                or data.fabric_availability.get(
+                    fabric, InstanceAvailability.UNKNOWN
+                ).is_available()
+            )
         }
 
 

@@ -861,6 +861,15 @@ projects:
     </div>
 
 
+??? info "Capacity advisor"
+    By default, dstack does not check GPU availability or quota. To show these statuses in
+    offers and skip unavailable offers or those with no quota, enable
+    [Nebius Capacity Advisor](https://docs.nebius.com/compute/virtual-machines/capacity-advisor)
+    with `capacity_advisor: true`.
+
+    Fetching availability and quota adds roughly 1–3 seconds to getting offers.
+    Both are cached for 10 minutes.
+
 ### Crusoe
 
 Log into your [Crusoe](https://console.crusoecloud.com/) console and create an API key
