@@ -1,7 +1,6 @@
-from typing import Generic, Optional, TypeVar
+from typing import Annotated, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, Field
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.fleets import FleetSpec
 from dstack._internal.core.models.gateways import GatewaySpec

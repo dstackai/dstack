@@ -1476,6 +1476,42 @@ class TestListEventsPagination:
         resp.raise_for_status()
         assert len(resp.json()) == 0
 
+    @pytest.mark.parametrize("ascending", [True, False])
+    async def test_pagination_with_same_recorded_at(
+        self, session: AsyncSession, client: AsyncClient, ascending: bool
+    ) -> None:
+        users = [await create_user(session=session, name=f"user_{i}") for i in range(3)]
+        with time_machine.travel(datetime(2026, 1, 1, 12, 0, 0), tick=False):
+            for user in users:
+                events.emit(
+                    session,
+                    "User created",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(user)],
+                )
+        await session.commit()
+
+        listed = []
+        pagination = {}
+        for _ in range(len(users) + 1):
+            resp = await client.post(
+                "/api/events/list",
+                json={"limit": 1, "ascending": ascending, **pagination},
+                headers=get_auth_headers(users[0].token),
+            )
+            resp.raise_for_status()
+            if not resp.json():
+                break
+            listed.extend(resp.json())
+            pagination = {
+                "prev_id": resp.json()[-1]["id"],
+                "prev_recorded_at": resp.json()[-1]["recorded_at"],
+            }
+        ids = [event["id"] for event in listed]
+        # Events with the same `recorded_at` are ordered by `id`, descending when ascending.
+        assert ids == sorted(ids, reverse=ascending)
+        assert len(set(ids)) == len(users)
+
     async def test_limits_events_regardless_number_of_targets(
         self, session: AsyncSession, client: AsyncClient
     ) -> None:

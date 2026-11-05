@@ -8,12 +8,11 @@ from contextlib import ExitStack
 from decimal import Decimal
 from enum import Enum
 from functools import partial
-from typing import List, Optional
+from typing import List, Optional, Self
 from uuid import UUID
 
 from gpuhunt import AcceleratorVendor
 from kubernetes import client
-from typing_extensions import Self
 
 from dstack._internal.core.backends.base.authorized_keys import (
     build_authorized_keys,

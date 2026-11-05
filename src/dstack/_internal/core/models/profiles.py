@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Optional, Self, Union
 
 from pydantic import (
     AfterValidator,
@@ -9,7 +9,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from typing_extensions import Annotated, Self
 
 from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType

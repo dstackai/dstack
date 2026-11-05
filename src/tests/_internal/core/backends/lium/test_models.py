@@ -1,6 +1,7 @@
+from typing import Annotated
+
 import pytest
 from pydantic import Field, TypeAdapter, ValidationError
-from typing_extensions import Annotated
 
 from dstack._internal.core.backends.lium.models import LiumBackendConfigWithCreds
 from dstack._internal.core.backends.models import (

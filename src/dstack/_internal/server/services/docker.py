@@ -1,14 +1,13 @@
 import contextlib
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import gpuhunt
 import requests
 from dxf import DXF
 from dxf.exceptions import DXFError
 from pydantic import Field, ValidationError, field_validator
-from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
 from dstack._internal.core.models.common import CoreModel, RegistryAuth, validate_json_extra_ignore

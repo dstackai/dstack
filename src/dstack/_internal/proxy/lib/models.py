@@ -1,10 +1,9 @@
 """Things stored in BaseProxyRepo implementations."""
 
 from datetime import datetime
-from typing import Any, Iterable, Literal, Optional, Union
+from typing import Annotated, Any, Iterable, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.proxy.lib.const import DEFAULT_SERVICE_READ_TIMEOUT

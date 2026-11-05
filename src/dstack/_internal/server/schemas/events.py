@@ -1,10 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Self
 from uuid import UUID
 
 from pydantic import Field, model_validator
-from typing_extensions import Self
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.events import EventTargetType

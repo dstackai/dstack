@@ -1,5 +1,7 @@
+import { useState } from 'react';
+
 import { useAppSelector } from 'hooks';
-import { copyToClipboard } from 'libs';
+import { copyToClipboard, TOKEN_MASK } from 'libs';
 
 import { selectAuthToken } from 'App/slice';
 
@@ -8,12 +10,16 @@ type Args = {
 };
 export const useConfigProjectCliCommand = ({ projectName }: Args) => {
     const currentUserToken = useAppSelector(selectAuthToken);
+    const [isTokenVisible, setIsTokenVisible] = useState(false);
 
-    const cliCommand = `dstack project add \\\n  --url ${location.origin} \\\n  --name ${projectName} \\\n  --token ${currentUserToken}`;
+    const getCliCommand = (token?: string) =>
+        `dstack project add \\\n  --url ${location.origin} \\\n  --name ${projectName} \\\n  --token ${token}`;
+
+    const cliCommand = getCliCommand(isTokenVisible ? currentUserToken : TOKEN_MASK);
 
     const copyCliCommand = () => {
-        copyToClipboard(cliCommand);
+        copyToClipboard(getCliCommand(currentUserToken));
     };
 
-    return [cliCommand, copyCliCommand] as const;
+    return [cliCommand, copyCliCommand, isTokenVisible, setIsTokenVisible] as const;
 };

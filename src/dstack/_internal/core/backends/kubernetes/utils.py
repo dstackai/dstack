@@ -8,6 +8,7 @@ from typing import (
     Generic,
     Literal,
     Optional,
+    ParamSpec,
     Protocol,
     TypeVar,
     Union,
@@ -19,7 +20,7 @@ from kubernetes.client import V1ListMeta, V1Status, VersionApi
 from kubernetes.client.exceptions import ApiException
 from kubernetes.watch import Watch
 from pydantic import Field
-from typing_extensions import ParamSpec, TypedDict
+from typing_extensions import TypedDict
 
 from dstack._internal.core.backends.kubernetes.api_client import (
     API_CLIENT_EXCEPTIONS,
