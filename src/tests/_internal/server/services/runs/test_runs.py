@@ -92,7 +92,10 @@ class TestListUserRuns:
         @event.listens_for(test_db.engine.sync_engine, "before_cursor_execute")
         def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
             normalized_statement = statement.lower()
-            if "from jobs" in normalized_statement and "row_number" not in normalized_statement:
+            if (
+                "from jobs" in normalized_statement
+                and "max(jobs.submission_num)" not in normalized_statement
+            ):
                 unbounded_job_selects.append(statement)
 
         try:
@@ -325,6 +328,53 @@ class TestListUserRuns:
             assert all(len(job.job_submissions) == 0 for run in runs for job in run.jobs)
         if not include_jobs:
             assert all(run.jobs == [] for run in runs)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_submissions_among_last_submission_nums(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        # Replica 1 has a gap where submissions were deleted.
+        submission_nums_by_replica = {0: [0, 1, 2, 3, 4], 1: [0, 1, 7, 8]}
+        for replica_num, submission_nums in submission_nums_by_replica.items():
+            for submission_num in submission_nums:
+                await create_job(
+                    session=session,
+                    run=run,
+                    replica_num=replica_num,
+                    submission_num=submission_num,
+                    status=(
+                        JobStatus.SUBMITTED
+                        if submission_num == submission_nums[-1]
+                        else JobStatus.TERMINATED
+                    ),
+                )
+
+        runs = await runs_services.list_user_runs(
+            session=session,
+            user=user,
+            project_name=project.name,
+            repo_id=None,
+            username=None,
+            only_active=False,
+            include_jobs=True,
+            job_submissions_limit=3,
+            prev_submitted_at=None,
+            prev_run_id=None,
+            limit=100,
+            ascending=False,
+        )
+
+        assert len(runs) == 1
+        submission_nums = {
+            job.job_spec.replica_num: [s.submission_num for s in job.job_submissions]
+            for job in runs[0].jobs
+        }
+        assert submission_nums == {0: [2, 3, 4], 1: [7, 8]}
 
 
 class TestCanAttachRunVolumes:
