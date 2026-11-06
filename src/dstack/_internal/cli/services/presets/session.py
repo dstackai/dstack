@@ -529,9 +529,12 @@ def list_preset_sessions() -> list[dict[str, Any]]:
         entry["id"] = path.name
         entry["name"] = claimed_session_name(state)
         entry["status"] = status
-        entry["trials"] = _summarize_session_trials(path / TRIALS_DIRNAME)
+        constraints = _read_session_constraints(path)
+        entry["trials"] = _summarize_session_trials(
+            path / TRIALS_DIRNAME, max_ttft=constraints.get("max_ttft")
+        )
         entry["verification"] = _read_last_session_verification(path / SERVICE_DIRNAME)
-        entry["constraints"] = _read_session_constraints(path)
+        entry["constraints"] = constraints
         entries.append(entry)
     return entries
 
@@ -584,7 +587,9 @@ def _read_last_session_verification(path: Path) -> Optional[dict[str, Any]]:
     return {"status": "verifying"}
 
 
-def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
+def _summarize_session_trials(
+    path: Path, *, max_ttft: Optional[float] = None
+) -> Optional[dict[str, Any]]:
     # TODO: Refactor this crap - must be explicit what is this and where is it used; also dicts are prohibited in dstack repo
     """A trial directory without `trial.json` is still in flight and is not
     counted."""
@@ -605,35 +610,25 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
     gpu: Optional[str] = None
     for record in records:
         count += 1
-        benchmark = record.get("benchmark")
         failed.append(bool(record.get("failed")))
         record_gpu = _format_trial_gpu(record)
         if record_gpu:
             gpu = record_gpu
-        if not isinstance(benchmark, dict):
+        point = _select_trial_point(record, max_ttft)
+        if point is None:
             series.append(None)
             continue
-        metrics = benchmark.get("metrics") or {}
-        workload = benchmark.get("workload") or {}
-        duration = metrics.get("duration_seconds")
-        tokens = metrics.get("total_output_tokens")
-        if not isinstance(duration, (int, float)) or duration <= 0:
-            series.append(None)
-            continue
-        if not isinstance(tokens, (int, float)):
-            series.append(None)
-            continue
-        tok_s = tokens / duration
+        tok_s, metrics, workload, sweep = point
         series.append(tok_s)
         # A failed trial keeps its benchmark — it is what the next trial learns
         # from — but it is not a candidate for best, and promoting one would put
         # a configuration that broke a constraint at the top of the listing.
         if record.get("failed"):
             if best_failed is None or tok_s > best_failed["tok_s"]:
-                best_failed = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+                best_failed = _trial_entry(tok_s, record, metrics, workload, sweep, record_gpu)
             continue
         if best is None or tok_s > best["tok_s"]:
-            best = _trial_entry(tok_s, record, metrics, workload, record_gpu)
+            best = _trial_entry(tok_s, record, metrics, workload, sweep, record_gpu)
     return {
         "count": count,
         "best": best,
@@ -644,11 +639,60 @@ def _summarize_session_trials(path: Path) -> Optional[dict[str, Any]]:
     }
 
 
+def _select_trial_point(
+    record: dict[str, Any], max_ttft: Optional[float]
+) -> Optional[tuple[float, dict[str, Any], dict[str, Any], list[dict[str, Any]]]]:
+    """Select the benchmark point used to judge a trial.
+
+    Choose the highest-throughput point whose p50 TTFT meets `max_ttft`.
+    If no point meets the limit, choose the point with the lowest p50 TTFT.
+    Older trial records may contain a single `benchmark` instead of `benchmarks`.
+
+    Return `(tok_s, metrics, workload, sweep)`, where `metrics` and `workload`
+    describe the selected point and `sweep` contains metrics for all usable
+    points. Return `None` if no point has usable throughput data.
+    """
+    benchmarks = record.get("benchmarks")
+    if not isinstance(benchmarks, list):
+        benchmarks = [record.get("benchmark")]
+    points: list[tuple[bool, float, Any, dict[str, Any], dict[str, Any]]] = []
+    for benchmark in benchmarks:
+        if not isinstance(benchmark, dict):
+            continue
+        metrics = benchmark.get("metrics") or {}
+        workload = benchmark.get("workload") or {}
+        duration = metrics.get("duration_seconds")
+        tokens = metrics.get("total_output_tokens")
+        if not isinstance(duration, (int, float)) or duration <= 0:
+            continue
+        if not isinstance(tokens, (int, float)):
+            continue
+        ttft = (metrics.get("ttft_ms") or {}).get("p50")
+        within = not isinstance(max_ttft, (int, float)) or (
+            isinstance(ttft, (int, float)) and ttft <= max_ttft
+        )
+        points.append((within, tokens / duration, ttft, metrics, workload))
+    if not points:
+        return None
+    sweep = [p[3] for p in points]
+    passing = [p for p in points if p[0]]
+    if passing:
+        _, tok_s, _, metrics, workload = max(passing, key=lambda p: p[1])
+    else:
+        # `ttft` may be missing in a raw record; sort those last.
+        _, tok_s, _, metrics, workload = min(
+            points,
+            key=lambda p: (p[2] if isinstance(p[2], (int, float)) else float("inf"), -p[1]),
+        )
+    return tok_s, metrics, workload, sweep
+
+
 def _trial_entry(
     tok_s: float,
     record: dict[str, Any],
     metrics: dict[str, Any],
     workload: dict[str, Any],
+    sweep: list[dict[str, Any]],
     gpu: Optional[str],
 ) -> dict[str, Any]:
     ttft = (metrics.get("ttft_ms") or {}).get("p50")
@@ -659,10 +703,30 @@ def _trial_entry(
         "tok_s": tok_s,
         "tpot_ms": tpot if isinstance(tpot, (int, float)) and tpot > 0 else None,
         "ttft_ms": ttft if isinstance(ttft, (int, float)) else None,
+        # Store the lowest and highest throughput and TTFT values across the trial's
+        # concurrency points. For example, throughput values 132, 237, and 380
+        # tokens/sec become [132, 380]. One value becomes [value, value]; no values
+        # becomes None.
+        "tok_s_range": _range([m["total_output_tokens"] / m["duration_seconds"] for m in sweep]),
+        "per_user_tok_s_range": _range(
+            [1000 / v for v in (_latency(m, "tpot_ms", "mean") for m in sweep) if v]
+        ),
+        "ttft_ms_range": _range(
+            [v for v in (_latency(m, "ttft_ms", "p50") for m in sweep) if v is not None]
+        ),
         "context_length": context_length if isinstance(context_length, int) else None,
         "concurrency": workload.get("concurrency"),
         "gpu": gpu,
     }
+
+
+def _latency(metrics: dict[str, Any], name: str, stat: str) -> Optional[float]:
+    value = (metrics.get(name) or {}).get(stat)
+    return value if isinstance(value, (int, float)) and value >= 0 else None
+
+
+def _range(values: list[float]) -> Optional[list[float]]:
+    return [min(values), max(values)] if values else None
 
 
 def _format_trial_gpu(record: dict[str, Any]) -> Optional[str]:

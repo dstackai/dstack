@@ -19,7 +19,7 @@ _NO_VALUES = {
     "base": None,
     "model": None,
     "context_length": None,
-    "benchmark": None,
+    "benchmarks": None,
     "failure_summary": None,
 }
 # Keywords the OpenAI strict structured-output mode rejects.
@@ -48,6 +48,15 @@ def _walk(node):
     elif isinstance(node, list):
         for item in node:
             yield from _walk(item)
+
+
+class TestGetReportJsonSchema:
+    def test_offers_only_the_sweep_shape(self):
+        # The legacy `benchmark` is accepted at parse only; agents are never offered it.
+        properties = get_report_json_schema()["properties"]
+
+        assert "benchmarks" in properties
+        assert "benchmark" not in properties
 
 
 class TestGetStrictReportJsonSchema:
@@ -106,31 +115,33 @@ class TestGetStrictReportJsonSchema:
                     "base": "Qwen/Qwen2.5-0.5B-Instruct",
                     "model": "Qwen/Qwen2.5-0.5B-Instruct",
                     "context_length": 2048,
-                    "benchmark": {
-                        "tool": "vllm.bench serve",
-                        "tool_version": "0.27.0",
-                        "command": "vllm bench serve --model Qwen/Qwen2.5-0.5B-Instruct",
-                        "workload": {
-                            "api": "chat_completions",
-                            "dataset": None,
-                            "num_requests": 32,
-                            "input_tokens": 128,
-                            "output_tokens": 64,
-                            "concurrency": 1,
-                            "shared_prefix_tokens": 0,
-                        },
-                        "metrics": {
-                            "successful_requests": 32,
-                            "failed_requests": 0,
-                            "duration_seconds": 40.5,
-                            "total_input_tokens": 4096,
-                            "total_output_tokens": 2048,
-                            "output_tok_per_s": 50.6,
-                            "per_user_tok_per_s": 50.6,
-                            "ttft_ms": {"mean": 210.0, "p50": 200.0, "p99": 300.0},
-                            "tpot_ms": {"mean": 19.8, "p50": 19.5, "p99": 25.0},
-                        },
-                    },
+                    "benchmarks": [
+                        {
+                            "tool": "vllm.bench serve",
+                            "tool_version": "0.27.0",
+                            "command": "vllm bench serve --model Qwen/Qwen2.5-0.5B-Instruct",
+                            "workload": {
+                                "api": "chat_completions",
+                                "dataset": None,
+                                "num_requests": 32,
+                                "input_tokens": 128,
+                                "output_tokens": 64,
+                                "concurrency": 1,
+                                "shared_prefix_tokens": 0,
+                            },
+                            "metrics": {
+                                "successful_requests": 32,
+                                "failed_requests": 0,
+                                "duration_seconds": 40.5,
+                                "total_input_tokens": 4096,
+                                "total_output_tokens": 2048,
+                                "output_tok_per_s": 50.6,
+                                "per_user_tok_per_s": 50.6,
+                                "ttft_ms": {"mean": 210.0, "p50": 200.0, "p99": 300.0},
+                                "tpot_ms": {"mean": 19.8, "p50": 19.5, "p99": 25.0},
+                            },
+                        }
+                    ],
                 },
                 PresetAgentSuccess,
             ),
@@ -146,5 +157,5 @@ class TestGetStrictReportJsonSchema:
         assert isinstance(report, expected)
         if isinstance(report, PresetAgentSuccess):
             assert isinstance(report.service_yaml, ServiceConfiguration)
-            assert report.benchmark.workload.dataset is None
-            assert report.benchmark.workload.shared_prefix_tokens == 0
+            assert report.benchmarks[0].workload.dataset is None
+            assert report.benchmarks[0].workload.shared_prefix_tokens == 0

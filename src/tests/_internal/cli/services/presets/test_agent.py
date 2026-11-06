@@ -1642,6 +1642,9 @@ class TestSummarizeSessionTrials:
             "tok_s": 2300.0,
             "tpot_ms": None,
             "ttft_ms": None,
+            "tok_s_range": [2300.0, 2300.0],
+            "per_user_tok_s_range": None,
+            "ttft_ms_range": None,
             "context_length": None,
             "concurrency": 8,
             "gpu": "A40:48GB:1",
@@ -1683,6 +1686,132 @@ class TestSummarizeSessionTrials:
 
         assert summary["count"] == 1
         assert summary["series"] == [2000.0]
+
+    def test_judges_a_sweep_by_its_fastest_point_within_max_ttft(self, tmp_path):
+        def point(concurrency, tok_s, ttft_p50):
+            return {
+                "workload": {"concurrency": concurrency},
+                "metrics": {
+                    "duration_seconds": 1.0,
+                    "total_output_tokens": tok_s,
+                    "ttft_ms": {"p50": ttft_p50},
+                },
+            }
+
+        record = {
+            "resources": {},
+            # Throughput rises with concurrency, but the top point breaches the cap.
+            "benchmarks": [point(2, 500.0, 100.0), point(4, 800.0, 300.0), point(8, 900.0, 900.0)],
+        }
+        trials_dir = _write_trials(tmp_path, [record])
+
+        summary = _summarize_session_trials(trials_dir, max_ttft=500)
+        assert summary is not None
+
+        assert summary["series"] == [800.0]
+        best = summary["best"]
+        assert best is not None
+        assert best["concurrency"] == 4
+        assert best["ttft_ms"] == 300.0
+        # The selected point is c=4; the ranges still cover every point.
+        assert best["ttft_ms_range"] == [100.0, 900.0]
+
+    def test_ranges_come_from_the_selected_trial_only(self, tmp_path):
+        def point(concurrency, tokens, ttft, tpot):
+            return {
+                "workload": {"concurrency": concurrency},
+                "metrics": {
+                    "duration_seconds": 1.0,
+                    "total_output_tokens": tokens,
+                    "ttft_ms": {"p50": ttft},
+                    "tpot_ms": {"mean": tpot},
+                },
+            }
+
+        slow = {"benchmarks": [point(4, 100.0, 50.0, 10.0), point(8, 200.0, 80.0, 20.0)]}
+        fast = {"benchmarks": [point(4, 300.0, 400.0, 30.0), point(8, 600.0, 450.0, 40.0)]}
+        trials_dir = _write_trials(tmp_path, [slow, fast])
+
+        summary = _summarize_session_trials(trials_dir, max_ttft=500)
+        assert summary is not None
+
+        best = summary["best"]
+        assert best is not None
+        assert best["concurrency"] == 8
+        assert best["ttft_ms_range"] == [400.0, 450.0]
+        assert best["per_user_tok_s_range"] == [25.0, 1000 / 30.0]
+
+    def test_a_partial_sweep_ranges_over_its_usable_points(self, tmp_path):
+        usable = {
+            "workload": {"concurrency": 4},
+            "metrics": {
+                "duration_seconds": 1.0,
+                "total_output_tokens": 100.0,
+                "ttft_ms": {"p50": 200.0},
+                "tpot_ms": {"mean": 20.0},
+            },
+        }
+        broken = {"workload": {"concurrency": 8}, "metrics": {"duration_seconds": 0}}
+        trials_dir = _write_trials(tmp_path, [{"benchmarks": [usable, broken]}])
+
+        summary = _summarize_session_trials(trials_dir, max_ttft=500)
+        assert summary is not None
+
+        best = summary["best"]
+        assert best is not None
+        assert best["ttft_ms_range"] == [200.0, 200.0]
+        assert best["per_user_tok_s_range"] == [50.0, 50.0]
+
+    def test_a_pre_sweep_record_has_a_single_point_range(self, tmp_path):
+        record = {
+            "benchmark": {
+                "workload": {"concurrency": 8},
+                "metrics": {
+                    "duration_seconds": 1.0,
+                    "total_output_tokens": 100.0,
+                    "ttft_ms": {"p50": 240.0},
+                    "tpot_ms": {"mean": 25.0},
+                },
+            }
+        }
+        trials_dir = _write_trials(tmp_path, [record])
+
+        summary = _summarize_session_trials(trials_dir, max_ttft=500)
+        assert summary is not None
+
+        best = summary["best"]
+        assert best is not None
+        assert best["ttft_ms_range"] == [240.0, 240.0]
+
+    def test_judges_a_sweep_that_breached_everywhere_by_its_closest_point(self, tmp_path):
+        record = {
+            "benchmarks": [
+                {
+                    "workload": {"concurrency": 4},
+                    "metrics": {
+                        "duration_seconds": 1.0,
+                        "total_output_tokens": 800.0,
+                        "ttft_ms": {"p50": 700.0},
+                    },
+                },
+                {
+                    "workload": {"concurrency": 8},
+                    "metrics": {
+                        "duration_seconds": 1.0,
+                        "total_output_tokens": 900.0,
+                        "ttft_ms": {"p50": 900.0},
+                    },
+                },
+            ]
+        }
+        trials_dir = _write_trials(tmp_path, [record])
+
+        summary = _summarize_session_trials(trials_dir, max_ttft=500)
+        assert summary is not None
+
+        best = summary["best"]
+        assert best is not None
+        assert best["concurrency"] == 4
 
     def test_a_torn_result_copy_reads_as_still_in_flight(self, tmp_path):
         trials_dir = _write_trials(tmp_path, [])
