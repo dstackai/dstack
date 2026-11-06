@@ -139,7 +139,7 @@ class TestListUserRuns:
         [
             (True, 1),
             (True, 0),
-            (True, None),
+            (True, 10),
             (False, 1),
         ],
     )
@@ -148,7 +148,7 @@ class TestListUserRuns:
         test_db,
         session: AsyncSession,
         include_jobs: bool,
-        job_submissions_limit: int | None,
+        job_submissions_limit: int,
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)

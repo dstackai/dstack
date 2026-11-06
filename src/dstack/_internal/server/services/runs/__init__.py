@@ -186,7 +186,7 @@ async def list_user_runs(
     username: Optional[str],
     only_active: bool,
     include_jobs: bool,
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -348,7 +348,7 @@ async def _list_job_models_by_run_id(
     session: AsyncSession,
     run_models: List[RunModel],
     include_jobs: bool,
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     return_in_api: bool,
 ) -> dict[uuid.UUID, List[JobModel]]:
     """
@@ -375,38 +375,21 @@ async def _list_job_models_by_run_id(
 async def _list_job_models(
     session: AsyncSession,
     run_ids: List[uuid.UUID],
-    job_submissions_limit: Optional[int],
+    job_submissions_limit: int,
     include_probes: bool,
 ) -> List[JobModel]:
     """
     List job models for runs list responses.
 
-    When job_submissions_limit is set, return at most job_submissions_limit latest
-    submissions of each job: those whose submission_num is within job_submissions_limit
-    of the job's latest submission_num. A job gets fewer if its submission numbers have
-    gaps, which happens when submissions are deleted. Also return the latest submission
-    with a termination reason, which run_model_to_run needs for status messages such as
-    `retrying`.
+    Return at most job_submissions_limit latest submissions of each job: those whose
+    submission_num is within job_submissions_limit of the job's latest submission_num.
+    A job gets fewer if its submission numbers have gaps, which happens when submissions
+    are deleted. Also return the latest submission with a termination reason, which
+    run_model_to_run needs for status messages such as `retrying`.
     """
     options = []
     if include_probes:
         options.append(joinedload(JobModel.probes))
-    if job_submissions_limit is None:
-        # With no job_submissions_limit, return full submission history. This
-        # can be slow. UI/CLI list views pass a limit, but API callers may omit it.
-        res = await session.execute(
-            select(JobModel)
-            .where(JobModel.run_id.in_(run_ids))
-            .options(*options)
-            .order_by(
-                JobModel.run_id,
-                JobModel.replica_num,
-                JobModel.job_num,
-                JobModel.submission_num,
-            )
-        )
-        return list(res.unique().scalars().all())
-
     limit = max(job_submissions_limit, 1)
     latest = (
         select(
