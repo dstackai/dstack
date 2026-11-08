@@ -5,21 +5,9 @@ hardware, through sequential experimental trials.
 
 ## Performance
 
-Performance is the highest `output_tok_per_s` a configuration reaches across
-the `concurrency` sweep from `constraints.json` (see `## Benchmark`), counting
-only sweep points that meet `max_ttft`, the maximum p50 time to first token, in
-milliseconds (see `# Constraints`). Points that breach `max_ttft` are ignored.
-For example, with `max_ttft` of 2000:
-
-| `concurrency` | `output_tok_per_s` | `ttft_ms.p50` |
-|---|---|---|
-| 4 | 130 | 400 |
-| 8 | 240 | 1500 |
-| 16 | 380 | 2400 |
-
-The point at 16 breaches `max_ttft`, so it is ignored. Performance is 240, the
-highest throughput among the remaining points. Benchmark tools report several
-throughput numbers; performance is the output one.
+Performance is `output_tok_per_s`, the output token throughput of a benchmark
+run at the `concurrency` from `constraints.json` (see `## Benchmark`). Benchmark
+tools report several throughput numbers; performance is the output one.
 
 Significantly better performance goes beyond what conventional configurations
 and published benchmarks reach; they are not the ceiling. Estimate the
@@ -47,9 +35,10 @@ Field semantics:
 - `max_ttft`: the maximum p50 time to first token, in milliseconds, that any
   benchmark in this session may report.
 - `trials_num`: the number of trials in this session.
-- `concurrency`: the numbers of simultaneous requests every benchmark in
-  this session is run at, one benchmark per value. The list is fixed so
-  that benchmark results are comparable across trials.
+- `concurrency`: a list of simultaneous request counts used for every
+  benchmark in this session. For example, `[2, 4, 8]` means running the
+  benchmark once each at 2, 4, and 8 simultaneous requests. The list is
+  fixed so that benchmark results are comparable across trials.
 <!--?if dataset-->
 - `dataset`: the benchmark dataset for every benchmark in this session; see
   `## Benchmark`.
@@ -257,7 +246,7 @@ benchmark results (see `## Benchmark` for the structure) to
 marks trial `<n>` completed. The benchmark
 may be skipped in one case only: you failed to make the configuration run
 at all — a failed trial. `trials/<n>/task.dstack.yml` may be skipped in
-one case only: you failed to get benchmark results at all. A trial is
+one case only: you failed to get benchmark results at any concurrency. A trial is
 also failed when its benchmark does not meet the constraints (see
 `# Constraints`). When a trial that changed several things fails, be
 mindful of which specific change was the root cause.
@@ -268,7 +257,7 @@ mindful of which specific change was the root cause.
    others:
 
 ```
-{"resources": {...}, "context_length": ..., "benchmarks": [{...}, ...], "learned": ..., "failed": ...}
+{"resources": {...}, "context_length": [{...}, ...], "benchmark": [{...}, ...], "learned": [{...}, ...], "failed": [{...}, ...]}
 ```
 
 2. In case the task is using node groups (a router group plus worker
@@ -276,7 +265,7 @@ mindful of which specific change was the root cause.
    includes `groups`, and the fields are these and no others:
 
 ```
-{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": ..., "benchmarks": [{...}, ...], "learned": ..., "failed": ...}
+{"groups": [[{...}], [{...}, {...}], [{...}]], "context_length": [{...}, ...], "benchmark": [{...}, ...], "learned": [{...}, ...], "failed": [{...}, ...]}
 ```
 
 - `resources`: the exact resources of the instance the task ran on, in
@@ -304,17 +293,50 @@ mindful of which specific change was the root cause.
     [{"cpu": "192", "memory": "2048GB", "disk": "1000GB", "gpu": {"name": "H200", "memory": "141GB", "count": 8}}]
   ]
   ```
-- `context_length`: the largest context the trial's configuration handles,
-  found as described in `## Benchmark`; `null` only when the benchmark couldn't
-  be done at all.
-- `benchmarks`: one trial benchmark per value of `concurrency`, in that
-  order (see `## Benchmark` for the structure); `null` only when no benchmark
-  could be done at all.
-- `learned`: the major things this trial taught you that you did not know
-  before it ran. Required for every trial, including a failed one.
-- `failed`: `true` if the configuration never ran or the benchmark broke a
-  constraint such as `min_context_length`, or no sweep point met `max_ttft`;
-  absent otherwise. Breaching `max_ttft` at some points only is not a failure.
+- `context_length`: a list of the largest context lengths the trial's configuration
+  handles at each concurrency, found as described in `## Benchmark`. Use `null`
+  for a concurrency when the benchmark could not be done at that concurrency.
+
+  E.g. context lengths recorded for concurrency values 4 and 8:
+
+  ```
+  [
+    {"concurrency": 4, "value": 32768},
+    {"concurrency": 8, "value": 16384}
+  ]
+  ```
+- `benchmark`: a list of trial benchmark results (see `## Benchmark` for the
+  structure). Include a result for each concurrency at which the benchmark
+  completed. If the benchmark could not be done at a concurrency, omit its
+  result.
+- `learned`: a list of the major things this trial taught you at each concurrency
+  that you did not know before the trial ran. Required for every concurrency in
+  every trial, including failed ones.
+
+  E.g. observations recorded for concurrency values 4 and 8:
+
+  ```
+  [
+    {"concurrency": 4, "value": "The configuration handled the workload."},
+    {"concurrency": 8, "value": "Memory pressure reduced the supported context."}
+  ]
+  ```
+- `failed`: a list indicating whether the trial failed at each concurrency. Set
+  the value to `true` if the configuration did not run or the benchmark broke a
+  constraint such as `min_context_length` or `max_ttft` at that concurrency;
+  otherwise set it to `false`.
+
+  E.g. the result for concurrency 4 passed, while the result for concurrency 8
+  failed:
+
+  ```
+  [
+    {"concurrency": 4, "value": false},
+    {"concurrency": 8, "value": true}
+  ]
+  ```
+
+  A trial fails if `failed` is `true` for any concurrency.
 
 You're expected to do exactly `trials_num` trials (see `# Constraints`).
 
@@ -389,10 +411,9 @@ never part of the measured metrics.
 
 All verification and benchmark requests must succeed.
 
-Record every benchmark using the following structure and field names, one
-object per value of `concurrency` — trial benchmarks in
-`trials/<n>/trial.json.benchmarks`, the final benchmarks as
-`final_report.json.benchmarks` (values are illustrative):
+Record every benchmark using the following structure and field names —
+trial benchmarks in `trials/<n>/trial.json`, the final benchmark as
+`final_report.json.benchmark` (values are illustrative):
 
 ```json
 {
@@ -422,17 +443,17 @@ the numbers used to compare trials (see `## Performance`).
 
 Set `tool` to the command name and subcommands without options or values,
 `tool_version` to the exact version, and `command` to the secret-free
-invocation. For the final benchmarks, run each with streaming responses, one
+invocation. For the final benchmark, run each with streaming responses, one
 per value of `concurrency` from `constraints.json` with `workload.concurrency`
 set to that value, produce every field of the structure, and calculate all metrics from the
 `num_requests` measured requests only — exclude setup, health-check, and
 warmup requests. Never invent missing values.
 
-After each benchmark, find the largest context the configuration handles by
-sending real requests, and record it: for a trial, as the `context_length`
-field of `trials/<n>/trial.json`; for the final benchmark, as
-`final_report.json.context_length`. Stopping at the required minimum is not
-enough.
+After each benchmark, find the largest context the configuration handles at
+each concurrency by sending real requests, and record the results: for a trial, in the
+`context_length` list of `trials/<n>/trial.json`; for the final service, in
+the `final_report.json.context_length` list. Stopping at the required minimum
+is not enough.
 
 
 <!--?if previous-->
@@ -609,12 +630,12 @@ variable listed under `env` in `constraints.json`.
 Do not put secret values in `final_report.json`, or print
 them. Use env
 references in `final_report.json.service_yaml`; use environment variable names or redacted values in
-`final_report.json.benchmarks[].command`.
+`final_report.json.benchmark[].command`.
 
 # Final Report
 
 `final_report.json` may contain only `success`, `run_id`, `run_name`,
-`service_yaml`, `trial`, `base`, `model`, `context_length`, `benchmarks`,
+`service_yaml`, `trial`, `base`, `model`, `context_length`, `benchmark`,
 and `failure_summary`.
 
 On success (even if you had to pick a failed trial because no non-failed
@@ -627,10 +648,9 @@ trial remained), include exactly:
 - `trial`: the `<n>` of the verified trial
 - `base`: the base model repo, determined by the rules below
 - `model`: the exact repo/path loaded by the final service command
-- `context_length`: the largest context verified for the final service, as
-  described in `## Benchmark`
-- `benchmarks`: the final service benchmarks described in `## Benchmark`,
-  one per value of `concurrency`
+- `context_length`: the largest context lengths verified for the final service,
+  as described in `## Benchmark`
+- `benchmark`: the final service benchmark described in `## Benchmark`
 
 Set `final_report.json.base` as follows:
 
