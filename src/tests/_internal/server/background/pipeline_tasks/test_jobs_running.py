@@ -46,7 +46,6 @@ from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     JOB_DISCONNECTED_RETRY_TIMEOUT,
     MAX_DURATION_ENFORCEMENT_GRACE,
-    ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS,
     JobRunningFetcher,
     JobRunningPipeline,
     JobRunningPipelineItem,
@@ -61,7 +60,6 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     _referenced_ips_ready,
     _should_wait_for_replica_provisioning,
     _SubmitJobToRunnerResult,
-    _terminate_if_router_unavailable,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
 from dstack._internal.server.models import JobModel, ProbeModel, ServiceReplicaRegistrationModel
@@ -76,7 +74,6 @@ from dstack._internal.server.schemas.runner import (
 from dstack._internal.server.services.jobs import server_connection
 from dstack._internal.server.services.jobs.server_connection import job_server_connections_pool
 from dstack._internal.server.services.runner.client import RunnerClient, ShimClient
-from dstack._internal.server.services.runs.replicas import RouterEnvStatus
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
     clear_events,
@@ -3354,142 +3351,6 @@ def _replica_ip_refs_service_configuration() -> ServiceConfiguration:
     )
 
 
-def _make_router_worker_context(*, submitted_at: datetime) -> _ProcessContext:
-    job_model = MagicMock()
-    job_model.submitted_at = submitted_at
-    job = MagicMock()
-    job.job_spec.replica_num = 0
-    run = MagicMock()
-    run.jobs = []
-    run.run_spec = MagicMock()
-    return _ProcessContext(
-        job_model=job_model,
-        run_model=MagicMock(),
-        run=run,
-        job=job,
-        job_submission=MagicMock(job_runtime_data=None),
-        job_provisioning_data=MagicMock(),
-        instance_access_revoked=False,
-    )
-
-
-class TestTerminateIfRouterUnavailable:
-    def test_router_failed_terminates_worker(self):
-        context = _make_router_worker_context(
-            submitted_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-        )
-        result = _ProcessResult()
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-            return_value=RouterEnvStatus.FAILED,
-        ):
-            assert _terminate_if_router_unavailable(context=context, result=result)
-        assert (
-            result.job_update_map.get("termination_reason")
-            == JobTerminationReason.TERMINATED_BY_SERVER
-        )
-        assert "Router replica is in a terminal state" in (
-            result.job_update_map.get("termination_reason_message") or ""
-        )
-
-    @time_machine.travel(datetime(2023, 1, 1, 12, tzinfo=timezone.utc), tick=False)
-    def test_router_not_provisioned_within_timeout_does_not_terminate(self):
-        context = _make_router_worker_context(
-            submitted_at=datetime(2023, 1, 1, 11, 45, 0, tzinfo=timezone.utc),
-        )
-        result = _ProcessResult()
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-            return_value=RouterEnvStatus.NOT_PROVISIONED,
-        ):
-            assert not _terminate_if_router_unavailable(context=context, result=result)
-        assert result.job_update_map == {}
-
-    @time_machine.travel(datetime(2023, 1, 1, 12, tzinfo=timezone.utc), tick=False)
-    def test_router_not_provisioned_past_timeout_terminates(self):
-        context = _make_router_worker_context(
-            submitted_at=datetime(2023, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
-        )
-        result = _ProcessResult()
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-            return_value=RouterEnvStatus.NOT_PROVISIONED,
-        ):
-            assert _terminate_if_router_unavailable(context=context, result=result)
-        assert (
-            result.job_update_map.get("termination_reason")
-            == JobTerminationReason.TERMINATED_BY_SERVER
-        )
-        msg = result.job_update_map.get("termination_reason_message") or ""
-        assert str(ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS) in msg
-        assert "internal IP" in msg
-
-
-@pytest.mark.asyncio
-class TestPrepareRunnerSubmissionRouterEnv:
-    @time_machine.travel(datetime(2023, 1, 1, 12, tzinfo=timezone.utc), tick=False)
-    async def test_router_not_provisioned_waits(self):
-        context = _make_router_worker_context(
-            submitted_at=datetime(2023, 1, 1, 11, 45, 0, tzinfo=timezone.utc),
-        )
-        result = _ProcessResult()
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-            return_value=RouterEnvStatus.NOT_PROVISIONED,
-        ):
-            out = await _prepare_runner_submission(context=context, result=result)
-        assert out is None
-        assert result.job_update_map == {}
-
-    async def test_router_env_dict_populates_submission_context(self):
-        context = _make_router_worker_context(
-            submitted_at=datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-        )
-        result = _ProcessResult()
-        router_env = {"DSTACK_ROUTER_INTERNAL_IP": "10.1.2.3"}
-
-        @asynccontextmanager
-        async def _fake_session_ctx():
-            yield MagicMock()
-
-        with (
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-                return_value=router_env,
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_session_ctx",
-                _fake_session_ctx,
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_repo_creds",
-                new_callable=AsyncMock,
-                return_value=None,
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_project_secrets_mapping",
-                new_callable=AsyncMock,
-                return_value={},
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.repo_model_to_repo_head_with_creds",
-                return_value=MagicMock(repo_creds=None),
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.interpolate_job_spec_secrets",
-            ),
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running._get_cluster_info",
-                return_value=ClusterInfo(
-                    job_ips=["10.0.0.1"], master_job_ip="10.0.0.1", gpus_per_job=0
-                ),
-            ),
-        ):
-            out = await _prepare_runner_submission(context=context, result=result)
-        assert out is not None
-        assert out.router_env == router_env
-
-
 @pytest.mark.asyncio
 class TestPrepareRunnerSubmissionClusterWait:
     def _make_context(self) -> _ProcessContext:
@@ -3561,10 +3422,6 @@ class TestPrepareRunnerSubmissionGroupsIpWait:
             yield MagicMock()
 
         return (
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-                return_value=None,
-            ),
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running.get_session_ctx",
                 _fake_session_ctx,
@@ -3754,10 +3611,6 @@ class TestPrepareRunnerSubmissionReplicaIpWait:
 
         return (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.jobs_running.get_router_env_for_job",
-                return_value=None,
-            ),
-            patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running.get_session_ctx",
                 _fake_session_ctx,
             ),
@@ -3830,80 +3683,7 @@ class TestPrepareRunnerSubmissionReplicaIpWait:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-class TestFetchRunModelDynamoBranch:
-    async def test_dynamo_run_loads_all_non_terminated_replicas(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        run_spec = get_run_spec(
-            repo_id=repo.name,
-            configuration=_router_service_configuration("dynamo"),
-        )
-        run = await create_run(
-            session=session, project=project, repo=repo, user=user, run_spec=run_spec
-        )
-        await create_job(
-            session=session,
-            run=run,
-            replica_num=0,
-            status=JobStatus.PROVISIONING,
-        )
-        await create_job(
-            session=session,
-            run=run,
-            replica_num=1,
-            status=JobStatus.PROVISIONING,
-        )
-        run_id = run.id
-        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
-        await session.commit()
-        session.expire_all()
-        run_model = await _fetch_run_model(
-            session=session,
-            run_id=run_id,
-            replica_num=0,
-            run_spec=parsed,
-        )
-        assert {j.replica_num for j in run_model.jobs} == {0, 1}
-
-    async def test_non_dynamo_loads_only_own_replica(self, test_db, session: AsyncSession):
-        """Without a Dynamo router, eager-load only the worker replica's jobs."""
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        run_spec = get_run_spec(
-            repo_id=repo.name,
-            configuration=_router_service_configuration("smg"),
-        )
-        run = await create_run(
-            session=session, project=project, repo=repo, user=user, run_spec=run_spec
-        )
-        await create_job(
-            session=session,
-            run=run,
-            replica_num=0,
-            status=JobStatus.PROVISIONING,
-        )
-        await create_job(
-            session=session,
-            run=run,
-            replica_num=1,
-            status=JobStatus.PROVISIONING,
-        )
-        run_id = run.id
-        parsed = validate_json_extra_ignore(RunSpec, get_or_error(run.run_spec))
-        await session.commit()
-        session.expire_all()
-        run_model = await _fetch_run_model(
-            session=session,
-            run_id=run_id,
-            replica_num=0,
-            run_spec=parsed,
-        )
-        assert {j.replica_num for j in run_model.jobs} == {0}
-
+class TestFetchRunModel:
     async def test_smg_with_replica_ip_refs_loads_all_replicas(
         self, test_db, session: AsyncSession
     ):

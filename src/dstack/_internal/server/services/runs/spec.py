@@ -439,20 +439,14 @@ def _check_dynamo_in_place_update_compatibility(
     for field in _router_affecting_top_level_fields:
         if getattr(current_cfg, field, None) != getattr(new_cfg, field, None):
             raise ServerClientError(
-                f"Cannot change top-level `{field}` in place when the "
-                f"service has a Dynamo router (would re-provision the "
-                f"router and invalidate workers' cached "
-                f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
-                f"`dstack stop` and re-apply."
+                f"Cannot change top-level `{field}` in place when the service has a Dynamo router."
+                f" Stop the run with `dstack stop` and re-apply."
             )
     for field in _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get("service", []):
         if getattr(current_run_spec, field, None) != getattr(new_run_spec, field, None):
             raise ServerClientError(
-                f"Cannot change top-level `{field}` in place when the "
-                f"service has a Dynamo router (would re-provision the "
-                f"router and invalidate workers' cached "
-                f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
-                f"`dstack stop` and re-apply."
+                f"Cannot change top-level `{field}` in place when the service has a Dynamo router."
+                f" Stop the run with `dstack stop` and re-apply."
             )
 
 
