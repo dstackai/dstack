@@ -1,8 +1,14 @@
+import asyncio
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from dstack._internal.proxy.gateway.app import lifespan, make_app
+from dstack._internal.proxy.gateway.app import (
+    lifespan,
+    make_app,
+    renew_certificates_periodically,
+)
 from dstack._internal.proxy.gateway.models import ModelEntrypoint
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import Nginx
@@ -32,3 +38,14 @@ async def test_lifespan(tmp_path: Path, system_mocks: Mocks) -> None:
         assert system_mocks.open_conn.call_count == 1
         assert system_mocks.close_conn.call_count == 0
     assert system_mocks.close_conn.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_renews_certificates_periodically_despite_errors() -> None:
+    nginx = Mock(renew_certificates=AsyncMock(side_effect=[RuntimeError("certbot failed"), None]))
+    # The first delay, then one after each of the two renewals; stop at the third
+    sleep = AsyncMock(side_effect=[None, None, asyncio.CancelledError()])
+    with patch("dstack._internal.proxy.gateway.app.asyncio.sleep", sleep):
+        with pytest.raises(asyncio.CancelledError):
+            await renew_certificates_periodically(nginx)
+    assert nginx.renew_certificates.await_count == 2
