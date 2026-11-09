@@ -28,9 +28,9 @@ Exceptions are noted in the sections below.
 
 Support for [exports](../concepts/exports.md) and the global `Events` page has moved from the open-source version to [dstack Sky](https://dstack.ai/products/sky/) and [dstack Factory](https://dstack.ai/products/factory/). The `dstack event` CLI command and the `Events` tabs on resource pages remain available in the open-source version.
 
-### Deprecations
+### `DSTACK_ROUTER_INTERNAL_IP`
 
-The `DSTACK_ROUTER_INTERNAL_IP` environment variable is deprecated in favor of [`${{ groups[i].replicas[j].IP_ADDRESS }}`](../concepts/services.md#replica-groups).
+Starting with `0.22.8`, `dstack` no longer sets the `DSTACK_ROUTER_INTERNAL_IP` environment variable. Use [`${{ groups[i].replicas[j].IP_ADDRESS }}`](../concepts/services.md#replica-groups) instead, e.g. to point Dynamo workers at a dedicated `etcd` replica group as shown in the [NVIDIA Dynamo example](../examples/inference/dynamo.md).
 
 ## 0.21.* { #0_21 }
 
